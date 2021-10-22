@@ -309,9 +309,5 @@ public:
                              RecordStore* rs) const {
         MONGO_UNREACHABLE;
     }
-    void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    std::unique_ptr<TemporaryRecordStore> rs) const {
-        MONGO_UNREACHABLE;
-    }
 };
 }  // namespace mongo

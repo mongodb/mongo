@@ -69,9 +69,8 @@ DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                             << _indexCatalogEntry->descriptor());
 }
 
-void DuplicateKeyTracker::finalizeTemporaryTable(OperationContext* opCtx,
-                                                 TemporaryRecordStore::FinalizationAction action) {
-    _keyConstraintsTable->finalizeTemporaryTable(opCtx, action);
+void DuplicateKeyTracker::keepTemporaryTable() {
+    _keyConstraintsTable->keep();
 }
 
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::Value& key) {

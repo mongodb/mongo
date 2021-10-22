@@ -38,7 +38,6 @@ namespace mongo {
  */
 class StorageEngineMock : public StorageEngine {
 public:
-    void finishInit() final {}
     RecoveryUnit* newRecoveryUnit() final {
         return nullptr;
     }
@@ -170,6 +169,8 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}
+    void startDropPendingIdentReaper() final {}
+
     void checkpoint() final {}
 
     int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) final {

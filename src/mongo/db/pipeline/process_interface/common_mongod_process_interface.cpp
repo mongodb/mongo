@@ -710,12 +710,4 @@ void CommonMongodProcessInterface::truncateRecordStore(
     });
 }
 
-void CommonMongodProcessInterface::deleteTemporaryRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::unique_ptr<TemporaryRecordStore> rs) const {
-    assertIgnorePrepareConflictsBehavior(expCtx);
-    AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
-    rs->finalizeTemporaryTable(expCtx->opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-}
-
 }  // namespace mongo

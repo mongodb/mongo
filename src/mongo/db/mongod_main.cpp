@@ -734,6 +734,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             OldClientContext ctx(startupOpCtx.get(), NamespaceString::kRsOplogNamespace.ns());
             tenant_migration_util::createOplogViewForTenantMigrations(startupOpCtx.get(), ctx.db());
         }
+
+        storageEngine->startDropPendingIdentReaper();
     }
 
     startClientCursorMonitor();

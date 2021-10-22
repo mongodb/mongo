@@ -85,8 +85,6 @@ public:
      */
     void finalize() {
         if (_diskCache) {
-            _expCtx->mongoProcessInterface->deleteTemporaryRecordStore(_expCtx,
-                                                                       std::move(_diskCache));
             _diskCache = nullptr;
         }
         _memCache.clear();

@@ -36,6 +36,7 @@
 #include <algorithm>
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
@@ -109,26 +110,28 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     for (auto& timestampAndIdentInfo : toDrop) {
         // Guards against catalog changes while dropping idents using KVEngine::dropIdent(). Yields
         // after dropping each ident.
-        Lock::GlobalLock globalLock(opCtx, MODE_IX);
+        writeConflictRetry(opCtx, "dropIdentsOlderThan", "", [&] {
+            Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
-        const auto& dropTimestamp = timestampAndIdentInfo.first;
-        auto& identInfo = timestampAndIdentInfo.second;
-        const auto& identName = identInfo.identName;
-        LOGV2(22237,
-              "Completing drop for ident",
-              "ident"_attr = identName,
-              "dropTimestamp"_attr = dropTimestamp);
-        WriteUnitOfWork wuow(opCtx);
-        auto status =
-            _engine->dropIdent(opCtx->recoveryUnit(), identName, std::move(identInfo.onDrop));
-        if (!status.isOK()) {
-            LOGV2_FATAL_NOTRACE(51022,
-                                "Failed to remove drop-pending ident",
-                                "ident"_attr = identName,
-                                "dropTimestamp"_attr = dropTimestamp,
-                                "error"_attr = status);
-        }
-        wuow.commit();
+            const auto& dropTimestamp = timestampAndIdentInfo.first;
+            auto& identInfo = timestampAndIdentInfo.second;
+            const auto& identName = identInfo.identName;
+            LOGV2(22237,
+                  "Completing drop for ident",
+                  "ident"_attr = identName,
+                  "dropTimestamp"_attr = dropTimestamp);
+            WriteUnitOfWork wuow(opCtx);
+            auto status =
+                _engine->dropIdent(opCtx->recoveryUnit(), identName, std::move(identInfo.onDrop));
+            if (!status.isOK()) {
+                LOGV2_FATAL_NOTRACE(51022,
+                                    "Failed to remove drop-pending ident",
+                                    "ident"_attr = identName,
+                                    "dropTimestamp"_attr = dropTimestamp,
+                                    "error"_attr = status);
+            }
+            wuow.commit();
+        });
     }
 
     {

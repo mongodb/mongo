@@ -515,13 +515,6 @@ public:
      */
     virtual void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      RecordStore* rs) const = 0;
-
-    /**
-     * Takes ownership of and deletes the record store `rs`. It is invalid to perform more
-     * operations on `rs` after this has been called.
-     */
-    virtual void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            std::unique_ptr<TemporaryRecordStore> rs) const = 0;
 };
 
 }  // namespace mongo

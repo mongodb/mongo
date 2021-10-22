@@ -120,9 +120,6 @@ public:
     void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              RecordStore* rs) const final;
 
-    void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    std::unique_ptr<TemporaryRecordStore> rs) const final;
-
 protected:
     BSONObj getCollectionOptionsLocally(OperationContext* opCtx, const NamespaceString& nss);
 

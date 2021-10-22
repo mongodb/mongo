@@ -34,27 +34,25 @@
 namespace mongo {
 
 /**
- * Manages the lifetime of a temporary RecordStore.
- *
- * Derived classes must implement and call finalizeTemporaryTable() before destruction to delete
- * the underlying RecordStore from the storage engine or to keep the underlying RecordStore.
+ * Manages the lifetime of a temporary RecordStore. Unless keep() is called, the managed RecordStore
+ * will be dropped after destruction.
  */
 class TemporaryRecordStore {
 public:
-    enum class FinalizationAction { kDelete, kKeep };
-
-    TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)) {}
+    TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)){};
+    virtual ~TemporaryRecordStore() {}
 
     // Not copyable.
     TemporaryRecordStore(const TemporaryRecordStore&) = delete;
     TemporaryRecordStore& operator=(const TemporaryRecordStore&) = delete;
 
     // Move constructor.
-    TemporaryRecordStore(TemporaryRecordStore&& other) noexcept : _rs(std::move(other._rs)) {}
+    TemporaryRecordStore(TemporaryRecordStore&& other) = default;
 
-    virtual ~TemporaryRecordStore() {}
-
-    virtual void finalizeTemporaryTable(OperationContext* opCtx, FinalizationAction action) {}
+    // If called, the RecordStore will not be dropped when the TemporaryRecordStore is destructed.
+    void keep() {
+        _keep = true;
+    }
 
     RecordStore* rs() {
         return _rs.get();
@@ -66,5 +64,6 @@ public:
 
 protected:
     std::unique_ptr<RecordStore> _rs;
+    bool _keep = false;
 };
 }  // namespace mongo

@@ -53,25 +53,22 @@ class DuplicateKeyTracker {
 public:
     /**
      * Creates a temporary table in which to store any duplicate key constraint violations.
-     * finalizeTemporaryTable() must be called before destruction.
      */
     DuplicateKeyTracker(OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry);
 
     /**
      * Finds the temporary table associated with storing any duplicate key constraint violations for
      * this index build. Only used when resuming an index build and the temporary table already
-     * exists on disk. finalizeTemporaryTable() must be called before destruction.
+     * exists on disk.
      */
     DuplicateKeyTracker(OperationContext* opCtx,
                         const IndexCatalogEntry* indexCatalogEntry,
                         StringData ident);
 
     /**
-     * Deletes or keeps the temporary table for the duplicate key constraint violations. Must be
-     * called before object destruction.
+     * Keeps the temporary table for the duplicate key constraint violations.
      */
-    void finalizeTemporaryTable(OperationContext* opCtx,
-                                TemporaryRecordStore::FinalizationAction action);
+    void keepTemporaryTable();
 
     /**
      * Given a duplicate key, insert it into the key constraint table.

@@ -278,10 +278,6 @@ public:
                              RecordStore* rs) const final {
         MONGO_UNREACHABLE;
     }
-    void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    std::unique_ptr<TemporaryRecordStore> rs) const final {
-        MONGO_UNREACHABLE;
-    }
 
 protected:
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,

@@ -169,7 +169,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         storageEngineChangeContext->changeStorageEngine(
             service, std::move(token), std::move(storageEngine));
     }
-    service->getStorageEngine()->finishInit();
 
     if (lockFile) {
         uassertStatusOK(lockFile->writePid());

@@ -32,10 +32,10 @@
 #include <unordered_map>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/record_store.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -89,10 +89,6 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
-protected:
-    void doDetachFromOperationContext() override;
-    void doAttachToOperationContext(OperationContext* opCtx) override;
-
 private:
     void makeTemporaryRecordStore();
 
@@ -141,7 +137,7 @@ private:
     bool _childOpened{false};
 
     // Used when spilling to disk.
-    std::unique_ptr<RecordStore> _recordStore;
+    std::unique_ptr<TemporaryRecordStore> _recordStore;
 };
 
 }  // namespace sbe

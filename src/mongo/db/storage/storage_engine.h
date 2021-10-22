@@ -176,13 +176,6 @@ public:
     virtual ~StorageEngine() {}
 
     /**
-     * Called after the globalStorageEngine pointer has been set up, before any other methods
-     * are called. Any initialization work that requires the ability to create OperationContexts
-     * should be done here rather than in the constructor.
-     */
-    virtual void finishInit() = 0;
-
-    /**
      * During the startup process, the storage engine is one of the first components to be started
      * up and fully initialized. But that fully initialized storage engine may not be recognized as
      * the end for the remaining storage startup tasks that still need to be performed.
@@ -476,6 +469,11 @@ public:
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
                                      std::shared_ptr<Ident> ident,
                                      DropIdentCallback&& onDrop = nullptr) = 0;
+
+    /**
+     * Periodically drop idents queued by addDropPendingIdent.
+     */
+    virtual void startDropPendingIdentReaper() = 0;
 
     /**
      * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The

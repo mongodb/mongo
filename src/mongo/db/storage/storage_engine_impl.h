@@ -68,8 +68,6 @@ public:
 
     virtual ~StorageEngineImpl();
 
-    virtual void finishInit() override;
-
     virtual void notifyStartupComplete() override;
 
     virtual RecoveryUnit* newRecoveryUnit() override;
@@ -267,6 +265,11 @@ public:
          */
         void addListener_forTestOnly(TimestampListener* listener);
 
+        /**
+         * Remove a listener.
+         */
+        void removeListener_forTestOnly(TimestampListener* listener);
+
         bool isRunning_forTestOnly() const {
             return _running;
         }
@@ -310,6 +313,8 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) override;
+
+    void startDropPendingIdentReaper() override;
 
     void checkpoint() override;
 

@@ -66,9 +66,6 @@ public:
      * Creates a temporary table for writes during an index build. Additionally creates a temporary
      * table to store any duplicate key constraint violations found during the build, if the index
      * being built has uniqueness constraints.
-     *
-     * finalizeTemporaryTables() must be called before destruction to delete or keep the temporary
-     * tables.
      */
     IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
 
@@ -77,8 +74,6 @@ public:
      * Only used when resuming an index build and the temporary table already exists on disk.
      * Additionally will find the temporary table associated with storing duplicate key constraint
      * violations found during the build, if the index being built has uniqueness constraints.
-     *
-     * finalizeTemporaryTable() must be called before destruction.
      */
     IndexBuildInterceptor(OperationContext* opCtx,
                           IndexCatalogEntry* entry,
@@ -87,11 +82,9 @@ public:
                           boost::optional<StringData> skippedRecordTrackerIdent);
 
     /**
-     * Deletes or keeps the temporary side writes and duplicate key constraint violations tables.
-     * Must be called before object destruction.
+     * Keeps the temporary side writes and duplicate key constraint violations tables.
      */
-    void finalizeTemporaryTables(OperationContext* opCtx,
-                                 TemporaryRecordStore::FinalizationAction action);
+    void keepTemporaryTables();
 
     /**
      * Client writes that are concurrent with an index build will have their index updates written

@@ -94,12 +94,6 @@ public:
         tassert(5643015, "Unable to clear record store", status.isOK());
         wuow.commit();
     }
-    void deleteTemporaryRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    std::unique_ptr<TemporaryRecordStore> rs) const override {
-        AutoGetCollection autoColl(expCtx->opCtx, expCtx->ns, MODE_IX);
-        rs->finalizeTemporaryTable(expCtx->opCtx,
-                                   TemporaryRecordStore::FinalizationAction::kDelete);
-    }
 };
 
 class SpillableCacheTest : public AggregationMongoDContextFixture {

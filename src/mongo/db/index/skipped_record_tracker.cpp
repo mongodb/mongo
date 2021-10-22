@@ -60,10 +60,9 @@ SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
             opCtx, ident.get());
 }
 
-void SkippedRecordTracker::finalizeTemporaryTable(OperationContext* opCtx,
-                                                  TemporaryRecordStore::FinalizationAction action) {
+void SkippedRecordTracker::keepTemporaryTable() {
     if (_skippedRecordsTable) {
-        _skippedRecordsTable->finalizeTemporaryTable(opCtx, action);
+        _skippedRecordsTable->keep();
     }
 }
 

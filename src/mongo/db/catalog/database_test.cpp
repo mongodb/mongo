@@ -317,8 +317,6 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             WriteUnitOfWork wuow(opCtx);
             indexBuildBlock->success(opCtx, collection);
             wuow.commit();
-            indexBuildBlock->finalizeTemporaryTables(
-                opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
         });
 
         ASSERT_GREATER_THAN(indexCatalog->numIndexesInProgress(opCtx), 0);

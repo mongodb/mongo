@@ -50,13 +50,9 @@ public:
     ~IndexBuildBlock();
 
     /**
-     * Must be called before the object is destructed if init() has been called.
-     * Cleans up or keeps the temporary tables that are created for an index build.
-     *
-     * Being called in a 'WriteUnitOfWork' has no effect.
+     * Prevent any temporary tables from being dropped when this IndexBuildBlock is destructed.
      */
-    void finalizeTemporaryTables(OperationContext* opCtx,
-                                 TemporaryRecordStore::FinalizationAction action);
+    void keepTemporaryTables();
 
     /**
      * Initializes a new entry for the index in the IndexCatalog.

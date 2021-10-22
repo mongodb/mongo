@@ -59,11 +59,10 @@ public:
     void record(OperationContext* opCtx, const RecordId& recordId);
 
     /**
-     * Deletes or keeps the temporary table managed by this tracker. This call is required, and is
-     * a no-op when the table is empty or has not yet been initialized.
+     * Keeps the temporary table managed by this tracker. This is a no-op when the table is empty or
+     * has not yet been initialized.
      */
-    void finalizeTemporaryTable(OperationContext* opCtx,
-                                TemporaryRecordStore::FinalizationAction action);
+    void keepTemporaryTable();
 
     /**
      * Returns true if the temporary table is empty.
@@ -84,8 +83,7 @@ public:
 private:
     IndexCatalogEntry* _indexCatalogEntry;
 
-    // This temporary record store is owned by the duplicate key tracker and should be dropped or
-    // kept along with it with a call to finalizeTemporaryTable().
+    // This temporary record store is owned by the duplicate key tracker.
     std::unique_ptr<TemporaryRecordStore> _skippedRecordsTable;
 
     AtomicWord<std::uint32_t> _skippedRecordCounter{0};

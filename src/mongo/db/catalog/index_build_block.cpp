@@ -60,10 +60,9 @@ IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  boost::optional<UUID> indexBuildUUID)
     : _nss(nss), _spec(spec.getOwned()), _method(method), _buildUUID(indexBuildUUID) {}
 
-void IndexBuildBlock::finalizeTemporaryTables(OperationContext* opCtx,
-                                              TemporaryRecordStore::FinalizationAction action) {
+void IndexBuildBlock::keepTemporaryTables() {
     if (_indexBuildInterceptor) {
-        _indexBuildInterceptor->finalizeTemporaryTables(opCtx, action);
+        _indexBuildInterceptor->keepTemporaryTables();
     }
 }
 

@@ -144,17 +144,6 @@ void assertIgnoreConflictsWriteBehavior(OperationContext* opCtx) {
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
 }  // namespace
-void HashAggStage::doDetachFromOperationContext() {
-    if (_recordStore) {
-        _recordStore->doDetachFromOperationContext();
-    }
-}
-
-void HashAggStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_recordStore) {
-        _recordStore->doAttachToOperationContext(opCtx);
-    }
-}
 
 void HashAggStage::makeTemporaryRecordStore() {
     tassert(
@@ -165,10 +154,8 @@ void HashAggStage::makeTemporaryRecordStore() {
             "No storage engine so HashAggStage cannot spill to disk",
             _opCtx->getServiceContext()->getStorageEngine());
     assertIgnoreConflictsWriteBehavior(_opCtx);
-    _recordStore = std::make_unique<RecordStore>(
-        _opCtx,
-        _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-            _opCtx, KeyFormat::String));
+    _recordStore = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
+        _opCtx, KeyFormat::String);
 }
 
 void HashAggStage::open(bool reOpen) {
@@ -277,8 +264,6 @@ PlanState HashAggStage::getNext() {
     if (_htIt == _ht->end()) {
         if (_recordStore && _seekKeysAccessors.empty()) {
             // A record store was created to spill to disk. Clean it up.
-            assertIgnoreConflictsWriteBehavior(_opCtx);
-            _recordStore->deleteTemporaryRecordStoreIfLock();
             _recordStore.reset();
         }
         return trackPlanState(PlanState::IS_EOF);
@@ -318,8 +303,6 @@ void HashAggStage::close() {
     _ht = boost::none;
     if (_recordStore) {
         // A record store was created to spill to disk. Clean it up.
-        assertIgnoreConflictsWriteBehavior(_opCtx);
-        _recordStore->deleteTemporaryRecordStoreIfLock();
         _recordStore.reset();
     }
 

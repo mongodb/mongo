@@ -51,6 +51,7 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/future.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
@@ -131,8 +132,6 @@ TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
 
     // The storage engine is responsible for dropping its temporary idents.
     ASSERT(!identExists(opCtx.get(), ident));
-
-    rs->finalizeTemporaryTable(opCtx.get(), TemporaryRecordStore::FinalizationAction::kDelete);
 }
 
 TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
@@ -157,28 +156,65 @@ TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
     } else {
         ASSERT_FALSE(identExists(opCtx.get(), ident));
     }
-
-    rs->finalizeTemporaryTable(opCtx.get(), TemporaryRecordStore::FinalizationAction::kDelete);
 }
 
-TEST_F(StorageEngineTest, TemporaryDropsItself) {
-    auto opCtx = cc().makeOperationContext();
+class StorageEngineTimestampMonitorTest : public StorageEngineTest {
+public:
+    void setUp() {
+        StorageEngineTest::setUp();
+        _storageEngine->startDropPendingIdentReaper();
+    }
 
-    Lock::GlobalLock lk(&*opCtx, MODE_IS);
+    void waitForTimestampMonitorPass() {
+        auto timestampMonitor =
+            dynamic_cast<StorageEngineImpl*>(_storageEngine)->getTimestampMonitor();
+        using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
+        using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
+        auto pf = makePromiseFuture<void>();
+        auto listener =
+            TimestampListener(TimestampType::kOldest, [promise = &pf.promise](Timestamp t) mutable {
+                promise->emplaceValue();
+            });
+        timestampMonitor->addListener_forTestOnly(&listener);
+        pf.future.wait();
+        timestampMonitor->removeListener_forTestOnly(&listener);
+    }
+};
+
+TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreEventuallyDropped) {
+    auto opCtx = cc().makeOperationContext();
 
     std::string ident;
     {
-        auto rs = makeTemporary(opCtx.get());
-        ASSERT(rs.get());
-        ident = rs->rs()->getIdent();
+        auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), KeyFormat::Long);
+        ASSERT(tempRs.get());
+        ident = tempRs->rs()->getIdent();
 
         ASSERT(identExists(opCtx.get(), ident));
-
-        rs->finalizeTemporaryTable(opCtx.get(), TemporaryRecordStore::FinalizationAction::kDelete);
     }
 
-    // The temporary record store RAII class should drop itself.
+    // The temporary record store RAII object should queue itself to be dropped by the storage
+    // engine eventually.
+    waitForTimestampMonitorPass();
     ASSERT(!identExists(opCtx.get(), ident));
+}
+
+TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
+    auto opCtx = cc().makeOperationContext();
+
+    std::string ident;
+    {
+        auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), KeyFormat::Long);
+        ASSERT(tempRs.get());
+        ident = tempRs->rs()->getIdent();
+
+        ASSERT(identExists(opCtx.get(), ident));
+        tempRs->keep();
+    }
+
+    // The ident for the record store should still exist even after a pass of the timestamp monitor.
+    waitForTimestampMonitorPass();
+    ASSERT(identExists(opCtx.get(), ident));
 }
 
 TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
@@ -488,7 +524,7 @@ public:
                                      /*lockFileCreatedByUncleanShutdown=*/false};
         _storageEngine = std::make_unique<StorageEngineImpl>(
             opCtx.get(), std::make_unique<TimestampMockKVEngine>(), options);
-        _storageEngine->finishInit();
+        _storageEngine->startDropPendingIdentReaper();
     }
 
     void tearDown() {
@@ -645,6 +681,5 @@ TEST_F(StorageEngineDurableTest, UseAlternateStorageLocation) {
     ASSERT_TRUE(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 }
-
 }  // namespace
 }  // namespace mongo

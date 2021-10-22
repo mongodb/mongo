@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-#include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/deferred_drop_record_store.h"
+
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/logv2/log.h"
+
 
 namespace mongo {
-
-class KVEngine;
-class OperationContext;
-
-/**
- * Implementation of TemporaryRecordStore that manages a temporary RecordStore on a KVEngine.
- */
-class TemporaryKVRecordStore : public TemporaryRecordStore {
-public:
-    TemporaryKVRecordStore(KVEngine* kvEngine, std::unique_ptr<RecordStore> rs)
-        : TemporaryRecordStore(std::move(rs)), _kvEngine(kvEngine){};
-
-    // Not copyable.
-    TemporaryKVRecordStore(const TemporaryKVRecordStore&) = delete;
-    TemporaryKVRecordStore& operator=(const TemporaryKVRecordStore&) = delete;
-
-    // Move constructor.
-    TemporaryKVRecordStore(TemporaryKVRecordStore&& other) noexcept
-        : TemporaryRecordStore(std::move(other._rs)), _kvEngine(other._kvEngine) {}
-
-    ~TemporaryKVRecordStore();
-
-    /**
-     * When called with kDelete, drops the persisted record store from the storage engine. When
-     * called with kKeep, keeps the persisted record store; this should be used for temporary
-     * tables that need to be be kept across shutdown.
-     */
-    void finalizeTemporaryTable(OperationContext* opCtx, FinalizationAction action);
-
-private:
-    KVEngine* _kvEngine;
-    bool _recordStoreHasBeenFinalized = false;
-};
-
+DeferredDropRecordStore::~DeferredDropRecordStore() {
+    if (_keep) {
+        return;
+    }
+    try {
+        _storageEngine->addDropPendingIdent(
+            Timestamp::min(), std::make_shared<Ident>(_rs->getIdent()), nullptr);
+    } catch (...) {
+        LOGV2_WARNING(6063900,
+                      "Caught exception deferring drop for temporary record store",
+                      "ident"_attr = _rs->getIdent(),
+                      "error"_attr = exceptionToStatus());
+    }
+}
 }  // namespace mongo

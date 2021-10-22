@@ -374,13 +374,15 @@ public:
      * Methods to access the storage engine's timestamps.
      */
     virtual Timestamp getCheckpointTimestamp() const {
-        MONGO_UNREACHABLE;
+        return Timestamp();
     }
 
-    virtual Timestamp getOldestTimestamp() const = 0;
+    virtual Timestamp getOldestTimestamp() const {
+        return Timestamp();
+    }
 
     virtual Timestamp getStableTimestamp() const {
-        MONGO_UNREACHABLE;
+        return Timestamp();
     }
 
     virtual StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,

@@ -2033,13 +2033,6 @@ public:
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
-
-                {
-                    WriteUnitOfWork wunit(&_opCtx);
-                    interceptor->finalizeTemporaryTables(
-                        &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-                    wunit.commit();
-                }
             }
 
             // Removing an index entry without removing the document should cause us to have a
@@ -2589,13 +2582,6 @@ public:
                 }
 
                 ASSERT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
-
-                {
-                    WriteUnitOfWork wunit(&_opCtx);
-                    interceptor->finalizeTemporaryTables(
-                        &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-                    wunit.commit();
-                }
             }
 
             // Insert the key on "a".
@@ -2643,13 +2629,6 @@ public:
                 }
 
                 ASSERT_NOT_OK(interceptor->checkDuplicateKeyConstraints(&_opCtx));
-
-                {
-                    WriteUnitOfWork wunit(&_opCtx);
-                    interceptor->finalizeTemporaryTables(
-                        &_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-                    wunit.commit();
-                }
             }
 
             releaseDb();

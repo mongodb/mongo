@@ -43,10 +43,10 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/deferred_drop_record_store.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/kv/temporary_kv_record_store.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
@@ -742,13 +742,17 @@ void StorageEngineImpl::cleanShutdown() {
 
 StorageEngineImpl::~StorageEngineImpl() {}
 
-void StorageEngineImpl::finishInit() {
-    if (_engine->supportsRecoveryTimestamp()) {
-        _timestampMonitor =
-            std::make_unique<TimestampMonitor>(_engine.get(),
-                                               &_minOfCheckpointAndOldestTimestampListener,
-                                               getGlobalServiceContext()->getPeriodicRunner());
+void StorageEngineImpl::startDropPendingIdentReaper() {
+    if (storageGlobalParams.readOnly) {
+        return;
     }
+    // Unless explicitly disabled, all storage engines should create a TimestampMonitor for
+    // drop-pending internal idents, even if they do not support pending drops for collections
+    // and indexes.
+    _timestampMonitor =
+        std::make_unique<TimestampMonitor>(_engine.get(),
+                                           &_minOfCheckpointAndOldestTimestampListener,
+                                           getGlobalServiceContext()->getPeriodicRunner());
 }
 
 void StorageEngineImpl::notifyStartupComplete() {
@@ -936,7 +940,7 @@ std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStor
     std::unique_ptr<RecordStore> rs =
         _engine->makeTemporaryRecordStore(opCtx, _catalog->newInternalIdent(), keyFormat);
     LOGV2_DEBUG(22258, 1, "Created temporary record store", "ident"_attr = rs->getIdent());
-    return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
+    return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 
 std::unique_ptr<TemporaryRecordStore>
@@ -948,13 +952,13 @@ StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationConte
                 1,
                 "Created temporary record store for resumable index build",
                 "ident"_attr = rs->getIdent());
-    return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
+    return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
     OperationContext* opCtx, StringData ident) {
     auto rs = _engine->getRecordStore(opCtx, "", ident, CollectionOptions());
-    return std::make_unique<TemporaryKVRecordStore>(getEngine(), std::move(rs));
+    return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 
 void StorageEngineImpl::setJournalListener(JournalListener* jl) {
@@ -1190,7 +1194,8 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                             listener->notify(minOfCheckpointAndOldest);
                         } else if (stable == Timestamp::min()) {
                             // Special case notification of all listeners when writes do not have
-                            // timestamps. This handles standalone mode.
+                            // timestamps. This handles standalone mode and storage engines that
+                            // don't support timestamps.
                             listener->notify(Timestamp::min());
                         }
                     }
@@ -1223,6 +1228,14 @@ void StorageEngineImpl::TimestampMonitor::addListener_forTestOnly(TimestampListe
         invariant(!listenerAlreadyRegistered);
     }
     _listeners.push_back(listener);
+}
+
+void StorageEngineImpl::TimestampMonitor::removeListener_forTestOnly(TimestampListener* listener) {
+    stdx::lock_guard<Latch> lock(_monitorMutex);
+    if (auto it = std::find(_listeners.begin(), _listeners.end(), listener);
+        it != _listeners.end()) {
+        _listeners.erase(it);
+    }
 }
 
 void StorageEngineImpl::TimestampMonitor::clearListeners() {

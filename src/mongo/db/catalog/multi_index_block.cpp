@@ -122,8 +122,6 @@ void MultiIndexBlock::abortIndexBuild(OperationContext* opCtx,
             // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail(opCtx, collection.getWritableCollection());
-                _indexes[i].block->finalizeTemporaryTables(
-                    opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
             }
 
             onCleanUp();
@@ -204,10 +202,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // up _indexes manually (since the changes were already rolled back). Due to this, it is
         // thus legal to call init() again after it fails.
         opCtx->recoveryUnit()->onRollback([this, opCtx]() {
-            for (auto& index : _indexes) {
-                index.block->finalizeTemporaryTables(
-                    opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-            }
             _indexes.clear();
             _buildIsCleanedUp = true;
         });
@@ -896,13 +890,6 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         if (bulkBuilder->isMultikey()) {
             indexCatalogEntry->setMultikey(opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
         }
-
-        // The commit() function can be called multiple times on write conflict errors. Dropping the
-        // temp tables cannot be rolled back, so do it only after the WUOW commits.
-        opCtx->recoveryUnit()->onCommit([opCtx, i, this](auto commitTs) {
-            _indexes[i].block->finalizeTemporaryTables(
-                opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-        });
     }
 
     onCommit();
@@ -934,18 +921,15 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
         lk.emplace(opCtx, MODE_IX);
     }
 
-    auto action = TemporaryRecordStore::FinalizationAction::kDelete;
-
     if (isResumable) {
         invariant(_buildUUID);
         invariant(_method == IndexBuildMethod::kHybrid);
 
         _writeStateToDisk(opCtx, collection);
-        action = TemporaryRecordStore::FinalizationAction::kKeep;
-    }
 
-    for (auto& index : _indexes) {
-        index.block->finalizeTemporaryTables(opCtx, action);
+        for (auto& index : _indexes) {
+            index.block->keepTemporaryTables();
+        }
     }
 
     _buildIsCleanedUp = true;
@@ -972,8 +956,6 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
         dassert(status,
                 str::stream() << "Failed to write resumable index build state to disk. UUID: "
                               << _buildUUID);
-
-        rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
         return;
     }
 
@@ -986,7 +968,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
           logAttrs(collection->ns()),
           "details"_attr = obj);
 
-    rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);
+    rs->keep();
 }
 
 BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,

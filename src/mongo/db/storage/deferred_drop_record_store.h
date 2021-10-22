@@ -29,58 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/temporary_record_store.h"
 
+#include "mongo/db/storage/storage_engine.h"
+
 namespace mongo {
-namespace sbe {
+
 /**
- * A way of interacting with the TemporaryRecordStore in PlanStages.
- * TODO SERVER-60639: Remove this when SERVER-60639 is done.
+ * Manages the lifetime of a TemporaryRecordStore that is eventually dropped after destruction.
  */
-class RecordStore {
+class DeferredDropRecordStore : public TemporaryRecordStore {
 public:
-    RecordStore(OperationContext* opCtx, std::unique_ptr<TemporaryRecordStore> rs)
-        : _opCtx(opCtx), _rs(std::move(rs)){};
+    DeferredDropRecordStore(std::unique_ptr<RecordStore> rs, StorageEngine* storageEngine)
+        : TemporaryRecordStore(std::move(rs)), _storageEngine(storageEngine){};
+    ~DeferredDropRecordStore();
 
-    RecordStore(RecordStore&& other) : _opCtx(other._opCtx), _rs(std::move(other._rs)) {
-        other._opCtx = nullptr;
-    }
-    ~RecordStore() {
-        deleteTemporaryRecordStoreIfLock();
-    }
-
-    RecordStore& operator=(RecordStore&& other) {
-        if (this == &other) {
-            return *this;
-        }
-        _opCtx = other._opCtx;
-        _rs = std::move(other._rs);
-        other._opCtx = nullptr;
-        return *this;
-    }
-
-    void doDetachFromOperationContext() {
-        _opCtx = nullptr;
-    }
-
-    void doAttachToOperationContext(OperationContext* opCtx) {
-        _opCtx = opCtx;
-    }
-
-    void deleteTemporaryRecordStoreIfLock() {
-        // A best-effort to destroy the TRS, we can only do this if the query is holding a
-        // global lock.
-        if (_opCtx->lockState()->wasGlobalLockTaken()) {
-            _rs->finalizeTemporaryTable(_opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-        }
-    }
-    // add attachToOperationContext, detachFromOperationContext, call this from
-    // HashAgg::attachToOperationContext, detachFromOperationContext.
-
-private:
-    OperationContext* _opCtx;
-    std::unique_ptr<TemporaryRecordStore> _rs;
+protected:
+    StorageEngine* _storageEngine;
 };
-}  // namespace sbe
 }  // namespace mongo
