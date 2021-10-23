@@ -37,6 +37,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
@@ -102,17 +103,18 @@ CoordinatorCommitMonitor::CoordinatorCommitMonitor(
 SemiFuture<void> CoordinatorCommitMonitor::waitUntilRecipientsAreWithinCommitThreshold() const {
     return _makeFuture()
         .onError([](Status status) {
-            if (ErrorCodes::isCancellationError(status.code())) {
+            if (ErrorCodes::isCancellationError(status.code()) ||
+                ErrorCodes::isInterruption(status.code())) {
                 LOGV2_DEBUG(5392003,
                             kDiagnosticLogLevel,
-                            "The resharding commit monitor is interrupted",
+                            "The resharding commit monitor has been interrupted",
                             "error"_attr = status);
             } else {
                 LOGV2_WARNING(5392004,
                               "Stopped the resharding commit monitor due to an error",
                               "error"_attr = status);
             }
-            return Status::OK();
+            return status;
         })
         .semi();
 }
@@ -133,7 +135,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
                 "Querying recipient shards for the remaining operation time",
                 "namespace"_attr = _ns);
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = CancelableOperationContext(cc().makeOperationContext(), _cancelToken, _executor);
     auto executor = _networkExecutor ? _networkExecutor : _executor;
     AsyncRequestsSender ars(opCtx.get(),
                             executor,
@@ -187,10 +189,11 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
 ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture() const {
     return ExecutorFuture<void>(_executor)
         .then([this] { return queryRemainingOperationTimeForRecipients(); })
-        .onError([](Status status) {
-            if (ErrorCodes::isCancellationError(status.code()))
+        .onError([this](Status status) {
+            if (_cancelToken.isCanceled()) {
                 // Do not retry on cancellation errors.
                 iasserted(status);
+            }
 
             // Absorbs any exception thrown by the query phase, except for cancellation errors, and
             // retries. The intention is to handle short term issues with querying recipients (e.g.,
