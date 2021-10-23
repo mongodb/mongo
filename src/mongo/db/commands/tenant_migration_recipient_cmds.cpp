@@ -34,7 +34,6 @@
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/logv2/log.h"
 
@@ -70,11 +69,16 @@ public:
 
             const auto& cmd = request();
 
+            tenant_migration_util::protocolCompatibilityCheck(cmd.getProtocol(),
+                                                              cmd.getTenantId().toString());
+
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
                                                       cmd.getStartMigrationDonorTimestamp(),
-                                                      cmd.getReadPreference());
+                                                      cmd.getReadPreference(),
+                                                      cmd.getProtocol());
+
 
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -88,7 +92,8 @@ public:
 
             if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
                 LOGV2(4879608,
-                      "'returnResponseOkForRecipientSyncDataCmd' failpoint enabled.",
+                      "Immediately returning OK because 'returnResponseOkForRecipientSyncDataCmd' "
+                      "failpoint is enabled.",
                       "tenantMigrationRecipientInstance"_attr = stateDoc.toBSON());
                 return Response(repl::OpTime());
             }
@@ -180,6 +185,9 @@ public:
 
             const auto& cmd = request();
 
+            tenant_migration_util::protocolCompatibilityCheck(cmd.getProtocol(),
+                                                              cmd.getTenantId().toString());
+
             opCtx->setAlwaysInterruptAtStepDownOrUp();
             auto recipientService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
@@ -195,7 +203,8 @@ public:
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
                                                       kUnusedStartMigrationTimestamp,
-                                                      cmd.getReadPreference());
+                                                      cmd.getReadPreference(),
+                                                      cmd.getProtocol());
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName

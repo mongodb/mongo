@@ -38,7 +38,9 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
@@ -126,6 +128,34 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
         ssl_util::findPEMBlob(payload, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
     return swBlob.getStatus().withContext("Invalid private key field");
 #endif
+}
+
+inline void protocolCompatibilityCheck(const MigrationProtocolEnum protocol,
+                                       const std::string& tenantId) {
+    switch (protocol) {
+        case MigrationProtocolEnum::kShardMerge: {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "protocol '" << MigrationProtocol_serializer(protocol)
+                                  << "' not supported",
+                    repl::feature_flags::gShardMerge.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
+            // TODO: SERVER-59495 Add a check to ensure tenantId is not provided for 'Merge'
+            // protocol.
+            break;
+        }
+        case MigrationProtocolEnum::kMultitenantMigrations: {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "'tenantId' is required for protocol '"
+                                  << MigrationProtocol_serializer(protocol) << "'",
+                    !tenantId.empty());
+
+
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 /*

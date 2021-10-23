@@ -479,7 +479,8 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
         "donor-rs/localhost:12345",
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -504,7 +505,8 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
         "donor-rs/localhost:12345",
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -539,7 +541,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -590,7 +593,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::SecondaryOnly));
+        ReadPreferenceSetting(ReadPreference::SecondaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -642,7 +646,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -700,7 +705,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -772,7 +778,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::Nearest));
+        ReadPreferenceSetting(ReadPreference::Nearest),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -833,7 +840,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -902,7 +910,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -974,7 +983,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::SecondaryOnly));
+        ReadPreferenceSetting(ReadPreference::SecondaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -1035,7 +1045,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
+        ReadPreferenceSetting(ReadPreference::SecondaryPreferred),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Hang the migration before attempting to connect to clients.
@@ -1114,7 +1125,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
     initialStateDocument.setStartApplyingDonorOpTime(startApplyingOpTime);
 
@@ -1172,7 +1184,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         startMigrationDonorTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1233,7 +1246,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1277,7 +1291,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
         "broken,connect,string,no,set,name",
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1299,7 +1314,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         "localhost:12345",
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1325,7 +1341,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1364,7 +1381,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1409,7 +1427,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1456,7 +1475,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -1492,7 +1512,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.  Fail to populate the remote oplog mock.
@@ -1527,7 +1548,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
@@ -1582,7 +1604,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
@@ -1637,7 +1660,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -1693,7 +1717,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
@@ -1800,7 +1825,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
@@ -1909,7 +1935,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
@@ -2034,7 +2061,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
@@ -2207,7 +2235,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
@@ -2352,7 +2381,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // We skip cloning here as a way to simulate that the recipient service has detected an existing
@@ -2458,7 +2488,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -2524,7 +2555,8 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -2579,7 +2611,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -2682,7 +2715,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) 
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto fp = globalFailPointRegistry().find("pauseBeforeRunTenantMigrationRecipientInstance");
@@ -2720,7 +2754,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToIniti
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto opCtx = makeOperationContext();
@@ -2754,7 +2789,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     auto fp = globalFailPointRegistry().find("pauseAfterRunTenantMigrationRecipientInstance");
@@ -2838,7 +2874,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -2901,7 +2938,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -2989,7 +3027,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -3071,7 +3110,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3123,7 +3163,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecor
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3158,7 +3199,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Add an FCV value as if it was from a previous attempt.
@@ -3197,7 +3239,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Add an FCV value as if it was from a previous attempt, making sure we set a different
@@ -3244,7 +3287,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3279,7 +3323,8 @@ TEST_F(TenantMigrationRecipientServiceTest, WaitUntilMigrationReachesReturnAfter
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Skip the cloners in this test, so we provide an empty list of databases.
@@ -3339,7 +3384,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableFetcherErr
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3403,7 +3449,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableFetcher
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3462,7 +3509,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnExternalInter
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3520,7 +3568,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableClonerErro
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3592,7 +3641,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerE
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 
     // Create and start the instance.
@@ -3646,7 +3696,8 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
     // Starting a migration where the state is not 'kUninitialized' indicates that we are restarting
     // from failover.
@@ -3697,7 +3748,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
         replSet.getConnectionString(),
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
     // Starting a migration where the state is not 'kUninitialized' indicates that we are restarting
     // from failover.

@@ -116,7 +116,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
         "donor-rs0/localhost:12345",
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     activeTenantAStateDoc.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), activeTenantAStateDoc));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), activeTenantAStateDoc));
@@ -126,7 +127,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
                                                "donor-rs1/localhost:12345",
                                                "tenantA",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc1.setRecipientCertificateForDonor(kRecipientPEMPayload);
     auto status = insertStateDoc(opCtx.get(), stateDoc1);
     ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status.code());
@@ -137,7 +139,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc2.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
         insertStateDoc(opCtx.get(), stateDoc2), DBException, ErrorCodes::DuplicateKey);
@@ -148,7 +151,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
                                                "donor-rs0/localhost:12345",
                                                "tenantA",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc3.setRecipientCertificateForDonor(kRecipientPEMPayload);
     status = insertStateDoc(opCtx.get(), stateDoc3);
     ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status.code());
@@ -159,7 +163,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc4.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc4));
@@ -175,7 +180,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
         "donor-rs0/localhost:12345",
         "tenantA",
         kDefaultStartMigrationTimestamp,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        MigrationProtocolEnum::kMultitenantMigrations);
     inactiveTenantAStateDoc.setRecipientCertificateForDonor(kRecipientPEMPayload);
     inactiveTenantAStateDoc.setExpireAt(Date_t::now());
     ASSERT_OK(insertStateDoc(opCtx.get(), inactiveTenantAStateDoc));
@@ -186,7 +192,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
                                                "donor-rs1/localhost:12345",
                                                "tenantA",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc1.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
         insertStateDoc(opCtx.get(), stateDoc1), DBException, ErrorCodes::DuplicateKey);
@@ -197,7 +204,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc2.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
         insertStateDoc(opCtx.get(), stateDoc2), DBException, ErrorCodes::DuplicateKey);
@@ -208,7 +216,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
                                                "donor-rs0/localhost:12345",
                                                "tenantA",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc3.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc3));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc3));
@@ -218,7 +227,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
                                                "donor-rs0/localhost:12345",
                                                "tenantC",
                                                kDefaultStartMigrationTimestamp,
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               MigrationProtocolEnum::kMultitenantMigrations);
     stateDoc4.setRecipientCertificateForDonor(kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc4));

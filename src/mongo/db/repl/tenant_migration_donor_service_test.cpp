@@ -186,7 +186,8 @@ TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
         migrationUUID,
         "donor-rs/localhost:12345",
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
-        "tenantA");
+        "tenantA",
+        MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setDonorCertificateForRecipient(kDonorPEMPayload);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
 

@@ -7,6 +7,7 @@
 "use strict";
 
 load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/libs/fail_point_util.js");
 
 function runTest(downgradeFCV) {
     let rst = new ReplSetTest({nodes: 1});
@@ -16,37 +17,62 @@ function runTest(downgradeFCV) {
     let primary = rst.getPrimary();
     let adminDB = primary.getDB("admin");
     const kDummyConnStr = "mongodb://localhost/?replicaSet=foo";
+    const readPreference = {mode: 'primary'};
+    const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
+
     // A function, not a constant, to ensure unique UUIDs.
     function donorStartMigrationCmd() {
         return {
             donorStartMigration: 1,
             protocol: "shard merge",
-            tenantId: "foo",
             migrationId: UUID(),
             recipientConnectionString: kDummyConnStr,
-            readPreference: {mode: "primary"},
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
         };
     }
+
+    function recipientSyncDataCmd() {
+        return {
+            recipientSyncData: 1,
+            protocol: "shard merge",
+            migrationId: UUID(),
+            donorConnectionString: kDummyConnStr,
+            readPreference: readPreference,
+            startMigrationDonorTimestamp: Timestamp(1, 1),
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
+        };
+    }
+
+    // Enable below fail points to prevent starting the donor/recipient POS instance.
+    configureFailPoint(primary, "returnResponseCommittedForDonorStartMigrationCmd");
+    configureFailPoint(primary, "returnResponseOkForRecipientSyncDataCmd");
 
     // Preconditions: the shard merge feature is enabled and our fresh RS is on the latest FCV.
     assert(TenantMigrationUtil.isShardMergeEnabled(adminDB));
     assert.eq(getFCVConstants().latest,
               adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version);
 
-    // Shard merge is enabled, so this call will fail for some *other* reason, e.g. no certificates,
-    // recipient is unavailable.
-    let res = adminDB.runCommand(donorStartMigrationCmd());
-    assert.neq(res.code,
-               5949300,
-               "donorStartMigration shouldn't reject 'shard merge' protocol when it's enabled");
+    // Shard merge is enabled, so this call should work.
+    assert.commandWorked(
+        adminDB.runCommand(donorStartMigrationCmd()),
+        "donorStartMigration shouldn't reject 'shard merge' protocol when it's enabled");
+    assert.commandWorked(
+        adminDB.runCommand(recipientSyncDataCmd()),
+        "recipientSyncDataCmd shouldn't reject 'shard merge' protocol when it's enabled");
 
     assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
 
     // Now that FCV is downgraded, shard merge is automatically disabled.
     assert.commandFailedWithCode(
         adminDB.runCommand(donorStartMigrationCmd()),
-        5949300,
+        ErrorCodes.IllegalOperation,
         "donorStartMigration should reject 'shard merge' protocol when it's disabled");
+    assert.commandFailedWithCode(
+        adminDB.runCommand(recipientSyncDataCmd()),
+        ErrorCodes.IllegalOperation,
+        "recipientSyncDataCmd should reject 'shard merge' protocol when it's disabled");
 
     rst.stopSet();
 }

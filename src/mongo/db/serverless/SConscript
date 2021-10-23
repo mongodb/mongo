@@ -4,6 +4,18 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='serverless_types_idl',
+    source=[
+        'serverless_types.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/basic_types',
+        '$BUILD_DIR/mongo/idl/idl_parser'
+    ],
+)
+
+env.Library(
     target='tenant_split_state_machine',
     source=[
         'tenant_split_state_machine.idl',

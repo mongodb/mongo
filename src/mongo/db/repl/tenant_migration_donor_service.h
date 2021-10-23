@@ -33,7 +33,6 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/cancellation.h"
@@ -137,6 +136,10 @@ public:
 
         StringData getTenantId() const {
             return _stateDoc.getTenantId();
+        }
+
+        MigrationProtocolEnum getProtocol() const {
+            return _stateDoc.getProtocol();
         }
 
         StringData getRecipientConnectionString() const {
@@ -330,6 +333,7 @@ public:
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
         const std::string _tenantId;
+        const MigrationProtocolEnum _protocol;
         const std::string _recipientConnectionString;
         const ReadPreferenceSetting _readPreference;
         const UUID _migrationUuid;
