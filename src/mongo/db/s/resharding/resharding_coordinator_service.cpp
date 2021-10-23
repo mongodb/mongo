@@ -1623,7 +1623,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
             _startCommitMonitor(executor);
 
             LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
-            return _canEnterCritical.getFuture()
+            return future_util::withCancellation(_canEnterCritical.getFuture(),
+                                                 _ctHolder->getAbortToken())
                 .thenRunOn(**executor)
                 .onCompletion([this](Status status) {
                     _ctHolder->cancelCommitMonitor();
