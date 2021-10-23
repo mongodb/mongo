@@ -248,7 +248,7 @@ TEST_F(CoordinatorCommitMonitorTest, UnblocksWhenCancellationTokenIsCancelled) {
         return future;
     }();
 
-    future.get();
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(CoordinatorCommitMonitorTest, RetriesWhenEncountersErrorsWhileQueryingRecipients) {

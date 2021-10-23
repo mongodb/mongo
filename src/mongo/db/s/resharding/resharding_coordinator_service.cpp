@@ -1315,6 +1315,13 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             return status;
         })
         .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
+        .onCompletion([this](Status outerStatus) {
+            // Wait for the commit monitor to halt. We ignore any ignores because the
+            // ReshardingCoordinator instance is already exiting at this point.
+            return _commitMonitorQuiesced
+                .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
+                .onCompletion([outerStatus](Status) { return outerStatus; });
+        })
         .onCompletion([this, self = shared_from_this()](Status status) {
             // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
             // Schedule cleanup work on the parent executor.
@@ -1432,11 +1439,21 @@ ReshardingCoordinatorService::ReshardingCoordinator::getObserver() {
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::onOkayToEnterCritical() {
+    _fulfillOkayToEnterCritical(Status::OK());
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_fulfillOkayToEnterCritical(
+    Status status) {
     auto lg = stdx::lock_guard(_fulfillmentMutex);
     if (_canEnterCritical.getFuture().isReady())
         return;
-    LOGV2(5391601, "Marking resharding operation okay to enter critical section");
-    _canEnterCritical.emplaceValue();
+
+    if (status.isOK()) {
+        LOGV2(5391601, "Marking resharding operation okay to enter critical section");
+        _canEnterCritical.emplaceValue();
+    } else {
+        _canEnterCritical.setError(std::move(status));
+    }
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
@@ -1575,20 +1592,23 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    _ctHolder->getAbortToken().onCancel().thenRunOn(**executor).getAsync([this](Status status) {
-        if (status.isOK())
-            _commitMonitorCancellationSource.cancel();
-    });
+    if (_commitMonitor) {
+        return;
+    }
 
-    auto commitMonitor = std::make_shared<resharding::CoordinatorCommitMonitor>(
+    _commitMonitor = std::make_shared<resharding::CoordinatorCommitMonitor>(
         _coordinatorDoc.getSourceNss(),
         extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
-        _commitMonitorCancellationSource.token());
+        _ctHolder->getCommitMonitorToken());
 
-    commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
-        .thenRunOn(**executor)
-        .getAsync([this](Status) { onOkayToEnterCritical(); });
+    _commitMonitorQuiesced = _commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
+                                 .thenRunOn(**executor)
+                                 .onCompletion([this](Status status) {
+                                     _fulfillOkayToEnterCritical(status);
+                                     return status;
+                                 })
+                                 .share();
 }
 
 ExecutorFuture<void>
@@ -1603,10 +1623,15 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
             _startCommitMonitor(executor);
 
             LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
-            return _canEnterCritical.getFuture().thenRunOn(**executor).then([this] {
-                _commitMonitorCancellationSource.cancel();
-                LOGV2(5391603, "Resharding operation is okay to enter critical section");
-            });
+            return _canEnterCritical.getFuture()
+                .thenRunOn(**executor)
+                .onCompletion([this](Status status) {
+                    _ctHolder->cancelCommitMonitor();
+                    if (status.isOK()) {
+                        LOGV2(5391603, "Resharding operation is okay to enter critical section");
+                    }
+                    return status;
+                });
         })
         .then([this, executor] {
             {
