@@ -118,6 +118,8 @@ all:
     test_file: jstests/replsets/sessions_collection_reaping.js
   - ticket: SERVER-37904
     test_file: jstests/replsets/cluster_chaining_override.js
+  - ticket: SERVER-59613
+    test_file: jstests/aggregation/range.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
