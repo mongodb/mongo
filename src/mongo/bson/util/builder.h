@@ -471,7 +471,7 @@ protected:
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
     /* "slow" portion of 'grow()'  */
-    MONGO_COMPILER_NOINLINE void _growReallocate(size_t minSize) {
+    void _growReallocate(size_t minSize) {
         // Going beyond the maximum buffer size is not likely.
         if (MONGO_unlikely(minSize > BufferMaxSize)) {
             growFailure(minSize);
