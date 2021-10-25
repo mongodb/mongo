@@ -3,11 +3,7 @@
  * measurements present. Additionally, this verifies that only indexes that are incompatible for
  * downgrade have the "originalSpec" field present on the buckets index definition.
  *
- * TODO SERVER-60576: Re-enable this test. Downgrading FCV does not remove the
- * 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag. When upgrading, an invariant will
- * be triggered as the catalog entry flag is expected to be removed on downgrade.
- *
- * @tags: [__TEMPORARILY_DISABLED__]
+ * TODO SERVER-60912: Remove this test once kLastLTS is 6.0.
  */
 (function() {
 "use strict";
@@ -37,7 +33,7 @@ assert.commandWorked(db.createCollection("system.buckets.abc"));
 assert.commandWorked(db.createCollection(
     coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-function checkIndexForDowngrade(isCompatible, createdOnBucketsCollection) {
+function checkIndexForDowngrade(withFCV, isCompatible, createdOnBucketsCollection) {
     const index = bucketsColl.getIndexes()[0];
 
     if (isCompatible) {
@@ -51,43 +47,72 @@ function checkIndexForDowngrade(isCompatible, createdOnBucketsCollection) {
             assert(index.hasOwnProperty("originalSpec"));
         }
 
-        assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+        assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: withFCV}),
                                      ErrorCodes.CannotDowngrade);
         assert.commandWorked(coll.dropIndexes("*"));
     }
 
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: withFCV}));
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
     assert.commandWorked(coll.dropIndexes("*"));
 }
 
+// TODO SERVER-60911: Remove downgrade checks for lastContinuousFCV once kLatest is 5.3.
+
 assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
-checkIndexForDowngrade(true, false);
+checkIndexForDowngrade(lastLTSFCV, true, false);
+
+assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
+checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
-checkIndexForDowngrade(true, false);
+checkIndexForDowngrade(lastLTSFCV, true, false);
+
+assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
+checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 assert.commandWorked(coll.createIndex({[metaFieldName]: 1, a: 1}));
-checkIndexForDowngrade(false, false);
+checkIndexForDowngrade(lastLTSFCV, false, false);
+
+assert.commandWorked(coll.createIndex({[metaFieldName]: 1, a: 1}));
+checkIndexForDowngrade(lastContinuousFCV, false, false);
 
 assert.commandWorked(coll.createIndex({b: 1}));
-checkIndexForDowngrade(false, false);
+checkIndexForDowngrade(lastLTSFCV, false, false);
+
+assert.commandWorked(coll.createIndex({b: 1}));
+checkIndexForDowngrade(lastContinuousFCV, false, false);
 
 assert.commandWorked(bucketsColl.createIndex({"control.min.c.d": 1, "control.max.c.d": 1}));
-checkIndexForDowngrade(false, true);
+checkIndexForDowngrade(lastLTSFCV, false, true);
+
+assert.commandWorked(bucketsColl.createIndex({"control.min.c.d": 1, "control.max.c.d": 1}));
+checkIndexForDowngrade(lastContinuousFCV, false, true);
 
 assert.commandWorked(bucketsColl.createIndex({"control.min.e": 1, "control.min.f": 1}));
-checkIndexForDowngrade(false, true);
+checkIndexForDowngrade(lastLTSFCV, false, true);
+
+assert.commandWorked(bucketsColl.createIndex({"control.min.e": 1, "control.min.f": 1}));
+checkIndexForDowngrade(lastContinuousFCV, false, true);
 
 assert.commandWorked(coll.createIndex({g: "2dsphere"}));
-checkIndexForDowngrade(false, false);
+checkIndexForDowngrade(lastLTSFCV, false, false);
+
+assert.commandWorked(coll.createIndex({g: "2dsphere"}));
+checkIndexForDowngrade(lastContinuousFCV, false, false);
 
 assert.commandWorked(coll.createIndex({[metaFieldName]: "2d"}));
-checkIndexForDowngrade(true, false);
+checkIndexForDowngrade(lastLTSFCV, true, false);
+
+assert.commandWorked(coll.createIndex({[metaFieldName]: "2d"}));
+checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 assert.commandWorked(coll.createIndex({[metaFieldName]: "2dsphere"}));
-checkIndexForDowngrade(true, false);
+checkIndexForDowngrade(lastLTSFCV, true, false);
+
+assert.commandWorked(coll.createIndex({[metaFieldName]: "2dsphere"}));
+checkIndexForDowngrade(lastContinuousFCV, true, false);
 
 MongoRunner.stopMongod(conn);
 }());

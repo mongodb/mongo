@@ -489,16 +489,26 @@ private:
 
         _cancelTenantMigrations(opCtx);
 
-        // Secondary indexes on time-series measurements are only supported in 5.2 and up. If the
-        // user tries to downgrade the cluster to an earlier version, they must first remove all
-        // incompatible secondary indexes on time-series measurements.
-        if (requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_2) {
+        {
+            // Take the global lock in S mode to create a barrier for operations taking the global
+            // IX or X locks. This ensures that either
+            //   - The global IX/X locked operation will start after the FCV change, see the
+            //     downgrading to the last-lts or last-continuous FCV and act accordingly.
+            //   - The global IX/X locked operation began prior to the FCV change, is acting on that
+            //     assumption and will finish before downgrade procedures begin right after this.
+            Lock::GlobalLock lk(opCtx, MODE_S);
+        }
+
+        // TODO SERVER-60911: When kLatest is 5.3, only check when downgrading to kLastLTS (5.0).
+        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated downgrade code.
+        if (serverGlobalParams.featureCompatibility
+                .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
                     opCtx,
                     dbName,
-                    MODE_IS,
+                    MODE_X,
                     [&](const CollectionPtr& collection) {
                         invariant(collection->getTimeseriesOptions());
 
@@ -508,6 +518,10 @@ private:
 
                         while (indexIt->more()) {
                             auto indexEntry = indexIt->next();
+                            // Secondary indexes on time-series measurements are only supported
+                            // in 5.2 and up. If the user tries to downgrade the cluster to an
+                            // earlier version, they must first remove all incompatible secondary
+                            // indexes on time-series measurements.
                             uassert(ErrorCodes::CannotDowngrade,
                                     str::stream()
                                         << "Cannot downgrade the cluster when there are secondary "
@@ -540,22 +554,36 @@ private:
                             }
                         }
 
+                        if (!collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
+                            // The catalog entry flag has already been removed. This can happen if
+                            // the downgrade process was interrupted and is being run again. The
+                            // downgrade process cannot be aborted at this point.
+                            return true;
+                        }
+
+                        BSONObjBuilder unusedBuilder;
+                        Status status = collMod(opCtx,
+                                                collection->ns(),
+                                                BSON("collMod" << collection->ns().coll()),
+                                                &unusedBuilder);
+
+                        if (!status.isOK()) {
+                            LOGV2_FATAL(
+                                6057600,
+                                "Failed to remove catalog entry during downgrade",
+                                "error"_attr = status,
+                                "timeseriesBucketsMayHaveMixedSchemaData"_attr =
+                                    collection->getTimeseriesBucketsMayHaveMixedSchemaData(),
+                                logAttrs(collection->ns()),
+                                logAttrs(collection->uuid()));
+                        }
+
                         return true;
                     },
                     [&](const CollectionPtr& collection) {
                         return collection->getTimeseriesOptions() != boost::none;
                     });
             }
-        }
-
-        {
-            // Take the global lock in S mode to create a barrier for operations taking the global
-            // IX or X locks. This ensures that either
-            //   - The global IX/X locked operation will start after the FCV change, see the
-            //     downgrading to the last-lts or last-continuous FCV and act accordingly.
-            //   - The global IX/X locked operation began prior to the FCV change, is acting on that
-            //     assumption and will finish before downgrade procedures begin right after this.
-            Lock::GlobalLock lk(opCtx, MODE_S);
         }
 
         uassert(ErrorCodes::Error(549181),

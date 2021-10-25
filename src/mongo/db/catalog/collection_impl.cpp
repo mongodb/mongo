@@ -1352,12 +1352,12 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
                                                                 boost::optional<bool> setting) {
     uassert(6057500, "This is not a time-series collection", _metadata->options.timeseries);
 
-    // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from kLastLTS (5.0).
-    // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade code.
-    uassert(
-        6057501,
-        "Cannot set the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag if FCV < 5.2",
-        serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest());
+    LOGV2_DEBUG(6057601,
+                1,
+                "Setting 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag",
+                logAttrs(ns()),
+                logAttrs(uuid()),
+                "setting"_attr = setting);
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         md.timeseriesBucketsMayHaveMixedSchemaData = setting;

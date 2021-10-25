@@ -536,7 +536,7 @@ public:
      * Sets the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag to 'setting' for this
      * collection.
      *
-     * Throws if FCV < 5.2 or if this is not a time-series collection.
+     * Throws if this is not a time-series collection.
      */
     virtual void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                             boost::optional<bool> setting) = 0;
