@@ -255,11 +255,10 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _serviceContext(serviceContext),
       _donorService(donorService),
       _stateDoc(tenant_migration_access_blocker::parseDonorStateDocument(initialState)),
-      _instanceName(kServiceName + "-" + _stateDoc.getId().toString()),
+      _instanceName(kServiceName + "-" + _stateDoc.getTenantId()),
       _recipientUri(
           uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))),
       _tenantId(_stateDoc.getTenantId()),
-      _protocol(_stateDoc.getProtocol()),
       _recipientConnectionString(_stateDoc.getRecipientConnectionString()),
       _readPreference(_stateDoc.getReadPreference()),
       _migrationUuid(_stateDoc.getId()),
@@ -267,7 +266,6 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _recipientCertificateForDonor(_stateDoc.getRecipientCertificateForDonor()),
       _sslMode(repl::tenantMigrationDisableX509Auth ? transport::kGlobalSSLMode
                                                     : transport::kEnableSSL) {
-
     _recipientCmdExecutor = _makeRecipientCmdExecutor();
     _recipientCmdExecutor->startup();
 
@@ -407,7 +405,7 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(stateDoc.getId() == _migrationUuid);
 
-    if (stateDoc.getProtocol() == _protocol && stateDoc.getTenantId() == _tenantId &&
+    if (stateDoc.getTenantId() == _tenantId &&
         stateDoc.getRecipientConnectionString() == _recipientConnectionString &&
         stateDoc.getReadPreference().equals(_readPreference) &&
         stateDoc.getDonorCertificateForRecipient() == _donorCertificateForRecipient &&
@@ -740,11 +738,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         request.setDbName(NamespaceString::kAdminDb);
 
         MigrationRecipientCommonData commonData(
-            _migrationUuid, donorConnString.toString(), _readPreference);
+            _migrationUuid, donorConnString.toString(), _tenantId, _readPreference);
         commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-        commonData.setProtocol(_protocol);
-        // TODO: Pass tenantId only for 'kMultitenantMigrations' protocol.
-        commonData.setTenantId(_tenantId);
         request.setMigrationRecipientCommonData(commonData);
 
         stdx::lock_guard<Latch> lg(_mutex);
@@ -770,11 +765,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     request.setDbName(NamespaceString::kAdminDb);
 
     MigrationRecipientCommonData commonData(
-        _migrationUuid, donorConnString.toString(), _readPreference);
+        _migrationUuid, donorConnString.toString(), _tenantId, _readPreference);
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-    commonData.setProtocol(_protocol);
-    // TODO: Pass tenantId only for 'kMultitenantMigrations' protocol.
-    commonData.setTenantId(_tenantId);
     request.setMigrationRecipientCommonData(commonData);
 
     return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()), token);

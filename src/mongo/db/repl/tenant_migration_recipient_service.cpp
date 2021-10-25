@@ -309,7 +309,6 @@ TenantMigrationRecipientService::Instance::Instance(
       _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
                                                         stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
-      _protocol(_stateDoc.getProtocol()),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
@@ -413,7 +412,7 @@ Status TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(stateDoc.getId() == _migrationUuid);
 
-    if (stateDoc.getProtocol() == _protocol && stateDoc.getTenantId() == _tenantId &&
+    if (stateDoc.getTenantId() == _tenantId &&
         stateDoc.getDonorConnectionString() == _donorConnectionString &&
         stateDoc.getReadPreference().equals(_readPreference) &&
         stateDoc.getRecipientCertificateForDonor() == _recipientCertificateForDonor) {
@@ -2490,10 +2489,6 @@ const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const 
 
 const std::string& TenantMigrationRecipientService::Instance::getTenantId() const {
     return _tenantId;
-}
-
-const MigrationProtocolEnum TenantMigrationRecipientService::Instance::getProtocol() const {
-    return _protocol;
 }
 
 }  // namespace repl
