@@ -902,6 +902,32 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
 
+    // Check if migrations are permitted.
+    auto findCollResponse =
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            CollectionType::ConfigNS,
+                                            BSON(CollectionType::fullNs << nss.ns()),
+                                            {},
+                                            1);
+    if (!findCollResponse.isOK()) {
+        return findCollResponse.getStatus();
+    }
+
+    if (findCollResponse.getValue().docs.empty()) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Collection '" << nss.ns() << "' does not exist"};
+    }
+
+    auto coll = uassertStatusOK(CollectionType::fromBSON(findCollResponse.getValue().docs[0]));
+
+    if (!coll.getPermitMigrations()) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Collection '" << nss.ns()
+                              << "' does not permit migrations so chunks cannot be moved"};
+    }
+
     // Must use local read concern because we will perform subsequent writes.
     auto findResponse =
         configShard->exhaustiveFindOnConfig(opCtx,

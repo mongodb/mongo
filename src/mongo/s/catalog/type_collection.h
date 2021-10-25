@@ -64,7 +64,8 @@ class StatusWith;
  *      "unique" : false,
  *      "uuid" : UUID,
  *      "noBalance" : false,
- *      "allowSplit" : false
+ *      "allowSplit" : false,
+ *      "permitMigrations": false
  *   }
  *
  */
@@ -159,6 +160,18 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
+    void setPermitMigrations(bool permit) {
+        if (permit) {
+            _permitMigrations = boost::none;
+        } else {
+            _permitMigrations = permit;
+        }
+    }
+
+    bool getPermitMigrations() const {
+        return _permitMigrations.get_value_or(true);
+    }
+
     void setIsAssignedShardKey(bool isAssignedShardKey) {
         _isAssignedShardKey = isAssignedShardKey;
     }
@@ -200,6 +213,9 @@ private:
     // Optional whether user has assigned a shard key to this collection before.
     // Implicitly true if missing.
     boost::optional<bool> _isAssignedShardKey;
+
+    // Optional whether migration is allowed for this collection. If missing, implies true.
+    boost::optional<bool> _permitMigrations;
 };
 
 }  // namespace mongo
