@@ -193,6 +193,14 @@ var convertVersionStringToArray = function(versionString) {
 };
 
 /**
+ * Returns an integer
+ */
+var convertVersionStringToInteger = function(versionString) {
+    const [major, minor, point] = _convertVersionToIntegerArray(versionString);
+    return major * 100 + minor + 10;
+};
+
+/**
  * Returns the major version string from a version string.
  *
  * 3.3.4-fade3783 -> 3.3
@@ -1166,10 +1174,13 @@ function appendSetParameterArgs(argArray) {
     // Setting programMajorMinorVersion to the maximum value for the latest binary version
     // simplifies version checks below.
     const lastestMajorMinorVersion = Number.MAX_SAFE_INTEGER;
+    const lastContinuousVersion =
+        convertVersionStringToInteger(MongoRunner.getBinVersionFor("last-continuous"));
+    const lastLTSVersion = convertVersionStringToInteger(MongoRunner.getBinVersionFor("last-lts"));
     let programMajorMinorVersion = lastestMajorMinorVersion;
+
     if (programVersion) {
-        let [major, minor, point] = programVersion.split(".");
-        programMajorMinorVersion = parseInt(major) * 100 + parseInt(minor) * 10;
+        programMajorMinorVersion = convertVersionStringToInteger(programVersion);
     }
 
     if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
@@ -1256,6 +1267,19 @@ function appendSetParameterArgs(argArray) {
                 }
 
                 return false;
+            }
+
+            // The 'logComponentVerbosity' parameter must be passed in on the last continuous
+            // version and last LTS version as well.
+            if ((programMajorMinorVersion === lastContinuousVersion ||
+                 programMajorMinorVersion === lastLTSVersion) &&
+                isSetParameterMentioned(jsTest.options().setParameters, "logComponentVerbosity") &&
+                !argArrayContainsSetParameterValue("logComponentVerbosity=")) {
+                let logVerbosityParam = jsTest.options().setParameters["logComponentVerbosity"];
+                if (typeof logVerbosityParam === "object") {
+                    logVerbosityParam = JSON.stringify(logVerbosityParam);
+                }
+                argArray.push(...['--setParameter', "logComponentVerbosity=" + logVerbosityParam]);
             }
 
             // When launching a 5.0 mongod, if we're mentioning the
