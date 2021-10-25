@@ -85,8 +85,7 @@ static void remove_records(WT_SESSION *session, const char *uri, int start, int 
 static void verify_tables(WT_SESSION *session);
 static int verify_tables_helper(WT_SESSION *session, const char *table1, const char *table2);
 static uint64_t get_file_size(WT_SESSION *session, const char *uri);
-static void get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_reviewed,
-  uint64_t *pages_selected, uint64_t *pages_rewritten);
+
 /*
  * Signal handler to catch if the child died unexpectedly.
  */
@@ -191,8 +190,6 @@ run_test(const char *home)
     time_t t;
     uint64_t file_sz_after, file_sz_before;
 
-    uint64_t pages_reviewed, pages_rewritten, pages_selected;
-
     first_ckpt = false;
     srand((u_int)time(&t));
 
@@ -241,14 +238,6 @@ run_test(const char *home)
         /* Check if there's at least 10% compaction. */
         printf(" - Compressed file size MB: %f\n - Original file size MB: %f\n",
           file_sz_after / (1024.0 * 1024), file_sz_before / (1024.0 * 1024));
-
-        /* If we made progress with compact, verify that compact stats support that. */
-        if (file_sz_after < file_sz_before) {
-            get_compact_progress(session, uri1, &pages_reviewed, &pages_rewritten, &pages_selected);
-            printf(" - Pages reviewed: %lu \n", pages_reviewed);
-            printf(" - Pages selected for being rewritten: %lu \n", pages_selected);
-            printf(" - Pages actually rewritten: %lu \n", pages_rewritten);
-        }
 
         /* Put the deleted records back. */
         populate(session, key_range_start, key_range_start + NUM_RECORDS / 3);
@@ -388,29 +377,4 @@ get_file_size(WT_SESSION *session, const char *uri)
     testutil_check(cur_stat->close(cur_stat));
 
     return (val);
-}
-
-static void
-get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_reviewed,
-  uint64_t *pages_selected, uint64_t *pages_rewritten)
-{
-
-    WT_CURSOR *cur_stat;
-    char *descr, *str_val;
-    char stat_uri[128];
-
-    sprintf(stat_uri, "statistics:%s", uri);
-    testutil_check(session->open_cursor(session, stat_uri, NULL, "statistics=(all)", &cur_stat));
-
-    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REVIEWED);
-    testutil_check(cur_stat->search(cur_stat));
-    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_reviewed));
-    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_WRITE_SELECTED);
-    testutil_check(cur_stat->search(cur_stat));
-    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_selected));
-    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REWRITTEN);
-    testutil_check(cur_stat->search(cur_stat));
-    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_rewritten));
-
-    testutil_check(cur_stat->close(cur_stat));
 }
