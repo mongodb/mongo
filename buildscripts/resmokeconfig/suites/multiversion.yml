@@ -16,6 +16,10 @@ selector:
   # TODO: SERVER-35390
   - jstests/multiVersion/upgrade_downgrade_cluster.js
 
+  exclude_with_any_tags:
+  - multiversion_incompatible
+  - requires_fcv_42
+
 # Multiversion tests start their own mongod's.
 executor:
   config:

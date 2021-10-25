@@ -24,6 +24,10 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/multiVersion/load_keys_on_upgrade.js
 
+  exclude_with_any_tags:
+  - multiversion_incompatible
+  - requires_fcv_42
+
 # Multiversion tests start their own mongod's.
 executor:
   config:

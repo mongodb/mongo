@@ -183,6 +183,10 @@ selector:
   - jstests/sharding/mongos_precache_routing_info.js
   - jstests/sharding/warm_up_connection_pool.js
 
+  exclude_with_any_tags:
+  - multiversion_incompatible
+  - requires_fcv_42
+
 executor:
   config:
     shell_options:
