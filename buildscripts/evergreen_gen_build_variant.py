@@ -229,7 +229,7 @@ class GenerateBuildVariantOrchestrator:
         run_vars = {k: translate_run_var(v, variant) for k, v in run_vars.items()}
 
         return FuzzerGenTaskParams(
-            task_name=run_vars.get("name"),
+            task_name=remove_gen_suffix(task_def.name),
             variant=build_variant,
             suite=run_vars.get("suite"),
             num_files=int(run_vars.get("num_files")),

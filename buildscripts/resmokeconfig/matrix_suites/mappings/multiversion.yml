@@ -52,7 +52,7 @@
   base_suite: replica_sets
   overrides:
     - "multiversion.replica_sets_multiversion_selector"
-    - "multiversion.replica_sets_multiversion_testdata"
+    - "multiversion.replica_sets_multiversion_testdata_last_lts"
     - "multiversion.test_kind"
 
 - suite_name: sharding_multiversion
@@ -60,4 +60,106 @@
   overrides:
     - "multiversion.sharding_multiversion_selector"
     - "multiversion.sharding_multiversion_testdata"
+    - "multiversion.test_kind"
+
+
+- suite_name: jstestfuzz_replication_last_continuous_new_new_old
+  base_suite: jstestfuzz_replication
+  overrides:
+    - "multiversion.replica_fixture_last_continuous_new_new_old"
+    - "multiversion.test_kind"
+
+- suite_name: jstestfuzz_replication_last_continuous_new_old_new
+  base_suite: jstestfuzz_replication
+  overrides:
+    - "multiversion.replica_fixture_last_continuous_new_old_new"
+    - "multiversion.test_kind"
+
+- suite_name: jstestfuzz_replication_last_continuous_old_new_new
+  base_suite: jstestfuzz_replication
+  overrides:
+    - "multiversion.replica_fixture_last_continuous_old_new_new"
+    - "multiversion.test_kind"
+
+- suite_name: jstestfuzz_replication_last_lts_new_new_old
+  base_suite: jstestfuzz_replication
+  overrides:
+    - "multiversion.replica_fixture_last_lts_new_new_old"
+    - "multiversion.test_kind"
+
+- suite_name: jstestfuzz_replication_last_lts_new_old_new
+  base_suite: jstestfuzz_replication
+  overrides:
+    - "multiversion.replica_fixture_last_lts_new_old_new"
+    - "multiversion.test_kind"
+
+- suite_name: jstestfuzz_replication_last_lts_old_new_new
+  base_suite: jstestfuzz_replication
+  overrides:
+    - "multiversion.replica_fixture_last_lts_old_new_new"
+    - "multiversion.test_kind"
+
+
+- suite_name: jstestfuzz_sharded_last_continuous_new_old_old_new
+  base_suite: jstestfuzz_sharded
+  overrides:
+    - "multiversion.sharded_fixture_last_continuous_new_old_old_new"
+    - "multiversion.test_kind"
+
+- suite_name: jstestfuzz_sharded_last_lts_new_old_old_new
+  base_suite: jstestfuzz_sharded
+  overrides:
+    - "multiversion.sharded_fixture_last_lts_new_old_old_new"
+    - "multiversion.test_kind"
+
+
+- suite_name: initial_sync_fuzzer_last_lts
+  base_suite: initial_sync_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_lts"
+    - "multiversion.test_kind"
+
+- suite_name: initial_sync_fuzzer_last_continuous
+  base_suite: initial_sync_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_continuous"
+    - "multiversion.test_kind"
+
+
+- suite_name: generational_fuzzer_last_lts
+  base_suite: generational_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_lts"
+    - "multiversion.test_kind"
+
+- suite_name: generational_fuzzer_last_continuous
+  base_suite: generational_fuzzer
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_continuous"
+    - "multiversion.test_kind"
+
+
+- suite_name: generational_fuzzer_replication_last_lts
+  base_suite: generational_fuzzer_replication
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_lts"
+    - "multiversion.test_kind"
+
+- suite_name: generational_fuzzer_replication_last_continuous
+  base_suite: generational_fuzzer_replication
+  overrides:
+    - "multiversion.replica_sets_multiversion_testdata_last_continuous"
+    - "multiversion.test_kind"
+
+
+- suite_name: rollback_fuzzer_last_lts
+  base_suite: rollback_fuzzer
+  overrides:
+    - "multiversion.rollback_multiversion_fuzzer_testdata_last_lts"
+    - "multiversion.test_kind"
+
+- suite_name: rollback_fuzzer_last_continuous
+  base_suite: rollback_fuzzer
+  overrides:
+    - "multiversion.rollback_multiversion_fuzzer_testdata_last_continuous"
     - "multiversion.test_kind"

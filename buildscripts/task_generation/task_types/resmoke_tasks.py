@@ -81,7 +81,9 @@ class ResmokeGenTaskService:
             tasks.add(
                 self._create_sub_task(None, est_timeout=TimeoutEstimate.no_timeouts(),
                                       suite=generated_suite, params=params))
-
+        if params.require_multiversion_setup:
+            # do the same thing as the fuzzer taks.
+            pass
         return tasks
 
     def _create_sub_task(self, index: Optional[int], est_timeout: TimeoutEstimate,

@@ -4,7 +4,9 @@ from typing import NamedTuple, Set, Optional, Dict
 from shrub.v2 import Task, FunctionCall, TaskDependency
 
 from buildscripts.patch_builds.task_generation import TimeoutInfo
-from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK
+from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK, CONFIGURE_EVG_CREDENTIALS, \
+    RUN_GENERATED_TESTS
+from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionGenTaskDecorator
 from buildscripts.util import taskname
 
 
@@ -72,6 +74,10 @@ class FuzzerGenTaskParams(NamedTuple):
 class FuzzerGenTaskService:
     """A service for generating fuzzer tasks."""
 
+    def __init__(self):
+        """Initialize the service."""
+        self.multiversion_decorator = MultiversionGenTaskDecorator()
+
     def generate_tasks(self, params: FuzzerGenTaskParams) -> FuzzerTask:
         """
         Generate evergreen tasks for fuzzers based on the options given.
@@ -83,6 +89,9 @@ class FuzzerGenTaskService:
         sub_tasks = sub_tasks.union(
             {self.build_fuzzer_sub_task(index, params)
              for index in range(params.num_tasks)})
+
+        if params.require_multiversion_setup:
+            sub_tasks = self.multiversion_decorator.decorate_tasks(sub_tasks, params)
 
         return FuzzerTask(task_name=params.task_name, sub_tasks=sub_tasks)
 
@@ -112,22 +121,13 @@ class FuzzerGenTaskService:
 
         timeout_info = TimeoutInfo.overridden(timeout=params.timeout_secs)
 
-        commands = []
-
-        if params.require_multiversion_setup:
-            commands += [FunctionCall("git get project no modules")]
-            commands += [FunctionCall("add git tag")]
-
-        commands += [
+        commands = [
             timeout_info.cmd,
             FunctionCall("do setup"),
-            FunctionCall("configure evergreen api credentials")
-            if params.require_multiversion_setup else None,
-            FunctionCall("do multiversion setup") if params.require_multiversion_setup else None,
+            FunctionCall(CONFIGURE_EVG_CREDENTIALS),
             FunctionCall("setup jstestfuzz"),
             FunctionCall("run jstestfuzz", params.jstestfuzz_params()),
-            FunctionCall("run generated tests", run_tests_vars)
+            FunctionCall(RUN_GENERATED_TESTS, run_tests_vars)
         ]
-        commands = [command for command in commands if command is not None]
 
         return Task(sub_task_name, commands, {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)})

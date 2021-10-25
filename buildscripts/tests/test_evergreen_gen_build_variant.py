@@ -183,11 +183,10 @@ class TestTaskDefToGenParams(unittest.TestCase):
 class TestTaskDefToFuzzerParams(unittest.TestCase):
     def test_params_should_be_generated(self):
         run_vars = {
-            "name": "my_fuzzer",
             "num_files": "5",
             "num_tasks": "3",
         }
-        mock_task_def = build_mock_task("my_task", run_vars)
+        mock_task_def = build_mock_task("my_fuzzer_gen", run_vars)
         mock_orchestrator = build_mock_orchestrator(task_def_list=[mock_task_def])
         fuzzer_params = mock_orchestrator.task_def_to_fuzzer_params(mock_task_def, "build_variant")
 
@@ -202,13 +201,12 @@ class TestTaskDefToFuzzerParams(unittest.TestCase):
 
     def test_params_should_be_overwritable(self):
         run_vars = {
-            "name": "my_fuzzer",
             "num_files": "${file_count|8}",
             "num_tasks": "3",
             "use_large_distro": "true",
             "npm_command": "aggfuzzer",
         }
-        mock_task_def = build_mock_task("my_task", run_vars)
+        mock_task_def = build_mock_task("my_fuzzer_gen", run_vars)
         build_expansions = {"large_distro_name": "my large distro"}
         mock_orchestrator = build_mock_orchestrator(build_expansions=build_expansions,
                                                     task_def_list=[mock_task_def])
@@ -235,13 +233,11 @@ class TestGenerateBuildVariant(unittest.TestCase):
             "suite": "some suite",
         }
         fuzz_run_vars = {
-            "name": "my_fuzzer",
             "num_files": "5",
             "num_tasks": "3",
             "is_jstestfuzz": "true",
         }
         mv_fuzz_run_vars = {
-            "name": "my_fuzzer",
             "num_files": "5",
             "num_tasks": "3",
             "is_jstestfuzz": "true",

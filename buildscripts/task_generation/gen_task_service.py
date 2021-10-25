@@ -80,7 +80,7 @@ class GenTaskService:
         return fuzzer_task
 
     def generate_task(self, generated_suite: GeneratedSuite, build_variant: BuildVariant,
-                      gen_params: ResmokeGenTaskParams) -> List[Task]:
+                      gen_params: ResmokeGenTaskParams) -> Set[Task]:
         """
         Generate evergreen configuration for the given suite and add it to the build_variant.
 

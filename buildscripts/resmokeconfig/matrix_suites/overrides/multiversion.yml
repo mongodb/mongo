@@ -5,12 +5,78 @@
       fixture:
         num_nodes: 3
 
+- name: replica_fixture_last_lts_new_new_old
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new-new-old
+
+- name: replica_fixture_last_lts_new_old_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: new-old-new
+
+- name: replica_fixture_last_lts_old_new_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_lts
+        mixed_bin_versions: old-new-new
+
+- name: replica_fixture_last_continuous_new_new_old
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_continuous
+        mixed_bin_versions: new-new-old
+
+- name: replica_fixture_last_continuous_new_old_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_continuous
+        mixed_bin_versions: new-old-new
+
+- name: replica_fixture_last_continuous_old_new_new
+  value:
+    executor:
+      fixture:
+        num_nodes: 3
+        old_bin_version: last_continuous
+        mixed_bin_versions: old-new-new
+
 - name: sharded_fixture
   value:
     executor:
       fixture:
         num_shards: 2
         num_rs_nodes_per_shard: 2
+
+- name: sharded_fixture_last_lts_new_old_old_new
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 2
+        old_bin_version: last_lts
+        mixed_bin_versions: new-old-old-new
+
+- name: sharded_fixture_last_continuous_new_old_old_new
+  value:
+    executor:
+      fixture:
+        num_shards: 2
+        num_rs_nodes_per_shard: 2
+        old_bin_version: last_continuous
+        mixed_bin_versions: new-old-old-new
 
 - name: test_kind
   value:
@@ -49,7 +115,7 @@
         - jstests/replsets/invalidate_sessions_on_stepdown.js
         - jstests/replsets/initial_sync_fails_unclean_restart.js
 
-- name: replica_sets_multiversion_testdata
+- name: replica_sets_multiversion_testdata_last_lts
   value:
     executor:
       config:
@@ -57,6 +123,51 @@
           global_vars:
             TestData:
               useRandomBinVersionsWithinReplicaSet: 'last-lts'
+
+- name: replica_sets_multiversion_testdata_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+
+- name: rollback_multiversion_fuzzer_testdata_last_lts
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              syncdelay: 5
+              logComponentVerbosity:
+                network:
+                  verbosity:
+                replication:
+                  verbosity: 1
+                storage:
+                  verbosity: 1
+              rollbackShutdowns: true
+              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+
+- name: rollback_multiversion_fuzzer_testdata_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              syncdelay: 5
+              logComponentVerbosity:
+                network:
+                  verbosity:
+                replication:
+                  verbosity: 1
+                storage:
+                  verbosity: 1
+              rollbackShutdowns: true
+              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
 
 - name: sharding_multiversion_selector
   value:

@@ -7,7 +7,7 @@ import buildscripts.task_generation.task_types.fuzzer_tasks as under_test
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
 
-def build_mock_fuzzer_params(multi_version=False, jstestfuzz_vars="vars for jstestfuzz"):
+def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz"):
     return under_test.FuzzerGenTaskParams(
         task_name="task name",
         variant="build variant",
@@ -21,7 +21,7 @@ def build_mock_fuzzer_params(multi_version=False, jstestfuzz_vars="vars for jste
         resmoke_jobs_max=5,
         should_shuffle=True,
         timeout_secs=100,
-        require_multiversion_setup=multi_version,
+        require_multiversion_setup=False,
         use_large_distro=None,
         large_distro_name="large distro",
         config_location="config_location",
@@ -73,24 +73,15 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
         sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params)
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
-        self.assertEqual(len(sub_task.commands), 5)
-
-    def test_sub_task_multi_version_tasks_should_be_built_correct(self):
-        mock_params = build_mock_fuzzer_params(multi_version=True)
-        fuzzer_service = under_test.FuzzerGenTaskService()
-
-        sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params)
-
-        self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
-        self.assertEqual(len(sub_task.commands), 9)
+        self.assertEqual(len(sub_task.commands), 6)
 
     def test_sub_task_should_include_timeout_info(self):
-        mock_params = build_mock_fuzzer_params(multi_version=True)
+        mock_params = build_mock_fuzzer_params()
         fuzzer_service = under_test.FuzzerGenTaskService()
 
         sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params)
 
-        cmd = sub_task.commands[2].as_dict()
+        cmd = sub_task.commands[0].as_dict()
 
         self.assertEqual(cmd["command"], "timeout.update")
         self.assertEqual(cmd["params"]["timeout_secs"], mock_params.timeout_secs)

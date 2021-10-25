@@ -10,7 +10,7 @@ from buildscripts.resmokelib.utils.history import make_historic as _make_histori
 from buildscripts.resmokelib.testing.fixtures import _builder
 
 
-class FixtureLib(object):
+class FixtureLib:
     """Class that exposes the resmokelib API that fixtures can use."""
 
     # pylint: disable=no-self-use
