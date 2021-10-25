@@ -162,6 +162,10 @@ public:
 
     std::string getInitialSyncMethod() const final;
 
+    bool allowLocalDbAccess() const final {
+        return true;
+    }
+
     Status startup(OperationContext* opCtx, std::uint32_t maxAttempts) noexcept final;
 
     Status shutdown() final;

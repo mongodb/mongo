@@ -2969,6 +2969,24 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         }
     }
 
+    // Non-oplog local reads from the user are not allowed during initial sync when the initial
+    // sync method disallows it.  "isFromUserConnection" means DBDirectClient reads are not blocked;
+    // "isInternalClient" means reads from other cluster members are not blocked.
+    if (!isPrimaryOrSecondary && getReplicationMode() == modeReplSet && ns.db() == kLocalDB &&
+        client->isFromUserConnection()) {
+        stdx::lock_guard<Latch> lock(_mutex);
+        auto isInternalClient = !client->session() ||
+            (client->session()->getTags() & transport::Session::kInternalClient);
+        if (!isInternalClient && _memberState.startup2() && _initialSyncer &&
+            !_initialSyncer->allowLocalDbAccess()) {
+            return Status{ErrorCodes::NotPrimaryOrSecondary,
+                          str::stream() << "Local reads are not allowed during initial sync with "
+                                           "current initial sync method: "
+                                        << _initialSyncer->getInitialSyncMethod()};
+        }
+    }
+
+
     if (canAcceptWritesFor_UNSAFE(opCtx, ns)) {
         return Status::OK();
     }

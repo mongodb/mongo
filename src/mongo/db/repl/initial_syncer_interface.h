@@ -121,6 +121,12 @@ public:
      * Returns the initial sync method that this initial syncer is using.
      */
     virtual std::string getInitialSyncMethod() const = 0;
+
+    /**
+     * Returns whether user access to db 'local' should be allowed during this initial sync.
+     * Should be constant, and must not take any locks.
+     */
+    virtual bool allowLocalDbAccess() const = 0;
 };
 
 }  // namespace repl
