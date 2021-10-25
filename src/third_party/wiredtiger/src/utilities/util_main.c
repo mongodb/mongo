@@ -306,7 +306,7 @@ open:
     }
     free(p);
     free(secretkey);
-    config = secretkey = p = NULL;
+    secretkey = p = NULL;
 
     /* If we only want to verify the metadata, that is done in wiredtiger_open. We're done. */
     if (func == NULL && meta_verify)
