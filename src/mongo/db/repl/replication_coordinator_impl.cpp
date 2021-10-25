@@ -4347,6 +4347,15 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
           "Replica set state transition",
           "newState"_attr = newState,
           "oldState"_attr = _memberState);
+
+    // Initializes the featureCompatibilityVersion to the latest value, because arbiters do not
+    // receive the replicated version. This is to avoid bugs like SERVER-32639.
+    if (newState.arbiter()) {
+        // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(
+            multiversion::GenericFCV::kLatest);
+    }
+
     _memberState = newState;
 
     _cancelAndRescheduleElectionTimeout_inlock();
