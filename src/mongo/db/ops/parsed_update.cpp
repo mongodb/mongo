@@ -39,7 +39,8 @@ namespace mongo {
 
 ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
                            const UpdateRequest* request,
-                           const ExtensionsCallback& extensionsCallback)
+                           const ExtensionsCallback& extensionsCallback,
+                           bool forgoOpCounterIncrements)
     : _opCtx(opCtx),
       _request(request),
       _expCtx(make_intrusive<ExpressionContext>(
@@ -53,7 +54,11 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
           request->explain())),
       _driver(_expCtx),
       _canonicalQuery(),
-      _extensionsCallback(extensionsCallback) {}
+      _extensionsCallback(extensionsCallback) {
+    if (forgoOpCounterIncrements) {
+        _expCtx->enabledCounters = false;
+    }
+}
 
 Status ParsedUpdate::parseRequest() {
     // It is invalid to request that the UpdateStage return the prior or newly-updated version
@@ -158,6 +163,7 @@ Status ParsedUpdate::parseQueryToCQ() {
         findCommand->setLet(*letParams);
     }
 
+    _expCtx->startExpressionCounters();
     auto statusWithCQ = CanonicalQuery::canonicalize(_opCtx,
                                                      std::move(findCommand),
                                                      static_cast<bool>(_request->explain()),

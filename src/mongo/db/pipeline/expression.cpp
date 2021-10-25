@@ -183,7 +183,7 @@ void Expression::registerExpression(
     parserMap[key] =
         ParserRegistration{parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
     // Add this expression to the global map of operator counters for expressions.
-    operatorCountersExpressions.addExpressionCounter(key);
+    operatorCountersAggExpressions.addAggExpressionCounter(key);
 }
 
 intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const expCtx,
@@ -224,8 +224,8 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
             expCtx->opCtx, opName, entry.allowedWithApiStrict, entry.allowedWithClientType);
     }
 
-    // Increment the global counter for this expression.
-    operatorCountersExpressions.incrementExpressionCounter(opName);
+    // Increment the counter for this expression in the current context.
+    expCtx->incrementAggExprCounter(opName);
     return entry.parser(expCtx, obj.firstElement(), vps);
 }
 

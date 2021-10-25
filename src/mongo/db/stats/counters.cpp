@@ -337,6 +337,6 @@ NetworkCounter networkCounter;
 AuthCounter authCounter;
 AggStageCounters aggStageCounters;
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
-OperatorCountersExpressions operatorCountersExpressions;
+OperatorCountersAggExpressions operatorCountersAggExpressions;
 OperatorCountersMatchExpressions operatorCountersMatchExpressions;
 }  // namespace mongo

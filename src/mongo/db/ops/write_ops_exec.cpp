@@ -719,7 +719,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                UpdateRequest* updateRequest,
                                                OperationSource source,
-                                               bool* containsDotsAndDollarsField) {
+                                               bool* containsDotsAndDollarsField,
+                                               bool forgoOpCounterIncrements) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangDuringBatchUpdate,
         opCtx,
@@ -808,7 +809,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }
 
     const ExtensionsCallbackReal extensionsCallback(opCtx, &updateRequest->getNamespaceString());
-    ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback);
+    ParsedUpdate parsedUpdate(opCtx, updateRequest, extensionsCallback, forgoOpCounterIncrements);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -884,7 +885,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     const write_ops::UpdateOpEntry& op,
     LegacyRuntimeConstants runtimeConstants,
     const boost::optional<BSONObj>& letParams,
-    OperationSource source) {
+    OperationSource source,
+    bool forgoOpCounterIncrements) {
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
@@ -921,8 +923,12 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
         try {
             bool containsDotsAndDollarsField = false;
-            const auto ret =
-                performSingleUpdateOp(opCtx, ns, &request, source, &containsDotsAndDollarsField);
+            const auto ret = performSingleUpdateOp(opCtx,
+                                                   ns,
+                                                   &request,
+                                                   source,
+                                                   &containsDotsAndDollarsField,
+                                                   forgoOpCounterIncrements);
 
             if (containsDotsAndDollarsField) {
                 // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
@@ -987,6 +993,9 @@ WriteResult performUpdates(OperationContext* opCtx,
     const auto& runtimeConstants =
         wholeOp.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
 
+    // Increment operator counters only during the fisrt single update operation in a batch of
+    // updates.
+    bool forgoOpCounterIncrements = false;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->getTxnNumber()) {
@@ -1025,8 +1034,16 @@ WriteResult performUpdates(OperationContext* opCtx,
                 ? *wholeOp.getStmtIds()
                 : std::vector<StmtId>{stmtId};
 
-            out.results.emplace_back(performSingleUpdateOpWithDupKeyRetry(
-                opCtx, ns, stmtIds, singleOp, runtimeConstants, wholeOp.getLet(), source));
+            out.results.emplace_back(
+                performSingleUpdateOpWithDupKeyRetry(opCtx,
+                                                     ns,
+                                                     stmtIds,
+                                                     singleOp,
+                                                     runtimeConstants,
+                                                     wholeOp.getLet(),
+                                                     source,
+                                                     forgoOpCounterIncrements));
+            forgoOpCounterIncrements = true;
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             out.canContinue = handleError(
