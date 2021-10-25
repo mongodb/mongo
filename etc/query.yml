@@ -680,15 +680,6 @@ functions:
     - *f_expansions_write
     - *set_up_remote_credentials
 
-  "call BF Suggestion service":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        silent: true
-        args:
-          - "./src/evergreen/functions/bf_suggestion_service_call.sh"
-
   "upload debugsymbols": &upload_debugsymbols
     command: s3.put
     params:
@@ -1877,7 +1868,6 @@ post:
   - func: "attach report"
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
-  - func: "call BF Suggestion service"
   - func: "attach wiki page"
   - func: "kill processes"
   - func: "save local client logs"
