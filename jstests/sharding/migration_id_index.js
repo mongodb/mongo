@@ -15,6 +15,10 @@ var coll = testDB.getCollection("migration_id_index");
 coll.drop();
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
+// We must insert a document into the collection so that subsequent index builds are two-phase.
+// If the collection is empty and the build is single-phase, the primary will not wait for the index
+// to finish building on the secondary before returning.
+assert.commandWorked(testDB.coll.insert({a: 6}));
 st.rs0.awaitReplication();
 var spec = GetIndexHelpers.findByName(
     st.rs0.getPrimary().getDB("test").migration_id_index.getIndexes(), "_id_");
