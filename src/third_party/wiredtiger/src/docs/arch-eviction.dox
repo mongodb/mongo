@@ -64,7 +64,7 @@ a database via ::wiredtiger_open, or changed after open with
 WT_CONNECTION::reconfigure.
 
 The \c eviction_target configuration value is the level at
-which WiredTiger attempts to keep the overall cache usage.  Eviction worker
+which WiredTiger attempts to keep the overall cache usage. Eviction worker
 threads are active when the cache contains at least this much content,
 expressed as a percentage of the total cache size.
 
@@ -72,15 +72,18 @@ The \c eviction_trigger configuration value is the level at which application th
 start to perform the eviction.
 
 The \c eviction_dirty_target and \c eviction_dirty_trigger operate in a similar way to
-the overall targets but only apply to dirty data in cache.  In particular, application
+the overall targets but only apply to dirty data in cache. In particular, application
 threads will be throttled if the percentage of dirty data reaches the
 \c eviction_dirty_trigger. Any page that has been modified since it was read from disk is
 considered dirty.
 
-The \c eviction_updates_target perform eviction in worker threads when the cache contain
+The \c eviction_updates_target perform eviction in worker threads when the cache contains
 at least this many bytes of updates
 
 The \c eviction_updates_trigger trigger application threads to perform eviction when the
 cache contains at least this many bytes of updates.
+
+It is worth noting that for all eviction target and trigger sizes, the target size must be lower
+than its trigger size counterpart.
 
 */

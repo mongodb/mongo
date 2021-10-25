@@ -26,8 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper import copy_wiredtiger_home
-import wiredtiger, wttest
+import wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
@@ -38,8 +37,9 @@ from wtscenario import make_scenarios
 class test_hs05(wttest.WiredTigerTestCase):
     # Force a small cache, but disable eviction of dirty pages until the cache is full.
     conn_config = 'cache_size=50MB,statistics=(fast),'
-    conn_config += 'eviction_dirty_target=100,eviction_dirty_trigger=100,'
-    conn_config += 'eviction_updates_target=100,eviction_updates_trigger=100'
+    conn_config += 'eviction_trigger=100,'
+    conn_config += 'eviction_dirty_target=95,eviction_dirty_trigger=100,'
+    conn_config += 'eviction_updates_target=95,eviction_updates_trigger=100'
     session_config = 'isolation=snapshot'
     stable = 1
     key_format_values = [

@@ -26,7 +26,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat, WT_NOTFOUND
@@ -56,7 +55,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
     scenarios = make_scenarios(in_memory_values, key_format_values, restart_options)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all),log=(enabled=false),eviction_dirty_trigger=5,eviction_updates_trigger=5'
+        config = 'cache_size=50MB,statistics=(all),log=(enabled=false),eviction_dirty_trigger=10,' \
+                 'eviction_updates_trigger=10'
         if self.in_memory:
             config += ',in_memory=true'
         else:
