@@ -42,7 +42,7 @@ namespace mongo {
 /**
  * Contains server/cluster-wide information about Authorization.
  */
-class AuthorizationManagerImpl : public AuthorizationManager {
+class AuthorizationManagerImpl final : public AuthorizationManager {
 public:
     struct InstallMockForTestingOrAuthImpl {
         explicit InstallMockForTestingOrAuthImpl() = default;
