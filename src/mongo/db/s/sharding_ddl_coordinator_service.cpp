@@ -94,7 +94,10 @@ ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(Operati
 }
 
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
-ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
+ShardingDDLCoordinatorService::constructInstance(
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
     auto coord = constructShardingDDLCoordinatorInstance(this, std::move(initialState));
     coord->getConstructionCompletionFuture()
         .thenRunOn(getInstanceCleanupExecutor())

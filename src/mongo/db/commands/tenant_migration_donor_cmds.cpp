@@ -114,22 +114,7 @@ public:
             // with the same migrationId but different options (e.g. tenantId or
             // recipientConnectionString or readPreference).
             uassertStatusOK(donor->checkIfOptionsConflict(stateDoc));
-
-            auto durableState = [&] {
-                try {
-                    return donor->getDurableState(opCtx);
-                } catch (ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-                    // The conflict is discovered while inserting the donor instance's state doc.
-                    // This implies that there is no other instance with the same migrationId, but
-                    // there is another instance with the same tenantId. Therefore, the instance
-                    // above was created by this command, so remove it.
-                    // The status from this exception will be passed to the instance interrupt()
-                    // method.
-                    donorService->releaseInstance(stateDocBson["_id"].wrap(), ex.toStatus());
-                    throw;
-                }
-            }();
-
+            auto durableState = donor->getDurableState(opCtx);
             auto response = Response(durableState.state);
             if (durableState.abortReason) {
                 BSONObjBuilder bob;

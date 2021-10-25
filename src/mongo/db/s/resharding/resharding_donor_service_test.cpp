@@ -103,7 +103,10 @@ public:
     explicit ReshardingDonorServiceForTest(ServiceContext* serviceContext)
         : ReshardingDonorService(serviceContext) {}
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+        OperationContext* opCtx,
+        BSONObj initialState,
+        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override {
         return std::make_shared<DonorStateMachine>(
             this,
             ReshardingDonorDocument::parse({"ReshardingDonorServiceForTest"}, initialState),

@@ -61,7 +61,10 @@ public:
 
     ThreadPool::Limits getThreadPoolLimits() const override;
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
+    std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
+        OperationContext* opCtx,
+        BSONObj initialState,
+        const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) override;
 };
 
 /**

@@ -154,6 +154,26 @@ void setPromiseOkIfNotReady(WithLock lk, Promise& promise) {
 
 }  // namespace
 
+std::shared_ptr<repl::PrimaryOnlyService::Instance> TenantMigrationDonorService::constructInstance(
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
+    auto tenantId = initialState["tenantId"].valueStringData();
+    // Any existing migration for this tenant must be aborted and garbage-collectable.
+    for (auto& instance : existingInstances) {
+        auto typedInstance = checked_cast<const TenantMigrationDonorService::Instance*>(instance);
+        auto durableState = typedInstance->getDurableState(opCtx);
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "tenant " << tenantId << " is already migrating",
+                typedInstance->getTenantId() != tenantId ||
+                    (durableState.state == TenantMigrationDonorStateEnum::kAborted &&
+                     durableState.expireAt));
+    }
+
+    return std::make_shared<TenantMigrationDonorService::Instance>(
+        _serviceContext, this, initialState);
+}
+
 void TenantMigrationDonorService::abortAllMigrations(OperationContext* opCtx) {
     LOGV2(5356301, "Aborting all tenant migrations on donor");
     auto instances = getAllInstances(opCtx);
@@ -255,6 +275,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
         // The migration was resumed on stepup.
 
         _durableState.state = _stateDoc.getState();
+        _durableState.expireAt = _stateDoc.getExpireAt();
         if (_stateDoc.getAbortReason()) {
             auto abortReasonBson = _stateDoc.getAbortReason().get();
             auto code = abortReasonBson["code"].Int();
@@ -401,7 +422,7 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(
 }
 
 TenantMigrationDonorService::Instance::DurableState
-TenantMigrationDonorService::Instance::getDurableState(OperationContext* opCtx) {
+TenantMigrationDonorService::Instance::getDurableState(OperationContext* opCtx) const {
     // Wait for the insert of the state doc to become majority-committed.
     _initialDonorStateDurablePromise.getFuture().get(opCtx);
 
@@ -639,6 +660,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
         .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
             _durableState.state = _stateDoc.getState();
+            _durableState.expireAt = _stateDoc.getExpireAt();
             switch (_durableState.state) {
                 case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
                     setPromiseOkIfNotReady(lg, _initialDonorStateDurablePromise);

@@ -38,7 +38,9 @@ ThreadPool::Limits TenantSplitDonorService::getThreadPoolLimits() const {
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> TenantSplitDonorService::constructInstance(
-    BSONObj initialState) {
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
     return std::make_shared<DonorStateMachine>(this, initialState);
 }
 

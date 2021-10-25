@@ -525,8 +525,17 @@ PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initial
     if (it != _activeInstances.end()) {
         return {it->second.getInstance(), false};
     }
+
+    // Lock _mutex, make this vector & call constructInstance so it can safely check for conflicts.
+    std::vector<const Instance*> existingInstances;
+    for (auto& [instanceId, instance] : _activeInstances) {
+        existingInstances.emplace_back(instance.getInstance().get());
+    }
+
     auto newInstance =
-        _insertNewInstance(lk, constructInstance(std::move(initialState)), std::move(instanceID));
+        _insertNewInstance(lk,
+                           constructInstance(opCtx, std::move(initialState), existingInstances),
+                           std::move(instanceID));
     return {newInstance, true};
 }
 
@@ -700,6 +709,9 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         sleepmillis(100);
     }
 
+    // Must create opCtx before taking _mutex to avoid deadlock.
+    AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+    auto opCtx = cc().makeOperationContext();
     stdx::lock_guard lk(_mutex);
     if (_state != State::kRebuilding || _term != term) {
         // Node stepped down before finishing rebuilding service from previous stepUp.
@@ -722,7 +734,9 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         auto idElem = doc["_id"];
         fassert(4923602, !idElem.eoo());
         auto instanceID = idElem.wrap().getOwned();
-        auto instance = constructInstance(std::move(doc));
+        // Pass existingInstances={} to constructInstance. No need to check for conflicts since
+        // these instances didn't conflict before we rebuilt.
+        auto instance = constructInstance(opCtx.get(), std::move(doc), {});
         [[maybe_unused]] auto newInstance =
             _insertNewInstance(lk, std::move(instance), std::move(instanceID));
     }

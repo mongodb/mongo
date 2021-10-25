@@ -112,7 +112,10 @@ public:
     explicit ReshardingCoordinatorServiceForTest(ServiceContext* serviceContext)
         : ReshardingCoordinatorService(serviceContext) {}
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+        OperationContext* opCtx,
+        BSONObj initialState,
+        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override {
         return std::make_shared<ReshardingCoordinator>(
             this,
             ReshardingCoordinatorDocument::parse(

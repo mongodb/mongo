@@ -62,10 +62,10 @@ public:
         return limits;
     }
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
-        return std::make_shared<TenantMigrationDonorService::Instance>(
-            _serviceContext, this, initialState);
-    }
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+        OperationContext* opCtx,
+        BSONObj initialState,
+        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override;
 
     /**
      * Sends an abort to all tenant migration instances on this donor.
@@ -77,6 +77,7 @@ public:
         struct DurableState {
             TenantMigrationDonorStateEnum state;
             boost::optional<Status> abortReason;
+            boost::optional<mongo::Date_t> expireAt;
         };
 
         explicit Instance(ServiceContext* serviceContext,
@@ -107,7 +108,7 @@ public:
         /**
          * Returns the latest durable migration state.
          */
-        DurableState getDurableState(OperationContext* opCtx);
+        DurableState getDurableState(OperationContext* opCtx) const;
 
         /**
          * Returns a Future that will be resolved when all work associated with this Instance has

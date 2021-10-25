@@ -191,7 +191,10 @@ public:
     explicit ReshardingRecipientServiceForTest(ServiceContext* serviceContext)
         : ReshardingRecipientService(serviceContext) {}
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
+    std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
+        OperationContext* opCtx,
+        BSONObj initialState,
+        const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) override {
         return std::make_shared<RecipientStateMachine>(
             this,
             ReshardingRecipientDocument::parse({"ReshardingRecipientServiceForTest"}, initialState),

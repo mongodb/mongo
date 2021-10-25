@@ -140,7 +140,10 @@ RenameCollectionParticipantService* RenameCollectionParticipantService::getServi
 }
 
 std::shared_ptr<RenameCollectionParticipantService::Instance>
-RenameCollectionParticipantService::constructInstance(BSONObj initialState) {
+RenameCollectionParticipantService::constructInstance(
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
     LOGV2_DEBUG(5515102,
                 2,
                 "Constructing new rename participant",

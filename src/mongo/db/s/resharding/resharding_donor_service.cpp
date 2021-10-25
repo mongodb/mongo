@@ -187,7 +187,9 @@ ThreadPool::Limits ReshardingDonorService::getThreadPoolLimits() const {
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
-    BSONObj initialState) {
+    OperationContext* opCtx,
+    BSONObj initialState,
+    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
     return std::make_shared<DonorStateMachine>(
         this,
         ReshardingDonorDocument::parse({"DonorStateMachine"}, initialState),

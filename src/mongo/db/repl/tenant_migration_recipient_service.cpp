@@ -291,7 +291,10 @@ ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
-    BSONObj initialStateDoc) {
+    OperationContext* opCtx,
+    BSONObj initialStateDoc,
+    const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
+    // TODO (SERVER-59786): check for conflicts here, not RecipientSyncDataCmd::typedRun.
     return std::make_shared<TenantMigrationRecipientService::Instance>(
         _serviceContext, this, initialStateDoc);
 }

@@ -292,9 +292,14 @@ protected:
     };
 
     /**
-     * Constructs a new Instance object with the given initial state.
+     * Constructs a new Instance object with the given initial state. Subclass implementations
+     * should throw ConflictingOperationInProgress if the new instance conflicts with any existing
+     * ones.
      */
-    virtual std::shared_ptr<Instance> constructInstance(BSONObj initialState) = 0;
+    virtual std::shared_ptr<Instance> constructInstance(
+        OperationContext* opCtx,
+        BSONObj initialState,
+        const std::vector<const Instance*>& existingInstances) = 0;
 
     /**
      * Given an InstanceId returns the corresponding running Instance object, or boost::none if
