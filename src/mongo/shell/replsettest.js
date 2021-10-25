@@ -1316,11 +1316,32 @@ var ReplSetTest = function(opts) {
             print("Reconfiguring replica set to add in other nodes");
             for (let i = 2; i <= originalMembers.length; i++) {
                 print("ReplSetTest adding in node " + i);
-                config.members = originalMembers.slice(0, i);
-                // Set a maxTimeMS so reconfig fails if it times out.
-                replSetCommandWithRetry(
-                    master, {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
-                config.version++;
+                assert.soon(function() {
+                    master = self.getPrimary().getDB("admin");
+                    const statusRes =
+                        assert.commandWorked(master.adminCommand({replSetGetStatus: 1}));
+                    const primaryMember = statusRes.members.find((m) => m.self);
+                    config.version = primaryMember.configVersion + 1;
+
+                    config.members = originalMembers.slice(0, i);
+                    cmd = {replSetReconfig: config, maxTimeMS: ReplSetTest.kDefaultTimeoutMS};
+                    print("Running reconfig command: " + tojsononeline(cmd));
+                    const reconfigRes = master.adminCommand(cmd);
+                    const retryableReconfigCodes = [
+                        ErrorCodes.NodeNotFound,
+                        ErrorCodes.NewReplicaSetConfigurationIncompatible,
+                        ErrorCodes.InterruptedDueToReplStateChange,
+                        ErrorCodes.ConfigurationInProgress,
+                        ErrorCodes.CurrentConfigNotCommittedYet,
+                        ErrorCodes.NotWritablePrimary
+                    ];
+                    if (retryableReconfigCodes.includes(reconfigRes.code)) {
+                        print("Retrying reconfig due to " + tojsononeline(reconfigRes));
+                        return false;
+                    }
+                    assert.commandWorked(reconfigRes);
+                    return true;
+                }, "reconfig for fixture set up failed", ReplSetTest.kDefaultTimeoutMS, 1000);
             }
         }
 
