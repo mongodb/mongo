@@ -385,8 +385,12 @@ __sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *ski
     if (ref->state != WT_REF_DISK)
         return (0);
 
-    /* Don't read any pages when the cache is operating in aggressive mode. */
-    if (__wt_cache_aggressive(session)) {
+    /*
+     * Reading any page that is not in the cache will increase the cache size. Perform a set of
+     * checks to verify the cache can handle it.
+     */
+    if (__wt_cache_aggressive(session) || __wt_cache_full(session) || __wt_cache_stuck(session) ||
+      __wt_eviction_needed(session, false, false, NULL)) {
         *skipp = true;
         return (0);
     }
