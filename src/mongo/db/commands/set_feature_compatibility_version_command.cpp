@@ -587,7 +587,7 @@ private:
         }
 
         uassert(ErrorCodes::Error(549181),
-                "Failing upgrade due to 'failDowngrading' failpoint set",
+                "Failing downgrade due to 'failDowngrading' failpoint set",
                 !failDowngrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
