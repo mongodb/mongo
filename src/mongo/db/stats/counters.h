@@ -252,6 +252,37 @@ public:
 
 extern AggStageCounters aggStageCounters;
 
+class OperatorCountersAggExpressions {
+private:
+    struct AggExprCounter {
+        AggExprCounter(StringData name)
+            : metric("operatorCounters.expressions." + name, &counter) {}
+
+        Counter64 counter;
+        ServerStatusMetricField<Counter64> metric;
+    };
+
+public:
+    void addAggExpressionCounter(StringData name) {
+        operatorCountersAggExpressionMap[name] = std::make_unique<AggExprCounter>(name);
+    }
+
+    void mergeCounters(StringMap<uint64_t>& toMerge) {
+        for (auto&& [name, cnt] : toMerge) {
+            if (auto it = operatorCountersAggExpressionMap.find(name);
+                it != operatorCountersAggExpressionMap.end()) {
+                it->second->counter.increment(cnt);
+            }
+        }
+    }
+
+private:
+    // Map of aggregation expressions to the number of occurrences in aggregation pipelines.
+    StringMap<std::unique_ptr<AggExprCounter>> operatorCountersAggExpressionMap = {};
+};
+
+extern OperatorCountersAggExpressions operatorCountersAggExpressions;
+
 /**
  * Global counters for match expressions.
  */
