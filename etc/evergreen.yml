@@ -5984,6 +5984,7 @@ tasks:
   - func: "do watchdog setup"
   - func: "run tests"
     vars:
+      suite: watchdog
       resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
