@@ -100,23 +100,6 @@ bool DBClientBase::isNotPrimaryErrorString(const BSONElement& e) {
         (str::contains(e.valuestr(), "not primary") || str::contains(e.valuestr(), "not master"));
 }
 
-
-enum QueryOptions DBClientBase::availableOptions() {
-    if (!_haveCachedAvailableOptions) {
-        _cachedAvailableOptions = _lookupAvailableOptions();
-        _haveCachedAvailableOptions = true;
-    }
-    return _cachedAvailableOptions;
-}
-
-enum QueryOptions DBClientBase::_lookupAvailableOptions() {
-    BSONObj ret;
-    if (runCommand("admin", BSON("availablequeryoptions" << 1), ret)) {
-        return QueryOptions(ret.getIntField("options"));
-    }
-    return QueryOptions(0);
-}
-
 void DBClientBase::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {
     _metadataWriter = std::move(writer);
 }

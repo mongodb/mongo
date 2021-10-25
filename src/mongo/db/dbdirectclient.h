@@ -107,8 +107,6 @@ public:
 
     double getSoTimeout() const override;
 
-    QueryOptions _lookupAvailableOptions() override;
-
     int getMinWireVersion() final;
     int getMaxWireVersion() final;
 

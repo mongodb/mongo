@@ -157,5 +157,25 @@ TEST_F(DBDirectClientTest, DeleteDocumentIncorrectHintDoesNotThrow) {
     ASSERT_EQ(writeErrors[0].getIntField("code"), ErrorCodes::BadValue);
 }
 
+TEST_F(DBDirectClientTest, ExhaustQuery) {
+    DBDirectClient client(_opCtx);
+    write_ops::InsertCommandRequest insertOp(kNs);
+    const int numDocs = 10;
+    std::vector<BSONObj> docsToInsert{numDocs};
+    for (int i = 0; i < numDocs; ++i) {
+        docsToInsert[i] = BSON("_id" << i);
+    }
+    insertOp.setDocuments(std::move(docsToInsert));
+    auto insertReply = client.insert(insertOp);
+    ASSERT_EQ(insertReply.getN(), numDocs);
+    ASSERT_FALSE(insertReply.getWriteErrors());
+
+    // The query should work even though exhaust mode is requested.
+    int batchSize = 2;
+    auto cursor = client.query(
+        kNs, BSONObj{}, Query{}, 0 /*limit*/, 0 /*skip*/, nullptr, QueryOption_Exhaust, batchSize);
+    ASSERT_EQ(cursor->itcount(), numDocs);
+}
+
 }  // namespace
 }  // namespace mongo

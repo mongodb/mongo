@@ -57,8 +57,10 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        result << "options" << QueryOption_AllSupportedForSharding;
-        return true;
+        // TODO SERVER-60892: Remove this command entirely along with the corresponding mongod
+        // implementation.
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "'availableQueryOptions' command is not supported on mongos");
     }
 
 } clusterAvailableQueryOptionsCmd;

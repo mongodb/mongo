@@ -361,9 +361,6 @@ enum QueryOptions {
     QueryOption_AllSupported = QueryOption_CursorTailable | QueryOption_SecondaryOk |
         QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_Exhaust |
         QueryOption_PartialResults,
-
-    QueryOption_AllSupportedForSharding = QueryOption_CursorTailable | QueryOption_SecondaryOk |
-        QueryOption_NoCursorTimeout | QueryOption_AwaitData | QueryOption_PartialResults,
 };
 
 /**

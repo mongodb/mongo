@@ -119,11 +119,6 @@ double DBDirectClient::getSoTimeout() const {
     return 0;
 }
 
-QueryOptions DBDirectClient::_lookupAvailableOptions() {
-    // Exhaust mode is not available in DBDirectClient.
-    return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
-}
-
 namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
     DirectClientScope directClientScope(opCtx);

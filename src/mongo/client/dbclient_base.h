@@ -83,10 +83,7 @@ public:
     static const uint64_t INVALID_SOCK_CREATION_TIME;
 
     DBClientBase(const ClientAPIVersionParameters* apiParameters = nullptr)
-        : _logLevel(logv2::LogSeverity::Log()),
-          _connectionId(ConnectionIdSequence.fetchAndAdd(1)),
-          _cachedAvailableOptions((enum QueryOptions)0),
-          _haveCachedAvailableOptions(false) {
+        : _logLevel(logv2::LogSeverity::Log()), _connectionId(ConnectionIdSequence.fetchAndAdd(1)) {
         if (apiParameters) {
             _apiParameters = *apiParameters;
         }
@@ -742,14 +739,6 @@ protected:
                       int skip,
                       boost::optional<BSONObj> readConcernObj);
 
-    /**
-     * Looks up the options available on this client. Caches the answer from
-     * _lookupAvailableOptions(), below.
-     */
-    QueryOptions availableOptions();
-
-    virtual QueryOptions _lookupAvailableOptions();
-
     virtual void _auth(const BSONObj& params);
 
     /**
@@ -774,9 +763,6 @@ private:
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;
-
-    enum QueryOptions _cachedAvailableOptions;
-    bool _haveCachedAvailableOptions;
 
     // The operationTime associated with the last command handled by the client.
     Timestamp _lastOperationTime;

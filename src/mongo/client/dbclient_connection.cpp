@@ -625,7 +625,7 @@ unsigned long long DBClientConnection::query(std::function<void(DBClientCursorBa
                                              int queryOptions,
                                              int batchSize,
                                              boost::optional<BSONObj> readConcernObj) {
-    if (!(queryOptions & QueryOption_Exhaust) || !(availableOptions() & QueryOption_Exhaust)) {
+    if (!(queryOptions & QueryOption_Exhaust)) {
         return DBClientBase::query(f,
                                    nsOrUuid,
                                    filter,
