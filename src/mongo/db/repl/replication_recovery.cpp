@@ -56,6 +56,7 @@
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -322,8 +323,14 @@ void ReplicationRecoveryImpl::_assertNoRecoveryNeededOnUnstableCheckpoint(Operat
     }
 }
 
-void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opCtx) {
+void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opCtx,
+                                                           bool duringInitialSync) {
+    _duringInitialSync = duringInitialSync;
+    ScopeGuard resetInitialSyncFlagOnExit([this] { _duringInitialSync = false; });
     auto recoveryTS = recoverFromOplogPrecursor(opCtx, _storageInterface);
+
+    // We support only recovery from stable checkpoints during initial sync.
+    invariant(!_duringInitialSync || recoveryTS);
 
     // Initialize the cached pointer to the oplog collection.
     acquireOplogCollectionForLogging(opCtx);
@@ -359,10 +366,13 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
 
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
-    LOGV2_WARNING(21558,
-                  "Setting mongod to readOnly mode as a result of specifying "
-                  "'recoverFromOplogAsStandalone'");
-    storageGlobalParams.readOnly = true;
+    if (!_duringInitialSync) {
+        LOGV2_WARNING(21558,
+                      "Setting mongod to readOnly mode as a result of specifying "
+                      "'recoverFromOplogAsStandalone'");
+
+        storageGlobalParams.readOnly = true;
+    }
 }
 
 void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) {
@@ -508,10 +518,13 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
           "Starting recovery oplog application at the stable timestamp",
           "stableTimestamp"_attr = stableTimestamp);
 
-    if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp && startupRecoveryForRestore) {
-        LOGV2_WARNING(5576600,
-                      "Replication startup parameter 'startupRecoveryForRestore' is set, "
-                      "recovering without preserving history before top of oplog.");
+    if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp &&
+        (startupRecoveryForRestore || _duringInitialSync)) {
+        if (startupRecoveryForRestore) {
+            LOGV2_WARNING(5576600,
+                          "Replication startup parameter 'startupRecoveryForRestore' is set, "
+                          "recovering without preserving history before top of oplog.");
+        }
         // Take only unstable checkpoints during the recovery process.
         _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
                                                    Timestamp::kAllowUnstableCheckpointsSentinel);
@@ -520,7 +533,8 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
     }
     auto startPoint = _adjustStartPointIfNecessary(opCtx, stableTimestamp);
     _applyToEndOfOplog(opCtx, startPoint, topOfOplog.getTimestamp(), recoveryMode);
-    if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp && startupRecoveryForRestore) {
+    if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp &&
+        (startupRecoveryForRestore || _duringInitialSync)) {
         _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
                                                    topOfOplog.getTimestamp());
     }
@@ -694,7 +708,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     // mode, which discards history before the top of oplog), we aren't doing new checkpoints during
     // recovery so there is no point in advancing the consistency marker and we cannot advance
     // "oldest" becaue it would be later than "stable".
-    const bool advanceTimestampsEachBatch = startupRecoveryForRestore &&
+    const bool advanceTimestampsEachBatch = (startupRecoveryForRestore || _duringInitialSync) &&
         (recoveryMode == RecoveryMode::kStartupFromStableTimestamp ||
          recoveryMode == RecoveryMode::kStartupFromUnstableCheckpoint);
 

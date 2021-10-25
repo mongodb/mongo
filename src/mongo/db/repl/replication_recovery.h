@@ -42,7 +42,8 @@ class StorageInterface;
 class ReplicationConsistencyMarkers;
 
 /**
- * This class is used by the replication system to recover after an unclean shutdown or a rollback.
+ * This class is used by the replication system to recover after an unclean shutdown, a rollback or
+ * during initial sync.
  */
 class ReplicationRecovery {
 public:
@@ -61,7 +62,8 @@ public:
      *  'takeUnstableCheckpointOnShutdown' is specified and an unstable checkpoint is present,
      *  ensures that recovery can be skipped safely.
      */
-    virtual void recoverFromOplogAsStandalone(OperationContext* opCtx) = 0;
+    virtual void recoverFromOplogAsStandalone(OperationContext* opCtx,
+                                              bool duringInitialSync = false) = 0;
 
     /**
      * Recovers the data on disk from the oplog up to and including the given timestamp.
@@ -80,7 +82,8 @@ public:
     void recoverFromOplog(OperationContext* opCtx,
                           boost::optional<Timestamp> stableTimestamp) override;
 
-    void recoverFromOplogAsStandalone(OperationContext* opCtx) override;
+    void recoverFromOplogAsStandalone(OperationContext* opCtx,
+                                      bool duringInitialSync = false) override;
 
     void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) override;
 
@@ -180,6 +183,9 @@ private:
 
     StorageInterface* _storageInterface;
     ReplicationConsistencyMarkers* _consistencyMarkers;
+
+    // Flag to indicate whether the recovery is being done during initial sync or not.
+    bool _duringInitialSync = false;
 };
 
 }  // namespace repl

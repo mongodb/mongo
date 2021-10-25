@@ -45,7 +45,8 @@ public:
     void recoverFromOplog(OperationContext* opCtx,
                           boost::optional<Timestamp> stableTimestamp) override {}
 
-    void recoverFromOplogAsStandalone(OperationContext* opCtx) override {}
+    void recoverFromOplogAsStandalone(OperationContext* opCtx,
+                                      bool duringInitialSync = false) override {}
 
     void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) override {}
 };
