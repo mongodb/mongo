@@ -89,7 +89,8 @@ bool joinShardVersionOperation(OperationContext* opCtx,
                                CollectionShardingRuntime* csr,
                                boost::optional<Lock::DBLock>* dbLock,
                                boost::optional<Lock::CollectionLock>* collLock,
-                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
+                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock,
+                               Milliseconds criticalSectionMaxWait) {
     invariant(collLock->has_value());
     invariant(csrLock->has_value());
 
@@ -106,7 +107,11 @@ bool joinShardVersionOperation(OperationContext* opCtx,
         dbLock->reset();
 
         if (critSecSignal) {
-            critSecSignal->get(opCtx);
+            const auto deadline = criticalSectionMaxWait == Milliseconds::max()
+                ? Date_t::max()
+                : opCtx->getServiceContext()->getFastClockSource()->now() + criticalSectionMaxWait;
+            opCtx->runWithDeadline(
+                deadline, ErrorCodes::ExceededTimeLimit, [&] { critSecSignal->get(opCtx); });
         } else {
             inRecoverOrRefresh->get(opCtx);
         }
@@ -212,6 +217,17 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 "namespace"_attr = nss,
                 "shardVersionReceived"_attr = shardVersionReceived);
 
+    // If we are in a transaction, limit the time we can wait behind the critical section. This is
+    // needed in order to prevent distributed deadlocks in situations where a DDL operation needs to
+    // acquire the critical section on several shards. In that case, a shard running a transaction
+    // could be waiting for the critical section to be exited, while on another shard the
+    // transaction has already executed some statement and stashed locks which prevent the critical
+    // section from being acquired in that node. Limiting the wait behind the critical section will
+    // ensure that the transaction will eventually get aborted.
+    const auto criticalSectionMaxWait = opCtx->inMultiDocumentTransaction()
+        ? Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load())
+        : Milliseconds::max();
+
     boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
     while (true) {
         boost::optional<Lock::DBLock> dbLock;
@@ -223,7 +239,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
         boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
             CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-        if (joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
+        if (joinShardVersionOperation(
+                opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
             continue;
         }
 
@@ -245,7 +262,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
         // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
         // thread and associate it to the CSR.
-        if (!joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
+        if (!joinShardVersionOperation(
+                opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
             // If the shard doesn't yet know its filtering metadata, recovery needs to be run
             const bool runRecover = metadata ? false : true;
             csr->setShardVersionRecoverRefreshFuture(
