@@ -1839,8 +1839,6 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
         setPromiseErrorifNotReady(lk, _dataConsistentPromise, status);
         setPromiseErrorifNotReady(lk, _dataSyncCompletionPromise, status);
 
-        shutdownTarget(lk, _writerPool);
-
         // Save them to join() with it outside of _mutex.
         using std::swap;
         swap(savedDonorOplogFetcher, _donorOplogFetcher);
@@ -1851,7 +1849,10 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
     // Perform join outside the lock to avoid deadlocks.
     joinTarget(savedDonorOplogFetcher);
     joinTarget(savedTenantOplogApplier);
-    joinTarget(savedWriterPool);
+    if (savedWriterPool) {
+        savedWriterPool->shutdown();
+        savedWriterPool->join();
+    }
 }
 
 BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() const {
