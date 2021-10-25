@@ -65,6 +65,7 @@ class StatusWith;
  *      "uuid" : UUID,
  *      "noBalance" : false,
  *      "distributionMode" : "unsharded|sharded",
+ *      "permitMigrations": false
  *   }
  *
  */
@@ -165,6 +166,18 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
+    void setPermitMigrations(bool permit) {
+        if (permit) {
+            _permitMigrations = boost::none;
+        } else {
+            _permitMigrations = permit;
+        }
+    }
+
+    bool getPermitMigrations() const {
+        return _permitMigrations.get_value_or(true);
+    }
+
     void setDistributionMode(DistributionMode distributionMode) {
         _distributionMode = distributionMode;
     }
@@ -206,6 +219,9 @@ private:
 
     // Optional whether balancing is allowed for this collection. If missing, implies true.
     boost::optional<bool> _allowBalance;
+
+    // Optional whether migration is allowed for this collection. If missing, implies true.
+    boost::optional<bool> _permitMigrations;
 };
 
 }  // namespace mongo
