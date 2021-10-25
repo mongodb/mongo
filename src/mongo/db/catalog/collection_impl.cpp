@@ -647,8 +647,10 @@ Collection::Validator CollectionImpl::parseValidator(
             ValidationLevelEnum::moderate)
         allowedFeatures &= ~MatchExpressionParser::AllowedFeatures::kEncryptKeywords;
 
+    expCtx->startExpressionCounters();
     auto statusWithMatcher =
         MatchExpressionParser::parse(validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
+    expCtx->stopExpressionCounters();
 
     if (!statusWithMatcher.isOK()) {
         return {

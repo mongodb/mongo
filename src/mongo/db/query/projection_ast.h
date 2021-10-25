@@ -278,10 +278,17 @@ public:
         bob << "" << other._expr->serialize(false);
 
         // TODO SERVER-31003: add a clone() method to Expression.
-        boost::intrusive_ptr<Expression> clonedExpr =
-            Expression::parseOperand(other._expr->getExpressionContext(),
-                                     bob.obj().firstElement(),
-                                     other._expr->getExpressionContext()->variablesParseState);
+        // Temporary stop expression counters while processing the cloned expression.
+        auto otherCtx = other._expr->getExpressionContext();
+        auto activeCounting = otherCtx->expressionCountersAreActive();
+        if (activeCounting) {
+            otherCtx->enabledCounters = false;
+        }
+        boost::intrusive_ptr<Expression> clonedExpr = Expression::parseOperand(
+            otherCtx, bob.obj().firstElement(), otherCtx->variablesParseState);
+        if (activeCounting) {
+            otherCtx->enabledCounters = true;
+        }
         _expr = clonedExpr;
     }
 

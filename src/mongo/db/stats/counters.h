@@ -336,33 +336,36 @@ public:
 
 extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 
-class OperatorCountersExpressions {
+class OperatorCountersAggExpressions {
 private:
-    struct ExprCounter {
-        ExprCounter(StringData name) : metric("operatorCounters.expressions." + name, &counter) {}
+    struct AggExprCounter {
+        AggExprCounter(StringData name)
+            : metric("operatorCounters.expressions." + name, &counter) {}
 
         Counter64 counter;
         ServerStatusMetricField<Counter64> metric;
     };
 
 public:
-    void addExpressionCounter(StringData name) {
-        operatorCountersExpressionMap[name] = std::make_unique<ExprCounter>(name);
+    void addAggExpressionCounter(StringData name) {
+        operatorCountersAggExpressionMap[name] = std::make_unique<AggExprCounter>(name);
     }
 
-    void incrementExpressionCounter(StringData name) {
-        if (auto it = operatorCountersExpressionMap.find(name);
-            it != operatorCountersExpressionMap.end()) {
-            it->second->counter.increment(1);
+    void mergeCounters(StringMap<uint64_t>& toMerge) {
+        for (auto&& [name, cnt] : toMerge) {
+            if (auto it = operatorCountersAggExpressionMap.find(name);
+                it != operatorCountersAggExpressionMap.end()) {
+                it->second->counter.increment(cnt);
+            }
         }
     }
 
 private:
     // Map of aggregation expressions to the number of occurrences in aggregation pipelines.
-    StringMap<std::unique_ptr<ExprCounter>> operatorCountersExpressionMap = {};
+    StringMap<std::unique_ptr<AggExprCounter>> operatorCountersAggExpressionMap = {};
 };
 
-extern OperatorCountersExpressions operatorCountersExpressions;
+extern OperatorCountersAggExpressions operatorCountersAggExpressions;
 
 /**
  * Global counters for match expressions.
