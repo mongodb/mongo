@@ -605,6 +605,19 @@ functions:
           ${pip3_binary} install psutil
           ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -v -ho WT_TEST -m ${maxruns} -o out.json
 
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/bench/wtperf/wtperf_run_py"
+        shell: bash
+        silent: true
+        script: |
+          set -o errexit
+          ${virtualenv_binary} -p ${python_binary} venv
+          source venv/bin/activate
+          ${pip3_binary} install pymongo[srv]
+          git clone git@github.com:wiredtiger/automation-scripts.git
+          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -c ${perf-test-name} -f out.json -b ${branch_name}
+
   "generic-perf-test-push-results":
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'perf-test-name' variable
@@ -2895,6 +2908,7 @@ tasks:
             source venv/bin/activate
             pip3 install lorem pymongo
             ./run_many_coll.sh ../../mongo/build/opt/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
+
       - command: shell.exec
         params:
           working_dir: mongo-tests/largescale
