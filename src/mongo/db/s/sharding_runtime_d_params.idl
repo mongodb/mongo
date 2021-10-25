@@ -141,3 +141,14 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: shardedIndexConsistencyCheckIntervalMS
         default: 600000
+
+    metadataRefreshInTransactionMaxWaitBehindCritSecMS:
+        description: >-
+          Maximum time in milliseconds to wait behind the critical section when refreshing the
+          filtering metadata within a transaction.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: metadataRefreshInTransactionMaxWaitBehindCritSecMS
+        validator:
+          gte: 0
+        default: 500
