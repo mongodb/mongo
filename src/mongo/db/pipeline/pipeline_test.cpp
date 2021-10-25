@@ -552,6 +552,100 @@ TEST(PipelineOptimizationTest, SortSwapsBeforeUnwindMetaWithoutFieldPath) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, LimitDuplicatesBeforeUnwindWithPreserveNull) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 100}"
+        "]";
+    std::string outputPipe =
+        "[{$limit : 100}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 100}"
+        "]";
+    std::string serializedPipe =
+        "[{$limit : 100}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 100}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LimitDoesNotDuplicatesBeforeUnwindWithoutPreserveNull) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$limit : 100}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$limit : 100}"
+        "]";
+    std::string serializedPipe =
+        "[{$unwind : {path: '$a'}}"
+        ",{$limit : 100}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LimitDuplicatesBeforeSortUnwindAndIsMergedWithSort) {
+    std::string inputPipe =
+        "[{$sort: {b: 1}}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 100}"
+        "]";
+    std::string outputPipe =
+        "[{$sort: {sortKey: {b: 1}, limit: 100}}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 100}"
+        "]";
+    std::string serializedPipe =
+        "[{$sort: {b: 1}}"
+        ",{$limit: 100}"
+        ",{$unwind: {path: \"$a\", preserveNullAndEmptyArrays: true}}"
+        ",{$limit: 100}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortAndLimitSwapsBeforeUnwindAndMerges) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$sort : {b: 1}}"
+        ",{$limit : 5}"
+        "]";
+    std::string outputPipe =
+        "[{$sort : {sortKey: {b: 1}, limit: 5}}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 5}"
+        "]";
+    std::string serializedPipe =
+        "[{$sort: {b: 1}}"
+        ",{$limit: 5}"
+        ",{$unwind: {path: \"$a\", preserveNullAndEmptyArrays: true}}"
+        ",{$limit: 5}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, UnwindLimitLimitPushesSmallestLimitBack) {
+    std::string inputPipe =
+        "[{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 500}"
+        ",{$limit : 50}"
+        ",{$limit : 5}"
+        "]";
+    std::string outputPipe =
+        "[{$limit : 5}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 5}"
+        "]";
+    std::string serializedPipe =
+        "[{$limit : 5}"
+        ",{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        ",{$limit : 5}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, SortMatchProjSkipLimBecomesMatchTopKSortSkipProj) {
     std::string inputPipe =
         "[{$sort: {a: 1}}"
@@ -2944,6 +3038,119 @@ TEST(PipelineOptimizationTest, UnionWithViewsSampleUseCase) {
         " }}"
         "]");
 }
+
+
+std::unique_ptr<Pipeline, PipelineDeleter> getOptimizedPipeline(const BSONObj inputBson) {
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+
+    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+    vector<BSONObj> rawPipeline;
+    for (auto&& stageElem : inputBson["pipeline"].Array()) {
+        ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+        rawPipeline.push_back(stageElem.embeddedObject());
+    }
+    AggregateCommandRequest request(kTestNss, rawPipeline);
+    intrusive_ptr<ExpressionContextForTest> ctx =
+        new ExpressionContextForTest(opCtx.get(), request);
+    ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
+    TempDir tempDir("PipelineTest");
+    ctx->tempDir = tempDir.path();
+
+    auto outputPipe = Pipeline::parse(request.getPipeline(), ctx);
+    outputPipe->optimizePipeline();
+    return outputPipe;
+}
+
+void assertTwoPipelinesOptimizeAndMergeTo(const std::string inputPipe1,
+                                          const std::string inputPipe2,
+                                          const std::string outputPipe) {
+    const BSONObj input1Bson = pipelineFromJsonArray(inputPipe1);
+    const BSONObj input2Bson = pipelineFromJsonArray(inputPipe2);
+    const BSONObj outputBson = pipelineFromJsonArray(outputPipe);
+
+    auto pipeline1 = getOptimizedPipeline(input1Bson);
+    auto pipeline2 = getOptimizedPipeline(input2Bson);
+
+    // Merge the pipelines
+    for (auto source : pipeline2->getSources()) {
+        pipeline1->pushBack(source);
+    }
+    pipeline1->optimizePipeline();
+
+    ASSERT_VALUE_EQ(Value(pipeline1->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
+                    Value(outputBson["pipeline"]));
+}
+
+TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelineDoesNotSwapIfNoPreserve) {
+    std::string inputPipe1 =
+        "[{$unwind : {path: '$a'}}"
+        "]";
+    std::string inputPipe2 =
+        "[{$sort: {b: 1}}"
+        ",{$limit: 5}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind: {path: \"$a\"}}"
+        ",{$sort: {sortKey: {b: 1}, limit: 5}}"
+        "]";
+
+    assertTwoPipelinesOptimizeAndMergeTo(inputPipe1, inputPipe2, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelineDoesSwapWithPreserve) {
+    std::string inputPipe1 =
+        "[{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        "]";
+    std::string inputPipe2 =
+        "[{$sort: {b: 1}}"
+        ",{$limit: 5}"
+        "]";
+    std::string outputPipe =
+        "[{$sort: {sortKey: {b: 1}, limit: 5}}"
+        ",{$unwind: {path: \"$a\", preserveNullAndEmptyArrays: true}}"
+        ",{$limit: 5}"
+        "]";
+
+    assertTwoPipelinesOptimizeAndMergeTo(inputPipe1, inputPipe2, outputPipe);
+}
+
+TEST(PipelineOptimizationTest,
+     MergeUnwindPipelineWithSortLimitPipelineDoesNotSwapWithOverlapPaths) {
+    std::string inputPipe1 =
+        "[{$unwind : {path: '$b', preserveNullAndEmptyArrays: true}}"
+        "]";
+    std::string inputPipe2 =
+        "[{$sort: {b: 1}}"
+        ",{$limit: 5}"
+        "]";
+    std::string outputPipe =
+        "[{$unwind: {path: \"$b\", preserveNullAndEmptyArrays: true}}"
+        ",{$sort: {sortKey: {b: 1}, limit: 5}}"
+        "]";
+
+    assertTwoPipelinesOptimizeAndMergeTo(inputPipe1, inputPipe2, outputPipe);
+}
+
+TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelinePlacesLimitProperly) {
+    std::string inputPipe1 =
+        "[{$unwind : {path: '$a', preserveNullAndEmptyArrays: true}}"
+        "]";
+    std::string inputPipe2 =
+        "[{$sort: {b: 1}}"
+        ",{$limit: 5}"
+        ",{$skip: 4}"
+        "]";
+    std::string outputPipe =
+        "[{$sort: {sortKey: {b: 1}, limit: 5}}"
+        ",{$unwind: {path: \"$a\", preserveNullAndEmptyArrays: true}}"
+        ",{$limit: 5}"
+        ",{$skip: 4}"
+        "]";
+
+    assertTwoPipelinesOptimizeAndMergeTo(inputPipe1, inputPipe2, outputPipe);
+}
+
 }  // namespace Local
 
 namespace Sharded {

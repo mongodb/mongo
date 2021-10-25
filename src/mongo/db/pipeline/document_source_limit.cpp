@@ -67,7 +67,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLimit::doOptimizeAt(
     if (nextLimit) {
         _limit = std::min(_limit, nextLimit->getLimit());
         container->erase(std::next(itr));
-        return itr;
+        return itr == container->begin() ? itr : std::prev(itr);
     }
     return std::next(itr);
 }

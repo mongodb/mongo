@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
@@ -109,6 +111,12 @@ private:
 
     GetNextResult doGetNext() final;
 
+    // Checks if a sort is eligible to be moved before the unwind.
+    bool canPushSortBack(const DocumentSourceSort* sort) const;
+
+    // Checks if a limit is eligible to be moved before the unwind.
+    bool canPushLimitBack(const DocumentSourceLimit* limit) const;
+
     // Configuration state.
     const FieldPath _unwindPath;
     // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
@@ -121,6 +129,11 @@ private:
     // Iteration state.
     class Unwinder;
     std::unique_ptr<Unwinder> _unwinder;
+
+    // If preserveNullAndEmptyArrays is true and unwind is followed by a limit, we can duplicate
+    // the limit before the unwind. We only want to do this if we've found a limit smaller than the
+    // one we already pushed down. boost::none means no push down has occurred yet.
+    boost::optional<long long> _smallestLimitPushedDown;
 };
 
 }  // namespace mongo

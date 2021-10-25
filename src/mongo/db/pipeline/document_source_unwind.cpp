@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_unwind.h"
@@ -226,6 +227,35 @@ DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields), {}};
 }
 
+bool DocumentSourceUnwind::canPushSortBack(const DocumentSourceSort* sort) const {
+    // If the sort has a limit, we should also check that _preserveNullAndEmptyArrays is true,
+    // otherwise when we swap the limit and unwind, we could end up providing fewer results to the
+    // user than expected.
+    if (!sort->hasLimit() || _preserveNullAndEmptyArrays) {
+        auto unwindPath = _unwindPath.fullPath();
+
+        // Checks if any of the $sort's paths depend on the unwind path (or vice versa).
+        SortPattern sortKeyPattern = sort->getSortKeyPattern();
+        bool sortPathMatchesUnwindPath =
+            std::any_of(sortKeyPattern.begin(), sortKeyPattern.end(), [&](auto& sortKey) {
+                // If 'sortKey' is a $meta expression, we can do the swap.
+                if (!sortKey.fieldPath)
+                    return false;
+                return expression::bidirectionalPathPrefixOf(unwindPath,
+                                                             sortKey.fieldPath->fullPath());
+            });
+        return !sortPathMatchesUnwindPath;
+    }
+    return false;
+}
+
+bool DocumentSourceUnwind::canPushLimitBack(const DocumentSourceLimit* limit) const {
+    // If _smallestLimitPushedDown is boost::none, then we have not yet pushed a limit down. So no
+    // matter what the limit is, we should duplicate and push down. Otherwise we should only push
+    // the limit down if it is smaller than the smallest limit we have pushed down so far.
+    return !_smallestLimitPushedDown || limit->getLimit() < _smallestLimitPushedDown.get();
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     tassert(5482200, "DocumentSourceUnwind: itr must point to this object", *itr == this);
@@ -235,25 +265,29 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     }
 
     // If the following stage is $sort (on a different field), push before $unwind.
-    auto nextSort = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
-    if (nextSort) {
-        auto unwindPath = _unwindPath.fullPath();
-
-        // Checks if any of the $sort's paths depend on the unwind path (or vice versa).
-        SortPattern sortKeyPattern = nextSort->getSortKeyPattern();
-        bool sortPathMatchesUnwindPath =
-            std::any_of(sortKeyPattern.begin(), sortKeyPattern.end(), [&](auto& sortKey) {
-                // If 'sortKey' is a $meta expression, we can do the swap.
-                if (!sortKey.fieldPath)
-                    return false;
-                return expression::bidirectionalPathPrefixOf(unwindPath,
-                                                             sortKey.fieldPath->fullPath());
-            });
-
-        if (!sortPathMatchesUnwindPath) {
-            std::swap(*itr, *std::next(itr));
-            return itr == container->begin() ? itr : std::prev(itr);
+    auto next = std::next(itr);
+    auto nextSort = dynamic_cast<DocumentSourceSort*>(next->get());
+    if (nextSort && canPushSortBack(nextSort)) {
+        // If this sort is a top-k sort, we should add a limit after the unwind so that we preserve
+        // behavior and not provide more results than requested.
+        if (nextSort->hasLimit()) {
+            container->insert(
+                std::next(next),
+                DocumentSourceLimit::create(nextSort->getContext(), nextSort->getLimit().get()));
         }
+        std::swap(*itr, *next);
+        return itr == container->begin() ? itr : std::prev(itr);
+    }
+
+    // If _preserveNullAndEmptyArrays is true, and unwind is followed by a limit, we can add a
+    // duplicate limit before the unwind to prevent sources further down the pipeline from giving us
+    // more than we need.
+    auto nextLimit = dynamic_cast<DocumentSourceLimit*>(next->get());
+    if (nextLimit && _preserveNullAndEmptyArrays && canPushLimitBack(nextLimit)) {
+        _smallestLimitPushedDown = nextLimit->getLimit();
+        auto newStageItr = container->insert(
+            itr, DocumentSourceLimit::create(nextLimit->getContext(), nextLimit->getLimit()));
+        return newStageItr == container->begin() ? newStageItr : std::prev(newStageItr);
     }
 
     return std::next(itr);
