@@ -69,6 +69,8 @@ static void remove_records(WT_SESSION *, const char *);
 static void get_file_stats(WT_SESSION *, const char *, uint64_t *, uint64_t *);
 static void set_timing_stress_checkpoint(WT_CONNECTION *);
 static bool check_db_size(WT_SESSION *, const char *);
+static void get_compact_progress(
+  WT_SESSION *session, const char *, uint64_t *, uint64_t *, uint64_t *);
 
 /* Methods implementation. */
 int
@@ -132,6 +134,7 @@ run_test(bool stress_test, bool column_store, const char *home, const char *uri)
     WT_CONNECTION *conn;
     WT_SESSION *session;
     pthread_t thread_checkpoint;
+    uint64_t pages_reviewed, pages_rewritten, pages_selected;
     bool size_check_res;
 
     testutil_make_work_dir(home);
@@ -180,6 +183,8 @@ run_test(bool stress_test, bool column_store, const char *home, const char *uri)
     (void)pthread_join(thread_checkpoint, NULL);
     (void)pthread_join(thread_compact, NULL);
 
+    /* Collect compact progress stats. */
+    get_compact_progress(session, uri, &pages_reviewed, &pages_selected, &pages_rewritten);
     size_check_res = check_db_size(session, uri);
 
     /* Cleanup */
@@ -194,6 +199,12 @@ run_test(bool stress_test, bool column_store, const char *home, const char *uri)
     testutil_check(conn->close(conn, NULL));
     conn = NULL;
 
+    printf(" - Pages reviewed: %" PRIu64 "\n", pages_reviewed);
+    printf(" - Pages selected for being rewritten: %" PRIu64 "\n", pages_selected);
+    printf(" - Pages actually rewritten: %" PRIu64 "\n", pages_rewritten);
+    testutil_assert(pages_reviewed > 0);
+    testutil_assert(pages_selected > 0);
+    testutil_assert(pages_rewritten > 0);
     /*
      * Check if there's more than 10% available space in the file. Checking result here to allow
      * connection to close properly.
@@ -367,6 +378,31 @@ set_timing_stress_checkpoint(WT_CONNECTION *conn)
 
     conn_impl = (WT_CONNECTION_IMPL *)conn;
     conn_impl->timing_stress_flags |= WT_TIMING_STRESS_CHECKPOINT_SLOW;
+}
+
+static void
+get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_reviewed,
+  uint64_t *pages_selected, uint64_t *pages_rewritten)
+{
+
+    WT_CURSOR *cur_stat;
+    char *descr, *str_val;
+    char stat_uri[128];
+
+    sprintf(stat_uri, "statistics:%s", uri);
+    testutil_check(session->open_cursor(session, stat_uri, NULL, "statistics=(all)", &cur_stat));
+
+    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REVIEWED);
+    testutil_check(cur_stat->search(cur_stat));
+    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_reviewed));
+    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_WRITE_SELECTED);
+    testutil_check(cur_stat->search(cur_stat));
+    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_selected));
+    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REWRITTEN);
+    testutil_check(cur_stat->search(cur_stat));
+    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_rewritten));
+
+    testutil_check(cur_stat->close(cur_stat));
 }
 
 static bool
