@@ -39,6 +39,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog_entry_impl.h"
@@ -787,13 +788,13 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     }
 
     uassert(ErrorCodes::InvalidOptions,
-            "Unique indexes are not supported on collections clustered by _id",
+            "Unique indexes are not supported on clustered collections",
             !collection->isClustered() || !spec[IndexDescriptor::kUniqueFieldName].trueValue());
 
     if (IndexDescriptor::isIdIndexPattern(key)) {
         if (collection->isClustered()) {
             return Status(ErrorCodes::CannotCreateIndex,
-                          "cannot create an _id index on a collection already clustered by _id");
+                          "cannot create the _id index on a clustered collection");
         }
 
         BSONElement uniqueElt = spec["unique"];
@@ -814,6 +815,13 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                                                collection->getDefaultCollator())) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "_id index must have the collection default collation");
+        }
+    } else {
+        // Non _id index
+        if (collection->isClustered() &&
+            clustered_util::matchesClusterKey(key, collection->getClusteredInfo())) {
+            return Status(ErrorCodes::CannotCreateIndex,
+                          "cannot create an index with the same key as the cluster key");
         }
     }
 

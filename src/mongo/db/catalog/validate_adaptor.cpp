@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/validate_adaptor.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_consistency.h"
@@ -73,8 +74,9 @@ const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 void _validateClusteredCollectionRecordId(OperationContext* opCtx,
                                           const RecordId& rid,
                                           const BSONObj& doc,
+                                          const ClusteredIndexSpec& indexSpec,
                                           ValidateResults* results) {
-    const auto ridFromDoc = record_id_helpers::keyForDoc(doc);
+    const auto ridFromDoc = record_id_helpers::keyForDoc(doc, indexSpec);
     if (!ridFromDoc.isOK()) {
         results->valid = false;
         results->errors.push_back(str::stream() << rid << " " << ridFromDoc.getStatus().reason());
@@ -86,12 +88,13 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
         KeyString::Builder(KeyString::Version::kLatestVersion, ridFromDoc.getValue());
     const auto ksFromRid = KeyString::Builder(KeyString::Version::kLatestVersion, rid);
 
+    const auto clusterKeyField = clustered_util::getClusterKeyFieldName(indexSpec);
     if (ksFromRid != ksFromBSON) {
         results->valid = false;
-        results->errors.push_back(str::stream()
-                                  << "Document with " << rid << " has mismatched " << doc["_id"]
-                                  << " (RecordId KeyString='" << ksFromRid.toString()
-                                  << "', cluster key KeyString='" << ksFromBSON.toString() << "')");
+        results->errors.push_back(
+            str::stream() << "Document with " << rid << " has mismatched " << doc[clusterKeyField]
+                          << " (RecordId KeyString='" << ksFromRid.toString()
+                          << "', cluster key KeyString='" << ksFromBSON.toString() << "')");
         results->corruptRecords.push_back(rid);
     }
 }
@@ -120,7 +123,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     }
 
     if (coll->isClustered()) {
-        _validateClusteredCollectionRecordId(opCtx, recordId, recordBson, results);
+        _validateClusteredCollectionRecordId(
+            opCtx, recordId, recordBson, coll->getClusteredInfo()->getIndexSpec(), results);
     }
 
     auto& executionCtx = StorageExecutionContext::get(opCtx);

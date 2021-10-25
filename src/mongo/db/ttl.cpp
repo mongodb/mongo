@@ -467,7 +467,7 @@ private:
     }
 
     /*
-     * Removes expired documents from a collection clustered by _id using a bounded collection scan.
+     * Removes expired documents from a clustered collection using a bounded collection scan.
      * On time-series buckets collections, TTL operates on type 'ObjectId'. On general purpose
      * collections, TTL operates on type 'Date'.
      */
@@ -476,7 +476,7 @@ private:
                                    const CollectionPtr& collection) {
         const auto& collOptions = collection->getCollectionOptions();
         uassert(5400701,
-                "collection is not clustered by _id but is described as being TTL",
+                "collection is not clustered but is described as being TTL",
                 collOptions.clusteredIndex);
         invariant(collection->isClustered());
 
@@ -487,10 +487,8 @@ private:
             return;
         }
 
-        LOGV2_DEBUG(5400704,
-                    1,
-                    "running TTL job for collection clustered by _id",
-                    logAttrs(collection->ns()));
+        LOGV2_DEBUG(
+            5400704, 1, "running TTL job for clustered collection", logAttrs(collection->ns()));
 
         const auto startId = makeCollScanStartBound(collection, Date_t::min());
 

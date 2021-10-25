@@ -247,7 +247,7 @@ public:
     /**
      * The key format for this RecordStore's RecordIds.
      *
-     * Collections with clustered indexes on _id may use the String format, however most
+     * Clustered collections may use the String format, however most
      * RecordStores use Long. RecordStores with the String format require callers to provide
      * RecordIds and will not generate them automatically.
      */

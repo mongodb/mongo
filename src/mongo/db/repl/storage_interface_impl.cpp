@@ -709,7 +709,12 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                           makeDeleteStageParamsForDeleteDocuments(),
                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction);
-            } else if (*indexName == kIdIndexName && collection->isClustered()) {
+            } else if (*indexName == kIdIndexName && collection->isClustered() &&
+                       collection->getClusteredInfo()
+                               ->getIndexSpec()
+                               .getKey()
+                               .firstElement()
+                               .fieldNameStringData() == "_id") {
                 // This collection is clustered by _id. Use a bounded collection scan, since a
                 // separate _id index is likely not available.
                 if (boundInclusion != BoundInclusion::kIncludeBothStartAndEndKeys) {

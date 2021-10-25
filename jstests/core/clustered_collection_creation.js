@@ -2,6 +2,8 @@
  * Tests the options used to create a clustered collection. Validates the created collection's
  * listIndexes and listCollections outputs and ensures the clusteredIndex cannot be dropped
  * regardless of the creation options used.
+ * Covers clustering on {_id: 1} for replicated collections, and clustering on non-_id fields for
+ * non-replicated collections.
  *
  * @tags: [
  *   requires_fcv_51,
@@ -40,12 +42,26 @@ const validateListIndexes = function(db, collName, fullCreationOptions) {
     assert.docEq(listIndexes.cursor.firstBatch[0], expectedListIndexesOutput);
 };
 
+// Cannot create an index with the same key as the cluster key
+const validateClusteredIndexAlreadyExists = function(db, collName, fullCreationOptions) {
+    const clusterKey = fullCreationOptions.clusteredIndex.key;
+    const res = db[collName].createIndex(clusterKey);
+    assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
+    const clusterKeyField = Object.keys(clusterKey)[0];
+    if (clusterKeyField == "_id") {
+        assert(res.errmsg.includes("cannot create the _id index on a clustered collection"));
+    } else {
+        assert(res.errmsg.includes("cannot create an index with the same key as the cluster key"));
+    }
+};
+
 // It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the
 // clusteredIndex fail accordingly.
 const validateClusteredIndexUndroppable = function(db, collName, fullCreationOptions) {
     const expectedIndexName = fullCreationOptions.clusteredIndex.name;
+    const expectedIndexKey = fullCreationOptions.clusteredIndex.key;
 
-    assert.commandFailedWithCode(db[collName].dropIndex({_id: 1}), 5979800);
+    assert.commandFailedWithCode(db[collName].dropIndex(expectedIndexKey), 5979800);
 
     assert.commandFailedWithCode(db[collName].dropIndex(expectedIndexName), 5979800);
 
@@ -61,7 +77,12 @@ const validateCreatedCollection = function(db, collName, creationOptions) {
 
     // If the creationOptions don't specify the name, expect the default.
     if (!creationOptions.clusteredIndex.name) {
-        fullCreationOptions.clusteredIndex.name = "_id_";
+        const clusterKey = Object.keys(creationOptions.clusteredIndex.key)[0];
+        if (clusterKey == "_id") {
+            fullCreationOptions.clusteredIndex.name = "_id_";
+        } else {
+            fullCreationOptions.clusteredIndex.name = clusterKey + "_1";
+        }
     }
 
     // If the creationOptions don't specify 'v', expect the default.
@@ -71,6 +92,7 @@ const validateCreatedCollection = function(db, collName, creationOptions) {
 
     validateListCollections(db, collName, fullCreationOptions);
     validateListIndexes(db, collName, fullCreationOptions);
+    validateClusteredIndexAlreadyExists(db, collName, fullCreationOptions);
     validateClusteredIndexUndroppable(db, collName, fullCreationOptions);
 };
 
@@ -79,73 +101,159 @@ const validateCreatedCollection = function(db, collName, creationOptions) {
  */
 const runSuccessfulCreate = function(db, coll, creationOptions) {
     assert.commandWorked(db.createCollection(coll.getName(), creationOptions));
-    validateCreatedCollection(testDB, coll.getName(), creationOptions);
+    validateCreatedCollection(db, coll.getName(), creationOptions);
     coll.drop();
 };
 
-const testDB = db.getSiblingDB(jsTestName());
-const coll = testDB.coll;
-coll.drop();
+const replicatedDB = db.getSiblingDB(jsTestName());
+const nonReplicatedDB = db.getSiblingDB('local');
+const replicatedColl = replicatedDB.coll;
+const nonReplicatedColl = nonReplicatedDB.coll;
 
+replicatedColl.drop();
+nonReplicatedColl.drop();
+
+runSuccessfulCreate(replicatedDB, replicatedColl, {clusteredIndex: {key: {_id: 1}, unique: true}});
 runSuccessfulCreate(
-    testDB, coll, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 5});
+    nonReplicatedDB, nonReplicatedColl, {clusteredIndex: {key: {ts: 1}, unique: true}});
+runSuccessfulCreate(replicatedDB,
+                    replicatedColl,
+                    {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 5});
+runSuccessfulCreate(nonReplicatedDB,
+                    nonReplicatedColl,
+                    {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 5});
+runSuccessfulCreate(nonReplicatedDB,
+                    nonReplicatedColl,
+                    {clusteredIndex: {key: {ts: 1}, unique: true}, expireAfterSeconds: 5});
 
-coll.drop();
+runSuccessfulCreate(replicatedDB,
+                    replicatedColl,
+                    {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true}});
+runSuccessfulCreate(nonReplicatedDB,
+                    nonReplicatedColl,
+                    {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true}});
+runSuccessfulCreate(nonReplicatedDB,
+                    nonReplicatedColl,
+                    {clusteredIndex: {key: {ts: 1}, name: "index_on_ts", unique: true}});
 
-runSuccessfulCreate(testDB, coll, {clusteredIndex: {key: {_id: 1}, unique: true}});
-
-runSuccessfulCreate(
-    testDB, coll, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 5});
-
-runSuccessfulCreate(
-    testDB, coll, {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true}});
-
-runSuccessfulCreate(
-    testDB, coll, {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true, v: 2}});
+runSuccessfulCreate(replicatedDB,
+                    replicatedColl,
+                    {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true, v: 2}});
+runSuccessfulCreate(nonReplicatedDB,
+                    nonReplicatedColl,
+                    {clusteredIndex: {key: {_id: 1}, name: "index_on_id", unique: true, v: 2}});
+runSuccessfulCreate(nonReplicatedDB,
+                    nonReplicatedColl,
+                    {clusteredIndex: {key: {ts: 1}, name: "index_on_ts", unique: true, v: 2}});
 
 // Validate that it's not possible to create a clustered collection as a view.
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(),
-                            {clusteredIndex: {key: {_id: 1}, unique: true}, viewOn: "sourceColl"}),
+    replicatedDB.createCollection(
+        replicatedColl.getName(),
+        {clusteredIndex: {key: {_id: 1}, unique: true}, viewOn: "sourceColl"}),
+    6026500);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(
+        nonReplicatedColl.getName(),
+        {clusteredIndex: {key: {ts: 1}, unique: true}, viewOn: "sourceColl"}),
     6026500);
 
 // Validate that it's not possible to create a clustered collection with {autoIndexId: false}.
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(),
-                            {clusteredIndex: {key: {_id: 1}, unique: true}, autoIndexId: false}),
+    replicatedDB.createCollection(
+        replicatedColl.getName(),
+        {clusteredIndex: {key: {_id: 1}, unique: true}, autoIndexId: false}),
+    6026501);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(
+        nonReplicatedColl.getName(),
+        {clusteredIndex: {key: {ts: 1}, unique: true}, autoIndexId: false}),
     6026501);
 
+// 'unique' field must be present and set to true
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: false}}),
+    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}}}),
+    40414);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(), {clusteredIndex: {key: {ts: 1}}}),
+    40414);
+assert.commandFailedWithCode(
+    replicatedDB.createCollection(replicatedColl.getName(),
+                                  {clusteredIndex: {key: {_id: 1}, unique: false}}),
+    5979700);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {ts: 1}, unique: false}}),
     5979700);
 
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(), {clusteredIndex: {key: {randKey: 1}, unique: true}}),
+    replicatedDB.createCollection(replicatedColl.getName(),
+                                  {clusteredIndex: {key: {randKey: 1}, unique: true}}),
     5979701);
+assert.commandWorked(nonReplicatedDB.createCollection(
+    nonReplicatedColl.getName(), {clusteredIndex: {key: {randKey: 1}, unique: true}}));
+nonReplicatedColl.drop();
+assert.commandFailedWithCode(
+    replicatedDB.createCollection(replicatedColl.getName(),
+                                  {clusteredIndex: {key: {ts: 1}, unique: true}}),
+    5979701);
+
+// Validate that arbitrary cluster keys must not be compounded, must not have nested fields, and
+// that the key must have a value of 1.
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {ts: 1, a: 1}, unique: true}}),
+    6053700);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {'ts.a': 1}, unique: true}}),
+    6053701);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {ts: -1}, unique: true}}),
+    6053702);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {ts: {a: 1}}, unique: true}}),
+    6053702);
 
 // Clustered index legacy format { clusteredIndex: <bool> } is only supported on certain internal
 // namespaces (e.g time-series buckets collections). Additionally, collections that support the
 // legacy format are prohibited from using the other format.
-const bucketsCollName = 'system.buckets.' + coll.getName();
+const bucketsCollName = 'system.buckets.' + replicatedColl.getName();
 assert.commandFailedWithCode(
-    testDB.createCollection(bucketsCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
+    replicatedDB.createCollection(bucketsCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}),
     5979703);
-assert.commandFailedWithCode(testDB.createCollection(coll.getName(), {clusteredIndex: true}),
-                             5979703);
+assert.commandFailedWithCode(
+    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: true}), 5979703);
 
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(),
-                            {clusteredIndex: {key: {_id: 1}, unique: true, randField: 1}}),
+    replicatedDB.createCollection(replicatedColl.getName(),
+                                  {clusteredIndex: {key: {_id: 1}, unique: true, randField: 1}}),
+    40415);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {ts: 1}, unique: true, randField: 1}}),
     40415);
 
 assert.commandFailedWithCode(
-    testDB.createCollection(coll.getName(),
-                            {clusteredIndex: {key: {_id: 1}, unique: true, v: 12345}}),
+    replicatedDB.createCollection(replicatedColl.getName(),
+                                  {clusteredIndex: {key: {_id: 1}, unique: true, v: 12345}}),
+    5979704);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(nonReplicatedColl.getName(),
+                                     {clusteredIndex: {key: {ts: 1}, unique: true, v: 12345}}),
     5979704);
 
 // Invalid 'expireAfterSeconds'.
 assert.commandFailedWithCode(
-    testDB.createCollection(
-        coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: -10}),
+    replicatedDB.createCollection(
+        replicatedColl.getName(),
+        {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: -10}),
+    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    nonReplicatedDB.createCollection(
+        nonReplicatedColl.getName(),
+        {clusteredIndex: {key: {ts: 1}, unique: true}, expireAfterSeconds: -10}),
     ErrorCodes.InvalidOptions);
 })();

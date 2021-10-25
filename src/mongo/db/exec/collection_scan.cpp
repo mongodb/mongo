@@ -70,7 +70,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     _specificStats.tailable = params.tailable;
     if (params.minRecord || params.maxRecord) {
         // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
-        // applies only to forwards scans of the oplog and scans on collections clustered by _id.
+        // applies only to forwards scans of the oplog and scans on clustered collections.
         invariant(!params.resumeAfterRecordId);
         if (collection->ns().isOplog()) {
             invariant(params.direction == CollectionScanParams::FORWARD);

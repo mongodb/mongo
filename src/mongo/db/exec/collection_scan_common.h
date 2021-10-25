@@ -44,7 +44,7 @@ struct CollectionScanParams {
     // reverse scan. A forward scan will start scanning at the document with the lowest RecordId
     // greater than or equal to minRecord. A reverse scan will stop and return EOF on the first
     // document with a RecordId less than minRecord, or a higher record if none exists. May only
-    // be used for scans on collections clustered by _id and forward oplog scans. If exclusive
+    // be used for scans on clustered collections and forward oplog scans. If exclusive
     // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
     // cannot be used in conjunction with 'resumeAfterRecordId'
     boost::optional<RecordId> minRecord;
@@ -53,7 +53,7 @@ struct CollectionScanParams {
     // forward scan. A forward scan will stop and return EOF on the first document with a RecordId
     // greater than maxRecord. A reverse scan will start scanning at the document with the
     // highest RecordId less than or equal to maxRecord, or a lower record if none exists. May
-    // only be used for scans on collections clustered by _id and forward oplog scans. If exclusive
+    // only be used for scans on clustered collections and forward oplog scans. If exclusive
     // bounds are required, a MatchExpression must be passed to the CollectionScan stage. This field
     // cannot be used in conjunction with 'resumeAfterRecordId'.
     boost::optional<RecordId> maxRecord;

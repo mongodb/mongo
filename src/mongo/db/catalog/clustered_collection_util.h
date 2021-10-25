@@ -60,5 +60,16 @@ bool requiresLegacyFormat(const NamespaceString& nss);
  */
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo);
 
+/**
+ * Returns true if the BSON object matches the collection's cluster key.
+ */
+bool matchesClusterKey(const BSONObj& obj,
+                       const boost::optional<ClusteredCollectionInfo>& collInfo);
+
+/**
+ * Returns the field name of a cluster key.
+ */
+StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec);
+
 }  // namespace clustered_util
 }  // namespace mongo

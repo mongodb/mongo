@@ -20,5 +20,6 @@ const bucketsColl = db.getCollection("system.buckets." + coll.getName());
 
 const res = bucketsColl.createIndex({"_id": 1});
 assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
-assert(res.errmsg.includes("cannot create an _id index on a collection already clustered by _id"));
+assert(res.errmsg.includes("cannot create the _id index on a clustered collection") ||
+       res.errmsg.includes("cannot create an _id index on a collection already clustered by _id"));
 })();

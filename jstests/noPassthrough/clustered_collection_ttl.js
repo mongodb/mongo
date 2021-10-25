@@ -8,16 +8,13 @@
  */
 (function() {
 "use strict";
+load("jstests/libs/clustered_indexes_utils.js");
 load('jstests/libs/dateutil.js');
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 
-const clusteredIndexesEnabled =
-    assert.commandWorked(conn.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1}))
-        .featureFlagClusteredIndexes.value;
-
-if (!clusteredIndexesEnabled) {
+if (areClusteredIndexesEnabled(conn) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
     MongoRunner.stopMongod(conn);
     return;

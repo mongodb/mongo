@@ -35,6 +35,7 @@
 
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
@@ -82,22 +83,24 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     return keyForOptime(elem.timestamp());
 }
 
-StatusWith<RecordId> keyForDoc(const BSONObj& doc) {
-    // Build a KeyString as the RecordId using the "_id" field.
-    BSONElement idElem;
-    bool foundId = doc.getObjectID(idElem);
-    if (!foundId) {
+StatusWith<RecordId> keyForDoc(const BSONObj& doc, const ClusteredIndexSpec& indexSpec) {
+    // Get the collection's cluster key field name
+    const auto clusterKeyField = clustered_util::getClusterKeyFieldName(indexSpec);
+    // Build a RecordId using the cluster key.
+    const BSONElement keyElement = doc.getField(clusterKeyField);
+    if (keyElement.eoo()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Document " << redact(doc) << " is missing the '_id' field"};
+                str::stream() << "Document " << redact(doc) << " is missing the '"
+                              << clusterKeyField << "' field"};
     }
 
-    return keyForElem(idElem);
+    return keyForElem(keyElement);
 }
 
 RecordId keyForElem(const BSONElement& elem) {
-    // Intentionally discard the TypeBits since the type information will be stored in the _id of
-    // the original document. The consequence of this behavior is that _id values that compare
-    // similarly, but are of different types may not be used concurrently.
+    // Intentionally discard the TypeBits since the type information will be stored in the cluster
+    // key of the original document. The consequence of this behavior is that cluster key values
+    // that compare similarly, but are of different types may not be used concurrently.
     KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
     keyBuilder.appendBSONElement(elem);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());

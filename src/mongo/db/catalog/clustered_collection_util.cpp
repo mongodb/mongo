@@ -36,6 +36,17 @@ namespace clustered_util {
 
 static constexpr StringData kDefaultClusteredIndexName = "_id_"_sd;
 
+void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
+    if (!indexSpec.getName()) {
+        auto clusterKey = indexSpec.getKey().firstElement().fieldNameStringData();
+        if (clusterKey == "_id") {
+            indexSpec.setName(kDefaultClusteredIndexName);
+        } else {
+            indexSpec.setName(StringData(clusterKey + "_1"));
+        }
+    }
+}
+
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
     auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true};
     indexSpec.setName(kDefaultClusteredIndexName);
@@ -43,9 +54,7 @@ ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
 }
 
 ClusteredCollectionInfo makeCanonicalClusteredInfo(ClusteredIndexSpec indexSpec) {
-    if (!indexSpec.getName()) {
-        indexSpec.setName(kDefaultClusteredIndexName);
-    }
+    ensureClusteredIndexName(indexSpec);
     return ClusteredCollectionInfo(std::move(indexSpec), false);
 }
 
@@ -67,6 +76,7 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
     }
 
     auto indexSpec = ClusteredIndexSpec::parse({"ClusteredUtil::parseClusteredInfo"}, elem.Obj());
+    ensureClusteredIndexName(indexSpec);
     return makeCanonicalClusteredInfo(std::move(indexSpec));
 }
 
@@ -79,6 +89,16 @@ BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo) 
     collInfo.getIndexSpec().serialize(&bob);
     bob.append("clustered", true);
     return bob.obj();
+}
+
+bool matchesClusterKey(const BSONObj& obj,
+                       const boost::optional<ClusteredCollectionInfo>& collInfo) {
+    return obj.firstElement().fieldNameStringData() ==
+        collInfo->getIndexSpec().getKey().firstElement().fieldNameStringData();
+}
+
+StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec) {
+    return indexSpec.getKey().firstElement().fieldNameStringData();
 }
 
 }  // namespace clustered_util

@@ -1485,7 +1485,8 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.engineName = _canonicalName;
     params.isCapped = options.capped;
     params.keyFormat = (options.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
-    // Record stores clustered by _id need to guarantee uniqueness by preventing overwrites.
+    // Record stores for clustered collections need to guarantee uniqueness by preventing
+    // overwrites.
     params.overwrite = options.clusteredIndex ? false : true;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;

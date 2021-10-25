@@ -69,6 +69,7 @@ MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 Status validateClusteredIndexSpec(OperationContext* opCtx,
+                                  const NamespaceString& nss,
                                   const ClusteredIndexSpec& spec,
                                   boost::optional<int64_t> expireAfterSeconds) {
     if (!spec.getUnique()) {
@@ -76,9 +77,33 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
                       "The clusteredIndex option requires unique: true to be specified");
     }
 
-    if (SimpleBSONObjComparator::kInstance.evaluate(spec.getKey() != BSON("_id" << 1))) {
+    bool clusterKeyOnId =
+        SimpleBSONObjComparator::kInstance.evaluate(spec.getKey() == BSON("_id" << 1));
+    if (nss.isReplicated() && !clusterKeyOnId) {
         return Status(ErrorCodes::Error(5979701),
-                      "The clusteredIndex option is only supported for key: {_id: 1}");
+                      "The clusteredIndex option is only supported for key: {_id: 1} on replicated "
+                      "collections");
+    }
+
+    if (spec.getKey().nFields() > 1) {
+        return Status(ErrorCodes::Error(6053700),
+                      "The clusteredIndex option does not support a compound cluster key");
+    }
+
+    const auto arbitraryClusterKeyField = clustered_util::getClusterKeyFieldName(spec);
+    if (arbitraryClusterKeyField.find(".", 0) != std::string::npos) {
+        return Status(
+            ErrorCodes::Error(6053701),
+            "The clusteredIndex option does not support a cluster key with nested fields");
+    }
+
+    const bool isForwardClusterKey = SimpleBSONObjComparator::kInstance.evaluate(
+        spec.getKey() == BSON(arbitraryClusterKeyField << 1));
+    if (!isForwardClusterKey) {
+        return Status(ErrorCodes::Error(6053702),
+                      str::stream()
+                          << "The clusteredIndex option supports cluster keys like {"
+                          << arbitraryClusterKeyField << ": 1}, but got " << spec.getKey());
     }
 
     if (expireAfterSeconds) {
@@ -455,7 +480,7 @@ Status _createCollection(OperationContext* opCtx,
             }
 
             auto clusteredIndexStatus = validateClusteredIndexSpec(
-                opCtx, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
+                opCtx, nss, clusteredIndex->getIndexSpec(), collectionOptions.expireAfterSeconds);
             if (!clusteredIndexStatus.isOK()) {
                 return clusteredIndexStatus;
             }

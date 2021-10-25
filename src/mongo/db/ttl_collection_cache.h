@@ -48,7 +48,7 @@ class TTLCollectionCache {
 public:
     static TTLCollectionCache& get(ServiceContext* ctx);
 
-    // Specifies that a collection is clustered by _id and is TTL.
+    // Specifies that a collection is clustered and is TTL.
     class ClusteredId : public stdx::monostate {};
     // Names an index that is TTL.
     using IndexName = std::string;

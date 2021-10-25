@@ -17,6 +17,7 @@ selector:
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/clustered_indexes.js # DuplicateKeys, too large RecordId's
+  - jstests/core/clustered_indexes_nonreplicated.js # DuplicateKeys, too large RecordId's
   - jstests/core/commands_with_uuid.js
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
