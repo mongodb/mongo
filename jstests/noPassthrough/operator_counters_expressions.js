@@ -67,14 +67,13 @@ function checkAggregationCounters(pipeline, expectedCounters, expectedCount) {
 }
 
 // Find.
-checkFindCounters(
-    {$expr: {$eq: [{$getField: "a$b"}, "foo"]}}, {"$getField": 2, "$eq": 2, "$const": 2}, 3);
+checkFindCounters({$expr: {$eq: [{$getField: "a$b"}, "foo"]}}, {"$getField": 1, "$eq": 1}, 3);
 
 // Update.
 checkCounters(() => assert.commandWorked(coll.update(
                   {_id: 0, $expr: {$eq: [{$getField: {field: "a$b", input: "$$ROOT"}}, "foo"]}},
                   {$set: {y: 10}})),
-              {"$getField": 4, "$const": 6, "$eq": 4});
+              {"$getField": 1, "$eq": 1});
 
 checkCounters(
     () => assert.commandWorked(coll.update(
@@ -96,23 +95,23 @@ checkCounters(() => assert.commandWorked(db.runCommand({
     delete: coll.getName(),
     deletes: [{q: {"_id": {$gt: 1}, $expr: {$eq: [{$getField: "a$b"}, "foo"]}}, limit: 1}]
 })),
-              {"$getField": 4, "$eq": 4, "$const": 6});
+              {"$getField": 1, "$eq": 1});
 
 // In aggregation pipeline.
 let pipeline = [{$project: {_id: 1, test: {$getField: "a$b"}}}];
-checkAggregationCounters(pipeline, {"$getField": 5, "$const": 4}, 2);
+checkAggregationCounters(pipeline, {"$getField": 1}, 2);
 
 pipeline = [{$match: {_id: 1, $expr: {$eq: [{$getField: "a$b"}, "foo"]}}}];
-checkAggregationCounters(pipeline, {"$getField": 5, "$eq": 5, "$const": 6}, 1);
+checkAggregationCounters(pipeline, {"$getField": 1, "$eq": 1}, 1);
 
 pipeline =
     [{$match: {_id: 1, $expr: {$eq: [{$getField: {field: "a$b", input: {"a$b": "b"}}}, "b"]}}}];
-checkAggregationCounters(pipeline, {"$getField": 5, "$const": 9, "$eq": 5}, 1);
+checkAggregationCounters(pipeline, {"$getField": 1, "$eq": 1}, 1);
 
 pipeline = [{
     $project: {_id: 1, test: {$setField: {field: {$const: "a.b"}, input: "$$ROOT", value: "barrr"}}}
 }];
-checkAggregationCounters(pipeline, {"$setField": 5, "$const": 9}, 2);
+checkAggregationCounters(pipeline, {"$setField": 1, "$const": 1}, 2);
 
 // With sub-pipeline.
 const testColl = db.operator_counters_expressions2;
@@ -136,7 +135,7 @@ pipeline = [
         }
     }
 ];
-checkAggregationCounters(pipeline, {"$getField": 10, "$const": 8}, 3);
+checkAggregationCounters(pipeline, {"$getField": 1}, 3);
 
 initTestColl(5);
 pipeline = [
@@ -145,7 +144,7 @@ pipeline = [
         pipeline: [{$project: {x: 1, _id: 0, test: {$getField: "a$b"}}}],
         as: "joinedField"
 }}];
-checkAggregationCounters(pipeline, {"$getField": 9, "$const": 6}, 2);
+checkAggregationCounters(pipeline, {"$getField": 1}, 2);
 
 initTestColl(1);
 let mergePipeline =
@@ -157,14 +156,14 @@ pipeline = [{
 checkCounters(() => {
     coll.aggregate(pipeline).itcount();
     assert.eq(2, testColl.find().itcount());
-}, {"$setField": 4, "$const": 4});
+}, {"$setField": 1});
 
 // Expressions in view pipeline.
 db.view.drop();
 let viewPipeline = [{$match: {$expr: {$eq: [{$getField: "a.b"}, "bar"]}}}];
 assert.commandWorked(
     db.runCommand({create: "view", viewOn: coll.getName(), pipeline: viewPipeline}));
-checkCounters(() => db.view.find().itcount(), {"$getField": 3, "$const": 2, "$eq": 3});
+checkCounters(() => db.view.find().itcount(), {"$getField": 1, "$eq": 1});
 
 // Expressions in document validator.
 checkCounters(() => {
@@ -190,11 +189,11 @@ checkCounters(() => {
 
 // $cond
 pipeline = [{$project: {item: 1, discount: {$cond: {if: {$gte: ["$x", 1]}, then: 10, else: 0}}}}];
-checkAggregationCounters(pipeline, {"$cond": 5, "$gte": 5, "$const": 12}, 2);
+checkAggregationCounters(pipeline, {"$cond": 1, "$gte": 1}, 2);
 
 // $ifNull
 pipeline = [{$project: {description: {$ifNull: ["$description", "Unspecified"]}}}];
-checkAggregationCounters(pipeline, {"$ifNull": 5, "$const": 4}, 2);
+checkAggregationCounters(pipeline, {"$ifNull": 1}, 2);
 
 // $divide, $switch
 let query = {
@@ -210,8 +209,7 @@ let query = {
         ]
     }
 };
-checkFindCounters(
-    query, {"$const": 4, "$divide": 2, "$subtract": 2, "$eq": 2, "$gt": 2, "$switch": 2}, 1);
+checkFindCounters(query, {"$divide": 1, "$subtract": 1, "$eq": 1, "$gt": 1, "$switch": 1}, 1);
 
 // $cmp, $exp, $abs, $range
 pipeline = [{
@@ -222,28 +220,38 @@ pipeline = [{
         rangeField: {$range: [0, "$x", 25]}
     }
 }];
-checkAggregationCounters(pipeline, {"$abs": 5, "$cmp": 5, "$const": 12, "$exp": 5, "$range": 5}, 2);
+checkAggregationCounters(pipeline, {"$abs": 1, "$cmp": 1, "$exp": 1, "$range": 1}, 2);
 
 // $or
 pipeline = [{$match: {$expr: {$or: [{$eq: ["$_id", 0]}, {$eq: ["$x", 1]}]}}}];
-checkAggregationCounters(pipeline, {"$const": 2, "$eq": 6, "$or": 3}, 2);
+checkAggregationCounters(pipeline, {"$eq": 2, "$or": 1}, 2);
 
 // $dateFromParts
 pipeline =
     [{$project: {date: {$dateFromParts: {'year': 2021, 'month': 10, 'day': {$add: ['$x', 10]}}}}}];
-checkAggregationCounters(pipeline, {"$add": 5, "$const": 12, "$dateFromParts": 5}, 2);
+checkAggregationCounters(pipeline, {"$add": 1, "$dateFromParts": 1}, 2);
 
 // $concat
 pipeline = [{$project: {mystring: {$concat: [{$getField: "a$b"}, {$getField: "a.b"}]}}}];
-checkAggregationCounters(pipeline, {"$concat": 5, "$const": 8, "$getField": 10}, 2);
+checkAggregationCounters(pipeline, {"$concat": 1, "$getField": 2}, 2);
 
 // $toDouble
 pipeline = [{$project: {doubleval: {$toDouble: "$_id"}}}];
-checkAggregationCounters(pipeline, {"$const": 4, "$convert": 4, "$toDouble": 1}, 2);
+checkAggregationCounters(pipeline, {"$toDouble": 1}, 2);
 
 // $setIntersection
 pipeline = [{$project: {intersection: {$setIntersection: [[1, 2, 3], [3, 2]]}}}];
-checkAggregationCounters(pipeline, {"$const": 8, "$setIntersection": 2}, 2);
+checkAggregationCounters(pipeline, {"$setIntersection": 1}, 2);
+
+// Expressions in bulk operations.
+const bulkColl = db.operator_counters_expressions3;
+for (let i = 0; i < 3; i++) {
+    assert.commandWorked(bulkColl.insert({_id: i, x: i}));
+}
+const bulkOp = bulkColl.initializeUnorderedBulkOp();
+bulkOp.find({$expr: {$eq: ["$x", 2]}}).update({$set: {x: 10}});
+bulkOp.find({$expr: {$lt: ["$x", 1]}}).remove();
+checkCounters(() => assert.commandWorked(bulkOp.execute()), {"$eq": 1, "$lt": 1});
 
 MongoRunner.stopMongod(mongod);
 })();

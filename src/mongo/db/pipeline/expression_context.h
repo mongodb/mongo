@@ -108,6 +108,15 @@ public:
     };
 
     /**
+     * The structure ExpressionCounters encapsulates counters for match, aggregate, and other
+     * expression types as seen in end-user queries.
+     */
+    struct ExpressionCounters {
+        StringMap<uint64_t> aggExprCountersMap;
+        StringMap<uint64_t> matchExprCountersMap;
+    };
+
+    /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
@@ -344,10 +353,19 @@ public:
     void incrementMatchExprCounter(StringData name);
 
     /**
+     * Increment the counter for the aggregate expression with a given name.
+     */
+    void incrementAggExprCounter(StringData name);
+
+    /**
      * Merge expression counters from the current expression context into the global maps
      * and stop counting.
      */
     void stopExpressionCounters();
+
+    bool expressionCountersAreActive() {
+        return _expressionCounters.is_initialized();
+    }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
@@ -428,6 +446,11 @@ public:
 
     // When non-empty, contains the unmodified user provided aggregation command.
     BSONObj originalAggregateCommand;
+
+    // True if the expression context is the original one for a given pipeline.
+    // False if another context is created for the same pipeline. Used to disable duplicate
+    // expression counting.
+    bool enabledCounters = true;
 
 protected:
     static const int kInterruptCheckPeriod = 128;
