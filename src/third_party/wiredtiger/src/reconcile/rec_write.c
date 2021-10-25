@@ -73,11 +73,9 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     F_SET(session, WT_SESSION_NO_RECONCILE);
 
     /*
-     * Reconciliation locks the page for three reasons:
+     * Reconciliation locks the page for two reasons:
      *    Reconciliation reads the lists of page updates, obsolete updates
      * cannot be discarded while reconciliation is in progress;
-     *    The compaction process reads page modification information, which
-     * reconciliation modifies;
      *    In-memory splits: reconciliation of an internal page cannot handle
      * a child page splitting during the reconciliation.
      */
@@ -97,6 +95,9 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
      * that information.
      */
     ret = __reconcile(session, ref, salvage, flags, &page_locked);
+
+    /* If writing a page in service of compaction, we're done, clear the flag. */
+    F_CLR_ATOMIC(ref->page, WT_PAGE_COMPACTION_WRITE);
 
 err:
     if (page_locked)
@@ -392,14 +393,18 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
     /*
      * If a single root page was written (either an empty page or there was a 1-for-1 page swap),
-     * we've written root and checkpoint, we're done. If the root page split, write the resulting
-     * WT_REF array. We already have an infrastructure for writing pages, create a fake root page
-     * and write it instead of adding code to write blocks based on the list of blocks resulting
-     * from a multiblock reconciliation.
+     * we've written root and checkpoint, we're done. Clear the result of the reconciliation, a root
+     * page never has the structures that would normally be associated with (at least), the
+     * replaced-object flag. If the root page split, write the resulting WT_REF array. We already
+     * have an infrastructure for writing pages, create a fake root page and write it instead of
+     * adding code to write blocks based on the list of blocks resulting from a multiblock
+     * reconciliation.
+     *
      */
     switch (mod->rec_result) {
     case WT_PM_REC_EMPTY:   /* Page is empty */
     case WT_PM_REC_REPLACE: /* 1-for-1 page swap */
+        mod->rec_result = 0;
         return (0);
     case WT_PM_REC_MULTIBLOCK: /* Multiple blocks */
         break;
@@ -1635,12 +1640,11 @@ __rec_split_write_reuse(
     multi->checksum = __wt_checksum(image->data, image->size);
 
     /*
-     * Don't check for a block match when writing blocks during compaction, the whole idea is to
-     * move those blocks. Check after calculating the checksum, we don't distinguish between pages
-     * written solely as part of the compaction and pages written at around the same time, and so
-     * there's a possibility the calculated checksum will be useful in the future.
+     * Don't check for a block match when writing a page for compaction, the whole idea is to move
+     * those blocks. Check after calculating the checksum, there's a possibility the calculated
+     * checksum will be useful in the future.
      */
-    if (session->compact_state != WT_COMPACT_NONE)
+    if (F_ISSET_ATOMIC(r->page, WT_PAGE_COMPACTION_WRITE))
         return (false);
 
     /*
