@@ -212,15 +212,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _performNoopRetryableWriteOnParticipants(opCtx, **executor);
                 }
 
-                if (_doc.getCollInfo()) {
-                    const auto& coll = _doc.getCollInfo().get();
-                    LOGV2_DEBUG(5494504,
-                                2,
-                                "Completing collection drop from previous primary",
-                                "namespace"_attr = coll.getNss());
-                    _dropShardedCollection(opCtx, coll, executor);
-                }
-
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", _dbName);
 
                 // Drop all collections under this DB
@@ -243,6 +234,15 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                         return;  // skip to _flushDatabaseCacheUpdates
                     }
+                }
+
+                if (_doc.getCollInfo()) {
+                    const auto& coll = _doc.getCollInfo().get();
+                    LOGV2_DEBUG(5494504,
+                                2,
+                                "Completing collection drop from previous primary",
+                                "namespace"_attr = coll.getNss());
+                    _dropShardedCollection(opCtx, coll, executor);
                 }
 
                 for (const auto& coll : allCollectionsForDb) {
