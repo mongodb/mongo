@@ -136,6 +136,11 @@ selector:
   - jstests/sharding/retryable_mongos_write_errors.js
   # Requires the fix for SERVER-58104 which was not backported to 3.6.
   - jstests/sharding/balancing_sessions_collection_reshard.js
+
+  exclude_with_any_tags:
+  - multiversion_incompatible
+  - requires_fcv_42
+
 executor:
   config:
     shell_options:

@@ -15,6 +15,10 @@ selector:
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
 
+  exclude_with_any_tags:
+  - multiversion_incompatible
+  - requires_fcv_42
+
 # Multiversion tests start their own mongod's.
 executor:
   config:
