@@ -1,0 +1,166 @@
+# Overrides necessary for killing the primary.
+
+###
+# Shell options.
+###
+- name: replica_sets_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            testingReplication = true;
+            load('jstests/libs/override_methods/network_error_and_txn_override.js');
+            db = connect(TestData.connectionString);
+            load("jstests/libs/override_methods/enable_sessions.js");
+            load("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            load("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
+- name: replcia_sets_reconfig_shell_options_TestData
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+                backgroundReconfigs: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                writeConcern:
+                  w: "majority"
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+
+###
+# Fixture options.
+###
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          enableMajorityReadConcern: ''
+          syncdelay: 5
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+        all_nodes_electable: true
+        num_nodes: 3
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
+- name: replica_sets_reconfig_fixture
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          enableMajorityReadConcern: ''
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+        all_nodes_electable: true
+        num_nodes: 5
+
+###
+# Hook options.
+###
+- name: replica_sets_hooks
+  value:
+    executor:
+      hooks:
+        # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
+        # so we need to allow time for at most 10 operations to be re-run and then re-committed. If
+        # too many network errors occur when re-running a transaction we will run out of retries.
+        - class: ContinuousStepdown
+          kill: true
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+
+- name: replica_sets_reconfig_hooks
+  value:
+    executor:
+      hooks:
+        - class: DoReconfigInBackground
+          shell_options:
+            nodb: ""
+        - class: ContinuousStepdown
+          kill: true
+          background_reconfig: true
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20
+
+###
+# Archival options.
+###
+- name: replica_sets_archive
+  value:
+    executor:
+      archive:
+        tests: true
+        hooks:
+          - CheckReplDBHash
+          - CheckReplOplogs
+          - ValidateCollections
