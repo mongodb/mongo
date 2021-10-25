@@ -147,11 +147,6 @@ public:
             }
 
             if (auto timeseries = cmd.getTimeseries()) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series collection is not enabled",
-                        feature_flags::gTimeseriesCollection.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-
                 for (auto&& option : cmd.toBSON({})) {
                     auto fieldName = option.fieldNameStringData();
 
