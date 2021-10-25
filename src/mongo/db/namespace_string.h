@@ -377,7 +377,7 @@ public:
     bool isTimeseriesBucketsCollection() const;
 
     /**
-     * Returns whether the specified namespace is local.system.preimages.
+     * Returns whether the specified namespace is config.system.preimages.
      */
     bool isChangeStreamPreImagesCollection() const;
 

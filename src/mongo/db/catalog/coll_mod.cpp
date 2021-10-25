@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod_index.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/coll_mod_gen.h"
@@ -519,6 +520,12 @@ Status _collModInternal(OperationContext* opCtx,
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmdObj);
+    }
+
+    if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
+        cmrNew.changeStreamPreAndPostImagesOptions->getEnabled()) {
+        // Create pre-images collection if it doesn't already exist.
+        createChangeStreamPreImagesCollection(opCtx);
     }
 
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {

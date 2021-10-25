@@ -97,7 +97,7 @@ const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::
                                                                "system.replset");
 const NamespaceString NamespaceString::kLastVoteNamespace(NamespaceString::kLocalDb,
                                                           "replset.election");
-const NamespaceString NamespaceString::kChangeStreamPreImagesNamespace(NamespaceString::kLocalDb,
+const NamespaceString NamespaceString::kChangeStreamPreImagesNamespace(NamespaceString::kConfigDb,
                                                                        "system.preimages");
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
                                                                  "system.indexBuilds");

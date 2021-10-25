@@ -34,7 +34,7 @@ const collName4 = 'changeStreamPreAndPostImages4';
 const collName5 = 'changeStreamPreAndPostImages5';
 const collName6 = 'changeStreamPreAndPostImages6';
 const viewName = "view";
-const preimagesCollName = "system.preimages";
+const preImagesCollName = "system.preimages";
 const createTimeseriesOptions = {
     timeField: "a"
 };
@@ -46,7 +46,7 @@ const configDB = primary.getDB("config");
 const testDB = primary.getDB(dbName);
 
 function findPreImagesCollectionDescriptions() {
-    return localDB.runCommand("listCollections", {filter: {name: preimagesCollName}});
+    return configDB.runCommand("listCollections", {filter: {name: preImagesCollName}});
 }
 
 function assertPreImagesCollectionIsAbsent() {
@@ -56,7 +56,7 @@ function assertPreImagesCollectionIsAbsent() {
 
 function assertPreImagesCollectionExists() {
     const result = findPreImagesCollectionDescriptions();
-    assert.eq(result.cursor.firstBatch[0].name, preimagesCollName);
+    assert.eq(result.cursor.firstBatch[0].name, preImagesCollName);
 }
 
 // Verifies that the pre-images collection is clustered by _id.
@@ -86,14 +86,8 @@ for (const db of [localDB, adminDB, configDB]) {
 }
 
 // Drop the pre-images collection.
-assertDropCollection(localDB, preimagesCollName);
+assertDropCollection(configDB, preImagesCollName);
 assertPreImagesCollectionIsAbsent();
-
-// Drop all collections that are used during the test.
-for (const collectionToDelete
-         of [collName, collName2, collName3, collName4, collName5, collName6, viewName]) {
-    assertDropCollection(testDB, collectionToDelete);
-}
 
 // Should be able to enable the 'changeStreamPreAndPostImages' via create or collMod.
 assert.commandWorked(
@@ -103,7 +97,7 @@ assertPreImagesCollectionExists();
 assertPreImagesCollectionIsClustered();
 
 // Drop the pre-images collection.
-assertDropCollection(localDB, preimagesCollName);
+assertDropCollection(configDB, preImagesCollName);
 assertPreImagesCollectionIsAbsent();
 
 assert.commandWorked(testDB.runCommand({create: collName2}));

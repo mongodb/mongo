@@ -17,6 +17,7 @@ load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPo
 
 const testDB = db.getSiblingDB(jsTestName());
 const localDB = db.getSiblingDB("local");
+const configDB = db.getSiblingDB("config");
 const collName = "test";
 const preImagesCollName = "system.preimages";
 const originalDoc = {
@@ -50,7 +51,7 @@ function assertValidChangeStreamPreImageDocument(preImage) {
 
 function testFunc(collOptions = {}) {
     let coll = assertDropAndRecreateCollection(testDB, collName, collOptions);
-    const preImagesColl = assertDropAndRecreateCollection(localDB, preImagesCollName);
+    const preImagesColl = assertDropAndRecreateCollection(configDB, preImagesCollName);
 
     // Perform an insert and an update modification.
     assert.commandWorked(coll.insert(originalDoc));

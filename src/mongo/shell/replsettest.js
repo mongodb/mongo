@@ -2436,8 +2436,11 @@ var ReplSetTest = function(opts) {
                 // sync. It's guaranteed to be eventually consistent. However, tests that initial
                 // sync concurrently with retryable findAndModify statements cannot make this
                 // assumption.
-                const primaryCollections = Object.keys(primaryDBHash.collections)
-                                               .filter((x) => x !== "config.image_collection");
+                // TODO SERVER-60238: remove system.preimages check when replication to secondaries
+                // is implemented.
+                const primaryCollections =
+                    Object.keys(primaryDBHash.collections)
+                        .filter((x) => x !== "config.image_collection" && x !== "system.preimages");
                 assert.commandWorked(primaryDBHash);
 
                 // Filter only collections that were retrieved by the dbhash. listCollections

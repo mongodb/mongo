@@ -41,7 +41,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
@@ -1426,9 +1425,6 @@ void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx,
                                                      ChangeStreamPreAndPostImagesOptions val) {
     if (val.getEnabled()) {
         uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(_ns));
-
-        // Create preimages collection if it doesn't already exist.
-        createChangeStreamPreImagesCollection(opCtx);
     }
 
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
