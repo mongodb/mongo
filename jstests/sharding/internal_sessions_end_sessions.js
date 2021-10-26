@@ -99,9 +99,7 @@ numTransactionsCollEntries++;
 numImageCollEntries++;
 
 assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount());
-// TODO (SERVER-60540): a retryable findAndModify command run inside a retryable internal
-// transaction should have a config.image_collection entry like a regular retryable write.
-// assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
+assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
 
 assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
 assert.eq(1, sessionsCollOnPrimary.find({"_id.id": sessionUUID}).itcount());

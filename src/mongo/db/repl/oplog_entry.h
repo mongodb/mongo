@@ -85,6 +85,12 @@ public:
     }
 
     void setPreImage(BSONObj value) {
+        if (!_fullPreImage.isEmpty()) {
+            uassert(6054003,
+                    "Cannot set pre-image more than once",
+                    _fullPreImage.woCompare(value) == 0);
+            return;
+        }
         _fullPreImage = std::move(value);
     }
 
@@ -93,6 +99,12 @@ public:
     }
 
     void setPostImage(BSONObj value) {
+        if (!_fullPostImage.isEmpty()) {
+            uassert(6054004,
+                    "Cannot set post-image more than once",
+                    _fullPostImage.woCompare(value) == 0);
+            return;
+        }
         _fullPostImage = std::move(value);
     }
 
@@ -117,6 +129,9 @@ public:
 
 private:
     BSONObj _preImageDocumentKey;
+
+    // Used for storing the pre-image and post-image for the operation in-memory regardless of where
+    // the images should be persisted.
     BSONObj _fullPreImage;
     BSONObj _fullPostImage;
 };
@@ -563,6 +578,14 @@ public:
     void setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp);
     void setPostImageOp(const BSONObj& postImageOp);
 
+    void setTimestampForRetryImage(Timestamp value) & {
+        _timestampForRetryImage = std::move(value);
+    }
+
+    boost::optional<Timestamp> getTimestampForRetryImage() const {
+        return _timestampForRetryImage;
+    }
+
     std::string toStringForLogging() const;
 
     /**
@@ -624,6 +647,17 @@ private:
     std::shared_ptr<DurableOplogEntry> _postImageOp;
 
     bool _isForCappedCollection = false;
+
+    // During oplog application on secondaries, oplog entries extracted from each applyOps oplog
+    // entry for a transaction are given the timestamp of the terminal applyOps oplog entry.
+    // Similarly, during oplog replay, oplog entries extracted from each applyOps oplog entry for
+    // a transaction are given the timestamp of the commit oplog entry. As a result, some of those
+    // oplog entries may have timestamp that is not equal to the timestamp of applyOps oplog entry
+    // that they corresponds to, and it is incorrect to use that timestamp when writing image
+    // collection entries. As such, during transaction oplog application, _timestampForRetryImage
+    // will be used to store the timestamp of the applyOps oplog entry that this operation
+    // actually corresponds to if an image collection entry is expected to be written.
+    boost::optional<Timestamp> _timestampForRetryImage = boost::none;
 };
 
 std::ostream& operator<<(std::ostream& s, const DurableOplogEntry& o);

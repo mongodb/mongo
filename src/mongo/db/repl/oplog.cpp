@@ -1550,17 +1550,18 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 if (op.getNeedsRetryImage()) {
-                    writeToImageCollection(opCtx,
-                                           op.getSessionId().get(),
-                                           op.getTxnNumber().get(),
-                                           op.getTimestamp(),
-                                           op.getNeedsRetryImage().get(),
-                                           // If we did not request an image because we're in
-                                           // initial sync, the value passed in here is conveniently
-                                           // the empty BSONObj.
-                                           ur.requestedDocImage,
-                                           getInvalidatingReason(mode, isDataConsistent),
-                                           &upsertConfigImage);
+                    writeToImageCollection(
+                        opCtx,
+                        op.getSessionId().get(),
+                        op.getTxnNumber().get(),
+                        op.getTimestampForRetryImage().value_or(op.getTimestamp()),
+                        op.getNeedsRetryImage().get(),
+                        // If we did not request an image because we're in
+                        // initial sync, the value passed in here is conveniently
+                        // the empty BSONObj.
+                        ur.requestedDocImage,
+                        getInvalidatingReason(mode, isDataConsistent),
+                        &upsertConfigImage);
                 }
 
                 wuow.commit();
@@ -1625,14 +1626,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // isn't strictly necessary for correctness -- the `config.transactions` table
                     // is responsible for whether to retry. The motivation here is to simply reduce
                     // the number of states related documents in the two collections can be in.
-                    writeToImageCollection(opCtx,
-                                           op.getSessionId().get(),
-                                           op.getTxnNumber().get(),
-                                           op.getTimestamp(),
-                                           repl::RetryImageEnum::kPreImage,
-                                           result.requestedPreImage.value_or(BSONObj()),
-                                           getInvalidatingReason(mode, isDataConsistent),
-                                           &upsertConfigImage);
+                    writeToImageCollection(
+                        opCtx,
+                        op.getSessionId().get(),
+                        op.getTxnNumber().get(),
+                        op.getTimestampForRetryImage().value_or(op.getTimestamp()),
+                        repl::RetryImageEnum::kPreImage,
+                        result.requestedPreImage.value_or(BSONObj()),
+                        getInvalidatingReason(mode, isDataConsistent),
+                        &upsertConfigImage);
                 }
 
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary) {

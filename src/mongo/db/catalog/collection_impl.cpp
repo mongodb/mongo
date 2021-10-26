@@ -260,32 +260,44 @@ Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceStri
     return Status::OK();
 }
 
+/**
+ * Returns true if we are running retryable write or retryable internal multi-document transaction.
+ */
 bool isRetryableWrite(OperationContext* opCtx) {
+    if (!opCtx->writesAreReplicated() || !opCtx->isRetryableWrite()) {
+        return false;
+    }
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    const bool inMultiDocumentTransaction = txnParticipant && txnParticipant.transactionIsOpen();
-    return !inMultiDocumentTransaction && opCtx->writesAreReplicated() && opCtx->getTxnNumber();
+    return txnParticipant &&
+        (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
+}
+
+bool shouldStoreImageInSideCollection(OperationContext* opCtx) {
+    // Check if we're in a retryable write that should save the image to `config.image_collection`.
+    // This is the only time `storeFindAndModifyImagesInSideCollection` may be queried for this
+    // transaction.
+    return isRetryableWrite(opCtx) &&
+        repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV() &&
+        repl::gStoreFindAndModifyImagesInSideCollection.load();
 }
 
 std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationContext* opCtx,
                                                                   const int numSlots) {
-    if (isRetryableWrite(opCtx)) {
-        // Check if we're in a retryable write that should save the image to
-        // `config.image_collection`. This is the only time
-        // `storeFindAndModifyImagesInSideCollection` may be queried for this transaction.
-        const bool storeImageInSideCollection =
-            repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV() &&
-            repl::gStoreFindAndModifyImagesInSideCollection.load();
-        if (storeImageInSideCollection) {
-            // We reserve oplog slots here, expecting the slot with the greatest timestmap (say TS)
-            // to be used as the oplog timestamp. Tenant migrations and resharding will forge no-op
-            // image oplog entries and set the timestamp for these synthetic entries to be TS - 1.
-            auto oplogInfo = LocalOplogInfo::get(opCtx);
-            auto slots = oplogInfo->getNextOpTimes(opCtx, numSlots);
-            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots.back().getTimestamp()));
-            return slots;
-        }
+    invariant(isRetryableWrite(opCtx));
+
+    // For retryable findAndModify running in a multi-document transaction, we will reserve the
+    // oplog entries when the transaction prepares or commits without prepare.
+    if (opCtx->inMultiDocumentTransaction()) {
+        return {};
     }
-    return {};
+
+    // We reserve oplog slots here, expecting the slot with the greatest timestmap (say TS) to be
+    // used as the oplog timestamp. Tenant migrations and resharding will forge no-op image oplog
+    // entries and set the timestamp for these synthetic entries to be TS - 1.
+    auto oplogInfo = LocalOplogInfo::get(opCtx);
+    auto slots = oplogInfo->getNextOpTimes(opCtx, numSlots);
+    uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots.back().getTimestamp()));
+    return slots;
 }
 
 
@@ -1168,14 +1180,16 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 
     std::vector<OplogSlot> oplogSlots;
-    if (storeDeletedDoc == Collection::StoreDeletedDoc::On && !getRecordPreImages()) {
-        oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, 2);
-    }
     auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
-    if (storeDeletedDoc == Collection::StoreDeletedDoc::On && isRetryableWrite(opCtx)) {
+    if (storeDeletedDoc == Collection::StoreDeletedDoc::On && !getRecordPreImages() &&
+        isRetryableWrite(opCtx)) {
+        const bool storeImageInSideCollection = shouldStoreImageInSideCollection(opCtx);
         retryableFindAndModifyLocation =
-            (oplogSlots.empty() ? RetryableFindAndModifyLocation::kOplog
-                                : RetryableFindAndModifyLocation::kSideCollection);
+            (storeImageInSideCollection ? RetryableFindAndModifyLocation::kSideCollection
+                                        : RetryableFindAndModifyLocation::kOplog);
+        if (storeImageInSideCollection) {
+            oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, 2);
+        }
     }
     OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
                                     fromMigrate,
@@ -1284,23 +1298,24 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     const bool setNeedsRetryImageOplogField =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
     if (args->oplogSlots.empty() && setNeedsRetryImageOplogField) {
-        // If the update is part of a retryable write and we expect to be storing the pre- or post-
-        // image in a side collection, then we must reserve oplog slots in advance. We expect to
-        // use the reserved oplog slots as follows, where TS is the greatest timestamp of
-        // 'oplogSlots':
-        // TS - 2: If 'getRecordPreImages()' is true, we reserve an extra oplog slot in case we must
-        //         account for storing a pre-image in the oplog and an eventual synthetic no-op
-        //         image oplog used by tenant migrations/resharding.
-        // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
-        //         the entry timestamps to TS - 1.
-        // TS:     The timestamp given to the update oplog entry.
-        const auto numSlotsToReserve = getRecordPreImages() ? 3 : 2;
-        const auto oplogSlots =
-            reserveOplogSlotsForRetryableFindAndModify(opCtx, numSlotsToReserve);
-        args->oplogSlots = oplogSlots;
+        const bool storeImageInSideCollection = shouldStoreImageInSideCollection(opCtx);
         onUpdateArgs.retryableFindAndModifyLocation =
-            (oplogSlots.empty() ? RetryableFindAndModifyLocation::kOplog
-                                : RetryableFindAndModifyLocation::kSideCollection);
+            (storeImageInSideCollection ? RetryableFindAndModifyLocation::kSideCollection
+                                        : RetryableFindAndModifyLocation::kOplog);
+        if (storeImageInSideCollection) {
+            // If the update is part of a retryable write and we expect to be storing the pre- or
+            // post-image in a side collection, then we must reserve oplog slots in advance. We
+            // expect to use the reserved oplog slots as follows, where TS is the greatest
+            // timestamp of 'oplogSlots':
+            // TS - 2: If 'getRecordPreImages()' is true, we reserve an extra oplog slot in case we
+            //         must account for storing a pre-image in the oplog and an eventual synthetic
+            //         no-op image oplog used by tenant migrations/resharding.
+            // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
+            //         the entry timestamps to TS - 1.
+            // TS:     The timestamp given to the update oplog entry.
+            const auto numSlotsToReserve = getRecordPreImages() ? 3 : 2;
+            args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, numSlotsToReserve);
+        }
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
         // function since tenant migrations and resharding rely on always being able to set
@@ -1365,23 +1380,24 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     const bool setNeedsRetryImageOplogField =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
     if (args->oplogSlots.empty() && setNeedsRetryImageOplogField) {
-        // If the update is part of a retryable write and we expect to be storing the pre- or post-
-        // image in a side collection, then we must reserve oplog slots in advance. We expect to
-        // use the reserved oplog slots as follows, where TS is the greatest timestamp of
-        // 'oplogSlots':
-        // TS - 2: If 'getRecordPreImages()' is true, we reserve an extra oplog slot in case we must
-        //         account for storing a pre-image in the oplog and an eventual synthetic no-op
-        //         image oplog used by tenant migrations/resharding.
-        // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
-        //         the entry timestamps to TS - 1.
-        // TS:     The timestamp given to the update oplog entry.
-        const auto numSlotsToReserve = getRecordPreImages() ? 3 : 2;
-        const auto oplogSlots =
-            reserveOplogSlotsForRetryableFindAndModify(opCtx, numSlotsToReserve);
-        args->oplogSlots = oplogSlots;
+        const bool storeImageInSideCollection = shouldStoreImageInSideCollection(opCtx);
         onUpdateArgs.retryableFindAndModifyLocation =
-            (oplogSlots.empty() ? RetryableFindAndModifyLocation::kOplog
-                                : RetryableFindAndModifyLocation::kSideCollection);
+            (storeImageInSideCollection ? RetryableFindAndModifyLocation::kSideCollection
+                                        : RetryableFindAndModifyLocation::kOplog);
+        if (storeImageInSideCollection) {
+            // If the update is part of a retryable write and we expect to be storing the pre- or
+            // post-image in a side collection, then we must reserve oplog slots in advance. We
+            // expect to use the reserved oplog slots as follows, where TS is the greatest
+            // timestamp of 'oplogSlots':
+            // TS - 2: If 'getRecordPreImages()' is true, we reserve an extra oplog slot in case we
+            //         must account for storing a pre-image in the oplog and an eventual synthetic
+            //         no-op image oplog used by tenant migrations/resharding.
+            // TS - 1: Tenant migrations and resharding will forge no-op image oplog entries and set
+            //         the entry timestamps to TS - 1.
+            // TS:     The timestamp given to the update oplog entry.
+            const auto numSlotsToReserve = getRecordPreImages() ? 3 : 2;
+            args->oplogSlots = reserveOplogSlotsForRetryableFindAndModify(opCtx, numSlotsToReserve);
+        }
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
         // function since tenant migrations and resharding rely on always being able to set

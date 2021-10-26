@@ -679,6 +679,10 @@ public:
             return p().transactionOperations;
         }
 
+        size_t getNumberOfPrePostImagesToWriteForTest() const {
+            return p().numberOfPrePostImagesToWrite;
+        }
+
         const Locker* getTxnResourceStashLockerForTest() const {
             invariant(o().txnResourceStash);
             return o().txnResourceStash->locker();

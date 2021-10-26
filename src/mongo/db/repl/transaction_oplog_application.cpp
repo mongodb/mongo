@@ -319,6 +319,12 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
         repl::ApplyOps::extractOperationsTo(operationEntry, lastEntryInTxnObj, &ops);
+        for (auto opIter = ops.begin() + prevOpsEnd; opIter != ops.end(); ++opIter) {
+            auto& op = *opIter;
+            if (op.getNeedsRetryImage()) {
+                op.setTimestampForRetryImage(operationEntry.getTimestamp());
+            }
+        }
 
         // Because BSONArrays do not have fast way of determining size without iterating through
         // them, and we also have no way of knowing how many oplog entries are in a transaction

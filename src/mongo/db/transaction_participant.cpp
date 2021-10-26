@@ -1432,6 +1432,10 @@ void TransactionParticipant::Participant::addTransactionOperation(
         p().transactionOperationBytes += operation.getPreImage().objsize();
         ++p().numberOfPrePostImagesToWrite;
     }
+    if (!operation.getPostImage().isEmpty()) {
+        p().transactionOperationBytes += operation.getPostImage().objsize();
+        ++p().numberOfPrePostImagesToWrite;
+    }
 
     auto transactionSizeLimitBytes = gTransactionSizeLimitBytes.load();
     uassert(ErrorCodes::TransactionTooLarge,

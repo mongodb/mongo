@@ -192,12 +192,16 @@ function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {}) {
     });
 }
 
-function getOplogEntriesForTxn(rs, lsid, txnNumber) {
+function getOplogEntriesForTxnOnNode(node, lsid, txnNumber) {
     const filter = {txnNumber: NumberLong(txnNumber)};
     for (let k in lsid) {
         filter["lsid." + k] = lsid[k];
     }
-    return rs.getPrimary().getCollection("local.oplog.rs").find(filter).sort({_id: 1}).toArray();
+    return node.getCollection("local.oplog.rs").find(filter).sort({_id: 1}).toArray();
+}
+
+function getOplogEntriesForTxn(rs, lsid, txnNumber) {
+    return getOplogEntriesForTxnOnNode(rs.getPrimary(), lsid, txnNumber);
 }
 
 function getTxnEntriesForSession(rs, lsid) {
@@ -206,6 +210,18 @@ function getTxnEntriesForSession(rs, lsid) {
         .find({"_id.id": lsid.id})
         .sort({_id: 1})
         .toArray();
+}
+
+function getImageEntriesForTxnOnNode(node, lsid, txnNumber) {
+    const filter = {txnNum: NumberLong(txnNumber)};
+    for (let k in lsid) {
+        filter["_id." + k] = lsid[k];
+    }
+    return node.getCollection("config.image_collection").find(filter).sort({_id: 1}).toArray();
+}
+
+function getImageEntriesForTxn(rs, lsid, txnNumber) {
+    return getImageEntriesForTxnOnNode(rs.getPrimary(), lsid, txnNumber);
 }
 
 function makeCommitTransactionCmdObj(lsid, txnNumber) {

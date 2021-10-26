@@ -145,9 +145,7 @@ assert.commandWorked(testDB.runCommand(
 jsTest.log("Verify that the config.transactions entry for the retryable internal transaction for " +
            "the findAndModify did not get reaped although there is already a new retryable write");
 assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount());
-// TODO (SERVER-60540): a retryable findAndModify command run inside a retryable internal
-// transaction should have a config.image_collection entry like a regular retryable write.
-// assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
+assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
 
 assert.eq({_id: 0, a: 0, b: 0, c: 0, d: 0, e: 0},
           testDB.getCollection(kCollName).findOne({_id: 0}));
@@ -157,7 +155,7 @@ assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 
 
 assert.eq(1, sessionsCollOnPrimary.find({"_id.id": sessionUUID}).itcount());
 assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount());
-// assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
+assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
 
 assert.commandWorked(shard0Primary.adminCommand({reapLogicalSessionCacheNow: 1}));
 
@@ -169,7 +167,7 @@ assert.eq(1, sessionsCollOnPrimary.find({"_id.id": sessionUUID}).itcount());
 assert.eq(numTransactionsCollEntries,
           transactionsCollOnPrimary.find().itcount(),
           tojson(transactionsCollOnPrimary.find().toArray()));
-// assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
+assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
 
 // Remove the session doc so the parent session gets reaped when reapLogicalSessionCacheNow is run.
 assert.commandWorked(sessionsCollOnPrimary.remove({}));

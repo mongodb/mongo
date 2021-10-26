@@ -639,7 +639,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             !(inTransaction && replCoord->isOplogDisabledFor(opCtx, nsString)));
 
 
-    const auto stmtId = 0;
+    const auto stmtId = req.getStmtId().value_or(0);
     if (opCtx->isRetryableWrite()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
         if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {

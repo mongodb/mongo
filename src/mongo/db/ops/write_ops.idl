@@ -417,6 +417,10 @@ commands:
                 description: "When true, returns the modified document rather than the original."
                 type: safeBool
                 optional: true
+            stmtId:
+                description: "The statement number for this findAndModify operation."
+                type: int
+                optional: true
             bypassDocumentValidation:
                 description: "Enables the operation to bypass document validation. This lets you
                               write documents that do not meet the validation requirements."
