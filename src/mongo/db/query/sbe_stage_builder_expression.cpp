@@ -1779,8 +1779,13 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
     void visit(const ExpressionFieldPath* expr) final {
-        if (auto it = _context->state.optimizedExprs.find(expr);
-            it != _context->state.optimizedExprs.end()) {
+        // There's a chance that we've already generated a SBE plan stage tree for this field path,
+        // in which case we avoid regeration of the same plan stage tree.
+        if (auto it = _context->state.preGeneratedExprs.find(expr->getFieldPath().fullPath());
+            it != _context->state.preGeneratedExprs.end()) {
+            tassert(6089301,
+                    "Expressions for top-level document or a variable must not be pre-generated",
+                    expr->getFieldPath().getPathLength() != 1 && !expr->isVariableReference());
             _context->pushExpr(it->second->clone());
             return;
         }
@@ -3683,7 +3688,7 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
 }
 
 EvalExprStagePair generateExpression(StageBuilderState& state,
-                                     Expression* expr,
+                                     const Expression* expr,
                                      EvalStage stage,
                                      boost::optional<sbe::value::SlotId> optionalRootSlot,
                                      PlanNodeId planNodeId) {

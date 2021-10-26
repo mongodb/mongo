@@ -2061,17 +2061,138 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 namespace {
 const size_t kGroupBySlots = 1;
 
+template <typename F>
+struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
+    // To avoid overloaded-virtual warnings.
+    using SelectiveConstExpressionVisitorBase::visit;
+
+    FieldPathVisitor(const F& fn) : _fn(fn) {}
+
+    void visit(const ExpressionFieldPath* expr) final {
+        _fn(expr);
+    }
+
+    F _fn;
+};
+
+/**
+ * Walks through the 'expr' expression tree and whenever finds an 'ExpressionFieldPath', calls
+ * the 'fn' function. Type requirement for 'fn' is it must have a const 'ExpressionFieldPath'
+ * pointer parameter.
+ */
+template <typename F>
+void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
+    FieldPathVisitor<F> visitor(fn);
+    ExpressionWalker walker(&visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+    expression_walker::walk(expr, &walker);
+}
+
+/**
+ * Checks whether all field paths in 'idExpr' and all accumulator expressions are top-level ones.
+ */
+bool checkAllFieldPathsAreTopLevel(const StringMap<boost::intrusive_ptr<Expression>>& idExpr,
+                                   const std::vector<AccumulationStatement>& accStmts) {
+    auto areAllTopLevelFields = true;
+
+    auto checkFieldPath = [&](const ExpressionFieldPath* fieldExpr) {
+        // We optimize neither a field path for the top-level document itself (getPathLength() == 1)
+        // nor a field path that refers to a variable. We can optimize only top-level fields
+        // (getPathLength() == 2).
+        if (fieldExpr->getFieldPath().getPathLength() != 2 || fieldExpr->isVariableReference()) {
+            areAllTopLevelFields = false;
+            return;
+        }
+    };
+
+    // Checks field paths from the group-by expression.
+    walkAndActOnFieldPaths(idExpr.at("_id").get(), checkFieldPath);
+
+    // Checks field paths from the accumulator expressions.
+    for (auto&& accStmt : accStmts) {
+        walkAndActOnFieldPaths(accStmt.expr.argument.get(), checkFieldPath);
+    }
+
+    return areAllTopLevelFields;
+}
+
+/**
+ * If there are adjacent $group stages in a pipeline and two $group stages are pushed down together,
+ * the first $group becomes a child GROUP node and the second $group becomes a parent GROUP node in
+ * a query solution tree. In the case that all field paths are top-level fields for the parent GROUP
+ * node, we can skip the mkbson stage of the child GROUP node and instead, the child GROUP node
+ * returns top-level fields and their associated slots. If a field path is found in child outputs,
+ * we should replace getField() by the associated slot because there's no object on which we can
+ * call getField().
+ *
+ * Also deduplicates field lookups for a field path which is accessed multiple times.
+ */
+EvalStage optimizeFieldPaths(StageBuilderState& state,
+                             Expression* expr,
+                             EvalStage childEvalStage,
+                             const PlanStageSlots& childOutputs,
+                             PlanNodeId nodeId) {
+    using namespace fmt::literals;
+    auto optionalRootSlot = childOutputs.getIfExists(SlotBasedStageBuilder::kResult);
+    // Absent root slot means that we optimized away mkbson stage and so, we need to search
+    // top-level field names in child outputs.
+    auto searchInChildOutputs = !optionalRootSlot.has_value();
+    auto retEvalStage = std::move(childEvalStage);
+
+    walkAndActOnFieldPaths(expr, [&](const ExpressionFieldPath* fieldExpr) {
+        // We optimize neither a field path for the top-level document itself nor a field path that
+        // refers to a variable instead of calling getField().
+        if (fieldExpr->getFieldPath().getPathLength() == 1 || fieldExpr->isVariableReference()) {
+            return;
+        }
+
+        auto fieldPathStr = fieldExpr->getFieldPath().fullPath();
+        if (searchInChildOutputs) {
+            if (auto optionalFieldPathSlot = childOutputs.getIfExists(fieldPathStr);
+                optionalFieldPathSlot) {
+                state.preGeneratedExprs.emplace(fieldPathStr, makeVariable(*optionalFieldPathSlot));
+            } else {
+                // getField('fieldPathStr') on a slot containing a BSONObj would have produced
+                // 'Nothing' if mkbson stage removal optimization didn't occur. So, generates a
+                // 'Nothing' const expression to simulate such a result.
+                state.preGeneratedExprs.emplace(
+                    fieldPathStr, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
+            }
+
+            return;
+        }
+
+        if (!state.preGeneratedExprs.contains(fieldPathStr)) {
+            auto [curEvalExpr, curEvalStage] = generateExpression(
+                state, fieldExpr, std::move(retEvalStage), optionalRootSlot, nodeId);
+            auto optionalFieldPathSlot = curEvalExpr.getSlot();
+            tassert(
+                6089300, "Must have a valid slot for "_format(fieldPathStr), optionalFieldPathSlot);
+            state.preGeneratedExprs.emplace(fieldPathStr, makeVariable(*optionalFieldPathSlot));
+            retEvalStage = std::move(curEvalStage);
+        }
+    });
+
+    return retEvalStage;
+}
+
 std::pair<sbe::value::SlotId, EvalStage> generateGroupByKey(
     StageBuilderState& state,
     Expression* idExpr,
-    boost::optional<sbe::value::SlotId> optionalRootSlot,
-    EvalStage childEvalStage,
+    const PlanStageSlots& childOutputs,
+    std::unique_ptr<sbe::PlanStage> childStage,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
+    auto optionalRootSlot = childOutputs.getIfExists(SlotBasedStageBuilder::kResult);
+    EvalStage childEvalStage{std::move(childStage),
+                             optionalRootSlot ? sbe::value::SlotVector{*optionalRootSlot}
+                                              : sbe::value::SlotVector{}};
+    auto evalStage =
+        optimizeFieldPaths(state, idExpr, std::move(childEvalStage), childOutputs, nodeId);
+
     // TODO SERVER-59951: make object form of the '_id' group-by expression work to handle multiple
     // group-by keys.
     auto [groupByEvalExpr, groupByEvalStage] = stage_builder::generateExpression(
-        state, idExpr, std::move(childEvalStage), optionalRootSlot, nodeId);
+        state, idExpr, std::move(evalStage), optionalRootSlot, nodeId);
 
     if (auto isConstIdExpr = dynamic_cast<ExpressionConstant*>(idExpr) != nullptr; isConstIdExpr) {
         return projectEvalExpr(
@@ -2090,13 +2211,16 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
     StageBuilderState& state,
     const AccumulationStatement& accStmt,
     EvalStage childEvalStage,
-    boost::optional<sbe::value::SlotId> optionalRootSlot,
+    const PlanStageSlots& childOutputs,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>>& accSlotToExprMap) {
     // Input fields may need field traversal which ends up being a complex tree.
+    auto evalStage = optimizeFieldPaths(
+        state, accStmt.expr.argument.get(), std::move(childEvalStage), childOutputs, nodeId);
+    auto optionalRootSlot = childOutputs.getIfExists(SlotBasedStageBuilder::kResult);
     auto [argExpr, accArgEvalStage] = stage_builder::buildArgument(
-        state, accStmt, std::move(childEvalStage), optionalRootSlot, nodeId);
+        state, accStmt, std::move(evalStage), optionalRootSlot, nodeId);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2168,97 +2292,6 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
 
     return {std::move(fieldNames), std::move(finalSlots), std::move(retEvalStage)};
 }
-
-template <typename F>
-struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
-    // To avoid overloaded-virtual warnings.
-    using SelectiveConstExpressionVisitorBase::visit;
-
-    FieldPathVisitor(const F& fn) : _fn(fn) {}
-
-    void visit(const ExpressionFieldPath* expr) final {
-        _fn(expr);
-    }
-
-    F _fn;
-};
-
-/**
- * Walks through the 'expr' expression tree and whenever finds an 'ExpressionFieldPath', calls
- * the 'fn' function. Type requirement for 'fn' is it must have a const 'ExpressionFieldPath'
- * pointer parameter.
- */
-template <typename F>
-void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
-    FieldPathVisitor<F> visitor(fn);
-    ExpressionWalker walker(&visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
-    expression_walker::walk(expr, &walker);
-}
-
-/**
- * Checks whether all field paths in 'idExpr' and all accumulator expressions are top-level ones.
- */
-bool checkAllFieldPaths(const StringMap<boost::intrusive_ptr<Expression>>& idExpr,
-                        const std::vector<AccumulationStatement>& accStmts) {
-    auto areAllTopLevelFields = true;
-
-    auto checkFieldPath = [&](const ExpressionFieldPath* fieldExpr) {
-        // We optimize neither a field path for the top-level document itself nor a field path that
-        // refers to a variable.
-        if (fieldExpr->getFieldPath().getPathLength() == 1 || fieldExpr->isVariableReference()) {
-            areAllTopLevelFields = false;
-            return;
-        }
-
-        if (auto fieldPath = fieldExpr->getFieldPathWithoutCurrentPrefix();
-            fieldPath.getPathLength() != 1) {
-            areAllTopLevelFields = false;
-        }
-    };
-
-    // Checks field paths from the group-by expression.
-    walkAndActOnFieldPaths(idExpr.at("_id").get(), checkFieldPath);
-
-    // Checks field paths from the accumulator expressions.
-    for (auto&& accStmt : accStmts) {
-        walkAndActOnFieldPaths(accStmt.expr.argument.get(), checkFieldPath);
-    }
-
-    return areAllTopLevelFields;
-}
-
-/**
- * If there are adjacent '$group's in a pipeline and two '$group's are pushed down together,
- * the first $group becomes a child GROUP node and the second $group becomes a parent GROUP node in
- * a query solution tree. In case that all field paths are top-level fields for the parent GROUP
- * node, we can skip the mkbson stage of the child GROUP node and instead, the child GROUP node
- * returns top-level fields and their associated slots. If a field path is found in child outputs,
- * we should replace getField() by the associated slot because there's no object on which we can
- * call getField().
- */
-void optimizeFieldPaths(StageBuilderState& state,
-                        Expression* expr,
-                        const PlanStageSlots& childOutputs) {
-    walkAndActOnFieldPaths(expr, [&](const ExpressionFieldPath* fieldExpr) {
-        // We optimize neither a field path for the top-level document itself nor a field path that
-        // refers to a variable.
-        if (fieldExpr->getFieldPath().getPathLength() == 1 || fieldExpr->isVariableReference()) {
-            return;
-        }
-
-        if (auto optionalSlotId =
-                childOutputs.getIfExists(fieldExpr->getFieldPathWithoutCurrentPrefix().fullPath());
-            optionalSlotId) {
-            state.optimizedExprs.emplace(fieldExpr, makeVariable(*optionalSlotId));
-        } else {
-            // If a field is not found in child outputs, getField() on BSONObj which would have been
-            // returned without optimization will produce Nothing. So, generates a Nothing const
-            // expression to simulate such a result.
-            state.optimizedExprs.emplace(
-                fieldExpr, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
-        }
-    });
-}
 }  // namespace
 
 /**
@@ -2307,7 +2340,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const auto& accStmts = groupNode->accumulators;
     auto childStageType = childNode->getType();
 
-    auto areAllTopLevelFields = checkAllFieldPaths(idExpr, accStmts);
+    auto areAllTopLevelFields = checkAllFieldPathsAreTopLevel(idExpr, accStmts);
 
     auto childReqs = reqs.copy();
     if (childStageType == StageType::STAGE_GROUP && areAllTopLevelFields) {
@@ -2319,27 +2352,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Builds the child and gets the child result slot.
     auto [childStage, childOutputs] = build(childNode, childReqs);
-    auto optionalChildResult = childOutputs.getIfExists(kResult);
-    EvalStage childEvalStage{std::move(childStage),
-                             optionalChildResult ? sbe::value::SlotVector{*optionalChildResult}
-                                                 : sbe::value::SlotVector{}};
     _shouldProduceRecordIdSlot = false;
-    // We can optimize field paths only when we successfully avoid unnecessary materialization.
-    auto canOptimizeFieldPaths = !optionalChildResult.has_value();
 
     tassert(6075900,
-            "Expected no optimized expressions but got: {}"_format(_state.optimizedExprs.size()),
-            _state.optimizedExprs.empty());
+            "Expected no optimized expressions but got: {}"_format(_state.preGeneratedExprs.size()),
+            _state.preGeneratedExprs.empty());
 
-    if (canOptimizeFieldPaths) {
-        optimizeFieldPaths(_state, idExpr.at("_id").get(), childOutputs);
-    }
     // Translates the group-by expression and wraps it with 'fillEmpty(..., null)' because the
     // missing field value for _id should be mapped to 'Null'.
     auto [groupBySlot, groupByEvalStage] = generateGroupByKey(_state,
                                                               idExpr.at("_id").get(),
-                                                              optionalChildResult,
-                                                              std::move(childEvalStage),
+                                                              childOutputs,
+                                                              std::move(childStage),
                                                               nodeId,
                                                               &_slotIdGenerator);
 
@@ -2349,14 +2373,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> accSlotToExprMap;
     std::vector<sbe::value::SlotVector> aggSlotsVec;
     for (const auto& accStmt : accStmts) {
-        if (canOptimizeFieldPaths) {
-            optimizeFieldPaths(_state, accStmt.expr.argument.get(), childOutputs);
-        }
-
         auto [aggSlots, tempEvalStage] = generateAccumulator(_state,
                                                              accStmt,
                                                              std::move(accProjEvalStage),
-                                                             optionalChildResult,
+                                                             childOutputs,
                                                              nodeId,
                                                              &_slotIdGenerator,
                                                              accSlotToExprMap);
@@ -2400,8 +2420,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             finalSlots.size() == kGroupBySlots + accStmts.size());
 
     // Cleans up optimized expressions.
-    stdx::unordered_map<const Expression*, std::unique_ptr<sbe::EExpression>>().swap(
-        _state.optimizedExprs);
+    _state.preGeneratedExprs.clear();
 
     PlanStageSlots outputs;
     std::unique_ptr<sbe::PlanStage> outStage;
@@ -2425,7 +2444,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      nodeId);
     } else {
         for (size_t i = 0; i < finalSlots.size(); ++i) {
-            outputs.set(fieldNames[i], finalSlots[i]);
+            outputs.set("CURRENT." + fieldNames[i], finalSlots[i]);
         };
 
         outStage = std::move(groupFinalEvalStage.stage);

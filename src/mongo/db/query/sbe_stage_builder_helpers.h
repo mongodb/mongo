@@ -845,8 +845,10 @@ struct StageBuilderState {
     // flags to true so that shards can sends special partial aggregation results to the mongos.
     bool needsMerge;
     // This map is used to plumb through pre-generated field expressions ('sbe::EExpression')
-    // corresponding to 'ExpressionFieldPath' to 'generateExpression'.
-    stdx::unordered_map<const Expression*, std::unique_ptr<sbe::EExpression>> optimizedExprs;
+    // corresponding to field paths to 'generateExpression' to avoid repeated expression generation.
+    // Key is expected to represent field paths in form CURRENT.<field_name>[.<field_name>]*.
+    stdx::unordered_map<std::string /*field path*/, std::unique_ptr<sbe::EExpression>>
+        preGeneratedExprs;
 };
 
 }  // namespace mongo::stage_builder
