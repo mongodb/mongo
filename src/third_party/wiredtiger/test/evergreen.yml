@@ -603,7 +603,8 @@ functions:
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
           ${pip3_binary} install psutil
-          ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -v -ho WT_TEST -m ${maxruns} -o out.json
+          ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -b -v -o test_stats/evergreen_out.json
+          ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -re -v -o test_stats/atlas_out.json
 
     - command: shell.exec
       params:
@@ -616,21 +617,23 @@ functions:
           source venv/bin/activate
           ${pip3_binary} install pymongo[srv]
           git clone git@github.com:wiredtiger/automation-scripts.git
-          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -c ${perf-test-name} -f out.json -b ${branch_name}
+          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -c ${perf-test-name} -f test_stats/atlas_out.json -b ${branch_name}
 
-  "generic-perf-test-push-results":
+    - command: perf.send
+      params:
+        file: ./wiredtiger/bench/wtperf/wtperf_run_py/test_stats/evergreen_out.json
+
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'perf-test-name' variable
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        local_file: wiredtiger/bench/wtperf/wtperf_run_py/out.json
+        local_files_include_filter: wiredtiger/bench/wtperf/wtperf_run_py/test_stats/*
         bucket: build_external
         permissions: public-read
         content_type: text/html
-        display_name: "Test results (JSON)"
-        remote_file: wiredtiger/${build_variant}/${revision}/perf-test-${perf-test-name}-${build_id}-${execution}/test-results.json
+        remote_file: wiredtiger/${build_variant}/${revision}/perf-test-${perf-test-name}-${build_id}-${execution}/
 
 #######################################
 #               Variables             #
@@ -2961,9 +2964,6 @@ tasks:
         vars:
           perf-test-name: small-lsm
           maxruns: 3
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: small-lsm
 
   - name: perf-test-medium-lsm
     commands:
@@ -2973,9 +2973,6 @@ tasks:
         vars:
           perf-test-name: medium-lsm
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: medium-lsm
 
   - name: perf-test-medium-lsm-compact
     commands:
@@ -2985,9 +2982,6 @@ tasks:
         vars:
           perf-test-name: medium-lsm-compact
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: medium-lsm-compact
 
   - name: perf-test-medium-multi-lsm
     commands:
@@ -2997,9 +2991,6 @@ tasks:
         vars:
           perf-test-name: medium-multi-lsm
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: medium-multi-lsm
 
   - name: perf-test-parallel-pop-lsm
     commands:
@@ -3009,9 +3000,6 @@ tasks:
         vars:
           perf-test-name: parallel-pop-lsm
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: parallel-pop-lsm
 
   - name: perf-test-update-lsm
     commands:
@@ -3021,9 +3009,6 @@ tasks:
         vars:
           perf-test-name: update-lsm
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: update-lsm
 
     ###############################
     # Performance Tests for btree #
@@ -3037,9 +3022,6 @@ tasks:
         vars:
           perf-test-name: small-btree
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: small-btree
 
   - name: perf-test-small-btree-backup
     commands:
@@ -3049,9 +3031,6 @@ tasks:
         vars:
           perf-test-name: small-btree-backup
           maxruns: 1
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: small-btree-backup
 
   - name: perf-test-medium-btree
     commands:
@@ -3061,9 +3040,6 @@ tasks:
         vars:
           perf-test-name: medium-btree
           maxruns: 3
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: medium-btree
 
   - name: perf-test-medium-btree-backup
     commands:
@@ -3073,9 +3049,6 @@ tasks:
         vars:
           perf-test-name: medium-btree-backup
           maxruns: 3
-      - func: "generic-perf-test-push-results"
-        vars:
-          perf-test-name: medium-btree-backup
 
 #######################################
 #            Buildvariants            #

@@ -54,16 +54,13 @@ class PerfStatCollection:
                               position_of_value=stat.input_offset)
             stat.add_value(value=value)
 
-    def to_value_list(self):
+    def to_value_list(self, brief: bool):
         as_list = []
         for stat in self.perf_stats.values():
-            as_list.append({
-                'name': stat.output_label,
-                'value': stat.get_core_average(),
-                'values': stat.values
-            })
+            as_dict = {}
+            as_dict['name'] = stat.output_label
+            as_dict['value'] = stat.get_core_average()
+            if not brief:
+                as_dict['values'] = stat.values
+            as_list.append(as_dict)
         return as_list
-
-    def to_dict(self):
-        as_dict = {'metrics': self.to_value_list()}
-        return as_dict
