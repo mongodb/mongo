@@ -48,6 +48,14 @@ WriteConflictException::WriteConflictException()
     }
 }
 
+WriteConflictException::WriteConflictException(StringData context) : WriteConflictException() {
+    // Avoid unnecessary update to embedded Status within DBException.
+    if (context.empty()) {
+        return;
+    }
+    addContext(context);
+}
+
 void WriteConflictException::logAndBackoff(int attempt, StringData operation, StringData ns) {
     mongo::logAndBackoff(4640401,
                          ::mongo::logv2::LogComponent::kWrite,

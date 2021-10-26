@@ -48,6 +48,7 @@ extern FailPoint skipWriteConflictRetries;
 class WriteConflictException final : public DBException {
 public:
     WriteConflictException();
+    WriteConflictException(StringData context);
 
     /**
      * Will log a message if sensible and will do an exponential backoff to make sure
