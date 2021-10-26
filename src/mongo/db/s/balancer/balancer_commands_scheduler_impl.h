@@ -29,15 +29,14 @@
 
 #pragma once
 
-#include <list>
-#include <unordered_map>
-
 #include "mongo/db/s/balancer/balancer_command_document_gen.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/balancer/balancer_dist_locks.h"
+#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
@@ -91,7 +90,12 @@ public:
         if (!response.status.isOK()) {
             return response.status;
         }
-        return getStatusFromCommandResult(response.data);
+        auto remoteStatus = getStatusFromCommandResult(response.data);
+        return Shard::shouldErrorBePropagated(remoteStatus.code())
+            ? remoteStatus
+            : Status(ErrorCodes::OperationFailed,
+                     str::stream() << "Command request" << getRequestId().toString()
+                                   << "failed on source shard." << causedBy(remoteStatus));
     }
 
     executor::RemoteCommandResponse getRemoteResponse() {
@@ -244,6 +248,18 @@ public:
     }
 };
 
+/**
+ * Utility class to extract and hold information describing the remote client that submitted a
+ * command.
+ */
+struct ExternalClientInfo {
+    ExternalClientInfo(OperationContext* opCtx)
+        : operationMetadata(opCtx), apiParameters(APIParameters::get(opCtx)) {}
+
+    const ForwardableOperationMetadata operationMetadata;
+    const APIParameters apiParameters;
+};
+
 
 /**
  * Base class describing the common traits of a shard command associated to a Request
@@ -251,8 +267,10 @@ public:
  */
 class CommandInfo {
 public:
-    CommandInfo(const ShardId& targetShardId, const NamespaceString& nss)
-        : _targetShardId(targetShardId), _nss(nss) {}
+    CommandInfo(const ShardId& targetShardId,
+                const NamespaceString& nss,
+                boost::optional<ExternalClientInfo>&& clientInfo)
+        : _targetShardId(targetShardId), _nss(nss), _clientInfo(clientInfo) {}
 
     virtual ~CommandInfo() {}
 
@@ -274,9 +292,22 @@ public:
         return _nss;
     }
 
+    void attachOperationMetadataTo(OperationContext* opCtx) {
+        if (_clientInfo) {
+            _clientInfo.get().operationMetadata.setOn(opCtx);
+        }
+    }
+
+    void appendCommandMetadataTo(BSONObjBuilder* commandBuilder) const {
+        if (_clientInfo && _clientInfo.get().apiParameters.getParamsPassed()) {
+            _clientInfo.get().apiParameters.appendInfo(commandBuilder);
+        }
+    }
+
 private:
     ShardId _targetShardId;
     NamespaceString _nss;
+    boost::optional<ExternalClientInfo> _clientInfo;
 };
 
 /**
@@ -293,8 +324,9 @@ public:
                          const MigrationSecondaryThrottleOptions& secondaryThrottle,
                          bool waitForDelete,
                          MoveChunkRequest::ForceJumbo forceJumbo,
-                         const ChunkVersion& version)
-        : CommandInfo(origin, nss),
+                         const ChunkVersion& version,
+                         boost::optional<ExternalClientInfo>&& clientInfo)
+        : CommandInfo(origin, nss, std::move(clientInfo)),
           _chunkBoundaries(lowerBoundKey, upperBoundKey),
           _recipient(recipient),
           _version(version),
@@ -315,6 +347,7 @@ public:
                                           _secondaryThrottle,
                                           _waitForDelete,
                                           _forceJumbo);
+        appendCommandMetadataTo(&commandBuilder);
         return commandBuilder.obj();
     }
 
@@ -343,7 +376,7 @@ public:
                            const BSONObj& lowerBoundKey,
                            const BSONObj& upperBoundKey,
                            const ChunkVersion& version)
-        : CommandInfo(shardId, nss),
+        : CommandInfo(shardId, nss, boost::none),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
           _version(version) {}
@@ -386,7 +419,7 @@ public:
                            boost::optional<long long> maxChunkObjects,
                            boost::optional<long long> maxChunkSizeBytes,
                            bool force)
-        : CommandInfo(shardId, nss),
+        : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
@@ -443,7 +476,7 @@ public:
                         const BSONObj& upperBoundKey,
                         bool estimatedValue,
                         const ChunkVersion& version)
-        : CommandInfo(shardId, nss),
+        : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
@@ -487,7 +520,7 @@ public:
                           const BSONObj& upperBoundKey,
                           const ChunkVersion& version,
                           const std::vector<BSONObj>& splitPoints)
-        : CommandInfo(shardId, nss),
+        : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
@@ -525,7 +558,7 @@ private:
 class RecoveryCommandInfo : public CommandInfo {
 public:
     RecoveryCommandInfo(const PersistedBalancerCommand& persistedCommand)
-        : CommandInfo(persistedCommand.getTarget(), persistedCommand.getNss()),
+        : CommandInfo(persistedCommand.getTarget(), persistedCommand.getNss(), boost::none),
           _serialisedCommand(persistedCommand.getRemoteCommand()),
           _requiresDistributedLock(persistedCommand.getRequiresDistributedLock()) {}
 
@@ -657,12 +690,12 @@ public:
 
     void stop() override;
 
-    std::unique_ptr<MoveChunkResponse> requestMoveChunk(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& chunk,
-        const ShardId& destination,
-        const MoveChunkSettings& commandSettings) override;
+    std::unique_ptr<MoveChunkResponse> requestMoveChunk(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        const ChunkType& chunk,
+                                                        const ShardId& destination,
+                                                        const MoveChunkSettings& commandSettings,
+                                                        bool issuedByRemoteUser) override;
 
     std::unique_ptr<MergeChunksResponse> requestMergeChunks(OperationContext* opCtx,
                                                             const NamespaceString& nss,
@@ -695,9 +728,10 @@ public:
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };
 
-    static const int32_t _maxRunningRequests{10};
-
+    // Protects the in-memory state of the Scheduler
     Mutex _mutex = MONGO_MAKE_LATCH("BalancerCommandsSchedulerImpl::_mutex");
+
+    // Ensures that concurrent calls to start() and stop() get serialised
     Mutex _startStopMutex = MONGO_MAKE_LATCH("BalancerCommandsSchedulerImpl::_startStopMutex");
 
     SchedulerState _state{SchedulerState::Stopped};
@@ -724,16 +758,13 @@ private:
 
     std::vector<UUID> _obsoleteRecoveryDocumentIds;
 
-    /**
-     * State to acquire and release DistLocks on a per namespace basis
-     */
-    struct Migrations {
-        Migrations(DistLockManager::ScopedLock lock) : lock(std::move(lock)), numMigrations(1) {}
+    std::vector<NamespaceString> _lockedReferencesToRelease;
 
-        DistLockManager::ScopedLock lock;
-        int numMigrations;
-    };
-    stdx::unordered_map<NamespaceString, Migrations> _migrationLocks;
+    /**
+     * Centralised accessor for all the distributed locks required by the Scheduler.
+     * Only _workerThread() is supposed to interact with this class.
+     */
+    BalancerDistLocks _distributedLocks;
 
     ResponseHandle _buildAndEnqueueNewRequest(OperationContext* opCtx,
                                               std::shared_ptr<CommandInfo>&& commandInfo);
@@ -742,23 +773,18 @@ private:
 
     bool _canSubmitNewRequests(WithLock);
 
-    Status _acquireDistLock(OperationContext* opCtx, NamespaceString nss);
+    bool _deferredCleanupRequired(WithLock);
 
-    void _releaseDistLock(OperationContext* opCtx, NamespaceString nss);
+    void _performDeferredCleanup(WithLock, OperationContext* opCtx);
 
     CommandSubmissionResult _submit(OperationContext* opCtx, const CommandSubmissionHandle& data);
 
-    void _applySubmissionResult(WithLock,
-                                OperationContext* opCtx,
-                                CommandSubmissionResult&& submissionResult);
+    void _applySubmissionResult(WithLock, CommandSubmissionResult&& submissionResult);
 
-    void _applyCommandResponse(OperationContext* opCtx,
-                               UUID requestId,
+    void _applyCommandResponse(UUID requestId,
                                const executor::TaskExecutor::ResponseStatus& response);
 
     std::vector<RequestData> _loadRequestsToRecover(OperationContext* opCtx);
-
-    void _cleanUpObsoleteRecoveryInfo(WithLock, OperationContext* opCtx);
 
     void _workerThread();
 };

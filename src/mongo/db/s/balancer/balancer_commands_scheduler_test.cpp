@@ -123,16 +123,25 @@ TEST_F(BalancerCommandsSchedulerTest, ResilientToMultipleStarts) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
+    auto deferredCleanupCompletedCheckpoint =
+        globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
+    auto timesEnteredFailPoint =
+        deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
     _scheduler.start(operationContext());
     ChunkType moveChunk = makeChunk(0, kShardId0);
     auto networkResponseFuture = launchAsync([&]() {
         onCommand(
             [&](const executor::RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
-    auto resp = _scheduler.requestMoveChunk(
-        operationContext(), kNss, moveChunk, ShardId(kShardId1), getDefaultMoveChunkSettings());
+    auto resp = _scheduler.requestMoveChunk(operationContext(),
+                                            kNss,
+                                            moveChunk,
+                                            ShardId(kShardId1),
+                                            getDefaultMoveChunkSettings(),
+                                            false /* issuedByRemoteUser */);
     ASSERT_OK(resp->getOutcome());
     networkResponseFuture.default_timed_get();
+    deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
     // Ensure DistLock is released correctly
     {
         auto opCtx = Client::getCurrent()->getOperationContext();
@@ -142,6 +151,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
             opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
         ASSERT_OK(scopedDistLock.getStatus());
     }
+    deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
 }
 
@@ -228,7 +238,7 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
                                            chunk.getRange(),
                                            chunk.getVersion(),
                                            KeyPattern(BSON("x" << 1)),
-                                           false);
+                                           false /* issuedByRemoteUser */);
     ASSERT_OK(resp->getOutcome());
     ASSERT_OK(resp->getSize().getStatus());
     ASSERT_EQ(resp->getSize().getValue(), 156);
@@ -239,16 +249,27 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
 }
 
 TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
+    auto deferredCleanupCompletedCheckpoint =
+        globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
+    auto timesEnteredFailPoint =
+        deferredCleanupCompletedCheckpoint->setMode(FailPoint::alwaysOn, 0);
+
     _scheduler.start(operationContext());
     ChunkType moveChunk = makeChunk(0, kShardId0);
     auto timeoutError = Status{ErrorCodes::NetworkTimeout, "Mock error: network timed out"};
     auto networkResponseFuture = launchAsync([&]() {
         onCommand([&](const executor::RemoteCommandRequest& request) { return timeoutError; });
     });
-    auto resp = _scheduler.requestMoveChunk(
-        operationContext(), kNss, moveChunk, ShardId(kShardId1), getDefaultMoveChunkSettings());
+    auto resp = _scheduler.requestMoveChunk(operationContext(),
+                                            kNss,
+                                            moveChunk,
+                                            ShardId(kShardId1),
+                                            getDefaultMoveChunkSettings(),
+                                            false /* issuedByRemoteUser */);
     ASSERT_EQUALS(resp->getOutcome(), timeoutError);
     networkResponseFuture.default_timed_get();
+    deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
     // Ensure DistLock is released correctly
     {
         auto opCtx = Client::getCurrent()->getOperationContext();
@@ -258,16 +279,21 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
             opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
         ASSERT_OK(scopedDistLock.getStatus());
     }
+    deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
 }
 
 TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
     ChunkType moveChunk = makeChunk(0, kShardId0);
-    auto resp = _scheduler.requestMoveChunk(
-        operationContext(), kNss, moveChunk, ShardId(kShardId1), getDefaultMoveChunkSettings());
-    ASSERT_EQUALS(
-        resp->getOutcome(),
-        Status(ErrorCodes::CallbackCanceled, "Request rejected - balancer scheduler is stopped"));
+    auto resp = _scheduler.requestMoveChunk(operationContext(),
+                                            kNss,
+                                            moveChunk,
+                                            ShardId(kShardId1),
+                                            getDefaultMoveChunkSettings(),
+                                            false /* issuedByRemoteUser */);
+    ASSERT_EQUALS(resp->getOutcome(),
+                  Status(ErrorCodes::BalancerInterrupted,
+                         "Request rejected - balancer scheduler is stopped"));
     // Ensure DistLock is not taken
     {
         auto opCtx = Client::getCurrent()->getOperationContext();
@@ -285,13 +311,17 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
         FailPointEnableBlock failPoint("pauseBalancerWorkerThread");
         _scheduler.start(operationContext());
         ChunkType moveChunk = makeChunk(0, kShardId0);
-        resp = _scheduler.requestMoveChunk(
-            operationContext(), kNss, moveChunk, ShardId(kShardId1), getDefaultMoveChunkSettings());
+        resp = _scheduler.requestMoveChunk(operationContext(),
+                                           kNss,
+                                           moveChunk,
+                                           ShardId(kShardId1),
+                                           getDefaultMoveChunkSettings(),
+                                           false /* issuedByRemoteUser */);
         _scheduler.stop();
     }
-    ASSERT_EQUALS(
-        resp->getOutcome(),
-        Status(ErrorCodes::CallbackCanceled, "Request cancelled - balancer scheduler is stopping"));
+    ASSERT_EQUALS(resp->getOutcome(),
+                  Status(ErrorCodes::BalancerInterrupted,
+                         "Request cancelled - balancer scheduler is stopping"));
     // Ensure DistLock is released correctly
     {
         auto opCtx = Client::getCurrent()->getOperationContext();
@@ -312,8 +342,12 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
     ChunkType moveChunk = makeChunk(0, kShardId0);
     auto requestSettings = getDefaultMoveChunkSettings();
 
-    auto deferredResponse = _scheduler.requestMoveChunk(
-        operationContext(), kNss, moveChunk, ShardId(kShardId1), requestSettings);
+    auto deferredResponse = _scheduler.requestMoveChunk(operationContext(),
+                                                        kNss,
+                                                        moveChunk,
+                                                        ShardId(kShardId1),
+                                                        requestSettings,
+                                                        false /* issuedByRemoteUser */);
 
     // The command is persisted...
     auto persistedCommandDocs = getPersistedCommandDocuments(opCtx);
@@ -334,7 +368,8 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
                                                     requestSettings.secondaryThrottle,
                                                     requestSettings.waitForDelete,
                                                     requestSettings.forceJumbo,
-                                                    moveChunk.getVersion());
+                                                    moveChunk.getVersion(),
+                                                    boost::none);
     ASSERT_BSONOBJ_EQ(originalCommandInfo.serialise(), persistedCommand.getRemoteCommand());
 }
 
@@ -356,7 +391,8 @@ TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecovering
                                                             requestSettings.secondaryThrottle,
                                                             requestSettings.waitForDelete,
                                                             requestSettings.forceJumbo,
-                                                            moveChunk.getVersion());
+                                                            moveChunk.getVersion(),
+                                                            boost::none);
             // 4. ... Which is inspected here.
             ASSERT_BSONOBJ_EQ(originalCommandInfo.serialise(), request.cmdObj);
 
@@ -364,15 +400,19 @@ TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecovering
         });
     });
 
-    auto resp = _scheduler.requestMoveChunk(
-        operationContext(), kNss, moveChunk, ShardId(kShardId1), getDefaultMoveChunkSettings());
+    auto resp = _scheduler.requestMoveChunk(operationContext(),
+                                            kNss,
+                                            moveChunk,
+                                            ShardId(kShardId1),
+                                            getDefaultMoveChunkSettings(),
+                                            false /* issuedByRemoteUser */);
     _scheduler.stop();
     failpoint->setMode(FailPoint::Mode::off);
 
     // 1. The original submission is expected to fail...
-    ASSERT_EQUALS(
-        resp->getOutcome(),
-        Status(ErrorCodes::CallbackCanceled, "Request cancelled - balancer scheduler is stopping"));
+    ASSERT_EQUALS(resp->getOutcome(),
+                  Status(ErrorCodes::BalancerInterrupted,
+                         "Request cancelled - balancer scheduler is stopping"));
 
     // 2. ... And a recovery document to be persisted
     auto persistedCommandDocs = getPersistedCommandDocuments(operationContext());
@@ -403,8 +443,12 @@ TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL
         ASSERT_OK(scopedDistLock.getStatus());
         failpoint->setMode(FailPoint::Mode::off);
         ChunkType moveChunk = makeChunk(0, kShardId0);
-        auto resp = _scheduler.requestMoveChunk(
-            operationContext(), kNss, moveChunk, ShardId(kShardId1), getDefaultMoveChunkSettings());
+        auto resp = _scheduler.requestMoveChunk(operationContext(),
+                                                kNss,
+                                                moveChunk,
+                                                ShardId(kShardId1),
+                                                getDefaultMoveChunkSettings(),
+                                                false /* issuedByRemoteUser */);
         ASSERT_EQ(
             resp->getOutcome(),
             Status(ErrorCodes::LockBusy, "Failed to acquire dist lock testDb.testColl locally"));

@@ -145,7 +145,8 @@ public:
         const NamespaceString& nss,
         const ChunkType& chunk,
         const ShardId& recipient,
-        const MoveChunkSettings& commandSettings) = 0;
+        const MoveChunkSettings& commandSettings,
+        bool issuedByRemoteUser = false) = 0;
 
     virtual std::unique_ptr<MergeChunksResponse> requestMergeChunks(
         OperationContext* opCtx,

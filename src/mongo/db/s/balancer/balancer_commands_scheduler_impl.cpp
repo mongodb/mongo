@@ -43,6 +43,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(pauseBalancerWorkerThread);
+MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
 
 const std::string MergeChunksCommandInfo::kCommandName = "mergeChunks";
 const std::string MergeChunksCommandInfo::kBounds = "bounds";
@@ -87,8 +88,6 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
     }
 
     invariant(!_workerThreadHandle.joinable());
-    _incompleteRequests.reserve(_maxRunningRequests * 10);
-    _runningRequestIds.reserve(_maxRunningRequests);
     auto requestsToRecover = _loadRequestsToRecover(opCtx);
     _state = requestsToRecover.empty() ? SchedulerState::Running : SchedulerState::Recovering;
 
@@ -120,7 +119,11 @@ std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChu
     const NamespaceString& nss,
     const ChunkType& chunk,
     const ShardId& recipient,
-    const MoveChunkSettings& commandSettings) {
+    const MoveChunkSettings& commandSettings,
+    bool issuedByRemoteUser) {
+
+    auto externalClientInfo =
+        issuedByRemoteUser ? boost::optional<ExternalClientInfo>(opCtx) : boost::none;
 
     auto commandInfo = std::make_shared<MoveChunkCommandInfo>(nss,
                                                               chunk.getShard(),
@@ -131,7 +134,8 @@ std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChu
                                                               commandSettings.secondaryThrottle,
                                                               commandSettings.waitForDelete,
                                                               commandSettings.forceJumbo,
-                                                              chunk.getVersion());
+                                                              chunk.getVersion(),
+                                                              std::move(externalClientInfo));
 
     auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
     return std::make_unique<MoveChunkResponseImpl>(std::move(requestCollectionInfo));
@@ -215,10 +219,9 @@ ResponseHandle BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
     OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo) {
     const auto newRequestId = UUID::gen();
     LOGV2(5847202,
-          "Enqueuing new Balancer command request with id {reqId}. Details: {command}",
           "Enqueuing new Balancer command request",
           "reqId"_attr = newRequestId,
-          "command"_attr = commandInfo->serialise().toString(),
+          "command"_attr = redact(commandInfo->serialise().toString()),
           "recoveryDocRequired"_attr = commandInfo->requiresRecoveryOnCrash());
 
     if (commandInfo->requiresRecoveryOnCrash()) {
@@ -238,7 +241,6 @@ ResponseHandle BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
 
         if (auto writeStatus = getStatusFromWriteCommandReply(reply); !writeStatus.isOK()) {
             LOGV2(5847210,
-                  "Failed to persist command document for reqId {reqId}. Error status: {status}",
                   "Failed to persist request command document",
                   "reqId"_attr = newRequestId,
                   "status"_attr = writeStatus);
@@ -263,61 +265,23 @@ ResponseHandle BalancerCommandsSchedulerImpl::_enqueueRequest(WithLock, RequestD
         _stateUpdatedCV.notify_all();
     } else {
         deferredResponseHandle.handle->set(Status(
-            ErrorCodes::CallbackCanceled, "Request rejected - balancer scheduler is stopped"));
+            ErrorCodes::BalancerInterrupted, "Request rejected - balancer scheduler is stopped"));
     }
 
     return deferredResponseHandle;
 }
 
 bool BalancerCommandsSchedulerImpl::_canSubmitNewRequests(WithLock) {
-    return (!_pendingRequestIds.empty() && _runningRequestIds.size() < _maxRunningRequests &&
-            MONGO_likely(!pauseBalancerWorkerThread.shouldFail()));
+    return (!_pendingRequestIds.empty() && MONGO_likely(!pauseBalancerWorkerThread.shouldFail()));
 }
 
-Status BalancerCommandsSchedulerImpl::_acquireDistLock(OperationContext* opCtx,
-                                                       NamespaceString nss) {
-    auto it = _migrationLocks.find(nss);
-    if (it != _migrationLocks.end()) {
-        ++it->second.numMigrations;
-        return Status::OK();
-    } else {
-        boost::optional<DistLockManager::ScopedLock> scopedLock;
-        try {
-            scopedLock.emplace(DistLockManager::get(opCtx)->lockDirectLocally(
-                opCtx, nss.ns(), DistLockManager::kSingleLockAttemptTimeout));
-
-            const std::string whyMessage(str::stream()
-                                         << "Migrating chunk(s) in collection " << nss.ns());
-            uassertStatusOK(DistLockManager::get(opCtx)->lockDirect(
-                opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
-        } catch (const DBException& ex) {
-            return ex.toStatus(str::stream() << "Could not acquire collection lock for " << nss.ns()
-                                             << " to migrate chunks");
-        }
-        Migrations migrationData(std::move(*scopedLock));
-        _migrationLocks.insert(std::make_pair(nss, std::move(migrationData)));
-    }
-    return Status::OK();
-}
-
-void BalancerCommandsSchedulerImpl::_releaseDistLock(OperationContext* opCtx, NamespaceString nss) {
-    auto it = _migrationLocks.find(nss);
-    if (it == _migrationLocks.end()) {
-        return;
-    } else if (it->second.numMigrations == 1) {
-        DistLockManager::get(opCtx)->unlock(opCtx, nss.ns());
-        _migrationLocks.erase(it);
-    } else {
-        --it->second.numMigrations;
-    }
+bool BalancerCommandsSchedulerImpl::_deferredCleanupRequired(WithLock) {
+    return (!_obsoleteRecoveryDocumentIds.empty() || !_lockedReferencesToRelease.empty());
 }
 
 CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     OperationContext* opCtx, const CommandSubmissionHandle& handle) {
-    LOGV2(5847203,
-          "Balancer command request id {reqId} submitted for execution",
-          "Balancer command request submitted for execution",
-          "reqId"_attr = handle.id);
+    LOGV2(5847203, "Balancer command request submitted for execution", "reqId"_attr = handle.id);
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     const auto shardWithStatus =
@@ -338,14 +302,14 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
                                                        opCtx);
 
     auto onRemoteResponseReceived =
-        [this, opCtx, requestId = handle.id](
-            const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            _applyCommandResponse(opCtx, requestId, args.response);
+        [this,
+         requestId = handle.id](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+            _applyCommandResponse(requestId, args.response);
         };
 
     if (handle.commandInfo->requiresDistributedLock()) {
         Status lockAcquisitionResponse =
-            _acquireDistLock(opCtx, handle.commandInfo->getNameSpace());
+            _distributedLocks.acquireFor(opCtx, handle.commandInfo->getNameSpace());
         if (!lockAcquisitionResponse.isOK()) {
             return CommandSubmissionResult(handle.id, false, lockAcquisitionResponse);
         }
@@ -360,12 +324,11 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
 }
 
 void BalancerCommandsSchedulerImpl::_applySubmissionResult(
-    WithLock, OperationContext* opCtx, CommandSubmissionResult&& submissionResult) {
+    WithLock, CommandSubmissionResult&& submissionResult) {
     auto requestToUpdateIt = _incompleteRequests.find(submissionResult.id);
     if (requestToUpdateIt == _incompleteRequests.end()) {
         LOGV2(5847209,
-              "Skipping _applySubmissionResult: reqId {reqId} already completed/canceled",
-              "Skipping _applySubmissionResult: reqId already completed/canceled",
+              "Skipping _applySubmissionResult: request already completed/canceled",
               "reqId"_attr = submissionResult.id);
         return;
     }
@@ -385,7 +348,7 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
     } else {
         const auto& submittedCommandInfo = requestToUpdate.getCommandInfo();
         if (submissionResult.acquiredDistLock) {
-            _releaseDistLock(opCtx, submittedCommandInfo.getNameSpace());
+            _lockedReferencesToRelease.emplace_back(submittedCommandInfo.getNameSpace());
         }
         if (submittedCommandInfo.requiresRecoveryOnCrash()) {
             _obsoleteRecoveryDocumentIds.push_back(submissionResult.id);
@@ -396,9 +359,7 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
 }
 
 void BalancerCommandsSchedulerImpl::_applyCommandResponse(
-    OperationContext* opCtx,
-    UUID requestId,
-    const executor::TaskExecutor::ResponseStatus& response) {
+    UUID requestId, const executor::TaskExecutor::ResponseStatus& response) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         auto requestToCompleteIt = _incompleteRequests.find(requestId);
@@ -411,7 +372,7 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
         requestToComplete.setOutcome(response);
         auto& commandInfo = requestToComplete.getCommandInfo();
         if (commandInfo.requiresDistributedLock()) {
-            _releaseDistLock(opCtx, commandInfo.getNameSpace());
+            _lockedReferencesToRelease.emplace_back(commandInfo.getNameSpace());
         }
         if (commandInfo.requiresRecoveryOnCrash()) {
             _obsoleteRecoveryDocumentIds.push_back(requestId);
@@ -425,7 +386,6 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
         _stateUpdatedCV.notify_all();
     }
     LOGV2(5847204,
-          "Execution of balancer command request id {reqId} completed",
           "Execution of balancer command request completed",
           "reqId"_attr = requestId,
           "response"_attr = response.toString());
@@ -434,61 +394,78 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
 std::vector<RequestData> BalancerCommandsSchedulerImpl::_loadRequestsToRecover(
     OperationContext* opCtx) {
     std::vector<RequestData> requestsToRecover;
-    auto documentProcessor = [&requestsToRecover](const BSONObj& commandToRecoverDoc) {
+    auto documentProcessor = [&requestsToRecover, opCtx](const BSONObj& commandToRecoverDoc) {
         auto originalCommand = PersistedBalancerCommand::parse(
             IDLParserErrorContext("BalancerCommandsScheduler"), commandToRecoverDoc);
         auto recoveryCommand = std::make_shared<RecoveryCommandInfo>(originalCommand);
         LOGV2(5847212,
-              "Recovered request id {reqId}, which command will be rescheduled. Details: "
-              "{command}",
               "Command request recovered and set for rescheduling",
               "reqId"_attr = originalCommand.getRequestId(),
-              "command"_attr = recoveryCommand->serialise());
+              "command"_attr = redact(recoveryCommand->serialise()));
         requestsToRecover.emplace_back(originalCommand.getRequestId(), std::move(recoveryCommand));
     };
     DBDirectClient dbClient(opCtx);
-    dbClient.query(documentProcessor, NamespaceString::kConfigBalancerCommandsNamespace, BSONObj());
+    try {
+        dbClient.query(
+            documentProcessor, NamespaceString::kConfigBalancerCommandsNamespace, BSONObj());
+    } catch (const DBException& e) {
+        LOGV2(5847225, "Failed to load requests to recover", "error"_attr = redact(e));
+    }
+
     return requestsToRecover;
 }
 
-void BalancerCommandsSchedulerImpl::_cleanUpObsoleteRecoveryInfo(WithLock,
-                                                                 OperationContext* opCtx) {
-    if (_obsoleteRecoveryDocumentIds.empty()) {
-        return;
-    }
-    BSONObjBuilder queryBuilder;
-    if (_obsoleteRecoveryDocumentIds.size() == 1) {
-        _obsoleteRecoveryDocumentIds[0].appendToBuilder(
-            &queryBuilder, PersistedBalancerCommand::kRequestIdFieldName);
-    } else {
-        BSONObjBuilder requestIdClause(
-            queryBuilder.subobjStart(PersistedBalancerCommand::kRequestIdFieldName));
-        BSONArrayBuilder valuesBuilder(requestIdClause.subarrayStart("$in"));
-        for (const auto& requestId : _obsoleteRecoveryDocumentIds) {
-            requestId.appendToArrayBuilder(&valuesBuilder);
+void BalancerCommandsSchedulerImpl::_performDeferredCleanup(WithLock, OperationContext* opCtx) {
+    auto recoveryDocsDeleted = [this, opCtx] {
+        if (_obsoleteRecoveryDocumentIds.empty()) {
+            return false;
         }
+        BSONObjBuilder queryBuilder;
+        if (_obsoleteRecoveryDocumentIds.size() == 1) {
+            _obsoleteRecoveryDocumentIds[0].appendToBuilder(
+                &queryBuilder, PersistedBalancerCommand::kRequestIdFieldName);
+        } else {
+            BSONObjBuilder requestIdClause(
+                queryBuilder.subobjStart(PersistedBalancerCommand::kRequestIdFieldName));
+            BSONArrayBuilder valuesBuilder(requestIdClause.subarrayStart("$in"));
+            for (const auto& requestId : _obsoleteRecoveryDocumentIds) {
+                requestId.appendToArrayBuilder(&valuesBuilder);
+            }
+        }
+
+        _obsoleteRecoveryDocumentIds.clear();
+
+        auto query = queryBuilder.obj();
+        DBDirectClient dbClient(opCtx);
+
+        auto reply = dbClient.removeAcknowledged(
+            NamespaceString::kConfigBalancerCommandsNamespace.toString(), query);
+
+        LOGV2(5847211,
+              "Clean up of obsolete document info performed",
+              "query"_attr = query,
+              "reply"_attr = reply);
+        return true;
+    }();
+
+    auto distributedLocksReleased = [this, opCtx] {
+        if (_lockedReferencesToRelease.empty()) {
+            return false;
+        }
+        for (const auto& nss : _lockedReferencesToRelease) {
+            _distributedLocks.releaseFor(opCtx, nss);
+        }
+        _lockedReferencesToRelease.clear();
+        return true;
+    }();
+
+    if (recoveryDocsDeleted || distributedLocksReleased) {
+        deferredCleanupCompletedCheckpoint.pauseWhileSet();
     }
-
-    _obsoleteRecoveryDocumentIds.clear();
-
-    auto query = queryBuilder.obj();
-    DBDirectClient dbClient(opCtx);
-
-    auto reply = dbClient.removeAcknowledged(
-        NamespaceString::kConfigBalancerCommandsNamespace.toString(), query);
-
-    LOGV2(5847211,
-          "Clean up of obsolete document info performed with outcome {reply}",
-          "Clean up of obsolete document info performed",
-          "query"_attr = query,
-          "reply"_attr = reply);
 }
-
 
 void BalancerCommandsSchedulerImpl::_workerThread() {
     ON_BLOCK_EXIT([this] {
-        invariant(_migrationLocks.empty(),
-                  "BalancerCommandsScheduler worker thread failed to release all locks on exit");
         LOGV2(5847208, "Leaving balancer command scheduler thread");
         stdx::lock_guard<Latch> lg(_mutex);
         _state = SchedulerState::Stopped;
@@ -496,7 +473,6 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     });
 
     Client::initThread("BalancerCommandsScheduler");
-    auto opCtxHolder = cc().makeOperationContext();
     stdx::unordered_map<UUID, RequestData, UUID::Hash> requestsToCleanUpOnExit;
     LOGV2(5847205, "Balancer scheduler thread started");
 
@@ -507,10 +483,14 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
             invariant(_state != SchedulerState::Stopped);
             _stateUpdatedCV.wait(ul, [this, &ul] {
                 return (_state == SchedulerState::Stopping || _canSubmitNewRequests(ul) ||
-                        !_obsoleteRecoveryDocumentIds.empty());
+                        _deferredCleanupRequired(ul));
             });
 
-            _cleanUpObsoleteRecoveryInfo(ul, opCtxHolder.get());
+            // Completed commands defer the clean up of acquired resources
+            {
+                auto opCtxHolder = cc().makeOperationContext();
+                _performDeferredCleanup(ul, opCtxHolder.get());
+            }
 
             if (_state == SchedulerState::Stopping) {
                 _runningRequestIds.clear();
@@ -523,51 +503,61 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
                 continue;
             }
 
-            // 1. Pick up new requests to be submitted from the pending list, if possible.
-            const auto availableSubmissionSlots =
-                static_cast<size_t>(_maxRunningRequests - _runningRequestIds.size());
-            while (!_pendingRequestIds.empty() &&
-                   commandsToSubmit.size() < availableSubmissionSlots) {
-                const auto& requestData = _incompleteRequests.at(_pendingRequestIds.front());
+            // 1. Pick up new requests to be submitted from the pending list
+            for (auto pendingRequestId : _pendingRequestIds) {
+                const auto& requestData = _incompleteRequests.at(pendingRequestId);
                 commandsToSubmit.push_back(requestData.getSubmissionInfo());
-                _pendingRequestIds.pop_front();
             }
+            _pendingRequestIds.clear();
         }
 
         // 2. Serve the picked up requests, submitting their related commands.
         std::vector<CommandSubmissionResult> submissionResults;
         for (auto& submissionInfo : commandsToSubmit) {
+            auto opCtxHolder = cc().makeOperationContext();
+            if (submissionInfo.commandInfo) {
+                submissionInfo.commandInfo.get()->attachOperationMetadataTo(opCtxHolder.get());
+            }
             submissionResults.push_back(_submit(opCtxHolder.get(), submissionInfo));
             if (!submissionResults.back().context.isOK()) {
                 LOGV2(5847206,
-                      "Submission for scheduler command request {reqId} failed: cause {cause}",
-                      "Submission for scheduler command request {reqId} failed",
+                      "Submission for scheduler command request failed",
                       "reqId"_attr = submissionResults.back().id,
                       "cause"_attr = submissionResults.back().context.getStatus());
             }
         }
 
         // 3. Process the outcome of each submission.
+        int numRunningRequests = 0;
+        int numPendingRequests = 0;
         {
             stdx::lock_guard<Latch> lg(_mutex);
             for (auto& submissionResult : submissionResults) {
-                _applySubmissionResult(lg, opCtxHolder.get(), std::move(submissionResult));
+                _applySubmissionResult(lg, std::move(submissionResult));
             }
+            numRunningRequests = _runningRequestIds.size();
+            numPendingRequests = _pendingRequestIds.size();
         }
-        LOGV2(5847207, "Ending balancer command scheduler round");
+        LOGV2_DEBUG(5847207,
+                    1,
+                    "Ending balancer command scheduler round",
+                    "numRunningRequests"_attr = numRunningRequests,
+                    "numPendingRequests"_attr = numPendingRequests);
     }
 
     // In case of clean exit, cancel all the pending/running command requests
     // (but keep the related descriptor documents to ensure they will be reissued on recovery).
+    auto opCtxHolder = cc().makeOperationContext();
     auto executor = Grid::get(opCtxHolder.get())->getExecutorPool()->getFixedExecutor();
     for (auto& idAndRequest : requestsToCleanUpOnExit) {
         idAndRequest.second.setOutcome(Status(
-            ErrorCodes::CallbackCanceled, "Request cancelled - balancer scheduler is stopping"));
+            ErrorCodes::BalancerInterrupted, "Request cancelled - balancer scheduler is stopping"));
         const auto& cancelHandle = idAndRequest.second.getExecutionContext();
         if (cancelHandle) {
             executor->cancel(*cancelHandle);
         }
-        _releaseDistLock(opCtxHolder.get(), idAndRequest.second.getCommandInfo().getNameSpace());
+        _distributedLocks.releaseFor(opCtxHolder.get(),
+                                     idAndRequest.second.getCommandInfo().getNameSpace());
     }
 }
 

@@ -32,7 +32,6 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
-#include "mongo/db/s/balancer/migration_manager.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -290,16 +289,6 @@ private:
     // thread.
     OperationContext* _threadOperationContext{nullptr};
 
-    // This thread is only available in the kStopping state and is necessary for the migration
-    // manager shutdown to not deadlock with replica set step down. In particular, the migration
-    // manager's order of lock acquisition is mutex, then collection lock, whereas stepdown first
-    // acquires the global S lock and then acquires the migration manager's mutex.
-    //
-    // The interrupt thread is scheduled when the balancer enters the kStopping state (which is at
-    // step down) and is joined outside of lock, when the replica set leaves draining mode, outside
-    // of the global X lock.
-    stdx::thread _migrationManagerInterruptThread;
-
     // Indicates whether the balancer is currently executing a balancer round
     bool _inBalancerRound{false};
 
@@ -330,9 +319,6 @@ private:
     std::unique_ptr<BalancerCommandsScheduler> _commandScheduler;
 
     std::unique_ptr<BalancerChunkMerger> _chunkMerger;
-
-    // Migration manager used to schedule and manage migrations
-    MigrationManager _migrationManager;
 };
 
 }  // namespace mongo
