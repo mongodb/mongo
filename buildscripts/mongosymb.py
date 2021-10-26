@@ -22,6 +22,259 @@ import argparse
 import os
 import subprocess
 import sys
+from collections import OrderedDict
+from typing import Dict
+
+import requests
+
+
+class PathDbgFileResolver(object):
+    """PathDbgFileResolver class."""
+
+    def __init__(self, bin_path_guess):
+        """Initialize PathDbgFileResolver."""
+        self._bin_path_guess = os.path.realpath(bin_path_guess)
+        self.mci_build_dir = None
+
+    def get_dbg_file(self, soinfo):
+        """Return dbg file name."""
+        path = soinfo.get("path", "")
+        # TODO: make identifying mongo shared library directory more robust
+        if self.mci_build_dir is None and path.startswith("/data/mci/"):
+            self.mci_build_dir = path.split("/src/", maxsplit=1)[0]
+        return path if path else self._bin_path_guess
+
+
+class S3BuildidDbgFileResolver(object):
+    """S3BuildidDbgFileResolver class."""
+
+    def __init__(self, cache_dir, s3_bucket):
+        """Initialize S3BuildidDbgFileResolver."""
+        self._cache_dir = cache_dir
+        self._s3_bucket = s3_bucket
+        self.mci_build_dir = None
+
+    def get_dbg_file(self, soinfo):
+        """Return dbg file name."""
+        build_id = soinfo.get("buildId", None)
+        if build_id is None:
+            return None
+        build_id = build_id.lower()
+        build_id_path = os.path.join(self._cache_dir, build_id + ".debug")
+        if not os.path.exists(build_id_path):
+            try:
+                self._get_from_s3(build_id)
+            except Exception:  # pylint: disable=broad-except
+                ex = sys.exc_info()[0]
+                sys.stderr.write("Failed to find debug symbols for {} in s3: {}\n".format(
+                    build_id, ex))
+                return None
+        if not os.path.exists(build_id_path):
+            return None
+        return build_id_path
+
+    def _get_from_s3(self, build_id):
+        """Download debug symbols from S3."""
+        subprocess.check_call(
+            ['wget', 'https://s3.amazonaws.com/{}/{}.debug.gz'.format(self._s3_bucket, build_id)],
+            cwd=self._cache_dir)
+        subprocess.check_call(['gunzip', build_id + ".debug.gz"], cwd=self._cache_dir)
+
+
+class CachedResults(object):
+    """
+    Used to manage / store results in a cache form (using dict as an underlying data structure).
+
+    Idea is to allow only N items to be present in cache at a time and eliminate extra items on the go.
+    """
+
+    def __init__(self, max_cache_size: int, initial_cache: Dict[str, str] = None):
+        """
+        Initialize instance.
+
+        :param max_cache_size: max number of items that can be added to cache
+        :param initial_cache: initial items as dict
+        """
+        self._max_cache_size = max_cache_size
+        self._cached_results = OrderedDict(initial_cache or {})
+
+    def insert(self, key: str, value: str) -> Dict[str, str] or None:
+        """
+        Insert new data into cache.
+
+        :param key: key string
+        :param value: value string
+        :return: inserted data as dict or None (if not possible to insert)
+        """
+        if self._max_cache_size <= 0:
+            # we can't insert into 0-length dict
+            return None
+
+        if len(self._cached_results) >= self._max_cache_size:
+            # remove items causing the size overflow of cache
+            # we use FIFO order when removing objects from cache,
+            # so that we delete olds and keep track of only the recent ones
+            keys_iterator = iter(self._cached_results.keys())
+            while len(self._cached_results) >= self._max_cache_size:
+                # pop the first (the oldest) item in dict
+                self._cached_results.pop(next(keys_iterator))
+
+        if key not in self._cached_results:
+            # actual insert operation
+            self._cached_results[key] = value
+
+        return dict(build_id=value)
+
+    def get(self, key: str) -> str or None:
+        """
+        Try to get object by key.
+
+        :param key: key string
+        :return: value for key
+        """
+        if self._max_cache_size <= 0:
+            return None
+
+        return self._cached_results.get(key)
+
+
+class PathResolver(object):
+    """
+    Class to find path for given buildId.
+
+    We'll be sending request each time to another server to get path.
+    This process is fairly small, but can be heavy in case of increased amount of requests per second.
+    Thus, I'm implementing a caching mechanism (as a suggestion).
+    It keeps track of the last N results from server, we always try to search from that cache, if not found then send
+    request to server and cache the response for further usage.
+    Cache size differs according to the situation, system resources and overall decision of development team.
+    """
+
+    default_host = 'http://127.0.0.1:8000'  # the main (API) sever that we'll be sending requests to
+    default_cache_dir = os.path.join(os.getcwd(), 'dl_cache')
+
+    def __init__(self, host: str = None, cache_size: int = 0, cache_dir: str = None):
+        """
+        Initialize instance.
+
+        :param host: URL of host - web service
+        :param cache_size: size of cache. We try to cache recent results and use them instead of asking from server.
+        Use 0 (by default) to disable caching
+        """
+        self.host = host or self.default_host
+        self._cached_results = CachedResults(max_cache_size=cache_size)
+        self.cache_dir = cache_dir or self.default_cache_dir
+        self.mci_build_dir = None
+
+        # create cache dir if it doesn't exist
+        if not os.path.exists(self.cache_dir):
+            os.mkdir(self.cache_dir)
+
+    @staticmethod
+    def is_valid_path(path: str) -> bool:
+        """
+        Sometimes the given path may not be valid: e.g: path for a non-existing file.
+
+        If we need to do extra checks on path, we'll do all of them here.
+        :param path: path string
+        :return: bool indicating the validation status
+        """
+        return os.path.exists(path)
+
+    def get_from_cache(self, key: str) -> str or None:
+        """
+        Try to get value from cache.
+
+        :param key: key string
+        :return: value or None (if doesn't exist)
+        """
+        return self._cached_results.get(key)
+
+    def add_to_cache(self, key: str, value: str) -> Dict[str, str]:
+        """
+        Add new value to cache.
+
+        :param key: key string
+        :param value: value string
+        :return: added data as dict
+        """
+        return self._cached_results.insert(key, value)
+
+    @staticmethod
+    def url_to_filename(url: str) -> str:
+        """
+        Convert URL to local filename.
+
+        :param url: download URL
+        :return: full name for local file
+        """
+        return url.split('/')[-1].replace('.tgz', '.tar', 1)
+
+    def unpack(self, path: str) -> str:
+        """
+        Use to utar/unzip files.
+
+        :param path: full path of file
+        :return: full path of 'bin' directory of unpacked file
+        """
+        args = ["tar", "xopf", path, "-C", self.cache_dir]
+        process = subprocess.Popen(args=args, close_fds=True, stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=open("/dev/null"))
+        process.wait()
+        return path.replace('.tar', '', 1)
+
+    def download(self, url: str) -> str:
+        """
+        Use to download file from URL.
+
+        :param url: URL string
+        :return: full path of downloaded file in local filesystem
+        """
+        filename = self.url_to_filename(url)
+        subprocess.check_call(['wget', url], cwd=self.cache_dir)
+        return os.path.join(self.cache_dir, filename)
+
+    def get_dbg_file(self, soinfo: dict) -> str or None:
+        """
+        To get path for given buildId.
+
+        :param soinfo: soinfo as dict
+        :return: path as string or None (if path not found)
+        """
+        build_id = soinfo.get("buildId", "")
+        # search from cached results
+        path = self.get_from_cache(build_id)
+        if not path:
+            # path does not exist in cache, so we send request to server
+            try:
+                response = requests.get(f'{self.host}/find_by_id', params={'build_id': build_id})
+                if response.status_code != 200:
+                    sys.stderr.write(
+                        f"Server returned unsuccessful status: {response.status_code}, "
+                        f"response body: {response.text}")
+                    return None
+                else:
+                    path = response.json().get('data', {}).get('debug_symbols_url')
+            except Exception as err:  # noqa pylint: disable=broad-except
+                sys.stderr.write(f"Error occurred while trying to get response from server "
+                                 f"for buildId({build_id}): {err}")
+                return None
+
+            # update cached results
+            if path:
+                self.add_to_cache(build_id, path)
+
+        if not path:
+            return None
+
+        # download & unpack debug symbols file and assign `path` to unpacked file's local path
+        try:
+            dl_path = self.download(path)
+            path = self.unpack(dl_path)
+        except Exception as err:  # noqa pylint: disable=broad-except
+            sys.stderr.write(f"Failed to download & unpack file: {err}")
+
+        return path
 
 
 def parse_input(trace_doc, dbg_path_resolver):
@@ -137,59 +390,6 @@ def preprocess_frames(dbg_path_resolver, trace_doc, input_format):
     return frames
 
 
-class PathDbgFileResolver(object):
-    """PathDbgFileResolver class."""
-
-    def __init__(self, bin_path_guess):
-        """Initialize PathDbgFileResolver."""
-        self._bin_path_guess = os.path.realpath(bin_path_guess)
-        self.mci_build_dir = None
-
-    def get_dbg_file(self, soinfo):
-        """Return dbg file name."""
-        path = soinfo.get("path", "")
-        # TODO: make identifying mongo shared library directory more robust
-        if self.mci_build_dir is None and path.startswith("/data/mci/"):
-            self.mci_build_dir = path.split("/src/", maxsplit=1)[0]
-        return path if path else self._bin_path_guess
-
-
-class S3BuildidDbgFileResolver(object):
-    """S3BuildidDbgFileResolver class."""
-
-    def __init__(self, cache_dir, s3_bucket):
-        """Initialize S3BuildidDbgFileResolver."""
-        self._cache_dir = cache_dir
-        self._s3_bucket = s3_bucket
-        self.mci_build_dir = None
-
-    def get_dbg_file(self, soinfo):
-        """Return dbg file name."""
-        build_id = soinfo.get("buildId", None)
-        if build_id is None:
-            return None
-        build_id = build_id.lower()
-        build_id_path = os.path.join(self._cache_dir, build_id + ".debug")
-        if not os.path.exists(build_id_path):
-            try:
-                self._get_from_s3(build_id)
-            except Exception:  # pylint: disable=broad-except
-                ex = sys.exc_info()[0]
-                sys.stderr.write("Failed to find debug symbols for {} in s3: {}\n".format(
-                    build_id, ex))
-                return None
-        if not os.path.exists(build_id_path):
-            return None
-        return build_id_path
-
-    def _get_from_s3(self, build_id):
-        """Download debug symbols from S3."""
-        subprocess.check_call(
-            ['wget', 'https://s3.amazonaws.com/{}/{}.debug.gz'.format(self._s3_bucket, build_id)],
-            cwd=self._cache_dir)
-        subprocess.check_call(['gunzip', build_id + ".debug.gz"], cwd=self._cache_dir)
-
-
 def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argument
     """Provide classic output."""
     for frame in frames:
@@ -219,6 +419,15 @@ def make_argument_parser(parser=None, **kwargs):
         "s3 options", description='Options used with \'--debug-file-resolver s3\'')
     s3_group.add_argument('--s3-cache-dir')
     s3_group.add_argument('--s3-bucket')
+
+    pr_group = parser.add_argument_group(
+        'path resolver options', description='Options used with \'--debug-file-resolver pr\'')
+    pr_group.add_argument('--pr-host', default='',
+                          help='URL of web service running the API to get debug symbol URL')
+    pr_group.add_argument('--pr-cache-dir', default='',
+                          help='Full path to a directory to store cache/files')
+    # caching mechanism is currently not fully developed and needs more advanced cleaning techniques, we add an option
+    # to enable it after completing the implementation
 
     # Look for symbols in the cwd by default.
     parser.add_argument('path_to_executable', nargs="?")
@@ -269,6 +478,8 @@ def main(options):
         resolver = PathDbgFileResolver(options.path_to_executable)
     elif options.debug_file_resolver == 's3':
         resolver = S3BuildidDbgFileResolver(options.s3_cache_dir, options.s3_bucket)
+    elif options.debug_file_resolver == 'pr':
+        resolver = PathResolver(host=options.pr_host, cache_dir=options.pr_cache_dir)
 
     frames = preprocess_frames(resolver, trace_doc, options.input_format)
 
