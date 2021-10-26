@@ -130,13 +130,11 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
         "oplogEntriesApplied": e.applied,
     });
 
-    if (!reshardingTest.isMixedVersionCluster()) {
-        verifyDict(sub.opcounters, {
-            "insert": e.opcounters.insert,
-            "update": e.opcounters.update,
-            "delete": e.opcounters.delete,
-        });
-    }
+    verifyDict(sub.opcounters, {
+        "insert": e.opcounters.insert,
+        "update": e.opcounters.update,
+        "delete": e.opcounters.delete,
+    });
 
     // bytesCopied is harder to pin down but it should be >0.
     assert.betweenIn(1, sub['bytesCopied'], 1024, 'bytesCopied');
