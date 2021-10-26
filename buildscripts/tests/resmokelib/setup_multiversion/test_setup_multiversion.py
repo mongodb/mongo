@@ -170,8 +170,8 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
 
         mock_versions_by_project.return_value = DummyIterator()
 
-        urls = self.setup_multiversion.get_latest_urls(version)
-        self.assertEqual(urls, {})
+        urlinfo = self.setup_multiversion.get_latest_urls(version)
+        self.assertEqual(urlinfo.urls, {})
 
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.versions_by_project")
@@ -182,8 +182,8 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
         mock_versions_by_project.return_value = iter([mock_version])
         mock_get_compile_artifact_urls.return_value = {}
 
-        urls = self.setup_multiversion.get_latest_urls("4.4")
-        self.assertEqual(urls, {})
+        urlinfo = self.setup_multiversion.get_latest_urls("4.4")
+        self.assertEqual(urlinfo.urls, {})
 
     @patch("evergreen.version.Version")
     @patch("evergreen.api.EvergreenApi.versions_by_project")
@@ -199,8 +199,8 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
         mock_versions_by_project.return_value = iter([mock_version])
         mock_get_compile_artifact_urls.return_value = expected_urls
 
-        urls = self.setup_multiversion.get_latest_urls("4.4")
-        self.assertEqual(urls, expected_urls)
+        urlinfo = self.setup_multiversion.get_latest_urls("4.4")
+        self.assertEqual(urlinfo.urls, expected_urls)
 
     @patch("evergreen.version.Version")
     @patch("evergreen.version.Version")
@@ -225,8 +225,8 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
                 expected_urls,
         }[evg_api, evg_version, buildvariant_name, ignore_failed_push]
 
-        urls = self.setup_multiversion.get_latest_urls("4.4")
-        self.assertEqual(urls, expected_urls)
+        urlinfo = self.setup_multiversion.get_latest_urls("4.4")
+        self.assertEqual(urlinfo.urls, expected_urls)
 
     @patch("evergreen.version.Version")
     @patch("evergreen.version.Version")
@@ -259,8 +259,8 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
                 expected_urls,
         }[evg_api, evg_version, buildvariant_name, ignore_failed_push]
 
-        urls = self.setup_multiversion.get_latest_urls("master", start_from_revision)
-        self.assertEqual(urls, expected_urls)
+        urlinfo = self.setup_multiversion.get_latest_urls("master", start_from_revision)
+        self.assertEqual(urlinfo.urls, expected_urls)
 
 
 class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
@@ -283,8 +283,8 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         mock_get_evergreen_version.return_value = mock_version
         mock_get_compile_artifact_urls.return_value = expected_urls
 
-        urls = self.setup_multiversion.get_urls("4.4.1")
-        self.assertEqual(urls, expected_urls)
+        urlinfo = self.setup_multiversion.get_urls("4.4.1")
+        self.assertEqual(urlinfo.urls, expected_urls)
 
     @patch("evergreen.version.Version")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
@@ -301,8 +301,8 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
         mock_get_evergreen_version.return_value = mock_version
         mock_get_compile_artifact_urls.return_value = expected_urls
 
-        urls = self.setup_multiversion.get_urls("90f767adbb1901d007ee4dd8714f53402d893669")
-        self.assertEqual(urls, expected_urls)
+        urlinfo = self.setup_multiversion.get_urls("90f767adbb1901d007ee4dd8714f53402d893669")
+        self.assertEqual(urlinfo.urls, expected_urls)
 
     @patch("evergreen.version.Version")
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
@@ -312,13 +312,15 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
                             mock_get_evergreen_version, mock_version):
         mock_get_git_tag_and_commit.return_value = ("r4.4.1",
                                                     "90f767adbb1901d007ee4dd8714f53402d893669")
+        mock_version.version_id = "dummy-version-id"
         mock_version.build_variants_map = {self.buildvariant_name: "build_id"}
         mock_version.project_identifier = "mongodb-mongo-v4.4"
         mock_get_evergreen_version.return_value = mock_version
         mock_get_compile_artifact_urls.return_value = {}
 
-        urls = self.setup_multiversion.get_urls("4.4.1")
-        self.assertEqual(urls, {})
+        urlinfo = self.setup_multiversion.get_urls("4.4.1")
+        self.assertEqual(urlinfo.urls, {})
+        self.assertEqual(urlinfo.evg_version_id, mock_version.version_id)
 
     @patch("buildscripts.resmokelib.utils.evergreen_conn.get_evergreen_version")
     @patch("buildscripts.resmokelib.setup_multiversion.github_conn.get_git_tag_and_commit")
@@ -327,5 +329,6 @@ class TestSetupMultiversionGetUrls(TestSetupMultiversionBase):
                                                     "90f767adbb1901d007ee4dd8714f53402d893669")
         mock_get_evergreen_version.return_value = None
 
-        urls = self.setup_multiversion.get_urls("4.4.1")
-        self.assertEqual(urls, {})
+        urlinfo = self.setup_multiversion.get_urls("4.4.1")
+        self.assertEqual(urlinfo.urls, {})
+        self.assertEqual(urlinfo.evg_version_id, None)
