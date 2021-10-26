@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/drop_database_legacy.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -104,8 +105,23 @@ public:
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{ns(), DDLCoordinatorTypeEnum::kDropDatabase}});
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto dropDatabaseCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            const auto requestVersion = OperationShardingState::get(opCtx).getDbVersion(ns().db());
+            auto dropDatabaseCoordinator = [&]() {
+                while (true) {
+                    auto currentCoordinator = checked_pointer_cast<DropDatabaseCoordinator>(
+                        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                    const auto currentDbVersion = currentCoordinator->getDatabaseVersion();
+                    if (currentDbVersion == requestVersion) {
+                        return currentCoordinator;
+                    }
+                    LOGV2_DEBUG(6073000,
+                                2,
+                                "DbVersion mismatch, waiting for existing coordinator to finish",
+                                "requestedVersion"_attr = requestVersion,
+                                "coordinatorVersion"_attr = currentDbVersion);
+                    currentCoordinator->getCompletionFuture().wait(opCtx);
+                }
+            }();
             dropDatabaseCoordinator->getCompletionFuture().get(opCtx);
         }
 

@@ -27,15 +27,18 @@ function assertDatabaseExists(dbName) {
 }
 
 let ddb = db.getSiblingDB("jstests_dropdb");
+const dbName = ddb.getName();
+const collName = "unshardedColl";
 
 jsTest.log("Initial DBs: " + tojson(listDatabases()));
 
-ddb.c.save({});
-assertDatabaseExists(ddb.getName());
+for (var i = 0; i < 3; i++) {
+    assert.commandWorked(ddb[collName].insert({x: i}));
+    assertDatabaseExists(dbName);
+    assert.commandWorked(ddb.dropDatabase());
+    assertDatabaseDoesNotExist(dbName);
+}
 
 assert.commandWorked(ddb.dropDatabase());
-assertDatabaseDoesNotExist(ddb.getName());
-
-assert.commandWorked(ddb.dropDatabase());
-assertDatabaseDoesNotExist(ddb.getName());
+assertDatabaseDoesNotExist(dbName);
 })();
