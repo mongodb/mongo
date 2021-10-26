@@ -3541,7 +3541,7 @@ tasks:
 ## jstestfuzz replica set multiversion ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_multiversion_gen
-  tags: ["jstestfuzz_multiversion_passthrough_gen", "require_npm", "random_name", "multiversion"]
+  tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -3592,7 +3592,7 @@ tasks:
 ## jstestfuzz sharded multiversion cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_multiversion_gen
-  tags: ["jstestfuzz_multiversion_passthrough_gen", "require_npm", "random_name", "multiversion"]
+  tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:

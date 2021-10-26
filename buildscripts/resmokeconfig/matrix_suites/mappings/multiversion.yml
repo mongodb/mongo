@@ -67,36 +67,42 @@
   base_suite: jstestfuzz_replication
   overrides:
     - "multiversion.replica_fixture_last_continuous_new_new_old"
+    - "multiversion.jstestfuzz_replication_multiversion_hooks"
     - "multiversion.test_kind"
 
 - suite_name: jstestfuzz_replication_last_continuous_new_old_new
   base_suite: jstestfuzz_replication
   overrides:
     - "multiversion.replica_fixture_last_continuous_new_old_new"
+    - "multiversion.jstestfuzz_replication_multiversion_hooks"
     - "multiversion.test_kind"
 
 - suite_name: jstestfuzz_replication_last_continuous_old_new_new
   base_suite: jstestfuzz_replication
   overrides:
     - "multiversion.replica_fixture_last_continuous_old_new_new"
+    - "multiversion.jstestfuzz_replication_multiversion_hooks"
     - "multiversion.test_kind"
 
 - suite_name: jstestfuzz_replication_last_lts_new_new_old
   base_suite: jstestfuzz_replication
   overrides:
     - "multiversion.replica_fixture_last_lts_new_new_old"
+    - "multiversion.jstestfuzz_replication_multiversion_hooks"
     - "multiversion.test_kind"
 
 - suite_name: jstestfuzz_replication_last_lts_new_old_new
   base_suite: jstestfuzz_replication
   overrides:
     - "multiversion.replica_fixture_last_lts_new_old_new"
+    - "multiversion.jstestfuzz_replication_multiversion_hooks"
     - "multiversion.test_kind"
 
 - suite_name: jstestfuzz_replication_last_lts_old_new_new
   base_suite: jstestfuzz_replication
   overrides:
     - "multiversion.replica_fixture_last_lts_old_new_new"
+    - "multiversion.jstestfuzz_replication_multiversion_hooks"
     - "multiversion.test_kind"
 
 
@@ -104,12 +110,14 @@
   base_suite: jstestfuzz_sharded
   overrides:
     - "multiversion.sharded_fixture_last_continuous_new_old_old_new"
+    - "multiversion.jstestfuzz_sharded_multiversion_hooks"
     - "multiversion.test_kind"
 
 - suite_name: jstestfuzz_sharded_last_lts_new_old_old_new
   base_suite: jstestfuzz_sharded
   overrides:
     - "multiversion.sharded_fixture_last_lts_new_old_old_new"
+    - "multiversion.jstestfuzz_sharded_multiversion_hooks"
     - "multiversion.test_kind"
 
 
