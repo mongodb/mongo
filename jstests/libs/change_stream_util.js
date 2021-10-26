@@ -45,6 +45,19 @@ function isChangeStreamsRewriteEnabled(db) {
 }
 
 /**
+ * Returns true if pre-images can be recorded in 'system.preimages' collection, false otherwise.
+ */
+function canRecordPreImagesInConfigDatabase(db) {
+    // Clustered index feature must be enabled to record pre-images in 'system.preimages'
+    // collection.
+    const clusteredIndexesEnabled =
+        assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1}))
+            .featureFlagClusteredIndexes.value;
+
+    return isChangeStreamPreAndPostImagesEnabled(db) && clusteredIndexesEnabled;
+}
+
+/**
  * Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
  * the same as calling db.runCommand. If a passthrough is active and has defined a function
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual

@@ -2,25 +2,42 @@
  * Tests the behaviour of the 'fullDocumentBeforeChange' argument to the $changeStream stage.
  *
  * @tags: [
- *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   uses_multiple_connections,
  *   multiversion_incompatible,
+ *   # TODO SERVER-58694: remove this tag.
+ *   change_stream_does_not_expect_txns,
+ *   # TODO SERVER-60238: remove this tag.
+ *   assumes_read_preference_unchanged
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
+                                                   // canRecordPreImagesInConfigDatabase.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+
+const canRecordPreImagesInConfigDb = canRecordPreImagesInConfigDatabase(db);
+
+if (!canRecordPreImagesInConfigDb && FixtureHelpers.isMongos(db)) {
+    jsTestLog("Skipping test as pre image lookup is not supported in sharded cluster with feature" +
+              "flag 'featureFlagChangeStreamPreAndPostImages' disabled.");
+    return;
+}
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_pre_images");
 const cst = new ChangeStreamTest(db);
 
 // Enable pre-image recording on the test collection.
-assert.commandWorked(db.runCommand({collMod: coll.getName(), recordPreImages: true}));
+if (!canRecordPreImagesInConfigDb) {
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), recordPreImages: true}));
+} else {
+    assert.commandWorked(
+        db.runCommand({collMod: coll.getName(), changeStreamPreAndPostImages: {enabled: true}}));
+}
 
 // Open three streams on the collection, one for each "fullDocumentBeforeChange" mode.
 const csNoPreImages = cst.startWatchingChanges({
@@ -97,7 +114,12 @@ assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 assert.docEq(latestChange, cst.getOneChange(csPreImageRequiredCursor));
 
 // Now disable pre-image generation on the test collection and re-test.
-assert.commandWorked(db.runCommand({collMod: coll.getName(), recordPreImages: false}));
+if (!canRecordPreImagesInConfigDb) {
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), recordPreImages: false}));
+} else {
+    assert.commandWorked(
+        db.runCommand({collMod: coll.getName(), changeStreamPreAndPostImages: {enabled: false}}));
+}
 
 // Test pre-image lookup for an insertion. No pre-image exists on any cursor.
 assert.commandWorked(coll.insert({_id: "y"}));

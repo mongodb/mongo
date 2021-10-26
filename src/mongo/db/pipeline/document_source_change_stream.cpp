@@ -279,14 +279,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
     }
 
-    // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
-    // (after DSCSCheckTopologyChange) so that any $match stages which follow the $changeStream
+
+    // If 'fullDocumentBeforeChange' is not set to 'off', add the DSCSAddPreImage stage into the
+    // pipeline. We place this stage here so that any $match stages which follow the $changeStream
     // pipeline may be able to skip ahead of the DSCSAddPreImage stage. This allows a whole-db or
     // whole-cluster stream to run on an instance where only some collections have pre-images
     // enabled, so long as the user filters for only those namespaces.
-    // TODO SERVER-36941: figure out how to get this to work in a sharded cluster.
     if (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff) {
-        invariant(!expCtx->inMongos);
         stages.push_back(DocumentSourceChangeStreamAddPreImage::create(expCtx, spec));
     }
 
@@ -350,16 +349,15 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
                           << (spec.getAllowToRunOnSystemNS() ? " through mongos" : ""),
             !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inMongos));
 
-    // TODO SERVER-36941: We do not currently support sharded pre-image lookup.
-    const bool shouldAddPreImage =
-        (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
-    uassert(51771,
-            "the 'fullDocumentBeforeChange' option is not supported in a sharded cluster",
-            !(shouldAddPreImage && (expCtx->inMongos || expCtx->needsMerge)));
-
     // TODO SERVER-58584: remove the feature flag.
     if (!feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
             serverGlobalParams.featureCompatibility)) {
+        const bool shouldAddPreImage =
+            (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
+        uassert(51771,
+                "the 'fullDocumentBeforeChange' option is not supported in a sharded cluster",
+                !(shouldAddPreImage && (expCtx->inMongos || expCtx->needsMerge)));
+
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Specified value '"
                               << FullDocumentMode_serializer(spec.getFullDocument())

@@ -6,6 +6,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/change_stream_util.js");  // For isChangeStreamPreAndPostImagesEnabled.
+
 const st = new ShardingTest({
     shards: 1,
     mongos: 1,
@@ -14,6 +16,14 @@ const st = new ShardingTest({
 
 const shard = st.shard0;
 const mongos = st.s;
+
+if (isChangeStreamPreAndPostImagesEnabled(mongos.getDB("test"))) {
+    jsTestLog(
+        "Skipping test as pre-image lookup is supported in sharded clusters with feature flag " +
+        "'featureFlagChangeStreamPreAndPostImages' enabled.");
+    st.stop();
+    return;
+}
 
 // Test that we cannot create a collection with pre-images enabled in a sharded cluster.
 assert.commandFailed(shard.getDB("test").runCommand({create: "test", recordPreImages: true}));

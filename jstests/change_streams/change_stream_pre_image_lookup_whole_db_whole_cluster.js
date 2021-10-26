@@ -4,26 +4,52 @@
  * specifies a pipeline that filters out changes to any collections which do not
  * have pre-images enabled.
  *
- * @tags: [uses_change_streams, requires_replication]
+ * @tags: [
+ *   uses_change_streams,
+ *   # TODO SERVER-58694: remove this tag.
+ *   change_stream_does_not_expect_txns,
+ *   # TODO SERVER-60238: remove this tag.
+ *   assumes_read_preference_unchanged
+ * ]
  */
 (function() {
 "use strict";
 
-const rst = new ReplSetTest({nodes: 1});
-rst.startSet();
-rst.initiate();
+load("jstests/libs/change_stream_util.js");  // For canRecordPreImagesInConfigDatabase.
+load("jstests/libs/fixture_helpers.js");     // For FixtureHelpers.
 
-const testDB = rst.getPrimary().getDB(jsTestName());
-const adminDB = rst.getPrimary().getDB("admin");
+const testDB = db.getSiblingDB(jsTestName());
+const adminDB = db.getSiblingDB("admin");
+const collWithPreImageName = "coll_with_pre_images";
+const collWithNoPreImageName = "coll_with_no_pre_images";
+const canRecordPreImagesInConfigDb = canRecordPreImagesInConfigDatabase(testDB);
+
+if (!canRecordPreImagesInConfigDb && FixtureHelpers.isMongos(db)) {
+    jsTestLog("Skipping test as pre image lookup is not supported in sharded cluster with feature" +
+              "flag 'featureFlagChangeStreamPreAndPostImages' disabled.");
+    return;
+}
+
+assert.commandWorked(testDB.dropDatabase());
 
 // Create one collection that has pre-image recording enabled...
-const collWithPreImages = testDB.coll_with_pre_images;
-assert.commandWorked(testDB.createCollection(collWithPreImages.getName(), {recordPreImages: true}));
+if (!canRecordPreImagesInConfigDb) {
+    assert.commandWorked(testDB.createCollection(collWithPreImageName, {recordPreImages: true}));
+} else {
+    assert.commandWorked(testDB.createCollection(collWithPreImageName,
+                                                 {changeStreamPreAndPostImages: {enabled: true}}));
+}
 
 //... and one collection which has pre-images disabled.
+if (!canRecordPreImagesInConfigDb) {
+    assert.commandWorked(testDB.createCollection(collWithNoPreImageName, {recordPreImages: false}));
+} else {
+    assert.commandWorked(testDB.createCollection(collWithNoPreImageName,
+                                                 {changeStreamPreAndPostImages: {enabled: false}}));
+}
+
+const collWithPreImages = testDB.coll_with_pre_images;
 const collWithNoPreImages = testDB.coll_with_no_pre_images;
-assert.commandWorked(
-    testDB.createCollection(collWithNoPreImages.getName(), {recordPreImages: false}));
 
 //... and a collection that will hold the sentinal document that marks the end of changes
 const sentinelColl = testDB.sentinelColl;
@@ -103,6 +129,4 @@ for (let runOnDB of [testDB, adminDB]) {
         assert.eq(observedEvent.fullDocumentBeforeChange, expectedEvent.fullDocumentBeforeChange);
     }
 }
-
-rst.stopSet();
 })();

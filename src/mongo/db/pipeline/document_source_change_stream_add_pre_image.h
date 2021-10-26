@@ -94,11 +94,8 @@ public:
         return constraints;
     }
 
-    // Conceptually, this stage must always run on the shards part of the pipeline. At
-    // present, however, pre-image retrieval is not supported in a sharded cluster, and
-    // so the distributed plan logic will not be used.
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return DistributedPlanLogic{this, nullptr, boost::none};
+        return boost::none;
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const {

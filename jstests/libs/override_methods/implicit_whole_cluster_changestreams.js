@@ -58,7 +58,11 @@ ChangeStreamPassthroughHelpers.passthroughType = function() {
 // we need to override the helper to ensure that the Mongo.watch function itself is exercised by the
 // passthrough wherever Collection.watch or DB.watch is called.
 DB.prototype.watch = function(pipeline, options) {
-    pipeline = Object.assign([], pipeline);
-    pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
+    // If the database being watched is 'admin', then don't update the pipeline. The pipeline in
+    // this case will update the 'ns.db' to 'admin' which will match nothing.
+    if (this.getName() !== "admin") {
+        pipeline = Object.assign([], pipeline);
+        pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
+    }
     return this.getMongo().watch(pipeline, options);
 };

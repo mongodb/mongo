@@ -1,24 +1,22 @@
 // Tests that the point-in-time pre- and post-images are loaded correctly in $changeStream running
 // with different arguments for collections with 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
-//  assumes_against_mongod_not_mongos,
-//  change_stream_does_not_expect_txns,
-//  multiversion_incompatible,
+//   # TODO SERVER-58694: remove this tag.
+//   change_stream_does_not_expect_txns,
+//   multiversion_incompatible,
+//   # TODO SERVER-60238: remove this tag.
+//   assumes_read_preference_unchanged
 // ]
 (function() {
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPostImagesEnabled.
+load("jstests/libs/change_stream_util.js");        // For canRecordPreImagesInConfigDatabase.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "test";
 
-const clusteredIndexesEnabled =
-    assert.commandWorked(testDB.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1}))
-        .featureFlagClusteredIndexes.value;
-
-if (!(isChangeStreamPreAndPostImagesEnabled(db) && clusteredIndexesEnabled)) {
+if (!canRecordPreImagesInConfigDatabase(testDB)) {
     const coll = assertDropAndRecreateCollection(testDB, collName);
 
     // If feature flag is off, creating changeStream with new fullDocument arguments should throw.
@@ -27,7 +25,7 @@ if (!(isChangeStreamPreAndPostImagesEnabled(db) && clusteredIndexesEnabled)) {
     assert.throwsWithCode(() => coll.watch([], {fullDocument: 'required'}), ErrorCodes.BadValue);
 
     jsTestLog(
-        'Skipping test because featureFlagChangeStreamPreAndPostImages or featureFlagClusteredIndexes feature flag is not enabled');
+        "Skipping test because pre-image recording capability in 'system.preimages' is not enabled.");
     return;
 }
 
