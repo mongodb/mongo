@@ -1026,6 +1026,11 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
         }
         iteration++;
 
+        const auto sessionCatalogSourceInCatchupPhase = _sessionCatalogSource->inCatchupPhase();
+        const auto estimateUntransferredSessionsSize = sessionCatalogSourceInCatchupPhase
+            ? _sessionCatalogSource->untransferredCatchUpDataSize()
+            : std::numeric_limits<int64_t>::max();
+
         stdx::lock_guard<Latch> sl(_mutex);
 
         const std::size_t cloneLocsRemaining = _cloneLocs.size();
@@ -1048,8 +1053,8 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
                   "docsRemainingToClone"_attr = cloneLocsRemaining);
         }
 
-        if (res["state"].String() == "steady" && _sessionCatalogSource->inCatchupPhase() &&
-            _sessionCatalogSource->untransferredCatchUpDataSize() == 0) {
+        if (res["state"].String() == "steady" && sessionCatalogSourceInCatchupPhase &&
+            estimateUntransferredSessionsSize == 0) {
             if (cloneLocsRemaining != 0 ||
                 (_jumboChunkCloneState && _forceJumbo &&
                  PlanExecutor::IS_EOF != _jumboChunkCloneState->clonerState)) {
@@ -1075,15 +1080,13 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
         }
 
         if ((res["state"].String() == "steady" || res["state"].String() == "catchup") &&
-            _sessionCatalogSource->inCatchupPhase() && supportsCriticalSectionDuringCatchUp) {
+            sessionCatalogSourceInCatchupPhase && supportsCriticalSectionDuringCatchUp) {
             int64_t estimatedUntransferredModsSize =
                 _untransferredDeletesCounter * _averageObjectIdSize +
                 _untransferredUpsertsCounter * _averageObjectSizeForCloneLocs;
             auto estimatedUntransferredChunkPercentage =
                 (std::min(_args.getMaxChunkSizeBytes(), estimatedUntransferredModsSize) * 100) /
                 _args.getMaxChunkSizeBytes();
-            int64_t estimateUntransferredSessionsSize =
-                _sessionCatalogSource->untransferredCatchUpDataSize();
             int64_t maxUntransferredSessionsSize = BSONObjMaxUserSize *
                 _args.getMaxChunkSizeBytes() / ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes;
             if (estimatedUntransferredChunkPercentage < maxCatchUpPercentageBeforeBlockingWrites &&
