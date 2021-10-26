@@ -1603,10 +1603,10 @@ void ShardingCatalogManager::bumpCollectionMinorVersionInTxn(OperationContext* o
 
 void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
                                                    const ChunkType& chunk,
-                                                   long long estSize,
+                                                   long long estimatedDataSizeBytes,
                                                    const WriteConcernOptions& writeConcern) {
     // ensure the unsigned value fits in the signed long long
-    uassert(6049442, "Estimated chunk size cannot be negative", estSize < 0);
+    uassert(6049442, "Estimated chunk size cannot be negative", estimatedDataSizeBytes >= 0);
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
@@ -1619,7 +1619,7 @@ void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
                                  << ChunkType::max(chunk.getMax()));
     BSONObjBuilder updateBuilder;
     BSONObjBuilder updateSub(updateBuilder.subobjStart("$set"));
-    updateSub.appendNumber(ChunkType::estimatedSize.name(), estSize);
+    updateSub.appendNumber(ChunkType::estimatedSizeBytes.name(), estimatedDataSizeBytes);
     updateSub.doneFast();
 
     auto didUpdate = uassertStatusOK(
@@ -1640,7 +1640,7 @@ bool ShardingCatalogManager::clearChunkEstimatedSize(OperationContext* opCtx, co
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
 
     const auto query = BSON(ChunkType::collectionUUID() << uuid);
-    const auto update = BSON("$unset" << BSON(ChunkType::estimatedSize() << ""));
+    const auto update = BSON("$unset" << BSON(ChunkType::estimatedSizeBytes() << ""));
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
         updateOp.setUpdates({[&] {

@@ -356,7 +356,7 @@ public:
      */
     void setChunkEstimatedSize(OperationContext* opCtx,
                                const ChunkType& chunk,
-                               long long estSize,
+                               long long estimatedDataSizeBytes,
                                const WriteConcernOptions& writeConcern);
 
     /*

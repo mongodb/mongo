@@ -210,7 +210,7 @@ public:
     static const BSONField<OID> epoch;
     static const BSONField<Timestamp> timestamp;
     static const BSONField<BSONObj> history;
-    static const BSONField<long long> estimatedSize;
+    static const BSONField<long long> estimatedSizeBytes;
 
     ChunkType();
     ChunkType(CollectionUUID collectionUUID,

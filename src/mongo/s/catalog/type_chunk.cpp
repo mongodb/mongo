@@ -58,7 +58,7 @@ const BSONField<Date_t> ChunkType::lastmod("lastmod");
 const BSONField<OID> ChunkType::epoch("lastmodEpoch");
 const BSONField<Timestamp> ChunkType::timestamp("lastmodTimestamp");
 const BSONField<BSONObj> ChunkType::history("history");
-const BSONField<long long> ChunkType::estimatedSize("estSize");
+const BSONField<long long> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
 
 namespace {
 
@@ -335,7 +335,7 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source,
     chunk.setVersion(
         ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp));
 
-    auto elem = source.getField(estimatedSize.name());
+    auto elem = source.getField(estimatedSizeBytes.name());
     if (!elem.eoo()) {
         chunk._estimatedSizeBytes = elem.safeNumberLong();
     }
@@ -359,7 +359,7 @@ BSONObj ChunkType::toConfigBSON() const {
         builder.appendTimestamp(lastmod.name(), _version->toLong());
     }
     if (_estimatedSizeBytes)
-        builder.appendNumber(estimatedSize.name(), *_estimatedSizeBytes);
+        builder.appendNumber(estimatedSizeBytes.name(), *_estimatedSizeBytes);
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
     addHistoryToBSON(builder);
