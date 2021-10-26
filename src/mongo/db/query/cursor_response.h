@@ -103,6 +103,12 @@ public:
         return _numDocs;
     }
 
+    void reserveReplyBuffer(size_t bytes) {
+        if (_replyBuilder != nullptr) {
+            _replyBuilder->reserveBytes(bytes);
+        }
+    }
+
     /**
      * Call this after successfully appending all fields that will be part of this response.
      * After calling, you may not call any more methods on this object.

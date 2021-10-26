@@ -330,8 +330,9 @@ public:
             // timeout to the user.
             BSONObj obj;
             PlanExecutor::ExecState state;
+            size_t batchSize = cmd.getBatchSize().value_or(0);
             try {
-                while (!FindCommon::enoughForGetMore(cmd.getBatchSize().value_or(0), *numResults) &&
+                while (!FindCommon::enoughForGetMore(batchSize, *numResults) &&
                        PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
@@ -345,6 +346,15 @@ public:
 
                     // If this executor produces a postBatchResumeToken, add it to the response.
                     nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
+
+                    // At this point, we know that there will be at least one document in this
+                    // batch. Reserve an initial estimated number of bytes for the response.
+                    if (*numResults == 0) {
+                        auto bytesToReserve = FindCommon::getBytesToReserveForGetMoreReply(
+                            isTailable, obj.objsize(), batchSize);
+                        nextBatch->reserveReplyBuffer(bytesToReserve);
+                    }
+
                     nextBatch->append(obj);
                     (*numResults)++;
                     docUnitsReturned->observeOne(obj.objsize());
@@ -803,13 +813,6 @@ public:
 
     LogicalOp getLogicalOp() const override {
         return LogicalOp::opGetMore;
-    }
-
-    std::size_t reserveBytesForReply() const override {
-        // The extra 1K is an artifact of how we construct batches. We consider a batch to be full
-        // when it exceeds the goal batch size. In the case that we are just below the limit and
-        // then read a large document, the extra 1K helps prevent a final realloc+memcpy.
-        return FindCommon::kMaxBytesToReturnToClientAtOnce + 1024u;
     }
 
     bool collectsResourceConsumptionMetrics() const override {

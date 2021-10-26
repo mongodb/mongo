@@ -500,7 +500,7 @@ public:
                     batchSize = *listCollRequest.getCursor()->getBatchSize();
                 }
 
-                int bytesBuffered = 0;
+                size_t bytesBuffered = 0;
                 for (long long objCount = 0; objCount < batchSize; objCount++) {
                     BSONObj nextDoc;
                     PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);

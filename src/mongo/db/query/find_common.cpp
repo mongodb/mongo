@@ -58,6 +58,11 @@ MONGO_FAIL_POINT_DEFINE(failGetMoreAfterCursorCheckout);
 const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();
 
+const size_t FindCommon::kMaxBytesToReturnToClientAtOnce = BSONObjMaxUserSize;
+const size_t FindCommon::kTailableGetMoreReplyBufferSize = BSONObjMaxUserSize / 2 - 1024;
+const size_t FindCommon::kMinDocSizeForGetMorePreAllocation = 1024;
+const size_t FindCommon::kInitReplyBufferSize = 32768;
+
 bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long long numDocs) {
     auto batchSize = findCommand.getBatchSize();
     tassert(5746104,
@@ -71,7 +76,7 @@ bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long
     return numDocs >= batchSize.value();
 }
 
-bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered) {
+bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, size_t bytesBuffered) {
     invariant(numDocs >= 0);
     if (!numDocs) {
         // Allow the first output document to exceed the limit to ensure we can always make
@@ -97,4 +102,36 @@ void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const Cano
                                                      std::move(whileWaitingFunc),
                                                      cq.nss());
 }
+
+std::size_t FindCommon::getBytesToReserveForGetMoreReply(bool isTailable,
+                                                         size_t firstResultSize,
+                                                         size_t batchSize) {
+#ifdef _WIN32
+    // SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in
+    // conjunction with the additional memory pressure introduced by reply buffer
+    // pre-allocation, causes the concurrency suite to run extremely slowly. As a workaround
+    // we do not pre-allocate in Windows DEBUG builds.
+    if (kDebugBuild)
+        return 0;
+#endif
+
+    // A tailable cursor may often return 0 or very few results. Allocate a small initial
+    // buffer. This buffer should be big-enough to accomodate for at least one document.
+    if (isTailable) {
+        return std::max(firstResultSize, kTailableGetMoreReplyBufferSize);
+    }
+
+    // A getMore with batchSize is likely to return limited results. Allocate a medium
+    // initial buffer based on an estimate of document sizes and the given batch size.
+    if (batchSize > 0) {
+        size_t estmtObjSize = std::max(kMinDocSizeForGetMorePreAllocation, firstResultSize);
+        return std::min(estmtObjSize * batchSize, kMaxBytesToReturnToClientAtOnce);
+    }
+
+    // Otherwise, reserve enough buffer to fit a full batch of results. The allocator will
+    // assign a little more than the requested amount to avoid reallocation when we add
+    // command metadata to the reply.
+    return kMaxBytesToReturnToClientAtOnce;
+}
+
 }  // namespace mongo

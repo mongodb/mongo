@@ -91,10 +91,23 @@ public:
     // response size will be BSONObjMaxUserSize plus the amount of size required for the message
     // header and the cursor response "envelope". (The envolope contains namespace and cursor id
     // info.)
-    static const int kMaxBytesToReturnToClientAtOnce = BSONObjMaxUserSize;
+    static const size_t kMaxBytesToReturnToClientAtOnce;
+
+    // The estimated amount of user data in a GetMore command response for a tailable cursor.
+    // This amount will be used for memory pre-allocation in this type of requests.
+    // Note: as this is an estimate, we request 1KB less than a full power of two, so that the
+    // memory allocator will not jump to the next power of two once the envelope size is added in.
+    static const size_t kTailableGetMoreReplyBufferSize;
+
+    // The minimum document size we are prepared to consider when preallocating a reply buffer for
+    // getMore requests. We use a combination of the batchSize and the the actual size of the first
+    // document in the batch to compute the amount of bytes to preallocate. If the document size is
+    // below this threshold, we calculate the reply buffer using this constant in order to avoid
+    // under-allocating and having to grow the buffer again later.
+    static const size_t kMinDocSizeForGetMorePreAllocation;
 
     // The initial size of the query response buffer.
-    static const int kInitReplyBufferSize = 32768;
+    static const size_t kInitReplyBufferSize;
 
     /**
      * Returns true if the batchSize for the initial find has been satisfied.
@@ -118,7 +131,7 @@ public:
      * response to a cursor-generating command, returns true if there are enough remaining bytes in
      * our budget to fit 'nextDoc'.
      */
-    static bool haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, int bytesBuffered);
+    static bool haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, size_t bytesBuffered);
 
     /**
      * This function wraps waitWhileFailPointEnabled() on waitInFindBeforeMakingBatch.
@@ -128,6 +141,13 @@ public:
      * failpoint is active.
      */
     static void waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq);
+
+    /**
+     * Computes an initial preallocation size for the GetMore reply buffer based on its properties.
+     */
+    static std::size_t getBytesToReserveForGetMoreReply(bool isTailable,
+                                                        size_t firstResultSize,
+                                                        size_t batchSize);
 };
 
 }  // namespace mongo

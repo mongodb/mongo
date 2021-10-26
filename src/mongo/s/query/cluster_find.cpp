@@ -321,7 +321,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     FindCommon::waitInFindBeforeMakingBatch(opCtx, query);
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
-    int bytesBuffered = 0;
+    size_t bytesBuffered = 0;
 
     // This loop will not result in actually calling getMore against shards, but just loading
     // results from the initial batches (that were obtained while establishing cursors) into
@@ -738,7 +738,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
 
     std::vector<BSONObj> batch;
-    int bytesBuffered = 0;
+    size_t bytesBuffered = 0;
     long long batchSize = cmd.getBatchSize().value_or(0);
     long long startingFrom = pinnedCursor.getValue()->getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
