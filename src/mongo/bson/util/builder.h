@@ -168,7 +168,7 @@ public:
         _fragmentBuilder.start(sz);
     }
 
-    SharedBufferFragment finish(int sz) {
+    SharedBufferFragment finish(size_t sz) {
         return _fragmentBuilder.finish(sz);
     }
 
@@ -299,23 +299,25 @@ template <class BufferAllocator>
 class BasicBufBuilder {
 public:
     template <typename... AllocatorArgs>
-    BasicBufBuilder(AllocatorArgs&&... args) : _buf(std::forward<AllocatorArgs>(args)...) {}
+    BasicBufBuilder(AllocatorArgs&&... args)
+        : _buf(std::forward<AllocatorArgs>(args)...),
+          _nextByte(_buf.get()),
+          _end(_nextByte + _buf.capacity()) {}
 
     void kill() {
         _buf.free();
     }
 
     void reset() {
-        l = 0;
-        reservedBytes = 0;
+        _nextByte = _buf.get();
+        _end = _nextByte + _buf.capacity();
     }
     void reset(size_t maxSize) {
-        l = 0;
-        reservedBytes = 0;
         if (maxSize && _buf.capacity() > maxSize) {
             _buf.free();
             _buf.malloc(maxSize);
         }
+        reset();
     }
 
     /** leave room for some stuff later
@@ -406,10 +408,13 @@ public:
 
     /** Returns the length of data in the current buffer */
     int len() const {
-        return l;
+        if (MONGO_unlikely(!_nextByte || !_end)) {
+            return 0;
+        }
+        return _nextByte - _buf.get();
     }
     void setlen(int newLen) {
-        l = newLen;
+        _nextByte = _buf.get() + newLen;
     }
     /** Returns the capacity of the buffer */
     int capacity() const {
@@ -418,26 +423,30 @@ public:
 
     /* returns the pre-grow write position */
     inline char* grow(int by) {
-        int oldlen = l;
-        int newLen = l + by;
-        size_t minSize = newLen + reservedBytes;
-        if (minSize > _buf.capacity()) {
-            _growReallocate(minSize);
+        if (MONGO_likely(_nextByte + by <= _end)) {
+            char* oldNextByte = _nextByte;
+            _nextByte += by;
+            return oldNextByte;
         }
-        l = newLen;
-        return _buf.get() + oldlen;
+        return _growReallocate(by);
     }
 
     /**
      * Reserve room for some number of bytes to be claimed at a later time via claimReservedBytes.
      */
     void reserveBytes(size_t bytes) {
-        size_t minSize = l + reservedBytes + bytes;
-        if (minSize > _buf.capacity())
-            _growReallocate(minSize);
+        dassert(_nextByte && _end);
+        if (MONGO_likely((_end - bytes) >= _nextByte)) {
+            _end -= bytes;
+            return;
+        }
 
-        // This must happen *after* any attempt to grow.
-        reservedBytes += bytes;
+        _growReallocate(bytes);
+
+        // _growReallocate adds to _nextByte to speed up the common case of grow(). Now remove
+        // those bytes, and put them after _end.
+        _nextByte -= bytes;
+        _end -= bytes;
     }
 
     /**
@@ -445,9 +454,9 @@ public:
      * reserved. Appends of up to this many bytes immediately following a claim are
      * guaranteed to succeed without a need to reallocate.
      */
-    void claimReservedBytes(int bytes) {
-        invariant(reservedBytes >= bytes);
-        reservedBytes -= bytes;
+    void claimReservedBytes(size_t bytes) {
+        invariant(reservedBytes() >= bytes);
+        _end += bytes;
     }
 
     /**
@@ -456,12 +465,23 @@ public:
      */
     REQUIRES_FOR_NON_TEMPLATE(std::is_same_v<BufferAllocator, SharedBufferAllocator>)
     void useSharedBuffer(SharedBuffer buf) {
-        invariant(l == 0);  // Can only do this while empty.
-        invariant(reservedBytes == 0);
+        invariant(len() == 0);  // Can only do this while empty.
+        invariant(reservedBytes() == 0);
         _buf = SharedBufferAllocator(std::move(buf));
+        reset();
     }
 
 protected:
+    /**
+     * Returns the reservedBytes in this buffer
+     */
+    size_t reservedBytes() const {
+        if (MONGO_unlikely(!_nextByte || !_end)) {
+            return 0;
+        }
+        return _buf.capacity() - (_end - _buf.get());
+    }
+
     template <typename T>
     void appendNumImpl(T t) {
         // NOTE: For now, we assume that all things written
@@ -471,7 +491,10 @@ protected:
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
     /* "slow" portion of 'grow()'  */
-    void _growReallocate(size_t minSize) {
+    char* _growReallocate(size_t by) {
+        const size_t oldLen = len();
+        const size_t oldReserved = reservedBytes();
+        size_t minSize = oldLen + by + oldReserved;
         // Going beyond the maximum buffer size is not likely.
         if (MONGO_unlikely(minSize > BufferMaxSize)) {
             growFailure(minSize);
@@ -514,6 +537,14 @@ protected:
         // next power of two for being friendly to the system memory allocators and avoid memory
         // fragmentation.
         _buf.realloc(reallocSize - BufferAllocator::kBuffHolderSize);
+        _nextByte = _buf.get() + oldLen + by;
+        _end = _buf.get() + _buf.capacity() - oldReserved;
+
+        invariant(_nextByte >= _buf.get());
+        invariant(_end >= _nextByte);
+        invariant(_buf.get() + _buf.capacity() >= _end);
+
+        return _buf.get() + oldLen;
     }
 
     /*
@@ -527,8 +558,8 @@ protected:
     }
 
     BufferAllocator _buf;
-    int l{0};
-    int reservedBytes{0};  // eagerly _growReallocate to keep this many bytes of spare room.
+    char* _nextByte;
+    char* _end;
 
     template <class Builder>
     friend class StringBuilderImpl;
@@ -539,7 +570,10 @@ public:
     static constexpr size_t kDefaultInitSizeBytes = 512;
     BufBuilder(size_t initsize = kDefaultInitSizeBytes) : BasicBufBuilder(initsize) {}
 
-    /* assume ownership of the buffer */
+    /**
+     * Assume ownership of the buffer.
+     * Note: There should not be any other method calls on this object after a call to 'release'.
+     */
     SharedBuffer release() {
         return _buf.release();
     }
@@ -547,14 +581,10 @@ public:
 class PooledFragmentBuilder : public BasicBufBuilder<SharedBufferFragmentAllocator> {
 public:
     PooledFragmentBuilder(SharedBufferFragmentBuilder& fragmentBuilder)
-        : BasicBufBuilder(fragmentBuilder) {
-        // Indicate that we are starting to build a fragment but rely on the builder for the block
-        // size
-        _buf.start(0);
-    }
+        : BasicBufBuilder(fragmentBuilder.start(0)) {}
 
     SharedBufferFragment done() {
-        return _buf.finish(l);
+        return _buf.finish(len());
     }
 };
 MONGO_STATIC_ASSERT(std::is_move_constructible_v<BufBuilder>);
@@ -564,7 +594,10 @@ public:
     static constexpr size_t kDefaultInitSizeBytes = 512;
     UniqueBufBuilder(size_t initsize = kDefaultInitSizeBytes) : BasicBufBuilder(initsize) {}
 
-    /* assume ownership of the buffer */
+    /**
+     * Assume ownership of the buffer.
+     * Note: There should not be any other method calls on this object after a call to 'release'.
+     */
     UniqueBuffer release() {
         return _buf.release();
     }
@@ -670,13 +703,13 @@ public:
     StringBuilderImpl& operator<<(R (*val)(Args...)) = delete;
 
     void appendDoubleNice(double x) {
-        const int prev = _buf.l;
+        const int prev = _buf.len();
         const int maxSize = 32;
         char* start = _buf.grow(maxSize);
         int z = snprintf(start, maxSize, "%.16g", x);
         verify(z >= 0);
         verify(z < maxSize);
-        _buf.l = prev + z;
+        _buf.setlen(prev + z);
         if (strchr(start, '.') == nullptr && strchr(start, 'E') == nullptr &&
             strchr(start, 'N') == nullptr) {
             write(".0", 2);
@@ -696,7 +729,7 @@ public:
     }
 
     std::string str() const {
-        return std::string(_buf.buf(), _buf.l);
+        return std::string(_buf.buf(), _buf.len());
     }
 
     /**
@@ -705,7 +738,7 @@ public:
      * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
      */
     std::string_view stringView() const {
-        return std::string_view(_buf.buf(), _buf.l);
+        return std::string_view(_buf.buf(), _buf.len());
     }
 
     /**
@@ -714,12 +747,12 @@ public:
      * WARNING: The view is invalidated when this StringBuilder is modified or destroyed.
      */
     StringData stringData() const {
-        return StringData(_buf.buf(), _buf.l);
+        return StringData(_buf.buf(), _buf.len());
     }
 
     /** size of current std::string */
     int len() const {
-        return _buf.l;
+        return _buf.len();
     }
 
 private:
@@ -740,11 +773,11 @@ private:
 
     template <typename T>
     StringBuilderImpl& SBNUM(T val, int maxSize, const char* macro) {
-        int prev = _buf.l;
+        int prev = _buf.len();
         int z = snprintf(_buf.grow(maxSize), maxSize, macro, (val));
         verify(z >= 0);
         verify(z < maxSize);
-        _buf.l = prev + z;
+        _buf.setlen(prev + z);
         return *this;
     }
 

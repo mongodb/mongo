@@ -403,7 +403,10 @@ public:
         } else {
             newBuf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
         }
-        return {version, sizeOfKeystring, SharedBufferFragment(newBuf.release(), newBuf.len())};
+        // Note: this variable is needed to make sure that no method is called on 'newBuf'
+        // after a call on its 'release' method.
+        const size_t newBufLen = newBuf.len();
+        return {version, sizeOfKeystring, SharedBufferFragment(newBuf.release(), newBufLen)};
     }
 
     /// Members for Sorter
@@ -534,7 +537,10 @@ public:
         } else {
             newBuf.appendBuf(_typeBits.getBuffer(), _typeBits.getSize());
         }
-        return {version, _buffer().len(), SharedBufferFragment(newBuf.release(), newBuf.len())};
+        // Note: this variable is needed to make sure that no method is called on 'newBuf'
+        // after a call on its 'release' method.
+        const size_t newBufLen = newBuf.len();
+        return {version, _buffer().len(), SharedBufferFragment(newBuf.release(), newBufLen)};
     }
 
     void appendRecordId(RecordId loc);
@@ -817,8 +823,10 @@ public:
         int32_t ksSize = _appendTypeBits();
         _transition(BuildState::kReleased);
 
-        return {
-            version, ksSize, SharedBufferFragment(_bufferBuilder.release(), _bufferBuilder.len())};
+        // Note: this variable is needed to make sure that no method is called on '_bufferBuilder'
+        // after a call on its 'release' method.
+        const size_t bufLen = _bufferBuilder.len();
+        return {version, ksSize, SharedBufferFragment(_bufferBuilder.release(), bufLen)};
     }
 
 protected:

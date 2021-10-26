@@ -750,17 +750,17 @@ TEST_F(KeyStringBuilderTest, ReasonableSize) {
     // generation. These upper bounds were the calculate sizes of each type at the time this
     // test was written.
     KeyString::Builder stackBuilder(KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
-    ASSERT_LTE(sizeof(stackBuilder), 608);
+    static_assert(sizeof(stackBuilder) <= 624);
 
     KeyString::HeapBuilder heapBuilder(
         KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
-    ASSERT_LTE(sizeof(heapBuilder), 96);
+    static_assert(sizeof(heapBuilder) <= 104);
 
     // Use large 1KB blocks and verify that we use way less
     SharedBufferFragmentBuilder fragmentBuilder(1024);
     KeyString::PooledBuilder pooledBuilder(
         fragmentBuilder, KeyString::Version::kLatestVersion, BSONObj(), ALL_ASCENDING);
-    ASSERT_LTE(sizeof(pooledBuilder), 96);
+    static_assert(sizeof(pooledBuilder) <= 104);
 
     // Test the dynamic memory usage reported to the sorter.
     KeyString::Value value1 = stackBuilder.getValueCopy();

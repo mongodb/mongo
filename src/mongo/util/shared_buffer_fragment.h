@@ -117,7 +117,7 @@ public:
 
     // Starts building a memory fragment with at least 'initialSize' capacity.
     // May only be called if we are not currently building a fragment
-    void start(size_t initialSize) {
+    SharedBufferFragmentBuilder& start(size_t initialSize) {
         invariant(!_inUse);
         if (_buffer.capacity() < (_offset + initialSize)) {
             // If capacity is 0, then this is our initial allocation and we should not use the grow
@@ -129,6 +129,7 @@ public:
             _offset = 0;
         }
         _inUse = true;
+        return *this;
     }
 
     // Grows the currently building memory fragment so it will fit at least 'size' bytes.
