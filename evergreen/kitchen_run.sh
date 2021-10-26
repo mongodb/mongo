@@ -11,6 +11,10 @@ export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
 export KITCHEN_SUBNET="${kitchen_subnet}"
 export KITCHEN_VPC="${kitchen_vpc}"
 
+if [ ${packager_distro} == "suse12" ]; then
+  export KITCHEN_YAML="kitchen.legacy.yml"
+fi
+
 if [[ "${packager_arch}" == "aarch64" || "${packager_arch}" == "arm64" ]]; then
   kitchen_packager_distro="${packager_distro}-arm64"
 else

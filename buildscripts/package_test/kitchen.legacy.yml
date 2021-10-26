@@ -1,0 +1,137 @@
+---
+driver:
+  name: ec2
+  region: us-east-1
+  vpc_mode: true
+  vpc_id: <%= ENV['KITCHEN_VPC'] %>
+  subnet_id: <%= ENV['KITCHEN_SUBNET'] %>
+  security_group_ids:
+    - <%= ENV['KITCHEN_SECURITY_GROUP'] %>
+  aws_ssh_key_id: <%= ENV['KITCHEN_SSH_KEY_ID'] %>
+  interface: private
+  associate_public_ip: true
+  tags:
+    name: "server package test"
+    owner: "build"
+    expire-on: "<%= ENV['KITCHEN_EXPIRE'] %>"
+
+verifier:
+  name: inspec
+  sudo: true
+
+provisioner:
+  name: chef_zero
+  log_level: info
+  require_chef_omnibus: 12
+
+platforms:
+  - name: amazon-x86-64
+    driver:
+      image_id: ami-0080e4c5bc078760e
+    transport:
+      username: ec2-user
+  - name: amazon2-x86-64
+    driver:
+      image_id: ami-428aa838
+    transport:
+      username: ec2-user
+  - name: amazon2-arm64
+    driver:
+      image_id: ami-0c582118883b46f4f
+      instance_type: c6g.medium
+    transport:
+      username: ec2-user
+  - name: debian71-x86-64
+    driver:
+      image_id: ami-4b124a22
+    transport:
+      username: admin
+  - name: debian81-x86-64
+    driver:
+      image_id: ami-896d85e2
+    transport:
+      username: admin
+  - name: debian92-x86-64
+    driver:
+      image_id: ami-71b7750b
+    transport:
+      username: admin
+  - name: debian10-x86-64
+    driver:
+      image_id: ami-0dedf6a6502877301
+    transport:
+      username: admin
+  - name: rhel70-x86-64
+    driver:
+      image_id: ami-2051294a
+    transport:
+      username: root
+  - name: rhel80-x86-64
+    driver:
+      image_id: ami-0c322300a1dd5dc79
+    transport:
+      username: ec2-user
+  - name: rhel82-arm64
+    driver:
+      image_id: ami-029ba835ddd43c34f
+      instance_type: m6g.medium
+    transport:
+      username: ec2-user
+  - name: suse11-x86-64
+    driver:
+      image_id: ami-7f2e6015
+    transport:
+      username: ec2-user
+  - name: suse12-x86-64
+    driver:
+      image_id: ami-043eebeabcc4e3d35
+    transport:
+      username: ec2-user
+  - name: suse15-x86-64
+    driver:
+      image_id: ami-06ea7729e394412c8
+    transport:
+      username: ec2-user
+  - name: ubuntu1204-x86-64
+    driver:
+      image_id: ami-3fec7956
+    transport:
+      username: ubuntu
+  - name: ubuntu1404-x86-64
+    driver:
+      image_id: ami-1d8c9574
+    transport:
+      username: ubuntu
+  - name: ubuntu1604-x86-64
+    driver:
+      image_id: ami-64140d0e
+    transport:
+      username: ubuntu
+  - name: ubuntu1804-x86-64
+    driver:
+      image_id: ami-7ad76705
+    transport:
+      username: ubuntu
+  - name: ubuntu1804-arm64
+    driver:
+      image_id: ami-01ac7d9c1179d7b74
+      instance_type: m6g.medium
+  - name: ubuntu2004-x86-64
+    driver:
+      image_id: ami-068663a3c619dd892
+    transport:
+      username: ubuntu
+  - name: ubuntu2004-arm64
+    driver:
+      image_id: ami-00579fbb15b954340
+      instance_type: m6g.medium
+
+transport:
+  ssh_key: ~/.ssh/kitchen.pem
+
+suites:
+  - name: service
+    run_list:
+      - recipe[package_test::install_mongodb]
+    attributes:
+      artifacts_url: <%= ENV['KITCHEN_ARTIFACTS_URL'] %>
