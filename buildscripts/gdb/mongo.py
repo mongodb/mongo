@@ -140,9 +140,12 @@ def get_decorations(obj):
         if type_name.endswith('*'):
             type_name = type_name[0:len(type_name) - 1]
         type_name = type_name.rstrip()
-        type_t = gdb.lookup_type(type_name)
-        obj = decoration_data[dindex].cast(type_t)
-        yield (type_name, obj)
+        try:
+            type_t = gdb.lookup_type(type_name)
+            obj = decoration_data[dindex].cast(type_t)
+            yield (type_name, obj)
+        except Exception as err:
+            print("Failed to look up decoration type: " + type_name + ": " + str(err))
 
 
 def get_decoration(obj, type_name):
