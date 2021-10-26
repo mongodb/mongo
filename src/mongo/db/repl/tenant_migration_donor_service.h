@@ -279,7 +279,7 @@ public:
             kForgotten
         };
 
-        static std::string _describeStage(DonorStage ds) {
+        static std::string describeStage(DonorStage ds) {
             switch (ds) {
                 case DonorStage::kUnstarted:
                     return "Migration not yet started.";
@@ -312,7 +312,7 @@ public:
         }
 
         void _updateDonorStage(DonorStage ds) {
-            _donorStage.store(ds);
+            _donorStage = ds;
         }
 
         /*
@@ -380,7 +380,7 @@ public:
         boost::optional<CancellationSource> _abortMigrationSource;
 
         // A diagnostics-only field used to describe the donor's progress in currentOp.
-        AtomicWord<DonorStage> _donorStage{DonorStage::kUnstarted};
+        DonorStage _donorStage = DonorStage::kUnstarted;
     };
 
 private:

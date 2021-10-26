@@ -396,7 +396,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     if (_stateDoc.getAbortReason()) {
         bob.append("abortReason", *_stateDoc.getAbortReason());
     }
-    bob.append("donorStage", _describeStage(_donorStage.load()));
+    bob.append("donorStage", describeStage(_donorStage));
     return bob.obj();
 }
 

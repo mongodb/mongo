@@ -165,10 +165,6 @@ MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingOplogBufferCollection);
 MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(fpAfterFetchingCommittedTransactions);
 MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
-MONGO_FAIL_POINT_DEFINE(pauseAtStartOfTenantMigrationRecipientFutureChain);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterSettingWaitingForCloneStage);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationRecipientBeforeForgetMigration);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationRecipientBeforeLeavingFutureChain);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -403,7 +399,6 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
                          static_cast<long long>(_tenantOplogApplier->getNumOpsApplied()));
     }
 
-    bob.append("recipientStage", _describeStage(_recipientStage.load()));
     return bob.obj();
 }
 
@@ -1976,8 +1971,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     return AsyncTry([this, self = shared_from_this(), executor, token, cancelWhenDurable] {
                return ExecutorFuture(**executor)
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kInitializing);
-                       pauseAtStartOfTenantMigrationRecipientFutureChain.pauseWhileSet();
                        stdx::unique_lock lk(_mutex);
                        // Instance task can be started only once for the current term on a primary.
                        invariant(!_taskState.isDone());
@@ -2088,12 +2081,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            _stateDoc.getStartFetchingDonorOpTime().has_value());
                    })
                    .then([this, self = shared_from_this(), token] {
-                       _updateRecipientStage(RecipientStage::kFetchingClusterTimeKeys);
                        _stopOrHangOnFailPoint(&fpBeforeFetchingDonorClusterTimeKeys);
                        _fetchAndStoreDonorClusterTimeKeyDocs(token);
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kSavingOwnFCV);
                        _stopOrHangOnFailPoint(&fpAfterConnectingTenantMigrationRecipientInstance);
                        stdx::lock_guard lk(_mutex);
 
@@ -2122,32 +2113,27 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        return SemiFuture<void>::makeReady();
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kFetchingDonorFCV);
                        _stopOrHangOnFailPoint(&fpAfterRecordingRecipientPrimaryStartingFCV);
                        _compareRecipientAndDonorFCV();
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kGettingStartOpTimes);
                        _stopOrHangOnFailPoint(&fpAfterComparingRecipientAndDonorFCV);
                        stdx::lock_guard lk(_mutex);
                        _getStartOpTimesFromDonor(lk);
                        return _updateStateDocForMajority(lk);
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kCreatingOplogBuffer);
                        _stopOrHangOnFailPoint(
                            &fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
                        _createOplogBuffer();
                        return _fetchRetryableWritesOplogBeforeStartOpTime();
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kStartingOplogFetcher);
                        _stopOrHangOnFailPoint(
                            &fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime);
                        _startOplogFetcher();
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kStartingDataSync);
                        _stopOrHangOnFailPoint(
                            &fpAfterStartingOplogFetcherMigrationRecipientInstance);
 
@@ -2226,13 +2212,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
                        return clonerFuture;
                    })
+                   .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kWaitingForClone);
-                       pauseTenantMigrationAfterSettingWaitingForCloneStage.pauseWhileSet();
-                       return _onCloneSuccess();
-                   })
-                   .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kFetchingCommittedTransactions);
                        {
                            auto opCtx = cc().makeOperationContext();
                            _stopOrHangOnFailPoint(&fpAfterCollectionClonerDone, opCtx.get());
@@ -2240,7 +2221,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        return _fetchCommittedTransactionsBeforeStartOpTime();
                    })
                    .then([this, self = shared_from_this()] {
-                       _updateRecipientStage(RecipientStage::kStartingOplogApplier);
                        _stopOrHangOnFailPoint(&fpAfterFetchingCommittedTransactions);
                        LOGV2_DEBUG(4881200,
                                    1,
@@ -2386,8 +2366,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         })
         .thenRunOn(**_scopedExecutor)
         .then([this, self = shared_from_this()] {
-            _updateRecipientStage(RecipientStage::kWaitingForForgetMigrationCmd);
-            pauseTenantMigrationRecipientBeforeForgetMigration.pauseWhileSet();
             // Schedule on the _scopedExecutor to make sure we are still the primary when
             // waiting for the recipientForgetMigration command.
             return _receivedRecipientForgetMigrationPromise.getFuture();
@@ -2404,10 +2382,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 _migrationUuid,
                 token);
         })
-        .then([this, self = shared_from_this()] {
-            _updateRecipientStage(RecipientStage::kMarkingStateDocGarbageCollectable);
-            return _markStateDocAsGarbageCollectable();
-        })
+        .then([this, self = shared_from_this()] { return _markStateDocAsGarbageCollectable(); })
         .then([this, self = shared_from_this()] {
             _stopOrHangOnFailPoint(&fpBeforeDroppingOplogBufferCollection);
             auto opCtx = cc().makeOperationContext();
@@ -2423,34 +2398,30 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .onCompletion([this,
                        self = shared_from_this(),
                        scopedCounter{std::move(scopedOutstandingMigrationCounter)}](Status status) {
-            {
-                // Schedule on the parent executor to mark the completion of the whole chain so this
-                // is safe even on shutDown/stepDown.
-                stdx::lock_guard lk(_mutex);
-                invariant(_dataSyncCompletionPromise.getFuture().isReady());
-                if (status.isOK()) {
-                    LOGV2(4881401,
-                          "Migration marked to be garbage collectable due to "
-                          "recipientForgetMigration "
-                          "command",
-                          "migrationId"_attr = getMigrationUUID(),
-                          "tenantId"_attr = getTenantId(),
-                          "expireAt"_attr = *_stateDoc.getExpireAt());
-                    setPromiseOkifNotReady(lk, _taskCompletionPromise);
-                } else {
-                    // We should only hit here on a stepDown/shutDown, or a 'conflicting migration'
-                    // error.
-                    LOGV2(4881402,
-                          "Migration not marked to be garbage collectable",
-                          "migrationId"_attr = getMigrationUUID(),
-                          "tenantId"_attr = getTenantId(),
-                          "status"_attr = status);
-                    setPromiseErrorifNotReady(lk, _taskCompletionPromise, status);
-                }
-                _taskState.setState(TaskState::kDone);
-                _updateRecipientStage(RecipientStage::kForgotten);
+            // Schedule on the parent executor to mark the completion of the whole chain so this
+            // is safe even on shutDown/stepDown.
+            stdx::lock_guard lk(_mutex);
+            invariant(_dataSyncCompletionPromise.getFuture().isReady());
+            if (status.isOK()) {
+                LOGV2(4881401,
+                      "Migration marked to be garbage collectable due to "
+                      "recipientForgetMigration "
+                      "command",
+                      "migrationId"_attr = getMigrationUUID(),
+                      "tenantId"_attr = getTenantId(),
+                      "expireAt"_attr = *_stateDoc.getExpireAt());
+                setPromiseOkifNotReady(lk, _taskCompletionPromise);
+            } else {
+                // We should only hit here on a stepDown/shutDown, or a 'conflicting migration'
+                // error.
+                LOGV2(4881402,
+                      "Migration not marked to be garbage collectable",
+                      "migrationId"_attr = getMigrationUUID(),
+                      "tenantId"_attr = getTenantId(),
+                      "status"_attr = status);
+                setPromiseErrorifNotReady(lk, _taskCompletionPromise, status);
             }
-            pauseTenantMigrationRecipientBeforeLeavingFutureChain.pauseWhileSet();
+            _taskState.setState(TaskState::kDone);
         })
         .semi();
 }
