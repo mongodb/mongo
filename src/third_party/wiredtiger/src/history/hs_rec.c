@@ -28,7 +28,7 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
 
     btree_id = btree->id;
 
-    if (!WT_VERBOSE_ISSET(session, WT_VERB_HS | WT_VERB_HS_ACTIVITY))
+    if (!WT_VERBOSE_ISSET(session, WT_VERB_HS) && !WT_VERBOSE_ISSET(session, WT_VERB_HS_ACTIVITY))
         return;
 
     conn = S2C(session);
@@ -46,7 +46,9 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
         WT_IGNORE_RET_BOOL(__wt_eviction_clean_needed(session, &pct_full));
         WT_IGNORE_RET_BOOL(__wt_eviction_dirty_needed(session, &pct_dirty));
 
-        __wt_verbose(session, WT_VERB_HS | WT_VERB_HS_ACTIVITY,
+        __wt_verbose_multi(session,
+          WT_DECL_VERBOSE_MULTI_CATEGORY(
+            ((WT_VERBOSE_CATEGORY[]){WT_VERB_HS, WT_VERB_HS_ACTIVITY})),
           "Page reconciliation triggered history store write: file ID %" PRIu32
           ". Current history store file size: %" PRId64
           ", cache dirty: %2.3f%% , cache use: %2.3f%%",

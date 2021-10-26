@@ -210,6 +210,75 @@ struct __wt_name_flag {
         (conn)->hot_backup_list = NULL;                      \
     } while (0)
 
+/* Permitted verbose event categories that can be used when defining a verbose message. */
+typedef enum {
+    WT_VERB_API = 0,
+    WT_VERB_BACKUP,
+    WT_VERB_BLOCK,
+    WT_VERB_CHECKPOINT,
+    WT_VERB_CHECKPOINT_CLEANUP,
+    WT_VERB_CHECKPOINT_PROGRESS,
+    WT_VERB_COMPACT,
+    WT_VERB_COMPACT_PROGRESS,
+    WT_VERB_ERROR_RETURNS,
+    WT_VERB_EVICT,
+    WT_VERB_EVICTSERVER,
+    WT_VERB_EVICT_STUCK,
+    WT_VERB_FILEOPS,
+    WT_VERB_HANDLEOPS,
+    WT_VERB_HS,
+    WT_VERB_HS_ACTIVITY,
+    WT_VERB_LOG,
+    WT_VERB_LSM,
+    WT_VERB_LSM_MANAGER,
+    WT_VERB_METADATA,
+    WT_VERB_MUTEX,
+    WT_VERB_OVERFLOW,
+    WT_VERB_READ,
+    WT_VERB_RECONCILE,
+    WT_VERB_RECOVERY,
+    WT_VERB_RECOVERY_PROGRESS,
+    WT_VERB_RTS,
+    WT_VERB_SALVAGE,
+    WT_VERB_SHARED_CACHE,
+    WT_VERB_SPLIT,
+    WT_VERB_TEMPORARY,
+    WT_VERB_THREAD_GROUP,
+    WT_VERB_TIERED,
+    WT_VERB_TIMESTAMP,
+    WT_VERB_TRANSACTION,
+    WT_VERB_VERIFY,
+    WT_VERB_VERSION,
+    WT_VERB_WRITE,
+    /* This entry needs to be the last in order to track the number of category items. */
+    WT_VERB_NUM_CATEGORIES,
+} WT_VERBOSE_CATEGORY;
+
+/*
+ * Permitted verbosity levels; to be used when defining verbose messages. The levels define a range
+ * of severity categories, with WT_VERBOSE_ERROR being the lowest, most critical level (used by
+ * messages on critical error paths) and WT_VERBOSE_DEBUG being the highest verbosity/informational
+ * level (mostly adopted for debugging).
+ */
+typedef enum {
+    WT_VERBOSE_ERROR = -2,
+    WT_VERBOSE_WARNING,
+    WT_VERBOSE_INFO,
+    WT_VERBOSE_DEBUG
+} WT_VERBOSE_LEVEL;
+
+/*
+ * WT_VERBOSE_MULTI_CATEGORY --
+ *  Simple structure to represent a set of verbose categories.
+ */
+struct __wt_verbose_multi_category {
+    WT_VERBOSE_CATEGORY *categories;
+    uint32_t cnt;
+};
+
+#define WT_DECL_VERBOSE_MULTI_CATEGORY(items) \
+    ((WT_VERBOSE_MULTI_CATEGORY){.categories = (items), .cnt = WT_ELEMENTS(items)})
+
 /*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
@@ -550,47 +619,8 @@ struct __wt_connection_impl {
     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t debug_flags;
 
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_VERB_API 0x0000000001u
-#define WT_VERB_BACKUP 0x0000000002u
-#define WT_VERB_BLOCK 0x0000000004u
-#define WT_VERB_CHECKPOINT 0x0000000008u
-#define WT_VERB_CHECKPOINT_CLEANUP 0x0000000010u
-#define WT_VERB_CHECKPOINT_PROGRESS 0x0000000020u
-#define WT_VERB_COMPACT 0x0000000040u
-#define WT_VERB_COMPACT_PROGRESS 0x0000000080u
-#define WT_VERB_ERROR_RETURNS 0x0000000100u
-#define WT_VERB_EVICT 0x0000000200u
-#define WT_VERB_EVICTSERVER 0x0000000400u
-#define WT_VERB_EVICT_STUCK 0x0000000800u
-#define WT_VERB_FILEOPS 0x0000001000u
-#define WT_VERB_HANDLEOPS 0x0000002000u
-#define WT_VERB_HS 0x0000004000u
-#define WT_VERB_HS_ACTIVITY 0x0000008000u
-#define WT_VERB_LOG 0x0000010000u
-#define WT_VERB_LSM 0x0000020000u
-#define WT_VERB_LSM_MANAGER 0x0000040000u
-#define WT_VERB_METADATA 0x0000080000u
-#define WT_VERB_MUTEX 0x0000100000u
-#define WT_VERB_OVERFLOW 0x0000200000u
-#define WT_VERB_READ 0x0000400000u
-#define WT_VERB_RECONCILE 0x0000800000u
-#define WT_VERB_RECOVERY 0x0001000000u
-#define WT_VERB_RECOVERY_PROGRESS 0x0002000000u
-#define WT_VERB_RTS 0x0004000000u
-#define WT_VERB_SALVAGE 0x0008000000u
-#define WT_VERB_SHARED_CACHE 0x0010000000u
-#define WT_VERB_SPLIT 0x0020000000u
-#define WT_VERB_TEMPORARY 0x0040000000u
-#define WT_VERB_THREAD_GROUP 0x0080000000u
-#define WT_VERB_TIERED 0x0100000000u
-#define WT_VERB_TIMESTAMP 0x0200000000u
-#define WT_VERB_TRANSACTION 0x0400000000u
-#define WT_VERB_VERIFY 0x0800000000u
-#define WT_VERB_VERSION 0x1000000000u
-#define WT_VERB_WRITE 0x2000000000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t verbose;
+    /* Verbose settings for our various categories. */
+    WT_VERBOSE_LEVEL verbose[WT_VERB_NUM_CATEGORIES];
 
 /*
  * Variable with flags for which subsystems the diagnostic stress timing delays have been requested.

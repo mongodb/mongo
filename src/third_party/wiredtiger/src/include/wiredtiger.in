@@ -2265,16 +2265,19 @@ struct __wt_connection {
 	 * approximate size of objects before creating them on the tiered storage tier., an integer
 	 * between 100K and 10TB; default \c 10M.}
 	 * @config{ ),,}
-	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
-	 * as <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the
-	 * following options: \c "api"\, \c "backup"\, \c "block"\, \c "checkpoint"\, \c
-	 * "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "compact"\, \c "compact_progress"\,
-	 * \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c
-	 * "handleops"\, \c "log"\, \c "history_store"\, \c "history_store_activity"\, \c "lsm"\, \c
-	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\,
-	 * \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c
-	 * "split"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c
-	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
+	 * @config{verbose, enable messages for various subsystems and operations.  Options are
+	 * given as a list\, where each message type can optionally define an associated verbosity
+	 * level\, such as <code>"verbose=[evictserver\,read:1\,rts:0]"</code>. Verbosity levels
+	 * that can be provided include <code>0</code> (INFO) and <code>1</code> (DEBUG)., a list\,
+	 * with values chosen from the following options: \c "api"\, \c "backup"\, \c "block"\, \c
+	 * "checkpoint"\, \c "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "compact"\, \c
+	 * "compact_progress"\, \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c
+	 * "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c "history_store"\, \c
+	 * "history_store_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c
+	 * "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c
+	 * "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
+	 * "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c
+	 * "version"\, \c "write"; default \c [].}
 	 * @configend
 	 * @errors
 	 */
@@ -3031,16 +3034,18 @@ struct __wt_connection {
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
  * variables even if the process is running with special privileges.  See @ref home for more
  * information., a boolean flag; default \c false.}
- * @config{verbose, enable messages for various events.  Options are given as a list\, such as
- * <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the following
- * options: \c "api"\, \c "backup"\, \c "block"\, \c "checkpoint"\, \c "checkpoint_cleanup"\, \c
- * "checkpoint_progress"\, \c "compact"\, \c "compact_progress"\, \c "error_returns"\, \c "evict"\,
- * \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c
- * "history_store"\, \c "history_store_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
- * "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\,
- * \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\,
- * \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c "version"\, \c "write";
- * default \c [].}
+ * @config{verbose, enable messages for various subsystems and operations.  Options are given as a
+ * list\, where each message type can optionally define an associated verbosity level\, such as
+ * <code>"verbose=[evictserver\,read:1\,rts:0]"</code>. Verbosity levels that can be provided
+ * include <code>0</code> (INFO) and <code>1</code> (DEBUG)., a list\, with values chosen from the
+ * following options: \c "api"\, \c "backup"\, \c "block"\, \c "checkpoint"\, \c
+ * "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "compact"\, \c "compact_progress"\, \c
+ * "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c
+ * "handleops"\, \c "log"\, \c "history_store"\, \c "history_store_activity"\, \c "lsm"\, \c
+ * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
+ * "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
+ * \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c
+ * "verify"\, \c "version"\, \c "write"; default \c [].}
  * @config{verify_metadata, open connection and verify any WiredTiger metadata.  This API allows
  * verification and detection of corruption in WiredTiger metadata., a boolean flag; default \c
  * false.}

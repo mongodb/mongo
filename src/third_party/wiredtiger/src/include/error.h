@@ -169,8 +169,13 @@
     } while (0)
 #endif
 
-/* Verbose messages. */
-#define WT_VERBOSE_ISSET(session, flag) (FLD_ISSET(S2C(session)->verbose, flag))
+/*
+ * Verbose messages. Given this verbosity check is without an explicit verbosity level, the macro
+ * will check whether the given category satisfies the WT_VERBOSE_DEBUG verbosity level.
+ * WT_VERBOSE_DEBUG being the default level assigned to verbose messages prior to the introduction
+ * of verbosity levels.
+ */
+#define WT_VERBOSE_ISSET(session, category) (WT_VERBOSE_DEBUG <= S2C(session)->verbose[category])
 
 /*
  * __wt_verbose --
@@ -180,8 +185,24 @@
  *     additional argument, there's no portable way to remove the comma before an empty __VA_ARGS__
  *     value.
  */
-#define __wt_verbose(session, flag, fmt, ...)                              \
-    do {                                                                   \
-        if (WT_VERBOSE_ISSET(session, flag))                               \
-            __wt_verbose_worker(session, "[" #flag "] " fmt, __VA_ARGS__); \
+#define __wt_verbose(session, category, fmt, ...)                              \
+    do {                                                                       \
+        if (WT_VERBOSE_ISSET(session, category))                               \
+            __wt_verbose_worker(session, "[" #category "] " fmt, __VA_ARGS__); \
+    } while (0)
+
+/*
+ * __wt_verbose_multi --
+ *     Display a verbose message, given a set of multiple verbose categories. A verbose message will
+ *     be displayed if at least one category in the set satisfies the required verbosity level.
+ */
+#define __wt_verbose_multi(session, multi_category, fmt, ...)                            \
+    do {                                                                                 \
+        uint32_t __v_idx;                                                                \
+        for (__v_idx = 0; __v_idx < multi_category.cnt; __v_idx++) {                     \
+            if (WT_VERBOSE_ISSET(session, multi_category.categories[__v_idx])) {         \
+                __wt_verbose_worker(session, "[" #multi_category "] " fmt, __VA_ARGS__); \
+                break;                                                                   \
+            }                                                                            \
+        }                                                                                \
     } while (0)
