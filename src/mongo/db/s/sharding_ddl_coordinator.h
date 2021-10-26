@@ -91,6 +91,10 @@ public:
         return metadata().getForwardableOpMetadata().get();
     }
 
+    const boost::optional<mongo::DatabaseVersion>& getDatabaseVersion() const& {
+        return metadata().getDatabaseVersion();
+    }
+
 protected:
     virtual std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) {
         return {};
