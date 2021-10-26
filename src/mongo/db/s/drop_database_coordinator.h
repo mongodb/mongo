@@ -82,6 +82,10 @@ private:
     void _performNoopRetryableWriteOnParticipants(
         OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
 
+    void _clearDatabaseInfoOnPrimary(OperationContext* opCtx);
+
+    void _clearDatabaseInfoOnSecondaries(OperationContext* opCtx);
+
     DropDatabaseCoordinatorDocument _doc;
     StringData _dbName;
 };
