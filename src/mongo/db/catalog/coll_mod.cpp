@@ -446,11 +446,12 @@ void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
 }
 
 Status _collModInternal(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const BSONObj& cmdObj,
+                        const NamespaceStringOrUUID& nsOrUUID,
+                        const CollMod& cmd,
                         BSONObjBuilder* result) {
+    AutoGetCollection coll(opCtx, nsOrUUID, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
+    auto nss = coll.getNss();
     StringData dbName = nss.db();
-    AutoGetCollection coll(opCtx, nss, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
     Lock::CollectionLock systemViewsLock(
         opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
 
@@ -503,6 +504,7 @@ Status _collModInternal(OperationContext* opCtx,
                       str::stream() << "Not primary while setting collection options on " << nss);
     }
 
+    auto cmdObj = cmd.toBSON(BSONObj());
     BSONObjBuilder oplogEntryBuilder;
     auto statusW =
         parseCollModRequest(opCtx, nss, coll.getCollection(), cmdObj, &oplogEntryBuilder);
@@ -673,11 +675,11 @@ Status _collModInternal(OperationContext* opCtx,
 
 }  // namespace
 
-Status collMod(OperationContext* opCtx,
-               const NamespaceString& nss,
-               const BSONObj& cmdObj,
-               BSONObjBuilder* result) {
-    return _collModInternal(opCtx, nss, cmdObj, result);
+Status processCollModCommand(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             const CollMod& cmd,
+                             BSONObjBuilder* result) {
+    return _collModInternal(opCtx, nsOrUUID, cmd, result);
 }
 
 }  // namespace mongo

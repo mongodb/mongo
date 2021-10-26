@@ -685,15 +685,13 @@ public:
             auto timeseriesViewCmd =
                 makeTimeseriesViewCollModCommand(opCtx, requestParser.request());
             if (timeseriesViewCmd) {
-                uassertStatusOK(collMod(opCtx,
-                                        timeseriesViewCmd->getNamespace(),
-                                        timeseriesViewCmd->toBSON(BSONObj()),
-                                        &result));
+                uassertStatusOK(processCollModCommand(
+                    opCtx, timeseriesViewCmd->getNamespace(), *timeseriesViewCmd, &result));
             }
             cmd = timeseriesBucketsCmd.get();
         }
 
-        uassertStatusOK(collMod(opCtx, cmd->getNamespace(), cmd->toBSON(BSONObj()), &result));
+        uassertStatusOK(processCollModCommand(opCtx, cmd->getNamespace(), *cmd, &result));
         return true;
     }
 

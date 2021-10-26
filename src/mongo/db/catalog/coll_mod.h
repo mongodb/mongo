@@ -30,6 +30,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/coll_mod_gen.h"
 
 namespace mongo {
 class BSONObj;
@@ -46,11 +47,11 @@ class OperationContext;
 void addCollectionUUIDs(OperationContext* opCtx);
 
 /**
- * Performs the collection modification described in "cmdObj" on the collection "ns".
+ * Performs the collection modification described in "cmd" on the collection "ns".
  */
-Status collMod(OperationContext* opCtx,
-               const NamespaceString& ns,
-               const BSONObj& cmdObj,
-               BSONObjBuilder* result);
+Status processCollModCommand(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             const CollMod& cmd,
+                             BSONObjBuilder* result);
 
 }  // namespace mongo

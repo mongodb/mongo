@@ -59,6 +59,7 @@
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -96,6 +97,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
@@ -914,6 +916,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"collMod",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
+          auto opMsg = OpMsgRequest::fromDBAndBody(entry.getNss().db(), cmd);
+          auto collModCmd = CollMod::parse(IDLParserErrorContext("collModOplogEntry"), opMsg);
           const auto nss([&] {
               // Oplog entries from secondary oplog application will allways have the Uuid set and
               // it is only invocations of applyOps directly that may omit it
@@ -931,9 +935,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       nsByUUID);
               return *nsByUUID;
           }());
-
           BSONObjBuilder resultWeDontCareAbout;
-          return collMod(opCtx, nss, cmd, &resultWeDontCareAbout);
+          return processCollModCommand(opCtx, nss, collModCmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},

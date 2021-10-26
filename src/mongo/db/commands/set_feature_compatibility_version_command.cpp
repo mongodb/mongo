@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
+#include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
@@ -417,11 +418,11 @@ private:
                             return true;
                         }
 
+                        NamespaceStringOrUUID nsOrUUID(collection->ns());
+                        CollMod collModCmd(collection->ns());
                         BSONObjBuilder unusedBuilder;
-                        Status status = collMod(opCtx,
-                                                collection->ns(),
-                                                BSON("collMod" << collection->ns().coll()),
-                                                &unusedBuilder);
+                        Status status =
+                            processCollModCommand(opCtx, nsOrUUID, collModCmd, &unusedBuilder);
 
                         if (!status.isOK()) {
                             LOGV2_FATAL(
@@ -561,11 +562,11 @@ private:
                             return true;
                         }
 
+                        NamespaceStringOrUUID nsOrUUID(collection->ns());
+                        CollMod collModCmd(collection->ns());
                         BSONObjBuilder unusedBuilder;
-                        Status status = collMod(opCtx,
-                                                collection->ns(),
-                                                BSON("collMod" << collection->ns().coll()),
-                                                &unusedBuilder);
+                        Status status =
+                            processCollModCommand(opCtx, nsOrUUID, collModCmd, &unusedBuilder);
 
                         if (!status.isOK()) {
                             LOGV2_FATAL(
