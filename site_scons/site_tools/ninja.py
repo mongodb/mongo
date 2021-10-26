@@ -768,7 +768,7 @@ class NinjaState:
 
             ninja.build(**build)
 
-        template_builds = dict()
+        template_builds = {'rule': "TEMPLATE"}
         for template_builder in template_builders:
 
             # Special handling for outputs and implicit since we need to
@@ -784,9 +784,6 @@ class NinjaState:
                 else:
                     new_val.append(cur_val)
                 template_builds[agg_key] = new_val
-
-            # Collect all other keys
-            template_builds.update(template_builder)
 
         if template_builds.get("outputs", []):
             ninja.build(**template_builds)
