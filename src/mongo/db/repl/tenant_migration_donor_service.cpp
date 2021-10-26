@@ -75,12 +75,6 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorWhileUpdatingStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeInsertingDonorStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingStateDocumentTTLIndex);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingExternalKeysTTLIndex);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeAbortingIndexBuilds);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorWhileEnteringBlockingState);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringCommittedState);
-MONGO_FAIL_POINT_DEFINE(pauseWhileWaitingForDonorForgetMigration);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeSendingRecipientForgetMigration);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingFutureChain);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
@@ -396,7 +390,6 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     if (_stateDoc.getAbortReason()) {
         bob.append("abortReason", *_stateDoc.getAbortReason());
     }
-    bob.append("donorStage", describeStage(_donorStage));
     return bob.obj();
 }
 
@@ -814,32 +807,26 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
     return ExecutorFuture(**executor)
         .then([this, self = shared_from_this(), executor, token] {
-            _updateDonorStage(DonorStage::kEnteringAbortingIndexBuildsState);
             // Note we do not use the abort migration token here because the donorAbortMigration
             // command waits for a decision to be persisted which will not happen if inserting the
             // initial state document fails.
             return _enterAbortingIndexBuildsState(executor, token);
         })
         .then([this, self = shared_from_this(), executor, abortToken] {
-            _updateDonorStage(DonorStage::kAbortingIndexBuilds);
             _abortIndexBuilds(abortToken);
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
-            _updateDonorStage(DonorStage::kFetchingClusterTimeKeys);
             return _fetchAndStoreRecipientClusterTimeKeyDocs(
                 executor, recipientTargeterRS, abortToken);
         })
         .then([this, self = shared_from_this(), executor, abortToken] {
-            _updateDonorStage(DonorStage::kEnteringDataSyncState);
             return _enterDataSyncState(executor, abortToken);
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
-            _updateDonorStage(DonorStage::kWaitingForRecipientConsistency);
             return _waitForRecipientToBecomeConsistentAndEnterBlockingState(
                 executor, recipientTargeterRS, abortToken);
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
-            _updateDonorStage(DonorStage::kWaitingForRecipientBlockTs);
             return _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
                 executor, recipientTargeterRS, abortToken);
         })
@@ -880,20 +867,15 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             // whatever canceled the token will also set the promise with an appropriate error.
             checkForTokenInterrupt(token);
 
-            {
-                stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<Latch> lg(_mutex);
 
-                LOGV2(4920400,
-                      "Marked migration state as garbage collectable",
-                      "migrationId"_attr = _migrationUuid,
-                      "expireAt"_attr = _stateDoc.getExpireAt(),
-                      "status"_attr = status);
+            LOGV2(4920400,
+                  "Marked migration state as garbage collectable",
+                  "migrationId"_attr = _migrationUuid,
+                  "expireAt"_attr = _stateDoc.getExpireAt(),
+                  "status"_attr = status);
 
-                setPromiseFromStatusIfNotReady(lg, _completionPromise, status);
-                _updateDonorStage(DonorStage::kForgotten);
-            }
-
-            pauseTenantMigrationBeforeLeavingFutureChain.pauseWhileSet();
+            setPromiseFromStatusIfNotReady(lg, _completionPromise, status);
         })
         .semi();
 }
@@ -928,8 +910,6 @@ void TenantMigrationDonorService::Instance::_abortIndexBuilds(const Cancellation
             return;
         }
     }
-
-    pauseTenantMigrationBeforeAbortingIndexBuilds.pauseWhileSet();
 
     // Before starting data sync, abort any in-progress index builds.  No new index
     // builds can start while we are doing this because the mtab prevents it.
@@ -1113,8 +1093,6 @@ TenantMigrationDonorService::Instance::_waitForRecipientToBecomeConsistentAndEnt
         })
         .then([this, self = shared_from_this(), executor, token] {
             // Enter "blocking" state.
-            _updateDonorStage(DonorStage::kEnteringBlockingState);
-            pauseTenantMigrationDonorWhileEnteringBlockingState.pauseWhileSet();
             return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kBlocking, token)
                 .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
@@ -1193,8 +1171,6 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
         })
         .then([this, self = shared_from_this(), executor, token] {
             // Enter "commit" state.
-            _updateDonorStage(DonorStage::kEnteringCommittedState);
-            pauseTenantMigrationBeforeEnteringCommittedState.pauseWhileSet();
             return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kCommitted, token)
                 .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
@@ -1273,7 +1249,6 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
-    _updateDonorStage(DonorStage::kWaitingForDonorForgetMigration);
     auto expiredAt = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         return _stateDoc.getExpireAt();
@@ -1287,8 +1262,6 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
         return ExecutorFuture(**executor);
     }
 
-    pauseWhileWaitingForDonorForgetMigration.pauseWhileSet();
-
     // Wait for the donorForgetMigration command.
     // If donorAbortMigration has already canceled work, the abortMigrationSource would be
     // canceled and continued usage of the source would lead to incorrect behavior. Thus, we
@@ -1297,12 +1270,9 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     return std::move(_receiveDonorForgetMigrationPromise.getFuture())
         .thenRunOn(**executor)
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
-            _updateDonorStage(DonorStage::kWaitingForRecipientForgetMigration);
-            pauseTenantMigrationBeforeSendingRecipientForgetMigration.pauseWhileSet();
             return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS, token);
         })
         .then([this, self = shared_from_this(), executor, token] {
-            _updateDonorStage(DonorStage::kMarkingMigrationGarbageCollectable);
             // Note marking the keys as garbage collectable is not atomic with marking the
             // state document garbage collectable, so an interleaved failover can lead the
             // keys to be deleted before the state document has an expiration date. This is
