@@ -107,6 +107,25 @@ def get_session_kv_pairs():
     return list(absl_get_nodes(session_catalog["_sessions"]))  # pylint: disable=undefined-variable
 
 
+def get_wt_session(recovery_unit, recovery_unit_impl_type):
+    """Return the WT_SESSION pointer stored in the WiredTigerRecoveryUnit.
+
+    Returns None if the recovery unit is not for the WiredTiger storage engine, or if no WT_SESSION
+    has been opened.
+    """
+
+    if recovery_unit_impl_type != "mongo::WiredTigerRecoveryUnit":
+        return None
+    if not recovery_unit:
+        return None
+    wt_session_handle = get_unique_ptr(recovery_unit["_session"])  # pylint: disable=undefined-variable
+    if not wt_session_handle.dereference().address:
+        return None
+    wt_session = wt_session_handle.dereference().cast(
+        gdb.lookup_type("mongo::WiredTigerSession"))["_session"]  # pylint: disable=undefined-variable
+    return wt_session
+
+
 def get_decorations(obj):
     """Return an iterator to all decorations on a given object.
 
@@ -508,6 +527,9 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
                     gdb.lookup_type(recovery_unit_impl_type))
 
             output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
+            wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
+            if wt_session:
+                output_doc["WT_SESSION"] = hex(wt_session)
             print(json.dumps(output_doc))
             if recovery_unit:
                 print(recovery_unit)
@@ -537,6 +559,9 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
                         gdb.lookup_type(recovery_unit_impl_type))
 
             output_doc["recoveryUnit"] = hex(recovery_unit_handle) if recovery_unit else "0x0"
+            wt_session = get_wt_session(recovery_unit, recovery_unit_impl_type)
+            if wt_session:
+                output_doc["WT_SESSION"] = hex(wt_session)
             print(json.dumps(output_doc))
             if recovery_unit:
                 print(recovery_unit)
