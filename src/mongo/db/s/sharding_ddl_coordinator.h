@@ -90,6 +90,10 @@ public:
         return metadata().getForwardableOpMetadata().get();
     }
 
+    const boost::optional<mongo::DatabaseVersion>& getDatabaseVersion() const& {
+        return metadata().getDatabaseVersion();
+    }
+
     // Cached LSIDs shared between DDL coordinator instances
     class SessionCache {
 
