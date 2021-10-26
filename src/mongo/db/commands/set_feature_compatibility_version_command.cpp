@@ -418,7 +418,7 @@ private:
                             return true;
                         }
 
-                        NamespaceStringOrUUID nsOrUUID(collection->ns());
+                        NamespaceStringOrUUID nsOrUUID(dbName, collection->uuid());
                         CollMod collModCmd(collection->ns());
                         BSONObjBuilder unusedBuilder;
                         Status status =
@@ -562,7 +562,7 @@ private:
                             return true;
                         }
 
-                        NamespaceStringOrUUID nsOrUUID(collection->ns());
+                        NamespaceStringOrUUID nsOrUUID(dbName, collection->uuid());
                         CollMod collModCmd(collection->ns());
                         BSONObjBuilder unusedBuilder;
                         Status status =
