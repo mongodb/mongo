@@ -15,9 +15,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/clustered_indexes_utils.js");
+load("jstests/libs/clustered_collection_util.js");
 
-if (areClusteredIndexesEnabled(db.getMongo()) == false) {
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo()) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
     return;
 }
@@ -28,5 +28,5 @@ const replicatedColl = replicatedDB[collName];
 
 replicatedColl.drop();
 
-validateClusteredCollection(replicatedDB, collName, '_id');
+ClusteredCollectionUtil.testBasicClusteredCollection(replicatedDB, collName, '_id');
 })();

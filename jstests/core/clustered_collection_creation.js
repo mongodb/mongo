@@ -1,7 +1,7 @@
 /**
  * Tests the options used to create a clustered collection. Validates the created collection's
  * listIndexes and listCollections outputs and ensures the clusteredIndex cannot be dropped
- * regardless of the creation options used.
+ * regardless of the create options used.
  * Covers clustering on {_id: 1} for replicated collections, and clustering on non-_id fields for
  * non-replicated collections.
  *
@@ -15,36 +15,16 @@
 (function() {
 "use strict";
 
-const clusteredIndexesEnabled = assert
-                                    .commandWorked(db.getMongo().adminCommand(
-                                        {getParameter: 1, featureFlagClusteredIndexes: 1}))
-                                    .featureFlagClusteredIndexes.value;
+load("jstests/libs/clustered_collection_util.js");
 
-if (!clusteredIndexesEnabled) {
+if (!ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo())) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
     return;
 }
 
-// listCollections should include the clusteredIndex.
-const validateListCollections = function(db, collName, fullCreationOptions) {
-    const listColls =
-        assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-    const listCollsOptions = listColls.cursor.firstBatch[0].options;
-    assert(listCollsOptions.clusteredIndex);
-    assert.docEq(listCollsOptions.clusteredIndex, fullCreationOptions.clusteredIndex);
-};
-
-// The clusteredIndex should appear in listIndexes with additional "clustered" field.
-const validateListIndexes = function(db, collName, fullCreationOptions) {
-    const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
-    const expectedListIndexesOutput =
-        Object.extend({clustered: true}, fullCreationOptions.clusteredIndex);
-    assert.docEq(listIndexes.cursor.firstBatch[0], expectedListIndexesOutput);
-};
-
 // Cannot create an index with the same key as the cluster key
-const validateClusteredIndexAlreadyExists = function(db, collName, fullCreationOptions) {
-    const clusterKey = fullCreationOptions.clusteredIndex.key;
+const validateClusteredIndexAlreadyExists = function(db, collName, fullCreateOptions) {
+    const clusterKey = fullCreateOptions.clusteredIndex.key;
     const res = db[collName].createIndex(clusterKey);
     assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
     const clusterKeyField = Object.keys(clusterKey)[0];
@@ -57,9 +37,9 @@ const validateClusteredIndexAlreadyExists = function(db, collName, fullCreationO
 
 // It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the
 // clusteredIndex fail accordingly.
-const validateClusteredIndexUndroppable = function(db, collName, fullCreationOptions) {
-    const expectedIndexName = fullCreationOptions.clusteredIndex.name;
-    const expectedIndexKey = fullCreationOptions.clusteredIndex.key;
+const validateClusteredIndexUndroppable = function(db, collName, fullCreateOptions) {
+    const expectedIndexName = fullCreateOptions.clusteredIndex.name;
+    const expectedIndexKey = fullCreateOptions.clusteredIndex.key;
 
     assert.commandFailedWithCode(db[collName].dropIndex(expectedIndexKey), 5979800);
 
@@ -69,39 +49,25 @@ const validateClusteredIndexUndroppable = function(db, collName, fullCreationOpt
                                  5979800);
 };
 
-const validateCreatedCollection = function(db, collName, creationOptions) {
-    // Upon creating a collection, fields absent in the user provided creation options are filled in
-    // with default values. The fullCreationOptions should contain default values for the fields not
+const validateCreatedCollection = function(db, collName, createOptions) {
+    // Upon creating a collection, fields absent in the user provided create options are filled in
+    // with default values. The fullCreateOptions should contain default values for the fields not
     // specified by the user.
-    let fullCreationOptions = creationOptions;
+    const fullCreateOptions = ClusteredCollectionUtil.constructFullCreateOptions(createOptions);
 
-    // If the creationOptions don't specify the name, expect the default.
-    if (!creationOptions.clusteredIndex.name) {
-        const clusterKey = Object.keys(creationOptions.clusteredIndex.key)[0];
-        if (clusterKey == "_id") {
-            fullCreationOptions.clusteredIndex.name = "_id_";
-        } else {
-            fullCreationOptions.clusteredIndex.name = clusterKey + "_1";
-        }
-    }
+    ClusteredCollectionUtil.validateListCollections(db, collName, fullCreateOptions);
+    ClusteredCollectionUtil.validateListIndexes(db, collName, fullCreateOptions);
 
-    // If the creationOptions don't specify 'v', expect the default.
-    if (!creationOptions.clusteredIndex.v) {
-        fullCreationOptions.clusteredIndex.v = 2;
-    }
-
-    validateListCollections(db, collName, fullCreationOptions);
-    validateListIndexes(db, collName, fullCreationOptions);
-    validateClusteredIndexAlreadyExists(db, collName, fullCreationOptions);
-    validateClusteredIndexUndroppable(db, collName, fullCreationOptions);
+    validateClusteredIndexAlreadyExists(db, collName, fullCreateOptions);
+    validateClusteredIndexUndroppable(db, collName, fullCreateOptions);
 };
 
 /**
- * Creates, validates, and drops a clustered collection with the provided creationOptions.
+ * Creates, validates, and drops a clustered collection with the provided createOptions.
  */
-const runSuccessfulCreate = function(db, coll, creationOptions) {
-    assert.commandWorked(db.createCollection(coll.getName(), creationOptions));
-    validateCreatedCollection(db, coll.getName(), creationOptions);
+const runSuccessfulCreate = function(db, coll, createOptions) {
+    assert.commandWorked(db.createCollection(coll.getName(), createOptions));
+    validateCreatedCollection(db, coll.getName(), createOptions);
     coll.drop();
 };
 
