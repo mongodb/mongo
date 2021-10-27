@@ -299,8 +299,6 @@ bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
     batch->_prepareCommit();
     _memoryUsage.fetchAndAdd(bucket->_memoryUsage - prevMemoryUsage);
 
-    bucket->_batches.erase(batch->_opId);
-
     return true;
 }
 
@@ -351,18 +349,20 @@ boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
             bucket.release();
             auto lk = _lockExclusive();
 
-            closedBucket =
-                ClosedBucket{ptr->_id, ptr->getTimeField().toString(), ptr->numMeasurements()};
+            if (_allBuckets.contains(ptr)) {
+                closedBucket =
+                    ClosedBucket{ptr->_id, ptr->getTimeField().toString(), ptr->numMeasurements()};
 
-            // Only remove from _allBuckets and _idleBuckets. If it was marked full, we know that
-            // happened in BucketAccess::rollover, and that there is already a new open bucket for
-            // this metadata.
-            _markBucketNotIdle(ptr, false /* locked */);
-            {
-                stdx::lock_guard statesLk{_statesMutex};
-                _bucketStates.erase(ptr->_id);
+                // Only remove from _allBuckets and _idleBuckets. If it was marked full, we know
+                // that happened in BucketAccess::rollover, and that there is already a new open
+                // bucket for this metadata.
+                _markBucketNotIdle(ptr, false /* locked */);
+                {
+                    stdx::lock_guard statesLk{_statesMutex};
+                    _bucketStates.erase(ptr->_id);
+                }
+                _allBuckets.erase(ptr);
             }
-            _allBuckets.erase(ptr);
         } else {
             _markBucketIdle(bucket);
         }
@@ -486,7 +486,7 @@ BucketCatalog::StripedMutex::ExclusiveLock BucketCatalog::_lockExclusive() const
 void BucketCatalog::_waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch) {
     while (true) {
         BucketAccess bucket{this, batch->bucket()};
-        if (!bucket) {
+        if (!bucket || batch->finished()) {
             return;
         }
 
@@ -494,6 +494,7 @@ void BucketCatalog::_waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch)
         if (!current) {
             // No other batches for this bucket are currently committing, so we can proceed.
             bucket->_preparedBatch = batch;
+            bucket->_batches.erase(batch->_opId);
             break;
         }
 
@@ -1239,7 +1240,6 @@ void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
     invariant(_commitRights.load());
     invariant(!_active);
     _promise.emplaceValue(info);
-    _bucket = nullptr;
 }
 
 void BucketCatalog::WriteBatch::_abort(const boost::optional<Status>& status,
@@ -1257,7 +1257,6 @@ void BucketCatalog::WriteBatch::_abort(const boost::optional<Status>& status,
     _promise.setError(status.value_or(
         Status{ErrorCodes::TimeseriesBucketCleared,
                str::stream() << "Time-series bucket " << bucketIdentification << "was cleared"}));
-    _bucket = nullptr;
 }
 
 class BucketCatalog::ServerStatus : public ServerStatusSection {
