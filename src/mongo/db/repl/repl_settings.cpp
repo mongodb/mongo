@@ -34,7 +34,6 @@
 #include "mongo/db/repl/repl_settings.h"
 
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_settings_gen.h"
 
 namespace mongo {
 namespace repl {

@@ -146,12 +146,14 @@ env.Library(
     target='repl_settings',
     source=[
         'repl_settings.cpp',
-        'repl_settings.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/server_parameter',
     ],
+    LIBDEPS_PRIVATE=[
+        'repl_server_parameters',
+    ]
 )
 
 env.Library(

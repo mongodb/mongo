@@ -300,6 +300,31 @@ server_parameters:
             gte: 1
             lte: 256
 
+    recoverFromOplogAsStandalone:
+        description: Tells the server to perform replication recovery as a standalone.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: recoverFromOplogAsStandalone
+        default: false
+
+    maxSyncSourceLagSecs:
+        description: ''
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: maxSyncSourceLagSecs
+        default: 30
+        validator:
+            gt: 0
+
+    replElectionTimeoutOffsetLimitFraction:
+        description: ''
+        set_at: startup
+        cpp_vartype: double
+        cpp_varname: replElectionTimeoutOffsetLimitFraction
+        default: 0.15
+        validator:
+            gt: 0.01
+
     # New parameters since this file was created, not taken from elsewhere.
     initialSyncTransientErrorRetryPeriodSeconds:
         description: >-
@@ -593,7 +618,7 @@ feature_flags:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
         cpp_varname: feature_flags::gShardMerge
         default: false
-    
+
     featureFlagShardSplit:
         description: When enabled, multitenant migration can use the shard split commands.
         cpp_varname: feature_flags::gShardSplit
