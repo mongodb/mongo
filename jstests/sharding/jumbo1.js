@@ -9,18 +9,18 @@
 
     var db = s.getDB("test");
 
-    const big = 'X'.repeat(10000);
+    const big = 'X'.repeat(1024 * 1024);  // 1MB
 
-    // Create sufficient documents to create a jumbo chunk, and use the same shard key in all of
+    // Insert 3MB of documents to create a jumbo chunk, and use the same shard key in all of
     // them so that the chunk cannot be split.
     var x = 0;
     var bulk = db.foo.initializeUnorderedBulkOp();
-    for (var i = 0; i < 500; i++) {
+    for (var i = 0; i < 3; i++) {
         bulk.insert({x: x, big: big});
     }
 
     // Create documents with different shard keys that can be split and moved without issue.
-    for (; x < 1500; x++) {
+    for (; x < 20; x++) {
         bulk.insert({x: x, big: big});
     }
 
@@ -30,25 +30,17 @@
 
     s.startBalancer();
 
-    function diff1() {
-        var x = s.chunkCounts("foo");
-        printjson(x);
-        return Math.max(x[s.shard0.shardName], x[s.shard1.shardName]) -
-            Math.min(x[s.shard0.shardName], x[s.shard1.shardName]);
-    }
-
-    assert.soon(function() {
-        var d = diff1();
-        print("diff: " + d);
-        s.printShardingStatus(true);
-        return d < 5;
-    }, "balance didn't happen", 1000 * 60 * 10, 5000);
-
-    // Check that the jumbo chunk did not move, which shouldn't be possible.
-    var jumboChunk =
-        s.getDB('config').chunks.findOne({ns: 'test.foo', min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
-    assert.eq(
-        s.shard1.shardName, jumboChunk.shard, 'jumbo chunk ' + tojson(jumboChunk) + ' was moved');
+    assert.soon(() => {
+        // Check that the jumbo chunk did not move, which shouldn't be possible, and that the jumbo
+        // flag
+        // has been added.
+        var jumboChunk = s.getDB('config').chunks.findOne(
+            {ns: 'test.foo', min: {$lte: {x: 0}}, max: {$gt: {x: 0}}});
+        assert.eq(s.shard1.shardName,
+                  jumboChunk.shard,
+                  'jumbo chunk ' + tojson(jumboChunk) + ' was moved');
+        return jumboChunk.jumbo;
+    });
 
     // TODO: SERVER-26531 Make sure that balancer marked the first chunk as jumbo.
     // Assumption: balancer favors moving the lowest valued chunk out of a shard.

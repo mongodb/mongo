@@ -8,7 +8,7 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 3, other: {rs: true, chunkSize: 1, enableBalancer: true}});
+    var s = new ShardingTest({shards: 3, other: {rs: true, chunkSize: 2, enableBalancer: true}});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', s.shard0.shardName);
@@ -16,14 +16,14 @@
 
     var db = s.getDB("test");
 
-    var bigString = "X".repeat(256 * 1024);
+    var bigString = "X".repeat(256 * 1024);  // 250 KB
 
     var insertedBytes = 0;
     var num = 0;
 
-    // Insert 10 MB of data to result in 10+ chunks
+    // Insert 20 MB of data to result in 20+ chunks
     var bulk = db.foo.initializeUnorderedBulkOp();
-    while (insertedBytes < (10 * 1024 * 1024)) {
+    while (insertedBytes < (20 * 1024 * 1024)) {
         bulk.insert({_id: num++, s: bigString, x: Math.random()});
         insertedBytes += bigString.length;
     }
@@ -61,5 +61,4 @@
     assert.eq(num, db.foo.find().sort({x: -1}).itcount(), "C6");
 
     s.stop();
-
 })();

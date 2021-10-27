@@ -639,8 +639,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
             nss,
             cm->getShardKeyPattern(),
             ChunkRange(chunk.getMin(), chunk.getMax()),
-            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-            boost::none));
+            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes()));
 
         uassert(ErrorCodes::CannotSplit, "No split points found", !splitPoints.empty());
 

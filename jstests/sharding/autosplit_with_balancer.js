@@ -7,10 +7,7 @@
     s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 
-    var bigString = "";
-    while (bigString.length < 1024 * 50) {
-        bigString += "asocsancdnsjfnsdnfsjdhfasdfasdfasdfnsadofnsadlkfnsaldknfsad";
-    }
+    var bigString = "X".repeat(1024 * 1024);  // 1MB
 
     var db = s.getDB("test");
     var coll = db.foo;

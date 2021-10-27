@@ -1,0 +1,71 @@
+# Copyright(C) 2021 - present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This IDL file describes the BSON format for the autoSplitVector command.
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/s/auto_split_vector.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+types:
+    bson_vector:
+        bson_serialization_type: any
+        description: "An array of objects representing the split keys."
+        cpp_type: "std::vector<mongo::BSONObj>"
+        deserializer: ::mongo::parseSplitKeys
+
+structs:
+    AutoSplitVectorResponse:
+        description: "The reply of an autoSplitVector command."
+        strict: false
+        fields:
+            splitKeys: bson_vector
+
+commands:
+  autoSplitVector:
+    cpp_name: AutoSplitVectorRequest
+    description: "Internal autoSplitVector command"
+    strict: false
+    namespace: concatenate_with_db
+    fields:
+        keyPattern:
+            type: object
+            description: "Shard key pattern of the collection"
+        min:
+            type: object
+            description: "Min key of the chunk"
+        max:
+            type: object
+            description: "Max key of the chunk"
+        maxChunkSizeBytes:
+            type: safeInt64
+            description: "Max chunk size of the collection expressed in bytes"

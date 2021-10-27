@@ -40,7 +40,7 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
 
-    for (var x = 0; x < 2100; x++) {
+    for (var x = 0; x < 2500; x++) {
         assert.writeOK(testDB.runCommand({
             update: 'update',
             updates: [{q: {x: x}, u: {x: x, v: doc1k}, upsert: true}],
@@ -59,7 +59,7 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 
-    for (var x = 0; x < 1100; x++) {
+    for (var x = 0; x < 1500; x++) {
         assert.writeOK(testDB.runCommand({
             delete: 'delete',
             deletes: [{q: {x: x, v: doc1k}, limit: NumberInt(0)}],

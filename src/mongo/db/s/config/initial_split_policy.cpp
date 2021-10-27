@@ -394,8 +394,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::createFirstChunksU
         nss,
         shardKeyPattern,
         ChunkRange(keyPattern.globalMin(), keyPattern.globalMax()),
-        balancerConfig->getMaxChunkSizeBytes(),
-        0));
+        balancerConfig->getMaxChunkSizeBytes()));
 
     return generateShardCollectionInitialChunks(nss,
                                                 shardKeyPattern,

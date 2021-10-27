@@ -145,6 +145,7 @@ env.Library(
         'stale_exception.cpp',
         env.Idlc('catalog/type_chunk_base.idl')[0],
         env.Idlc('database_version.idl')[0],
+        env.Idlc('request_types/auto_split_vector.idl')[0],
         env.Idlc('request_types/clone_catalog_data.idl')[0],
         env.Idlc('request_types/clear_jumbo_flag.idl')[0],
         env.Idlc('request_types/create_collection.idl')[0],

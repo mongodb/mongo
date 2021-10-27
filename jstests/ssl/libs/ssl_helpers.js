@@ -144,11 +144,11 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         var bigstr = Array(1024 * 1024).join("#");
 
         var bulk = db1.col.initializeUnorderedBulkOp();
-        for (var i = 0; i < 128; i++) {
+        for (var i = 0; i < 64; i++) {
             bulk.insert({_id: i, string: bigstr});
         }
         assert.writeOK(bulk.execute());
-        assert.eq(128, db1.col.count(), "error retrieving documents from cluster");
+        assert.eq(64, db1.col.count(), "error retrieving documents from cluster");
 
         // Test shards talking to each other
         r = st.getDB('test').adminCommand(

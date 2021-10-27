@@ -68,21 +68,21 @@ class ShardCollectionTestBase : public ConfigServerTestFixture {
 protected:
     void expectSplitVector(const HostAndPort& shardHost,
                            const ShardKeyPattern& keyPattern,
-                           const BSONObj& splitPoints) {
+                           const BSONArray& splitPoints) {
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(shardHost, request.target);
             string cmdName = request.cmdObj.firstElement().fieldName();
-            ASSERT_EQUALS("splitVector", cmdName);
-            ASSERT_EQUALS(kNamespace.ns(),
-                          request.cmdObj["splitVector"].String());  // splitVector uses full ns
+            ASSERT_EQUALS("autoSplitVector", cmdName);
+            // autoSplitVector concatenates the collection name to the command's db
+            const auto receivedNs =
+                request.dbname + '.' + request.cmdObj["autoSplitVector"].String();
+            ASSERT_EQUALS(kNamespace.ns(), receivedNs);
 
             ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
             ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
             ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
             ASSERT_EQUALS(64 * 1024 * 1024ULL,
                           static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
-            ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
-            ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
             ASSERT_BSONOBJ_EQ(
                 ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
@@ -338,7 +338,7 @@ TEST_F(ConfigServerShardCollectionTest, RangeSharding_NoInitialSplitPoints_NoSpl
     });
 
     // Respond to the splitVector command sent to the shard to figure out initial split points.
-    expectSplitVector(shardHost, keyPattern, BSONObj());
+    expectSplitVector(shardHost, keyPattern, BSONArray());
 
     // Expect the set shard version for that namespace.
     // We do not check for a specific ChunkVersion, because we cannot easily know the OID that was

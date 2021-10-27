@@ -737,7 +737,7 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     if (totalRecs > 0) {
         avgRecSize = collection->dataSize(opCtx) / totalRecs;
         maxRecsWhenFull = _args.getMaxChunkSizeBytes() / avgRecSize;
-        maxRecsWhenFull = 130 * maxRecsWhenFull / 100;  // pad some slack
+        maxRecsWhenFull = 2 * maxRecsWhenFull;  // pad some slack
     } else {
         avgRecSize = 0;
         maxRecsWhenFull = kMaxObjectPerChunk + 1;

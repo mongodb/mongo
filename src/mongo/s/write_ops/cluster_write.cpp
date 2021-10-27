@@ -302,8 +302,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                                               nss,
                                                               manager->getShardKeyPattern(),
                                                               chunkRange,
-                                                              chunkSizeToUse,
-                                                              boost::none));
+                                                              chunkSizeToUse));
 
         if (splitPoints.size() <= 1) {
             // No split points means there isn't enough data to split on; 1 split point means we

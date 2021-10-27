@@ -1,3 +1,9 @@
+/*
+ * @tags: [
+ *     requires_fcv_40, # autoSplitVector not present in v3.6 binaries
+ * ]
+ */
+
 (function() {
     'use strict';
 
@@ -23,7 +29,7 @@
     assert.writeOK(bulk.execute());
 
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
-    assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "setup2");
+    assert.lte(20, s.config.chunks.count({"ns": "test.foo"}), "setup2");
 
     function diff1() {
         var x = s.chunkCounts("foo");
@@ -37,7 +43,7 @@
         return x[s.shard0.shardName] + x[s.shard1.shardName];
     }
 
-    assert.lt(20, diff1(), "big differential here");
+    assert.lte(20, diff1(), "big differential here");
     print(diff1());
 
     assert.soon(function() {
