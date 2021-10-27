@@ -4,15 +4,6 @@ load("jstests/libs/feature_flag_util.js");
 
 var TimeseriesTest = class {
     /**
-     * Returns whether time-series collections are supported.
-     */
-    static timeseriesCollectionsEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTimeseriesCollection: 1}))
-            .featureFlagTimeseriesCollection.value;
-    }
-
-    /**
      * Returns whether time-series bucket compression are supported.
      */
     static timeseriesBucketCompressionEnabled(conn) {
@@ -188,11 +179,6 @@ var TimeseriesTest = class {
      * Runs the provided test with both ordered and unordered inserts.
      */
     static run(testFn, theDb) {
-        if (!TimeseriesTest.timeseriesCollectionsEnabled((theDb || db).getMongo())) {
-            jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-            return;
-        }
-
         const insert = function(ordered) {
             jsTestLog('Running test with {ordered: ' + ordered + '} inserts');
             return function(coll, docs, options) {
