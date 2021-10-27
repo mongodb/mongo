@@ -815,7 +815,20 @@ Simple8bWriteFn BSONColumnBuilder::EncodingState::_createBufferWriter() {
 
         auto previous = _previous();
         if (previous.type() == NumberDouble) {
-            _lastValueInPrevBlock = previous._numberDouble();
+            // If we are double we need to remember the last value written in the block. There could
+            // be multiple values pending still so we need to loop backwards and re-construct the
+            // value before the first value in pending.
+            auto current = _prevEncoded64;
+            for (auto it = _simple8bBuilder64.rbegin(), end = _simple8bBuilder64.rend(); it != end;
+                 ++it) {
+                if (const boost::optional<uint64_t>& encoded = *it) {
+                    // As we're going backwards we need to 'expandDelta' backwards which is the same
+                    // as 'calcDelta'.
+                    current = calcDelta(current, Simple8bTypeUtil::decodeInt64(*encoded));
+                }
+            }
+
+            _lastValueInPrevBlock = Simple8bTypeUtil::decodeDouble(current, _scaleIndex);
         }
 
         return true;

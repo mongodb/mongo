@@ -338,8 +338,11 @@ Simple8bBuilder<T>::PendingValue::PendingValue(
 
 template <typename T>
 Simple8bBuilder<T>::PendingIterator::PendingIterator(
-    typename std::deque<PendingValue>::const_iterator it, reference rleValue, uint32_t rleCount)
-    : _it(it), _rleValue(rleValue), _rleCount(rleCount) {}
+    typename std::deque<PendingValue>::const_iterator beginning,
+    typename std::deque<PendingValue>::const_iterator it,
+    reference rleValue,
+    uint32_t rleCount)
+    : _begin(beginning), _it(it), _rleValue(rleValue), _rleCount(rleCount) {}
 
 template <typename T>
 auto Simple8bBuilder<T>::PendingIterator::operator-> () const -> pointer {
@@ -369,6 +372,24 @@ template <typename T>
 auto Simple8bBuilder<T>::PendingIterator::operator++(int) -> PendingIterator {
     auto ret = *this;
     ++(*this);
+    return ret;
+}
+
+template <typename T>
+auto Simple8bBuilder<T>::PendingIterator::operator--() -> PendingIterator& {
+    if (_rleCount > 0 || _it == _begin) {
+        ++_rleCount;
+        return *this;
+    }
+
+    --_it;
+    return *this;
+}
+
+template <typename T>
+auto Simple8bBuilder<T>::PendingIterator::operator--(int) -> PendingIterator {
+    auto ret = *this;
+    --(*this);
     return ret;
 }
 
@@ -710,12 +731,24 @@ void Simple8bBuilder<T>::_updateSimple8bCurrentState(const PendingValue& val) {
 
 template <typename T>
 typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::begin() const {
-    return {_pendingValues.begin(), _lastValueInPrevWord.val, _rleCount};
+    return {_pendingValues.begin(), _pendingValues.begin(), _lastValueInPrevWord.val, _rleCount};
 }
 
 template <typename T>
 typename Simple8bBuilder<T>::PendingIterator Simple8bBuilder<T>::end() const {
-    return PendingIterator{_pendingValues.end(), _lastValueInPrevWord.val, 0};
+    return {_pendingValues.begin(), _pendingValues.end(), _lastValueInPrevWord.val, 0};
+}
+
+template <typename T>
+std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuilder<T>::rbegin()
+    const {
+    return std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator>(end());
+}
+
+template <typename T>
+std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuilder<T>::rend()
+    const {
+    return std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator>(begin());
 }
 
 template <typename T>

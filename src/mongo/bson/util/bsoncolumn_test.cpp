@@ -1019,6 +1019,42 @@ TEST_F(BSONColumnTest, DoubleUnscalable) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, DoubleMultiplePendingAfterWritingBlock) {
+    BSONColumnBuilder cb("test"_sd);
+
+    // This tests that we properly set '_lastValueInPrevBlock' after writing out a full Simple8b
+    // block. In this test the last value in the first block will be '99.0' but the block will not
+    // be written until '89.0' is appended. That means that 'previous' will be '123.0' which is not
+    // the last value in previous block.
+    std::vector<BSONElement> elems = {createElementDouble(116.0),
+                                      createElementDouble(95.0),
+                                      createElementDouble(80.0),
+                                      createElementDouble(87.0),
+                                      createElementDouble(113.0),
+                                      createElementDouble(90.0),
+                                      createElementDouble(113.0),
+                                      createElementDouble(93.0),
+                                      createElementDouble(99.0),
+                                      createElementDouble(123.0),
+                                      createElementDouble(89.0),
+                                      createElementDouble(92.0)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1001, 0b0001);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.end(), elems.front(), 1.0), 2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, DoubleSignalingNaN) {
     BSONColumnBuilder cb("test"_sd);
 

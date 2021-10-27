@@ -85,13 +85,13 @@ public:
      * Iterator for reading pending values in Simple8bBuilder that has not yet been written to
      * Simple-8b blocks.
      *
-     * Provides forward iteration
+     * Provides bidirectional iteration
      */
     class PendingIterator {
     public:
         friend class Simple8bBuilder;
         // typedefs expected in iterators
-        using iterator_category = std::forward_iterator_tag;
+        using iterator_category = std::bidirectional_iterator_tag;
         using difference_type = ptrdiff_t;
         using value_type = boost::optional<T>;
         using pointer = const boost::optional<T>*;
@@ -102,14 +102,20 @@ public:
 
         PendingIterator& operator++();
         PendingIterator operator++(int);
+
+        PendingIterator& operator--();
+        PendingIterator operator--(int);
+
         bool operator==(const PendingIterator& rhs) const;
         bool operator!=(const PendingIterator& rhs) const;
 
     private:
-        PendingIterator(typename std::deque<PendingValue>::const_iterator it,
+        PendingIterator(typename std::deque<PendingValue>::const_iterator beginning,
+                        typename std::deque<PendingValue>::const_iterator it,
                         reference rleValue,
                         uint32_t rleCount);
 
+        typename std::deque<PendingValue>::const_iterator _begin;
         typename std::deque<PendingValue>::const_iterator _it;
 
         const boost::optional<T>& _rleValue;
@@ -121,6 +127,12 @@ public:
      */
     PendingIterator begin() const;
     PendingIterator end() const;
+
+    /**
+     * Reverse iterators to read pending values
+     */
+    std::reverse_iterator<PendingIterator> rbegin() const;
+    std::reverse_iterator<PendingIterator> rend() const;
 
     /**
      * Set write callback
