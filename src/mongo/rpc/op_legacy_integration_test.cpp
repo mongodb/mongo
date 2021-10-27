@@ -460,9 +460,13 @@ TEST(OpLegacy, IsmasterCommandViaOpQuery) {
 }
 
 TEST(OpLegacy, SaslStartCommandViaOpQuery) {
-    // Here we verify that "saslStart" command passes parsing since the request is actually
-    // an invalid authentication request which is capture from a log. The AuthenticationFailed error
-    // code means that it passes request parsing.
+    // Some older drivers continue to authenticate using OP_QUERY commands, even if the
+    // isMaster/hello protocol negotiation resolves to OP_MSG. For this reason, the server must
+    // continue to accept "saslStart" commands as OP_QUERY.
+    //
+    // Here we verify that "saslStart" command passes parsing since the request is actually an
+    // invalid authentication request. The AuthenticationFailed error code means that it passes
+    // request parsing.
     testAllowedCommand(R"({
                            saslStart: 1,
                            "mechanism":"SCRAM-SHA-256",
@@ -478,9 +482,13 @@ TEST(OpLegacy, SaslStartCommandViaOpQuery) {
 }
 
 TEST(OpLegacy, SaslContinueCommandViaOpQuery) {
-    // Here we verify that "saslContinue" command passes parsing since the request is actually
-    // an invalid authentication request which is captured from a log. The ProtocolError error code
-    // means that it passes request parsing.
+    // Some older drivers continue to authenticate using OP_QUERY commands, even if the
+    // isMaster/hello protocol negotiation resolves to OP_MSG. For this reason, the server must
+    // continue to accept "saslContinue" commands as OP_QUERY.
+    //
+    // Here we verify that "saslContinue" command passes parsing since the request is actually an
+    // invalid authentication request. The ProtocolError error code means that it passes request
+    // parsing.
     testAllowedCommand(R"({
                            saslContinue: 1,
                            "payload":{
@@ -492,6 +500,18 @@ TEST(OpLegacy, SaslContinueCommandViaOpQuery) {
                            "conversationId":1
                        })",
                        ErrorCodes::ProtocolError);
+}
+
+TEST(OpLegacy, AuthenticateCommandViaOpQuery) {
+    // Some older drivers continue to authenticate using OP_QUERY commands, even if the
+    // isMaster/hello protocol negotiation resolves to OP_MSG. For this reason, the server must
+    // continue to accept "authenticate" commands as OP_QUERY.
+    //
+    // Here we only verify that "authenticate" command passes parsing since the request is actually
+    // an invalid authentication request. The AuthenticationFailed error code means that it passes
+    // request parsing.
+    testAllowedCommand(R"({authenticate: 1, mechanism: "MONGODB-X509"})",
+                       ErrorCodes::AuthenticationFailed);
 }
 
 }  // namespace
