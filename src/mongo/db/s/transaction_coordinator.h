@@ -115,7 +115,7 @@ public:
      */
     void cancelIfCommitNotYetStarted();
 
-    const TxnRetryCounter getTxnRetryCounterForTest() const {
+    TxnRetryCounter getTxnRetryCounterForTest() const {
         return *_txnNumberAndRetryCounter.getTxnRetryCounter();
     }
 
