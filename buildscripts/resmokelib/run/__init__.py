@@ -846,6 +846,12 @@ class RunPlugin(PluginInterface):
             "Run MongoDB servers with all feature flags enabled and only run tests tags with these feature flags"
         )
 
+        parser.add_argument(
+            "--runAllFeatureFlagsNoTests", dest="run_all_feature_flags_no_tests",
+            action="store_true", help=
+            "Run MongoDB servers with all feature flags enabled but don't run any tests tagged with these feature flags; used for multiversion suites"
+        )
+
         parser.add_argument("--additionalFeatureFlags", dest="additional_feature_flags",
                             action="append", metavar="featureFlag1, featureFlag2, ...",
                             help="Additional feature flags")
@@ -1207,6 +1213,8 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
     if run_all_feature_flag_tests is not None:
         setattr(parsed_args, "additional_feature_flags", config.ENABLED_FEATURE_FLAGS)
         del parsed_args.run_all_feature_flag_tests
+
+    del parsed_args.run_all_feature_flags_no_tests
 
     # The top-level parser has one subparser that contains all subcommand parsers.
     command_subparser = [

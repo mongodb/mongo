@@ -48,7 +48,7 @@ def _validate_options(parser, args):
             "Cannot use --replayFile with additional test files listed on the command line invocation."
         )
 
-    if args.run_all_feature_flag_tests:
+    if args.run_all_feature_flag_tests or args.run_all_feature_flags_no_tests:
         if not os.path.isfile(ALL_FEATURE_FLAG_FILE):
             parser.error(
                 "To run tests with all feature flags, the %s file must exist and be placed in"
@@ -156,6 +156,12 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     def setup_feature_flags():
         _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
+        _config.RUN_ALL_FEATURE_FLAGS = config.pop("run_all_feature_flags_no_tests")
+
+        # Running all feature flag tests implies running the fixtures with feature flags.
+        if _config.RUN_ALL_FEATURE_FLAG_TESTS:
+            _config.RUN_ALL_FEATURE_FLAGS = True
+
         all_feature_flags = []
         enabled_feature_flags = []
         try:
@@ -163,10 +169,10 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         except FileNotFoundError:
             # If we ask resmoke to run with all feature flags, the feature flags file
             # needs to exist.
-            if _config.RUN_ALL_FEATURE_FLAG_TESTS:
+            if _config.RUN_ALL_FEATURE_FLAGS:
                 raise
 
-        if _config.RUN_ALL_FEATURE_FLAG_TESTS:
+        if _config.RUN_ALL_FEATURE_FLAGS:
             enabled_feature_flags = all_feature_flags[:]
 
         # Specify additional feature flags from the command line.
@@ -192,8 +198,12 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
 
-    # Don't run tests with feature flags that are not enabled.
-    _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
+    if _config.RUN_ALL_FEATURE_FLAGS and not _config.RUN_ALL_FEATURE_FLAG_TESTS:
+        # Don't run any feature flag tests.
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(all_feature_flags)
+    else:
+        # Don't run tests with feature flags that are not enabled.
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
 
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.FLOW_CONTROL = config.pop("flow_control")

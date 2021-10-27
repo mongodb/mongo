@@ -90,6 +90,7 @@ DEFAULTS = {
     "report_failure_status": "fail",
     "report_file": None,
     "run_all_feature_flag_tests": False,
+    "run_all_feature_flags_no_tests": False,
     "additional_feature_flags": None,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
@@ -377,6 +378,9 @@ INSTALL_DIR = None
 
 # Whether to run tests for feature flags.
 RUN_ALL_FEATURE_FLAG_TESTS = None
+
+# Whether to run the server with feature flags. Defaults to true if `RUN_ALL_FEATURE_FLAG_TESTS` is true.
+RUN_ALL_FEATURE_FLAGS = None
 
 # List of enabled feature flags.
 ENABLED_FEATURE_FLAGS = []

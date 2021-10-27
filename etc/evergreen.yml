@@ -9757,11 +9757,9 @@ buildvariants:
   cron: "0 12 * * *" # Every day starting at 12:00
   expansions:
     <<: *enterprise-rhel-80-64-bit-multiversion-expansions-template
-    # TODO (SERVER-55857): Remove 'requires_fcv_51' once tests are filtered out using the
-    # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
+    # No feature flag tests since they aren't compatible with the older binaries.
     test_flags: >-
-      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible
-      --runAllFeatureFlagTests
+      --runAllFeatureFlagsNoTests
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"
