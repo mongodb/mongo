@@ -198,8 +198,6 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 _doc = _updateSession(opCtx, _doc);
 
                 const auto primaryShardId = ShardingState::get(opCtx)->shardId();
-                sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-                    opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(_doc));
 
                 // We need to send the drop to all the shards because both movePrimary and
                 // moveChunk leave garbage behind for sharded collections.
@@ -211,6 +209,12 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
 
                 sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
                     opCtx, nss(), participants, **executor, getCurrentSession(_doc));
+
+                // The sharded collection must be dropped on the primary shard after it has been
+                // dropped on all of the other shards to ensure it can only be re-created as
+                // unsharded with a higher optime than all of the drops.
+                sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+                    opCtx, nss(), {primaryShardId}, **executor, getCurrentSession(_doc));
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
                 LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());
