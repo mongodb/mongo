@@ -410,11 +410,9 @@ private:
                     [&](const CollectionPtr& collection) {
                         if (collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
                             // The catalog entry flag has already been added. This can happen if the
-                            // upgrade process was interrupted and is being run again. The catalog
-                            // entry flag must be set to true, in this case. The upgrade process
-                            // cannot be aborted at this point so we don't have to worry about
-                            // unsetting the catalog entry flag.
-                            invariant(*collection->getTimeseriesBucketsMayHaveMixedSchemaData());
+                            // upgrade process was interrupted and is being run again, or if there
+                            // was a time-series collection created during the upgrade. The upgrade
+                            // process cannot be aborted at this point.
                             return true;
                         }
 
