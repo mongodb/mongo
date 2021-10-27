@@ -678,10 +678,11 @@ public:
                 invariant(batch->finished());
                 auto batchStatus = batch->getResult().getStatus();
                 tassert(5916402,
-                        str::stream() << "Got unexpected error (" << batch->getResult().getStatus()
+                        str::stream() << "Got unexpected error (" << batchStatus
                                       << ") preparing time-series bucket to be committed for "
                                       << ns() << ": " << redact(request().toBSON({})),
                         batchStatus == ErrorCodes::TimeseriesBucketCleared ||
+                            batchStatus.isA<ErrorCategory::Interruption>() ||
                             batchStatus.isA<ErrorCategory::StaleShardVersionError>());
 
                 docsToRetry->push_back(index);
@@ -759,15 +760,21 @@ public:
                 return left.get()->bucket() < right.get()->bucket();
             });
 
+            boost::optional<Status> abortStatus;
+            auto batchGuard = makeGuard([&] {
+                for (auto batch : batchesToCommit) {
+                    if (batch.get()) {
+                        bucketCatalog.abort(batch, abortStatus);
+                    }
+                }
+            });
+
             std::vector<write_ops::InsertCommandRequest> insertOps;
             std::vector<write_ops::UpdateCommandRequest> updateOps;
 
             for (auto batch : batchesToCommit) {
                 auto metadata = bucketCatalog.getMetadata(batch.get()->bucket());
                 if (!bucketCatalog.prepareCommit(batch)) {
-                    for (auto batchToAbort : batchesToCommit) {
-                        bucketCatalog.abort(batchToAbort);
-                    }
                     return false;
                 }
 
@@ -785,9 +792,7 @@ public:
             auto result =
                 write_ops_exec::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
             if (!result.isOK()) {
-                for (auto batch : batchesToCommit) {
-                    bucketCatalog.abort(batch, result);
-                }
+                abortStatus = result;
                 return false;
             }
 
@@ -798,6 +803,7 @@ public:
                 batch.get().reset();
             }
 
+            batchGuard.dismiss();
             return true;
         }
 
