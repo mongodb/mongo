@@ -425,6 +425,10 @@ public:
         // The minimum and maximum values for each field in the bucket.
         timeseries::MinMax _minmax;
 
+        // The reference schema for measurements in this bucket. May reflect schema of uncommitted
+        // measurements.
+        BSONObj _schema;
+
         // The latest time that has been inserted into the bucket.
         Date_t _latestTime;
 
@@ -463,6 +467,7 @@ private:
         AtomicWord<long long> numBucketUpdates;
         AtomicWord<long long> numBucketsOpenedDueToMetadata;
         AtomicWord<long long> numBucketsClosedDueToCount;
+        AtomicWord<long long> numBucketsClosedDueToSchemaChange;
         AtomicWord<long long> numBucketsClosedDueToSize;
         AtomicWord<long long> numBucketsClosedDueToTimeForward;
         AtomicWord<long long> numBucketsClosedDueToTimeBackward;
@@ -596,6 +601,14 @@ private:
 
         // Release the bucket lock, typically in order to reacquire the catalog lock.
         void release();
+
+        /**
+         * Determines if the schema for an incoming measurement is incompatible with those already
+         * stored in the bucket.
+         *
+         * Returns true if incompatible
+         */
+        bool schemaIncompatible(const BSONObj& doc);
 
         /**
          * Close the existing, full bucket and open a new one for the same metadata.

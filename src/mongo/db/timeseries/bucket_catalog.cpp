@@ -48,7 +48,9 @@ namespace mongo {
 namespace {
 
 void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj);
-void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
+void normalizeObject(BSONObjBuilder* builder,
+                     const BSONObj& obj,
+                     boost::optional<StringData> omitField = boost::none);
 
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
@@ -76,7 +78,9 @@ void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj) {
     }
 }
 
-void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
+void normalizeObject(BSONObjBuilder* builder,
+                     const BSONObj& obj,
+                     boost::optional<StringData> omitField) {
     // BSONObjIteratorSorted provides an abstraction similar to what this function does. However it
     // is using a lexical comparison that is slower than just doing a binary comparison of the field
     // names. That is all we need here as we are looking to create something that is binary
@@ -113,6 +117,10 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
     auto end = fields.end();
     std::sort(it, end);
     for (; it != end; ++it) {
+        if (omitField && *omitField == it->fieldName) {
+            continue;
+        }
+
         auto elem = it->element();
         if (elem.type() == BSONType::Array) {
             BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
@@ -155,6 +163,197 @@ BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
     builder.append(timeField, roundedTime);
     return builder.obj();
 }
+
+enum class SchemaChange { Compatible, NeedsMerge, Incompatible };
+
+SchemaChange compareSchemaArray(const BSONObj& reference, const BSONObj& arr);
+
+// Recursive comparison helper for objects
+SchemaChange compareSchemaObject(const BSONObj& reference, const BSONObj& obj) {
+    SchemaChange res{SchemaChange::Compatible};
+
+    auto refIt = reference.begin();
+    auto refEnd = reference.end();
+    auto it = obj.begin();
+    auto end = obj.end();
+
+    // Iterate until we reach end of any of the two objects.
+    while (refIt != refEnd && it != end) {
+        StringData refName = refIt->fieldNameStringData();
+        StringData itName = it->fieldNameStringData();
+        int nameCmp = refName.compare(itName);
+        if (nameCmp == 0) {
+            bool typeMatch = refIt->canonicalType() == it->canonicalType();
+            SchemaChange subRes{SchemaChange::Compatible};
+            if (!typeMatch) {
+                return SchemaChange::Incompatible;
+            } else if (refIt->type() == Object) {
+                subRes = compareSchemaObject(refIt->Obj(), it->Obj());
+            } else if (refIt->type() == Array) {
+                subRes = compareSchemaArray(refIt->Obj(), it->Obj());
+            }
+
+            if (subRes == SchemaChange::Incompatible) {
+                return subRes;
+            } else if (subRes == SchemaChange::NeedsMerge) {
+                res = subRes;
+            }
+
+            ++refIt;
+            ++it;
+        } else if (nameCmp < 0) {
+            res = SchemaChange::NeedsMerge;
+            ++refIt;
+        } else {
+            res = SchemaChange::NeedsMerge;
+            ++it;
+        }
+    }
+
+    // If we haven't detected any schema change yet, but we have extra elements in one of the
+    // objects, then we just need to mark the changes compatible.
+    if (res == SchemaChange::Compatible && (refIt != refEnd || it != end)) {
+        res = SchemaChange::NeedsMerge;
+    }
+
+    return res;
+}
+
+// Recursively merge helper for arrays
+SchemaChange compareSchemaArray(const BSONObj& reference, const BSONObj& arr) {
+    SchemaChange res{SchemaChange::Compatible};
+
+    auto refIt = reference.begin();
+    auto refEnd = reference.end();
+    auto it = arr.begin();
+    auto end = arr.end();
+
+    // Iterate until we reach end of any of the two objects.
+    while (refIt != refEnd && it != end) {
+        SchemaChange subRes{SchemaChange::Compatible};
+        bool typeMatch = refIt->canonicalType() == it->canonicalType();
+        if (!typeMatch) {
+            return SchemaChange::Incompatible;
+        } else if (refIt->type() == Object) {
+            subRes = compareSchemaObject(refIt->Obj(), it->Obj());
+        } else if (refIt->type() == Array) {
+            subRes = compareSchemaArray(refIt->Obj(), it->Obj());
+        }
+
+        if (subRes == SchemaChange::Incompatible) {
+            return subRes;
+        } else if (subRes == SchemaChange::NeedsMerge) {
+            res = subRes;
+        }
+
+        ++refIt;
+        ++it;
+    }
+
+    // If we haven't detected any schema change yet, but we have extra elements in one of the
+    // arrays, then we just need to mark the changes compatible.
+    if (res == SchemaChange::Compatible && (refIt != refEnd || it != end)) {
+        res = SchemaChange::NeedsMerge;
+    }
+
+    return res;
+}
+
+void mergeSchemaArray(BSONArrayBuilder* builder, const BSONObj& reference, const BSONObj& arr);
+
+// Recursive merge helper for objects
+void mergeSchemaObject(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj& obj) {
+    auto refIt = reference.begin();
+    auto refEnd = reference.end();
+    auto it = obj.begin();
+    auto end = obj.end();
+
+    // Iterate until we reach end of any of the two objects.
+    while (refIt != refEnd && it != end) {
+        StringData refName = refIt->fieldNameStringData();
+        StringData itName = it->fieldNameStringData();
+        int nameCmp = refName.compare(itName);
+        if (nameCmp == 0) {
+            if (refIt->type() == Object) {
+                // Recurse deeper
+                BSONObjBuilder subBuilder{builder->subobjStart(refName)};
+                mergeSchemaObject(&subBuilder, refIt->Obj(), it->Obj());
+
+            } else if (refIt->type() == Array) {
+                BSONArrayBuilder subBuilder{builder->subarrayStart(refName)};
+                mergeSchemaArray(&subBuilder, refIt->Obj(), it->Obj());
+            } else {
+                builder->append(*refIt);
+            }
+            ++refIt;
+            ++it;
+        } else if (nameCmp < 0) {
+            builder->append(*refIt);
+            ++refIt;
+        } else {
+            builder->append(*it);
+            ++it;
+        }
+    }
+
+    // Add remaining reference elements when we reached end first in 'obj'.
+    for (; refIt != refEnd; ++refIt) {
+        builder->append(*refIt);
+    }
+
+    // Add remaining 'obj' elements when we reached end first in 'reference'.
+    for (; it != end; ++it) {
+        builder->append(*it);
+    }
+}
+
+// Recursively merge helper for arrays
+void mergeSchemaArray(BSONArrayBuilder* builder, const BSONObj& reference, const BSONObj& arr) {
+    auto refIt = reference.begin();
+    auto refEnd = reference.end();
+    auto it = arr.begin();
+    auto end = arr.end();
+
+    // Iterate until we reach end of any of the two objects.
+    while (refIt != refEnd && it != end) {
+        if (refIt->type() == Object) {
+            // Recurse deeper
+            BSONObjBuilder subBuilder{builder->subobjStart()};
+            mergeSchemaObject(&subBuilder, refIt->Obj(), it->Obj());
+
+        } else if (refIt->type() == Array) {
+            BSONArrayBuilder subBuilder{builder->subarrayStart()};
+            mergeSchemaArray(&subBuilder, refIt->Obj(), it->Obj());
+        } else {
+            builder->append(*refIt);
+        }
+        ++refIt;
+        ++it;
+    }
+
+    // Add remaining reference elements when we reached end first in 'obj'.
+    for (; refIt != refEnd; ++refIt) {
+        builder->append(*refIt);
+    }
+
+    // Add remaining 'obj' elements when we reached end first in 'reference'.
+    for (; it != end; ++it) {
+        builder->append(*it);
+    }
+}
+
+// Recursively merge two sorted objects of compatible schema, retaining type information.
+BSONObj mergeSchema(const BSONObj& reference, const BSONObj& input) {
+    if (reference.isEmptyPrototype()) {
+        return input;
+    }
+
+    BSONObjBuilder merged;
+    mergeSchemaObject(&merged, reference, input);
+
+    return merged.obj();
+}
+
 }  // namespace
 
 const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::kEmptyStats{
@@ -192,6 +391,10 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
     }
     auto key = BucketKey{ns, BucketMetadata{metadata, comparator}};
 
+    BSONObjBuilder normalized;
+    normalizeObject(&normalized, doc, metaFieldName);
+    BSONObj schema = normalized.obj();
+
     auto stats = _getExecutionStats(ns);
     invariant(stats);
 
@@ -217,7 +420,11 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
                                                 &newFieldNamesSize,
                                                 &sizeToBeAdded);
 
-    auto isBucketFull = [&](BucketAccess* bucket) -> bool {
+    auto shouldCloseBucket = [&](BucketAccess* bucket) -> bool {
+        if (bucket->schemaIncompatible(schema)) {
+            stats->numBucketsClosedDueToSchemaChange.fetchAndAddRelaxed(1);
+            return true;
+        }
         if ((*bucket)->_numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
             stats->numBucketsClosedDueToCount.fetchAndAddRelaxed(1);
             return true;
@@ -239,8 +446,8 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
         return false;
     };
 
-    if (!bucket->_ns.isEmpty() && isBucketFull(&bucket)) {
-        bucket.rollover(isBucketFull, &closedBuckets);
+    if (!bucket->_ns.isEmpty() && shouldCloseBucket(&bucket)) {
+        bucket.rollover(shouldCloseBucket, &closedBuckets);
 
         bucket->_calculateBucketFieldsAndSizeChange(doc,
                                                     options.getMetaField(),
@@ -270,6 +477,10 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::insert(
         // _openBuckets, _idleBuckets.
         bucket->_memoryUsage += (ns.size() * 2) + (bucket->_metadata.toBSON().objsize() * 2) +
             sizeof(Bucket) + sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
+
+        BSONObjBuilder normalized;
+        normalizeObject(&normalized, doc);
+        bucket->_schema = normalized.obj();
     } else {
         _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     }
@@ -442,6 +653,8 @@ void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuild
     builder->appendNumber("numBucketsOpenedDueToMetadata",
                           stats->numBucketsOpenedDueToMetadata.load());
     builder->appendNumber("numBucketsClosedDueToCount", stats->numBucketsClosedDueToCount.load());
+    builder->appendNumber("numBucketsClosedDueToSchemaChange",
+                          stats->numBucketsClosedDueToSchemaChange.load());
     builder->appendNumber("numBucketsClosedDueToSize", stats->numBucketsClosedDueToSize.load());
     builder->appendNumber("numBucketsClosedDueToTimeForward",
                           stats->numBucketsClosedDueToTimeForward.load());
@@ -1068,8 +1281,22 @@ BucketCatalog::BucketAccess::operator BucketCatalog::Bucket*() const {
     return _bucket;
 }
 
-void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess*)>& isBucketFull,
-                                           ClosedBuckets* closedBuckets) {
+bool BucketCatalog::BucketAccess::schemaIncompatible(const BSONObj& input) {
+    auto res = compareSchemaObject(_bucket->_schema, input);
+    if (res == SchemaChange::Compatible) {
+        return false;
+    } else if (res == SchemaChange::Incompatible) {
+        return true;
+    }
+
+    invariant(res == SchemaChange::NeedsMerge);
+    _bucket->_schema = mergeSchema(_bucket->_schema, input);
+
+    return false;
+}
+
+void BucketCatalog::BucketAccess::rollover(
+    const std::function<bool(BucketAccess*)>& shouldCloseBucket, ClosedBuckets* closedBuckets) {
     invariant(isLocked());
     invariant(_key);
     invariant(_time);
@@ -1091,7 +1318,7 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
     // Recheck if still full now that we've reacquired the bucket.
     bool sameBucket =
         oldBucket == _bucket;  // Only record stats if bucket has changed, don't double-count.
-    if (sameBucket || isBucketFull(this)) {
+    if (sameBucket || shouldCloseBucket(this)) {
         // The bucket is indeed full, so create a new one.
         if (_bucket->allCommitted()) {
             // The bucket does not contain any measurements that are yet to be committed, so we can
