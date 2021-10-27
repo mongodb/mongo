@@ -114,6 +114,7 @@ void warnDeprecation(Client& client, StringData op) {
 void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
     static constexpr std::array allowedOpQueryCommands{
         "_isSelf"_sd,
+        "authenticate"_sd,
         "buildinfo"_sd,
         "buildInfo"_sd,
         "hello"_sd,
