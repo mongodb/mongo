@@ -918,25 +918,18 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& cmd = entry.getObject();
           auto opMsg = OpMsgRequest::fromDBAndBody(entry.getNss().db(), cmd);
           auto collModCmd = CollMod::parse(IDLParserErrorContext("collModOplogEntry"), opMsg);
-          const auto nss([&] {
+          const auto nssOrUUID([&collModCmd, &entry, mode]() -> NamespaceStringOrUUID {
               // Oplog entries from secondary oplog application will allways have the Uuid set and
               // it is only invocations of applyOps directly that may omit it
               if (!entry.getUuid()) {
                   invariant(mode == OplogApplication::Mode::kApplyOpsCmd);
-                  return extractNs(entry.getNss().db(), cmd);
+                  return collModCmd.getNamespace();
               }
 
-              const auto& uuid = *entry.getUuid();
-              auto catalog = CollectionCatalog::get(opCtx);
-              const auto nsByUUID = catalog->lookupNSSByUUID(opCtx, uuid);
-              uassert(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Failed to apply operation due to missing collection ("
-                                    << uuid << "): " << redact(cmd.toString()),
-                      nsByUUID);
-              return *nsByUUID;
+              return {collModCmd.getDbName().toString(), *entry.getUuid()};
           }());
           BSONObjBuilder resultWeDontCareAbout;
-          return processCollModCommand(opCtx, nss, collModCmd, &resultWeDontCareAbout);
+          return processCollModCommand(opCtx, nssOrUUID, collModCmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},
