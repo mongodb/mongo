@@ -92,7 +92,7 @@ python
 import sys
 sys.path.insert(0, './Boost-Pretty-Printer')
 import boost
-boost.register_printers(boost_version=(1,70,0))
+boost.register_printers()
 end
 EOF
 
