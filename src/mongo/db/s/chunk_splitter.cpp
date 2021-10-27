@@ -38,11 +38,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/auto_split_vector.h"
 #include "mongo/db/s/chunk_split_state_driver.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
-#include "mongo/db/s/split_vector.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -327,23 +327,20 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
                << " maxChunkSizeBytes: " << maxChunkSizeBytes;
 
         chunkSplitStateDriver->prepareSplit();
-        auto splitPoints = uassertStatusOK(splitVector(opCtx.get(),
-                                                       nss,
-                                                       shardKeyPattern.toBSON(),
-                                                       chunk.getMin(),
-                                                       chunk.getMax(),
-                                                       false,
-                                                       boost::none,
-                                                       boost::none,
-                                                       boost::none,
-                                                       maxChunkSizeBytes));
 
-        if (splitPoints.size() <= 1) {
+        auto splitPoints = autoSplitVector(opCtx.get(),
+                                           nss,
+                                           shardKeyPattern.toBSON(),
+                                           chunk.getMin(),
+                                           chunk.getMax(),
+                                           maxChunkSizeBytes);
+
+        if (splitPoints.empty()) {
             LOG(1)
                 << "ChunkSplitter attempted split but not enough split points were found for chunk "
                 << redact(chunk.toString());
-            // Reset our size estimate that we had prior to splitVector to 0, while still counting
-            // the bytes that have been written in parallel to this split task
+            // Reset our size estimate that we had prior to autoSplitVector to 0, while still
+            // counting the bytes that have been written in parallel to this split task
             chunkSplitStateDriver->abandonPrepare();
             // No split points means there isn't enough data to split on; 1 split point means we
             // have between half the chunk size to full chunk size so there is no need to split yet

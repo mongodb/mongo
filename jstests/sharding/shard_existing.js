@@ -1,3 +1,9 @@
+/*
+ * @tags: [
+ *     requires_fcv_42, # autoSplitVector not present in older v4.0 binaries
+ * ]
+ */
+
 (function() {
 'use strict';
 
@@ -28,10 +34,10 @@ s.ensurePrimaryShard('test', s.shard1.shardName);
 var res = s.adminCommand({shardcollection: "test.data", key: {_id: 1}});
 printjson(res);
 
-// number of chunks should be approx equal to the total data size / half the chunk size
+// number of chunks should be approx equal to the total data size / chunk size
 var numChunks = s.config.chunks.find({ns: 'test.data'}).itcount();
-var guess = Math.ceil(dataSize / (512 * 1024 + avgObjSize));
-assert(Math.abs(numChunks - guess) < 2, "not right number of chunks");
+var guess = Math.ceil(dataSize / (1024 * 1024 + avgObjSize));
+assert.lte(Math.abs(numChunks - guess), 2, "not right number of chunks");
 
 s.stop();
 })();

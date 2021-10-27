@@ -1,3 +1,9 @@
+/*
+ * @tags: [
+ *     requires_fcv_42, # autoSplitVector not present in older v4.0 binaries
+ * ]
+ */
+
 (function() {
 
 var s = new ShardingTest({name: "presplit", shards: 2, mongos: 1, other: {chunkSize: 1}});
@@ -31,7 +37,7 @@ s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
 // Make sure the collection's original chunk got split
 s.printChunks();
-assert.lt(20, s.config.chunks.count({"ns": "test.foo"}), "many chunks assertion");
+assert.lte(20, s.config.chunks.count({"ns": "test.foo"}), "many chunks assertion");
 assert.eq(num, primary.foo.count());
 
 s.printChangeLog();

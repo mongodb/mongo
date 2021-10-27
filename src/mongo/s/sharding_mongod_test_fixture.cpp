@@ -105,7 +105,7 @@ void ShardingMongodTestFixture::setUp() {
     // Set up this node as part of a replica set.
 
     repl::ReplSettings replSettings;
-    replSettings.setOplogSizeBytes(512'000);
+    replSettings.setOplogSizeBytes(1024 * 1024 * 2);  // 2MB
     replSettings.setReplSetString(ConnectionString::forReplicaSet(_setName, _servers).toString());
     auto replCoordPtr = makeReplicationCoordinator(replSettings);
     _replCoord = replCoordPtr.get();

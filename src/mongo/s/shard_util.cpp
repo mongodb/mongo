@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
@@ -93,46 +94,63 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
                                                         const ChunkRange& chunkRange,
-                                                        long long chunkSizeBytes,
-                                                        boost::optional<int> maxObjs) {
-    BSONObjBuilder cmd;
-    cmd.append("splitVector", nss.ns());
-    cmd.append("keyPattern", shardKeyPattern.toBSON());
-    chunkRange.append(&cmd);
-    cmd.append("maxChunkSizeBytes", chunkSizeBytes);
-    if (maxObjs) {
-        cmd.append("maxChunkObjects", *maxObjs);
-    }
-
+                                                        long long chunkSizeBytes) {
     auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
 
-    auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        "admin",
-        cmd.obj(),
-        Shard::RetryPolicy::kIdempotent);
-    if (!cmdStatus.isOK()) {
-        return std::move(cmdStatus.getStatus());
+    auto invokeSplitCommand = [&](const BSONObj& command, const StringData db) {
+        return shardStatus.getValue()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            db.toString(),
+            command,
+            Shard::RetryPolicy::kIdempotent);
+    };
+
+    const AutoSplitVectorRequest req(
+        nss, shardKeyPattern.toBSON(), chunkRange.getMin(), chunkRange.getMax(), chunkSizeBytes);
+
+    auto cmdStatus = invokeSplitCommand(req.toBSON({}), nss.db());
+
+    // Fallback to splitVector command in case of mixed binaries not supporting autoSplitVector
+    bool fallback = [&]() {
+        auto status = Shard::CommandResponse::getEffectiveStatus(cmdStatus);
+        return !status.isOK() && status.code() == ErrorCodes::CommandNotFound;
+    }();
+
+    if (fallback) {
+        BSONObjBuilder cmd;
+        cmd.append("splitVector", nss.ns());
+        cmd.append("keyPattern", shardKeyPattern.toBSON());
+        chunkRange.append(&cmd);
+        cmd.append("maxChunkSizeBytes", chunkSizeBytes);
+        cmdStatus = invokeSplitCommand(cmd.obj(), NamespaceString::kAdminDb);
     }
-    if (!cmdStatus.getValue().commandStatus.isOK()) {
-        return std::move(cmdStatus.getValue().commandStatus);
+
+
+    auto status = Shard::CommandResponse::getEffectiveStatus(cmdStatus);
+    if (!status.isOK()) {
+        return status;
     }
 
-    const auto response = std::move(cmdStatus.getValue().response);
+    if (fallback) {
+        const auto response = std::move(cmdStatus.getValue().response);
+        std::vector<BSONObj> splitPoints;
 
-    std::vector<BSONObj> splitPoints;
-
-    BSONObjIterator it(response.getObjectField("splitKeys"));
-    while (it.more()) {
-        splitPoints.push_back(it.next().Obj().getOwned());
+        BSONObjIterator it(response.getObjectField("splitKeys"));
+        while (it.more()) {
+            splitPoints.push_back(it.next().Obj().getOwned());
+        }
+        return std::move(splitPoints);
     }
 
-    return std::move(splitPoints);
-}
+    const auto response = AutoSplitVectorResponse::parse(
+        IDLParserErrorContext("AutoSplitVectorResponse"), std::move(cmdStatus.getValue().response));
+    return response.getSplitKeys();
+
+}  // namespace shardutil
 
 StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     OperationContext* opCtx,

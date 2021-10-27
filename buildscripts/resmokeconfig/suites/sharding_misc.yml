@@ -161,7 +161,6 @@ selector:
   - jstests/sharding/secondary_shard_versioning.js
   - jstests/sharding/move_chunk_wc.js
   - jstests/sharding/shard_aware_init_secondaries.js
-  - jstests/sharding/autosplit_heuristics.js
   - jstests/sharding/move_chunk_open_cursors.js
   - jstests/sharding/basic_split.js
   - jstests/sharding/merge_chunks_test_with_md_ops.js

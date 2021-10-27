@@ -643,8 +643,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
             nss,
             cm->getShardKeyPattern(),
             ChunkRange(chunk.getMin(), chunk.getMax()),
-            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-            boost::none));
+            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes()));
 
         if (splitPoints.empty()) {
             log() << "Marking chunk " << redact(chunk.toString()) << " as jumbo.";

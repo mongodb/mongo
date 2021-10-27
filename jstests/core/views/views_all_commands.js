@@ -121,6 +121,14 @@ let viewsCommandTests = {
         skipSharded: true,
     },
     authenticate: {skip: isUnrelated},
+    autoSplitVector: {
+        command: {
+            splitVector: "test.view",
+            keyPattern: {x: 1},
+            maxChunkSize: 1,
+        },
+        expectFailure: true,
+    },
     availableQueryOptions: {skip: isAnInternalCommand},
     balancerStart: {skip: isUnrelated},
     balancerStatus: {skip: isUnrelated},
