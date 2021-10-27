@@ -860,6 +860,46 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockContinueAppend) {
+    BSONColumnBuilder cb("test"_sd);
+
+    // The values below should result in two Simple8b blocks, one scaled with 10.0 and the second
+    // scaled to 1.0. This tests that we can scale down doubles after writing a Simple8b block and
+    // that we are in a good state to continue to append values.
+    //
+    // When the value '105.0' is appended the first Simple8b block with scale factor 10.0 will be
+    // written and it will be determined that we can scale down to scale factor 1.0 for the next
+    // block as '119.0' (last value previous Simple8b block) and '105.0' can both be encoded using
+    // scale factor '1.0'. We then test that we can continue to append a value ('120.0') using this
+    // lower scale factor.
+    std::vector<BSONElement> elems = {createElementDouble(94.8),
+                                      createElementDouble(107.9),
+                                      createElementDouble(111.9),
+                                      createElementDouble(113.4),
+                                      createElementDouble(89.0),
+                                      createElementDouble(126.7),
+                                      createElementDouble(119.0),
+                                      createElementDouble(105.0),
+                                      createElementDouble(120.0)};
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1010, 0b0000);
+    appendSimple8bBlocks64(
+        expected, deltaDouble(elems.begin() + 1, elems.begin() + 7, elems.front(), 10.0), 1);
+    appendSimple8bControl(expected, 0b1001, 0b0000);
+    appendSimple8bBlocks64(expected, deltaDouble(elems.begin() + 7, elems.end(), elems[6], 1.0), 1);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
     BSONColumnBuilder cb("test"_sd);
 

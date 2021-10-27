@@ -650,33 +650,35 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
             Simple8bTypeUtil::encodeInt64(calcDelta(encoded, _prevEncoded64))))
         return false;
 
-    if (_bufBuilder->len() != before) {
-        // Reset the scale factor to 0 and append all pending values to a new Simple8bBuilder. In
-        // the worse case we will end up with an identical scale factor.
-        auto prevScale = _scaleIndex;
-        std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
-
-        // Create a new Simple8bBuilder.
-        Simple8bBuilder<uint64_t> builder(_createBufferWriter());
-        std::swap(_simple8bBuilder64, builder);
-
-        // Iterate over previous pending values and re-add them recursively. That will increase the
-        // scale factor as needed.
-        auto prev = _lastValueInPrevBlock;
-        auto prevEncoded = *Simple8bTypeUtil::encodeDouble(prev, prevScale);
-        for (const auto& pending : builder) {
-            if (pending) {
-                prevEncoded = expandDelta(prevEncoded, Simple8bTypeUtil::decodeInt64(*pending));
-                auto val = Simple8bTypeUtil::decodeDouble(prevEncoded, prevScale);
-                _appendDouble(val, prev);
-                prev = val;
-            } else {
-                _simple8bBuilder64.skip();
-            }
-        }
+    if (_bufBuilder->len() == before) {
+        _prevEncoded64 = encoded;
+        return true;
     }
 
-    _prevEncoded64 = encoded;
+    // Reset the scale factor to 0 and append all pending values to a new Simple8bBuilder. In
+    // the worse case we will end up with an identical scale factor.
+    auto prevScale = _scaleIndex;
+    std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
+
+    // Create a new Simple8bBuilder.
+    Simple8bBuilder<uint64_t> builder(_createBufferWriter());
+    std::swap(_simple8bBuilder64, builder);
+
+    // Iterate over previous pending values and re-add them recursively. That will increase the
+    // scale factor as needed. No need to set '_prevEncoded64' in this code path as that will be
+    // done in the recursive call to '_appendDouble' below.
+    auto prev = _lastValueInPrevBlock;
+    auto prevEncoded = *Simple8bTypeUtil::encodeDouble(prev, prevScale);
+    for (const auto& pending : builder) {
+        if (pending) {
+            prevEncoded = expandDelta(prevEncoded, Simple8bTypeUtil::decodeInt64(*pending));
+            auto val = Simple8bTypeUtil::decodeDouble(prevEncoded, prevScale);
+            _appendDouble(val, prev);
+            prev = val;
+        } else {
+            _simple8bBuilder64.skip();
+        }
+    }
     return true;
 }
 
