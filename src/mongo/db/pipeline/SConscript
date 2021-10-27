@@ -142,6 +142,9 @@ env.Library(
         'dependencies',
         'document_value',
         'expression_context',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/query_knobs',
     ]
 )
 

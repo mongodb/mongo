@@ -157,6 +157,8 @@ extern AtomicInt32 internalQueryMaxPushBytes;
 
 extern AtomicInt32 internalQueryMaxAddToSetBytes;
 
+extern AtomicInt32 internalQueryMaxRangeBytes;
+
 // The number of bytes after which explain should start truncating portions of its output.
 extern AtomicInt32 internalQueryExplainSizeThresholdBytes;
 }  // namespace mongo
