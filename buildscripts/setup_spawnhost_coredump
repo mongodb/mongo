@@ -48,18 +48,18 @@ cd debug
 git clone git@github.com:ruediger/Boost-Pretty-Printer.git &
 
 # Discover and unarchive necessary files and source code. This will put mongo binaries and their
-# partner .debug files in the same top-level (`debug`) directory. Shared library files and their
-# debug symbols will be dumped into a `debug/lib` directory for tidiness. The mongo
-# `<reporoot>/src/` directory is soft linked as `debug/src`. The .gdbinit file assumes gdb is being
-# run from the `debug` directory.
+# partner .debug files in the same `debug/bin` directory. The `bin` directory will later be symbolic
+# linked into the top-level (`debug`) directory. Shared library files and their debug symbols will
+# be dumped into a `debug/lib` directory for tidiness. The mongo `<reporoot>/src/` directory is soft
+# linked as `debug/src`. The .gdbinit file assumes gdb is being run from the `debug` directory.
 BIN_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test*/mongo-*.tgz`
-tar --wildcards --strip-components=2 -xzf $BIN_ARCHIVE '*/bin/mongod' '*/bin/mongos' '*/bin/mongo' '*/bin/mongobridge' &
+tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/bin/mongod' '*/bin/mongos' '*/bin/mongo' '*/bin/mongobridge' &
 tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/lib/*' &
 DBG_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test_debug/debugsymbols-*.tgz`
-tar --wildcards --strip-components=2 -xzf $DBG_ARCHIVE '*/bin/mongod.debug' '*/bin/mongos.debug' '*/bin/mongo.debug' '*/bin/mongobridge.debug' &
+tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/bin/mongod.debug' '*/bin/mongos.debug' '*/bin/mongo.debug' '*/bin/mongobridge.debug' &
 tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/lib/*' &
 UNITTEST_ARCHIVE=`ls /data/mci/artifacts-*run_unittests/mongo-unittests-*.tgz`
-tar --wildcards --strip-components=1 -xzf $UNITTEST_ARCHIVE 'bin/*' &
+tar --wildcards --strip-components=0 -xzf $UNITTEST_ARCHIVE 'bin/*' &
 tar --wildcards -xzf $UNITTEST_ARCHIVE 'lib/*' &
 
 SRC_DIR=`find /data/mci/ -maxdepth 1 | grep source`
@@ -74,6 +74,11 @@ COREDUMP_ARCHIVE=`ls /data/mci/artifacts-*/mongo-coredumps-*.tgz`
 tar -xzf $COREDUMP_ARCHIVE &
 echo "Waiting for background processes to complete."
 wait
+
+# Symbolic linking all of the executable files is sufficient for `gdb ./mongod ./dump_mongod.core`
+# to succeed. This inadvertantly also links in the ".debug" files which is unnecessary, but
+# harmless. gdb expects the .debug files to live adjacent to the physical binary.
+ln -s bin/* ./
 
 cat >> ~/.gdbinit <<EOF
 set auto-load safe-path /
