@@ -253,7 +253,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         // response.
         if (aggResults["cursor"]["id"].Long() != 0) {
             uassertStatusOK(Grid::get(opCtx)->getCursorManager()->killCursor(
-                opCtx, parsedMr.getNamespace(), aggResults["cursor"]["id"].Long()));
+                opCtx, aggResults["cursor"]["id"].Long()));
             uasserted(31301, "MapReduce inline results are greater than the allowed 16MB limit");
         }
 

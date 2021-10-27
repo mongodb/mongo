@@ -681,7 +681,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     NamespaceString nss(cmd.getDbName(), cmd.getCollection());
     int64_t cursorId = cmd.getCommandParameter();
 
-    auto pinnedCursor = cursorManager->checkOutCursor(nss, cursorId, opCtx, authChecker);
+    auto pinnedCursor = cursorManager->checkOutCursor(cursorId, opCtx, authChecker);
     if (!pinnedCursor.isOK()) {
         return pinnedCursor.getStatus();
     }

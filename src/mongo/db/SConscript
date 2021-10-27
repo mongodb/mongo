@@ -1964,6 +1964,7 @@ env.Library(
 env.Library(
     target='generic_cursor',
     source=[
+        'allocate_cursor_id.cpp',
         'generic_cursor.idl',
     ],
     LIBDEPS=[

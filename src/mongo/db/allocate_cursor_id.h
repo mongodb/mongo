@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/auth/authorization_checks.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/killcursors_common.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/transaction_router.h"
+#include <functional>
 
-namespace mongo {
-namespace {
+#include "mongo/db/cursor_id.h"
+#include "mongo/platform/random.h"
 
-struct ClusterKillCursorsCmd {
-    static constexpr bool supportsReadConcern = true;
-    static Status doCheckAuth(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              CursorId cursorId) {
-        auto const authzSession = AuthorizationSession::get(opCtx->getClient());
-        auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
-            return auth::checkAuthForKillCursors(authzSession, nss, userNames);
-        };
+namespace mongo::generic_cursor {
 
-        return Grid::get(opCtx)->getCursorManager()->checkAuthForKillCursors(
-            opCtx, cursorId, authChecker);
-    }
+/**
+ * Allocates a positive Cursor Id that satisfies 'pred', which checks that the CursorId is not
+ * already in use.
+ *
+ * The caller of this function is responsible for synchronization between the check of whether a
+ * cursor is already allocated in 'pred' and the creation of new cursors.
+ */
+CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random);
 
-    static Status doKillCursor(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               CursorId cursorId) {
-        return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, cursorId);
-    }
-};
-KillCursorsCmdBase<ClusterKillCursorsCmd> clusterKillCursorsCmd;
-
-}  // namespace
-}  // namespace mongo
+}  // namespace mongo::generic_cursor

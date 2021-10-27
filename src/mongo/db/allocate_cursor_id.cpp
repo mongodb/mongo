@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/allocate_cursor_id.h"
 
-#include "mongo/db/auth/authorization_checks.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands/killcursors_common.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util.h"
 
-namespace mongo {
-namespace {
+namespace mongo::generic_cursor {
 
-struct ClusterKillCursorsCmd {
-    static constexpr bool supportsReadConcern = true;
-    static Status doCheckAuth(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              CursorId cursorId) {
-        auto const authzSession = AuthorizationSession::get(opCtx->getClient());
-        auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
-            return auth::checkAuthForKillCursors(authzSession, nss, userNames);
-        };
+CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random) {
+    for (int i = 0; i < 10000; i++) {
+        CursorId id = random.nextInt64();
 
-        return Grid::get(opCtx)->getCursorManager()->checkAuthForKillCursors(
-            opCtx, cursorId, authChecker);
+        // A cursor id of zero is reserved to indicate that the cursor has been closed. If the
+        // random number generator gives us zero, then try again.
+        if (id == 0) {
+            continue;
+        }
+
+        // Avoid negative cursor ids by taking the absolute value. If the cursor id is the minimum
+        // representable negative number, then just generate another random id.
+        if (id == std::numeric_limits<CursorId>::min()) {
+            continue;
+        }
+        id = std::abs(id);
+
+        if (pred(id)) {
+            // The cursor id is not already in use, so return it.
+            return id;
+        }
+
+        // The cursor id is already in use. Generate another random id.
     }
 
-    static Status doKillCursor(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               CursorId cursorId) {
-        return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, cursorId);
-    }
-};
-KillCursorsCmdBase<ClusterKillCursorsCmd> clusterKillCursorsCmd;
+    // We failed to generate a unique cursor id.
+    fassertFailed(17360);
+}
 
-}  // namespace
-}  // namespace mongo
+}  // namespace mongo::generic_cursor

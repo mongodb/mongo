@@ -32,6 +32,7 @@
 #include "mongo/db/commands/killoperations_common.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -39,24 +40,28 @@ class ClusterKillOperationsCmd : public KillOperationsCmdBase<ClusterKillOperati
 public:
     static void killCursors(OperationContext* opCtx, const std::vector<OperationKey>& opKeys) {
         auto clusterCursorManager = Grid::get(opCtx)->getCursorManager();
-        for (auto& cursorId : clusterCursorManager->getCursorsForOpKeys(opKeys)) {
-            LOGV2(4664805, "Attempting to kill cursor", "cursorId"_attr = cursorId);
-            auto cursorNss = clusterCursorManager->getNamespaceForCursorId(cursorId);
-            if (!cursorNss) {
-                // The cursor must have already been killed.
-                continue;
-            }
+        stdx::unordered_set<UUID, UUID::Hash> opKeySet(opKeys.begin(), opKeys.end());
 
-            auto status = clusterCursorManager->killCursor(opCtx, cursorNss.get(), cursorId);
+        std::size_t numCursorsKilled = clusterCursorManager->killCursorsSatisfying(
+            opCtx,
+            [&opKeySet](CursorId cursorId, const ClusterCursorManager::CursorEntry& entry) -> bool {
+                if (!entry.getOperationKey()) {
+                    return false;
+                }
 
-            if (!status.isOK()) {
-                LOGV2(4664806,
-                      "Failed to kill the cursor ",
-                      "error"_attr = redact(status.toString()));
-            } else {
-                LOGV2(4664807, "Killed cursor", "cursorId"_attr = cursorId);
-            }
-        }
+                bool hasOpKey = opKeySet.find(*entry.getOperationKey()) != opKeySet.end();
+                if (hasOpKey) {
+                    LOGV2(4664805,
+                          "Attempting to kill cursor",
+                          "cursorId"_attr = cursorId,
+                          "opKey"_attr = entry.getOperationKey());
+                }
+
+                return hasOpKey;
+            });
+
+        LOGV2(
+            4664806, "_killOperations command killed cursors", "numKilled"_attr = numCursorsKilled);
     }
 } ClusterKillOperationsCmd;
 
