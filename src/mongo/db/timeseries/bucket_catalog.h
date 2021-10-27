@@ -158,7 +158,7 @@ public:
         void _abort(const boost::optional<Status>& status, bool canAccessBucket);
 
 
-        Bucket* _bucket;
+        Bucket* const _bucket;
         OperationId _opId;
         std::shared_ptr<ExecutionStats> _stats;
 
