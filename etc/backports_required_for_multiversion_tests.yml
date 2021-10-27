@@ -106,6 +106,8 @@ last-continuous:
       test_file: jstests/core/sbe/sbe_cmd.js
     - ticket: SERVER-56127
       test_file: jstests/sharding/retryable_writes_nested_shard_key.js
+    - ticket: SERVER-54909
+      test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -372,6 +374,8 @@ last-lts:
       test_file: jstests/core/sbe/sbe_cmd.js
     - ticket: SERVER-56127
       test_file: jstests/sharding/retryable_writes_nested_shard_key.js
+    - ticket: SERVER-54909
+      test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
