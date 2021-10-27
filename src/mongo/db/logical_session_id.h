@@ -147,11 +147,11 @@ public:
         return bob.obj();
     }
 
-    const TxnNumber getTxnNumber() const {
+    TxnNumber getTxnNumber() const {
         return _txnNumber;
     }
 
-    const boost::optional<TxnRetryCounter> getTxnRetryCounter() const {
+    boost::optional<TxnRetryCounter> getTxnRetryCounter() const {
         return _txnRetryCounter;
     }
 
