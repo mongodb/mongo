@@ -2,12 +2,15 @@
 import copy
 from typing import List, Set, Union, Optional
 
+import structlog
 from shrub.v2 import Task, FunctionCall
 from shrub.v2.command import ShrubCommand
 
 from buildscripts.task_generation.constants import DO_MULTIVERSION_SETUP, CONFIGURE_EVG_CREDENTIALS, RUN_GENERATED_TESTS
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.util import taskname
+
+LOGGER = structlog.get_logger(__name__)
 
 
 class _SuiteFixtureType:
@@ -26,7 +29,7 @@ class MultiversionGenTaskDecorator:
     def __init__(self):
         """Initialize multiversion decorator."""
         self.resmoke_proxy = ResmokeProxyService()
-        self.old_versions = ["last_lts", "last_continuous"]
+        self.old_versions = self._init_old_versions()
 
     def decorate_tasks(self, sub_tasks: Set[Task], params) -> Set[Task]:
         """Make multiversion subtasks based on generated subtasks."""
@@ -50,6 +53,17 @@ class MultiversionGenTaskDecorator:
                         Task(name=sub_task_name, commands=commands,
                              dependencies=sub_task.dependencies))
         return decorated_tasks
+
+    def _init_old_versions(self) -> List[str]:
+        from buildscripts.resmokelib import multiversionconstants
+        if multiversionconstants.LAST_LTS_FCV == multiversionconstants.LAST_CONTINUOUS_FCV:
+            LOGGER.debug("Last-lts FCV and last-continuous FCV are equal")
+            old_versions = ["last_lts"]
+        else:
+            old_versions = ["last_lts", "last_continuous"]
+        LOGGER.debug("Determined old versions for the multiversion tasks",
+                     old_versions=old_versions)
+        return old_versions
 
     def _get_suite_fixture_type(self, suite_name: str) -> str:
         """Return suite fixture type."""
