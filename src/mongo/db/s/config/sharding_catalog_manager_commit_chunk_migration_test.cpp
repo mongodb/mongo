@@ -47,8 +47,11 @@ using unittest::assertGet;
 using CommitChunkMigrate = ConfigServerTestFixture;
 
 const NamespaceString kNamespace("TestDB.TestColl");
+const KeyPattern kKeyPattern(BSON("a" << 1));
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
+    const auto collUuid = UUID::gen();
+
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -83,7 +86,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
         controlChunk.setJumbo(true);
     }
 
-    setupChunks({migratedChunk, controlChunk});
+    setupCollection(migratedChunk.getNS(), collUuid, kKeyPattern, {migratedChunk, controlChunk});
 
     Timestamp validAfter{101, 0};
     BSONObj versions = assertGet(ShardingCatalogManager::get(operationContext())
@@ -131,6 +134,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithControlChunk) {
 }
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -158,7 +162,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupCollection(chunk0.getNS(), collUuid, kKeyPattern, {chunk0});
 
     Timestamp validAfter{101, 0};
 
@@ -192,6 +196,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
 }
 
 TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -219,7 +224,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupCollection(chunk0.getNS(), collUuid, kKeyPattern, {chunk0});
 
     // Make the time distance between the last history element large enough.
     Timestamp validAfter{200, 0};
@@ -254,6 +259,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 }
 
 TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -281,7 +287,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupCollection(chunk0.getNS(), collUuid, kKeyPattern, {chunk0});
 
     // Make the time before the last change to trigger the failure.
     Timestamp validAfter{99, 0};
@@ -299,6 +305,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
 }
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -335,7 +342,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk0, chunk1});
+    setupCollection(chunk0.getNS(), collUuid, kKeyPattern, {chunk0, chunk1});
 
     Timestamp validAfter{1};
 
@@ -352,6 +359,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 }
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -390,7 +398,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk1.setMax(chunkMaxax);
 
     // get version from the control chunk this time
-    setupChunks({chunk1, chunk0});
+    setupCollection(chunk0.getNS(), collUuid, kKeyPattern, {chunk1, chunk0});
 
     Timestamp validAfter{1};
 
@@ -407,6 +415,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 }
 
 TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -443,7 +452,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk1});
+    setupCollection(chunk1.getNS(), collUuid, kKeyPattern, {chunk1});
 
     Timestamp validAfter{1};
 
@@ -460,6 +469,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 }
 
 TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks) {
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -500,7 +510,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     Timestamp ctrlChunkValidAfter = Timestamp(50, 0);
     chunk1.setHistory({ChunkHistory(ctrlChunkValidAfter, shard1.getName())});
 
-    setupChunks({chunk0, chunk1});
+    setupCollection(chunk0.getNS(), collUuid, kKeyPattern, {chunk0, chunk1});
 
     Timestamp validAfter{101, 0};
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
@@ -543,6 +553,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 TEST_F(CommitChunkMigrate, RejectMissingChunkVersionOnFCV44) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -574,7 +585,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersionOnFCV44) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(currentChunk.getNS(), collUuid, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
@@ -592,6 +603,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersionOnFCV44) {
 TEST_F(CommitChunkMigrate, AcceptMissingChunkVersionOnFCV42) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo42);
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -623,7 +635,7 @@ TEST_F(CommitChunkMigrate, AcceptMissingChunkVersionOnFCV42) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(currentChunk.getNS(), collUuid, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())
@@ -641,6 +653,7 @@ TEST_F(CommitChunkMigrate, AcceptMissingChunkVersionOnFCV42) {
 TEST_F(CommitChunkMigrate, RejectOlderChunkVersionOnFCV44) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -675,7 +688,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersionOnFCV44) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(currentChunk.getNS(), collUuid, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())
@@ -694,6 +707,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersionOnFCV44) {
 TEST_F(CommitChunkMigrate, RejectMismatchedEpochOnFCV44) {
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo44);
+    const auto collUuid = UUID::gen();
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -727,7 +741,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpochOnFCV44) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(currentChunk.getNS(), collUuid, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())

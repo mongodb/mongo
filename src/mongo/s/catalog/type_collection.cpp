@@ -43,6 +43,7 @@ namespace {
 
 const BSONField<bool> kNoBalance("noBalance");
 const BSONField<bool> kDropped("dropped");
+const BSONField<bool> kPermitMigrations("permitMigrations");
 
 }  // namespace
 
@@ -200,6 +201,19 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         }
     }
 
+    {
+        bool collPermitMigrations;
+        Status status =
+            bsonExtractBooleanField(source, kPermitMigrations.name(), &collPermitMigrations);
+        if (status.isOK()) {
+            coll._permitMigrations = collPermitMigrations;
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // PermitMigrations can be missing.
+        } else {
+            return status;
+        }
+    }
+
     return StatusWith<CollectionType>(coll);
 }
 
@@ -271,6 +285,10 @@ BSONObj CollectionType::toBSON() const {
 
     if (_allowBalance.is_initialized()) {
         builder.append(kNoBalance.name(), !_allowBalance.get());
+    }
+
+    if (_permitMigrations.is_initialized()) {
+        builder.append(kPermitMigrations.name(), _permitMigrations.get());
     }
 
     if (_distributionMode) {
