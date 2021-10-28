@@ -82,6 +82,12 @@ parameters:
   - key: future_git_tag
     description: "Future git tag to be added. If empty, we will use the most recent git tag instead."
 
+  - key: last_lts_evg_version_id
+    description: "The Evergreen Version ID of the last-lts MongoDB binaries. Only binaries from release variants are used"
+
+  - key: last_continuous_evg_version_id
+    description: "The Evergreen Version ID of the last-continuous MongoDB binaries. Only binaries from release variants are used"
+
 ## Some variables for convenience:
 variables:
 

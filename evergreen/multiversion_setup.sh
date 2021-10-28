@@ -64,6 +64,17 @@ if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
   architecture="${multiversion_architecture_44_or_later}"
 fi
 
+last_lts_arg="--installLastLTS"
+last_continuous_arg="--installLastContinuous"
+
+if [[ -n "${last_lts_evg_version_id}" ]]; then
+  last_lts_arg="${last_lts_evg_version_id}"
+fi
+
+if [[ -n "${last_continuous_evg_version_id}" ]]; then
+  last_continuous_arg="${last_continuous_evg_version_id}"
+fi
+
 $python buildscripts/resmoke.py setup-multiversion \
   --installDir /data/install \
   --linkDir /data/multiversion \
@@ -71,5 +82,5 @@ $python buildscripts/resmoke.py setup-multiversion \
   --platform $platform \
   --architecture $architecture \
   --useLatest \
-  --installLastLTS \
-  --installLastContinuous 4.4
+  $last_lts_arg \
+  $last_continuous_arg 4.4
