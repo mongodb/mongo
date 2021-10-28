@@ -104,6 +104,8 @@ public:
      */
     void dropConnections(const HostAndPort& hostAndPort);
 
+    void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
+
     /**
      * Returns true if there are any tasks in any of _poolInProgressQueue, _networkInProgressQueue,
      * or _sleepersQueue.

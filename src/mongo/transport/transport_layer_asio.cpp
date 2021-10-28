@@ -50,7 +50,9 @@
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/executor_stats.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
@@ -179,7 +181,7 @@ private:
 
 class TransportLayerASIO::ASIOReactor final : public Reactor {
 public:
-    ASIOReactor() : _ioContext() {}
+    ASIOReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
     void run() noexcept override {
         ThreadIdGuard threadIdGuard(this);
@@ -215,11 +217,12 @@ public:
     }
 
     void schedule(Task task) override {
-        asio::post(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+        asio::post(_ioContext, [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
     }
 
     void dispatch(Task task) override {
-        asio::dispatch(_ioContext, [task = std::move(task)] { task(Status::OK()); });
+        asio::dispatch(_ioContext,
+                       [task = _stats.wrapTask(std::move(task))] { task(Status::OK()); });
     }
 
     bool onReactorThread() const override {
@@ -230,7 +233,29 @@ public:
         return _ioContext;
     }
 
+    void appendStats(BSONObjBuilder& bob) const override {
+        _stats.serialize(&bob);
+    }
+
 private:
+    // Provides `ClockSource` API for the reactor's clock source.
+    class ReactorClockSource final : public ClockSource {
+    public:
+        explicit ReactorClockSource(ASIOReactor* reactor) : _reactor(reactor) {}
+        ~ReactorClockSource() = default;
+
+        Milliseconds getPrecision() override {
+            MONGO_UNREACHABLE;
+        }
+
+        Date_t now() override {
+            return _reactor->now();
+        }
+
+    private:
+        ASIOReactor* const _reactor;
+    };
+
     class ThreadIdGuard {
     public:
         ThreadIdGuard(TransportLayerASIO::ASIOReactor* reactor) {
@@ -245,6 +270,10 @@ private:
     };
 
     static thread_local ASIOReactor* _reactorForThread;
+
+    ReactorClockSource _clkSource;
+
+    ExecutorStats _stats;
 
     asio::io_context _ioContext;
 };

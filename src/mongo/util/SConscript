@@ -490,6 +490,26 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='executor_stats',
+    source=[
+        'executor_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='executor_stats_test',
+    source=[
+        'executor_stats_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/executor_stats',
+    ],
+)
 
 env.Benchmark(
     target='decimal_counter_bm',

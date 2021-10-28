@@ -37,6 +37,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -84,9 +85,29 @@ public:
     }
 };
 
+class NetworkInterfaceStatsCollector final : public FTDCCollectorInterface {
+public:
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
+        auto const grid = Grid::get(opCtx);
+        if (auto executorPool = grid->getExecutorPool()) {
+            executorPool->appendNetworkInterfaceStats(builder);
+        }
+
+        if (auto executor = ReplicaSetMonitorManager::get()->getExecutor()) {
+            executor->appendNetworkInterfaceStats(builder);
+        }
+    }
+
+    std::string name() const override {
+        return "networkInterfaceStats";
+    }
+};
+
 void registerMongoSCollectors(FTDCController* controller) {
     // PoolStats
     controller->addPeriodicCollector(std::make_unique<ConnPoolStatsCollector>());
+
+    controller->addPeriodicCollector(std::make_unique<NetworkInterfaceStatsCollector>());
 
     // GetDefaultRWConcern
     controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(

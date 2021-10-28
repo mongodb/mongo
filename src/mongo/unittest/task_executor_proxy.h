@@ -80,6 +80,7 @@ public:
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
+    void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
 
 private:
     // Not owned by us.

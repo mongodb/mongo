@@ -61,6 +61,7 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/util/executor_stats',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[

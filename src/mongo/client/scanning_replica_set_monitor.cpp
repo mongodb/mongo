@@ -175,11 +175,11 @@ ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const SetStatePtr& initialS
     : ReplicaSetMonitor(cleanupCallback), _state(initialState) {}
 
 ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const MongoURI& uri,
+                                                     std::shared_ptr<TaskExecutor> executor,
                                                      std::function<void()> cleanupCallback)
     : ScanningReplicaSetMonitor(
-          std::make_shared<SetState>(uri,
-                                     &ReplicaSetMonitorManager::get()->getNotifier(),
-                                     ReplicaSetMonitorManager::get()->getExecutor().get()),
+          std::make_shared<SetState>(
+              uri, &ReplicaSetMonitorManager::get()->getNotifier(), executor.get()),
           cleanupCallback) {}
 
 void ScanningReplicaSetMonitor::init() {

@@ -138,5 +138,9 @@ void TaskExecutorProxy::appendConnectionStats(executor::ConnectionPoolStats* sta
     _executor.load()->appendConnectionStats(stats);
 }
 
+void TaskExecutorProxy::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {
+    _executor.load()->appendNetworkInterfaceStats(bob);
+}
+
 }  // namespace unittest
 }  // namespace mongo
