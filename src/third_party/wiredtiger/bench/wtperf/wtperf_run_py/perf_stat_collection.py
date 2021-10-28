@@ -57,10 +57,12 @@ class PerfStatCollection:
     def to_value_list(self, brief: bool):
         as_list = []
         for stat in self.perf_stats.values():
-            as_dict = {}
-            as_dict['name'] = stat.output_label
-            as_dict['value'] = stat.get_core_average()
-            if not brief:
-                as_dict['values'] = stat.values
-            as_list.append(as_dict)
+            if not stat.are_values_all_zero():
+                as_dict = {
+                    'name': stat.output_label,
+                    'value': stat.get_core_average()
+                }
+                if not brief:
+                    as_dict['values'] = stat.values
+                as_list.append(as_dict)
         return as_list

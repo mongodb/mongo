@@ -73,3 +73,10 @@ class PerfStat:
             return self.get_skipminmax_average()
         else:
             return self.get_average()
+
+    def are_values_all_zero(self):
+        result = True
+        for value in self.values:
+            if value != 0:
+                result = False
+        return result

@@ -36,6 +36,8 @@ import subprocess
 import sys
 import platform
 import psutil
+from pygit2 import discover_repository, Repository
+from pygit2 import GIT_SORT_TOPOLOGICAL, GIT_SORT_REVERSE, GIT_SORT_NONE
 
 from wtperf_config import WTPerfConfig
 from perf_stat import PerfStat
@@ -62,6 +64,33 @@ def find_stat(test_stat_path: str, pattern: str, position_of_value: int):
     return 0
 
 
+def get_git_info(git_working_tree_dir):
+    repository_path = discover_repository(git_working_tree_dir)
+    assert repository_path is not None
+
+    repo = Repository(repository_path)
+    commits = list(repo.walk(repo.head.target, GIT_SORT_NONE))
+    head_commit = commits[0]
+    diff = repo.diff()
+
+    git_info = {
+        'head_commit': {
+            'hash': head_commit.hex,
+            'message': head_commit.message,
+            'author': head_commit.author.name
+            },
+        'branch': {
+            'name': repo.head.shorthand
+        },
+        'stats': {
+            'files_changed': diff.stats.files_changed,
+        },
+        'num_commits': len(commits)
+    }
+
+    return git_info
+
+
 def construct_wtperf_command_line(wtperf: str, env: str, test: str, home: str):
     command_line = []
     if env is not None:
@@ -77,15 +106,12 @@ def construct_wtperf_command_line(wtperf: str, env: str, test: str, home: str):
 
 
 def brief_perf_stats(config: WTPerfConfig, perf_stats: PerfStatCollection):
-    as_list = []
-    as_list.append(
-        {
-            "info": {
-                "test_name": os.path.basename(config.test)
-            },
-            "metrics": perf_stats.to_value_list(brief=True)
-        }
-    )
+    as_list = [{
+        "info": {
+            "test_name": os.path.basename(config.test)
+        },
+        "metrics": perf_stats.to_value_list(brief=True)
+    }]
     return as_list
 
 
@@ -101,6 +127,10 @@ def detailed_perf_stats(config: WTPerfConfig, perf_stats: PerfStatCollection):
                    'platform': platform.platform()
                 }
             }
+
+    if config.git_root:
+        as_dict['git'] = get_git_info(config.git_root)
+
     return as_dict
 
 
@@ -111,7 +141,6 @@ def run_test(config: WTPerfConfig, test_run: int):
         env=config.environment,
         test=config.test,
         home=test_home)
-    # print('Command Line for test: {}'.format(command_line))
     subprocess.run(command_line)
 
 
@@ -161,13 +190,15 @@ def main():
     parser.add_argument('-e', '--env', help='any environment variables that need to be set for running wtperf')
     parser.add_argument('-t', '--test', help='path of the wtperf test to execute')
     parser.add_argument('-o', '--outfile', help='path of the file to write test output to')
-    parser.add_argument('-b', '--brief_output', action="store_true", help='brief(not detailed) test output')
+    parser.add_argument('-b', '--brief_output', action="store_true", help='brief (not detailed) test output')
     parser.add_argument('-m', '--runmax', type=int, default=1, help='maximum number of times to run the test')
     parser.add_argument('-ho', '--home', help='path of the "home" directory that wtperf will use')
     parser.add_argument('-re',
                         '--reuse',
                         action="store_true",
                         help='reuse and reanalyse results from previous tests rather than running tests again')
+    parser.add_argument('-g', '--git_root', help='path of the Git working directory')
+    parser.add_argument('-i', '--json_info', help='additional test information in a json format string')
     parser.add_argument('-v', '--verbose', action="store_true", help='be verbose')
     args = parser.parse_args()
 
@@ -179,9 +210,12 @@ def main():
         print("  Environment:   {}".format(args.env))
         print("  Test path:     {}".format(args.test))
         print("  Home base:     {}".format(args.home))
+        print("  Git root:      {}".format(args.git_root))
         print("  Outfile:       {}".format(args.outfile))
         print("  Runmax:        {}".format(args.runmax))
+        print("  JSON info      {}".format(args.json_info))
         print("  Reuse results: {}".format(args.reuse))
+        print("  Brief output:  {}".format(args.brief_output))
 
     if args.wtperf is None:
         sys.exit('The path to the wtperf executable is required')
@@ -190,12 +224,16 @@ def main():
     if args.home is None:
         sys.exit('The path to the "home" directory is required')
 
+    json_info = json.loads(args.json_info) if args.json_info else {}
+
     config = WTPerfConfig(wtperf_path=args.wtperf,
                           home_dir=args.home,
                           test=args.test,
                           environment=args.env,
                           run_max=args.runmax,
-                          verbose=args.verbose)
+                          verbose=args.verbose,
+                          git_root=args.git_root,
+                          json_info=json_info)
 
     perf_stats: PerfStatCollection = setup_perf_stats()
 
@@ -207,7 +245,8 @@ def main():
             print("Completed test {}".format(test_run))
 
     if not args.verbose and not args.outfile:
-        sys.exit("Enable verbosity (or provide a file path) to dump the stats. Try 'python3 wtperf_run.py --help' for more information.")
+        sys.exit("Enable verbosity (or provide a file path) to dump the stats. "
+                 "Try 'python3 wtperf_run.py --help' for more information.")
 
     process_results(config, perf_stats)
 
