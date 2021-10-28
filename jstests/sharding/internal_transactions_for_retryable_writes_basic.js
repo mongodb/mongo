@@ -22,7 +22,7 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
 
 function testRetry(
-    cmdObj, lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, checkFunc}) {
+    cmdObj, lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, restart, checkFunc}) {
     const writeCmdObj = Object.assign(cmdObj, {
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
@@ -47,6 +47,11 @@ function testRetry(
     assert.eq(
         oplogEntriesBeforeRetry.length, isPreparedTransaction ? 2 : 1, oplogEntriesBeforeRetry);
 
+    if (restart) {
+        st.rs0.stopSet(null /* signal */, true /*forRestart */);
+        st.rs0.startSet({restart: true});
+    }
+
     const retryRes = mongosTestDB.runCommand(writeCmdObj);
     if (shouldRetrySucceed) {
         assert.commandWorked(retryRes);
@@ -64,7 +69,7 @@ function testRetry(
     assert.commandWorked(mongosTestColl.remove({}));
 }
 
-function testRetryLargeTxn(lsid, txnNumber, {isPreparedTransaction}) {
+function testRetryLargeTxn(lsid, txnNumber, {isPreparedTransaction, restart}) {
     jsTest.log(
         "Test retrying a retryable internal transaction with more than one applyOps oplog entry");
 
@@ -104,6 +109,11 @@ function testRetryLargeTxn(lsid, txnNumber, {isPreparedTransaction}) {
               isPreparedTransaction ? insertCmdObjs.length + 1 : insertCmdObjs.length,
               oplogEntriesBeforeRetry);
 
+    if (restart) {
+        st.rs0.stopSet(null /* signal */, true /*forRestart */);
+        st.rs0.startSet({restart: true});
+    }
+
     insertCmdObjs.forEach(insertCmdObj => {
         const retryRes = assert.commandWorked(mongosTestDB.runCommand(insertCmdObj));
         assert.eq(retryRes.n, 1);
@@ -119,7 +129,7 @@ function testRetryLargeTxn(lsid, txnNumber, {isPreparedTransaction}) {
     assert.commandWorked(mongosTestColl.remove({}));
 }
 
-function testRetryInserts(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction}) {
+function testRetryInserts(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, restart}) {
     jsTest.log("Test batched inserts");
 
     const insertCmdObj = {
@@ -132,11 +142,13 @@ function testRetryInserts(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransa
             assert.eq(mongosTestColl.count(doc), 1);
         });
     };
-    testRetry(
-        insertCmdObj, lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, checkFunc});
+    testRetry(insertCmdObj,
+              lsid,
+              txnNumber,
+              {shouldRetrySucceed, isPreparedTransaction, restart, checkFunc});
 }
 
-function testRetryUpdates(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction}) {
+function testRetryUpdates(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, restart}) {
     jsTest.log("Test batched updates");
 
     assert.commandWorked(mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 1}]));
@@ -156,11 +168,13 @@ function testRetryUpdates(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransa
         });
     };
 
-    testRetry(
-        updateCmdObj, lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, checkFunc});
+    testRetry(updateCmdObj,
+              lsid,
+              txnNumber,
+              {shouldRetrySucceed, isPreparedTransaction, restart, checkFunc});
 }
 
-function testRetryDeletes(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction}) {
+function testRetryDeletes(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, restart}) {
     jsTest.log("Test batched deletes");
 
     assert.commandWorked(mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 1}]));
@@ -176,8 +190,10 @@ function testRetryDeletes(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransa
         });
     };
 
-    testRetry(
-        deleteCmdObj, lsid, txnNumber, {shouldRetrySucceed, isPreparedTransaction, checkFunc});
+    testRetry(deleteCmdObj,
+              lsid,
+              txnNumber,
+              {shouldRetrySucceed, isPreparedTransaction, restart, checkFunc});
 }
 
 {
@@ -207,9 +223,9 @@ function testRetryDeletes(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransa
     const lsid = {id: UUID(), txnNumber: NumberLong(0), txnUUID: UUID()};
     let txnNumber = 0;
 
-    let runTests = ({isPreparedTransaction}) => {
+    let runTests = ({isPreparedTransaction, restart}) => {
         jsTest.log("Test prepared transactions: " + isPreparedTransaction);
-        const testOptions = {shouldRetrySucceed: true, isPreparedTransaction};
+        const testOptions = {shouldRetrySucceed: true, isPreparedTransaction, restart};
         testRetryInserts(lsid, txnNumber++, testOptions);
         testRetryUpdates(lsid, txnNumber++, testOptions);
         testRetryDeletes(lsid, txnNumber++, testOptions);
@@ -218,6 +234,8 @@ function testRetryDeletes(lsid, txnNumber, {shouldRetrySucceed, isPreparedTransa
 
     runTests({isPreparedTransaction: false});
     runTests({isPreparedTransaction: true});
+    runTests({isPreparedTransaction: false, restart: true});
+    runTests({isPreparedTransaction: true, restart: true});
 }
 
 st.stop();

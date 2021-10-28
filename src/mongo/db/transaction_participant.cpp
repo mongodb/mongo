@@ -168,14 +168,35 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
         return result;
     }
 
-    if (result.lastTxnRecord->getState()) {
-        // When state is given, it must be a transaction, so we don't need to traverse the history.
-        return result;
+    if (auto state = result.lastTxnRecord->getState()) {
+        if (!isInternalSessionForRetryableWrite(lsid) || state == DurableTxnStateEnum::kAborted) {
+            // When state is given, it must be a transaction, so we don't need to traverse the
+            // history if it is not a transaction for retryable writes.
+            return result;
+        }
     }
 
     if (!fetchOplogEntries) {
         return result;
     }
+
+    auto insertStmtIdsForOplogEntry = [&](const repl::OplogEntry& entry) {
+        for (auto stmtId : entry.getStatementIds()) {
+            uassert(5875604,
+                    str::stream() << "Found an oplog entry with an invalid stmtId "
+                                  << entry.toBSONForLogging(),
+                    stmtId >= 0);
+            const auto insertRes = result.committedStatements.emplace(stmtId, entry.getOpTime());
+            if (!insertRes.second) {
+                const auto& existingOpTime = insertRes.first->second;
+                fassertOnRepeatedExecution(lsid,
+                                           result.lastTxnRecord->getTxnNum(),
+                                           stmtId,
+                                           existingOpTime,
+                                           entry.getOpTime());
+            }
+        }
+    };
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {
@@ -185,34 +206,46 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
             // Each entry should correspond to a retryable write or a FCV4.0 format transaction.
             // These oplog entries must have statementIds.
             auto stmtIds = entry.getStatementIds();
-            invariant(!stmtIds.empty());
-            if (stmtIds.front() == kIncompleteHistoryStmtId) {
-                // Only the dead end sentinel can have this id for oplog write history
-                invariant(stmtIds.size() == 1);
-                invariant(entry.getObject2());
-                invariant(entry.getObject2()->woCompare(TransactionParticipant::kDeadEndSentinel) ==
-                          0);
-                result.hasIncompleteHistory = true;
-                continue;
-            }
 
-            if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-                !entry.shouldPrepare() && !entry.isPartialTransaction()) {
-                result.lastTxnRecord->setState(DurableTxnStateEnum::kCommitted);
-                return result;
-            }
+            if (isInternalSessionForRetryableWrite(lsid)) {
+                uassert(5875605,
+                        "Found an oplog entry for retryable internal transaction with top-level "
+                        "'stmtId' field",
+                        stmtIds.empty());
 
-            for (auto stmtId : entry.getStatementIds()) {
-                const auto insertRes =
-                    result.committedStatements.emplace(stmtId, entry.getOpTime());
-                if (!insertRes.second) {
-                    const auto& existingOpTime = insertRes.first->second;
-                    fassertOnRepeatedExecution(lsid,
-                                               result.lastTxnRecord->getTxnNum(),
-                                               stmtId,
-                                               existingOpTime,
-                                               entry.getOpTime());
+                if (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {
+                    continue;
+                } else if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+                    validateTransactionHistoryApplyOpsOplogEntry(entry);
+
+                    std::vector<repl::OplogEntry> innerEntries;
+                    repl::ApplyOps::extractOperationsTo(
+                        entry, entry.getEntry().toBSON(), &innerEntries);
+                    for (const auto& innerEntry : innerEntries) {
+                        insertStmtIdsForOplogEntry(innerEntry);
+                    }
+                } else {
+                    MONGO_UNREACHABLE;
                 }
+            } else {
+                invariant(!stmtIds.empty());
+
+                if (stmtIds.front() == kIncompleteHistoryStmtId) {
+                    // Only the dead end sentinel can have this id for oplog write history
+                    invariant(stmtIds.size() == 1);
+                    invariant(entry.getObject2());
+                    invariant(entry.getObject2()->woCompare(
+                                  TransactionParticipant::kDeadEndSentinel) == 0);
+                    result.hasIncompleteHistory = true;
+                    continue;
+                }
+
+                if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
+                    !entry.shouldPrepare() && !entry.isPartialTransaction()) {
+                    result.lastTxnRecord->setState(DurableTxnStateEnum::kCommitted);
+                    return result;
+                }
+                insertStmtIdsForOplogEntry(entry);
             }
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
