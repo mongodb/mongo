@@ -616,20 +616,6 @@ TEST_F(ReplicationRecoveryTest,
     testRecoveryToStableAppliesDocumentsWithNoAppliedThrough(false);
 }
 
-DEATH_TEST_F(ReplicationRecoveryTest,
-             RecoveryFailsWithUnmatchedAppliedThrough,
-             "Invariant failure") {
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    auto opCtx = getOperationContext();
-
-    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
-
-    auto appliedThroughTS = Timestamp(4, 4);
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(appliedThroughTS, 1));
-    getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
-    recovery.recoverFromOplog(opCtx, boost::none);
-}
-
 TEST_F(ReplicationRecoveryTest, RecoveryIgnoresDroppedCollections) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
@@ -752,19 +738,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryDoesNotApplyOperationsIfAppliedThroughIs
     // In 4.0 with RTT, recovering without a `recoverTimestamp` will set `appliedThrough` to the
     // top of oplog.
     ASSERT_EQ(OpTime(Timestamp(5, 5), 1), getConsistencyMarkers()->getAppliedThrough(opCtx));
-}
-
-DEATH_TEST_F(ReplicationRecoveryTest,
-             RecoveryInvariantsWithUnequalStableTimestampAndAppliedThrough,
-             "Invariant failure") {
-    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
-    auto opCtx = getOperationContext();
-
-    _setUpOplog(opCtx, getStorageInterface(), {5});
-
-    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(3, 3), 1));
-
-    recovery.recoverFromOplog(opCtx, Timestamp(4, 4));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
