@@ -403,7 +403,7 @@ public:
             BSONColumn col(columnElement);
 
             for (size_t i = 0; i < expected.size(); ++i) {
-                ASSERT(expected[i].binaryEqualValues(col[i]));
+                ASSERT(expected[i].binaryEqualValues(*col[i]));
             }
         }
 
@@ -412,7 +412,7 @@ public:
             BSONColumn col(columnElement);
 
             for (int i = (int)expected.size() - 1; i >= 0; --i) {
-                ASSERT(expected[i].binaryEqualValues(col[i]));
+                ASSERT(expected[i].binaryEqualValues(*col[i]));
             }
         }
 
@@ -3208,6 +3208,35 @@ TEST_F(BSONColumnTest, NoLiteralStart) {
     BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
     for (auto it = col.begin(), e = col.end(); it != e; ++it) {
     }
+}
+
+TEST_F(BSONColumnTest, InvalidInterleavedCount) {
+    // This test sets up an interleaved reference object with two fields but only provides one
+    // interleaved substream.
+    BufBuilder expected;
+    appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+    ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
+}
+
+TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
+    // This tests that we handle the interleaved start byte when already in interleaved mode.
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendInterleavedStart(expected, BSON("a" << 1 << "b" << 1));
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+    ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
 }
 
 TEST_F(BSONColumnTest, AppendMinKey) {

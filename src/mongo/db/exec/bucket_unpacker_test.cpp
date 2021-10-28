@@ -30,6 +30,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/timeseries/bucket_compression.h"
@@ -124,6 +126,43 @@ public:
                     int count = controlElem.Number();
                     controlBuilder.append("count"_sd, count + delta);
                 }
+            }
+        }
+        return root.obj();
+    }
+
+    // Modifies the 'data.<fieldName>' field for a v2 compressed bucket. Rebuilds the compressed
+    // column with the last element removed.
+    BSONObj modifyCompressedBucketRemoveLastInField(BSONObj compressedBucket,
+                                                    StringData fieldName) {
+        BSONObjBuilder root;
+        for (auto&& elem : compressedBucket) {
+            if (elem.fieldNameStringData() != "data"_sd) {
+                root.append(elem);
+                continue;
+            }
+
+            BSONObjBuilder dataBuilder(root.subobjStart("data"_sd));
+            for (auto&& dataElem : elem.Obj()) {
+                if (dataElem.fieldNameStringData() != fieldName) {
+                    dataBuilder.append(dataElem);
+                    continue;
+                }
+
+                BSONColumn col(dataElem);
+                int num = col.size() - 1;
+                ASSERT(num >= 0);
+
+                BSONColumnBuilder builder(fieldName);
+                for (int i = 0; i < num; ++i) {
+                    auto elem = *col[i];
+                    if (!elem.eoo())
+                        builder.append(elem);
+                    else
+                        builder.skip();
+                }
+
+                dataBuilder.append(fieldName, builder.finalize());
             }
         }
         return root.obj();
@@ -853,6 +892,73 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMissing) {
 
     ASSERT_TRUE(unpacker.hasNext());
     assertGetNext(unpacker, doc1);
+    ASSERT_FALSE(unpacker.hasNext());
+}
+
+TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchDataField) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
+        "time: {'0':1, '1':2}, "
+        "a:{'0':1, '1':2}, b:{'1':1}}}");
+
+    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    // Remove an element in the "a" field.
+    auto modifiedCompressedBucket =
+        modifyCompressedBucketRemoveLastInField(*compressedBucket, "a"_sd);
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(modifiedCompressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
+    // We will now uassert when trying to get the tampered document
+    ASSERT_THROWS_CODE(unpacker.extractSingleMeasurement(1), AssertionException, 6067600);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc0);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    // We will now uassert when trying to get the tampered document
+    ASSERT_THROWS_CODE(unpacker.getNext(), AssertionException, 6067601);
+}
+
+TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchTimeField) {
+    std::set<std::string> fields{
+        "_id", kUserDefinedMetaName.toString(), kUserDefinedTimeName.toString(), "a", "b"};
+
+    auto bucket = fromjson(
+        "{control: {'version': 1}, meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, "
+        "time: {'0':1, '1':2}, "
+        "a:{'0':1, '1':2}, b:{'1':1}}}");
+
+    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    // Remove an element in the time field
+    auto modifiedCompressedBucket =
+        modifyCompressedBucketRemoveLastInField(*compressedBucket, "time"_sd);
+
+    auto unpacker = makeBucketUnpacker(std::move(fields),
+                                       BucketUnpacker::Behavior::kInclude,
+                                       std::move(modifiedCompressedBucket),
+                                       kUserDefinedMetaName.toString());
+
+    auto doc0 = Document{fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")};
+
+    ASSERT_EQ(unpacker.numberOfMeasurements(), 2);
+    ASSERT_DOCUMENT_EQ(unpacker.extractSingleMeasurement(0), doc0);
+    // We will now uassert when trying to get the tampered document
+    ASSERT_THROWS_CODE(unpacker.extractSingleMeasurement(1), AssertionException, 6067500);
+
+    ASSERT_TRUE(unpacker.hasNext());
+    assertGetNext(unpacker, doc0);
+
+    // When time is modified it will look like there is no more elements when iterating
     ASSERT_FALSE(unpacker.hasNext());
 }
 

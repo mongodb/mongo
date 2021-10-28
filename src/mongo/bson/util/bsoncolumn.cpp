@@ -352,7 +352,7 @@ void BSONColumn::Iterator::_incrementRegular() {
 
     // We don't have any more delta values in current block so we need to load next control byte.
     // Validate that we are not reading out of bounds
-    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", _control < _end);
+    uassert(6067602, "Invalid BSON Column encoding", _control < _end);
 
     // Decoders are exhausted, load next control byte. If we are at EOO then decoding is done.
     if (*_control == EOO) {
@@ -408,9 +408,7 @@ void BSONColumn::Iterator::_incrementInterleaved() {
         [this, &stateIt, &stateEnd](const BSONElement& referenceField) {
             // Called for every scalar field in the reference interleaved BSONObj. We have as many
             // decoding states as scalars.
-            uassert(ErrorCodes::BadValue,
-                    "Invalid BSON Column interleaved encoding",
-                    stateIt != stateEnd);
+            uassert(6067603, "Invalid BSON Column interleaved encoding", stateIt != stateEnd);
             auto& state = *(stateIt++);
 
             // Remember the iterator position before writing anything. This is to detect that
@@ -473,6 +471,9 @@ void BSONColumn::Iterator::_incrementInterleaved() {
         _interleaved = false;
         _states.clear();
         _states.resize(1);
+        uassert(6067604,
+                "Invalid BSON Column interleaved encoding",
+                _index > 0 && _index - 1 < _column->_decompressed.size());
         _states.front()._lastValue = _column->_decompressed[_index - 1];
 
         _incrementRegular();
@@ -480,7 +481,7 @@ void BSONColumn::Iterator::_incrementInterleaved() {
     }
 
     // There should have been as many interleaved states as scalar fields.
-    uassert(ErrorCodes::BadValue, "Invalid BSON Column interleaved encoding", stateIt == stateEnd);
+    uassert(6067605, "Invalid BSON Column interleaved encoding", stateIt == stateEnd);
 
     // If this element has been decompressed in a previous iteration we don't need to store it in
     // our decompressed list.
@@ -576,22 +577,20 @@ BSONColumn::Iterator::DecodingState::_loadControl(BSONColumn& column,
 
     // Simple-8b delta block, load its scale factor and validate for sanity
     _scaleIndex = kControlToScaleIndex[(control & 0xF0) >> 4];
-    uassert(ErrorCodes::BadValue,
-            "Invalid control byte in BSON Column",
-            _scaleIndex != kInvalidScaleIndex);
+    uassert(6067606, "Invalid control byte in BSON Column", _scaleIndex != kInvalidScaleIndex);
 
     // If Double, scale last value according to this scale factor
     auto type = _lastValue.type();
     if (type == NumberDouble) {
         auto encoded = Simple8bTypeUtil::encodeDouble(_lastValue._numberDouble(), _scaleIndex);
-        uassert(ErrorCodes::BadValue, "Invalid double encoding in BSON Column", encoded);
+        uassert(6067607, "Invalid double encoding in BSON Column", encoded);
         _lastEncodedValue64 = *encoded;
     }
 
     // Setup decoder for this range of Simple-8b blocks
     uint8_t blocks = _numSimple8bBlocks(control);
     int size = sizeof(uint64_t) * blocks;
-    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", buffer + size + 1 < end);
+    uassert(6067608, "Invalid BSON Column encoding", buffer + size + 1 < end);
 
     // Instantiate decoder and load first value, every Simple-8b block should have at least one
     // value
@@ -757,7 +756,7 @@ BSONColumn::BSONColumn(BSONElement bin) {
             "Invalid BSON type for column",
             bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
     _binary = bin.binData(_size);
-    uassert(ErrorCodes::BadValue, "Invalid BSON Column encoding", _size > 0);
+    uassert(6067609, "Invalid BSON Column encoding", _size > 0);
     _elementCount = ConstDataView(_binary).read<LittleEndian<uint32_t>>();
     _maxDecodingStartPos._control = _binary;
     _name = bin.fieldNameStringData().toString();
@@ -775,7 +774,7 @@ BSONColumn::Iterator BSONColumn::end() {
     return it;
 }
 
-BSONElement BSONColumn::operator[](size_t index) {
+boost::optional<const BSONElement&> BSONColumn::operator[](size_t index) {
     // If index is already decompressed, we can just return the element
     if (index < _decompressed.size()) {
         return _decompressed[index];
@@ -783,7 +782,7 @@ BSONElement BSONColumn::operator[](size_t index) {
 
     // No more elements to be found if we are fully decompressed, return EOO
     if (_fullyDecompressed)
-        return BSONElement();
+        return boost::none;
 
     // We can begin iterating from last known literal
     Iterator it{*this, _maxDecodingStartPos._control, _binary + _size};
@@ -796,7 +795,7 @@ BSONElement BSONColumn::operator[](size_t index) {
 
     // Return EOO if not found
     if (it == e)
-        return BSONElement();
+        return boost::none;
 
     return *it;
 }

@@ -217,7 +217,7 @@ public:
      * Iterators materialize compressed BSONElement as they iterate over the compressed binary.
      * It is NOT safe to do this from multiple threads concurrently.
      *
-     * Throws BadValue if invalid encoding is encountered.
+     * Throws if invalid encoding is encountered.
      */
     Iterator begin();
     Iterator end();
@@ -225,22 +225,26 @@ public:
     /**
      * Element lookup by index
      *
-     * Returns EOO if index represent skipped element or is out of bounds.
+     * Returns EOO if index represent skipped element.
+     * Returns boost::none if index is out of bounds.
+     *
      * O(1) time complexity if element has been previously accessed
      * O(N) time complexity otherwise
      *
      * Materializes compressed BSONElement as needed. It is NOT safe to do this from multiple
      * threads concurrently.
      *
-     * Throws BadValue if invalid encoding is encountered.
+     * Throws if invalid encoding is encountered.
      */
-    BSONElement operator[](size_t index);
+    boost::optional<const BSONElement&> operator[](size_t index);
 
     /**
      * Number of elements stored in this BSONColumn
      *
      * O(1) time complexity if BSONColumn is fully decompressed (iteration reached end).
      * O(N) time complexity otherwise, will fully decompress BSONColumn.
+     *
+     * * Throws if invalid encoding is encountered.
      */
     size_t size();
 

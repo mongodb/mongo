@@ -277,6 +277,9 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
     }
 
     for (auto& fieldColumn : _fieldColumns) {
+        uassert(6067601,
+                "Bucket unexpectedly contained fewer values than count",
+                fieldColumn.it != fieldColumn.column.end());
         const BSONElement& elem = *(fieldColumn.it++);
         // EOO represents missing field
         if (!elem.eoo()) {
@@ -296,9 +299,10 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
                                                 bool includeTimeField,
                                                 bool includeMetaField) {
     if (includeTimeField) {
-        BSONElement val = _timeColumn.column[j];
-        uassert(6067500, "Bucket unexpectedly contained fewer values than count", !val.eoo());
-        measurement.addField(_timeColumn.column.name(), Value{val});
+        auto val = _timeColumn.column[j];
+        uassert(
+            6067500, "Bucket unexpectedly contained fewer values than count", val && !val->eoo());
+        measurement.addField(_timeColumn.column.name(), Value{*val});
     }
 
     if (includeMetaField && !metaValue.isNull()) {
@@ -307,7 +311,9 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
 
     if (includeTimeField) {
         for (auto& fieldColumn : _fieldColumns) {
-            measurement.addField(fieldColumn.column.name(), Value{fieldColumn.column[j]});
+            auto val = fieldColumn.column[j];
+            uassert(6067600, "Bucket unexpectedly contained fewer values than count", val);
+            measurement.addField(fieldColumn.column.name(), Value{*val});
         }
     }
 }
