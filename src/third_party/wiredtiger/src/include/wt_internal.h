@@ -69,6 +69,14 @@ struct __wt_addr;
 typedef struct __wt_addr WT_ADDR;
 struct __wt_addr_copy;
 typedef struct __wt_addr_copy WT_ADDR_COPY;
+struct __wt_blkcache;
+typedef struct __wt_blkcache WT_BLKCACHE;
+struct __wt_blkcache_bucket_metadata;
+typedef struct __wt_blkcache_bucket_metadata WT_BLKCACHE_BUCKET_METADATA;
+struct __wt_blkcache_id;
+typedef struct __wt_blkcache_id WT_BLKCACHE_ID;
+struct __wt_blkcache_item;
+typedef struct __wt_blkcache_item WT_BLKCACHE_ITEM;
 struct __wt_blkincr;
 typedef struct __wt_blkincr WT_BLKINCR;
 struct __wt_block;
@@ -403,6 +411,7 @@ typedef uint64_t wt_timestamp_t;
 
 #include "api.h"
 #include "block.h"
+#include "block_cache.h"
 #include "bloom.h"
 #include "btmem.h"
 #include "btree.h"

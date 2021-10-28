@@ -1,0 +1,26 @@
+# wtperf options file: simulate MongoDB.
+# The configuration for the connection and table are from mongoDB.
+# We use multiple tables to simulate collections and indexes.
+# This test assumes that its correlating populate already completed and exists.
+#
+# Set cache to half of memory.  This value is computed from the AWS instance
+# where Jenkins perf runs which has 32G.  Enable logging and checkpoints. 
+# Collect wiredtiger stats for ftdc.
+#
+# This generates about 80 Gb of uncompressed data.  But it should compress
+# well and be small on disk.
+conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,log=(enabled),eviction=(threads_max=8)"
+compact=true
+compression="snappy"
+sess_config="isolation=snapshot"
+table_config="internal_page_max=16K,type=file,leaf_page_max=16K,memory_page_max=10M,split_pct=90"
+table_count=2
+icount=4000000000
+key_sz=40
+value_sz=120
+max_latency=2000
+populate_threads=20
+report_interval=10
+random_value=true
+sample_interval=10
+sample_rate=1

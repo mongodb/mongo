@@ -147,6 +147,13 @@ static const char *const __stats_dsrc_desc[] = {
   "compression: compressed page maximum leaf page size prior to compression ",
   "compression: compressed pages read",
   "compression: compressed pages written",
+  "compression: number of blocks with compress ratio greater than 64",
+  "compression: number of blocks with compress ratio smaller than 16",
+  "compression: number of blocks with compress ratio smaller than 2",
+  "compression: number of blocks with compress ratio smaller than 32",
+  "compression: number of blocks with compress ratio smaller than 4",
+  "compression: number of blocks with compress ratio smaller than 64",
+  "compression: number of blocks with compress ratio smaller than 8",
   "compression: page written failed to compress",
   "compression: page written was too small to compress",
   "cursor: Total number of entries skipped by cursor next calls",
@@ -414,6 +421,13 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     /* not clearing compress_precomp_leaf_max_page_size */
     stats->compress_read = 0;
     stats->compress_write = 0;
+    stats->compress_hist_ratio_max = 0;
+    stats->compress_hist_ratio_16 = 0;
+    stats->compress_hist_ratio_2 = 0;
+    stats->compress_hist_ratio_32 = 0;
+    stats->compress_hist_ratio_4 = 0;
+    stats->compress_hist_ratio_64 = 0;
+    stats->compress_hist_ratio_8 = 0;
     stats->compress_write_fail = 0;
     stats->compress_write_too_small = 0;
     stats->cursor_next_skip_total = 0;
@@ -670,6 +684,13 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->compress_precomp_leaf_max_page_size += from->compress_precomp_leaf_max_page_size;
     to->compress_read += from->compress_read;
     to->compress_write += from->compress_write;
+    to->compress_hist_ratio_max += from->compress_hist_ratio_max;
+    to->compress_hist_ratio_16 += from->compress_hist_ratio_16;
+    to->compress_hist_ratio_2 += from->compress_hist_ratio_2;
+    to->compress_hist_ratio_32 += from->compress_hist_ratio_32;
+    to->compress_hist_ratio_4 += from->compress_hist_ratio_4;
+    to->compress_hist_ratio_64 += from->compress_hist_ratio_64;
+    to->compress_hist_ratio_8 += from->compress_hist_ratio_8;
     to->compress_write_fail += from->compress_write_fail;
     to->compress_write_too_small += from->compress_write_too_small;
     to->cursor_next_skip_total += from->cursor_next_skip_total;
@@ -930,6 +951,13 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_READ(from, compress_precomp_leaf_max_page_size);
     to->compress_read += WT_STAT_READ(from, compress_read);
     to->compress_write += WT_STAT_READ(from, compress_write);
+    to->compress_hist_ratio_max += WT_STAT_READ(from, compress_hist_ratio_max);
+    to->compress_hist_ratio_16 += WT_STAT_READ(from, compress_hist_ratio_16);
+    to->compress_hist_ratio_2 += WT_STAT_READ(from, compress_hist_ratio_2);
+    to->compress_hist_ratio_32 += WT_STAT_READ(from, compress_hist_ratio_32);
+    to->compress_hist_ratio_4 += WT_STAT_READ(from, compress_hist_ratio_4);
+    to->compress_hist_ratio_64 += WT_STAT_READ(from, compress_hist_ratio_64);
+    to->compress_hist_ratio_8 += WT_STAT_READ(from, compress_hist_ratio_8);
     to->compress_write_fail += WT_STAT_READ(from, compress_write_fail);
     to->compress_write_too_small += WT_STAT_READ(from, compress_write_too_small);
     to->cursor_next_skip_total += WT_STAT_READ(from, cursor_next_skip_total);
@@ -1041,6 +1069,27 @@ static const char *const __stats_connection_desc[] = {
   "LSM: tree maintenance operations executed",
   "LSM: tree maintenance operations scheduled",
   "LSM: tree queue hit maximum",
+  "block-manager: block cache cached blocks updated",
+  "block-manager: block cache cached bytes updated",
+  "block-manager: block cache evicted blocks",
+  "block-manager: block cache file size causing bypass",
+  "block-manager: block cache lookups",
+  "block-manager: block cache number of blocks not evicted due to overhead",
+  "block-manager: block cache number of bypasses because no-write-allocate setting was on",
+  "block-manager: block cache number of bypasses due to overhead on put",
+  "block-manager: block cache number of bypasses on get",
+  "block-manager: block cache number of bypasses on put because file is too small",
+  "block-manager: block cache number of eviction passes",
+  "block-manager: block cache number of hits including existence checks",
+  "block-manager: block cache number of misses including existence checks",
+  "block-manager: block cache number of put bypasses on checkpoint I/O",
+  "block-manager: block cache removed blocks",
+  "block-manager: block cache total blocks",
+  "block-manager: block cache total blocks inserted on read path",
+  "block-manager: block cache total blocks inserted on write path",
+  "block-manager: block cache total bytes",
+  "block-manager: block cache total bytes inserted on read path",
+  "block-manager: block cache total bytes inserted on write path",
   "block-manager: blocks pre-loaded",
   "block-manager: blocks read",
   "block-manager: blocks written",
@@ -1595,6 +1644,27 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lsm_work_units_done = 0;
     stats->lsm_work_units_created = 0;
     stats->lsm_work_queue_max = 0;
+    stats->block_cache_blocks_update = 0;
+    stats->block_cache_bytes_update = 0;
+    stats->block_cache_blocks_evicted = 0;
+    stats->block_cache_bypass_filesize = 0;
+    stats->block_cache_data_refs = 0;
+    stats->block_cache_not_evicted_overhead = 0;
+    stats->block_cache_bypass_writealloc = 0;
+    stats->block_cache_bypass_overhead_put = 0;
+    stats->block_cache_bypass_get = 0;
+    stats->block_cache_bypass_put = 0;
+    stats->block_cache_eviction_passes = 0;
+    stats->block_cache_hits = 0;
+    stats->block_cache_misses = 0;
+    stats->block_cache_bypass_chkpt = 0;
+    stats->block_cache_blocks_removed = 0;
+    stats->block_cache_blocks = 0;
+    stats->block_cache_blocks_insert_read = 0;
+    stats->block_cache_blocks_insert_write = 0;
+    stats->block_cache_bytes = 0;
+    stats->block_cache_bytes_insert_read = 0;
+    stats->block_cache_bytes_insert_write = 0;
     stats->block_preload = 0;
     stats->block_read = 0;
     stats->block_write = 0;
@@ -2108,6 +2178,27 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lsm_work_units_done += WT_STAT_READ(from, lsm_work_units_done);
     to->lsm_work_units_created += WT_STAT_READ(from, lsm_work_units_created);
     to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
+    to->block_cache_blocks_update += WT_STAT_READ(from, block_cache_blocks_update);
+    to->block_cache_bytes_update += WT_STAT_READ(from, block_cache_bytes_update);
+    to->block_cache_blocks_evicted += WT_STAT_READ(from, block_cache_blocks_evicted);
+    to->block_cache_bypass_filesize += WT_STAT_READ(from, block_cache_bypass_filesize);
+    to->block_cache_data_refs += WT_STAT_READ(from, block_cache_data_refs);
+    to->block_cache_not_evicted_overhead += WT_STAT_READ(from, block_cache_not_evicted_overhead);
+    to->block_cache_bypass_writealloc += WT_STAT_READ(from, block_cache_bypass_writealloc);
+    to->block_cache_bypass_overhead_put += WT_STAT_READ(from, block_cache_bypass_overhead_put);
+    to->block_cache_bypass_get += WT_STAT_READ(from, block_cache_bypass_get);
+    to->block_cache_bypass_put += WT_STAT_READ(from, block_cache_bypass_put);
+    to->block_cache_eviction_passes += WT_STAT_READ(from, block_cache_eviction_passes);
+    to->block_cache_hits += WT_STAT_READ(from, block_cache_hits);
+    to->block_cache_misses += WT_STAT_READ(from, block_cache_misses);
+    to->block_cache_bypass_chkpt += WT_STAT_READ(from, block_cache_bypass_chkpt);
+    to->block_cache_blocks_removed += WT_STAT_READ(from, block_cache_blocks_removed);
+    to->block_cache_blocks += WT_STAT_READ(from, block_cache_blocks);
+    to->block_cache_blocks_insert_read += WT_STAT_READ(from, block_cache_blocks_insert_read);
+    to->block_cache_blocks_insert_write += WT_STAT_READ(from, block_cache_blocks_insert_write);
+    to->block_cache_bytes += WT_STAT_READ(from, block_cache_bytes);
+    to->block_cache_bytes_insert_read += WT_STAT_READ(from, block_cache_bytes_insert_read);
+    to->block_cache_bytes_insert_write += WT_STAT_READ(from, block_cache_bytes_insert_write);
     to->block_preload += WT_STAT_READ(from, block_preload);
     to->block_read += WT_STAT_READ(from, block_read);
     to->block_write += WT_STAT_READ(from, block_write);

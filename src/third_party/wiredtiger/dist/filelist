@@ -2,6 +2,7 @@
 #	List of source files for WiredTiger library.
 
 src/block/block_addr.c
+src/block/block_cache.c
 src/block/block_ckpt.c
 src/block/block_ckpt_scan.c
 src/block/block_compact.c
@@ -201,6 +202,7 @@ src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c
+src/support/float.c
 src/support/lock_ext.c
 src/support/modify.c
 src/support/mtx_rw.c
