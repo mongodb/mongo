@@ -127,19 +127,19 @@ Mutex WiredTigerUtil::_tableLoggingInfoMutex =
     MONGO_MAKE_LATCH("WiredTigerUtil::_tableLoggingInfoMutex");
 WiredTigerUtil::TableLoggingInfo WiredTigerUtil::_tableLoggingInfo;
 
-Status wtRCToStatus_slow(int retCode, const char* prefix) {
+Status wtRCToStatus_slow(int retCode, StringData prefix) {
     if (retCode == 0)
         return Status::OK();
 
     if (retCode == WT_ROLLBACK) {
-        throw WriteConflictException();
+        throw WriteConflictException(prefix);
     }
 
     // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
     fassert(28559, retCode != WT_PANIC || storageGlobalParams.repair);
 
     str::stream s;
-    if (prefix)
+    if (!prefix.empty())
         s << prefix << " ";
     s << retCode << ": " << wiredtiger_strerror(retCode);
 

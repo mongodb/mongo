@@ -46,7 +46,7 @@ class WiredTigerConfigParser;
 class WiredTigerKVEngine;
 class WiredTigerSession;
 
-Status wtRCToStatus_slow(int retCode, const char* prefix);
+Status wtRCToStatus_slow(int retCode, StringData prefix);
 
 /**
  * converts wiredtiger return codes to mongodb statuses.
@@ -56,6 +56,14 @@ inline Status wtRCToStatus(int retCode, const char* prefix = nullptr) {
         return Status::OK();
 
     return wtRCToStatus_slow(retCode, prefix);
+}
+
+template <typename ContextExpr>
+Status wtRCToStatus(int retCode, ContextExpr&& contextExpr) {
+    if (MONGO_likely(retCode == 0))
+        return Status::OK();
+
+    return wtRCToStatus_slow(retCode, std::forward<ContextExpr>(contextExpr)());
 }
 
 #define MONGO_invariantWTOK_1(expression)                                               \
