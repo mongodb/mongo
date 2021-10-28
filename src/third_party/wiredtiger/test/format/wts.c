@@ -175,6 +175,51 @@ static WT_EVENT_HANDLER event_handler = {
     } while (0)
 
 /*
+ * configure_timing_stress --
+ *     Configure stressing settings.
+ */
+static void
+configure_timing_stress(char *p, size_t max)
+{
+    CONFIG_APPEND(p, ",timing_stress_for_test=[");
+    if (g.c_timing_stress_aggressive_sweep)
+        CONFIG_APPEND(p, ",aggressive_sweep");
+    if (g.c_timing_stress_checkpoint)
+        CONFIG_APPEND(p, ",checkpoint_slow");
+    if (g.c_timing_stress_checkpoint_prepare)
+        CONFIG_APPEND(p, ",prepare_checkpoint_delay");
+    if (g.c_timing_stress_checkpoint_reserved_txnid_delay)
+        CONFIG_APPEND(p, ",checkpoint_reserved_txnid_delay");
+    if (g.c_timing_stress_failpoint_hs_delete_key_from_ts)
+        CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
+    if (g.c_timing_stress_failpoint_hs_insert_1)
+        CONFIG_APPEND(p, ",failpoint_history_store_insert_1");
+    if (g.c_timing_stress_failpoint_hs_insert_2)
+        CONFIG_APPEND(p, ",failpoint_history_store_insert_2");
+    if (g.c_timing_stress_hs_checkpoint_delay)
+        CONFIG_APPEND(p, ",history_store_checkpoint_delay");
+    if (g.c_timing_stress_hs_search)
+        CONFIG_APPEND(p, ",history_store_search");
+    if (g.c_timing_stress_hs_sweep)
+        CONFIG_APPEND(p, ",history_store_sweep_race");
+    if (g.c_timing_stress_split_1)
+        CONFIG_APPEND(p, ",split_1");
+    if (g.c_timing_stress_split_2)
+        CONFIG_APPEND(p, ",split_2");
+    if (g.c_timing_stress_split_3)
+        CONFIG_APPEND(p, ",split_3");
+    if (g.c_timing_stress_split_4)
+        CONFIG_APPEND(p, ",split_4");
+    if (g.c_timing_stress_split_5)
+        CONFIG_APPEND(p, ",split_5");
+    if (g.c_timing_stress_split_6)
+        CONFIG_APPEND(p, ",split_6");
+    if (g.c_timing_stress_split_7)
+        CONFIG_APPEND(p, ",split_7");
+    CONFIG_APPEND(p, "]");
+}
+
+/*
  * create_database --
  *     Create a WiredTiger database.
  */
@@ -266,43 +311,8 @@ create_database(const char *home, WT_CONNECTION **connp)
     } else
         CONFIG_APPEND(p, ",statistics=(%s)", g.c_statistics ? "fast" : "none");
 
-    /* Optionally stress operations. */
-    CONFIG_APPEND(p, ",timing_stress_for_test=[");
-    if (g.c_timing_stress_aggressive_sweep)
-        CONFIG_APPEND(p, ",aggressive_sweep");
-    if (g.c_timing_stress_checkpoint)
-        CONFIG_APPEND(p, ",checkpoint_slow");
-    if (g.c_timing_stress_checkpoint_prepare)
-        CONFIG_APPEND(p, ",prepare_checkpoint_delay");
-    if (g.c_timing_stress_checkpoint_reserved_txnid_delay)
-        CONFIG_APPEND(p, ",checkpoint_reserved_txnid_delay");
-    if (g.c_timing_stress_failpoint_hs_delete_key_from_ts)
-        CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
-    if (g.c_timing_stress_failpoint_hs_insert_1)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_1");
-    if (g.c_timing_stress_failpoint_hs_insert_2)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_2");
-    if (g.c_timing_stress_hs_checkpoint_delay)
-        CONFIG_APPEND(p, ",history_store_checkpoint_delay");
-    if (g.c_timing_stress_hs_search)
-        CONFIG_APPEND(p, ",history_store_search");
-    if (g.c_timing_stress_hs_sweep)
-        CONFIG_APPEND(p, ",history_store_sweep_race");
-    if (g.c_timing_stress_split_1)
-        CONFIG_APPEND(p, ",split_1");
-    if (g.c_timing_stress_split_2)
-        CONFIG_APPEND(p, ",split_2");
-    if (g.c_timing_stress_split_3)
-        CONFIG_APPEND(p, ",split_3");
-    if (g.c_timing_stress_split_4)
-        CONFIG_APPEND(p, ",split_4");
-    if (g.c_timing_stress_split_5)
-        CONFIG_APPEND(p, ",split_5");
-    if (g.c_timing_stress_split_6)
-        CONFIG_APPEND(p, ",split_6");
-    if (g.c_timing_stress_split_7)
-        CONFIG_APPEND(p, ",split_7");
-    CONFIG_APPEND(p, "]");
+    /* Optional timing stress. */
+    configure_timing_stress(p, max);
 
     /* Extensions. */
     CONFIG_APPEND(p, ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
@@ -490,48 +500,15 @@ wts_open(const char *home, WT_CONNECTION **connp, WT_SESSION **sessionp, bool al
     max = sizeof(config);
     config[0] = '\0';
 
+    /* Configuration settings that are not persistent between open calls. */
     enc = encryptor_at_open(g.c_encryption_flag);
     if (enc != NULL)
         CONFIG_APPEND(p, ",encryption=(name=%s)", enc);
 
-    /*
-     * Timing stress options aren't persisted in the base config and need to be added to the
-     * configuration for re-open.
-     */
-    CONFIG_APPEND(p, ",timing_stress_for_test=[");
-    if (g.c_timing_stress_aggressive_sweep)
-        CONFIG_APPEND(p, ",aggressive_sweep");
-    if (g.c_timing_stress_checkpoint)
-        CONFIG_APPEND(p, ",checkpoint_slow");
-    if (g.c_timing_stress_checkpoint_prepare)
-        CONFIG_APPEND(p, ",prepare_checkpoint_delay");
-    if (g.c_timing_stress_failpoint_hs_delete_key_from_ts)
-        CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
-    if (g.c_timing_stress_failpoint_hs_insert_1)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_1");
-    if (g.c_timing_stress_failpoint_hs_insert_2)
-        CONFIG_APPEND(p, ",failpoint_history_store_insert_2");
-    if (g.c_timing_stress_hs_checkpoint_delay)
-        CONFIG_APPEND(p, ",history_store_checkpoint_delay");
-    if (g.c_timing_stress_hs_search)
-        CONFIG_APPEND(p, ",history_store_search");
-    if (g.c_timing_stress_hs_sweep)
-        CONFIG_APPEND(p, ",history_store_sweep_race");
-    if (g.c_timing_stress_split_1)
-        CONFIG_APPEND(p, ",split_1");
-    if (g.c_timing_stress_split_2)
-        CONFIG_APPEND(p, ",split_2");
-    if (g.c_timing_stress_split_3)
-        CONFIG_APPEND(p, ",split_3");
-    if (g.c_timing_stress_split_4)
-        CONFIG_APPEND(p, ",split_4");
-    if (g.c_timing_stress_split_5)
-        CONFIG_APPEND(p, ",split_5");
-    if (g.c_timing_stress_split_6)
-        CONFIG_APPEND(p, ",split_6");
-    if (g.c_timing_stress_split_7)
-        CONFIG_APPEND(p, ",split_7");
-    CONFIG_APPEND(p, "]");
+    CONFIG_APPEND(p, "error_prefix=\"%s\"", progname);
+
+    /* Optional timing stress. */
+    configure_timing_stress(p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (g.c_in_memory != 0)
