@@ -473,6 +473,19 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'true'}
+  - name: query_read_commands_large_dataset
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: query_large_dataset,
+             include_filter_2: regression,
+             exclude_filter: none,
+             threads: "1 4",
+             read_cmd: 'true',
+             share_dataset: 'true'}
   - name: big_collection
     depends_on: *_compile
     commands:
@@ -682,6 +695,19 @@ tasks:
              exclude_filter: js,
              threads: "1",
              read_cmd: 'true'}
+  - name: aggregation_read_commands_large_dataset
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: aggregation_large_dataset,
+             include_filter_2: regression,
+             exclude_filter: js,
+             threads: "1 4",
+             read_cmd: 'true',
+             share_dataset: 'true'}
   - name: agg-query-comparison_read_commands
     depends_on: *_compile
     commands:
@@ -750,8 +776,10 @@ microbenchmark-buildvariants:
     - name: genny_scale_InsertRemove
     - name: genny_execution_UserAcquisition
     - name: aggregation_read_commands
+    - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
     - name: query_read_commands
+    - name: query_read_commands_large_dataset
     - name: views-aggregation
     - name: views-query
     - name: where_read_commands
