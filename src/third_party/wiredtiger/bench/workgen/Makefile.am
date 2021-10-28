@@ -1,5 +1,7 @@
+# FIX-ME-WT-8263: Remove the next line to keep the flags defined in configure.ac.in
+AM_CXXFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)
-AM_CPPFLAGS += -I$(top_srcdir)/src/include
+AM_CPPFLAGS +=-I$(top_srcdir)/src/include
 AM_CPPFLAGS +=-I$(top_srcdir)/test/utility
 
 PYSRC = $(top_srcdir)/bench/workgen

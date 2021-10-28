@@ -107,7 +107,7 @@ test::run()
     statistics_config = _config->get_subconfig(STATISTICS_CONFIG);
     statistics_type = statistics_config->get_string(TYPE);
     statistics_logging = statistics_config->get_bool(ENABLE_LOGGING);
-    db_create_config += statistics_logging ? "," + std::string(STATISTICS_LOG) : "";
+    db_create_config += statistics_logging ? "," + STATISTICS_LOG : "";
     db_create_config += ",statistics=(" + statistics_type + ")";
     /* Don't forget to delete. */
     delete statistics_config;

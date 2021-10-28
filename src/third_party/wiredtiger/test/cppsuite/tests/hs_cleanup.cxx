@@ -58,7 +58,7 @@ class hs_cleanup : public test {
 
         /* In this test each thread gets a single collection. */
         testutil_assert(tc->db.get_collection_count() == tc->thread_count);
-        scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
+        scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
 
         /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
         while (tc->running()) {

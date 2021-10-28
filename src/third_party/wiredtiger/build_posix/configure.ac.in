@@ -139,7 +139,8 @@ if test "$wt_cv_enable_strict" = "yes"; then
 		    [--enable-strict does not support "$wt_cv_cc_version".]);;
 	esac
 
-	AM_CFLAGS="$AM_CFLAGS $wt_cv_strict_warnings"
+	AM_CFLAGS="$AM_CFLAGS $wt_c_strict_warnings"
+	AM_CXXFLAGS="$AM_CXXFLAGS $wt_cxx_strict_warnings"
 fi
 
 # Python API
@@ -237,7 +238,9 @@ fi
 AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 	[Default alignment of buffers used for I/O])
 
+# Export the C and CXX flags.
 AC_SUBST(AM_CFLAGS)
+AC_SUBST(AM_CXXFLAGS)
 
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then

@@ -90,7 +90,7 @@ class search_near_02 : public test_harness::test {
         for (uint64_t i = thread_offset;
              i < thread_offset + collections_per_thread && tc->running(); ++i) {
             collection &coll = tc->db.get_collection(i);
-            scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
+            scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
             ccv.push_back({coll, std::move(cursor)});
         }
 
@@ -163,8 +163,7 @@ class search_near_02 : public test_harness::test {
 
             /* Find a cached cursor or create one if none exists. */
             if (cursors.find(coll.id) == cursors.end()) {
-                cursors.emplace(
-                  coll.id, std::move(tc->session.open_scoped_cursor(coll.name.c_str())));
+                cursors.emplace(coll.id, std::move(tc->session.open_scoped_cursor(coll.name)));
                 auto &cursor_prefix = cursors[coll.id];
                 /* The cached cursors have the prefix configuration enabled. */
                 testutil_check(
@@ -211,7 +210,7 @@ class search_near_02 : public test_harness::test {
                 }
 
                 /* Open a cursor with the default configuration on the selected collection. */
-                scoped_cursor cursor_default(tc->session.open_scoped_cursor(coll.name.c_str()));
+                scoped_cursor cursor_default(tc->session.open_scoped_cursor(coll.name));
 
                 /* Verify the prefix search_near output using the default cursor. */
                 validate_prefix_search_near(

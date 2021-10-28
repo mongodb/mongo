@@ -66,7 +66,7 @@ workload_tracking::load()
     _session = connection_manager::instance().create_session();
     testutil_check(
       _session->create(_session.get(), _schema_table_name.c_str(), _schema_table_config.c_str()));
-    _schema_track_cursor = _session.open_scoped_cursor(_schema_table_name.c_str());
+    _schema_track_cursor = _session.open_scoped_cursor(_schema_table_name);
     logger::log_msg(LOG_TRACE, "Schema tracking initiated");
 
     /* Initiate operations tracking. */
@@ -78,7 +78,7 @@ workload_tracking::load()
      * Open sweep cursor. This cursor will be used to clear out obsolete data from the tracking
      * table.
      */
-    _sweep_cursor = _session.open_scoped_cursor(_operation_table_name.c_str());
+    _sweep_cursor = _session.open_scoped_cursor(_operation_table_name);
     logger::log_msg(LOG_TRACE, "Tracking table sweep initialized");
 }
 

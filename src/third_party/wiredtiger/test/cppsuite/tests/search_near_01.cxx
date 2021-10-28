@@ -63,7 +63,7 @@ class search_near_01 : public test_harness::test {
          */
         for (int64_t i = 0; i < collections_per_thread; ++i) {
             collection &coll = tc->db.get_collection(i);
-            scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
+            scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
             for (uint64_t j = 0; j < ALPHABET.size(); ++j) {
                 for (uint64_t k = 0; k < ALPHABET.size(); ++k) {
                     for (uint64_t count = 0; count < tc->key_count; ++count) {
@@ -204,7 +204,7 @@ class search_near_01 : public test_harness::test {
             /* Get a collection and find a cached cursor. */
             collection &coll = tc->db.get_random_collection();
             if (cursors.find(coll.id) == cursors.end()) {
-                scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name.c_str());
+                scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
                 cursor->reconfigure(cursor.get(), "prefix_search=true");
                 cursors.emplace(coll.id, std::move(cursor));
             }

@@ -8,11 +8,11 @@
 
 include(cmake/strict/strict_flags_helpers.cmake)
 
-# Get common CL flags.
-set(cl_flags)
-get_cl_base_flags(cl_flags C)
+# Get common CLANG flags.
+set(clangxx_flags)
+get_clang_base_flags(clangxx_flags CXX)
 
-# Specific C flags:
+# Specific CXX flags:
 
 # Set our common compiler flags that can be used by the rest of our build.
-set(COMPILER_DIAGNOSTIC_C_FLAGS ${cl_flags})
+set(COMPILER_DIAGNOSTIC_CXX_FLAGS ${clangxx_flags})

@@ -35,6 +35,22 @@
 #include "thread_context.h"
 
 namespace test_harness {
+
+const std::string
+type_string(thread_type type)
+{
+    switch (type) {
+    case thread_type::INSERT:
+        return ("insert");
+    case thread_type::READ:
+        return ("read");
+    case thread_type::UPDATE:
+        return ("update");
+    default:
+        testutil_die(EINVAL, "unexpected thread_type: %d", static_cast<int>(type));
+    }
+}
+
 /* transaction_context class implementation */
 transaction_context::transaction_context(
   configuration *config, timestamp_manager *timestamp_manager, WT_SESSION *session)
@@ -125,7 +141,7 @@ transaction_context::set_commit_timestamp(wt_timestamp_t ts)
     /* We don't want to set zero timestamps on transactions if we're not using timestamps. */
     if (!_timestamp_manager->enabled())
         return;
-    std::string config = std::string(COMMIT_TS) + "=" + timestamp_manager::decimal_to_hex(ts);
+    const std::string config = COMMIT_TS + "=" + timestamp_manager::decimal_to_hex(ts);
     testutil_check(_session->timestamp_transaction(_session, config.c_str()));
 }
 
@@ -151,19 +167,18 @@ transaction_context::can_rollback()
 thread_context::thread_context(uint64_t id, thread_type type, configuration *config,
   scoped_session &&created_session, timestamp_manager *timestamp_manager,
   workload_tracking *tracking, database &dbase)
-    : id(id), type(type), db(dbase), tsm(timestamp_manager), tracking(tracking),
-      session(std::move(created_session)),
-      transaction(transaction_context(config, timestamp_manager, session.get())),
-      /* These won't exist for certain threads which is why we use optional here. */
+    : /* These won't exist for certain threads which is why we use optional here. */
       collection_count(config->get_optional_int(COLLECTION_COUNT, 1)),
       key_count(config->get_optional_int(KEY_COUNT_PER_COLLECTION, 1)),
       key_size(config->get_optional_int(KEY_SIZE, 1)),
       value_size(config->get_optional_int(VALUE_SIZE, 1)),
-      thread_count(config->get_int(THREAD_COUNT))
+      thread_count(config->get_int(THREAD_COUNT)), type(type), id(id), db(dbase),
+      session(std::move(created_session)), tsm(timestamp_manager),
+      transaction(transaction_context(config, timestamp_manager, session.get())),
+      tracking(tracking), _throttle(config)
 {
-    _throttle = throttle(config);
     if (tracking->enabled())
-        op_track_cursor = session.open_scoped_cursor(tracking->get_operation_table_name().c_str());
+        op_track_cursor = session.open_scoped_cursor(tracking->get_operation_table_name());
 
     testutil_assert(key_size > 0 && value_size > 0);
 }

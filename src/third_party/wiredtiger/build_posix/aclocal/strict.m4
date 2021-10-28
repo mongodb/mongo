@@ -3,31 +3,21 @@
 
 # GCC warnings.
 AC_DEFUN([AM_GCC_WARNINGS], [
-	w="$w -Wall -Wextra -Werror"
 
-	w="$w -Waggregate-return"
-	w="$w -Wbad-function-cast"
+	# List of common C/CXX flags.
 	w="$w -Wcast-align"
-	w="$w -Wdeclaration-after-statement"
 	w="$w -Wdouble-promotion"
+	w="$w -Werror"
 	w="$w -Wfloat-equal"
 	w="$w -Wformat-nonliteral"
 	w="$w -Wformat-security"
 	w="$w -Wformat=2"
 	w="$w -Winit-self"
-	w="$w -Wjump-misses-init"
 	w="$w -Wmissing-declarations"
 	w="$w -Wmissing-field-initializers"
-	w="$w -Wmissing-prototypes"
-	w="$w -Wnested-externs"
-	w="$w -Wold-style-definition"
 	w="$w -Wpacked"
 	w="$w -Wpointer-arith"
-	w="$w -Wpointer-sign"
 	w="$w -Wredundant-decls"
-	w="$w -Wshadow"
-	w="$w -Wsign-conversion"
-	w="$w -Wstrict-prototypes"
 	w="$w -Wswitch-enum"
 	w="$w -Wundef"
 	w="$w -Wuninitialized"
@@ -72,8 +62,6 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 
 	if test $gcc5 -eq 1; then
 		w="$w -Wformat-signedness"
-		w="$w -Wjump-misses-init"
-		w="$w -Wredundant-decls"
 		w="$w -Wunused-macros"
 		w="$w -Wvariadic-macros"
 	fi
@@ -94,13 +82,35 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 		w="$w -Wmultistatement-macros"
 	fi
 
-	wt_cv_strict_warnings="$w"
+	w_c="$w"
+	w_cxx="$w"
+
+	# FIX-ME-WT-8247: Add those flags to the common ones if we want them for the compilation of the c++ files too.
+	w_c="$w_c -Waggregate-return"
+	w_c="$w_c -Wall"
+	w_c="$w_c -Wextra"
+	w_c="$w_c -Wshadow"
+	w_c="$w_c -Wsign-conversion"
+
+	# Specific C flags.
+	w_c="$w_c -Wbad-function-cast"
+	w_c="$w_c -Wdeclaration-after-statement"
+	w_c="$w_c -Wjump-misses-init"
+	w_c="$w_c -Wmissing-prototypes"
+	w_c="$w_c -Wnested-externs"
+	w_c="$w_c -Wold-style-definition"
+	w_c="$w_c -Wpointer-sign"
+	w_c="$w_c -Wstrict-prototypes"
+
+	wt_c_strict_warnings="$w_c"
+	wt_cxx_strict_warnings="$w_cxx"
 ])
 
 # Clang warnings.
 AC_DEFUN([AM_CLANG_WARNINGS], [
-	w="-Weverything -Werror"
 
+	# List of common C/CXX flags.
+	w="$w -Werror"
 	w="$w -Wno-cast-align"
 	w="$w -Wno-documentation-unknown-command"
 	w="$w -Wno-format-nonliteral"
@@ -146,5 +156,13 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 	# Ignore unrecognized options.
 	w="$w -Wno-unknown-warning-option"
 
-	wt_cv_strict_warnings="$w"
+	w_c="$w"
+	w_cxx="$w"
+
+	# Specific C flags.
+	# The -Weverything flag is not recommended, we only keep it for C files as it was already enabled.
+	w_c="$w_c -Weverything"
+
+	wt_c_strict_warnings="$w_c"
+	wt_cxx_strict_warnings="$w_cxx"
 ])
