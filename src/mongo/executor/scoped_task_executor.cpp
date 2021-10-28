@@ -190,6 +190,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void appendNetworkInterfaceStats(BSONObjBuilder&) const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     /**
      * Helper function to get a shared_ptr<ScopedTaskExecutor::Impl> to this object, akin to

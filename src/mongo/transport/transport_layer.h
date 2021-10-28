@@ -213,6 +213,8 @@ public:
     virtual std::unique_ptr<ReactorTimer> makeTimer() = 0;
     virtual Date_t now() = 0;
 
+    virtual void appendStats(BSONObjBuilder& bob) const = 0;
+
 protected:
     Reactor() = default;
 };

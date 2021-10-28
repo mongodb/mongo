@@ -262,5 +262,9 @@ void ShardingTaskExecutor::dropConnections(const HostAndPort& hostAndPort) {
     _executor->dropConnections(hostAndPort);
 }
 
+void ShardingTaskExecutor::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {
+    _executor->appendNetworkInterfaceStats(bob);
+}
+
 }  // namespace executor
 }  // namespace mongo

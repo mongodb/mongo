@@ -142,5 +142,9 @@ void TaskExecutorProxy::dropConnections(const HostAndPort& hostAndPort) {
     _executor.load()->dropConnections(hostAndPort);
 }
 
+void TaskExecutorProxy::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {
+    _executor.load()->appendNetworkInterfaceStats(bob);
+}
+
 }  // namespace unittest
 }  // namespace mongo

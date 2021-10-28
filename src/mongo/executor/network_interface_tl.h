@@ -64,6 +64,7 @@ public:
 
     std::string getDiagnosticString() override;
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
+    void appendStats(BSONObjBuilder&) const override;
     std::string getHostName() override;
     Counters getCounters() const override;
 
