@@ -8606,7 +8606,7 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
   - name: snmp
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
 
 - <<: *enterprise-windows-required-template
   name: enterprise-windows-all-feature-flags-required
@@ -8959,7 +8959,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
   - name: push
     distros:
     - rhel70-small
@@ -8992,7 +8992,7 @@ buildvariants:
   - name: replica_sets_large_txns_format_gen
   - name: .ssl
   - name: .stitch
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -9320,7 +9320,7 @@ buildvariants:
   - name: burn_in_tags_gen
   - name: buildscripts_test
   - name: resmoke_end2end_tests
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
@@ -9449,7 +9449,7 @@ buildvariants:
   - name: .aggregation
   - name: audit
   - name: .auth
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
@@ -9642,6 +9642,7 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: snmp
   - name: test_api_version_compatibility
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: enterprise-rhel-80-64-bit-large-txns-format
   display_name: "Enterprise RHEL 8.0 (large transactions format)"
@@ -9869,7 +9870,7 @@ buildvariants:
     - name: build_variant_gen
     - name: .aggregation
     - name: .auth
-#    - name: unittest_shell_hang_analyzer_gen
+    - name: unittest_shell_hang_analyzer_gen
     - name: .causally_consistent !.sharding
     - name: .change_streams
     - name: .misc_js
@@ -9957,7 +9958,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10211,7 +10212,7 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_auth_gen
   - name: .stitch
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
 
 - name: ubuntu1804-container
   display_name: "Ubuntu 18.04 Container"
@@ -11272,7 +11273,7 @@ buildvariants:
   - name: .watchdog
   - name: .stitch
   - name: .tenant_migration
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -11695,7 +11696,7 @@ buildvariants:
   - name: build_variant_gen
   - name: jsCore
   - name: jsCore_txns
-#  - name: unittest_shell_hang_analyzer_gen
+  - name: unittest_shell_hang_analyzer_gen
 
 - <<: *ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-all-feature-flags-required

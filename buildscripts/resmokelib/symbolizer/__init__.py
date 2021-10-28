@@ -101,10 +101,10 @@ class Symbolizer(Subcommand):
         version_id = self.task_info.version_id
         buildvariant_name = self.task_info.build_variant
 
-        urls = self.multiversion_setup.get_urls(version=version_id,
-                                                buildvariant_name=buildvariant_name)
+        urlinfo = self.multiversion_setup.get_urls(version=version_id,
+                                                   buildvariant_name=buildvariant_name)
 
-        self.multiversion_setup.download_and_extract_from_urls(urls, bin_suffix=None,
+        self.multiversion_setup.download_and_extract_from_urls(urlinfo.urls, bin_suffix=None,
                                                                install_dir=self.dest_dir)
 
     def _patch_diff_by_id(self):
