@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
+#include <fmt/format.h>
 #include <memory>
 #include <set>
 
@@ -1510,7 +1511,9 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
     metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
 
     if (ret != WT_DUPLICATE_KEY) {
-        return wtRCToStatus(ret);
+        return wtRCToStatus(ret, [this]() {
+            return fmt::format("WiredTigerIdIndex::_insert: index: {}; uri: {}", _indexName, _uri);
+        });
     }
 
     auto key = KeyString::toBson(keyString, _ordering);
@@ -1551,14 +1554,18 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
                                           _keyPattern,
                                           _collation);
         }
-        invariantWTOK(ret);
+        invariantWTOK(ret,
+                      str::stream() << "WiredTigerIndexUnique::_insert: insert: index: "
+                                    << _indexName << "; uri: " << _uri);
 
         // Remove the prefix key, our entry will continue to conflict with any concurrent
         // transactions, but will not conflict with any transaction that begins after this
         // operation commits.
         setKey(c, prefixKeyItem.Get());
         ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
-        invariantWTOK(ret);
+        invariantWTOK(
+            ret,
+            fmt::format("WiredTigerIndexUnique::_insert: remove: {}; uri: {}", _indexName, _uri));
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
         if (_keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId)) {
@@ -1592,7 +1599,10 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
 
     // It is possible that this key is already present during a concurrent background index build.
     if (ret != WT_DUPLICATE_KEY)
-        invariantWTOK(ret);
+        invariantWTOK(ret,
+                      fmt::format("WiredTigerIndexUnique::_insert: duplicate: {}; uri: {}",
+                                  _indexName,
+                                  _uri));
 
     return Status::OK();
 }
@@ -1752,7 +1762,10 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
     // This can happen, for example, when building a background index while documents are being
     // written and reindexed.
     if (ret != 0 && ret != WT_DUPLICATE_KEY)
-        return wtRCToStatus(ret);
+        return wtRCToStatus(ret, [this]() {
+            return fmt::format(
+                "WiredTigerIndexStandard::_insert: index: {}; uri: {}", _indexName, _uri);
+        });
 
     return Status::OK();
 }
