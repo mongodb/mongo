@@ -1120,29 +1120,26 @@ err:
 int
 __wt_cursor_largest_key(WT_CURSOR *cursor)
 {
+    WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(key);
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    bool ignore_tombstone;
-    bool visible_all;
+    bool key_only;
 
-    ignore_tombstone = F_ISSET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
-    visible_all = F_ISSET(cursor, WT_CURSTD_VISIBLE_ALL);
-    CURSOR_API_CALL(cursor, session, largest_key, NULL);
+    cbt = (WT_CURSOR_BTREE *)cursor;
+    key_only = F_ISSET(cursor, WT_CURSTD_KEY_ONLY);
+    CURSOR_API_CALL(cursor, session, largest_key, CUR2BT(cbt));
 
     WT_ERR(__wt_scr_alloc(session, 0, &key));
 
     /* Reset the cursor to give up the cursor position. */
     WT_ERR(cursor->reset(cursor));
 
-    /* Ignore deletion. */
-    F_SET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
-    /* Ignore visibility. */
-    F_SET(cursor, WT_CURSTD_VISIBLE_ALL);
+    /* Set the flag to bypass value read. */
+    F_SET(cursor, WT_CURSTD_KEY_ONLY);
 
-    /* Call cursor prev to get the largest key. */
-    WT_ERR(cursor->prev(cursor));
-    WT_ERR(ret);
+    /* Call btree cursor prev to get the largest key. */
+    WT_ERR(__wt_btcur_prev(cbt, false));
 
     /* Copy the key as we will reset the cursor after that. */
     WT_ERR(__wt_buf_set(session, key, cursor->key.data, cursor->key.size));
@@ -1152,10 +1149,8 @@ __wt_cursor_largest_key(WT_CURSOR *cursor)
     F_SET(cursor, WT_CURSTD_KEY_EXT);
 
 err:
-    if (!ignore_tombstone)
-        F_CLR(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
-    if (!visible_all)
-        F_CLR(cursor, WT_CURSTD_VISIBLE_ALL);
+    if (!key_only)
+        F_CLR(cursor, WT_CURSTD_KEY_ONLY);
     __wt_scr_free(session, &key);
     if (ret != 0)
         WT_TRET(cursor->reset(cursor));
