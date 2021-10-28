@@ -93,6 +93,9 @@ size_t capPlanCacheSize(size_t planCacheSize) {
 
 size_t getPlanCacheSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
     size_t planCacheSize = convertToSizeInBytes(param);
+    uassert(5968001,
+            "Cache size must be at least 1KB * number of cores",
+            planCacheSize >= 1024 * ProcessInfo::getNumCores());
     return capPlanCacheSize(planCacheSize);
 }
 
@@ -119,7 +122,7 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
 
             auto size = getPlanCacheSizeInBytes(status.getValue());
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
-            globalPlanCache = std::make_unique<sbe::PlanCache>(size);
+            globalPlanCache = std::make_unique<sbe::PlanCache>(size, ProcessInfo::getNumCores());
         }
     }};
 

@@ -39,6 +39,13 @@
 namespace mongo {
 namespace sbe {
 
+struct PlanCachePartitioner {
+    // Determines the partitioning function for use with the 'Partitioned' utility.
+    std::size_t operator()(const PlanCacheKey& k, const std::size_t nPartitions) const {
+        return PlanCacheKeyHasher{}(k) % nPartitions;
+    }
+};
+
 /**
  * Represents the data cached in the SBE plan cache. This data holds an execution plan and necessary
  * auxiliary data for preparing and executing the PlanStage tree.
@@ -67,7 +74,11 @@ struct BudgetEstimator {
     }
 };
 
-using PlanCache = PlanCacheBase<PlanCacheKey, CachedSbePlan, BudgetEstimator, PlanCacheKeyHasher>;
+using PlanCache = PlanCacheBase<PlanCacheKey,
+                                CachedSbePlan,
+                                BudgetEstimator,
+                                PlanCachePartitioner,
+                                PlanCacheKeyHasher>;
 
 /**
  * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.

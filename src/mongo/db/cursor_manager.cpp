@@ -151,7 +151,8 @@ std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
 
 CursorManager::CursorManager(ClockSource* preciseClockSource)
     : _random(std::make_unique<PseudoRandom>(SecureRandom().nextInt64())),
-      _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()),
+      _cursorMap(std::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>(
+          kNumPartitions)),
       _preciseClockSource(preciseClockSource) {}
 
 CursorManager::~CursorManager() {
@@ -414,7 +415,7 @@ void CursorManager::deregisterCursor(ClientCursor* cursor) {
 }
 
 void CursorManager::deregisterAndDestroyCursor(
-    Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>::OnePartition&& lk,
+    Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>::OnePartition&& lk,
     OperationContext* opCtx,
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     {

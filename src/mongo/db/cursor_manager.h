@@ -204,7 +204,7 @@ private:
 
     void deregisterCursor(ClientCursor* cursor);
     void deregisterAndDestroyCursor(
-        Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>::OnePartition&&,
+        Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>::OnePartition&&,
         OperationContext* opCtx,
         std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
 
@@ -241,8 +241,7 @@ private:
     // mutexes for all partitions.
     mutable SimpleMutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
-    std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>>
-        _cursorMap;
+    std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>> _cursorMap;
 
     // A mapping from client OperationKey to corresponding CursorID. Note that it's possible that
     // cursors in the map above are not present in this map, since OperationKey is not required when

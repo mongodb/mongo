@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
@@ -235,6 +236,7 @@ private:
 template <class KeyType,
           class CachedPlanType,
           class BudgetEstimator,
+          class Partitioner,
           class KeyHasher = std::hash<KeyType>>
 class PlanCacheBase {
 private:
@@ -243,6 +245,7 @@ private:
 
 public:
     using Entry = PlanCacheEntryBase<CachedPlanType>;
+    using Lru = LRUKeyValue<KeyType, Entry, BudgetEstimator, KeyHasher>;
 
     // We have three states for a cache entry to be in. Rather than just 'present' or 'not
     // present', we use a notion of 'inactive entries' as a way of remembering how performant our
@@ -271,7 +274,16 @@ public:
         std::unique_ptr<CachedPlanHolder<CachedPlanType>> cachedPlanHolder;
     };
 
-    PlanCacheBase(size_t size) : _cache{size} {}
+    /**
+     * Initialize plan cache with the total cache size in bytes and number of partitions.
+     */
+    explicit PlanCacheBase(size_t cacheSize, size_t numPartitions = 1)
+        : _numPartitions(numPartitions),
+          _partitionedCache(std::make_unique<Partitioned<Lru, Partitioner>>(
+              numPartitions, Lru(cacheSize / numPartitions))) {
+        invariant(numPartitions > 0);
+        invariant(cacheSize / numPartitions > 0);
+    }
 
     ~PlanCacheBase() = default;
 
@@ -334,7 +346,7 @@ public:
                                      }},
             why->stats);
 
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
+        auto partition = _partitionedCache->lockOnePartition(key);
         auto [queryHash, planCacheKey, isNewEntryActive, shouldBeCreated] = [&]() {
             if (internalQueryCacheDisableInactiveEntries.load()) {
                 // All entries are always active.
@@ -343,7 +355,7 @@ public:
                                        true /* isNewEntryActive  */,
                                        true /* shouldBeCreated  */);
             } else {
-                auto oldEntryWithStatus = _cache.get(key);
+                auto oldEntryWithStatus = partition->get(key);
                 tassert(6007020,
                         "LRU store must get value or NoSuchKey error code",
                         oldEntryWithStatus.isOK() ||
@@ -384,8 +396,7 @@ public:
                                     newWorks,
                                     callbacks));
 
-        [[maybe_unused]] auto numEvicted = _cache.add(key, newEntry.release());
-
+        partition->add(key, newEntry.release());
         return Status::OK();
     }
 
@@ -400,8 +411,8 @@ public:
             return;
         }
 
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        auto entry = _cache.get(key);
+        auto partition = _partitionedCache->lockOnePartition(key);
+        auto entry = partition->get(key);
         if (!entry.isOK()) {
             tassert(6007021,
                     "Unexpected error code from LRU store",
@@ -420,8 +431,8 @@ public:
      * for the query (if there is one).
      */
     GetResult get(const KeyType& key) const {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        auto entry = _cache.get(key);
+        auto partition = _partitionedCache->lockOnePartition(key);
+        auto entry = partition->get(key);
         if (!entry.isOK()) {
             tassert(6007023,
                     "Unexpected error code from LRU store",
@@ -455,25 +466,25 @@ public:
      * the cache, this call is a no-op.
      */
     void remove(const KeyType& key) {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        [[maybe_unused]] auto ret = _cache.remove(key);
+        _partitionedCache->erase(key);
     }
 
     /**
      * Remove *all* cached plans.  Does not clear index information.
      */
     void clear() {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        _cache.clear();
+        _partitionedCache->clear();
     }
 
     /**
-     * Reset the cache with new cache size. If the cache size is set to a smaller value than before,
-     * enough entries are evicted in order to ensure that the cache fits within the new budget.
+     * Reset total cache size. If the size is set to a smaller value than before, enough entries are
+     * evicted in order to ensure that the cache fits within the new budget.
      */
-    void reset(size_t size) {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        [[maybe_unused]] auto numEvicted = _cache.reset(size);
+    void reset(size_t cacheSize) {
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
+            lockedPartition->reset(cacheSize / _numPartitions);
+        }
     }
 
     /**
@@ -482,8 +493,8 @@ public:
      * If there is no entry in the cache for the 'query', returns an error Status.
      */
     StatusWith<std::unique_ptr<Entry>> getEntry(const KeyType& key) const {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        auto entry = _cache.get(key);
+        auto partition = _partitionedCache->lockOnePartition(key);
+        auto entry = partition->get(key);
         if (!entry.isOK()) {
             return entry.getStatus();
         }
@@ -493,16 +504,17 @@ public:
     }
 
     /**
-     * Returns a vector of all cache entries.
-     * Used by planCacheListQueryShapes and index_filter_commands_test.cpp.
+     * Returns a vector of all cache entries. Does not guarantee a point-in-time view of the cache.
      */
     std::vector<std::unique_ptr<Entry>> getAllEntries() const {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
         std::vector<std::unique_ptr<Entry>> entries;
 
-        for (auto&& cacheEntry : _cache) {
-            auto entry = cacheEntry.second;
-            entries.push_back(std::unique_ptr<Entry>(entry->clone()));
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
+
+            for (auto&& [key, entry] : *lockedPartition) {
+                entries.emplace_back(entry->clone());
+            }
         }
 
         return entries;
@@ -513,25 +525,28 @@ public:
      * Used for testing.
      */
     size_t size() const {
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
-        return _cache.size();
+        return _partitionedCache->size();
     }
 
     /**
      * Iterates over the plan cache. For each entry, serializes the PlanCacheEntryBase according to
      * 'serializationFunc'. Returns a vector of all serialized entries which match 'filterFunc'.
+     * This does not guarantee a point-in-time view of the cache.
      */
     std::vector<BSONObj> getMatchingStats(
         const std::function<BSONObj(const Entry&)>& serializationFunc,
         const std::function<bool(const BSONObj&)>& filterFunc) const {
         std::vector<BSONObj> results;
-        stdx::lock_guard<Latch> cacheLock(_cacheMutex);
 
-        for (auto&& cacheEntry : _cache) {
-            const auto entry = cacheEntry.second;
-            auto serializedEntry = serializationFunc(*entry);
-            if (filterFunc(serializedEntry)) {
-                results.push_back(serializedEntry);
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
+
+            for (auto&& cacheEntry : *lockedPartition) {
+                const auto& entry = cacheEntry.second;
+                auto serializedEntry = serializationFunc(*entry);
+                if (filterFunc(serializedEntry)) {
+                    results.push_back(serializedEntry);
+                }
             }
         }
 
@@ -614,10 +629,8 @@ private:
         return res;
     }
 
-    LRUKeyValue<KeyType, PlanCacheEntryBase<CachedPlanType>, BudgetEstimator, KeyHasher> _cache;
-
-    // Protects _cache.
-    mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("PlanCache::_cacheMutex");
+    std::size_t _numPartitions;
+    std::unique_ptr<Partitioned<Lru, Partitioner>> _partitionedCache;
 };
 
 }  // namespace mongo

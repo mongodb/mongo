@@ -38,6 +38,14 @@
 namespace mongo {
 
 
+class PlanCachePartitioner {
+public:
+    std::size_t operator()(const PlanCacheKey& k, const std::size_t nPartitions) const {
+        tassert(5968000, "classic plan cache should only have one partition", nPartitions == 1);
+        return 0;
+    }
+};
+
 /**
  * A PlanCacheIndexTree is the meaty component of the data
  * stored in SolutionCacheData. It is a tree structure with
@@ -188,8 +196,11 @@ struct BudgetEstimator {
     }
 };
 
-using PlanCache =
-    PlanCacheBase<PlanCacheKey, SolutionCacheData, BudgetEstimator, PlanCacheKeyHasher>;
+using PlanCache = PlanCacheBase<PlanCacheKey,
+                                SolutionCacheData,
+                                BudgetEstimator,
+                                PlanCachePartitioner,
+                                PlanCacheKeyHasher>;
 
 /**
  * We don't want to cache every possible query. This function encapsulates the criteria for what
