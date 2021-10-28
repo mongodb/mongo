@@ -44,6 +44,7 @@ class EvgExpansions(BaseModel):
     project: Evergreen project being run under.
     max_test_per_suite: Maximum amount of tests to include in a suite.
     max_sub_suites: Maximum number of sub-suites to generate per task.
+    mainline_max_sub_suites: Max number of sub-suites to generate per task on mainline builds.
     resmoke_repeat_suites: Number of times suites should be repeated.
     revision: Git revision being run against.
     task_name: Name of task running.
@@ -57,6 +58,7 @@ class EvgExpansions(BaseModel):
     project: str
     max_tests_per_suite: Optional[int] = 100
     max_sub_suites: Optional[int] = 5
+    mainline_max_sub_suites: Optional[int] = 1
     resmoke_repeat_suites: Optional[int] = None
     revision: str
     task_name: str
@@ -73,6 +75,12 @@ class EvgExpansions(BaseModel):
         """
         return cls(**read_yaml_file(path))
 
+    def get_max_sub_suites(self) -> int:
+        """Get the max_sub_suites to use."""
+        if not self.is_patch:
+            return self.mainline_max_sub_suites
+        return self.max_sub_suites
+
     def build_suite_split_config(self, start_date: datetime,
                                  end_date: datetime) -> SuiteSplitConfig:
         """
@@ -85,7 +93,7 @@ class EvgExpansions(BaseModel):
         return SuiteSplitConfig(
             evg_project=self.project,
             target_resmoke_time=self.target_resmoke_time if self.target_resmoke_time else 60,
-            max_sub_suites=self.max_sub_suites,
+            max_sub_suites=self.get_max_sub_suites(),
             max_tests_per_suite=self.max_tests_per_suite,
             start_date=start_date,
             end_date=end_date,

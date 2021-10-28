@@ -84,6 +84,55 @@ def build_mock_orchestrator(build_expansions=None, task_def_list=None, build_tas
     )
 
 
+class TestEvgExpansions(unittest.TestCase):
+    def test_get_max_sub_suites_should_use_patch_value_in_patches(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch=True,
+            max_sub_suites=5,
+            mainline_max_sub_suites=1,
+            build_id="build_id",
+            build_variant="build_variant",
+            project="project",
+            revision="revision",
+            task_name="task_name",
+            task_id="task_id",
+        )
+
+        self.assertEqual(evg_expansions.get_max_sub_suites(), evg_expansions.max_sub_suites)
+
+    def test_get_max_sub_suites_should_use_mainline_value_in_non_patches(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch=False,
+            max_sub_suites=5,
+            mainline_max_sub_suites=1,
+            build_id="build_id",
+            build_variant="build_variant",
+            project="project",
+            revision="revision",
+            task_name="task_name",
+            task_id="task_id",
+        )
+
+        self.assertEqual(evg_expansions.get_max_sub_suites(),
+                         evg_expansions.mainline_max_sub_suites)
+
+    def test_get_max_sub_suites_should_use_mainline_value_if_patch_status_unknown(self):
+        evg_expansions = under_test.EvgExpansions(
+            is_patch=None,
+            max_sub_suites=5,
+            mainline_max_sub_suites=1,
+            build_id="build_id",
+            build_variant="build_variant",
+            project="project",
+            revision="revision",
+            task_name="task_name",
+            task_id="task_id",
+        )
+
+        self.assertEqual(evg_expansions.get_max_sub_suites(),
+                         evg_expansions.mainline_max_sub_suites)
+
+
 class TestTranslateRunVar(unittest.TestCase):
     def test_normal_value_should_be_returned(self):
         run_var = "some value"
