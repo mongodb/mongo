@@ -179,6 +179,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void appendNetworkInterfaceStats(BSONObjBuilder&) const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     /**
      * Wraps a scheduling call, along with its callback, so that:

@@ -56,7 +56,8 @@ public:
     static constexpr auto kExpeditedRefreshPeriod = Milliseconds(500);
     static constexpr auto kCheckTimeout = Seconds(5);
 
-    ScanningReplicaSetMonitor(const MongoURI& uri);
+    ScanningReplicaSetMonitor(const MongoURI& uri,
+                              std::shared_ptr<executor::TaskExecutor> executor);
 
     void init() override;
 

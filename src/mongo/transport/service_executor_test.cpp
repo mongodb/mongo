@@ -145,6 +145,10 @@ public:
         return _ioContext;
     }
 
+    void appendStats(mongo::BSONObjBuilder&) const final {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     asio::io_context _ioContext;
 };

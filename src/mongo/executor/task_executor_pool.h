@@ -32,6 +32,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
@@ -111,6 +112,13 @@ public:
      * will be from slightly different points in time.
      */
     void appendConnectionStats(ConnectionPoolStats* stats) const;
+
+    /**
+     * Appends statistics for all the executors, in particular their underlying network interfaces,
+     * in the pool. The information is collected in a non-blocking fashion and is just an
+     * approximate.
+     */
+    void appendNetworkInterfaceStats(BSONObjBuilder&) const;
 
 private:
     AtomicWord<unsigned> _counter;

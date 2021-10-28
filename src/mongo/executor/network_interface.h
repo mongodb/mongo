@@ -33,6 +33,7 @@
 #include <functional>
 #include <string>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
@@ -72,6 +73,11 @@ public:
      * Appends information about the connections on this NetworkInterface.
      */
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
+
+    /**
+     * Appends information about this instance of NetworkInterface.
+     */
+    virtual void appendStats(BSONObjBuilder&) const = 0;
 
     /**
      * Starts up the network interface.

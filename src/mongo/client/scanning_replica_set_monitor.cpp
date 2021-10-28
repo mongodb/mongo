@@ -170,11 +170,10 @@ const Seconds kDefaultRefreshPeriod(30);
 ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const SetStatePtr& initialState)
     : _state(initialState) {}
 
-ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const MongoURI& uri)
-    : ScanningReplicaSetMonitor(
-          std::make_shared<SetState>(uri,
-                                     &ReplicaSetMonitorManager::get()->getNotifier(),
-                                     ReplicaSetMonitorManager::get()->getExecutor().get())) {}
+ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const MongoURI& uri,
+                                                     std::shared_ptr<TaskExecutor> executor)
+    : ScanningReplicaSetMonitor(std::make_shared<SetState>(
+          uri, &ReplicaSetMonitorManager::get()->getNotifier(), executor.get())) {}
 
 void ScanningReplicaSetMonitor::init() {
     if (areRefreshRetriesDisabledForTest()) {

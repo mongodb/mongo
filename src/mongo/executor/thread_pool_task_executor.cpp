@@ -528,6 +528,10 @@ void ThreadPoolTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) c
     _net->appendConnectionStats(stats);
 }
 
+void ThreadPoolTaskExecutor::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {
+    _net->appendStats(bob);
+}
+
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::enqueueCallbackState_inlock(
     WorkQueue* queue, WorkQueue* wq) {
     if (_inShutdown_inlock()) {

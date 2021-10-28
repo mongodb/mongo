@@ -190,13 +190,14 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(const
           "Starting Replica Set Monitor",
           "protocol"_attr = toString(gReplicaSetMonitorProtocol),
           "uri"_attr = uri.toString());
+    invariant(_taskExecutor);
     if (gReplicaSetMonitorProtocol == ReplicaSetMonitorProtocol::kScanning) {
-        newMonitor = std::make_shared<ScanningReplicaSetMonitor>(uri);
+        newMonitor = std::make_shared<ScanningReplicaSetMonitor>(uri, _taskExecutor);
         newMonitor->init();
     } else {
         // Both ReplicaSetMonitorProtocol::kSdam and ReplicaSetMonitorProtocol::kStreamable use the
         // StreamableReplicaSetMonitor.
-        newMonitor = StreamableReplicaSetMonitor::make(uri, getExecutor(), _getConnectionManager());
+        newMonitor = StreamableReplicaSetMonitor::make(uri, _taskExecutor, _getConnectionManager());
     }
     _monitors[setName] = newMonitor;
     return newMonitor;
@@ -301,7 +302,7 @@ void ReplicaSetMonitorManager::report(BSONObjBuilder* builder, bool forFTDC) {
 }
 
 std::shared_ptr<executor::TaskExecutor> ReplicaSetMonitorManager::getExecutor() {
-    invariant(_taskExecutor);
+    auto lk = stdx::lock_guard(_mutex);
     return _taskExecutor;
 }
 

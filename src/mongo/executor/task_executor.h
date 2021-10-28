@@ -327,6 +327,11 @@ public:
      */
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
 
+    /**
+     * Appends statistics for the underlying network interface.
+     */
+    virtual void appendNetworkInterfaceStats(BSONObjBuilder&) const = 0;
+
 protected:
     // Retrieves the Callback from a given CallbackHandle
     static CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle);

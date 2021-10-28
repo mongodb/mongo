@@ -103,5 +103,12 @@ void TaskExecutorPool::appendConnectionStats(ConnectionPoolStats* stats) const {
     }
 }
 
+void TaskExecutorPool::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {
+    _fixedExecutor->appendNetworkInterfaceStats(bob);
+    for (auto&& executor : _executors) {
+        executor->appendNetworkInterfaceStats(bob);
+    }
+}
+
 }  // namespace executor
 }  // namespace mongo

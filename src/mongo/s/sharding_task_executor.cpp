@@ -290,5 +290,9 @@ void ShardingTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) con
     _executor->appendConnectionStats(stats);
 }
 
+void ShardingTaskExecutor::appendNetworkInterfaceStats(BSONObjBuilder& bob) const {
+    _executor->appendNetworkInterfaceStats(bob);
+}
+
 }  // namespace executor
 }  // namespace mongo
