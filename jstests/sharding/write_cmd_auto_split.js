@@ -1,5 +1,8 @@
 /**
  * Tests the auto split will be triggered when using write commands.
+ * @tags: [
+ *     requires_fcv_42, # autoSplitVector not present in older v4.0 binaries
+ * ]
  */
 (function() {
 'use strict';
