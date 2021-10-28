@@ -111,10 +111,10 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::kNoTimeout);
 
 template <typename Cmd>
-void sendToRecipient(OperationContext* opCtx,
-                     const ShardId& recipientId,
-                     const Cmd& cmd,
-                     const BSONObj& passthroughFields = {}) {
+void sendWriteCommandToRecipient(OperationContext* opCtx,
+                                 const ShardId& recipientId,
+                                 const Cmd& cmd,
+                                 const BSONObj& passthroughFields = {}) {
     auto recipientShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientId));
 
@@ -128,7 +128,8 @@ void sendToRecipient(OperationContext* opCtx,
         cmdBSON,
         Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+    uassertStatusOK(response.getStatus());
+    uassertStatusOK(getStatusFromWriteCommandReply(response.getValue().response));
 }
 
 /**
@@ -660,7 +661,7 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
         opCtx, "cancel range deletion on recipient", [&](OperationContext* newOpCtx) {
             hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
 
-            sendToRecipient(
+            sendWriteCommandToRecipient(
                 newOpCtx,
                 recipientId,
                 deleteOp,
@@ -711,7 +712,7 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
         opCtx, "ready remote range deletion", [&](OperationContext* newOpCtx) {
             hangInReadyRangeDeletionOnRecipientInterruptible.pauseWhileSet(newOpCtx);
 
-            sendToRecipient(
+            sendWriteCommandToRecipient(
                 newOpCtx,
                 recipientId,
                 updateOp,
@@ -747,7 +748,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
         opCtx, "advance migration txn number", [&](OperationContext* newOpCtx) {
             hangInAdvanceTxnNumInterruptible.pauseWhileSet(newOpCtx);
-            sendToRecipient(newOpCtx, recipientId, updateOp, passthroughFields);
+            sendWriteCommandToRecipient(newOpCtx, recipientId, updateOp, passthroughFields);
 
             if (hangInAdvanceTxnNumThenSimulateErrorUninterruptible.shouldFail()) {
                 hangInAdvanceTxnNumThenSimulateErrorUninterruptible.pauseWhileSet(newOpCtx);
