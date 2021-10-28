@@ -17,13 +17,18 @@ __tiered_opener_open(WT_BLOCK_FILE_OPENER *opener, WT_SESSION_IMPL *session, uin
   WT_FS_OPEN_FILE_TYPE type, u_int flags, WT_FH **fhp)
 {
     WT_BUCKET_STORAGE *bstorage;
+    WT_CONFIG_ITEM pfx;
     WT_DECL_RET;
     WT_TIERED *tiered;
-    const char *object_name, *object_uri;
+    size_t len;
+    char *tmp;
+    const char *cfg[2], *object_name, *object_uri, *object_val;
     bool local_only;
 
     tiered = opener->cookie;
     object_uri = NULL;
+    object_val = NULL;
+    tmp = NULL;
     local_only = false;
 
     WT_ASSERT(session,
@@ -54,13 +59,25 @@ __tiered_opener_open(WT_BLOCK_FILE_OPENER *opener, WT_SESSION_IMPL *session, uin
      * This can be called at any time, because we are opening the objects lazily.
      */
     if (!local_only && ret != 0) {
+        /* Get the prefix from the object's metadata, not the connection. */
+        WT_ERR(__wt_metadata_search(session, object_uri, (char **)&object_val));
+        cfg[0] = object_val;
+        cfg[1] = NULL;
+        WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket_prefix", &pfx));
+        /* We expect a prefix. */
+        WT_ASSERT(session, pfx.len != 0);
+        len = strlen(object_name) + pfx.len + 1;
+        WT_ERR(__wt_calloc_def(session, len, &tmp));
+        WT_ERR(__wt_snprintf(tmp, len, "%.*s%s", (int)pfx.len, pfx.str, object_name));
         bstorage = tiered->bstorage;
-        LF_SET(WT_FS_OPEN_READONLY);
+        LF_SET(WT_FS_OPEN_FIXED | WT_FS_OPEN_READONLY);
         WT_WITH_BUCKET_STORAGE(
-          bstorage, session, { ret = __wt_open(session, object_name, type, flags, fhp); });
+          bstorage, session, { ret = __wt_open(session, tmp, type, flags, fhp); });
     }
 err:
     __wt_free(session, object_uri);
+    __wt_free(session, object_val);
+    __wt_free(session, tmp);
     return (ret);
 }
 

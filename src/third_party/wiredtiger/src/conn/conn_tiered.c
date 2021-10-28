@@ -212,7 +212,7 @@ __tier_flush_meta(
     WT_RET(__wt_scr_alloc(session, 512, &buf));
     dhandle = &tiered->iface;
 
-    newconfig = NULL;
+    newconfig = obj_value = NULL;
     WT_ERR(__wt_meta_track_on(session));
     tracking = true;
 
@@ -235,6 +235,7 @@ __tier_flush_meta(
 
 err:
     __wt_free(session, newconfig);
+    __wt_free(session, obj_value);
     if (release)
         WT_TRET(__wt_session_release_dhandle(session));
     __wt_scr_free(session, &buf);
@@ -251,11 +252,15 @@ int
 __wt_tier_do_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, const char *local_uri,
   const char *obj_uri)
 {
+    WT_CONFIG_ITEM pfx;
     WT_DECL_RET;
     WT_FILE_SYSTEM *bucket_fs;
     WT_STORAGE_SOURCE *storage_source;
-    const char *local_name, *obj_name;
+    size_t len;
+    char *tmp;
+    const char *cfg[2], *local_name, *obj_name;
 
+    tmp = NULL;
     storage_source = tiered->bstorage->storage_source;
     bucket_fs = tiered->bstorage->file_system;
 
@@ -263,27 +268,36 @@ __wt_tier_do_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, con
     WT_PREFIX_SKIP_REQUIRED(session, local_name, "file:");
     obj_name = obj_uri;
     WT_PREFIX_SKIP_REQUIRED(session, obj_name, "object:");
+    cfg[0] = tiered->obj_config;
+    cfg[1] = NULL;
+    WT_RET(__wt_config_gets(session, cfg, "tiered_storage.bucket_prefix", &pfx));
+    WT_ASSERT(session, pfx.len != 0);
+    len = strlen(obj_name) + pfx.len + 1;
+    WT_RET(__wt_calloc_def(session, len, &tmp));
+    WT_ERR(__wt_snprintf(tmp, len, "%.*s%s", (int)pfx.len, pfx.str, obj_name));
 
     /* This call make take a while, and may fail due to network timeout. */
-    WT_RET(storage_source->ss_flush(
-      storage_source, &session->iface, bucket_fs, local_name, obj_name, NULL));
+    WT_ERR(
+      storage_source->ss_flush(storage_source, &session->iface, bucket_fs, local_name, tmp, NULL));
 
     WT_WITH_CHECKPOINT_LOCK(session,
       WT_WITH_SCHEMA_LOCK(session, ret = __tier_flush_meta(session, tiered, local_uri, obj_uri)));
-    WT_RET(ret);
+    WT_ERR(ret);
 
     /*
      * We may need a way to cleanup flushes for those not completed (after a crash), or failed (due
      * to previous network outage).
      */
-    WT_RET(storage_source->ss_flush_finish(
-      storage_source, &session->iface, bucket_fs, local_name, obj_name, NULL));
+    WT_ERR(storage_source->ss_flush_finish(
+      storage_source, &session->iface, bucket_fs, local_name, tmp, NULL));
     /*
      * After successful flushing, push a work unit to drop the local object in the future. The
      * object will be removed locally after the local retention period expires.
      */
-    WT_RET(__wt_tiered_put_drop_local(session, tiered, id));
-    return (0);
+    WT_ERR(__wt_tiered_put_drop_local(session, tiered, id));
+err:
+    __wt_free(session, tmp);
+    return (ret);
 }
 
 /*

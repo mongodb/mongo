@@ -123,6 +123,7 @@ typedef struct local_file_handle {
  */
 static int local_bucket_path(WT_FILE_SYSTEM *, const char *, char **);
 static int local_cache_path(WT_FILE_SYSTEM *, const char *, char **);
+static int local_home_path(WT_FILE_SYSTEM *, const char *, char **);
 static int local_configure(LOCAL_STORAGE *, WT_CONFIG_ARG *);
 static int local_configure_int(LOCAL_STORAGE *, WT_CONFIG_ARG *, const char *, uint32_t *);
 static int local_delay(LOCAL_STORAGE *);
@@ -353,6 +354,16 @@ static int
 local_cache_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
 {
     return (local_path(file_system, ((LOCAL_FILE_SYSTEM *)file_system)->cache_dir, name, pathp));
+}
+
+/*
+ * local_home_path --
+ *     Construct the source pathname from the file system and local name.
+ */
+static int
+local_home_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
+{
+    return (local_path(file_system, ((LOCAL_FILE_SYSTEM *)file_system)->home_dir, name, pathp));
 }
 
 /*
@@ -667,15 +678,18 @@ local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYST
 {
     LOCAL_STORAGE *local;
     int ret;
-    char *dest_path;
+    char *dest_path, *src_path;
 
     (void)config; /* unused */
-    dest_path = NULL;
+    dest_path = src_path = NULL;
     local = (LOCAL_STORAGE *)storage_source;
     ret = 0;
 
     if (file_system == NULL || source == NULL || object == NULL)
-        return local_err(local, session, EINVAL, "ss_flush_finish: required arguments missing");
+        return local_err(local, session, EINVAL, "ss_flush: required arguments missing");
+
+    if ((ret = local_home_path(file_system, source, &src_path)) != 0)
+        goto err;
 
     if ((ret = local_bucket_path(file_system, object, &dest_path)) != 0)
         goto err;
@@ -683,13 +697,15 @@ local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYST
     if ((ret = local_delay(local)) != 0)
         goto err;
 
-    if ((ret = local_file_copy(local, session, source, dest_path, WT_FS_OPEN_FILE_TYPE_DATA)) != 0)
+    if ((ret = local_file_copy(local, session, src_path, dest_path, WT_FS_OPEN_FILE_TYPE_DATA)) !=
+      0)
         goto err;
 
     local->object_writes++;
 
 err:
     free(dest_path);
+    free(src_path);
     return (ret);
 }
 
@@ -703,15 +719,18 @@ local_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
 {
     LOCAL_STORAGE *local;
     int ret;
-    char *dest_path;
+    char *dest_path, *src_path;
 
     (void)config; /* unused */
-    dest_path = NULL;
+    dest_path = src_path = NULL;
     local = (LOCAL_STORAGE *)storage_source;
     ret = 0;
 
     if (file_system == NULL || source == NULL || object == NULL)
         return local_err(local, session, EINVAL, "ss_flush_finish: required arguments missing");
+
+    if ((ret = local_home_path(file_system, source, &src_path)) != 0)
+        goto err;
 
     if ((ret = local_cache_path(file_system, object, &dest_path)) != 0)
         goto err;
@@ -721,7 +740,7 @@ local_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
      * Link the object with the original local object. The could be replaced by a file copy if
      * portability is an issue.
      */
-    if ((ret = link(source, dest_path)) != 0) {
+    if ((ret = link(src_path, dest_path)) != 0) {
         ret = local_err(
           local, session, errno, "ss_flush_finish link %s to %s failed", source, dest_path);
         goto err;
@@ -731,6 +750,7 @@ local_flush_finish(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
         ret = local_err(local, session, errno, "%s: ss_flush_finish chmod failed", dest_path);
 err:
     free(dest_path);
+    free(src_path);
     return (ret);
 }
 
