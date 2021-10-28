@@ -1,3 +1,9 @@
+/*
+ * @tags: [
+ *     requires_fcv_40, # autoSplitVector not present in v3.6 binaries
+ * ]
+ */
+
 (function() {
     'use strict';
 
