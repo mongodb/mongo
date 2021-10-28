@@ -70,7 +70,13 @@ void ThreadPoolExecutorStressTestEngine::addSimpleSchedulingThreads(int count) {
                 auto lk = stdx::lock_guard(_mutex);
                 _callbacks.push_back(swCb.getValue());
             }
-            sleepFor(kDurationBetweenSimpleSchedulings);
+            while (!_terminate.load()) {
+                sleepFor(kDurationBetweenSimpleSchedulings);
+                auto lk = stdx::lock_guard(_mutex);
+                if (_callbacks.size() < kMaxCallbacks) {
+                    break;
+                }
+            }
         }
     };
 
@@ -83,11 +89,11 @@ void ThreadPoolExecutorStressTestEngine::addSimpleSchedulingThreads(int count) {
 
 void ThreadPoolExecutorStressTestEngine::addRandomCancelationThreads(int count) {
     auto cancelationTask = [this] {
-        while (!_terminate.load()) {
+        while (true) {
             TaskExecutor::CallbackHandle cb;
             {
                 auto lk = stdx::lock_guard(_mutex);
-                while (_callbacks.size() > 100 && !cb) {
+                while ((_callbacks.size() > 100 || _terminate.load()) && !cb) {
                     cb = std::move(_callbacks.front());
                     _callbacks.pop_front();
                 }
@@ -97,6 +103,12 @@ void ThreadPoolExecutorStressTestEngine::addRandomCancelationThreads(int count) 
                 _executor->cancel(cb);
             } else if (cb) {
                 _executor->wait(cb);
+            }
+            if (_terminate.load()) {
+                stdx::lock_guard<Latch> lk(_mutex);
+                if (_callbacks.empty()) {
+                    break;
+                }
             }
         }
     };
@@ -148,7 +160,7 @@ void ThreadPoolExecutorStressTestEngine::_addMockNetworkResponseThread() {
     }
     stdx::lock_guard<Latch> lk(_mutex);
     _threads.emplace_back([this] {
-        while (!_terminate.load()) {
+        while (true) {
             {
                 NetworkInterfaceMock::InNetworkGuard ing(*_netMock);
                 while ((*_netMock)->hasReadyRequests()) {
@@ -157,6 +169,13 @@ void ThreadPoolExecutorStressTestEngine::_addMockNetworkResponseThread() {
                 }
             }
             sleepFor(kDurationBetweenMockedResponses);
+            // Network response thread must wait until all callbacks are cleared.
+            if (_terminate.load()) {
+                stdx::lock_guard<Latch> lk(_mutex);
+                if (_callbacks.empty()) {
+                    break;
+                }
+            }
         }
     });
 }
