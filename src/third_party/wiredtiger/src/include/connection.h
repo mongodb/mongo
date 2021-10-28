@@ -215,7 +215,6 @@ typedef enum {
     WT_VERB_API = 0,
     WT_VERB_BACKUP,
     WT_VERB_BLOCK,
-    WT_VERB_BLKCACHE,
     WT_VERB_CHECKPOINT,
     WT_VERB_CHECKPOINT_CLEANUP,
     WT_VERB_CHECKPOINT_PROGRESS,
@@ -364,8 +363,6 @@ struct __wt_connection_impl {
     WT_SPINLOCK block_lock; /* Locked: block manager list */
     TAILQ_HEAD(__wt_blockhash, __wt_block) * blockhash;
     TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
-
-    WT_BLKCACHE blkcache; /* Block cache */
 
     /* Locked: handles in each bucket */
     uint64_t *dh_bucket_count;

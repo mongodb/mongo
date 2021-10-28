@@ -254,16 +254,6 @@ create_database(const char *home, WT_CONNECTION **connp)
     if (DATASOURCE("lsm") || g.c_cache < 20)
         CONFIG_APPEND(p, ",eviction_dirty_trigger=95");
 
-    /* Block cache */
-    CONFIG_APPEND(p,
-      ",block_cache=(enabled=%s,type=\"dram\""
-      ",cache_on_checkpoint=%s"
-      ",cache_on_writes=%s"
-      ",size=%" PRIu32 "MB)",
-      g.c_block_cache == 0 ? "false" : "true",
-      g.c_block_cache_cache_on_checkpoint == 0 ? "false" : "true",
-      g.c_block_cache_cache_on_writes == 0 ? "false" : "true", g.c_block_cache_size);
-
     /* Eviction worker configuration. */
     if (g.c_evict_max != 0)
         CONFIG_APPEND(p, ",eviction=(threads_max=%" PRIu32 ")", g.c_evict_max);

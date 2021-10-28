@@ -22,10 +22,10 @@ __wt_ext_spin_init(WT_EXTENSION_API *wt_api, WT_EXTENSION_SPINLOCK *ext_spinlock
     ext_spinlock->spinlock = NULL;
     default_session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
     if ((ret = __wt_calloc_one(default_session, &lock)) != 0)
-        return (ret);
+        return ret;
     if ((ret = __wt_spin_init(default_session, lock, name)) != 0) {
         __wt_free(default_session, lock);
-        return (ret);
+        return ret;
     }
     ext_spinlock->spinlock = lock;
     return (0);
@@ -44,6 +44,7 @@ __wt_ext_spin_lock(
     WT_UNUSED(wt_api); /* Unused parameters */
     lock = ((WT_SPINLOCK *)ext_spinlock->spinlock);
     __wt_spin_lock((WT_SESSION_IMPL *)session, lock);
+    return;
 }
 
 /*
@@ -59,6 +60,7 @@ __wt_ext_spin_unlock(
     WT_UNUSED(wt_api); /* Unused parameters */
     lock = ((WT_SPINLOCK *)ext_spinlock->spinlock);
     __wt_spin_unlock((WT_SESSION_IMPL *)session, lock);
+    return;
 }
 
 /*
@@ -78,4 +80,5 @@ __wt_ext_spin_destroy(WT_EXTENSION_API *wt_api, WT_EXTENSION_SPINLOCK *ext_spinl
     __wt_spin_destroy(default_session, lock);
     __wt_free(default_session, lock);
     ext_spinlock->spinlock = NULL;
+    return;
 }

@@ -303,25 +303,6 @@ __wt_stats_clear(void *stats_arg, int slot)
             WT_STAT_CONN_INCR(session, stat##_gt10000);                                           \
     }
 
-#define WT_STAT_COMPR_RATIO_HIST_INCR_FUNC(ratio)                                                \
-    static inline void __wt_stat_compr_ratio_hist_incr(WT_SESSION_IMPL *session, uint64_t ratio) \
-    {                                                                                            \
-        if (ratio < 2)                                                                           \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_2);                                   \
-        else if (ratio < 4)                                                                      \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_4);                                   \
-        else if (ratio < 8)                                                                      \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_8);                                   \
-        else if (ratio < 16)                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_16);                                  \
-        else if (ratio < 32)                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_32);                                  \
-        else if (ratio < 64)                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_64);                                  \
-        else                                                                                     \
-            WT_STAT_DATA_INCR(session, compress_hist_ratio_max);                                 \
-    }
-
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
@@ -342,27 +323,6 @@ struct __wt_connection_stats {
     int64_t lsm_work_units_done;
     int64_t lsm_work_units_created;
     int64_t lsm_work_queue_max;
-    int64_t block_cache_blocks_update;
-    int64_t block_cache_bytes_update;
-    int64_t block_cache_blocks_evicted;
-    int64_t block_cache_bypass_filesize;
-    int64_t block_cache_data_refs;
-    int64_t block_cache_not_evicted_overhead;
-    int64_t block_cache_bypass_writealloc;
-    int64_t block_cache_bypass_overhead_put;
-    int64_t block_cache_bypass_get;
-    int64_t block_cache_bypass_put;
-    int64_t block_cache_eviction_passes;
-    int64_t block_cache_hits;
-    int64_t block_cache_misses;
-    int64_t block_cache_bypass_chkpt;
-    int64_t block_cache_blocks_removed;
-    int64_t block_cache_blocks;
-    int64_t block_cache_blocks_insert_read;
-    int64_t block_cache_blocks_insert_write;
-    int64_t block_cache_bytes;
-    int64_t block_cache_bytes_insert_read;
-    int64_t block_cache_bytes_insert_write;
     int64_t block_preload;
     int64_t block_read;
     int64_t block_write;
@@ -992,13 +952,6 @@ struct __wt_dsrc_stats {
     int64_t compress_precomp_leaf_max_page_size;
     int64_t compress_read;
     int64_t compress_write;
-    int64_t compress_hist_ratio_max;
-    int64_t compress_hist_ratio_16;
-    int64_t compress_hist_ratio_2;
-    int64_t compress_hist_ratio_32;
-    int64_t compress_hist_ratio_4;
-    int64_t compress_hist_ratio_64;
-    int64_t compress_hist_ratio_8;
     int64_t compress_write_fail;
     int64_t compress_write_too_small;
     int64_t cursor_next_skip_total;
