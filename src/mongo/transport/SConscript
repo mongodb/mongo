@@ -55,7 +55,6 @@ tlEnv.Library(
         'transport_layer_asio.cpp',
         'asio_utils.cpp',
         'session_asio.cpp',
-        'proxy_protocol_header_parser.cpp',
         'transport_options.idl',
     ],
     LIBDEPS=[
@@ -186,7 +185,6 @@ tlEnv.CppUnitTest(
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
         'service_state_machine_test.cpp',
-        'proxy_protocol_header_parser_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
