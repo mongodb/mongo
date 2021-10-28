@@ -25,15 +25,27 @@ env.Library(
 )
 
 env.Library(
+    target='apply_ops_command_info',
+    source=[
+        'apply_ops_command_info.cpp',
+        'apply_ops.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        'oplog_entry',
+    ]
+)
+
+env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',
         'oplog.cpp',
         'oplog_entry_or_grouped_inserts.cpp',
         'transaction_oplog_application.cpp',
-        'apply_ops.idl',
     ],
     LIBDEPS=[
+        'apply_ops_command_info',
         'tenant_migration_decoration',
     ],
     LIBDEPS_PRIVATE=[

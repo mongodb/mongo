@@ -69,34 +69,6 @@ namespace {
 // If enabled, causes loop in _applyOps() to hang after applying current operation.
 MONGO_FAIL_POINT_DEFINE(applyOpsPauseBetweenOperations);
 
-/**
- * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
- */
-bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
-    for (const auto& elem : applyOpCmd.firstElement().Obj()) {
-        const char* opType = elem.Obj().getField("op").valuestrsafe();
-
-        // All atomic ops have an opType of length 1.
-        if (opType[0] == '\0' || opType[1] != '\0')
-            return false;
-
-        // Only consider CRUD operations.
-        switch (*opType) {
-            case 'd':
-            case 'n':
-            case 'u':
-                break;
-            case 'i':
-                break;
-            // Fallthrough.
-            default:
-                return false;
-        }
-    }
-
-    return true;
-}
-
 Status _applyOps(OperationContext* opCtx,
                  const ApplyOpsCommandInfo& info,
                  repl::OplogApplication::Mode oplogApplicationMode,
@@ -347,38 +319,6 @@ Status _checkPrecondition(OperationContext* opCtx,
 }
 }  // namespace
 
-// static
-ApplyOpsCommandInfo ApplyOpsCommandInfo::parse(const BSONObj& applyOpCmd) {
-    try {
-        return ApplyOpsCommandInfo(applyOpCmd);
-    } catch (DBException& ex) {
-        ex.addContext(str::stream() << "Failed to parse applyOps command: " << redact(applyOpCmd));
-        throw;
-    }
-}
-
-bool ApplyOpsCommandInfo::areOpsCrudOnly() const {
-    return _areOpsCrudOnly;
-}
-
-bool ApplyOpsCommandInfo::isAtomic() const {
-    return getAllowAtomic() && areOpsCrudOnly();
-}
-
-ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
-    : _areOpsCrudOnly(_parseAreOpsCrudOnly(applyOpCmd)) {
-    parseProtected(IDLParserErrorContext("applyOps"), applyOpCmd);
-
-    if (getPreCondition()) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot use preCondition with {allowAtomic: false}",
-                getAllowAtomic());
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot use preCondition when operations include commands.",
-                areOpsCrudOnly());
-    }
-}
-
 Status applyApplyOpsOplogEntry(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode oplogApplicationMode) {
@@ -512,51 +452,6 @@ Status applyOps(OperationContext* opCtx,
     }
 
     return Status::OK();
-}
-
-// static
-std::vector<OplogEntry> ApplyOps::extractOperations(const OplogEntry& applyOpsOplogEntry) {
-    std::vector<OplogEntry> result;
-    extractOperationsTo(applyOpsOplogEntry, applyOpsOplogEntry.getEntry().toBSON(), &result);
-    return result;
-}
-
-// static
-void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
-                                   const BSONObj& topLevelDoc,
-                                   std::vector<OplogEntry>* operations) {
-    uassert(ErrorCodes::TypeMismatch,
-            str::stream() << "ApplyOps::extractOperations(): not a command: "
-                          << redact(applyOpsOplogEntry.toBSONForLogging()),
-            applyOpsOplogEntry.isCommand());
-
-    uassert(ErrorCodes::CommandNotSupported,
-            str::stream() << "ApplyOps::extractOperations(): not applyOps command: "
-                          << redact(applyOpsOplogEntry.toBSONForLogging()),
-            OplogEntry::CommandType::kApplyOps == applyOpsOplogEntry.getCommandType());
-
-    auto cmdObj = applyOpsOplogEntry.getOperationToApply();
-    auto info = ApplyOpsCommandInfo::parse(cmdObj);
-    auto operationDocs = info.getOperations();
-    bool alwaysUpsert = info.getAlwaysUpsert() && !applyOpsOplogEntry.getTxnNumber();
-
-    for (const auto& operationDoc : operationDocs) {
-        // Make sure that the inner ops are not malformed or over-specified.
-        ReplOperation::parse(IDLParserErrorContext("extractOperations"), operationDoc);
-
-        BSONObjBuilder builder(operationDoc);
-
-        // Oplog entries can have an oddly-named "b" field for "upsert". MongoDB stopped creating
-        // such entries in 4.0, but we can use the "b" field for the extracted entry here.
-        if (alwaysUpsert && !operationDoc.hasField("b")) {
-            builder.append("b", true);
-        }
-
-        builder.appendElementsUnique(topLevelDoc);
-        auto operation = builder.obj();
-
-        operations->emplace_back(operation);
-    }
 }
 
 }  // namespace repl
