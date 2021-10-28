@@ -50,11 +50,17 @@ public:
     }
 
     void add(Value value) final {
+        // Ignore nullish values.
+        if (value.nullish())
+            return;
         _memUsageBytes += value.getApproximateSize();
         _values.insert(std::move(value));
     }
 
     void remove(Value value) final {
+        // Ignore nullish values.
+        if (value.nullish())
+            return;
         // std::multiset::insert is guaranteed to put the element after any equal elements
         // already in the container. So find() / erase() will remove the oldest equal element,
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
