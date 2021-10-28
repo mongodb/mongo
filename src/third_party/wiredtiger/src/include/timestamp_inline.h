@@ -157,37 +157,3 @@
         if ((source)->prepare != 0)                                                           \
             (dest)->prepare = 1;                                                              \
     } while (0)
-
-/*
- * __wt_time_window_clear_obsolete --
- *     Where possible modify time window values to avoid writing obsolete values to the cell later.
- */
-static inline void
-__wt_time_window_clear_obsolete(
-  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, uint64_t oldest_id, wt_timestamp_t oldest_ts)
-{
-    /*
-     * In memory database don't need to avoid writing values to the cell. If we remove this check we
-     * create an extra update on the end of the chain later in reconciliation as we'll re-append the
-     * disk image value to the update chain.
-     */
-    if (!tw->prepare && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
-        if (tw->stop_txn == WT_TXN_MAX && tw->start_txn < oldest_id)
-            tw->start_txn = WT_TXN_NONE;
-        /* Avoid retrieving the pinned timestamp unless we need it. */
-        if (tw->stop_ts == WT_TS_MAX) {
-            /*
-             * The durable stop timestamp should be it's default value whenever the stop timestamp
-             * is.
-             */
-            WT_ASSERT(session, tw->durable_stop_ts == WT_TS_NONE);
-            /*
-             * The durable start timestamp is always greater than or equal to the start timestamp,
-             * as such we must check it against the pinned timestamp and not the start timestamp.
-             */
-            WT_ASSERT(session, tw->start_ts <= tw->durable_start_ts);
-            if (tw->durable_start_ts < oldest_ts)
-                tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
-        }
-    }
-}

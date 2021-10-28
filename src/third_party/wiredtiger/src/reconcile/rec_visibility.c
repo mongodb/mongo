@@ -790,8 +790,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
       !vpack->tw.prepare && (upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
         WT_ERR(__rec_append_orig_value(session, page, upd_select->upd, vpack));
 
-    __wt_time_window_clear_obsolete(
-      session, &upd_select->tw, r->rec_start_oldest_id, r->rec_start_pinned_ts);
+    __wt_rec_time_window_clear_obsolete(session, &upd_select->tw, r);
 err:
     __wt_scr_free(session, &tmp);
     return (ret);

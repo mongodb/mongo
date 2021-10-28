@@ -2317,6 +2317,8 @@ static inline void __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCI
 static inline void __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv);
 static inline void __wt_rec_incr(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size);
+static inline void __wt_rec_time_window_clear_obsolete(
+  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_RECONCILE *r);
 static inline void __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep);
 static inline void __wt_ref_key_clear(WT_REF *ref);
 static inline void __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK_ADDR *unpack);
@@ -2336,8 +2338,6 @@ static inline void __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
 static inline void __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
 static inline void __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
 static inline void __wt_struct_size_adjust(WT_SESSION_IMPL *session, size_t *sizep);
-static inline void __wt_time_window_clear_obsolete(
-  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, uint64_t oldest_id, wt_timestamp_t oldest_ts);
 static inline void __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag);
 static inline void __wt_tree_modify_set(WT_SESSION_IMPL *session);
 static inline void __wt_txn_cursor_op(WT_SESSION_IMPL *session);
