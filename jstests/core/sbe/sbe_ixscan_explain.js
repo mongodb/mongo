@@ -3,6 +3,7 @@
 //
 // @tags: [
 //   assumes_against_mongod_not_mongos,
+//   requires_fcv_51,
 // ]
 
 (function() {
