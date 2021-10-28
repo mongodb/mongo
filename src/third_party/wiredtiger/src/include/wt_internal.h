@@ -424,6 +424,7 @@ typedef uint64_t wt_timestamp_t;
 #include "thread_group.h"
 #include "tiered.h"
 #include "txn.h"
+#include "verbose.h"
 
 #include "session.h" /* required by connection.h */
 #include "connection.h"

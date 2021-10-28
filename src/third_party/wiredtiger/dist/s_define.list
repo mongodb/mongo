@@ -92,6 +92,8 @@ WT_TRET_ERROR_OK
 WT_TXN_UPDATE
 WT_UPDATE_SIZE
 WT_USE_OPENAT
+WT_VERBOSE_DEFAULT
+WT_VERBOSE_LEVEL_ISSET
 WT_WITH_LOCK_NOWAIT
 WT_WITH_LOCK_WAIT
 __F
@@ -99,3 +101,9 @@ __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
 __WT_INTERNAL_H
 __wt_bswap16
+__wt_verbose_debug
+__wt_verbose_error
+__wt_verbose_info
+__wt_verbose_level
+__wt_verbose_level_multi
+__wt_verbose_warning
