@@ -898,7 +898,7 @@ void ReshardingCoordinatorExternalStateImpl::sendCommandToShards(
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor) {
-    sharding_util::sendCommandToShards(opCtx, dbName, command, shardIds, executor);
+    sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, dbName, command, shardIds, executor);
 }
 
 ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
