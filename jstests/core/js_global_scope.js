@@ -114,7 +114,7 @@ const expectedGlobalVars = [
 ];
 
 const targetArch = buildInfo().buildEnvironment.target_arch;
-if (targetArch !== 'aarch64' && targetArch !== 'ppc64le') {
+if (targetArch !== 'aarch64' && targetArch !== 'ppc64le' && targetArch !== 's390x') {
     // WebAssembly is not supported on ARM and PPC platforms. It is not compiled in to the JS
     // environment, so isn't expected in this output.
     expectedGlobalVars.push("WebAssembly");
