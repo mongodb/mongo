@@ -164,28 +164,4 @@ test::run()
 
     logger::log_msg(LOG_INFO, "SUCCESS");
 }
-
-workload_generator *
-test::get_workload_generator()
-{
-    return (_workload_generator);
-}
-
-runtime_monitor *
-test::get_runtime_monitor()
-{
-    return (_runtime_monitor);
-}
-
-timestamp_manager *
-test::get_timestamp_manager()
-{
-    return (_timestamp_manager);
-}
-
-thread_manager *
-test::get_thread_manager()
-{
-    return (_thread_manager);
-}
 } // namespace test_harness

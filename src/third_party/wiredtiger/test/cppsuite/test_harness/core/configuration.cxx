@@ -101,12 +101,6 @@ configuration::~configuration()
     }
 }
 
-const std::string &
-configuration::get_config() const
-{
-    return (_config);
-}
-
 std::string
 configuration::get_string(const std::string &key)
 {
@@ -161,12 +155,6 @@ std::vector<std::string>
 configuration::get_list(const std::string &key)
 {
     return get<std::vector<std::string>>(key, false, types::LIST, {}, config_item_to_list);
-}
-
-std::vector<std::string>
-configuration::get_optional_list(const std::string &key)
-{
-    return get<std::vector<std::string>>(key, true, types::LIST, {}, config_item_to_list);
 }
 
 template <typename T>
