@@ -223,8 +223,16 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                                        ErrorCodes::Error err) {
     class Hook final : public audit::CommandInterface {
     public:
-        explicit Hook(const CommandInvocation* invocation, const NamespaceString* nss)
-            : _invocation(invocation), _nss(nss) {}
+        Hook(const CommandInvocation* invocation, const OpMsgRequest& request)
+            : _invocation(invocation) {
+            if (_invocation) {
+                _nss = _invocation->ns();
+                _name = _invocation->definition()->getName();
+            } else {
+                _nss = NamespaceString(request.getDatabase());
+                _name = request.getCommandName().toString();
+            }
+        }
 
         void snipForLogging(mutablebson::Document* cmdObj) const override {
             if (_invocation) {
@@ -240,14 +248,11 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
         }
 
         StringData getName() const override {
-            if (!_invocation) {
-                return "Error"_sd;
-            }
-            return _invocation->definition()->getName();
+            return _name;
         }
 
         NamespaceString ns() const override {
-            return *_nss;
+            return _nss;
         }
 
         bool redactArgs() const override {
@@ -256,10 +261,9 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
 
     private:
         const CommandInvocation* _invocation;
-        const NamespaceString* _nss;
+        NamespaceString _nss;
+        std::string _name;
     };
-
-    NamespaceString nss = invocation ? invocation->ns() : NamespaceString(request.getDatabase());
 
     // Always audit errors other than Unauthorized.
     //
@@ -268,7 +272,7 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
     // or if we don't know our Command definition.
     if ((err != ErrorCodes::Unauthorized) || !invocation ||
         invocation->definition()->auditAuthorizationFailure()) {
-        audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation, &nss), err);
+        audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation, request), err);
     }
 }
 
