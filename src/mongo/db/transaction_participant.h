@@ -357,6 +357,8 @@ public:
 
         const LogicalSessionId& _sessionId() const;
 
+        bool _isInternalSessionForRetryableWrite() const;
+
         // Reports transaction stats for both active and inactive transactions using the provided
         // builder.
         void _reportTransactionStats(OperationContext* opCtx,

@@ -644,8 +644,7 @@ WriteResult performInserts(OperationContext* opCtx,
         bool containsDotsAndDollarsField = false;
         auto fixedDoc = fixDocumentForInsert(opCtx, doc, &containsDotsAndDollarsField);
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-        const bool wasAlreadyExecuted = opCtx->getTxnNumber() &&
-            !opCtx->inMultiDocumentTransaction() &&
+        const bool wasAlreadyExecuted = opCtx->isRetryableWrite() &&
             txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId);
 
         if (!fixedDoc.isOK()) {
@@ -997,14 +996,12 @@ WriteResult performUpdates(OperationContext* opCtx,
     bool forgoOpCounterIncrements = false;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-        if (opCtx->getTxnNumber()) {
-            if (!opCtx->inMultiDocumentTransaction()) {
-                if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
-                    containsRetry = true;
-                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                    out.results.emplace_back(parseOplogEntryForUpdate(*entry));
-                    continue;
-                }
+        if (opCtx->isRetryableWrite()) {
+            if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+                containsRetry = true;
+                RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+                out.results.emplace_back(parseOplogEntryForUpdate(*entry));
+                continue;
             }
         }
 
@@ -1220,14 +1217,12 @@ WriteResult performDeletes(OperationContext* opCtx,
 
     for (auto&& singleOp : wholeOp.getDeletes()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-        if (opCtx->getTxnNumber()) {
-            if (!opCtx->inMultiDocumentTransaction() &&
-                txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
-                containsRetry = true;
-                RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
-                continue;
-            }
+        if (opCtx->isRetryableWrite() &&
+            txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
+            containsRetry = true;
+            RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
+            continue;
         }
 
         // TODO: don't create nested CurOp for legacy writes.

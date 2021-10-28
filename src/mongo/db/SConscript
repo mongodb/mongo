@@ -742,6 +742,7 @@ env.Library(
         'internal_transactions_feature_flag',
         'not_primary_error_tracker',
         'query_exec',
+        'repl/apply_ops_command_info',
         'repl/repl_server_parameters',
         'stats/fill_locker_info',
         'stats/top',

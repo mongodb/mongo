@@ -56,6 +56,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/retryable_writes_stats.h"
@@ -116,6 +117,17 @@ void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
         "txnNumber"_attr = txnNumber,
         "firstCommitOpTime"_attr = firstOpTime,
         "secondCommitOpTime"_attr = secondOpTime);
+}
+
+void validateTransactionHistoryApplyOpsOplogEntry(const repl::OplogEntry& oplogEntry) {
+    uassert(5875601,
+            "Found an applyOps oplog entry for retryable writes that were executed without "
+            "using a retryable internal transaction",
+            isInternalSessionForRetryableWrite(*oplogEntry.getSessionId()));
+    uassert(5875602,
+            "Found an applyOps oplog entry for retryable internal transaction with top-level "
+            "'stmtId' field",
+            oplogEntry.getStatementIds().empty());
 }
 
 struct ActiveTransactionHistory {
@@ -425,6 +437,10 @@ const LogicalSessionId& TransactionParticipant::Observer::_sessionId() const {
     return owningSession->getSessionId();
 }
 
+bool TransactionParticipant::Observer::_isInternalSessionForRetryableWrite() const {
+    return isInternalSessionForRetryableWrite(_sessionId());
+}
+
 void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
     OperationContext* opCtx, const TxnNumber& txnNumber) {
     if (txnNumber > o().activeTxnNumber) {
@@ -503,6 +519,13 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
                     "Only servers in a sharded cluster can start a new transaction at the active "
                     "transaction number",
                     serverGlobalParams.clusterRole != ClusterRole::None);
+
+            if (_isInternalSessionForRetryableWrite() &&
+                o().txnState.isInSet(TransactionState::kCommitted)) {
+                // This is a retry of a committed internal transaction for retryable writes so
+                // skip resetting the state and updating the metrics.
+                return;
+            }
 
             // The active transaction number can only be reused if:
             // 1. The transaction participant is in retryable write mode and has not yet executed a
@@ -1309,8 +1332,15 @@ const repl::OpTime TransactionParticipant::Participant::getPrepareOpTimeForRecov
 
 void TransactionParticipant::Participant::addTransactionOperation(
     OperationContext* opCtx, const repl::ReplOperation& operation) {
-
     // Ensure that we only ever add operations to an in progress transaction.
+    if (!o().txnState.isInProgress() && _isInternalSessionForRetryableWrite()) {
+        // Throw a uassert error instead of an invariant error if this is a retryable internal
+        // transaction since all write statements are allowed to bypass the checks in
+        // beginOrContinue if the transaction has already committed.
+        uasserted(5875606,
+                  "Cannot perform writes in a retryable internal transaction that has already "
+                  "committed, aborted or prepared");
+    }
     invariant(o().txnState.isInProgress(), str::stream() << "Current state: " << o().txnState);
 
     invariant(p().autoCommit && !*p().autoCommit && o().activeTxnNumber != kUninitializedTxnNumber);
@@ -1602,6 +1632,11 @@ bool TransactionParticipant::Observer::expiredAsOf(Date_t when) const {
 }
 
 void TransactionParticipant::Participant::abortTransaction(OperationContext* opCtx) {
+    if (_isInternalSessionForRetryableWrite() && o().txnState.isCommitted()) {
+        // An error occurred while retrying an committed retryable internal transaction should
+        // not modify the state of the committed transaction.
+        return;
+    }
     // Normally, absence of a transaction resource stash indicates an inactive transaction.
     // However, in the case of a failed "unstash", an active transaction may exist without a stash
     // and be killed externally.  In that case, the opCtx will not have a transaction number.
@@ -1796,10 +1831,13 @@ void TransactionParticipant::Participant::_checkIsCommandValidWithTxnState(
             str::stream() << "Transaction " << requestTxnNumber << " has been aborted.",
             !o().txnState.isAborted());
 
-    // Cannot change committed transaction but allow retrying commitTransaction command.
+    // Cannot change committed transaction but allow retrying:
+    // - commitTransaction command.
+    // - any command if the transaction is an internal transaction for retryable writes.
     uassert(ErrorCodes::TransactionCommitted,
             str::stream() << "Transaction " << requestTxnNumber << " has been committed.",
-            cmdName == "commitTransaction" || !o().txnState.isCommitted());
+            cmdName == "commitTransaction" || !o().txnState.isCommitted() ||
+                (_isInternalSessionForRetryableWrite() && o().txnState.isCommitted()));
 
     // Disallow operations other than abort, prepare or commit on a prepared transaction
     uassert(ErrorCodes::PreparedTransactionInProgress,
@@ -2347,6 +2385,15 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
     invariant(sessionTxnRecord.getSessionId() == _sessionId());
     invariant(sessionTxnRecord.getTxnNum() == o().activeTxnNumber);
 
+    if (o().txnState.isCommitted()) {
+        // Only write statements in retryable internal transaction can bypass the checks in
+        // beginOrContinue and get to here.
+        invariant(_isInternalSessionForRetryableWrite());
+        uasserted(5875603,
+                  "Cannot perform writes in a retryable internal transaction that has already "
+                  "committed");
+    }
+
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
         const auto stmtOpTime = _checkStatementExecuted(stmtId);
@@ -2447,10 +2494,25 @@ boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStat
     TransactionHistoryIterator txnIter(*stmtTimestamp);
     while (txnIter.hasNext()) {
         const auto entry = txnIter.next(opCtx);
-        auto stmtIds = entry.getStatementIds();
-        invariant(!stmtIds.empty());
-        if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end())
-            return entry;
+
+        if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+            validateTransactionHistoryApplyOpsOplogEntry(entry);
+
+            std::vector<repl::OplogEntry> innerEntries;
+            repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
+            for (const auto& innerEntry : innerEntries) {
+                auto stmtIds = innerEntry.getStatementIds();
+                if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end()) {
+                    return innerEntry;
+                }
+            }
+        } else {
+            auto stmtIds = entry.getStatementIds();
+            invariant(!stmtIds.empty());
+            if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end()) {
+                return entry;
+            }
+        }
     }
 
     MONGO_UNREACHABLE;

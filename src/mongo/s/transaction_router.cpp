@@ -443,7 +443,8 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     if (!mustStartTransaction) {
         auto readConcernFieldName = repl::ReadConcernArgs::kReadConcernFieldName;
         dassert(!cmd.hasField(readConcernFieldName) ||
-                cmd.getObjectField(readConcernFieldName).isEmpty());
+                cmd.getObjectField(readConcernFieldName).isEmpty() ||
+                sharedOptions.isInternalTransactionForRetryableWrite);
     }
 
     BSONObjBuilder newCmd = mustStartTransaction
@@ -660,7 +661,8 @@ TransactionRouter::Participant& TransactionRouter::Router::_createParticipant(
         o().apiParameters,
         o().readConcernArgs,
         o().atClusterTime ? boost::optional<LogicalTime>(o().atClusterTime->getTime())
-                          : boost::none};
+                          : boost::none,
+        isInternalSessionForRetryableWrite(_sessionId())};
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     auto resultPair =
@@ -932,9 +934,10 @@ void TransactionRouter::Router::_beginOrContinueActiveTxnNumber(OperationContext
     } else if (txnRetryCounter == o().txnRetryCounter) {
         switch (action) {
             case TransactionActions::kStart: {
-                uasserted(ErrorCodes::ConflictingOperationInProgress,
-                          str::stream() << "txnNumber " << o().txnNumber << " for session "
-                                        << _sessionId() << " already started");
+                uassert(ErrorCodes::ConflictingOperationInProgress,
+                        str::stream() << "txnNumber " << o().txnNumber << " for session "
+                                      << _sessionId() << " already started",
+                        isInternalSessionForRetryableWrite(_sessionId()));
                 break;
             }
             case TransactionActions::kContinue: {

@@ -89,6 +89,8 @@ public:
 
         // Only set for transactions with snapshot level read concern.
         boost::optional<LogicalTime> atClusterTime;
+
+        bool isInternalTransactionForRetryableWrite;
     };
 
     /**

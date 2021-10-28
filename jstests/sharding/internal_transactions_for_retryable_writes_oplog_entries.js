@@ -58,12 +58,7 @@ function verifyOplogEntries(cmdObj,
         stmtIds = makeCustomStmtIdsForTest(numWriteStatements, customStmtIdsOption);
         writeCmdObj.stmtIds = stmtIds;
     }
-    const commitCmdObj = {
-        commitTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-    };
+    const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNumber);
 
     const writeRes = mongosTestDB.runCommand(writeCmdObj);
     if (customStmtIdsOption == kStmtIdsOption.isRepeated) {
@@ -74,13 +69,9 @@ function verifyOplogEntries(cmdObj,
     assert.commandWorked(writeRes);
     if (isPreparedTransaction) {
         const shard0Primary = st.rs0.getPrimary();
-        const isPreparedTransactionRes = assert.commandWorked(shard0Primary.adminCommand({
-            prepareTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-            writeConcern: {w: "majority"},
-        }));
+        const prepareCmdObj = makePrepareTransactionCmdObj(lsid, txnNumber);
+        const isPreparedTransactionRes =
+            assert.commandWorked(shard0Primary.adminCommand(prepareCmdObj));
         commitCmdObj.commitTimestamp = isPreparedTransactionRes.prepareTimestamp;
         assert.commandWorked(shard0Primary.adminCommand(commitCmdObj));
     }

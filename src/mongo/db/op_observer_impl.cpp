@@ -1399,6 +1399,9 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
         }
     }
 
+    // Stores the statement ids of all write statements in the transaction.
+    std::vector<StmtId> stmtIdsWritten;
+
     // At the beginning of each loop iteration below, 'stmtsIter' will always point to the
     // first statement of the sequence of remaining, unpacked transaction statements. If all
     // statements have been packed, it should point to stmts.end(), which is the loop's
@@ -1407,7 +1410,6 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     while (stmtsIter != stmts->end()) {
 
         BSONObjBuilder applyOpsBuilder;
-        std::vector<StmtId> stmtIdsWritten;
         auto nextStmt = packTransactionStatementsForApplyOps(
             &applyOpsBuilder, &stmtIdsWritten, stmtsIter, stmts->end());
 
@@ -1469,8 +1471,13 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
         auto txnState = isPartialTxn
             ? DurableTxnStateEnum::kInProgress
             : (implicitPrepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted);
-        prevWriteOpTime = logApplyOpsForTransaction(
-            opCtx, &oplogEntry, txnState, startOpTime, std::move(stmtIdsWritten), updateTxnTable);
+        prevWriteOpTime =
+            logApplyOpsForTransaction(opCtx,
+                                      &oplogEntry,
+                                      txnState,
+                                      startOpTime,
+                                      (lastOp ? std::move(stmtIdsWritten) : std::vector<StmtId>{}),
+                                      updateTxnTable);
 
         hangAfterLoggingApplyOpsForTransaction.pauseWhileSet();
 
