@@ -23,18 +23,19 @@ search=`sed \
 # There are some fields that are used, but we can't detect it.
 cat << UNUSED_STAT_FIELDS
 btree_clean_checkpoint_timer
+compress_hist_ratio_max
 lock_checkpoint_count
 lock_checkpoint_wait_application
 lock_checkpoint_wait_internal
-lock_durable_timestamp_read_count
-lock_durable_timestamp_wait_application
-lock_durable_timestamp_wait_internal
-lock_durable_timestamp_write_count
 lock_dhandle_read_count
 lock_dhandle_wait
 lock_dhandle_wait_application
 lock_dhandle_wait_internal
 lock_dhandle_write_count
+lock_durable_timestamp_read_count
+lock_durable_timestamp_wait_application
+lock_durable_timestamp_wait_internal
+lock_durable_timestamp_write_count
 lock_metadata_count
 lock_metadata_wait_application
 lock_metadata_wait_internal

@@ -1,0 +1,18 @@
+#
+# Run with very large overflow items and btree.
+#
+conn_config="cache_size=21G,checkpoint_sync=false,mmap=false"
+compact=true
+compression="snappy"
+sess_config="isolation=snapshot"
+table_config="internal_page_max=128K,type=file,leaf_page_max=16K,os_cache_dirty_max=16MB,leaf_value_max=32K"
+icount=1500000
+key_sz=40
+value_sz=130000
+max_latency=2000
+populate_threads=1
+report_interval=5
+random_value=true
+run_time=300
+threads=((count=10,read=1),(count=10,update=1))
+warmup=30

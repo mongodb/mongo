@@ -186,6 +186,23 @@ if test "$wt_cv_enable_tcmalloc" = "yes"; then
 fi
 AM_CONDITIONAL([TCMalloc], [test "$wt_cv_enable_tcmalloc" = "yes"])
 
+AC_MSG_CHECKING(if --enable-memkind option specified)
+AC_ARG_ENABLE(memkind,
+	[AS_HELP_STRING([--enable-memkind],
+	    [Memkind library enables using memory on Optane NVRAM. Enable if planning to use NVRAM block cache.])], r=$enableval, r=no)
+case "$r" in
+no)	wt_cv_enable_memkind=no;;
+*)	wt_cv_enable_memkind=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_memkind)
+if test "$wt_cv_enable_memkind" = "yes"; then
+	AC_CHECK_HEADER(memkind.h,,
+	    [AC_MSG_ERROR([--enable-memkind requires memkind.h])])
+	AC_CHECK_LIB(memkind, memkind_get_version,,
+	    [AC_MSG_ERROR([--enable-memkind requires memkind library])])
+fi
+AM_CONDITIONAL([Memkind], [test "$wt_cv_enable_memkind" = "yes"])
+
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
 AC_MSG_CHECKING(if --with-spinlock option specified)
 AC_ARG_WITH(spinlock,

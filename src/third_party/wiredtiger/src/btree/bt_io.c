@@ -9,6 +9,11 @@
 #include "wt_internal.h"
 
 /*
+ * Define a function that increments histogram statistics compression ratios.
+ */
+WT_STAT_COMPR_RATIO_HIST_INCR_FUNC(ratio)
+
+/*
  * __wt_bt_read --
  *     Read a cookie referenced block into a buffer.
  */
@@ -23,7 +28,7 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
     WT_ENCRYPTOR *encryptor;
     WT_ITEM *ip;
     const WT_PAGE_HEADER *dsk;
-    size_t result_len;
+    size_t compression_ratio, result_len;
     const char *fail_msg;
 
     btree = S2BT(session);
@@ -105,6 +110,10 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
             fail_msg = "block decompression failed";
             goto corrupt;
         }
+
+        compression_ratio = result_len / (tmp->size - WT_BLOCK_COMPRESS_SKIP);
+        __wt_stat_compr_ratio_hist_incr(session, compression_ratio);
+
     } else {
         /*
          * If we uncompressed above, the page is in the correct buffer. If we get here the data may

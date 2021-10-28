@@ -296,7 +296,7 @@ do_range_reads(WTPERF_THREAD *thread, WT_CURSOR *cursor, int64_t read_range)
 }
 
 /* pre_load_data --
- *	Pull everything into cache before starting the workload phase.
+ *  Pull everything into cache before starting the workload phase.
  */
 static void
 pre_load_data(WTPERF *wtperf)

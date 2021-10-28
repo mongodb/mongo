@@ -333,6 +333,11 @@ __block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint3
         WT_RET(ret);
     }
 
+    if (block->fh->file_type == WT_FS_OPEN_FILE_TYPE_DATA) {
+        WT_TRET_ERROR_OK(
+          __wt_blkcache_put(session, offset, align_size, checksum, buf->mem, checkpoint_io, true),
+          WT_BLKCACHE_FULL);
+    }
     /*
      * Optionally schedule writes for dirty pages in the system buffer cache, but only if the
      * current session can wait.

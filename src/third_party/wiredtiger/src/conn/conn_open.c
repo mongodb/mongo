@@ -86,6 +86,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     /* The default session is used to access data handles during close. */
     F_CLR(session, WT_SESSION_NO_DATA_HANDLES);
 
+    __wt_block_cache_destroy(session);
+
     /*
      * Shut down server threads. Some of these threads access btree handles and eviction, shut them
      * down before the eviction server, and shut all servers down before closing open data handles.

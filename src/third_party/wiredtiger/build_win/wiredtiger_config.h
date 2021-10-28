@@ -52,6 +52,9 @@
 /* Define to 1 if you have the `lz4' library (-llz4). */
 /* #undef HAVE_LIBLZ4 */
 
+/* Define to 1 if you have the `memkind' library (-lmemkind). */
+/* #undef HAVE_LIBMEMKIND */
+
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 /* #undef HAVE_LIBPTHREAD */
 

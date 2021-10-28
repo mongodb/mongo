@@ -32,6 +32,9 @@ AddOption("--enable-diagnostic", dest="diagnostic", action="store_true", default
 AddOption("--enable-lz4", dest="lz4", type="string", nargs=1, action="store",
           help="Use LZ4 compression")
 
+AddOption("--enable-memkind", dest="memkind", type="string", nargs=1, action="store",
+          help="Enable support for Intel memkind library, needed for NVRAM block cache.")
+
 AddOption("--enable-python", dest="lang-python", type="string", nargs=1, action="store",
           help="Build Python extension, specify location of swig.exe binary")
 
@@ -113,6 +116,7 @@ useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
 useLz4 = GetOption("lz4")
 useTcmalloc = GetOption("tcmalloc")
+useMemkind = GetOption("memkind")
 wtlibs = []
 
 conf = Configure(env)
@@ -159,6 +163,16 @@ if useTcmalloc:
         conf.env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
     else:
         print('tcmalloc.h must be installed!')
+        Exit(1)
+
+if useMemkind:
+    conf.env.Append(CPPPATH=[useMemkind + "/include"])
+    conf.env.Append(LIBPATH=[useMemkind + "/lib"])
+    if conf.CheckCHeader('memkind.h'):
+        conf.env.Append(CPPDEFINES=['HAVE_MEMKIND'])
+        wtlibs.append("memkind")
+    else:
+        print('memkind.h must be installed!')
         Exit(1)
 
 env = conf.Finish()
