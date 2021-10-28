@@ -1330,7 +1330,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         // Even if the prepared transaction contained no statements, we always reserve at least
         // 1 oplog slot for the prepare oplog entry.
         auto numSlotsToReserve = retrieveCompletedTransactionOperations(opCtx).size();
-        numSlotsToReserve += p().numberOfPreImagesToWrite;
+        numSlotsToReserve += p().numberOfPrePostImagesToWrite;
         oplogSlotReserver.emplace(opCtx, std::max(1, static_cast<int>(numSlotsToReserve)));
         invariant(oplogSlotReserver->getSlots().size() >= 1);
         prepareOplogSlot = oplogSlotReserver->getLastSlot();
@@ -1358,7 +1358,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
     opCtx->getServiceContext()->getOpObserver()->onTransactionPrepare(
-        opCtx, reservedSlots, &completedTransactionOperations, p().numberOfPreImagesToWrite);
+        opCtx, reservedSlots, &completedTransactionOperations, p().numberOfPrePostImagesToWrite);
 
     abortGuard.dismiss();
 
@@ -1430,7 +1430,7 @@ void TransactionParticipant::Participant::addTransactionOperation(
         repl::DurableOplogEntry::getDurableReplOperationSize(operation);
     if (!operation.getPreImage().isEmpty()) {
         p().transactionOperationBytes += operation.getPreImage().objsize();
-        ++p().numberOfPreImagesToWrite;
+        ++p().numberOfPrePostImagesToWrite;
     }
 
     auto transactionSizeLimitBytes = gTransactionSizeLimitBytes.load();
@@ -1468,7 +1468,7 @@ void TransactionParticipant::Participant::clearOperationsInMemory(OperationConte
     p().transactionOperationBytes = 0;
     p().transactionOperations.clear();
     p().transactionStmtIds.clear();
-    p().numberOfPreImagesToWrite = 0;
+    p().numberOfPrePostImagesToWrite = 0;
 }
 
 void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationContext* opCtx) {
@@ -1480,7 +1480,7 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
 
-    opObserver->onUnpreparedTransactionCommit(opCtx, &txnOps, p().numberOfPreImagesToWrite);
+    opObserver->onUnpreparedTransactionCommit(opCtx, &txnOps, p().numberOfPrePostImagesToWrite);
 
     // Read-only transactions with all read concerns must wait for any data they read to be majority
     // committed. For local read concern this is to match majority read concern. For both local and

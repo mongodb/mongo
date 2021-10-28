@@ -94,10 +94,10 @@ public:
     void onTransactionPrepare(OperationContext* opCtx,
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPreImagesToWrite) override {
+                              size_t numberOfPrePostImagesToWrite) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
         OpObserverNoop::onTransactionPrepare(
-            opCtx, reservedSlots, statements, numberOfPreImagesToWrite);
+            opCtx, reservedSlots, statements, numberOfPrePostImagesToWrite);
 
         uassert(ErrorCodes::OperationFailed,
                 "onTransactionPrepare() failed",
@@ -112,9 +112,10 @@ public:
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPreImagesToWrite) override {
+                                       size_t numberOfPrePostImagesToWrite) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
-        OpObserverNoop::onUnpreparedTransactionCommit(opCtx, statements, numberOfPreImagesToWrite);
+        OpObserverNoop::onUnpreparedTransactionCommit(
+            opCtx, statements, numberOfPrePostImagesToWrite);
 
         uassert(ErrorCodes::OperationFailed,
                 "onUnpreparedTransactionCommit() failed",

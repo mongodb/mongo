@@ -105,7 +105,7 @@ public:
     void onTransactionPrepare(OperationContext* opCtx,
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPreImagesToWrite) override;
+                              size_t numberOfPrePostImagesToWrite) override;
 
     bool onTransactionPrepareThrowsException = false;
     bool transactionPrepared = false;
@@ -113,7 +113,7 @@ public:
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPreImagesToWrite) override;
+                                       size_t numberOfPrePostImagesToWrite) override;
     bool onUnpreparedTransactionCommitThrowsException = false;
     bool unpreparedTransactionCommitted = false;
     std::function<void(const std::vector<repl::ReplOperation>&)> onUnpreparedTransactionCommitFn =
@@ -150,10 +150,10 @@ public:
 void OpObserverMock::onTransactionPrepare(OperationContext* opCtx,
                                           const std::vector<OplogSlot>& reservedSlots,
                                           std::vector<repl::ReplOperation>* statements,
-                                          size_t numberOfPreImagesToWrite) {
+                                          size_t numberOfPrePostImagesToWrite) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
     OpObserverNoop::onTransactionPrepare(
-        opCtx, reservedSlots, statements, numberOfPreImagesToWrite);
+        opCtx, reservedSlots, statements, numberOfPrePostImagesToWrite);
 
     uassert(ErrorCodes::OperationFailed,
             "onTransactionPrepare() failed",
@@ -164,10 +164,10 @@ void OpObserverMock::onTransactionPrepare(OperationContext* opCtx,
 
 void OpObserverMock::onUnpreparedTransactionCommit(OperationContext* opCtx,
                                                    std::vector<repl::ReplOperation>* statements,
-                                                   size_t numberOfPreImagesToWrite) {
+                                                   size_t numberOfPrePostImagesToWrite) {
     ASSERT(opCtx->lockState()->inAWriteUnitOfWork());
 
-    OpObserverNoop::onUnpreparedTransactionCommit(opCtx, statements, numberOfPreImagesToWrite);
+    OpObserverNoop::onUnpreparedTransactionCommit(opCtx, statements, numberOfPrePostImagesToWrite);
 
     uassert(ErrorCodes::OperationFailed,
             "onUnpreparedTransactionCommit() failed",

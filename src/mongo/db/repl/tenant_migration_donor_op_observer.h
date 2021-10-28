@@ -179,7 +179,7 @@ public:
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPreImagesToWrite) final {}
+                                       size_t numberOfPrePostImagesToWrite) final {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
@@ -190,7 +190,7 @@ public:
     void onTransactionPrepare(OperationContext* opCtx,
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPreImagesToWrite) final {}
+                              size_t numberOfPrePostImagesToWrite) final {}
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}

@@ -160,7 +160,7 @@ public:
                        const UUID& uuid) override {}
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPreImagesToWrite) override {}
+                                       size_t numberOfPrePostImagesToWrite) override {}
     void onPreparedTransactionCommit(
         OperationContext* opCtx,
         OplogSlot commitOplogEntryOpTime,
@@ -169,7 +169,7 @@ public:
     void onTransactionPrepare(OperationContext* opCtx,
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPreImagesToWrite) override{};
+                              size_t numberOfPrePostImagesToWrite) override{};
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override{};
     void onMajorityCommitPointUpdate(ServiceContext* service,

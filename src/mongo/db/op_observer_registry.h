@@ -367,10 +367,10 @@ public:
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        std::vector<repl::ReplOperation>* statements,
-                                       size_t numberOfPreImagesToWrite) override {
+                                       size_t numberOfPrePostImagesToWrite) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onUnpreparedTransactionCommit(opCtx, statements, numberOfPreImagesToWrite);
+            o->onUnpreparedTransactionCommit(opCtx, statements, numberOfPrePostImagesToWrite);
     }
 
     void onPreparedTransactionCommit(
@@ -387,11 +387,11 @@ public:
     void onTransactionPrepare(OperationContext* opCtx,
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
-                              size_t numberOfPreImagesToWrite) override {
+                              size_t numberOfPrePostImagesToWrite) override {
         ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
             observer->onTransactionPrepare(
-                opCtx, reservedSlots, statements, numberOfPreImagesToWrite);
+                opCtx, reservedSlots, statements, numberOfPrePostImagesToWrite);
         }
     }
 

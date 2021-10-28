@@ -1377,7 +1377,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
 int logOplogEntriesForTransaction(OperationContext* opCtx,
                                   std::vector<repl::ReplOperation>* stmts,
                                   const std::vector<OplogSlot>& oplogSlots,
-                                  size_t numberOfPreImagesToWrite,
+                                  size_t numberOfPrePostImagesToWrite,
                                   bool prepare) {
     invariant(!stmts->empty());
     invariant(stmts->size() <= oplogSlots.size());
@@ -1402,7 +1402,7 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
     // replica set.
     const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
 
-    if (numberOfPreImagesToWrite > 0 && !migrationRecipientInfo) {
+    if (numberOfPrePostImagesToWrite > 0 && !migrationRecipientInfo) {
         for (auto& statement : *stmts) {
             if (statement.getPreImage().isEmpty()) {
                 continue;
@@ -1565,7 +1565,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
 void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
                                                    std::vector<repl::ReplOperation>* statements,
-                                                   size_t numberOfPreImagesToWrite) {
+                                                   size_t numberOfPrePostImagesToWrite) {
     invariant(opCtx->getTxnNumber());
 
     if (!opCtx->writesAreReplicated()) {
@@ -1580,7 +1580,8 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     repl::OpTime commitOpTime;
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
-    auto oplogSlots = repl::getNextOpTimes(opCtx, statements->size() + numberOfPreImagesToWrite);
+    auto oplogSlots =
+        repl::getNextOpTimes(opCtx, statements->size() + numberOfPrePostImagesToWrite);
 
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
@@ -1595,7 +1596,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
 
     // Log in-progress entries for the transaction along with the implicit commit.
     int numOplogEntries = logOplogEntriesForTransaction(
-        opCtx, statements, oplogSlots, numberOfPreImagesToWrite, false);
+        opCtx, statements, oplogSlots, numberOfPrePostImagesToWrite, false);
     commitOpTime = oplogSlots[numOplogEntries - 1];
     invariant(!commitOpTime.isNull());
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, *statements, commitOpTime);
@@ -1627,7 +1628,7 @@ void OpObserverImpl::onPreparedTransactionCommit(
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                                           const std::vector<OplogSlot>& reservedSlots,
                                           std::vector<repl::ReplOperation>* statements,
-                                          size_t numberOfPreImagesToWrite) {
+                                          size_t numberOfPrePostImagesToWrite) {
     invariant(!reservedSlots.empty());
     const auto prepareOpTime = reservedSlots.back();
     invariant(opCtx->getTxnNumber());
@@ -1661,7 +1662,7 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
                     logOplogEntriesForTransaction(opCtx,
                                                   statements,
                                                   reservedSlots,
-                                                  numberOfPreImagesToWrite,
+                                                  numberOfPrePostImagesToWrite,
                                                   true /* prepare */);
 
                 } else {

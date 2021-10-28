@@ -387,13 +387,13 @@ public:
      *
      * The 'statements' are the list of CRUD operations to be applied in this transaction.
      *
-     * The 'numberOfPreImagesToWrite' is the number of CRUD operations that have a pre-image
+     * The 'numberOfPrePostImagesToWrite' is the number of CRUD operations that have a pre-image
      * to write as a noop oplog entry. The op observer will reserve oplog slots for these
      * preimages in addition to the statements.
      */
     virtual void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                                std::vector<repl::ReplOperation>* statements,
-                                               size_t numberOfPreImagesToWrite) = 0;
+                                               size_t numberOfPrePostImagesToWrite) = 0;
     /**
      * The onPreparedTransactionCommit method is called on the commit of a prepared transaction,
      * after the RecoveryUnit onCommit() is called.  It must not be called when no transaction is
@@ -419,14 +419,14 @@ public:
      *
      * The 'statements' are the list of CRUD operations to be applied in this transaction.
      *
-     * The 'numberOfPreImagesToWrite' is the number of CRUD operations that have a pre-image
+     * The 'numberOfPrePostImagesToWrite' is the number of CRUD operations that have a pre-image
      * to write as a noop oplog entry. The op observer will reserve oplog slots for these
      * preimages in addition to the statements.
      */
     virtual void onTransactionPrepare(OperationContext* opCtx,
                                       const std::vector<OplogSlot>& reservedSlots,
                                       std::vector<repl::ReplOperation>* statements,
-                                      size_t numberOfPreImagesToWrite) = 0;
+                                      size_t numberOfPrePostImagesToWrite) = 0;
 
     /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the
