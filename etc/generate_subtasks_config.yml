@@ -33,6 +33,7 @@ build_variant_large_distro_exceptions:
   - hot_backups-rhel-70-64-bit
   - linux-64-ephemeralForTest
   - macos
+  - macos-debug-suggested
   - rhel70
   - rhel80
   - rhel-82-arm64
@@ -45,6 +46,7 @@ build_variant_large_distro_exceptions:
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-asan-all-feature-flags
   - ubuntu1804-debug-asan-classic-engine
+  - ubuntu1804-debug-aubsan-lite-required
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-ubsan-all-feature-flags
   - ubuntu1804-debug-ubsan-classic-engine

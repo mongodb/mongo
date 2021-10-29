@@ -4816,6 +4816,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       resmoke_args: --storageEngine=wiredTiger
+      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: noPassthrough_gen
