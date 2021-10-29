@@ -1056,7 +1056,8 @@ Status BSONElement::tryCoerce(T* out) const {
             if (!std::isfinite(d)) {
                 return {ErrorCodes::BadValue, "Unable to coerce NaN/Inf to integral type"};
             }
-            bool sameMax = std::numeric_limits<T>::max() == std::numeric_limits<long long>::max();
+            constexpr bool sameMax =
+                std::numeric_limits<T>::max() == std::numeric_limits<long long>::max();
             if ((!sameMax && d > static_cast<double>(std::numeric_limits<T>::max())) ||
                 (sameMax && d >= static_cast<double>(std::numeric_limits<T>::max())) ||
                 (d < std::numeric_limits<T>::lowest())) {
