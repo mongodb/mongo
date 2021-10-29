@@ -94,6 +94,8 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeInsertCoordinatorDoc);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+const WriteConcernOptions kMajorityWriteConcern{
+    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
 bool shouldStopAttemptingToCreateIndex(Status status, const CancellationToken& token) {
     return status.isOK() || token.isCanceled();
@@ -509,13 +511,9 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, ChunkType::ConfigNS, chunksQuery, ShardingCatalogClient::kMajorityWriteConcern));
-    uassertStatusOK(
-        catalogClient->removeConfigDocuments(opCtx,
-                                             TagsType::ConfigNS,
-                                             tagsQuery,
-                                             ShardingCatalogClient::kMajorityWriteConcern,
-                                             tagDeleteOperationHint));
+        opCtx, ChunkType::ConfigNS, chunksQuery, kMajorityWriteConcern));
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
 }
 
 void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
@@ -555,7 +553,8 @@ BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
     auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
-    return CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({})).getOwned();
+    return cmd.toBSON(
+        BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON()));
 }
 
 }  // namespace
@@ -762,7 +761,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
             opCtx,
             CollectionType::ConfigNS,
             BSON(CollectionType::kNssFieldName << coordinatorDoc.getTempReshardingNss().ns()),
-            ShardingCatalogClient::kMajorityWriteConcern));
+            kMajorityWriteConcern));
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
     }
@@ -1008,7 +1007,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
                                            "resharding.coordinator.transition",
                                            doc.getSourceNss().toString(),
                                            bob.obj(),
-                                           ShardingCatalogClient::kMajorityWriteConcern);
+                                           kMajorityWriteConcern);
 }
 
 void markCompleted(const Status& status) {
