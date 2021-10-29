@@ -17,7 +17,7 @@ var ClusteredCollectionUtil = class {
     // Returns a copy of the 'createOptions' used to create the clustered collection with default
     // values for fields absent in the user provided 'createOptions'.
     static constructFullCreateOptions(createOptions) {
-        const fullCreateOptions = createOptions;
+        const fullCreateOptions = Object.extend({}, createOptions, /* deep copy */ true);
 
         // If the createOptions don't specify the name, expect the default.
         if (!createOptions.clusteredIndex.name) {
@@ -49,10 +49,11 @@ var ClusteredCollectionUtil = class {
     }
 
     // The clusteredIndex should appear in listIndexes with additional "clustered" field.
-    static validateListIndexes(db, collName, fullCreationOptions) {
+    static validateListIndexes(db, collName, createOptions) {
+        const fullCreateOptions = ClusteredCollectionUtil.constructFullCreateOptions(createOptions);
         const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
         const expectedListIndexesOutput =
-            Object.extend({clustered: true}, fullCreationOptions.clusteredIndex);
+            Object.extend({clustered: true}, fullCreateOptions.clusteredIndex);
         assert.docEq(listIndexes.cursor.firstBatch[0], expectedListIndexesOutput);
     }
 
