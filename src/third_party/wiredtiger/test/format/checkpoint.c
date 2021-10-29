@@ -35,7 +35,7 @@
 void
 wts_checkpoints(void)
 {
-    char config[128];
+    char config[1024];
 
     /*
      * Configuring WiredTiger library checkpoints is done separately, rather than as part of the
@@ -45,12 +45,12 @@ wts_checkpoints(void)
      * checkpoint running in the tree, and the cache can get stuck. That workload is unlikely enough
      * we're not going to fix it in the library, so configure it away by delaying checkpoint start.
      */
-    if (g.checkpoint_config != CHECKPOINT_WIREDTIGER)
+    if (g.c_checkpoint_flag != CHECKPOINT_WIREDTIGER)
         return;
 
     testutil_check(
       __wt_snprintf(config, sizeof(config), ",checkpoint=(wait=%" PRIu32 ",log_size=%" PRIu32 ")",
-        GV(CHECKPOINT_WAIT), MEGABYTE(GV(CHECKPOINT_LOG_SIZE))));
+        g.c_checkpoint_wait, MEGABYTE(g.c_checkpoint_log_size)));
     testutil_check(g.wts_conn->reconfigure(g.wts_conn, config));
 }
 
@@ -67,13 +67,11 @@ checkpoint(void *arg)
     u_int secs;
     char config_buf[64];
     const char *ckpt_config;
-    bool backup_locked, named_checkpoints;
+    bool backup_locked;
 
     (void)arg;
-
     conn = g.wts_conn;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    named_checkpoints = !g.lsm_config;
 
     for (secs = mmrand(NULL, 1, 10); !g.workers_finished;) {
         if (secs > 0) {
@@ -90,7 +88,7 @@ checkpoint(void *arg)
          */
         ckpt_config = NULL;
         backup_locked = false;
-        if (named_checkpoints)
+        if (!DATASOURCE("lsm"))
             switch (mmrand(NULL, 1, 20)) {
             case 1:
                 /*

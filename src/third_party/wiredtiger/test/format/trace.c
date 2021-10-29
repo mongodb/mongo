@@ -31,13 +31,10 @@
 #define TRACE_DIR "OPS.TRACE"
 #define TRACE_INIT_CMD "rm -rf %s/" TRACE_DIR " && mkdir %s/" TRACE_DIR
 
-/*
- * trace_config --
- *     Configure operation tracing.
- */
-void
+int
 trace_config(const char *config)
 {
+    WT_DECL_RET;
     char *copy, *p;
 
     copy = dstrdup(config);
@@ -56,16 +53,15 @@ trace_config(const char *config)
     }
 
     for (p = copy; *p != '\0'; ++p)
-        if (*p != ',' && !__wt_isspace((u_char)*p))
-            testutil_assertfmt(0, "unexpected trace configuration \"%s\"\n", config);
+        if (*p != ',' && !__wt_isspace((u_char)*p)) {
+            ret = EINVAL;
+            break;
+        }
 
     free(copy);
+    return (ret);
 }
 
-/*
- * trace_init --
- *     Initialize operation tracing.
- */
 void
 trace_init(void)
 {
@@ -80,7 +76,7 @@ trace_init(void)
 
     /* Write traces to a separate database by default, optionally write traces to the primary. */
     if (g.trace_local) {
-        if (!GV(LOGGING))
+        if (!g.c_logging)
             testutil_die(EINVAL,
               "operation logging to the primary database requires logging be configured for that "
               "database");
@@ -111,10 +107,6 @@ trace_init(void)
     g.trace_session = session;
 }
 
-/*
- * trace_teardown --
- *     Close operation tracing.
- */
 void
 trace_teardown(void)
 {
@@ -123,14 +115,12 @@ trace_teardown(void)
     conn = g.trace_conn;
     g.trace_conn = NULL;
 
-    if (conn != NULL)
-        testutil_check(conn->close(conn, NULL));
+    if (!g.trace || g.trace_local || conn == NULL)
+        return;
+
+    testutil_check(conn->close(conn, NULL));
 }
 
-/*
- * trace_ops_init --
- *     Per thread operation tracing setup.
- */
 void
 trace_ops_init(TINFO *tinfo)
 {

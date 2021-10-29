@@ -56,14 +56,75 @@ track_ts_dots(u_int dot_count)
 }
 
 /*
- * track_write --
- *     Write out a tracking message.
+ * track --
+ *     Show a status line of operations and time stamp progress.
  */
-static void
-track_write(char *msg, size_t len)
+void
+track(const char *tag, uint64_t cnt, TINFO *tinfo)
 {
-    static size_t last_len; /* callers must be single-threaded */
+    static size_t last_len;
+    static uint64_t last_cur, last_old, last_stable;
+    static u_int cur_dot_cnt, old_dot_cnt, stable_dot_cnt;
+    size_t len;
+    uint64_t cur_ts, old_ts, stable_ts;
+    char msg[128], ts_msg[64];
 
+    if (g.c_quiet || tag == NULL)
+        return;
+
+    if (tinfo == NULL && cnt == 0)
+        testutil_check(
+          __wt_snprintf_len_set(msg, sizeof(msg), &len, "%4" PRIu32 ": %s", g.run_cnt, tag));
+    else if (tinfo == NULL)
+        testutil_check(__wt_snprintf_len_set(
+          msg, sizeof(msg), &len, "%4" PRIu32 ": %s: %" PRIu64, g.run_cnt, tag, cnt));
+    else {
+        ts_msg[0] = '\0';
+        if (g.c_txn_timestamps) {
+            /*
+             * Don't worry about having a completely consistent set of timestamps.
+             */
+            old_ts = g.oldest_timestamp;
+            stable_ts = g.stable_timestamp;
+            cur_ts = g.timestamp;
+
+            if (old_ts != last_old) {
+                ++old_dot_cnt;
+                last_old = old_ts;
+            }
+            if (stable_ts != last_stable) {
+                ++stable_dot_cnt;
+                last_stable = stable_ts;
+            }
+            if (cur_ts != last_cur) {
+                ++cur_dot_cnt;
+                last_cur = cur_ts;
+            }
+
+            testutil_check(__wt_snprintf(ts_msg, sizeof(ts_msg),
+              " old%s"
+              "stb%s%s"
+              "ts%s%s",
+              track_ts_dots(old_dot_cnt), track_ts_diff(old_ts, stable_ts),
+              track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
+              track_ts_dots(cur_dot_cnt)));
+        }
+        testutil_check(
+          __wt_snprintf_len_set(msg, sizeof(msg), &len,
+            "%4" PRIu32 ": %s: "
+            "S %" PRIu64 "%s, "
+            "I %" PRIu64 "%s, "
+            "U %" PRIu64 "%s, "
+            "R %" PRIu64 "%s%s",
+            g.run_cnt, tag, tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search,
+            tinfo->search > M(9) ? "M" : "",
+            tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert,
+            tinfo->insert > M(9) ? "M" : "",
+            tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
+            tinfo->update > M(9) ? "M" : "",
+            tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
+            tinfo->remove > M(9) ? "M" : "", ts_msg));
+    }
     if (last_len > len) {
         memset(msg + len, ' ', (size_t)(last_len - len));
         msg[last_len] = '\0';
@@ -74,91 +135,6 @@ track_write(char *msg, size_t len)
         testutil_die(EIO, "printf");
     if (fflush(stdout) == EOF)
         testutil_die(errno, "fflush");
-}
-
-/*
- * track_ops --
- *     Show a status line of operations and time stamp progress.
- */
-void
-track_ops(TINFO *tinfo)
-{
-    static uint64_t last_cur, last_old, last_stable;
-    static u_int cur_dot_cnt, old_dot_cnt, stable_dot_cnt;
-    size_t len;
-    uint64_t cur_ts, old_ts, stable_ts;
-    char msg[128], ts_msg[64];
-
-    if (GV(QUIET))
-        return;
-
-    ts_msg[0] = '\0';
-    if (g.transaction_timestamps_config) {
-        /*
-         * Don't worry about having a completely consistent set of timestamps.
-         */
-        old_ts = g.oldest_timestamp;
-        stable_ts = g.stable_timestamp;
-        cur_ts = g.timestamp;
-
-        if (old_ts != last_old) {
-            ++old_dot_cnt;
-            last_old = old_ts;
-        }
-        if (stable_ts != last_stable) {
-            ++stable_dot_cnt;
-            last_stable = stable_ts;
-        }
-        if (cur_ts != last_cur) {
-            ++cur_dot_cnt;
-            last_cur = cur_ts;
-        }
-
-        testutil_check(__wt_snprintf(ts_msg, sizeof(ts_msg),
-          " old%s"
-          "stb%s%s"
-          "ts%s%s",
-          track_ts_dots(old_dot_cnt), track_ts_diff(old_ts, stable_ts),
-          track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
-          track_ts_dots(cur_dot_cnt)));
-    }
-    testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len,
-      "ops: "
-      "S %" PRIu64
-      "%s, "
-      "I %" PRIu64
-      "%s, "
-      "U %" PRIu64
-      "%s, "
-      "R %" PRIu64 "%s%s",
-      tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search, tinfo->search > M(9) ? "M" : "",
-      tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert, tinfo->insert > M(9) ? "M" : "",
-      tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update, tinfo->update > M(9) ? "M" : "",
-      tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove, tinfo->remove > M(9) ? "M" : "",
-      ts_msg));
-
-    track_write(msg, len);
-}
-
-/*
- * track --
- *     Show general operation progress.
- */
-void
-track(const char *tag, uint64_t cnt)
-{
-    size_t len;
-    char msg[128];
-
-    if (GV(QUIET))
-        return;
-
-    if (cnt == 0)
-        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%s", tag));
-    else
-        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%s: %" PRIu64, tag, cnt));
-
-    track_write(msg, len);
 }
 
 /*
@@ -185,6 +161,12 @@ path_setup(const char *home)
     len = strlen(g.home) + strlen(name) + 2;
     g.home_key = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_key, len, "%s/%s", g.home, name));
+
+    /* RNG log file. */
+    name = "CONFIG.rand";
+    len = strlen(g.home) + strlen(name) + 2;
+    g.home_rand = dmalloc(len);
+    testutil_check(__wt_snprintf(g.home_rand, len, "%s/%s", g.home, name));
 
     /* History store dump file. */
     name = "FAIL.HSdump";
@@ -213,7 +195,7 @@ bool
 fp_readv(FILE *fp, char *name, uint32_t *vp)
 {
     u_long ulv;
-    char *endptr, buf[64];
+    char *endptr, buf[100];
 
     if (fgets(buf, sizeof(buf), fp) == NULL)
         testutil_die(errno, "%s: read-value error", name);
@@ -257,7 +239,7 @@ timestamp_parse(const char *p, uint64_t *tsp)
 }
 
 /*
- * timestamp_init --
+ * timestamp_stable --
  *     Set the stable timestamp on open.
  */
 void
@@ -335,8 +317,7 @@ timestamp(void *arg)
     WT_CONNECTION *conn;
     WT_SESSION *session;
 
-    (void)arg; /* Unused argument */
-
+    (void)(arg);
     conn = g.wts_conn;
 
     /* Locks need session */
@@ -409,7 +390,7 @@ lock_init(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(lock->lock_type == LOCK_NONE);
 
-    if (GV(WIREDTIGER_RWLOCK)) {
+    if (g.c_wt_mutex) {
         testutil_check(__wt_rwlock_init((WT_SESSION_IMPL *)session, &lock->l.wt));
         lock->lock_type = LOCK_WT;
     } else {
@@ -427,9 +408,10 @@ lock_destroy(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(LOCK_INITIALIZED(lock));
 
-    if (lock->lock_type == LOCK_WT)
+    if (lock->lock_type == LOCK_WT) {
         __wt_rwlock_destroy((WT_SESSION_IMPL *)session, &lock->l.wt);
-    else
+    } else {
         testutil_check(pthread_rwlock_destroy(&lock->l.pthread));
+    }
     lock->lock_type = LOCK_NONE;
 }

@@ -2,7 +2,7 @@
 btree.huffman_value=0
 cache.minimum=20
 runs.rows=1000000:5000000
-runs.tables=3:10
 runs.threads=4:32
 runs.timer=6:30
 runs.type=row,var
+runs=100

@@ -29,126 +29,124 @@
 #include "format.h"
 
 /*
- * uri_path --
- *     Return the path to an object file, and optionally, the object name.
- */
-static void
-uri_path(TABLE *table, char **object_namep, char *buf, size_t len)
-{
-    char *p;
-
-    /*
-     * It's a little tricky: if the data source is a file, we're looking for the table URI, if the
-     * data source is a table, we're looking for the table URI with a trailing ".wt".
-     */
-    p = strchr(table->uri, ':');
-    testutil_assert(p != NULL);
-    ++p;
-
-    testutil_check(__wt_snprintf(buf, len, "%s/%s", g.home, p));
-    if (object_namep != NULL)
-        *object_namep = strrchr(buf, '/') + 1;
-    if (!access(buf, F_OK))
-        return;
-    testutil_check(__wt_snprintf(buf, len, "%s/%s.wt", g.home, p));
-    if (object_namep != NULL)
-        *object_namep = strrchr(buf, '/') + 1;
-    if (!access(buf, F_OK))
-        return;
-    testutil_die(0, "%s: unable to find file for salvage", table->uri);
-}
-
-/*
  * corrupt --
  *     Corrupt the file in a random way.
  */
-static void
-corrupt(TABLE *table)
+static int
+corrupt(void)
 {
     struct stat sb;
     FILE *fp;
     wt_off_t offset;
     size_t len, nw;
-    int fd;
-    char buf[MAX_FORMAT_PATH * 2], *object_name, path[MAX_FORMAT_PATH];
+    int fd, ret;
+    char copycmd[2 * 1024], path[1024];
     const char *smash;
 
-    uri_path(table, &object_name, path, sizeof(path));
-
-    fd = open(path, O_RDWR);
-    testutil_assert(fd != -1);
-
     /*
-     * Corrupt a chunk of the file at a random spot, including the first bytes of the file and
-     * possibly overlapping the end. The length of the corruption is roughly 2% of the file, not
-     * exceeding a megabyte (so we aren't just corrupting the whole file).
+     * If it's a single Btree file (not LSM), open the file, and corrupt roughly 2% of the file at a
+     * random spot, including the beginning of the file and overlapping the end.
+     *
+     * It's a little tricky: if the data source is a file, we're looking for "wt", if the data
+     * source is a table, we're looking for "wt.wt".
      */
-    testutil_check(fstat(fd, &sb));
-    offset = mmrand(NULL, 0, (u_int)sb.st_size - 1024);
-    len = (size_t)(sb.st_size * 2) / 100;
-    len += 4 * 1024;
-    len = WT_MIN(len, WT_MEGABYTE);
+    testutil_check(__wt_snprintf(path, sizeof(path), "%s/%s", g.home, WT_NAME));
+    if ((fd = open(path, O_RDWR)) != -1) {
+        testutil_check(__wt_snprintf(copycmd, sizeof(copycmd),
+          "cp %s/%s %s/SALVAGE.copy/%s.corrupted", g.home, WT_NAME, g.home, WT_NAME));
+        goto found;
+    }
+    testutil_check(__wt_snprintf(path, sizeof(path), "%s/%s.wt", g.home, WT_NAME));
+    if ((fd = open(path, O_RDWR)) != -1) {
+        testutil_check(__wt_snprintf(copycmd, sizeof(copycmd),
+          "cp %s/%s.wt %s/SALVAGE.copy/%s.wt.corrupted", g.home, WT_NAME, g.home, WT_NAME));
+        goto found;
+    }
+    return (0);
 
-    /* Log the corruption offset and length. */
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/SALVAGE.corrupt", g.home));
-    testutil_assert((fp = fopen(buf, "w")) != NULL);
+found:
+    if (fstat(fd, &sb) == -1)
+        testutil_die(errno, "salvage-corrupt: fstat");
+
+    offset = mmrand(NULL, 0, (u_int)sb.st_size);
+    len = (size_t)(20 + (sb.st_size / 100) * 2);
+    testutil_check(__wt_snprintf(path, sizeof(path), "%s/SALVAGE.corrupt", g.home));
+    if ((fp = fopen(path, "w")) == NULL)
+        testutil_die(errno, "salvage-corrupt: open: %s", path);
     (void)fprintf(fp, "salvage-corrupt: offset %" PRIuMAX ", length %" WT_SIZET_FMT "\n",
       (uintmax_t)offset, len);
     fclose_and_clear(&fp);
 
-    testutil_assert(lseek(fd, offset, SEEK_SET) != -1);
+    if (lseek(fd, offset, SEEK_SET) == -1)
+        testutil_die(errno, "salvage-corrupt: lseek");
+
     smash = "!!! memory corrupted by format to test salvage ";
     for (; len > 0; len -= nw) {
         nw = (size_t)(len > strlen(smash) ? strlen(smash) : len);
-        testutil_assert(write(fd, smash, nw) != -1);
+        if (write(fd, smash, nw) == -1)
+            testutil_die(errno, "salvage-corrupt: write");
     }
 
-    testutil_check(close(fd));
+    if (close(fd) == -1)
+        testutil_die(errno, "salvage-corrupt: close");
 
-    /* Save a copy of the corrupted file so we can replay the salvage step as necessary.  */
-    testutil_check(__wt_snprintf(
-      buf, sizeof(buf), "cp %s %s/SALVAGE.copy/%s.corrupted", path, g.home, object_name));
-    testutil_check(system(buf));
+    /*
+     * Save a copy of the corrupted file so we can replay the salvage step as necessary.
+     */
+    if ((ret = system(copycmd)) != 0)
+        testutil_die(ret, "salvage corrupt copy step failed");
+
+    return (1);
 }
 
-/* Salvage command, save the interesting files so we can replay the salvage command as necessary. */
-#define SALVAGE_COPY_CMD \
-    "rm -rf %s/SALVAGE.copy && mkdir %s/SALVAGE.copy && cp %s/WiredTiger* %s %s/SALVAGE.copy/"
+/*
+ * Salvage command, save the interesting files so we can replay the salvage command as necessary.
+ *
+ * Redirect the "cd" command to /dev/null so chatty cd implementations don't add the new working
+ * directory to our output.
+ */
+#define SALVAGE_COPY_CMD                            \
+    "cd %s > /dev/null && "                         \
+    "rm -rf SALVAGE.copy && mkdir SALVAGE.copy && " \
+    "cp WiredTiger* wt* SALVAGE.copy/"
 
 /*
  * wts_salvage --
  *     Salvage testing.
  */
 void
-wts_salvage(TABLE *table, void *arg)
+wts_salvage(void)
 {
     WT_CONNECTION *conn;
+    WT_DECL_RET;
     WT_SESSION *session;
-    char buf[MAX_FORMAT_PATH * 5], path[MAX_FORMAT_PATH];
+    size_t len;
+    char *cmd;
 
-    (void)arg; /* unused argument */
-
-    if (GV(OPS_SALVAGE) == 0 || DATASOURCE(table, "lsm"))
+    if (g.c_salvage == 0)
         return;
 
+    track("salvage", 0ULL, NULL);
+
     /* Save a copy of the interesting files so we can replay the salvage step as necessary. */
-    uri_path(table, NULL, path, sizeof(path));
-    testutil_check(
-      __wt_snprintf(buf, sizeof(buf), SALVAGE_COPY_CMD, g.home, g.home, g.home, path, g.home));
-    testutil_check(system(buf));
+    len = strlen(g.home) + strlen(SALVAGE_COPY_CMD) + 1;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, SALVAGE_COPY_CMD, g.home));
+    if ((ret = system(cmd)) != 0)
+        testutil_die(ret, "salvage copy (\"%s\"), failed", cmd);
+    free(cmd);
 
     /* Salvage, then verify. */
     wts_open(g.home, &conn, &session, true);
-    session->app_private = table->track_prefix;
-    testutil_check(session->salvage(session, table->uri, "force=true"));
-    wts_verify(table, conn);
+    testutil_check(session->salvage(session, g.uri, "force=true"));
+    wts_verify(conn, "post-salvage verify");
     wts_close(&conn, &session);
 
     /* Corrupt the file randomly, salvage, then verify. */
-    corrupt(table);
-    wts_open(g.home, &conn, &session, false);
-    testutil_check(session->salvage(session, table->uri, "force=true"));
-    wts_verify(table, conn);
-
-    wts_close(&conn, &session);
+    if (corrupt()) {
+        wts_open(g.home, &conn, &session, false);
+        testutil_check(session->salvage(session, g.uri, "force=true"));
+        wts_verify(conn, "post-corrupt-salvage verify");
+        wts_close(&conn, &session);
+    }
 }

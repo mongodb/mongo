@@ -29,13 +29,12 @@
 #include "format.h"
 
 /*
- * compact --
+ * compaction --
  *     Periodically do a compaction operation.
  */
 WT_THREAD_RET
 compact(void *arg)
 {
-    TABLE *table;
     WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
@@ -67,8 +66,7 @@ compact(void *arg)
          * Compact returns ETIMEDOUT if the compaction doesn't finish in in some number of seconds.
          * We don't configure a timeout and occasionally exceed the default of 1200 seconds.
          */
-        table = table_select(NULL);
-        ret = session->compact(session, table->uri, NULL);
+        ret = session->compact(session, g.uri, NULL);
         if (ret != 0 && ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK &&
           ret != WT_CACHE_FULL)
             testutil_die(ret, "session.compact");

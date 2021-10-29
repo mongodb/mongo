@@ -33,16 +33,11 @@
  *     Initialize the keys for a run.
  */
 void
-key_init(TABLE *table, void *arg)
+key_init(void)
 {
     FILE *fp;
     size_t i;
     uint32_t max;
-    char buf[MAX_FORMAT_PATH];
-
-    (void)arg; /* unused argument */
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%u", g.home_key, table->id));
 
     /*
      * The key is a variable length item with a leading 10-digit value. Since we have to be able
@@ -53,10 +48,10 @@ key_init(TABLE *table, void *arg)
      * Read in the values during reopen.
      */
     if (g.reopen) {
-        if ((fp = fopen(buf, "r")) == NULL)
-            testutil_die(errno, "%s", buf);
-        for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i)
-            fp_readv(fp, buf, &table->key_rand_len[i]);
+        if ((fp = fopen(g.home_key, "r")) == NULL)
+            testutil_die(errno, "%s", g.home_key);
+        for (i = 0; i < WT_ELEMENTS(g.key_rand_len); ++i)
+            fp_readv(fp, g.home_key, &g.key_rand_len[i]);
         fclose_and_clear(&fp);
         return;
     }
@@ -67,19 +62,23 @@ key_init(TABLE *table, void *arg)
      * Focus on relatively small items, admitting the possibility of larger items. Pick a size close
      * to the minimum most of the time, only create a larger item 1 in 20 times.
      */
-    for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i) {
-        max = TV(BTREE_KEY_MAX);
-        if (i % 20 != 0 && max > TV(BTREE_KEY_MIN) + 20)
-            max = TV(BTREE_KEY_MIN) + 20;
-        table->key_rand_len[i] = mmrand(NULL, TV(BTREE_KEY_MIN), max);
+    for (i = 0; i < WT_ELEMENTS(g.key_rand_len); ++i) {
+        max = g.c_key_max;
+        if (i % 20 != 0 && max > g.c_key_min + 20)
+            max = g.c_key_min + 20;
+        g.key_rand_len[i] = mmrand(NULL, g.c_key_min, max);
     }
 
     /* Write out the values for a subsequent reopen. */
-    if ((fp = fopen(buf, "w")) == NULL)
-        testutil_die(errno, "%s", buf);
-    for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i)
-        fprintf(fp, "%" PRIu32 "\n", table->key_rand_len[i]);
+    if ((fp = fopen(g.home_key, "w")) == NULL)
+        testutil_die(errno, "%s", g.home_key);
+    for (i = 0; i < WT_ELEMENTS(g.key_rand_len); ++i)
+        fprintf(fp, "%" PRIu32 "\n", g.key_rand_len[i]);
     fclose_and_clear(&fp);
+
+    /* Fill in the common key prefix length (which is added to the key min/max). */
+    if (g.c_prefix != 0)
+        g.prefix_len = mmrand(NULL, 15, 80);
 }
 
 /*
@@ -92,7 +91,7 @@ key_gen_init(WT_ITEM *key)
     size_t i, len;
     char *p;
 
-    len = WT_MAX(KILOBYTE(100), table_maxv(V_TABLE_BTREE_KEY_MAX) + g.prefix_len_max + 10);
+    len = WT_MAX(KILOBYTE(100), g.c_key_max + g.prefix_len);
     p = dmalloc(len);
     for (i = 0; i < len; ++i)
         p[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
@@ -114,22 +113,20 @@ key_gen_teardown(WT_ITEM *key)
     memset(key, 0, sizeof(*key));
 }
 
-#define COMMON_PREFIX_CHAR 'C'
-
 /*
  * key_gen_common --
  *     Row-store key generation code shared between normal and insert key generation.
  */
 void
-key_gen_common(TABLE *table, WT_ITEM *key, uint64_t keyno, const char *const suffix)
+key_gen_common(WT_ITEM *key, uint64_t keyno, const char *const suffix)
 {
-    size_t i;
     uint64_t n;
-    uint32_t prefix_len;
     char *p;
     const char *bucket;
 
-    testutil_assert(table->type == ROW);
+    testutil_assert(g.type == ROW);
+
+    p = key->mem;
 
     /*
      * The workload we're trying to mimic with a prefix is a long common prefix followed by a record
@@ -141,32 +138,16 @@ key_gen_common(TABLE *table, WT_ITEM *key, uint64_t keyno, const char *const suf
      * lexicographically, meaning the common key prefix will grow and shrink by a few bytes as the
      * number increments, which is a good thing for testing.
      */
-    p = key->mem;
-    prefix_len = TV(BTREE_PREFIX_LEN);
-    if (g.prefix_len_max != 0) {
-        /*
-         * Not all tables have prefixes and prefixes may be of different lengths. If any table has a
-         * prefix, check if we need to reset the leading bytes in the key to their original values.
-         * It's an ugly test, but it avoids rewriting the key in a performance path. The variable is
-         * the largest prefix in the run, and the hard-coded 20 gets us past the key appended to
-         * that prefix.
-         */
-        if (p[1] == COMMON_PREFIX_CHAR) {
-            for (i = 0; i < g.prefix_len_max + 20; ++i)
-                p[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
-            p = key->mem;
+    if (g.prefix_len > 0) {
+        bucket = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        for (n = keyno; n > 0; n >>= 1) {
+            if (*bucket == 'z')
+                break;
+            ++bucket;
         }
-        if (prefix_len != 0) {
-            bucket = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-            for (n = keyno; n > 0; n >>= 1) {
-                if (*bucket == 'z')
-                    break;
-                ++bucket;
-            }
-            p[0] = *bucket;
-            memset(p + 1, COMMON_PREFIX_CHAR, prefix_len - 1);
-            p += prefix_len;
-        }
+        p[0] = *bucket;
+        memset(p + 1, 'C', g.prefix_len - 1);
+        p += g.prefix_len;
     }
 
     /*
@@ -185,19 +166,19 @@ key_gen_common(TABLE *table, WT_ITEM *key, uint64_t keyno, const char *const suf
      * the cache. Handle that here, use a really big key 1 in 2500 times.
      */
     key->data = key->mem;
-    key->size = prefix_len;
-    key->size += keyno % 2500 == 0 && TV(BTREE_KEY_MAX) < KILOBYTE(80) ?
+    key->size = g.prefix_len;
+    key->size += keyno % 2500 == 0 && g.c_key_max < KILOBYTE(80) ?
       KILOBYTE(80) :
-      table->key_rand_len[keyno % WT_ELEMENTS(table->key_rand_len)];
+      g.key_rand_len[keyno % WT_ELEMENTS(g.key_rand_len)];
     testutil_assert(key->size <= key->memsize);
 }
 
-/*
- * val_len --
- *     Select and return the length for a value.
- */
+static char *val_base;            /* Base/original value */
+static uint32_t val_dup_data_len; /* Length of duplicate data items */
+static uint32_t val_len;          /* Length of data items */
+
 static inline uint32_t
-val_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
+value_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 {
     /*
      * Focus on relatively small items, admitting the possibility of larger items. Pick a size close
@@ -212,22 +193,15 @@ val_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
     return (mmrand(rnd, min, max));
 }
 
-/*
- * val_init --
- *     Initialize the value structures for a table.
- */
 void
-val_init(TABLE *table, void *arg)
+val_init(void)
 {
     size_t i;
-    uint32_t len;
-
-    (void)arg; /* unused argument */
 
     /* Discard any previous value initialization. */
-    free(table->val_base);
-    table->val_base = NULL;
-    table->val_dup_data_len = 0;
+    free(val_base);
+    val_base = NULL;
+    val_dup_data_len = val_len = 0;
 
     /*
      * Set initial buffer contents to recognizable text.
@@ -235,35 +209,23 @@ val_init(TABLE *table, void *arg)
      * Add a few extra bytes in order to guarantee we can always offset into the buffer by a few
      * extra bytes, used to generate different data for column-store run-length encoded files.
      */
-    len = WT_MAX(KILOBYTE(100), table_maxv(V_TABLE_BTREE_VALUE_MAX)) + 20;
-    table->val_base = dmalloc(len);
-    for (i = 0; i < len; ++i)
-        table->val_base[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
+    val_len = WT_MAX(KILOBYTE(100), g.c_value_max) + 20;
+    val_base = dmalloc(val_len);
+    for (i = 0; i < val_len; ++i)
+        val_base[i] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
-    table->val_dup_data_len =
-      val_len(NULL, (uint64_t)mmrand(NULL, 1, 20), TV(BTREE_VALUE_MIN), TV(BTREE_VALUE_MAX));
+    val_dup_data_len = value_len(NULL, (uint64_t)mmrand(NULL, 1, 20), g.c_value_min, g.c_value_max);
 }
 
-/*
- * val_gen_init --
- *     Initialize a single value structure.
- */
 void
 val_gen_init(WT_ITEM *value)
 {
-    uint32_t len;
-
-    len = WT_MAX(KILOBYTE(100), table_maxv(V_TABLE_BTREE_VALUE_MAX)) + 20;
-    value->mem = dmalloc(len);
-    value->memsize = len;
+    value->mem = dmalloc(val_len);
+    value->memsize = val_len;
     value->data = value->mem;
     value->size = 0;
 }
 
-/*
- * val_gen_teardown --
- *     Discard a single value structure.
- */
 void
 val_gen_teardown(WT_ITEM *value)
 {
@@ -271,12 +233,8 @@ val_gen_teardown(WT_ITEM *value)
     memset(value, 0, sizeof(*value));
 }
 
-/*
- * val_gen --
- *     Generate a new value.
- */
 void
-val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
+val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 {
     char *p;
 
@@ -286,8 +244,8 @@ val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
     /*
      * Fixed-length records: take the low N bits from the last digit of the record number.
      */
-    if (table->type == FIX) {
-        switch (TV(BTREE_BITCNT)) {
+    if (g.type == FIX) {
+        switch (g.c_bitcnt) {
         case 8:
             p[0] = (char)mmrand(rnd, 1, 0xff);
             break;
@@ -331,14 +289,14 @@ val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
      * Data items have unique leading numbers by default and random lengths; variable-length
      * column-stores use a duplicate data value to test RLE.
      */
-    if (table->type == VAR && mmrand(rnd, 1, 100) < TV(BTREE_REPEAT_DATA_PCT)) {
-        value->size = table->val_dup_data_len;
-        memcpy(p, table->val_base, value->size);
+    if (g.type == VAR && mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
+        value->size = val_dup_data_len;
+        memcpy(p, val_base, value->size);
         (void)strcpy(p, "DUPLICATEV");
         p[10] = '/';
     } else {
-        value->size = val_len(rnd, keyno, TV(BTREE_VALUE_MIN), TV(BTREE_VALUE_MAX));
-        memcpy(p, table->val_base, value->size);
+        value->size = value_len(rnd, keyno, g.c_value_min, g.c_value_max);
+        memcpy(p, val_base, value->size);
         u64_to_string_zf(keyno, p, 11);
         p[10] = '/';
     }
