@@ -7,7 +7,7 @@ import buildscripts.task_generation.task_types.fuzzer_tasks as under_test
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
 
-def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz"):
+def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz", npm_command="jstestfuzz"):
     return under_test.FuzzerGenTaskParams(
         task_name="task name",
         variant="build variant",
@@ -15,7 +15,7 @@ def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz"):
         num_files=10,
         num_tasks=5,
         resmoke_args="args for resmoke",
-        npm_command="jstestfuzz",
+        npm_command=npm_command,
         jstestfuzz_vars=jstestfuzz_vars,
         continue_on_failure=True,
         resmoke_jobs_max=5,
@@ -66,14 +66,25 @@ class TestGenerateTasks(unittest.TestCase):
 
 
 class TestBuildFuzzerSubTask(unittest.TestCase):
-    def test_sub_task_should_be_built_correct(self):
-        mock_params = build_mock_fuzzer_params()
+    def test_sub_task_should_be_built_correct_no_minimize_command(self):
+        mock_params = build_mock_fuzzer_params(npm_command="jstestfuzz")
         fuzzer_service = under_test.FuzzerGenTaskService()
 
         sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params)
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
         self.assertEqual(len(sub_task.commands), 6)
+        self.assertNotEqual(sub_task.commands[-1].as_dict()["func"], "minimize jstestfuzz")
+
+    def test_sub_task_should_be_built_correct_with_minimize_command(self):
+        mock_params = build_mock_fuzzer_params(npm_command="agg-fuzzer")
+        fuzzer_service = under_test.FuzzerGenTaskService()
+
+        sub_task = fuzzer_service.build_fuzzer_sub_task(3, mock_params)
+
+        self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
+        self.assertEqual(len(sub_task.commands), 7)
+        self.assertEqual(sub_task.commands[-1].as_dict()["func"], "minimize jstestfuzz")
 
     def test_sub_task_should_include_timeout_info(self):
         mock_params = build_mock_fuzzer_params()

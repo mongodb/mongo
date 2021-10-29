@@ -1400,6 +1400,39 @@ functions:
         content_type: application/gzip
         display_name: Generated Tests - Execution ${execution}
 
+  "minimize jstestfuzz":
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jstestfuzz_minimize.sh"
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/minimizer-outputs.json
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-${build_id}.json
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/json
+        display_name: Minimizer Outputs - Execution ${execution}
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/jstestfuzz/out/minimizer-outputs-minimizedtest.js
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-minimizedtest-${build_id}.json
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: text/javascript
+        display_name: Minimized jstestfuzz Test - Execution ${execution}
+
   "run idl tests":
     - *f_expansions_write
     - command: subprocess.exec
