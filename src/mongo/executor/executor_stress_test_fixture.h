@@ -49,6 +49,7 @@ public:
     static constexpr auto kDurationBetweenSimpleSchedulings{Microseconds(40)};
     static constexpr auto kDurationBetweenRemoteCommands{Microseconds(10)};
     static constexpr auto kDurationBetweenMockedResponses{Microseconds(10)};
+    static constexpr auto kMaxCallbacks = 100 * 1000;
 
     ThreadPoolExecutorStressTestEngine(std::shared_ptr<TaskExecutor> executor,
                                        boost::optional<NetworkInterfaceMock*> netMock,
