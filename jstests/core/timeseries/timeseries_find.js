@@ -6,6 +6,8 @@
  *     does_not_support_stepdowns,
  *     requires_pipeline_optimization,
  *     requires_timeseries,
+ *     # Tenant migration may cause they test case to fail as it could lead to bucket splitting.
+ *     tenant_migration_incompatible,
  * ]
  */
 
