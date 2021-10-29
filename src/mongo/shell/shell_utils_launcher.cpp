@@ -908,6 +908,8 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
             boost::filesystem::remove_all(path);
         } catch (const boost::filesystem::filesystem_error&) {
 #ifdef _WIN32
+            // A small sleep allows Windows an opportunity to close locked file
+            // handlers, and reduce false errors on remove_all
             sleepmillis(100);
             boost::filesystem::remove_all(path);
 #else
@@ -915,7 +917,18 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
 #endif
         }
     }
-    boost::filesystem::create_directory(path);
+    try {
+        boost::filesystem::create_directory(path);
+    } catch (const boost::filesystem::filesystem_error&) {
+#ifdef _WIN32
+        // A small sleep allows Windows an opportunity to close locked file
+        // handlers, and reduce false errors on create_directory
+        sleepmillis(100);
+        boost::filesystem::create_directory(path);
+#else
+        throw;
+#endif
+    }
     return undefinedReturn;
 }
 
