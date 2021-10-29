@@ -69,7 +69,7 @@ testutil_die(int e, const char *fmt, ...)
     fprintf(stderr, "\n");
     fprintf(stderr, "%s: process aborting\n", progname);
 
-    abort();
+    __wt_abort(NULL);
 }
 
 /*

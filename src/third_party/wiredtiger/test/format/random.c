@@ -35,6 +35,7 @@
 WT_THREAD_RET
 random_kv(void *arg)
 {
+    TABLE *table;
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -47,13 +48,19 @@ random_kv(void *arg)
 
     (void)(arg); /* Unused parameter */
 
-    conn = g.wts_conn;
-
-    /* Random cursor ops are only supported on row-store. */
-    if (g.type != ROW)
+    /* Random cursor ops are only supported on row-store, make sure there's a row-store table. */
+    if (ntables == 0 && tables[0]->type != ROW)
         return (WT_THREAD_RET_VALUE);
+    else {
+        for (i = 1; i < ntables; ++i)
+            if (tables[i]->type == ROW)
+                break;
+        if (i == ntables)
+            return (WT_THREAD_RET_VALUE);
+    }
 
     /* Open a session. */
+    conn = g.wts_conn;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     for (simple = false;;) {
@@ -61,12 +68,9 @@ random_kv(void *arg)
         config = simple ? "next_random=true" : "next_random=true,next_random_sample_size=37";
         simple = !simple;
 
-        /*
-         * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
-         */
-        while ((ret = session->open_cursor(session, g.uri, NULL, config, &cursor)) == EBUSY)
-            __wt_yield();
-        testutil_check(ret);
+        /* Select a table and open a cursor. */
+        table = table_select_type(ROW);
+        wiredtiger_open_cursor(session, table->uri, config, &cursor);
 
         /* This is just a smoke-test, get some key/value pairs. */
         for (i = mmrand(NULL, 0, 1000); i > 0; --i) {

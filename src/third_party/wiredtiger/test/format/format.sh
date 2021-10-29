@@ -45,17 +45,16 @@ smoke_base_2="$smoke_base_1 leaf_page_max=9 internal_page_max=9"
 smoke_list=(
 	# Three access methods.
 	"$smoke_base_1 file_type=row"
-    # Temporarily disabled
+    # Temporarily disabled: FIXME FLCS
 	# "$smoke_base_1 file_type=fix"
-	# "$smoke_base_1 file_type=var"
+	"$smoke_base_1 file_type=var"
 
 	# Huffman value encoding.
 	"$smoke_base_1 file_type=row huffman_value=1"
-    # Temporarily disabled
-	# "$smoke_base_1 file_type=var huffman_value=1"
+	"$smoke_base_1 file_type=var huffman_value=1"
 
 	# LSM
-    # Temporarily disabled
+    # Temporarily disabled: FIXME LSM
 	# "$smoke_base_1 file_type=row runs.source=lsm"
 
 	# Force the statistics server.
@@ -64,8 +63,7 @@ smoke_list=(
 	# Overflow testing.
 	"$smoke_base_2 file_type=row key_min=256"
 	"$smoke_base_2 file_type=row key_min=256 value_min=256"
-    # Temporarily disabled
-	# "$smoke_base_2 file_type=var value_min=256"
+	"$smoke_base_2 file_type=var value_min=256"
 )
 smoke_next=0
 
@@ -392,18 +390,36 @@ resolve()
 			 echo "$name: original directory copied into $dir.RECOVER"
 			 echo) >> $log
 
-			# Everything is a table unless explicitly a file.
-			uri="table:wt"
-			grep 'runs.source=file' $dir/CONFIG > /dev/null && uri="file:wt"
+			# Verify the objects. In current format, it's a list of files named with a
+			# leading F or tables named with a leading T. Historically, it was a file
+			# or table named "wt".
+			verify_failed=0
+			for i in $(ls $dir | sed -e 's/.*\///'); do
+			    case $i in
+			    F*) uri="file:$i";;
+			    T*) uri="table:${i%.wt}";;
+			    wt) uri="file:wt";;
+			    wt.wt) uri="table:wt";;
+			    *) continue;;
+			    esac
 
-			# Use the wt utility to recover & verify the object.
-			if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
-				rm -rf $dir $dir.RECOVER $log
-				success=$(($success + 1))
-				verbose "$name: job in $dir successfully completed"
+			    # Use the wt utility to recover & verify the object.
+			    echo "verify: $wt_binary -m -R -h $dir verify $uri" >> $log
+			    if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
+				continue
+			    fi
+
+			    verify_failed=1
+			    break
+			done
+
+			if [[ $verify_failed -eq 0 ]]; then
+			    rm -rf $dir $dir.RECOVER $log
+			    success=$(($success + 1))
+			    verbose "$name: job in $dir successfully completed"
 			else
-				echo "$name: job in $dir failed abort/recovery testing"
-				report_failure $dir
+			    echo "$name: job in $dir failed abort/recovery testing"
+			    report_failure $dir
 			fi
 			continue
 		}
@@ -498,7 +514,7 @@ format()
 		live_record_binary="$live_record_binary --save-on=error"
 	fi
 
-	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" -1 $args quiet=1"
+	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" $args quiet=1"
 	echo "$name: $cmd"
 
 	# Disassociate the command from the shell script so we can exit and let the command

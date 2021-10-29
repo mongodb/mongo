@@ -206,7 +206,7 @@ __rollback_has_stable_update(WT_UPDATE *upd)
 {
     while (upd != NULL && (upd->type == WT_UPDATE_INVALID || upd->txnid == WT_TXN_ABORTED))
         upd = upd->next;
-    return upd != NULL;
+    return (upd != NULL);
 }
 
 /*
@@ -1428,7 +1428,7 @@ __rollback_to_stable_btree_apply(
     wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
     size_t addr_size;
     uint64_t rollback_txnid, write_gen;
-    uint32_t btree_id, handle_open_flags;
+    uint32_t btree_id;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool dhandle_allocated, durable_ts_found, has_txn_updates_gt_than_ckpt_snap, perform_rts;
     bool prepared_updates;
@@ -1529,16 +1529,7 @@ __rollback_to_stable_btree_apply(
 
     if (perform_rts || max_durable_ts > rollback_timestamp || prepared_updates ||
       !durable_ts_found || has_txn_updates_gt_than_ckpt_snap) {
-        /*
-         * MongoDB does not close all open handles before calling rollback-to-stable; otherwise,
-         * don't permit that behavior, the application is likely making a mistake.
-         */
-#ifdef WT_STANDALONE_BUILD
-        handle_open_flags = WT_DHANDLE_DISCARD | WT_DHANDLE_EXCLUSIVE;
-#else
-        handle_open_flags = 0;
-#endif
-        ret = __wt_session_get_dhandle(session, uri, NULL, NULL, handle_open_flags);
+        ret = __wt_session_get_dhandle(session, uri, NULL, NULL, 0);
         if (ret != 0)
             WT_ERR_MSG(session, ret, "%s: unable to open handle%s", uri,
               ret == EBUSY ? ", error indicates handle is unavailable due to concurrent use" : "");

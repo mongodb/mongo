@@ -80,12 +80,12 @@
 #undef MEGABYTE
 #define MEGABYTE(v) ((v)*WT_MEGABYTE)
 
+/* Format isn't careful about path buffers, an easy to fix hard-coded length. */
+#define MAX_FORMAT_PATH 1024
+
 #define BACKUP_INFO_FILE "BACKUP_INFO"         /* Format's backup information for restart */
 #define BACKUP_INFO_FILE_TMP "BACKUP_INFO.TMP" /* Format's backup information for restart */
 #define BACKUP_MAX_COPY MEGABYTE(64)           /* Maximum size we'll read/write at a time */
-#define WT_NAME "wt"                           /* Object name */
-
-#define DATASOURCE(v) (strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 
 #define FORMAT_OPERATION_REPS 3 /* 3 thread operations sets */
 
@@ -105,45 +105,109 @@ typedef struct {
 
 #define LOCK_INITIALIZED(lock) ((lock)->lock_type != LOCK_NONE)
 
-typedef struct {
-    char tidbuf[128]; /* thread ID in printable form */
+#include "config.h"
+extern CONFIG configuration_list[];
 
+typedef struct {
+    uint32_t v; /* integral value */
+    char *vstr; /* string value */
+    bool set;   /* value explicitly set */
+} CONFIGV;
+
+typedef enum { FIX, ROW, VAR } table_type;
+typedef struct {
+    u_int id;              /* table ID */
+    char uri[32];          /* table URI */
+    table_type type;       /* table type */
+    char track_prefix[32]; /* table track message prefix */
+
+    uint32_t max_intl_page; /* page size configurations converted to bytes */
+    uint32_t max_leaf_page;
+    uint32_t max_mem_page;
+
+    uint32_t rows_current; /* current row count */
+
+    uint64_t truncate_cnt; /* truncation operation counter */
+
+    uint32_t key_rand_len[1031]; /* key: lengths */
+    char *val_base;              /* value: base/original */
+    uint32_t val_dup_data_len;   /* value: length of duplicate data items */
+
+    CONFIGV v[V_ELEMENT_COUNT]; /* table configuration */
+} TABLE;
+
+/*
+ * We read the configuration in a single pass, which means we don't know the table count until the
+ * end, and it can be extended at any time. Start out with a single table, which contains all of the
+ * global/default values, stored in the first slot of the tables array. If tables are added during
+ * configuration, they are separately allocated, but we continue to use the first (base) table slot
+ * for non-specific table or global configurations. In other words, the base information and the
+ * only table's information are both in tables' slot 0 to start. If additional tables are
+ * configured, the per-table information for each table is stored in tables slots 1-N. The number of
+ * tables starts at 0, and if any tables are configured, it's incremented: in other words, if the
+ * number of tables is 0, all of the information is in tables' slot 0. If the number of tables is
+ * greater than 1, all of the base information is in tables slot 0, and tables slot 1 holds table
+ * #1's specific information, slot #2 holds table #2's specific information and so on. This allows
+ * general and table-specific information to be configured in any order, and as part of the final
+ * table configuration, if there's more than a single table, the information in tables' slot 0 is
+ * propagated out to the additional table slots.
+ */
+extern TABLE *tables[V_MAX_TABLES_CONFIG + 1]; /* Table array */
+extern u_int ntables;
+
+/*
+ * Global and table-specific macros to retrieve configuration information. All of the tables contain
+ * all of the possible configuration entries, but the first table slot contains all of the global
+ * configuration information. The offset names a prefixed with "V_GLOBAL" and "V_TABLE" to reduce
+ * the chance of a coding error retrieving the wrong configuration item.
+ */
+#define GV(off) (tables[0]->v[V_GLOBAL_##off].v)
+#define GVS(off) (tables[0]->v[V_GLOBAL_##off].vstr)
+#define TV(off) (table->v[V_TABLE_##off].v)
+#define TVS(off) (table->v[V_TABLE_##off].vstr)
+
+#define DATASOURCE(table, ds) (strcmp((table)->v[V_TABLE_RUNS_SOURCE].vstr, ds) == 0)
+
+typedef struct {
     WT_CONNECTION *wts_conn;
     WT_CONNECTION *wts_conn_inmemory;
     WT_SESSION *wts_session;
 
-    char *uri; /* Object name */
-
     bool backward_compatible; /* Backward compatibility testing */
+    bool configured;          /* Configuration completed */
     bool reopen;              /* Reopen an existing database */
     bool workers_finished;    /* Operations completed */
 
     char *home;          /* Home directory */
     char *home_config;   /* Run CONFIG file path */
     char *home_hsdump;   /* HS dump filename */
-    char *home_init;     /* Initialize home command */
     char *home_key;      /* Key file filename */
-    char *home_log;      /* Operation log file path */
     char *home_pagedump; /* Page dump filename */
-    char *home_rand;     /* RNG log file path */
     char *home_stats;    /* Statistics file path */
 
     char *config_open; /* Command-line configuration */
 
-    uint32_t run_cnt; /* Run counter */
-
     bool trace;                /* trace operations  */
     bool trace_all;            /* trace all operations  */
     bool trace_local;          /* write trace to the primary database */
+    char tidbuf[128];          /* thread ID in printable form */
     WT_CONNECTION *trace_conn; /* optional tracing database */
     WT_SESSION *trace_session;
 
     RWLOCK backup_lock; /* Backup running */
     uint64_t backup_id; /* Block incremental id */
+#define INCREMENTAL_BLOCK 1
+#define INCREMENTAL_LOG 2
+#define INCREMENTAL_OFF 3
+    u_int backup_incr_flag; /* Incremental backup configuration */
 
     WT_RAND_STATE rnd; /* Global RNG state */
 
-    uint32_t rts_no_check; /* track unsuccessful RTS checking */
+    u_int rts_no_check; /* track unsuccessful RTS checking */
+
+    uint64_t timestamp;        /* Counter for timestamps */
+    uint64_t oldest_timestamp; /* Last timestamp used for oldest */
+    uint64_t stable_timestamp; /* Last timestamp used for stable */
 
     /*
      * Prepare will return an error if the prepare timestamp is less than any active read timestamp.
@@ -153,6 +217,7 @@ typedef struct {
      * that requires locking out transactional ops that set a timestamp.
      */
     RWLOCK ts_lock;
+
     /*
      * Lock to prevent the stable timestamp from moving during the commit of prepared transactions.
      * Otherwise, it may panic if the stable timestamp is moved to greater than or equal to the
@@ -160,163 +225,38 @@ typedef struct {
      */
     RWLOCK prepare_commit_lock;
 
-    uint64_t timestamp;        /* Counter for timestamps */
-    uint64_t oldest_timestamp; /* Last timestamp used for oldest */
-    uint64_t stable_timestamp; /* Last timestamp used for stable */
-
-    uint64_t truncate_cnt; /* Counter for truncation */
-
     /*
-     * Single-thread failure. Always use pthread lock rather than WT lock in case WT library is
-     * misbehaving.
+     * Single-thread failure. Not a WiredTiger library lock because it's set up before configuring
+     * anything.
      */
     pthread_rwlock_t death_lock;
+
     WT_CURSOR *page_dump_cursor; /* Snapshot isolation read failed, modifies failure handling. */
 
-    uint32_t c_abort; /* Config values */
-    uint32_t c_alter;
-    uint32_t c_assert_read_timestamp;
-    uint32_t c_assert_write_timestamp;
-    uint32_t c_auto_throttle;
-    char *c_backup_incremental;
-    uint32_t c_backup_incr_granularity;
-    uint32_t c_backups;
-    uint32_t c_bitcnt;
-    uint32_t c_bloom;
-    uint32_t c_bloom_bit_count;
-    uint32_t c_bloom_hash_count;
-    uint32_t c_bloom_oldest;
-    uint32_t c_cache;
-    uint32_t c_cache_minimum;
-    char *c_checkpoint;
-    uint32_t c_checkpoint_log_size;
-    uint32_t c_checkpoint_wait;
-    char *c_checksum;
-    uint32_t c_chunk_size;
-    uint32_t c_compact;
-    char *c_compression;
-    char *c_config_open;
-    uint32_t c_data_extend;
-    char *c_data_source;
-    uint32_t c_delete_pct;
-    uint32_t c_dictionary;
-    uint32_t c_direct_io;
-    char *c_encryption;
-    uint32_t c_evict_max;
-    char *c_file_type;
-    uint32_t c_firstfit;
-    uint32_t c_hs_cursor;
-    uint32_t c_huffman_value;
-    uint32_t c_import;
-    uint32_t c_in_memory;
-    uint32_t c_independent_thread_rng;
-    uint32_t c_insert_pct;
-    uint32_t c_internal_key_truncation;
-    uint32_t c_intl_page_max;
-    uint32_t c_key_max;
-    uint32_t c_key_min;
-    uint32_t c_leaf_page_max;
-    uint32_t c_leak_memory;
-    uint32_t c_logging;
-    uint32_t c_logging_archive;
-    char *c_logging_compression;
-    uint32_t c_logging_file_max;
-    uint32_t c_logging_prealloc;
-    uint32_t c_lsm_worker_threads;
-    uint32_t c_major_timeout;
-    uint32_t c_memory_page_max;
-    uint32_t c_merge_max;
-    uint32_t c_mmap;
-    uint32_t c_mmap_all;
-    uint32_t c_modify_pct;
-    uint32_t c_ops;
-    uint32_t c_prefix;
-    uint32_t c_prefix_compression;
-    uint32_t c_prefix_compression_min;
-    uint32_t c_prepare;
-    uint32_t c_quiet;
-    uint32_t c_random_cursor;
-    uint32_t c_read_pct;
-    uint32_t c_repeat_data_pct;
-    uint32_t c_reverse;
-    uint32_t c_rows;
-    uint32_t c_runs;
-    uint32_t c_salvage;
-    uint32_t c_split_pct;
-    uint32_t c_statistics;
-    uint32_t c_statistics_server;
-    uint32_t c_threads;
-    uint32_t c_timer;
-    uint32_t c_timing_stress_aggressive_sweep;
-    uint32_t c_timing_stress_checkpoint;
-    uint32_t c_timing_stress_checkpoint_reserved_txnid_delay;
-    uint32_t c_timing_stress_failpoint_hs_delete_key_from_ts;
-    uint32_t c_timing_stress_failpoint_hs_insert_1;
-    uint32_t c_timing_stress_failpoint_hs_insert_2;
-    uint32_t c_timing_stress_hs_checkpoint_delay;
-    uint32_t c_timing_stress_hs_search;
-    uint32_t c_timing_stress_hs_sweep;
-    uint32_t c_timing_stress_checkpoint_prepare;
-    uint32_t c_timing_stress_split_1;
-    uint32_t c_timing_stress_split_2;
-    uint32_t c_timing_stress_split_3;
-    uint32_t c_timing_stress_split_4;
-    uint32_t c_timing_stress_split_5;
-    uint32_t c_timing_stress_split_6;
-    uint32_t c_timing_stress_split_7;
-    uint32_t c_truncate;
-    uint32_t c_txn_implicit;
-    uint32_t c_txn_timestamps;
-    uint32_t c_value_max;
-    uint32_t c_value_min;
-    uint32_t c_verify;
-    uint32_t c_verify_failure_dump;
-    uint32_t c_write_pct;
-    uint32_t c_wt_mutex;
+    /* Any runs.type configuration. */
+    char runs_type[64];
 
-#define FIX 1
-#define ROW 2
-#define VAR 3
-    u_int type; /* File type's flag value */
+    /*
+     * The minimum key size: A minimum key size of 11 is necessary, row-store keys have a leading
+     * 10-digit number and the 11 guarantees we never see a key we can't immediately convert to a
+     * numeric value without modification (there's a trailing non-digit character after every key).
+     *
+     * Range of common key prefix selection and the maximum table prefix length.
+     */
+#define KEY_LEN_CONFIG_MIN 11
+#define PREFIX_LEN_CONFIG_MIN 15
+#define PREFIX_LEN_CONFIG_MAX 80
+    uint32_t prefix_len_max;
 
-#define INCREMENTAL_BLOCK 1
-#define INCREMENTAL_LOG 2
-#define INCREMENTAL_OFF 3
-    u_int c_backup_incr_flag; /* Incremental backup flag value */
+    bool column_store_config;           /* At least one column-store table configured */
+    bool lsm_config;                    /* At least one LSM data source configured */
+    bool multi_table_config;            /* If configuring multiple tables */
+    bool transaction_timestamps_config; /* If transaction timestamps configured on any table */
 
 #define CHECKPOINT_OFF 1
 #define CHECKPOINT_ON 2
 #define CHECKPOINT_WIREDTIGER 3
-    u_int c_checkpoint_flag; /* Checkpoint flag value */
-
-#define CHECKSUM_OFF 1
-#define CHECKSUM_ON 2
-#define CHECKSUM_UNCOMPRESSED 3
-#define CHECKSUM_UNENCRYPTED 4
-    u_int c_checksum_flag; /* Checksum flag value */
-
-#define COMPRESS_NONE 1
-#define COMPRESS_LZ4 2
-#define COMPRESS_SNAPPY 3
-#define COMPRESS_ZLIB 4
-#define COMPRESS_ZSTD 5
-    u_int c_compression_flag;         /* Compression flag value */
-    u_int c_logging_compression_flag; /* Log compression flag value */
-
-#define ENCRYPT_NONE 1
-#define ENCRYPT_ROTN_7 2
-#define ENCRYPT_SODIUM 3
-    u_int c_encryption_flag; /* Encryption flag value */
-
-/* The page must be a multiple of the allocation size, and 512 always works. */
-#define BLOCK_ALLOCATION_SIZE 512
-    uint32_t intl_page_max; /* Maximum page sizes */
-    uint32_t leaf_page_max;
-
-    uint64_t rows; /* Total rows */
-
-    uint32_t prefix_len;         /* Common key prefix length */
-    uint32_t key_rand_len[1031]; /* Key lengths */
+    u_int checkpoint_config; /* Checkpoint configuration */
 } GLOBAL;
 extern GLOBAL g;
 
@@ -330,6 +270,7 @@ typedef struct {
     thread_op op;  /* Operation */
     uint64_t opid; /* Operation ID */
 
+    uint32_t id;    /* Table ID */
     uint64_t keyno; /* Row number */
 
     uint64_t ts;     /* Read/commit timestamp */
@@ -373,7 +314,14 @@ typedef struct {
     uint64_t update;
 
     WT_SESSION *session; /* WiredTiger session */
-    WT_CURSOR *cursor;   /* WiredTiger cursor */
+    WT_CURSOR **cursors; /* WiredTiger cursors, maps one-to-one to tables */
+    WT_CURSOR *cursor;   /* Current cursor */
+    TABLE *table;        /* Current table */
+
+    struct col_insert {
+        uint32_t insert_list[256]; /* Inserted column-store records, maps one-to-one to tables */
+        u_int insert_list_cnt;
+    } * col_insert;
 
     WT_SESSION *trace; /* WiredTiger operations tracing session */
 
@@ -397,9 +345,6 @@ typedef struct {
 #define snap_end s->snap_state_end
 #define snap_first s->snap_state_first
 #define snap_list s->snap_state_list
-
-    uint64_t insert_list[256]; /* column-store inserted records */
-    u_int insert_list_cnt;
 
     WT_ITEM vprint;     /* Temporary buffer for printable values */
     WT_ITEM moda, modb; /* Temporary buffer for modify operations */
@@ -426,17 +371,16 @@ void config_clear(void);
 void config_compat(const char **);
 void config_error(void);
 void config_file(const char *);
-void config_final(void);
 void config_print(bool);
 void config_run(void);
-void config_single(const char *, bool);
+void config_single(TABLE *, const char *, bool);
 void create_database(const char *home, WT_CONNECTION **connp);
 void fclose_and_clear(FILE **);
 bool fp_readv(FILE *, char *, uint32_t *);
-void key_gen_common(WT_ITEM *, uint64_t, const char *);
+void key_gen_common(TABLE *, WT_ITEM *, uint64_t, const char *);
 void key_gen_init(WT_ITEM *);
 void key_gen_teardown(WT_ITEM *);
-void key_init(void);
+void key_init(TABLE *, void *);
 void lock_destroy(WT_SESSION *, RWLOCK *);
 void lock_init(WT_SESSION *, RWLOCK *);
 void operations(u_int, bool);
@@ -445,37 +389,40 @@ void set_alarm(u_int);
 void set_core_off(void);
 void set_oldest_timestamp(void);
 void snap_init(TINFO *);
-void snap_teardown(TINFO *);
 void snap_op_init(TINFO *, uint64_t, bool);
-void snap_repeat_rollback(WT_CURSOR *, TINFO **, size_t);
-void snap_repeat_single(WT_CURSOR *, TINFO *);
-int snap_repeat_txn(WT_CURSOR *, TINFO *);
+void snap_repeat_rollback(TINFO **, size_t);
+void snap_repeat_single(TINFO *);
+int snap_repeat_txn(TINFO *);
 void snap_repeat_update(TINFO *, bool);
+void snap_teardown(TINFO *);
 void snap_track(TINFO *, thread_op);
 void timestamp_init(void);
 void timestamp_once(WT_SESSION *, bool, bool);
 void timestamp_teardown(WT_SESSION *);
-int trace_config(const char *);
+void trace_config(const char *);
 void trace_init(void);
 void trace_ops_init(TINFO *);
 void trace_teardown(void);
-void track(const char *, uint64_t, TINFO *);
-void val_gen(WT_RAND_STATE *, WT_ITEM *, uint64_t);
+void track(const char *, uint64_t);
+void track_ops(TINFO *);
+void val_gen(TABLE *, WT_RAND_STATE *, WT_ITEM *, uint64_t);
 void val_gen_init(WT_ITEM *);
 void val_gen_teardown(WT_ITEM *);
-void val_init(void);
+void val_init(TABLE *, void *);
 void wts_checkpoints(void);
 void wts_close(WT_CONNECTION **, WT_SESSION **);
-void wts_create(const char *);
+void wts_create_database(void);
+void wts_create_home(void);
 void wts_dump(const char *, bool);
-void wts_load(void);
+void wts_load(TABLE *, void *);
 void wts_open(const char *, WT_CONNECTION **, WT_SESSION **, bool);
-void wts_read_scan(void);
+void wts_read_scan(TABLE *, void *);
 void wts_reopen(void);
-void wts_salvage(void);
+void wts_salvage(TABLE *, void *);
 void wts_stats(void);
-void wts_verify(WT_CONNECTION *, const char *);
+void wts_verify(TABLE *, void *);
 
+/* Backward compatibility to older versions of the WiredTiger library. */
 #if !defined(CUR2S)
 #define CUR2S(c) ((WT_SESSION_IMPL *)((WT_CURSOR *)c)->session)
 #endif
