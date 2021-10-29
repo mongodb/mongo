@@ -135,7 +135,7 @@ class TestTimeout(_ResmokeSelftest):
             self.resmoke_process.stop()
         self.assertEqual(return_code, 0)
 
-    def execute_resmoke(self, resmoke_args, sleep_secs=15, **kwargs):  # pylint: disable=arguments-differ
+    def execute_resmoke(self, resmoke_args, sleep_secs=30, **kwargs):  # pylint: disable=arguments-differ
         super(TestTimeout, self).execute_resmoke(resmoke_args, **kwargs)
 
         time.sleep(sleep_secs
