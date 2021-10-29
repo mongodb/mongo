@@ -1771,10 +1771,22 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // Need to start at 1 so we are always higher than RecordId::minLong()
     int64_t nextId = 1;
 
-    // Find the largest RecordId currently in use.
-    std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
-    if (auto record = cursor->next()) {
-        nextId = record->id.getLong() + 1;
+    // Initialize the highest seen RecordId in a session without a read timestamp because that is
+    // required by the largest_key API.
+    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    auto sessRaii = cache->getSession();
+    auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
+    auto cursor = cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
+    ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
+
+    // Find the largest RecordId in the table and add 1 to generate our next RecordId. The
+    // largest_key API returns the largest key in the table regardless of visibility. This ensures
+    // we don't re-use RecordIds that are not visible.
+    int ret = cursor->largest_key(cursor);
+    if (ret != WT_NOTFOUND) {
+        invariantWTOK(ret);
+        auto recordId = getKey(cursor);
+        nextId = recordId.getLong() + 1;
     }
 
     _nextIdNum.store(nextId);
