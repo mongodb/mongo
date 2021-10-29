@@ -14,7 +14,6 @@
   base_suite: concurrency_replication
   overrides:
     - "multiversion.replica_fixture"
-    - "multiversion.test_kind"
 
 - suite_name: multiversion_sanity_check
   base_suite: replica_sets_jscore_passthrough
@@ -34,7 +33,6 @@
   overrides:
     - "multiversion.sharded_fixture"
     - "multiversion.concurrency_sharded_replication_multiversion_mongod_options"
-    - "multiversion.test_kind"
 
 - suite_name: sharding_jscore_multiversion
   base_suite: sharding_jscore_passthrough
