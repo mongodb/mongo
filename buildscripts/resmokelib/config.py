@@ -155,6 +155,9 @@ DEFAULTS = {
 
     # Generate multiversion exclude tags options
     "exclude_tags_file_path": "generated_resmoke_config/multiversion_exclude_tags.yml",
+
+    # Limit the number of tests to execute
+    "max_test_queue_size": None,
 }
 
 _SuiteOptions = collections.namedtuple("_SuiteOptions", [
@@ -539,6 +542,9 @@ UNDO_RECORDER_PATH = None
 
 # # Generate multiversion exclude tags options
 EXCLUDE_TAGS_FILE_PATH = None
+
+# Limit the number of tests to execute
+MAX_TEST_QUEUE_SIZE = None
 
 ##
 # Internally used configuration options that aren't exposed to the user

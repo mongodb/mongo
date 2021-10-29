@@ -368,6 +368,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     _config.EXCLUDE_TAGS_FILE_PATH = config.pop("exclude_tags_file_path")
 
+    _config.MAX_TEST_QUEUE_SIZE = config.pop("max_test_queue_size")
+
     def configure_tests(test_files, replay_file):
         # `_validate_options` has asserted that at most one of `test_files` and `replay_file` contains input.
 

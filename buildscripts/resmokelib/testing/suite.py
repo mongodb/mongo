@@ -166,6 +166,12 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         """Return the "test_kind" section of the YAML configuration."""
         return self._suite_config["test_kind"]
 
+    def get_num_times_to_repeat_tests(self) -> int:
+        """Return the number of times to repeat tests."""
+        if self.options.num_repeat_tests:
+            return self.options.num_repeat_tests
+        return 1
+
     @property
     def options(self):
         """Get the options."""

@@ -2,6 +2,7 @@
 
 import threading
 import time
+from typing import List
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors
@@ -14,8 +15,8 @@ from buildscripts.resmokelib.testing import hooks as _hooks
 from buildscripts.resmokelib.testing import job as _job
 from buildscripts.resmokelib.testing import report as _report
 from buildscripts.resmokelib.testing import testcases
-from buildscripts.resmokelib.testing.queue_element import queue_elem_factory
-from buildscripts.resmokelib.utils.queue import Queue
+from buildscripts.resmokelib.testing.queue_element import queue_elem_factory, QueueElem
+from buildscripts.resmokelib.utils import queue as _queue
 
 
 class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
@@ -52,11 +53,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                                                       archive)
 
         self._suite = suite
-        self.num_tests = len(suite.tests) * suite.options.num_repeat_tests
         self.test_queue_logger = logging.loggers.new_testqueue_logger(suite.test_kind)
-
-        # Must be done after getting buildlogger configuration.
-        self._jobs = self._create_jobs(self.num_tests)
+        self._jobs = []
 
     def _num_jobs_to_start(self, suite, num_tests):
         """
@@ -109,6 +107,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             num_repeat_suites = self._suite.options.num_repeat_suites
             while num_repeat_suites > 0:
                 test_queue = self._make_test_queue()
+                self._jobs = self._create_jobs(test_queue.num_tests)
 
                 partial_reports = [job.report for job in self._jobs]
                 self._suite.record_test_start(partial_reports)
@@ -157,10 +156,10 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 test_report = report.as_dict()
                 test_results_num = len(test_report["results"])
                 # There should be at least as many tests results as expected number of tests.
-                if test_results_num < self.num_tests:
+                if test_results_num < test_queue.num_tests:
                     raise errors.ResmokeError(
                         "{} reported tests is less than {} expected tests".format(
-                            test_results_num, self.num_tests))
+                            test_results_num, test_queue.num_tests))
 
                 # Clear the report so it can be reused for the next execution.
                 for job in self._jobs:
@@ -230,7 +229,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         # We cannot return 'interrupt_flag.is_set()' because the interrupt flag can be set by a Job
         # instance if a test fails and it decides to drain the queue. We only want to raise a
         # StopExecution exception in TestSuiteExecutor.run() if the user triggered the interrupt.
-        return (combined_report, user_interrupted)
+        return combined_report, user_interrupted
 
     def _teardown_fixtures(self):
         """Tear down all of the fixtures.
@@ -291,16 +290,6 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         return _job.Job(job_num, job_logger, fixture, hooks, report, self.archival,
                         self._suite.options, self.test_queue_logger)
 
-    def _num_times_to_repeat_tests(self):
-        """
-        Determine the number of times to repeat the tests.
-
-        :return: Number of times to repeat the tests.
-        """
-        if self._suite.options.num_repeat_tests:
-            return self._suite.options.num_repeat_tests
-        return 1
-
     def _create_queue_elem_for_test_name(self, test_name):
         """
         Create the appropriate queue_elem to run the given test_name.
@@ -321,24 +310,47 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         we will add 2 queue_elements of each test to the queue). If we are repeating execution for
         a specified time period, we will add each test to the queue, but as a QueueElemRepeatTime
         object, which will requeue itself if it has not run for the expected duration.
-
         Use a multi-consumer queue instead of a unittest.TestSuite so that the test cases can
         be dispatched to multiple threads.
-
         :return: Queue of testcases to run.
         """
-        queue = Queue()
+        test_queue = TestQueue()
 
-        # Put all the test cases in a queue.
-        for _ in range(self._num_times_to_repeat_tests()):
+        # Make test cases to put in test queue
+        test_cases = []
+        for _ in range(self._suite.get_num_times_to_repeat_tests()):
             for test_name in self._suite.tests:
                 queue_elem = self._create_queue_elem_for_test_name(test_name)
-                queue.put(queue_elem)
+                test_cases.append(queue_elem)
+        test_queue.add_test_cases(test_cases)
 
-        return queue
+        return test_queue
 
     def _log_timeout_warning(self, seconds):
         """Log a message if any thread fails to terminate after `seconds`."""
         self.logger.warning(
             '*** Still waiting for processes to terminate after %s seconds. Try using ctrl-\\ '
             'to send a SIGQUIT on Linux or ctrl-c again on Windows ***', seconds)
+
+
+class TestQueue(_queue.Queue):
+    """A queue of test cases to run.
+
+    Use a multi-consumer queue instead of a unittest.TestSuite so that the test cases can
+    be dispatched to multiple threads.
+    """
+
+    def __init__(self):
+        """Initialize test queue."""
+        self.num_tests = 0
+        self.max_test_queue_size = utils.default_if_none(_config.MAX_TEST_QUEUE_SIZE, -1)
+        super().__init__()
+
+    def add_test_cases(self, test_cases: List[QueueElem]) -> None:
+        """Add test cases to the queue."""
+        for test_case in test_cases:
+            if self.max_test_queue_size < 0 or self.num_tests < self.max_test_queue_size:
+                self.put(test_case)
+                self.num_tests += 1
+            else:
+                break

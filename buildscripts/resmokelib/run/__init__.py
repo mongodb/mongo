@@ -843,6 +843,9 @@ class RunPlugin(PluginInterface):
                             action="append", metavar="featureFlag1, featureFlag2, ...",
                             help="Additional feature flags")
 
+        parser.add_argument("--maxTestQueueSize", type=int, dest="max_test_queue_size",
+                            help=argparse.SUPPRESS)
+
         mongodb_server_options = parser.add_argument_group(
             title=_MONGODB_SERVER_OPTIONS_TITLE,
             description=("Options related to starting a MongoDB cluster that are forwarded from"
