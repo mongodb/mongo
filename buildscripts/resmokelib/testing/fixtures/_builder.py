@@ -74,6 +74,8 @@ class ReplSetBuilder(FixtureBuilder):
         # but here it is for the case, when it comes from resmoke suite definition
         if isinstance(mixed_bin_versions, str):
             mixed_bin_versions = mixed_bin_versions.split("-")
+        if config.MIXED_BIN_VERSIONS is None:
+            config.MIXED_BIN_VERSIONS = mixed_bin_versions
         old_bin_version = kwargs.pop("old_bin_version", config.MULTIVERSION_BIN_VERSION)
 
         # We also hijack the num_nodes because we need it here.
@@ -282,6 +284,8 @@ class ShardedClusterBuilder(FixtureBuilder):
         # but here it is for the case, when it comes from resmoke suite definition
         if isinstance(mixed_bin_versions, str):
             mixed_bin_versions = mixed_bin_versions.split("-")
+        if config.MIXED_BIN_VERSIONS is None:
+            config.MIXED_BIN_VERSIONS = mixed_bin_versions
         old_bin_version = kwargs.pop("old_bin_version", config.MULTIVERSION_BIN_VERSION)
         is_multiversion = mixed_bin_versions is not None
 
