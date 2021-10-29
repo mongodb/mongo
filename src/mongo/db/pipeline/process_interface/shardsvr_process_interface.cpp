@@ -63,12 +63,6 @@ using write_ops::Insert;
 using write_ops::Update;
 using write_ops::UpdateOpEntry;
 
-ShardServerProcessInterface::ShardServerProcessInterface(
-    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor)
-    : CommonMongodProcessInterface(executor) {
-    _opIsVersioned = OperationShardingState::isOperationVersioned(opCtx);
-}
-
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
@@ -185,15 +179,14 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     newCmdWithWriteConcernBuilder.append(WriteConcernOptions::kWriteConcernField,
                                          opCtx->getWriteConcern().toBSON());
     newCmdObj = newCmdWithWriteConcernBuilder.done();
-    auto response = executeRawCommandAgainstDatabasePrimary(
-        opCtx,
-        // internalRenameIfOptionsAndIndexesMatch is adminOnly.
-        NamespaceString::kAdminDb,
-        cachedDbInfo,
-        // Only unsharded collections can be renamed.
-        _versionCommandIfAppropriate(newCmdObj, cachedDbInfo, ChunkVersion::UNSHARDED()),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kNoRetry);
+    auto response =
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             // internalRenameIfOptionsAndIndexesMatch is adminOnly.
+                                             NamespaceString::kAdminDb,
+                                             std::move(cachedDbInfo),
+                                             newCmdObj,
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                             Shard::RetryPolicy::kNoRetry);
     uassertStatusOKWithContext(response.swResponse,
                                str::stream() << "failed while running command " << newCmdObj);
     auto result = response.swResponse.getValue().data;
@@ -219,7 +212,7 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                               nss.db().toString(),
-                                              _versionCommandIfAppropriate(cmdObj, cachedDbInfo),
+                                              appendDbVersionIfPresent(cmdObj, cachedDbInfo),
                                               Milliseconds(-1)));
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return BSONObj{};
@@ -265,7 +258,7 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
             shard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                               ns.db().toString(),
-                                              _versionCommandIfAppropriate(cmdObj, cachedDbInfo),
+                                              appendDbVersionIfPresent(cmdObj, cachedDbInfo),
                                               Milliseconds(-1)));
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return std::list<BSONObj>();
@@ -282,13 +275,13 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
     finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                            opCtx->getWriteConcern().toBSON());
     BSONObj finalCmdObj = finalCmdBuilder.obj();
-    auto response = executeRawCommandAgainstDatabasePrimary(
-        opCtx,
-        dbName,
-        cachedDbInfo,
-        _versionCommandIfAppropriate(finalCmdObj, cachedDbInfo),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
+    auto response =
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             dbName,
+                                             std::move(cachedDbInfo),
+                                             finalCmdObj,
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                             Shard::RetryPolicy::kIdempotent);
     uassertStatusOKWithContext(response.swResponse,
                                str::stream() << "failed while running command " << finalCmdObj);
     auto result = response.swResponse.getValue().data;
@@ -310,12 +303,12 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
                          opCtx->getWriteConcern().toBSON());
     auto cmdObj = newCmdBuilder.done();
     auto response =
-        executeRawCommandAgainstDatabasePrimary(opCtx,
-                                                ns.db(),
-                                                std::move(cachedDbInfo),
-                                                _versionCommandIfAppropriate(cmdObj, cachedDbInfo),
-                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                Shard::RetryPolicy::kIdempotent);
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             ns.db(),
+                                             std::move(cachedDbInfo),
+                                             cmdObj,
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                             Shard::RetryPolicy::kIdempotent);
     uassertStatusOKWithContext(response.swResponse,
                                str::stream() << "failed while running command " << cmdObj);
     auto result = response.swResponse.getValue().data;
@@ -336,14 +329,13 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     newCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                          opCtx->getWriteConcern().toBSON());
     auto cmdObj = newCmdBuilder.done();
-    auto response = executeRawCommandAgainstDatabasePrimary(
-        opCtx,
-        ns.db(),
-        cachedDbInfo,
-        // Only unsharded collections can be dropped.
-        _versionCommandIfAppropriate(cmdObj, cachedDbInfo, ChunkVersion::UNSHARDED()),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
+    auto response =
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             ns.db(),
+                                             std::move(cachedDbInfo),
+                                             cmdObj,
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                             Shard::RetryPolicy::kIdempotent);
     uassertStatusOKWithContext(response.swResponse,
                                str::stream() << "failed while running command " << cmdObj);
     auto result = response.swResponse.getValue().data;
@@ -359,16 +351,4 @@ ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipelin
                                                           bool allowTargetingShards) {
     return sharded_agg_helpers::attachCursorToPipeline(ownedPipeline, allowTargetingShards);
 }
-
-BSONObj ShardServerProcessInterface::_versionCommandIfAppropriate(
-    BSONObj cmdObj,
-    const CachedDatabaseInfo& cachedDbInfo,
-    boost::optional<ChunkVersion> shardVersion) {
-    if (!_opIsVersioned) {
-        return cmdObj;
-    }
-    return appendDbVersionIfPresent(
-        shardVersion ? appendShardVersion(cmdObj, *shardVersion) : cmdObj, cachedDbInfo);
-}
-
 }  // namespace mongo
