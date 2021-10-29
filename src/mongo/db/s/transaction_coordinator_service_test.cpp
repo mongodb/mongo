@@ -377,9 +377,16 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kCommitDeadline);
 
-    auto completionFuture = coordinatorService->coordinateCommit(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
-    assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
+    {
+        // Set this server parameter so coordinateCommit returns the decision future instead of the
+        // completion future.
+        RAIIServerParameterControllerForTest _controller{
+            "coordinateCommitReturnImmediatelyAfterPersistingDecision", true};
+        auto decisionFuture = *coordinatorService->coordinateCommit(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
+        assertCommandSentAndRespondWith("prepareTransaction", kPrepareOk, boost::none);
+        decisionFuture.get();
+    }
 
     TxnNumberAndRetryCounter otherTxnNumberAndRetryCounter{
         _txnNumberAndRetryCounter.getTxnNumber(),
@@ -390,6 +397,8 @@ TEST_F(TransactionCoordinatorServiceTest,
         AssertionException,
         6032301);
 
+    auto completionFuture =
+        *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumberAndRetryCounter);
     assertCommandSentAndRespondWith("commitTransaction", kOk, boost::none);
     completionFuture.get();
 }
@@ -642,7 +651,7 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kCommitDeadline);
 
-    auto completionFuture = coordinatorService->coordinateCommit(
+    auto completionFuture = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
 
     TxnNumberAndRetryCounter newTxnNumberAndRetryCounter{
@@ -655,7 +664,7 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
     assertCommandSentAndRespondWith("abortTransaction", kOk, boost::none);
-    completionFuture.get();
+    ASSERT_THROWS_CODE(completionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(TransactionCoordinatorServiceTest, CoordinatorRetriesOnWriteConcernErrorToPrepare) {
