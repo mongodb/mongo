@@ -619,7 +619,7 @@ functions:
           source venv/bin/activate
           ${pip3_binary} install pymongo[srv]
           git clone git@github.com:wiredtiger/automation-scripts.git
-          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -c ${perf-test-name} -f test_stats/atlas_out.json -b ${branch_name}
+          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -f test_stats/atlas_out.json -b ${branch_name}
 
     - command: perf.send
       params:
