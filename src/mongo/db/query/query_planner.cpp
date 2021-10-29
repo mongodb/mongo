@@ -129,6 +129,40 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
 
     return Status::OK();
 }
+
+/**
+ * Returns whether the hintedIndex matches the cluster key. When hinting by index name,
+ * 'hintObj' takes the shape of {$hint: <indexName>}. When hinting by key pattern,
+ * 'hintObj' represents the actual key pattern (eg: {_id: 1}).
+ */
+bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clusteredInfo,
+                           const BSONObj& hintObj) {
+    if (!clusteredInfo) {
+        // The collection isn't clustered.
+        return false;
+    }
+
+    auto clusteredIndexSpec = clusteredInfo->getIndexSpec();
+
+    BSONElement firstHintElt = hintObj.firstElement();
+    if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
+        firstHintElt.type() == BSONType::String) {
+        // An index name is provided by the hint.
+
+        // The clusteredIndex's name should always be filled in with a default value when not
+        // specified upon creation.
+        tassert(6012100,
+                "clusteredIndex's 'name' field should be filled in by default after creation",
+                clusteredIndexSpec.getName());
+
+        auto hintName = firstHintElt.valueStringData();
+        return hintName == clusteredIndexSpec.getName().get();
+    }
+
+    // An index spec is provided by the hint.
+    return hintObj.woCompare(clusteredIndexSpec.getKey()) == 0;
+}
+
 }  // namespace
 
 using std::numeric_limits;
@@ -671,21 +705,29 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::planForMul
         return {std::move(out)};
     }
 
-    // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect any $natural
-    // sort to have been normalized to a $natural hint upstream.
     if (!query.getFindCommandRequest().getHint().isEmpty()) {
         const BSONObj& hintObj = query.getFindCommandRequest().getHint();
-        if (hintObj[query_request_helper::kNaturalSortField]) {
-            LOGV2_DEBUG(20969, 5, "Forcing a table scan due to hinted $natural");
-            if (!canTableScan) {
-                return Status(ErrorCodes::NoQueryExecutionPlans,
-                              "hint $natural is not allowed, because 'notablescan' is enabled");
+        const auto naturalHint = hintObj[query_request_helper::kNaturalSortField];
+        if (naturalHint || hintMatchesClusterKey(params.clusteredInfo, hintObj)) {
+            // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect any
+            // $natural sort to have been normalized to a $natural hint upstream. Additionally, if
+            // the hint matches the collection's cluster key, we also output a collscan utilizing
+            // the cluster key.
+
+            if (naturalHint) {
+                // Perform validation specific to $natural.
+                LOGV2_DEBUG(20969, 5, "Forcing a table scan due to hinted $natural");
+                if (!canTableScan) {
+                    return Status(ErrorCodes::NoQueryExecutionPlans,
+                                  "hint $natural is not allowed, because 'notablescan' is enabled");
+                }
+                if (!query.getFindCommandRequest().getMin().isEmpty() ||
+                    !query.getFindCommandRequest().getMax().isEmpty()) {
+                    return Status(ErrorCodes::NoQueryExecutionPlans,
+                                  "min and max are incompatible with $natural");
+                }
             }
-            if (!query.getFindCommandRequest().getMin().isEmpty() ||
-                !query.getFindCommandRequest().getMax().isEmpty()) {
-                return Status(ErrorCodes::NoQueryExecutionPlans,
-                              "min and max are incompatible with $natural");
-            }
+
             auto soln = buildCollscanSoln(query, isTailable, params);
             if (!soln) {
                 return Status(ErrorCodes::NoQueryExecutionPlans,
