@@ -4548,6 +4548,108 @@ ValueUnorderedSet arrayToUnorderedSet(const Value& val, const ValueComparator& v
 }
 }  // namespace
 
+/* ------------------------ ExpressionSortArray ------------------------ */
+
+namespace {
+
+BSONObj createSortSpecObject(const BSONElement& sortClause) {
+    if (sortClause.type() == BSONType::Object) {
+        auto status = pattern_cmp::checkSortClause(sortClause.embeddedObject());
+        uassert(2942505, status.toString(), status.isOK());
+
+        return sortClause.embeddedObject();
+    } else if (sortClause.isNumber()) {
+        double orderVal = sortClause.Number();
+        uassert(2942506,
+                "The $sort element value must be either 1 or -1",
+                orderVal == -1 || orderVal == 1);
+
+        return BSON("" << orderVal);
+    } else {
+        uasserted(2942507,
+                  "The $sort is invalid: use 1/-1 to sort the whole element, or {field:1/-1} to "
+                  "sort embedded fields");
+    }
+}
+
+}  // namespace
+
+intrusive_ptr<Expression> ExpressionSortArray::parse(ExpressionContext* const expCtx,
+                                                     BSONElement expr,
+                                                     const VariablesParseState& vps) {
+    uassert(2942500,
+            str::stream() << "$sortArray requires an object as an argument, found: "
+                          << typeName(expr.type()),
+            expr.type() == Object);
+
+    boost::intrusive_ptr<Expression> input;
+    boost::optional<PatternValueCmp> sortBy;
+    for (auto&& elem : expr.Obj()) {
+        auto field = elem.fieldNameStringData();
+
+        if (field == "input") {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == "sortBy") {
+            sortBy = PatternValueCmp(createSortSpecObject(elem), elem, expCtx->getCollator());
+        } else {
+            uasserted(2942501, str::stream() << "$sortArray found an unknown argument: " << field);
+        }
+    }
+
+    uassert(2942502, "$sortArray requires 'input' to be specified", input);
+    uassert(2942503, "$sortArray requires 'sortBy' to be specified", sortBy != boost::none);
+
+    return new ExpressionSortArray(expCtx, std::move(input), *sortBy);
+}
+
+Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) const {
+    Value input(_input->evaluate(root, variables));
+
+    if (input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(2942504,
+            str::stream() << "The input argument to $sortArray must be an array, but was of type: "
+                          << typeName(input.getType()),
+            input.isArray());
+
+    if (input.getArrayLength() < 2) {
+        return input;
+    }
+
+    std::vector<Value> array = input.getArray();
+    std::sort(array.begin(), array.end(), _sortBy);
+    return Value(array);
+}
+
+// TODO: SERVER-60207 change this when we enable the feature flag by default.
+REGISTER_EXPRESSION_CONDITIONALLY(sortArray,
+                                  ExpressionSortArray::parse,
+                                  AllowedWithApiStrict::kNeverInVersion1,
+                                  AllowedWithClientType::kAny,
+                                  boost::none,
+                                  feature_flags::gFeatureFlagSortArray.isEnabledAndIgnoreFCV());
+
+const char* ExpressionSortArray::getOpName() const {
+    return kName.rawData();
+}
+
+intrusive_ptr<Expression> ExpressionSortArray::optimize() {
+    _input = _input->optimize();
+    return this;
+}
+
+void ExpressionSortArray::_doAddDependencies(DepsTracker* deps) const {
+    _input->addDependencies(deps);
+}
+
+Value ExpressionSortArray::serialize(bool explain) const {
+    return Value(Document{{kName,
+                           Document{{"input", _input->serialize(explain)},
+                                    {"sortBy", _sortBy.getOriginalElement()}}}});
+}
+
 /* ----------------------- ExpressionSetDifference ---------------------------- */
 
 Value ExpressionSetDifference::evaluate(const Document& root, Variables* variables) const {

@@ -387,6 +387,7 @@ public:
     void visit(const ExpressionSetUnion* expr) final {}
     void visit(const ExpressionSize* expr) final {}
     void visit(const ExpressionReverseArray* expr) final {}
+    void visit(const ExpressionSortArray* expr) final {}
     void visit(const ExpressionSlice* expr) final {}
     void visit(const ExpressionIsArray* expr) final {}
     void visit(const ExpressionRound* expr) final {}
@@ -617,6 +618,7 @@ public:
     void visit(const ExpressionSetUnion* expr) final {}
     void visit(const ExpressionSize* expr) final {}
     void visit(const ExpressionReverseArray* expr) final {}
+    void visit(const ExpressionSortArray* expr) final {}
     void visit(const ExpressionSlice* expr) final {}
     void visit(const ExpressionIsArray* expr) final {}
     void visit(const ExpressionRound* expr) final {}
@@ -2572,6 +2574,11 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprRevArr)));
     }
+
+    void visit(const ExpressionSortArray* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+
     void visit(const ExpressionSlice* expr) final {
         unsupportedExpression(expr->getOpName());
     }

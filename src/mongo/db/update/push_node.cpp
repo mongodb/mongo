@@ -49,40 +49,6 @@ const StringData PushNode::kPositionClauseName = "$position";
 namespace {
 
 /**
- * When the $sort clause in a $push modifer is an object, that object should pass the checks in
- * this function.
- */
-Status checkSortClause(const BSONObj& sortObject) {
-    if (sortObject.isEmpty()) {
-        return Status(ErrorCodes::BadValue,
-                      "The $sort pattern is empty when it should be a set of fields.");
-    }
-
-    for (auto&& patternElement : sortObject) {
-        double orderVal = patternElement.isNumber() ? patternElement.Number() : 0;
-        if (orderVal != -1 && orderVal != 1) {
-            return Status(ErrorCodes::BadValue, "The $sort element value must be either 1 or -1");
-        }
-
-        FieldRef sortField(patternElement.fieldName());
-        if (sortField.numParts() == 0) {
-            return Status(ErrorCodes::BadValue, "The $sort field cannot be empty");
-        }
-
-        for (size_t i = 0; i < sortField.numParts(); ++i) {
-            if (sortField.getPart(i).size() == 0) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The $sort field is a dotted field "
-                                               "but has an empty part: "
-                                            << sortField.dottedField());
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
-/**
  * std::abs(LLONG_MIN) results in undefined behavior on 2's complement systems because the
  * absolute value of LLONG_MIN cannot be represented in a 'long long'.
  *
@@ -157,7 +123,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
             auto sortClause = sortIt->second;
 
             if (sortClause.type() == BSONType::Object) {
-                auto status = checkSortClause(sortClause.embeddedObject());
+                auto status = pattern_cmp::checkSortClause(sortClause.embeddedObject());
 
                 if (status.isOK()) {
                     _sort = PatternElementCmp(sortClause.embeddedObject(), expCtx->getCollator());

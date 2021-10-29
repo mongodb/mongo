@@ -1446,4 +1446,10 @@ Value Value::deserializeForIDL(const BSONElement& element) {
     return Value(element);
 }
 
+BSONObj Value::wrap(StringData newName) const {
+    BSONObjBuilder b(getApproximateSize() + 6 + newName.size());
+    addToBsonObj(&b, newName);
+    return b.obj();
+}
+
 }  // namespace mongo

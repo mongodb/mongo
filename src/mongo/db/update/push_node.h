@@ -36,7 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/update/modifier_node.h"
-#include "mongo/db/update/push_sorter.h"
+#include "mongo/db/update/pattern_cmp.h"
 
 namespace mongo {
 

@@ -262,6 +262,91 @@ TEST(ExpressionReverseArrayTest, ReturnsNullWithNullishInput) {
         {{{Value(BSONNULL)}, Value(BSONNULL)}, {{Value(BSONUndefined)}, Value(BSONNULL)}});
 }
 
+/* ------------------------ ExpressionSortArray -------------------- */
+
+TEST(ExpressionSortArrayTest, SortsNormalArrayForwards) {
+    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
+
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ 2, 1, 3 ] }, sortBy: 1 } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2 << 3)));
+}
+
+
+TEST(ExpressionSortArrayTest, SortsNormalArrayBackwards) {
+    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
+
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ 2, 1, 3 ] }, sortBy: -1 } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(3 << 2 << 1)));
+}
+
+TEST(ExpressionSortArrayTest, SortsEmptyArray) {
+    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
+
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ ] }, sortBy: -1 } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_VALUE_EQ(val, Value(std::vector<Value>()));
+}
+
+TEST(ExpressionSortArrayTest, SortsOneElementArray) {
+    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
+
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ 1 ] }, sortBy: -1 } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1)));
+}
+
+TEST(ExpressionSortArrayTest, ReturnsNullWithNullInput) {
+    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
+
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $sortArray: { input: { $literal: null }, sortBy: -1 } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
+TEST(ExpressionSortArrayTest, ReturnsNullWithUndefinedInput) {
+    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
+
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{ $sortArray: { input: { $literal: undefined }, sortBy: -1 } }");
+
+    auto expressionSortArray =
+        ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+    Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
+
+    ASSERT_VALUE_EQ(val, Value(BSONNULL));
+}
+
 /* ------------------------- Old-style tests -------------------------- */
 
 namespace Add {

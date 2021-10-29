@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/update/push_sorter.h"
+#include "mongo/db/update/pattern_cmp.h"
 
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"

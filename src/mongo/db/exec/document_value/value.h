@@ -394,6 +394,9 @@ public:
     void serializeForIDL(BSONArrayBuilder* builder) const;
     static Value deserializeForIDL(const BSONElement& element);
 
+    // Wrap a value in a BSONObj.
+    BSONObj wrap(StringData newName) const;
+
 private:
     explicit Value(const ValueStorage& storage) : _storage(storage) {}
 

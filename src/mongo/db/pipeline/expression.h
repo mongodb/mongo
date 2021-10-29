@@ -54,6 +54,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/update/pattern_cmp.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
@@ -2889,6 +2890,41 @@ public:
     }
 };
 
+class ExpressionSortArray final : public Expression {
+public:
+    static constexpr auto kName = "$sortArray"_sd;
+    ExpressionSortArray(ExpressionContext* const expCtx,
+                        boost::intrusive_ptr<Expression> input,
+                        const PatternValueCmp& sortBy)
+        : Expression(expCtx, {std::move(input)}), _input(_children[0]), _sortBy(sortBy) {
+        expCtx->sbeCompatible = false;
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+    Value serialize(bool explain) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+    const char* getOpName() const;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+private:
+    boost::intrusive_ptr<Expression>& _input;
+
+    PatternValueCmp _sortBy;
+};
 
 class ExpressionSlice final : public ExpressionRangedArity<ExpressionSlice, 2, 3> {
 public:

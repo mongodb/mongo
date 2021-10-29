@@ -104,6 +104,7 @@ class ExpressionSetIsSubset;
 class ExpressionSetUnion;
 class ExpressionSize;
 class ExpressionReverseArray;
+class ExpressionSortArray;
 class ExpressionSlice;
 class ExpressionIsArray;
 class ExpressionRandom;
@@ -262,6 +263,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetUnion>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSize>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionReverseArray>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSortArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSlice>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionIsArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionRandom>) = 0;
@@ -438,6 +440,7 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionSetUnion*) override {}
     void visit(const ExpressionSize*) override {}
     void visit(const ExpressionReverseArray*) override {}
+    void visit(const ExpressionSortArray*) override {}
     void visit(const ExpressionSlice*) override {}
     void visit(const ExpressionIsArray*) override {}
     void visit(const ExpressionRound*) override {}

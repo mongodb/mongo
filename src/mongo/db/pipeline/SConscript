@@ -106,6 +106,7 @@ env.Library(
         'variables.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
