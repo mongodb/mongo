@@ -64,8 +64,8 @@ public:
         if (includeInitialSync) {
             responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
         }
-        status =
-            ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(&result, responseStyle);
+        status = ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(
+            opCtx, &result, responseStyle);
         uassertStatusOK(status);
         return true;
     }

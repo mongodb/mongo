@@ -612,7 +612,8 @@ public:
      * Handles an incoming replSetGetStatus command. Adds BSON to 'result'. If kInitialSync is
      * requested but initial sync is not running, kBasic will be used.
      */
-    virtual Status processReplSetGetStatus(BSONObjBuilder* result,
+    virtual Status processReplSetGetStatus(OperationContext* opCtx,
+                                           BSONObjBuilder* result,
                                            ReplSetGetStatusResponseStyle responseStyle) = 0;
 
     /**

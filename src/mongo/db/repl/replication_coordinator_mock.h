@@ -189,7 +189,9 @@ public:
 
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
 
-    virtual Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle);
+    virtual Status processReplSetGetStatus(OperationContext* opCtx,
+                                           BSONObjBuilder*,
+                                           ReplSetGetStatusResponseStyle);
 
     virtual void appendSecondaryInfoData(BSONObjBuilder* result);
 

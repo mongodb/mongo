@@ -456,7 +456,8 @@ void ReplicationCoordinatorMock::advanceCommitPoint(
 
 void ReplicationCoordinatorMock::cancelAndRescheduleElectionTimeout() {}
 
-Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder*,
+Status ReplicationCoordinatorMock::processReplSetGetStatus(OperationContext* opCtx,
+                                                           BSONObjBuilder*,
                                                            ReplSetGetStatusResponseStyle) {
     return Status::OK();
 }

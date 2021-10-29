@@ -309,7 +309,8 @@ StatusWith<BSONObj> ReplicationCoordinatorEmbedded::prepareReplSetUpdatePosition
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::processReplSetGetStatus(BSONObjBuilder*,
+Status ReplicationCoordinatorEmbedded::processReplSetGetStatus(OperationContext* opCtx,
+                                                               BSONObjBuilder*,
                                                                ReplSetGetStatusResponseStyle) {
     UASSERT_NOT_IMPLEMENTED;
 }

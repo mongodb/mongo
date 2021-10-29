@@ -3043,7 +3043,9 @@ StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionComm
 }
 
 Status ReplicationCoordinatorImpl::processReplSetGetStatus(
-    BSONObjBuilder* response, ReplSetGetStatusResponseStyle responseStyle) {
+    OperationContext* opCtx,
+    BSONObjBuilder* response,
+    ReplSetGetStatusResponseStyle responseStyle) {
 
     BSONObj initialSyncProgress;
     if (responseStyle == ReplSetGetStatusResponseStyle::kInitialSync) {
@@ -3066,6 +3068,32 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
     BSONObj electionParticipantMetrics =
         ReplicationMetrics::get(getServiceContext()).getElectionParticipantMetricsBSON();
 
+    boost::optional<Timestamp> lastStableRecoveryTimestamp = boost::none;
+    try {
+        // Retrieving last stable recovery timestamp should not be blocked by oplog
+        // application.
+        ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+            opCtx->lockState());
+        opCtx->lockState()->skipAcquireTicket();
+        // We need to hold the lock so that we don't run when storage is being shutdown.
+        Lock::GlobalLock lk(opCtx,
+                            MODE_IS,
+                            Date_t::now() + Milliseconds(5),
+                            Lock::InterruptBehavior::kLeaveUnlocked,
+                            true /* skipRSTLLock */);
+        if (lk.isLocked()) {
+            lastStableRecoveryTimestamp = _storage->getLastStableRecoveryTimestamp(_service);
+        } else {
+            LOGV2_WARNING(6100702,
+                          "Failed to get last stable recovery timestamp due to {error}",
+                          "error"_attr = "lock acquire timeout"_sd);
+        }
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
+        LOGV2_WARNING(6100703,
+                      "Failed to get last stable recovery timestamp due to {error}",
+                      "error"_attr = redact(ex));
+    }
+
     stdx::lock_guard<Latch> lk(_mutex);
     if (_inShutdown) {
         return Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
@@ -3080,7 +3108,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             initialSyncProgress,
             electionCandidateMetrics,
             electionParticipantMetrics,
-            _storage->getLastStableRecoveryTimestamp(_service),
+            lastStableRecoveryTimestamp,
             _externalState->tooStale()},
         response,
         &result);

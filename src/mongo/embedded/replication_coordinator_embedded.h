@@ -176,7 +176,9 @@ public:
 
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
 
-    Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle) override;
+    Status processReplSetGetStatus(OperationContext* opCtx,
+                                   BSONObjBuilder*,
+                                   ReplSetGetStatusResponseStyle) override;
 
     void appendSecondaryInfoData(BSONObjBuilder*) override;
 

@@ -372,7 +372,8 @@ public:
         const BSONObj electionCandidateMetrics;
         const BSONObj electionParticipantMetrics;
 
-        // boost::none if the storage engine does not support recovery to a timestamp.
+        // boost::none if the storage engine does not support recovery to a timestamp, or if the
+        // storage engine is not available.
         // Timestamp::min() if a stable recovery timestamp is yet to be taken.
         //
         // On the replication layer, a non-min() timestamp ensures recoverable rollback is possible,

@@ -167,7 +167,9 @@ public:
 
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const final;
 
-    Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle) final;
+    Status processReplSetGetStatus(OperationContext* opCtx,
+                                   BSONObjBuilder*,
+                                   ReplSetGetStatusResponseStyle) final;
 
     void appendSecondaryInfoData(BSONObjBuilder*) final;
 

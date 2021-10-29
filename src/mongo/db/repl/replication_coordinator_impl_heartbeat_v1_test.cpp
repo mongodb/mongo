@@ -1109,8 +1109,11 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
     ASSERT_NOT_EQUALS(opTime.getTerm(), getTopoCoord().getTerm());
 
     BSONObjBuilder statusBuilder;
+    auto opCtx = makeOperationContext();
     ASSERT_OK(getReplCoord()->processReplSetGetStatus(
-        &statusBuilder, ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic));
+        opCtx.get(),
+        &statusBuilder,
+        ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic));
     auto statusObj = statusBuilder.obj();
     LOGV2(21495, "replica set status = {statusObj}", "statusObj"_attr = statusObj);
 

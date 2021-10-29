@@ -134,11 +134,34 @@ public:
             uassertStatusOK(status);
             return true;
         } else if (cmdObj.hasElement("getLastStableRecoveryTimestamp")) {
-            boost::optional<Timestamp> ts =
-                StorageInterface::get(getGlobalServiceContext())
-                    ->getLastStableRecoveryTimestamp(getGlobalServiceContext());
-            if (ts) {
-                result.append("lastStableRecoveryTimestamp", ts.get());
+            try {
+                // Retrieving last stable recovery timestamp should not be blocked by oplog
+                // application.
+                ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                    opCtx->lockState());
+                opCtx->lockState()->skipAcquireTicket();
+                // We need to hold the lock so that we don't run when storage is being shutdown.
+                Lock::GlobalLock lk(opCtx,
+                                    MODE_IS,
+                                    Date_t::now() + Milliseconds(5),
+                                    Lock::InterruptBehavior::kLeaveUnlocked,
+                                    true /* skipRSTLLock */);
+                if (lk.isLocked()) {
+                    boost::optional<Timestamp> ts =
+                        StorageInterface::get(getGlobalServiceContext())
+                            ->getLastStableRecoveryTimestamp(getGlobalServiceContext());
+                    if (ts) {
+                        result.append("lastStableRecoveryTimestamp", ts.get());
+                    }
+                } else {
+                    LOGV2_WARNING(6100700,
+                                  "Failed to get last stable recovery timestamp due to {error}",
+                                  "error"_attr = "lock acquire timeout"_sd);
+                }
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
+                LOGV2_WARNING(6100701,
+                              "Failed to get last stable recovery timestamp due to {error}",
+                              "error"_attr = redact(ex));
             }
             return true;
         } else if (cmdObj.hasElement("restartHeartbeats")) {

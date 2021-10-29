@@ -285,7 +285,8 @@ StatusWith<BSONObj> ReplicationCoordinatorNoOp::prepareReplSetUpdatePositionComm
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::processReplSetGetStatus(BSONObjBuilder*,
+Status ReplicationCoordinatorNoOp::processReplSetGetStatus(OperationContext* opCtx,
+                                                           BSONObjBuilder*,
                                                            ReplSetGetStatusResponseStyle) {
     MONGO_UNREACHABLE;
 }
