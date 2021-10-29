@@ -33,6 +33,7 @@
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
@@ -41,6 +42,11 @@
 #include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
+
+namespace {
+const WriteConcernOptions kMajorityWriteConcern{
+    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
+}
 
 void ReshardingRecipientService::RecipientStateMachineExternalState::
     ensureTempReshardingCollectionExistsWithIndexes(OperationContext* opCtx,
@@ -160,7 +166,7 @@ void RecipientStateMachineExternalStateImpl::updateCoordinatorDocument(Operation
                                             query,
                                             update,
                                             false, /* upsert */
-                                            ShardingCatalogClient::kMajorityWriteConcern,
+                                            kMajorityWriteConcern,
                                             Milliseconds::max()));
 
     if (!docWasModified) {
