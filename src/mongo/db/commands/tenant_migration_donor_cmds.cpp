@@ -57,8 +57,9 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "tenant migrations are not available in sharded clusters",
-                    serverGlobalParams.clusterRole == ClusterRole::None);
+                    "tenant migrations are not available on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::None ||
+                        serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
             // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
             uassert(
@@ -160,8 +161,9 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "tenant migrations are not available in sharded clusters",
-                    serverGlobalParams.clusterRole == ClusterRole::None);
+                    "tenant migrations are not available on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::None ||
+                        serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
             const auto& cmd = request();
 
@@ -228,8 +230,9 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "tenant migrations are not available in sharded clusters",
-                    serverGlobalParams.clusterRole == ClusterRole::None);
+                    "tenant migrations are not available on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::None ||
+                        serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
             const RequestType& cmd = request();
 

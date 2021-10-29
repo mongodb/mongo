@@ -1,5 +1,5 @@
 /**
- * Tests that tenant migration commands cannot be run on sharded clusters.
+ * Tests that tenant migration commands cannot be run on sharded clusters for config servers.
  *
  * @tags: [
  *   incompatible_with_eft,
@@ -24,8 +24,8 @@ recipientRst.initiate();
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), donorRst: donorRstShard, recipientRst});
 
-// Run tenant migration commands on shards.
-let donorPrimary = donorRstShard.getPrimary();
+// Run tenant migration commands on config servers.
+let donorPrimary = donorRstConfig.getPrimary();
 
 let cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
     donorStartMigration: 1,
@@ -35,50 +35,6 @@ let cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
     readPreference: {mode: "primary"}
 },
                                                                  donorPrimary.getDB("admin"));
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
-
-cmdObj = {
-    donorForgetMigration: 1,
-    migrationId: UUID()
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
-
-cmdObj = {
-    donorAbortMigration: 1,
-    migrationId: UUID()
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
-
-cmdObj = {
-    recipientSyncData: 1,
-    migrationId: UUID(),
-    donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-    tenantId: "kTenantTest",
-    readPreference: {mode: "primary"},
-    startMigrationDonorTimestamp: Timestamp(1, 1)
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
-
-cmdObj = {
-    recipientForgetMigration: 1,
-    migrationId: UUID(),
-    donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-    tenantId: "kTenantTest",
-    readPreference: {mode: "primary"},
-};
-assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
-
-// Run tenant migration commands on config servers.
-donorPrimary = donorRstConfig.getPrimary();
-
-cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
-    donorStartMigration: 1,
-    tenantId: "kTenantTest",
-    migrationId: UUID(),
-    recipientConnectionString: tenantMigrationTest.getRecipientConnString(),
-    readPreference: {mode: "primary"}
-},
-                                                             donorPrimary.getDB("admin"));
 assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
 
 cmdObj = {
