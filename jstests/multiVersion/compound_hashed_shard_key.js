@@ -158,52 +158,23 @@ lowestChunk = configDB.chunks.find({ns: ns}).sort({min: 1}).limit(1).next();
 assert.commandWorked(st.s.adminCommand(
     {moveChunk: ns, bounds: [lowestChunk.min, lowestChunk.max], to: st.shard1.shardName}));
 
-// Starting mongos with 4.2 binary does not fail but read/write operations cannot be performed on
-// the collection. This is because mongos cannot understand compound hashed shard key while trying
-// to target the operation to the respective shard(s).
-st.upgradeCluster(
-    nodeOptions42.binVersion,
-    {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false, waitUntilStable: true});
-coll = st.s.getDB(jsTestName()).coll;
-assert.commandFailedWithCode(coll.insert({a: 1, b: 1, c: 1}), ErrorCodes.BadValue);
-assert.commandFailedWithCode(coll.update({_id: 0}, {$set: {p: 1}}), ErrorCodes.BadValue);
-assert.commandFailedWithCode(coll.remove({_id: 0}), ErrorCodes.BadValue);
-assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}}),
-                             ErrorCodes.BadValue);
-assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}}),
-                             ErrorCodes.BadValue);
-assert.commandFailedWithCode(coll.runCommand({find: coll.getName(), filter: {}}),
-                             ErrorCodes.BadValue);
-
-// Verify that sharding admin commands will also fails.
-configDB = st.s.getDB('config');
-lowestChunk = configDB.chunks.find({ns: ns}).sort({min: 1}).limit(1).next();
-assert(lowestChunk);
-assert.commandFailedWithCode(
-    st.s.adminCommand({split: ns, bounds: [lowestChunk.min, lowestChunk.max]}),
-    ErrorCodes.BadValue);
-assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {moveChunk: ns, bounds: [lowestChunk.min, lowestChunk.max], to: st.shard1.shardName}),
-    ErrorCodes.BadValue);
-
-// Verify that the shards cannot be downgraded to 4.2 binary in the presense of compound hashed
-// index. This should force users to drop the collection.
-const secondaryNodeOfShard = st.rs0.getSecondaries()[0];
-assert(secondaryNodeOfShard);
+const oldMongos = st._mongos[0];
 try {
-    restartReplSetNode(st.rs0, secondaryNodeOfShard, nodeOptions42);
-    assert(false, "Expected 'restartCluster' to throw");
+    // Starting mongos with 4.2 binary should fail.
+    st.upgradeCluster(
+        nodeOptions42.binVersion,
+        {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false, waitUntilStable: true});
+    assert(
+        false,
+        "Upgrade to a 4.2 mongos in the presence of compound hashed shard key should not be allowed");
 } catch (err) {
-    assert.eq(err.message, `Failed to connect to node ${st.rs0.getNodeId(secondaryNodeOfShard)}`);
-    // HashAccessMethod should throw this error when the index spec is validated during startup.
-    assert(rawMongoProgramOutput().match("exception in initAndListen: Location16763"));
+    const newMongos = MongoRunner.runMongos(
+        {restart: oldMongos, binVersion: nodeOptions44.binVersion, appendOptions: true});
+    st["s" + 0] = st._mongos[0] = newMongos;
 }
-// Start that node and mongos with the 4.4 binary for a clean shutdown.
-st.rs0.start(secondaryNodeOfShard, nodeOptions44);
-st.rs0.awaitReplication();
+
+// Start mongos with the 4.4 binary for a clean shutdown.
 st.upgradeCluster(nodeOptions44.binVersion,
                   {upgradeMongos: true, upgradeShards: false, upgradeConfigs: false});
-
 st.stop();
 }());
