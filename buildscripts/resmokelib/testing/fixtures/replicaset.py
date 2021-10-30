@@ -14,13 +14,6 @@ import buildscripts.resmokelib.testing.fixtures.interface as interface
 class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides JSTests with a replica set to run against."""
 
-    # Error response codes copied from mongo/base/error_codes.yml.
-    _NODE_NOT_FOUND = 74
-    _NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE = 103
-    _CONFIGURATION_IN_PROGRESS = 109
-    _CURRENT_CONFIG_NOT_COMMITTED_YET = 308
-    _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
-
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
             self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
             dbpath_prefix=None, preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
@@ -289,7 +282,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                     raise self.fixturelib.ServerFailure(msg)
                 time.sleep(5)  # Wait a little bit before trying again.
 
-    def await_last_op_committed(self):
+    def await_last_op_committed(self, timeout_secs=None):
         """Wait for the last majority committed op to be visible."""
         primary_client = self.get_primary().mongo_client()
         interface.authenticate(primary_client, self.auth_options)
@@ -308,7 +301,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
             return len(up_to_date_nodes) == len(self.nodes)
 
-        self._await_cmd_all_nodes(check_rcmaj_optime, "waiting for last committed optime")
+        self._await_cmd_all_nodes(check_rcmaj_optime, "waiting for last committed optime",
+                                  timeout_secs)
 
     def await_ready(self):
         """Wait for replica set to be ready."""
@@ -506,7 +500,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         return self._await_cmd_all_nodes(is_primary, "waiting for a primary", timeout_secs)
 
-    def _await_cmd_all_nodes(self, fn, msg, timeout_secs=30):
+    def _await_cmd_all_nodes(self, fn, msg, timeout_secs=None):
         """Run `fn` on all nodes until it returns a truthy value.
 
         Return the node for which makes `fn` become truthy.
@@ -515,6 +509,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         the MongoDFixture corresponding to that node.
         """
 
+        if timeout_secs is None:
+            timeout_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
         start = time.time()
         clients = {}
         while True:
