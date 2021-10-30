@@ -71,6 +71,14 @@ class TeardownMode(Enum):
 class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  # pylint: disable=invalid-metaclass
     """Base class for all fixtures."""
 
+    # Error response codes copied from mongo/base/error_codes.yml.
+    _WRITE_CONCERN_FAILED = 64
+    _NODE_NOT_FOUND = 74
+    _NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE = 103
+    _CONFIGURATION_IN_PROGRESS = 109
+    _CURRENT_CONFIG_NOT_COMMITTED_YET = 308
+    _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
+
     # We explicitly set the 'REGISTERED_NAME' attribute so that PyLint realizes that the attribute
     # is defined for all subclasses of Fixture.
     REGISTERED_NAME = "Fixture"
