@@ -1,10 +1,12 @@
 //
 // Tests launching multi-version ReplSetTest replica sets
 //
-// @tags: [disabled_due_to_server_60490]
 //
 
 load('./jstests/multiVersion/libs/verify_versions.js');
+
+(function() {
+"use strict";
 
 for (let version of ["last-lts", "last-continuous", "latest"]) {
     jsTestLog("Testing single version: " + version);
@@ -43,26 +45,31 @@ for (let versions of [["last-lts", "latest"], ["last-continuous", "latest"]]) {
     rst.stopSet();
 }
 
+// TODO(SERVER-61100): Re-enable this test.
+if (true) {
+    jsTestLog("Skipping test as it is currently disabled.");
+    return;
+}
+
 for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last-lts"]]) {
     jsTestLog("Testing mixed versions: " + tojson(versions));
 
     try {
         var rst = new ReplSetTest({nodes: 2});
+        rst.startSet({binVersion: versions});
+        rst.initiate();
     } catch (e) {
         if (e instanceof Error) {
-            assert.includes(
-                e.message,
-                "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
-            continue;
-        } else {
-            throw e;
+            if (e.message.includes(
+                    "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.")) {
+                continue;
+            }
         }
+        throw e;
     }
     assert(
         MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts"),
         "Should have thrown error in creating ReplSetTest because can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
-
-    rst.startSet({binVersion: versions});
 
     var nodes = rst.nodes;
 
@@ -77,6 +84,7 @@ for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last
 }
 
 jsTestLog("Done!");
+})();
 
 //
 // End

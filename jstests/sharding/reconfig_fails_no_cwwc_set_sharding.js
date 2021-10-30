@@ -2,7 +2,7 @@
  * Test that a reconfig for a shard that would change the implicit default write concern to w:1
  * fails if CWWC is not set.
  *
- * @tags: [requires_majority_read_concern, requires_persistence, disabled_due_to_server_60490]
+ * @tags: [requires_majority_read_concern, requires_persistence, requires_fcv_51]
  */
 
 (function() {

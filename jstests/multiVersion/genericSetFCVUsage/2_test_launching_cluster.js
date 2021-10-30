@@ -1,13 +1,18 @@
 //
 // Tests launching multi-version ShardingTest clusters.
 //
-// @tags: [disabled_due_to_server_60490]
 //
 
 load('./jstests/multiVersion/libs/verify_versions.js');
 
 (function() {
 "use strict";
+
+// TODO(SERVER-61100): Re-enable this test.
+if (true) {
+    jsTestLog("Skipping test as it is currently disabled.");
+    return;
+}
 
 // Sharded cluster upgrade order: config servers -> shards -> mongos.
 const mixedVersionsToCheck = [
@@ -33,13 +38,12 @@ for (let versions of mixedVersionsToCheck) {
         });
     } catch (e) {
         if (e instanceof Error) {
-            assert.includes(
-                e.message,
-                "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
-            continue;
-        } else {
-            throw e;
+            if (e.message.includes(
+                    "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.")) {
+                continue;
+            }
         }
+        throw e;
     }
     if ((versions.shard[0] === "last-continuous" && versions.shard[1] === "last-lts") ||
         (versions.shard[1] === "last-continuous" && versions.shard[0] === "last-lts")) {

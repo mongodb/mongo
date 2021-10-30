@@ -3,7 +3,9 @@
  * cloner observed, specifically when it happens during a not-yet-finalized batch on the sync
  * source. This tests that this is no longer possible.
  *
- * @tags: [requires_replication, incompatible_with_eft, disabled_due_to_server_60490]
+ * TODO(SERVER-61100): Remove 'requires_fcv_51' tag below.
+ *
+ * @tags: [requires_replication, incompatible_with_eft, requires_fcv_51]
  */
 
 (function() {
