@@ -108,5 +108,13 @@ TimeseriesTest.run((insert) => {
     runTest({a: 1, c: 1}, {a: 1, c: 1}, {a: 1, c: 1});
     runTest({b: 2}, {a: 1, b: 2, c: 1}, {a: 1, b: 2, c: 1});
     runTest({c: 3, d: 3}, {a: 1, b: 2, c: 1, d: 3}, {a: 1, b: 2, c: 3, d: 3});
+    clearColl();
+
+    // We correctly handle canonical type
+    runTest({a: Number(1.5)}, {a: Number(1.5)}, {a: Number(1.5)});
+    runTest({a: NumberLong(2)}, {a: Number(1.5)}, {a: NumberLong(2)});
+    runTest({a: NumberInt(1)}, {a: NumberInt(1)}, {a: NumberLong(2)});
+    runTest({a: NumberDecimal(2.5)}, {a: NumberInt(1)}, {a: NumberDecimal(2.5)});
+    runTest({a: Number(0.5)}, {a: Number(0.5)}, {a: NumberDecimal(2.5)});
 });
 })();
