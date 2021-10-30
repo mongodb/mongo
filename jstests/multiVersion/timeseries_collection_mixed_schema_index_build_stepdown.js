@@ -1,14 +1,17 @@
 /**
- * Tests that upgrading time-series collections created using the last-lts binary warns about
- * potentially mixed-schema data when building secondary indexes on time-series measurements on the
- * latest binary. Additionally, tests that downgrading FCV from 5.2 removes the
- * 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag from time-series collections.
+ * Only the primary node enforces the mixed-schema data constraint during an index build. This is
+ * because index builds may not fail on secondaries. They can only be aborted via the
+ * abortIndexBuild oplog entry. Secondaries will still record any mixed-schema data they detect
+ * during an index build but take no action. This tests that a secondary stepping up will cause an
+ * index build to fail due to the earlier detection of mixed-schema data.
  */
 (function() {
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/fail_point_util.js");
 load("jstests/multiVersion/libs/multi_rs.js");
+load('jstests/noPassthrough/libs/index_build.js');
 
 const oldVersion = "last-lts";
 const nodes = {
@@ -33,12 +36,17 @@ const metaField = "meta";
 assert.commandWorked(
     db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 
+// Create a bucket with mixed-schema data.
 assert.commandWorked(coll.insert({[timeField]: ISODate(), [metaField]: 1, x: 1}));
-assert.commandWorked(coll.insert({[timeField]: ISODate(), [metaField]: 1, x: {y: "z"}}));
 assert.commandWorked(coll.insert({[timeField]: ISODate(), [metaField]: 1, x: "abc"}));
 
+// Create buckets without mixed-schema data.
+assert.commandWorked(coll.insert({[timeField]: ISODate(), [metaField]: 2, x: 1}));
+assert.commandWorked(coll.insert({[timeField]: ISODate(), [metaField]: 3, x: 1}));
+
 jsTest.log("Upgrading replica set from last-lts to latest");
-rst.upgradeSet({binVersion: "latest", setParameter: {logComponentVerbosity: tojson({storage: 1})}});
+rst.upgradeSet(
+    {binVersion: "latest", setParameter: {logComponentVerbosity: tojson({storage: 1, index: 1})}});
 
 primary = rst.getPrimary();
 db = primary.getDB(dbName);
@@ -62,34 +70,34 @@ assert(checkLog.checkContainsWithCountJson(primary, 6057601, {setting: true}, /*
 assert(
     checkLog.checkContainsWithCountJson(secondary, 6057601, {setting: true}, /*expectedCount=*/1));
 
-assert.commandWorked(coll.createIndex({[timeField]: 1}, {name: "time_1"}));
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6057502, {namespace: bucketCollName}, /*expectedCount=*/0));
+// Hang the index build on the primary after replicating the startIndexBuild oplog entry.
+const primaryIndexBuild = configureFailPoint(primary, "hangAfterSettingUpIndexBuildUnlocked");
 
-assert.commandWorked(coll.createIndex({[metaField]: 1}, {name: "meta_1"}));
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6057502, {namespace: bucketCollName}, /*expectedCount=*/0));
+// Hang the index build on the secondary after the collection scan phase is complete.
+const secondaryIndexBuild = configureFailPoint(secondary, "hangAfterStartingIndexBuildUnlocked");
 
-assert.commandFailedWithCode(coll.createIndex({x: 1}, {name: "x_1"}), ErrorCodes.CannotCreateIndex);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary, bucketCollName, {x: 1}, {name: "x_1"}, [ErrorCodes.InterruptedDueToReplStateChange]);
 
-// May have mixed-schema data.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6057502, {namespace: bucketCollName}, /*expectedCount=*/1));
+primaryIndexBuild.wait();
+secondaryIndexBuild.wait();
 
-// Mixed-schema data detected.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6057700, {namespace: bucketCollName}, /*expectedCount=*/1));
+jsTestLog("Stepping up new primary");
+assert.commandWorked(secondary.adminCommand({replSetStepUp: 1}));
 
-assert.commandFailedWithCode(coll.createIndex({[timeField]: 1, x: 1}, {name: "time_1_x_1"}),
-                             ErrorCodes.CannotCreateIndex);
+primaryIndexBuild.off();
+secondaryIndexBuild.off();
 
-// May have mixed-schema data.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6057502, {namespace: bucketCollName}, /*expectedCount=*/2));
+awaitIndexBuild();
 
-// Mixed-schema data detected.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6057700, {namespace: bucketCollName}, /*expectedCount=*/2));
+// Aborting index build commit due to the earlier detection of mixed-schema data (now primary).
+checkLog.containsJson(secondary, 6057701);
+
+// Index build: failed (now primary).
+checkLog.containsJson(secondary, 20649);
+
+// Aborting index build from oplog entry (now secondary).
+checkLog.containsJson(primary, 3856206);
 
 // Check that the catalog entry flag doesn't get set to false.
 assert(
@@ -99,7 +107,8 @@ assert(
 
 // The FCV downgrade process removes the catalog entry flag from time-series collections.
 jsTest.log("Setting FCV to 'lastLTSFCV'");
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+assert.commandWorked(secondary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+
 assert(checkLog.checkContainsWithCountJson(primary, 6057601, {setting: null}, /*expectedCount=*/1));
 assert(
     checkLog.checkContainsWithCountJson(secondary, 6057601, {setting: null}, /*expectedCount=*/1));

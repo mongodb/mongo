@@ -53,6 +53,8 @@
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -81,6 +83,20 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
 
     return static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
         numIndexSpecs;
+}
+
+Status timeseriesMixedSchemaDataFailure(const Collection* collection) {
+    // TODO SERVER-61070: Re-word the error message below if necessary and add a URL for
+    // workarounds.
+    return Status(
+        ErrorCodes::CannotCreateIndex,
+        str::stream() << "Index build on collection '" << collection->ns() << "' ("
+                      << collection->uuid()
+                      << ") failed due to the detection of mixed-schema data in the "
+                      << "time-series buckets collection. Starting as of v5.2, time-series "
+                      << "measurement bucketing has been modified to ensure that newly created "
+                      << "time-series buckets do not contain mixed-schema data. For workarounds, "
+                      << "see: <url>");
 }
 
 }  // namespace
@@ -254,6 +270,15 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             }
             info = statusWithInfo.getValue();
             indexInfoObjs.push_back(info);
+
+            // TODO SERVER-54592: Remove FCV check once feature flag is enabled for v5.2.
+            boost::optional<TimeseriesOptions> options = collection->getTimeseriesOptions();
+            if (options &&
+                serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
+                timeseries::doesBucketsIndexIncludeKeyOnMeasurement(*options, info)) {
+                invariant(collection->getTimeseriesBucketsMayHaveMixedSchemaData());
+                _containsIndexBuildOnTimeseriesMeasurement = true;
+            }
 
             boost::optional<IndexStateInfo> stateInfo;
             auto& index = _indexes.emplace_back();
@@ -651,6 +676,37 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
                                 const std::function<void()>& saveCursorBeforeWrite,
                                 const std::function<void()>& restoreCursorAfterWrite) {
     invariant(!_buildIsCleanedUp);
+
+    // The detection of mixed-schema data needs to be done before applying the partial filter
+    // expression below. Only check for mixed-schema data if it's possible for the time-series
+    // collection to have it.
+    if (_containsIndexBuildOnTimeseriesMeasurement &&
+        *collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
+        bool docHasMixedSchemaData =
+            collection->doesTimeseriesBucketsDocContainMixedSchemaData(doc);
+
+        if (docHasMixedSchemaData) {
+            LOGV2(6057700,
+                  "Detected mixed-schema data in time-series bucket collection",
+                  logAttrs(collection->ns()),
+                  logAttrs(collection->uuid()),
+                  "recordId"_attr = loc,
+                  "control"_attr = redact(doc.getObjectField(timeseries::kBucketControlFieldName)));
+
+            _timeseriesBucketContainsMixedSchemaData = true;
+        }
+
+        // Only enforce the mixed-schema data constraint on the primary. Index builds may not fail
+        // on the secondaries. The primary will replicate an abortIndexBuild oplog entry.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const bool replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
+            !replCoord->canAcceptWritesFor(opCtx, collection->ns());
+
+        if (docHasMixedSchemaData && !replSetAndNotPrimary) {
+            return timeseriesMixedSchemaDataFailure(collection.get());
+        }
+    }
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
             continue;
@@ -857,6 +913,23 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         invariant(_collectionUUID.get() == collection->uuid());
     }
 
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool replSetAndNotPrimary = replCoord->getSettings().usingReplSets() &&
+        !replCoord->canAcceptWritesFor(opCtx, collection->ns());
+
+    // During the collection scan phase, only the primary will enforce the mixed-schema data
+    // constraint. Secondaries will only keep track of and take no action if mixed-schema data is
+    // detected. If the primary steps down during the index build, a secondary node will takeover.
+    // This can happen after the collection scan phase, which is why we need this check here.
+    if (_timeseriesBucketContainsMixedSchemaData && !replSetAndNotPrimary) {
+        LOGV2_DEBUG(6057701,
+                    1,
+                    "Aborting index build commit due to the earlier detection of mixed-schema data",
+                    logAttrs(collection->ns()),
+                    logAttrs(collection->uuid()));
+        return timeseriesMixedSchemaDataFailure(collection);
+    }
+
     // Do not interfere with writing multikey information when committing index builds.
     ScopeGuard restartTracker(
         [this, opCtx] { MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo(); });
@@ -893,6 +966,18 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
 
     onCommit();
+
+    // Update the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag to false in order to
+    // allow subsequent index builds to skip checking bucket documents for mixed-schema data.
+    if (_containsIndexBuildOnTimeseriesMeasurement && !_timeseriesBucketContainsMixedSchemaData) {
+        boost::optional<bool> mayContainMixedSchemaData =
+            collection->getTimeseriesBucketsMayHaveMixedSchemaData();
+        invariant(mayContainMixedSchemaData);
+
+        if (*mayContainMixedSchemaData) {
+            collection->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx, false);
+        }
+    }
 
     CollectionQueryInfo::get(collection).clearQueryCache(opCtx, collection);
     opCtx->recoveryUnit()->onCommit(

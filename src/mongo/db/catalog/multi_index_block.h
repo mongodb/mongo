@@ -354,6 +354,13 @@ private:
 
     bool _ignoreUnique = false;
 
+    // True if one or more indexes being built are on time-series measurements.
+    bool _containsIndexBuildOnTimeseriesMeasurement = false;
+
+    // True if at least one bucket document contains mixed-schema data and
+    // '_containsIndexBuildOnTimeseriesMeasurement=true'.
+    bool _timeseriesBucketContainsMixedSchemaData = false;
+
     // Set to true when no work remains to be done, the object can safely destruct without leaving
     // incorrect state set anywhere.
     bool _buildIsCleanedUp = true;

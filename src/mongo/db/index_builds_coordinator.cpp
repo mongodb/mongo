@@ -2183,7 +2183,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         fassertFailedNoTrace(5642402);
     }
     invariant(status.isA<ErrorCategory::Interruption>() ||
-                  status.isA<ErrorCategory::ShutdownError>(),
+                  status.isA<ErrorCategory::ShutdownError>() ||
+                  status.code() == ErrorCodes::CannotCreateIndex,
               str::stream() << "Unexpected error code during index build cleanup: " << status);
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         _cleanUpSinglePhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
