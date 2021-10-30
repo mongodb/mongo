@@ -57,6 +57,7 @@ using namespace mongo;
 class CollectionTest : public CatalogTestFixture {
 protected:
     void makeCapped(NamespaceString nss, long long cappedSize = 8192);
+    void makeTimeseries(NamespaceString nss);
     void makeCollectionForMultikey(NamespaceString nss, StringData indexName);
 };
 
@@ -64,6 +65,12 @@ void CollectionTest::makeCapped(NamespaceString nss, long long cappedSize) {
     CollectionOptions options;
     options.capped = true;
     options.cappedSize = cappedSize;  // Maximum size of capped collection in bytes.
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+}
+
+void CollectionTest::makeTimeseries(NamespaceString nss) {
+    CollectionOptions options;
+    options.timeseries = TimeseriesOptions(/*timeField=*/"t");
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 }
 
@@ -331,6 +338,126 @@ TEST_F(CollectionTest, ForceSetIndexIsMultikeyRemovesUncommittedChangesOnRollbac
         WriteUnitOfWork wuow(opCtx);
         ASSERT(coll->setIndexIsMultikey(opCtx, indexName, paths));
         wuow.commit();
+    }
+}
+
+TEST_F(CollectionTest, CheckTimeseriesBucketDocsForMixedSchemaData) {
+    NamespaceString nss("test.system.buckets.ts");
+    makeTimeseries(nss);
+
+    auto opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    const auto& coll = autoColl.getCollection();
+    ASSERT(coll);
+    ASSERT(coll->getTimeseriesOptions());
+
+    // These are the min/max control fields generated prior to the change in SERVER-60565 in order
+    // to test the detection of mixed-schema data in time-series buckets from earlier versions.
+    std::vector<BSONObj> mixedSchemaControlDocs = {
+        // Insert -> {x: NumberLong(1)}, {x: {y: "z"}}, {x: "abc"}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : NumberLong(1) },
+                               "max" : { "x" : { "y" : "z" } } } })"),
+        // Insert -> {x: NumberLong(1)}, {x: [1, 2, 3]}, {x: "abc"}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : NumberLong(1) },
+                               "max" : { "x" : [ 1, 2, 3 ] } } })"),
+        // Insert -> {x: {y: 1}}, {x: {y: 2}}, {x: {y: [1, 2]}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : 1 } },
+                               "max" : { "x" : { "y" : [ 1, 2 ] } } } })"),
+        // Insert -> {x: 1}, {x: {y: 10}}, {x: true}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 }, 
+                                             "max" : { "x" : true } } })"),
+        // Insert -> {x: {y: 1}}, {x: {y: 2}}, {x: {y: null}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : null } }, 
+                               "max" : { "x" : { "y" : 2 } } } })"),
+        // Insert -> {x: {y: true}}, {x: {y: false}}, {x: {y: null}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : null } },
+                               "max" : { "x" : { "y" : true } } } })"),
+        // Insert -> {x: NumberLong(1)}, {x: {y: NumberDecimal(1.5)}}, {x: NumberLong(2)}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : NumberLong(1) },
+                               "max" : { "x" : { "y" : NumberDecimal("1.50000000000000") } } } })"),
+        // Insert -> {x: ["abc"]}, {x: [123]}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : [ 123 ] },
+                                             "max" : { "x" : [ "abc" ] } } })"),
+        // Insert -> {x: ["abc", 123]}, {x: [123, "abc"]}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : [ 123, 123 ] },
+                               "max" : { "x" : [ "abc", "abc" ] } } })"),
+        // Insert -> {x: {y: 1}}, {x: {y: {z: 5}}}, {x: {y: [1, 2]}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : 1 } },
+                               "max" : { "x" : { "y" : [ 1, 2 ] } } } })"),
+        // Insert -> {x: Number(1.0)}, {x: {y: "z"}}, {x: NumberLong(10)}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
+                                             "max" : { "x" : { "y" : "z" } } } })"),
+        // Insert -> {x: Number(1.0)}, {x: [Number(2.0), Number(3.0)]}, {x: NumberLong(10)}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
+                                             "max" : { "x" : [ 2, 3 ] } } })")};
+
+    for (const auto& controlDoc : mixedSchemaControlDocs) {
+        ASSERT_TRUE(coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc));
+    }
+
+    std::vector<BSONObj> nonMixedSchemaControlDocs = {
+        // Insert -> {x: 1}, {x: 2}, {x: 3}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
+                                             "max" : { "x" : 3 } } })"),
+        // Insert -> {x: 1}, {x: 1.5}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
+                                             "max" : { "x" : 1.5 } } })"),
+        // Insert -> {x: NumberLong(1)}, {x: NumberDecimal(2)}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : NumberLong(1) },
+                               "max" : { "x" : NumberDecimal("2.00000000000000") } } })"),
+        // Insert -> {x: NumberInt(1)}, {x: NumberDecimal(1.5)}, {x: NumberLong(2)}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
+                                             "max" : { "x" : NumberLong(2) } } })"),
+        // Insert -> {x: NumberLong(1)}, {x: NumberDecimal(1.5)}, {x: NumberLong(2)}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : NumberLong(1) },
+                               "max" : { "x" : NumberLong(2) } } })"),
+        // Insert -> {x: {y: true}}, {x: {y: false}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : false } },
+                               "max" : { "x" : { "y" : true } } } })"),
+        // Insert -> {x: [1, 2, 3]}, {x: [4, 5, 6]}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : [ 1, 2, 3 ] },
+                               "max" : { "x" : [ 4, 5, 6 ] } } })"),
+        // Insert -> {x: [{x: 1}, {z: false}]}, {x: [{x: 5}, {y: "abc"}]}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : [ { "x" : 1 }, { "y" : "abc", "z" : false } ] },
+                               "max" : { "x" : [ { "x" : 5 }, { "y" : "abc", "z" : false } ] } } })"),
+        // Insert -> {x: 1}, {y: 1}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1, "y" : 1 },
+                                             "max" : { "x" : 1, "y" : 1 } } })"),
+        // Insert -> {x: ["a"]}, {y: [1]}
+        ::mongo::fromjson(
+            R"({ control : { min : { x : [ "a" ], y : [ 1 ] },
+                             max : { x : [ "a" ], y : [ 1 ] } } })"),
+        // Insert -> {x: {y: [{a: Number(1.0)}, [{b: NumberLong(10)}]]}},
+        //           {x: {y: [{a: Number(5.0)}, [{b: NumberLong(50)}]]}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : [ { "a" : 1 }, [ { "b" : NumberLong(10) } ] ] } },
+                               "max" : { "x" : { "y" : [ { "a" : 5 }, [ { "b" : NumberLong(50) } ] ] } } } })"),
+        // Insert -> {x: Number(1.0)}, {x: NumberLong(10)}
+        ::mongo::fromjson(R"({ "control" : { "min" : { "x" : 1 },
+                                             "max" : { "x" : NumberLong(10) } } })"),
+
+        // Insert -> {x: {y: [{a: Number(1.5)}, [{b: NumberLong(10)}]]}},
+        //           {x: {y: [{a: Number(2.5)}, [{b: Number(3.5)}]]}}
+        ::mongo::fromjson(
+            R"({ "control" : { "min" : { "x" : { "y" : [ { "a" : 1.5 }, [ { "b" : 3.5 } ] ] } },
+                               "max" : { "x" : { "y" : [ { "a" : 2.5 }, [ { "b" : NumberLong(10) } ] ] } } } })")};
+
+
+    for (const auto& controlDoc : nonMixedSchemaControlDocs) {
+        ASSERT_FALSE(coll->doesTimeseriesBucketsDocContainMixedSchemaData(controlDoc));
     }
 }
 

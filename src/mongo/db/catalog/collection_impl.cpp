@@ -76,6 +76,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl_collection_cache.h"
@@ -312,6 +313,39 @@ private:
 
 bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
     return accessMethod == IndexNames::BTREE || accessMethod == IndexNames::GEO_2DSPHERE;
+}
+
+bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
+    auto minIt = min.begin();
+    auto minEnd = min.end();
+    auto maxIt = max.begin();
+    auto maxEnd = max.end();
+
+    while (minIt != minEnd && maxIt != maxEnd) {
+        bool typeMatch = minIt->canonicalType() == maxIt->canonicalType();
+        if (!typeMatch) {
+            return true;
+        } else if (minIt->type() == Object) {
+            // The 'control.min' and 'control.max' fields have the same ordering.
+            invariant(minIt->fieldNameStringData() == maxIt->fieldNameStringData());
+            if (doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj())) {
+                return true;
+            }
+        } else if (minIt->type() == Array) {
+            if (doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj())) {
+                return true;
+            }
+        }
+
+        invariant(typeMatch);
+        minIt++;
+        maxIt++;
+    }
+
+    // The 'control.min' and 'control.max' fields have the same cardinality.
+    invariant(minIt == minEnd && maxIt == maxEnd);
+
+    return false;
 }
 
 }  // namespace
@@ -1362,6 +1396,19 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
         md.timeseriesBucketsMayHaveMixedSchemaData = setting;
     });
+}
+
+bool CollectionImpl::doesTimeseriesBucketsDocContainMixedSchemaData(
+    const BSONObj& bucketsDoc) const {
+    if (!getTimeseriesOptions()) {
+        return false;
+    }
+
+    const BSONObj controlObj = bucketsDoc.getObjectField(timeseries::kBucketControlFieldName);
+    const BSONObj minObj = controlObj.getObjectField(timeseries::kBucketControlMinFieldName);
+    const BSONObj maxObj = controlObj.getObjectField(timeseries::kBucketControlMaxFieldName);
+
+    return doesMinMaxHaveMixedSchemaData(minObj, maxObj);
 }
 
 bool CollectionImpl::isClustered() const {

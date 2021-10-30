@@ -541,6 +541,12 @@ public:
     virtual void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                             boost::optional<bool> setting) = 0;
 
+    /**
+     * Returns true if the passed in time-series bucket document contains mixed-schema data.
+     */
+    virtual bool doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const = 0;
+
     /*
      * Returns true if this collection is clustered. That is, its RecordIds store the value of the
      * cluster key. If the collection is clustered on _id, there is no separate _id index.

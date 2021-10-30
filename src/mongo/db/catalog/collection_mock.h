@@ -246,6 +246,10 @@ public:
         std::abort();
     }
 
+    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const {
+        std::abort();
+    }
+
     bool isClustered() const {
         std::abort();
     }

@@ -325,6 +325,8 @@ public:
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) final;
 
+    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final;
+
     /**
      * isClustered() relies on the object returned from getClusteredInfo(). If
      * ClusteredCollectionInfo exists, the collection is clustered.
