@@ -172,3 +172,7 @@ REQUIRES_FCV_TAG = ",".join([tag_str(fcv) for fcv in fcv_constants.requires_fcv_
 # Generate evergreen project names for all FCVs less than latest.
 EVERGREEN_PROJECTS = ['mongodb-mongo-master']
 EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in fcv_constants.fcvs_less_than_latest])
+
+OLD_VERSIONS = ["last_lts"]
+if LAST_LTS_FCV != LAST_CONTINUOUS_FCV:
+    OLD_VERSIONS.append("last_continuous")

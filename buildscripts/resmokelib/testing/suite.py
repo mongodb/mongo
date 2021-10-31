@@ -87,6 +87,10 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
         # report intermediate results.
         self._partial_reports = None
 
+    def get_config(self):
+        """Return the configuration of this suite."""
+        return self._suite_config
+
     def __repr__(self):
         """Create a string representation of object for debugging."""
         return f"{self.test_kind}:{self._suite_name}"
