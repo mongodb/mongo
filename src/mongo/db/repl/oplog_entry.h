@@ -88,6 +88,14 @@ public:
         _fullPreImage = std::move(value);
     }
 
+    const BSONObj& getPostImage() const {
+        return _fullPostImage;
+    }
+
+    void setPostImage(BSONObj value) {
+        _fullPostImage = std::move(value);
+    }
+
     /**
      * Sets the statement ids for this ReplOperation to 'stmtIds' if it does not contain any
      * kUninitializedStmtId (i.e. placeholder statement id).
@@ -110,6 +118,7 @@ public:
 private:
     BSONObj _preImageDocumentKey;
     BSONObj _fullPreImage;
+    BSONObj _fullPostImage;
 };
 
 /**
@@ -202,6 +211,14 @@ public:
         return getDurableReplOperation().getPreImageOpTime();
     }
 
+    void setPostImageOpTime(boost::optional<OpTime> value) {
+        getDurableReplOperation().setPostImageOpTime(std::move(value));
+    }
+
+    const boost::optional<OpTime>& getPostImageOpTime() const {
+        return getDurableReplOperation().getPostImageOpTime();
+    }
+
     void setTimestamp(Timestamp value) & {
         getOpTimeBase().setTimestamp(std::move(value));
     }
@@ -216,6 +233,10 @@ public:
 
     const boost::optional<ShardId>& getDestinedRecipient() const {
         return getDurableReplOperation().getDestinedRecipient();
+    }
+
+    void setNeedsRetryImage(boost::optional<RetryImageEnum> value) & {
+        getDurableReplOperation().setNeedsRetryImage(value);
     }
 
     /**

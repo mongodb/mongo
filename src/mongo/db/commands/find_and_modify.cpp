@@ -640,7 +640,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
 
     const auto stmtId = 0;
-    if (opCtx->getTxnNumber() && !inTransaction) {
+    if (opCtx->isRetryableWrite()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
         if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
             RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
