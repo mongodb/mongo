@@ -198,39 +198,6 @@ public:
     const RecordId _catalogId;
 };
 
-class DurableCatalogImpl::RemoveIdentChange : public RecoveryUnit::Change {
-public:
-    RemoveIdentChange(DurableCatalogImpl* catalog, RecordId catalogId, const Entry& entry)
-        : _catalog(catalog), _catalogId(catalogId), _entry(entry) {}
-
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        stdx::lock_guard<Latch> lk(_catalog->_catalogIdToEntryMapLock);
-        _catalog->_catalogIdToEntryMap[_catalogId] = _entry;
-    }
-
-    DurableCatalogImpl* const _catalog;
-    const RecordId _catalogId;
-    const Entry _entry;
-};
-
-class DurableCatalogImpl::AddIndexChange : public RecoveryUnit::Change {
-public:
-    AddIndexChange(RecoveryUnit* ru, StorageEngineInterface* engine, StringData ident)
-        : _recoveryUnit(ru), _engine(engine), _ident(ident.toString()) {}
-
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        // Intentionally ignoring failure.
-        auto kvEngine = _engine->getEngine();
-        kvEngine->dropIdent(_recoveryUnit, _ident).ignore();
-    }
-
-    RecoveryUnit* const _recoveryUnit;
-    StorageEngineInterface* _engine;
-    const std::string _ident;
-};
-
 bool DurableCatalogImpl::isFeatureDocument(BSONObj obj) {
     BSONElement firstElem = obj.firstElement();
     if (firstElem.fieldNameStringData() == kIsFeatureDocumentFieldName) {
@@ -554,8 +521,10 @@ Status DurableCatalogImpl::_removeEntry(OperationContext* opCtx, RecordId catalo
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
     }
 
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<RemoveIdentChange>(this, catalogId, it->second));
+    opCtx->recoveryUnit()->onRollback([this, catalogId, entry = it->second]() {
+        stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+        _catalogIdToEntryMap[catalogId] = entry;
+    });
 
     LOGV2_DEBUG(22212,
                 1,
@@ -703,8 +672,11 @@ Status DurableCatalogImpl::createIndex(OperationContext* opCtx,
     auto kvEngine = _engine->getEngine();
     const Status status = kvEngine->createSortedDataInterface(opCtx, collOptions, ident, spec);
     if (status.isOK()) {
-        opCtx->recoveryUnit()->registerChange(
-            std::make_unique<AddIndexChange>(opCtx->recoveryUnit(), _engine, ident));
+        opCtx->recoveryUnit()->onRollback([this, ident, recoveryUnit = opCtx->recoveryUnit()]() {
+            // Intentionally ignoring failure.
+            auto kvEngine = _engine->getEngine();
+            kvEngine->dropIdent(recoveryUnit, ident).ignore();
+        });
     }
     return status;
 }

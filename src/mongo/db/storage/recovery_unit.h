@@ -568,6 +568,32 @@ public:
     void registerChange(std::unique_ptr<Change> change);
 
     /**
+     * Registers a change with the given rollback and commit functions.
+     *
+     * Be careful about the lifetimes of all variables captured by the callback!
+     */
+    template <typename RollbackCallback, typename CommitCallback>
+    void registerChange(CommitCallback commit, RollbackCallback rollback) {
+        class CallbackChange final : public Change {
+        public:
+            CallbackChange(CommitCallback&& commit, RollbackCallback&& rollback)
+                : _rollback(std::move(rollback)), _commit(std::move(commit)) {}
+            void rollback() final {
+                _rollback();
+            }
+            void commit(boost::optional<Timestamp> ts) final {
+                _commit(ts);
+            }
+
+        private:
+            RollbackCallback _rollback;
+            CommitCallback _commit;
+        };
+
+        registerChange(std::make_unique<CallbackChange>(std::move(commit), std::move(rollback)));
+    }
+
+    /**
      * Like registerChange() above but should only be used to make new state visible in the
      * in-memory catalog. Only one change of this kind may be registered at a given time to ensure
      * catalog updates are atomic. Change registered with this function will commit after the commit

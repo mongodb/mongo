@@ -195,16 +195,9 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     return exec(code, filename, printResult, reportError, false, timeoutMs);
 }
 
-class Scope::StoredFuncModLogOpHandler : public RecoveryUnit::Change {
-public:
-    void commit(boost::optional<Timestamp>) {
-        _lastVersion.fetchAndAdd(1);
-    }
-    void rollback() {}
-};
-
 void Scope::storedFuncMod(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->registerChange(std::make_unique<StoredFuncModLogOpHandler>());
+    opCtx->recoveryUnit()->onCommit(
+        [](boost::optional<Timestamp>) { _lastVersion.fetchAndAdd(1); });
 }
 
 void Scope::validateObjectIdString(const string& str) {

@@ -123,7 +123,6 @@ public:
 
 private:
     class InsertChange;
-    class TruncateChange;
 
     void _calculateStones(OperationContext* opCtx, size_t size);
     void _calculateStonesByScanning(OperationContext* opCtx);

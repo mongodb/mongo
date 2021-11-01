@@ -188,12 +188,6 @@ public:
 protected:
     friend class PooledScope;
 
-    /**
-     * RecoveryUnit::Change subclass used to commit work for
-     * Scope::storedFuncMod logOp listener.
-     */
-    class StoredFuncModLogOpHandler;
-
     virtual ScriptingFunction _createFunction(const char* code) = 0;
 
     std::string _localDBName;

@@ -1119,12 +1119,9 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
 namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
-    IndexRemoveChange(IndexCatalogEntryContainer* entries,
-                      std::shared_ptr<IndexCatalogEntry> entry,
+    IndexRemoveChange(std::shared_ptr<IndexCatalogEntry> entry,
                       SharedCollectionDecorations* collectionDecorations)
-        : _entries(entries),
-          _entry(std::move(entry)),
-          _collectionDecorations(collectionDecorations) {}
+        : _entry(std::move(entry)), _collectionDecorations(collectionDecorations) {}
 
     void commit(boost::optional<Timestamp> commitTime) final {
         _entry->setDropped();
@@ -1140,7 +1137,6 @@ public:
     }
 
 private:
-    IndexCatalogEntryContainer* _entries;
     std::shared_ptr<IndexCatalogEntry> _entry;
     SharedCollectionDecorations* _collectionDecorations;
 };
@@ -1160,12 +1156,12 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     if (released) {
         invariant(released.get() == entry);
         opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            &_readyIndexes, std::move(released), collection->getSharedDecorations()));
+            std::move(released), collection->getSharedDecorations()));
     } else {
         released = _buildingIndexes.release(entry->descriptor());
         invariant(released.get() == entry);
         opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            &_buildingIndexes, std::move(released), collection->getSharedDecorations()));
+            std::move(released), collection->getSharedDecorations()));
     }
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
@@ -1352,7 +1348,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
     opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        &_readyIndexes, std::move(oldEntry), collection->getSharedDecorations()));
+        std::move(oldEntry), collection->getSharedDecorations()));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
 

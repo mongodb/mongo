@@ -68,17 +68,15 @@ public:
     /**
      * Invariant: idObj should belong to a document that is part of the active chunk being migrated
      */
-    LogTransactionOperationsForShardingHandler(ServiceContext* svcCtx,
-                                               const std::vector<repl::ReplOperation>& stmts,
+    LogTransactionOperationsForShardingHandler(const std::vector<repl::ReplOperation>& stmts,
                                                const repl::OpTime& prepareOrCommitOpTime)
-        : _svcCtx(svcCtx), _stmts(stmts), _prepareOrCommitOpTime(prepareOrCommitOpTime) {}
+        : _stmts(stmts), _prepareOrCommitOpTime(prepareOrCommitOpTime) {}
 
     void commit(boost::optional<Timestamp>) override;
 
     void rollback() override{};
 
 private:
-    ServiceContext* _svcCtx;
     std::vector<repl::ReplOperation> _stmts;
     const repl::OpTime _prepareOrCommitOpTime;
 };

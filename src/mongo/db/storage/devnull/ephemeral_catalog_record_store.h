@@ -147,7 +147,6 @@ public:
     }
 
 private:
-    class InsertChange;
     class RemoveChange;
     class TruncateChange;
 

@@ -51,51 +51,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
 
-class CollModResultChange : public RecoveryUnit::Change {
-public:
-    CollModResultChange(const BSONElement& oldExpireSecs,
-                        const BSONElement& newExpireSecs,
-                        const BSONElement& oldHidden,
-                        const BSONElement& newHidden,
-                        const BSONElement& newUnique,
-                        BSONObjBuilder* result)
-        : _oldExpireSecs(oldExpireSecs),
-          _newExpireSecs(newExpireSecs),
-          _oldHidden(oldHidden),
-          _newHidden(newHidden),
-          _newUnique(newUnique),
-          _result(result) {}
-
-    void commit(boost::optional<Timestamp>) override {
-        // add the fields to BSONObjBuilder result
-        if (!_oldExpireSecs.eoo()) {
-            _result->appendAs(_oldExpireSecs, "expireAfterSeconds_old");
-        }
-        if (!_newExpireSecs.eoo()) {
-            _result->appendAs(_newExpireSecs, "expireAfterSeconds_new");
-        }
-        if (!_newHidden.eoo()) {
-            bool oldValue = _oldHidden.eoo() ? false : _oldHidden.booleanSafe();
-            _result->append("hidden_old", oldValue);
-            _result->appendAs(_newHidden, "hidden_new");
-        }
-        if (!_newUnique.eoo()) {
-            invariant(_newUnique.trueValue());
-            _result->appendBool("unique_new", true);
-        }
-    }
-
-    void rollback() override {}
-
-private:
-    const BSONElement _oldExpireSecs;
-    const BSONElement _newExpireSecs;
-    const BSONElement _oldHidden;
-    const BSONElement _newHidden;
-    const BSONElement _newUnique;
-    BSONObjBuilder* _result;
-};
-
 /**
  * Adjusts expiration setting on an index.
  */
@@ -233,8 +188,26 @@ void processCollModIndexRequest(OperationContext* opCtx,
     autoColl->getWritableCollection()->getIndexCatalog()->refreshEntry(
         opCtx, autoColl->getWritableCollection(), idx, flags);
 
-    opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
-        oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result));
+    opCtx->recoveryUnit()->onCommit(
+        [oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result](
+            boost::optional<Timestamp>) {
+            // add the fields to BSONObjBuilder result
+            if (!oldExpireSecs.eoo()) {
+                result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
+            }
+            if (!newExpireSecs.eoo()) {
+                result->appendAs(newExpireSecs, "expireAfterSeconds_new");
+            }
+            if (!newHidden.eoo()) {
+                bool oldValue = oldHidden.eoo() ? false : oldHidden.booleanSafe();
+                result->append("hidden_old", oldValue);
+                result->appendAs(newHidden, "hidden_new");
+            }
+            if (!newUnique.eoo()) {
+                invariant(newUnique.trueValue());
+                result->appendBool("unique_new", true);
+            }
+        });
 
     if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
         LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");

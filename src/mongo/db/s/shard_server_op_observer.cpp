@@ -100,30 +100,6 @@ private:
 };
 
 /**
- * Used to perform shard identity initialization once it is certain that the document is committed.
- */
-class ShardIdentityLogOpHandler final : public RecoveryUnit::Change {
-public:
-    ShardIdentityLogOpHandler(OperationContext* opCtx, ShardIdentityType shardIdentity)
-        : _opCtx(opCtx), _shardIdentity(std::move(shardIdentity)) {}
-
-    void commit(boost::optional<Timestamp>) override {
-        try {
-            ShardingInitializationMongoD::get(_opCtx)->initializeFromShardIdentity(_opCtx,
-                                                                                   _shardIdentity);
-        } catch (const AssertionException& ex) {
-            fassertFailedWithStatus(40071, ex.toStatus());
-        }
-    }
-
-    void rollback() override {}
-
-private:
-    OperationContext* _opCtx;
-    const ShardIdentityType _shardIdentity;
-};
-
-/**
  * Used to submit a range deletion task once it is certain that the update/insert to
  * config.rangeDeletions is committed.
  */
@@ -262,9 +238,20 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                     auto shardIdentityDoc =
                         uassertStatusOK(ShardIdentityType::fromShardIdentityDocument(insertedDoc));
                     uassertStatusOK(shardIdentityDoc.validate());
-                    opCtx->recoveryUnit()->registerChange(
-                        std::make_unique<ShardIdentityLogOpHandler>(opCtx,
-                                                                    std::move(shardIdentityDoc)));
+                    /**
+                     * Perform shard identity initialization once we are certain that the document
+                     * is committed.
+                     */
+                    opCtx->recoveryUnit()->onCommit([opCtx,
+                                                     shardIdentity = std::move(shardIdentityDoc)](
+                                                        boost::optional<Timestamp>) {
+                        try {
+                            ShardingInitializationMongoD::get(opCtx)->initializeFromShardIdentity(
+                                opCtx, shardIdentity);
+                        } catch (const AssertionException& ex) {
+                            fassertFailedWithStatus(40071, ex.toStatus());
+                        }
+                    });
                 }
             }
         }

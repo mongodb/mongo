@@ -149,8 +149,6 @@ public:
 
 private:
     class AddIdentChange;
-    class RemoveIdentChange;
-    class AddIndexChange;
 
     friend class StorageEngineImpl;
     friend class DurableCatalogImplTest;

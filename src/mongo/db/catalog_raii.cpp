@@ -183,39 +183,25 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
     // Acquire writable instance if not already available
     if (!_writableColl) {
 
-        // Makes the internal CollectionPtr Yieldable and resets the writable Collection when the
-        // write unit of work finishes so we re-fetches and re-clones the Collection if a new write
-        // unit of work is opened.
-        class WritableCollectionReset : public RecoveryUnit::Change {
-        public:
-            WritableCollectionReset(AutoGetCollection& autoColl,
-                                    const Collection* originalCollection)
-                : _autoColl(autoColl), _originalCollection(originalCollection) {}
-            void commit(boost::optional<Timestamp> commitTime) final {
-                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
-                                                _autoColl._coll.get(),
-                                                LookupCollectionForYieldRestore());
-                _autoColl._writableColl = nullptr;
-            }
-            void rollback() final {
-                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
-                                                _originalCollection,
-                                                LookupCollectionForYieldRestore());
-                _autoColl._writableColl = nullptr;
-            }
-
-        private:
-            AutoGetCollection& _autoColl;
-            // Used to be able to restore to the original pointer in case of a rollback
-            const Collection* _originalCollection;
-        };
-
         auto catalog = CollectionCatalog::get(_opCtx);
         _writableColl =
             catalog->lookupCollectionByNamespaceForMetadataWrite(_opCtx, mode, _resolvedNss);
         if (mode != CollectionCatalog::LifetimeMode::kInplace) {
+            // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
+            // the write unit of work finishes so we re-fetches and re-clones the Collection if a
+            // new write unit of work is opened.
             _opCtx->recoveryUnit()->registerChange(
-                std::make_unique<WritableCollectionReset>(*this, _coll.get()));
+                [this](boost::optional<Timestamp> commitTime) {
+                    _coll = CollectionPtr(
+                        getOperationContext(), _coll.get(), LookupCollectionForYieldRestore());
+                    _writableColl = nullptr;
+                },
+                [this, originalCollection = _coll.get()]() {
+                    _coll = CollectionPtr(getOperationContext(),
+                                          originalCollection,
+                                          LookupCollectionForYieldRestore());
+                    _writableColl = nullptr;
+                });
         }
 
         // Set to writable collection. We are no longer yieldable.
@@ -383,38 +369,29 @@ Collection* CollectionWriter::getWritableCollection() {
     if (!_writableCollection) {
         _writableCollection = _sharedImpl->_writableCollectionInitializer(_mode);
 
-        // Resets the writable Collection when the write unit of work finishes so we re-fetch and
-        // re-clone the Collection if a new write unit of work is opened. Holds the back pointer to
-        // the CollectionWriter via a shared_ptr so we can detect if the instance is already
-        // destroyed.
-        class WritableCollectionReset : public RecoveryUnit::Change {
-        public:
-            WritableCollectionReset(std::shared_ptr<SharedImpl> shared,
-                                    CollectionPtr rollbackCollection)
-                : _shared(std::move(shared)), _rollbackCollection(std::move(rollbackCollection)) {}
-            void commit(boost::optional<Timestamp> commitTime) final {
-                if (_shared->_parent)
-                    _shared->_parent->_writableCollection = nullptr;
-            }
-            void rollback() final {
-                if (_shared->_parent) {
-                    _shared->_parent->_storedCollection = std::move(_rollbackCollection);
-                    _shared->_parent->_writableCollection = nullptr;
-                }
-            }
-
-        private:
-            std::shared_ptr<SharedImpl> _shared;
-            CollectionPtr _rollbackCollection;
-        };
-
         // If we are using our stored Collection then we are not managed by an AutoGetCollection and
         // we need to manage lifetime here.
         if (_mode != CollectionCatalog::LifetimeMode::kInplace) {
             bool usingStoredCollection = *_collection == _storedCollection;
-            _opCtx->recoveryUnit()->registerChange(std::make_unique<WritableCollectionReset>(
-                _sharedImpl,
-                usingStoredCollection ? std::move(_storedCollection) : CollectionPtr()));
+            auto rollbackCollection =
+                usingStoredCollection ? std::move(_storedCollection) : CollectionPtr();
+
+            // Resets the writable Collection when the write unit of work finishes so we re-fetch
+            // and re-clone the Collection if a new write unit of work is opened. Holds the back
+            // pointer to the CollectionWriter explicitly so we can detect if the instance is
+            // already destroyed.
+            _opCtx->recoveryUnit()->registerChange(
+                [shared = _sharedImpl](boost::optional<Timestamp>) {
+                    if (shared->_parent)
+                        shared->_parent->_writableCollection = nullptr;
+                },
+                [shared = _sharedImpl,
+                 rollbackCollection = std::move(rollbackCollection)]() mutable {
+                    if (shared->_parent) {
+                        shared->_parent->_storedCollection = std::move(rollbackCollection);
+                        shared->_parent->_writableCollection = nullptr;
+                    }
+                });
             if (usingStoredCollection) {
                 _storedCollection = _writableCollection;
             }

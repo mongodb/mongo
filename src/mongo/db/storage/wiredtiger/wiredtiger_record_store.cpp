@@ -176,24 +176,6 @@ private:
     Date_t _wall;
 };
 
-class WiredTigerRecordStore::OplogStones::TruncateChange final : public RecoveryUnit::Change {
-public:
-    TruncateChange(OplogStones* oplogStones) : _oplogStones(oplogStones) {}
-
-    void commit(boost::optional<Timestamp>) final {
-        _oplogStones->_currentRecords.store(0);
-        _oplogStones->_currentBytes.store(0);
-
-        stdx::lock_guard<Latch> lk(_oplogStones->_mutex);
-        _oplogStones->_stones.clear();
-    }
-
-    void rollback() final {}
-
-private:
-    OplogStones* _oplogStones;
-};
-
 WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs)
     : _rs(rs) {
     stdx::lock_guard<Latch> reclaimLk(_oplogReclaimMutex);
@@ -371,7 +353,13 @@ void WiredTigerRecordStore::OplogStones::updateCurrentStoneAfterInsertOnCommit(
 }
 
 void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* opCtx) {
-    opCtx->recoveryUnit()->registerChange(std::make_unique<TruncateChange>(this));
+    opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp>) {
+        _currentRecords.store(0);
+        _currentBytes.store(0);
+
+        stdx::lock_guard<Latch> lk(_mutex);
+        _stones.clear();
+    });
 }
 
 void WiredTigerRecordStore::OplogStones::updateStonesAfterCappedTruncateAfter(
@@ -1829,23 +1817,6 @@ RecordId WiredTigerRecordStore::_nextId(OperationContext* opCtx) {
     return out;
 }
 
-class WiredTigerRecordStore::NumRecordsChange : public RecoveryUnit::Change {
-public:
-    NumRecordsChange(WiredTigerRecordStore* rs, int64_t diff) : _rs(rs), _diff(diff) {}
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        LOGV2_DEBUG(
-            22404, 3, "WiredTigerRecordStore: rolling back NumRecordsChange", "diff"_attr = -_diff);
-        if (_rs->_sizeInfo->numRecords.addAndFetch(-_diff) < 0) {
-            _rs->_sizeInfo->numRecords.store(0);
-        }
-    }
-
-private:
-    WiredTigerRecordStore* _rs;
-    int64_t _diff;
-};
-
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t diff) {
     if (!_tracksSizeAdjustments) {
         return;
@@ -1855,23 +1826,16 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t d
         return;
     }
 
-    opCtx->recoveryUnit()->registerChange(std::make_unique<NumRecordsChange>(this, diff));
+    opCtx->recoveryUnit()->onRollback([this, diff]() {
+        LOGV2_DEBUG(
+            22404, 3, "WiredTigerRecordStore: rolling back NumRecordsChange", "diff"_attr = -diff);
+        if (_sizeInfo->numRecords.addAndFetch(-diff) < 0) {
+            _sizeInfo->numRecords.store(0);
+        }
+    });
     if (_sizeInfo->numRecords.addAndFetch(diff) < 0)
         _sizeInfo->numRecords.store(0);
 }
-
-class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
-public:
-    DataSizeChange(WiredTigerRecordStore* rs, int64_t amount) : _rs(rs), _amount(amount) {}
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        _rs->_increaseDataSize(nullptr, -_amount);
-    }
-
-private:
-    WiredTigerRecordStore* _rs;
-    int64_t _amount;
-};
 
 void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t amount) {
     if (!_tracksSizeAdjustments) {
@@ -1883,7 +1847,8 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
     }
 
     if (opCtx)
-        opCtx->recoveryUnit()->registerChange(std::make_unique<DataSizeChange>(this, amount));
+        opCtx->recoveryUnit()->onRollback(
+            [this, amount]() { _increaseDataSize(nullptr, -amount); });
 
     if (_sizeInfo->dataSize.fetchAndAdd(amount) < 0)
         _sizeInfo->dataSize.store(std::max(amount, int64_t(0)));

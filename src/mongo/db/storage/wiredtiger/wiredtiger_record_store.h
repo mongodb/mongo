@@ -280,9 +280,6 @@ protected:
 private:
     class RandomCursor;
 
-    class NumRecordsChange;
-    class DataSizeChange;
-
     Status _insertRecords(OperationContext* opCtx,
                           Record* records,
                           const Timestamp* timestamps,

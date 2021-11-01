@@ -45,27 +45,6 @@ namespace mongo {
 
 using std::shared_ptr;
 
-class EphemeralForTestRecordStore::InsertChange : public RecoveryUnit::Change {
-public:
-    InsertChange(OperationContext* opCtx, Data* data, RecordId loc)
-        : _opCtx(opCtx), _data(data), _loc(loc) {}
-    virtual void commit(boost::optional<Timestamp>) {}
-    virtual void rollback() {
-        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-
-        Records::iterator it = _data->records.find(_loc);
-        if (it != _data->records.end()) {
-            _data->dataSize -= it->second.size;
-            _data->records.erase(it);
-        }
-    }
-
-private:
-    OperationContext* _opCtx;
-    Data* const _data;
-    const RecordId _loc;
-};
-
 // Works for both removes and updates
 class EphemeralForTestRecordStore::RemoveChange : public RecoveryUnit::Change {
 public:
@@ -396,7 +375,15 @@ Status EphemeralForTestRecordStore::insertRecords(OperationContext* opCtx,
         _data->records[loc] = rec;
         record->id = loc;
 
-        opCtx->recoveryUnit()->registerChange(std::make_unique<InsertChange>(opCtx, _data, loc));
+        opCtx->recoveryUnit()->onRollback([this, loc]() {
+            stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+
+            Records::iterator it = _data->records.find(loc);
+            if (it != _data->records.end()) {
+                _data->dataSize -= it->second.size;
+                _data->records.erase(it);
+            }
+        });
         return Status::OK();
     };
 
