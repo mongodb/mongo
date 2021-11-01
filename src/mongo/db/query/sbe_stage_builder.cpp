@@ -572,13 +572,15 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
 
             auto& executionCtx = StorageExecutionContext::get(opCtx);
             auto keys = executionCtx.keys();
+            SharedBufferFragmentBuilder pooledBuilder(
+                KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
 
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pooledBuilder,
                          nextRecord.data.toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          IndexAccessMethod::GetKeysContext::kValidatingKeys,

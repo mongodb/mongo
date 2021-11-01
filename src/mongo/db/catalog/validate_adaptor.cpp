@@ -90,6 +90,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     }
 
     auto& executionCtx = StorageExecutionContext::get(opCtx);
+    SharedBufferFragmentBuilder pool(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     for (const auto& index : _validateState->getIndexes()) {
         const IndexDescriptor* descriptor = index->descriptor();
@@ -102,7 +103,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
         auto documentMultikeyPaths = executionCtx.multikeyPaths();
 
-        iam->getKeys(executionCtx.pooledBufferBuilder(),
+        iam->getKeys(pool,
                      recordBson,
                      IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                      IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -278,13 +279,9 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     const KeyString::Version version =
         index->accessMethod()->getSortedDataInterface()->getKeyStringVersion();
 
-    auto& executionCtx = StorageExecutionContext::get(opCtx);
-    KeyString::PooledBuilder firstKeyStringBuilder(executionCtx.pooledBufferBuilder(),
-                                                   version,
-                                                   BSONObj(),
-                                                   indexInfo.ord,
-                                                   KeyString::Discriminator::kExclusiveBefore);
-    KeyString::Value firstKeyString = firstKeyStringBuilder.release();
+    KeyString::Builder firstKeyStringBuilder(
+        version, BSONObj(), indexInfo.ord, KeyString::Discriminator::kExclusiveBefore);
+    KeyString::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
     KeyString::Value prevIndexKeyStringValue;
 
     // Ensure that this index has an open index cursor.

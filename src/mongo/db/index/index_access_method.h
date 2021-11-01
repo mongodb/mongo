@@ -88,6 +88,7 @@ public:
      * The behavior of the insertion can be specified through 'options'.
      */
     virtual Status insert(OperationContext* opCtx,
+                          SharedBufferFragmentBuilder& pooledBufferBuilder,
                           const CollectionPtr& coll,
                           const BSONObj& obj,
                           const RecordId& loc,
@@ -249,6 +250,7 @@ public:
          * have to save/restore around each insert() call just in case there is a side table write.
          */
         virtual Status insert(OperationContext* opCtx,
+                              SharedBufferFragmentBuilder& pooledBuilder,
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
@@ -472,6 +474,7 @@ public:
                               std::unique_ptr<SortedDataInterface> btree);
 
     Status insert(OperationContext* opCtx,
+                  SharedBufferFragmentBuilder& pooledBufferBuilder,
                   const CollectionPtr& coll,
                   const BSONObj& obj,
                   const RecordId& loc,

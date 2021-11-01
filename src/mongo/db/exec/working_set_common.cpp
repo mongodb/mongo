@@ -139,12 +139,13 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             }
 
             auto keys = executionCtx.keys();
+            SharedBufferFragmentBuilder pool(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
             auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId);
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pool,
                          member->doc.value().toBson(),
                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
                          IndexAccessMethod::GetKeysContext::kValidatingKeys,

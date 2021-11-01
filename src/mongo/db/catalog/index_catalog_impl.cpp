@@ -1369,6 +1369,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                                const IndexCatalogEntry* index,
                                                const std::vector<BsonRecord>& bsonRecords,
                                                int64_t* keysInsertedOut) const {
+    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
     auto& executionCtx = StorageExecutionContext::get(opCtx);
 
     InsertDeleteOptions options;
@@ -1387,7 +1388,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
         auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
         auto multikeyPaths = executionCtx.multikeyPaths();
 
-        index->accessMethod()->getKeys(executionCtx.pooledBufferBuilder(),
+        index->accessMethod()->getKeys(pooledBuilder,
                                        *bsonRecord.docPtr,
                                        options.getKeysMode,
                                        IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -1552,13 +1553,14 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
                                       const RecordId& loc,
                                       bool logIfError,
                                       int64_t* keysDeletedOut) const {
+    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
     auto& executionCtx = StorageExecutionContext::get(opCtx);
 
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
     auto keys = executionCtx.keys();
-    entry->accessMethod()->getKeys(executionCtx.pooledBufferBuilder(),
+    entry->accessMethod()->getKeys(pooledBuilder,
                                    obj,
                                    IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                                    IndexAccessMethod::GetKeysContext::kRemovingKeys,

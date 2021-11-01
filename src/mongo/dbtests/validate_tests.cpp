@@ -808,7 +808,8 @@ public:
             return;
         }
 
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
@@ -860,7 +861,7 @@ public:
             options.logIfError = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pooledBuilder,
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -872,8 +873,8 @@ public:
 
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
-            auto insertStatus =
-                iam->insert(&_opCtx, coll, badKey, id1, options, nullptr, &numInserted);
+            auto insertStatus = iam->insert(
+                &_opCtx, pooledBuilder, coll, badKey, id1, options, nullptr, &numInserted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_EQUALS(numInserted, 1);
@@ -1204,7 +1205,8 @@ public:
             return;
         }
 
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -1262,7 +1264,7 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pooledBuilder,
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -1586,7 +1588,8 @@ public:
     ValidateMissingIndexEntryRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -1644,7 +1647,7 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pooledBuilder,
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -1919,7 +1922,8 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
@@ -1989,7 +1993,7 @@ public:
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -2045,7 +2049,7 @@ public:
                 const BSONObj actualKey = BSON("a" << 1);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              actualKey,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2136,8 +2140,8 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert non-multikey document.
         lockDb(MODE_X);
@@ -2182,7 +2186,7 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              doc,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2315,7 +2319,8 @@ public:
     ValidateDuplicateDocumentIndexKeySet() : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -2385,7 +2390,7 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pooledBuilder,
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2422,7 +2427,7 @@ public:
             options.dupsAllowed = true;
 
             KeyStringSet keys;
-            iam->getKeys(executionCtx.pooledBufferBuilder(),
+            iam->getKeys(pooledBuilder,
                          actualKey,
                          IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                          IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2459,7 +2464,8 @@ public:
             return;
         }
 
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -2535,7 +2541,7 @@ public:
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -2587,7 +2593,7 @@ public:
                 auto interceptor = std::make_unique<IndexBuildInterceptor>(&_opCtx, entry);
 
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              dupObj,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraints,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -2892,8 +2898,8 @@ public:
     ValidateIndexWithMultikeyDocRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert non-multikey document.
         lockDb(MODE_X);
@@ -2938,7 +2944,7 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              doc,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -2972,7 +2978,7 @@ public:
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
                 MultikeyPaths multikeyPaths;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              mkDoc,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,
@@ -3114,8 +3120,8 @@ public:
     ValidateMultikeyPathCoverageRepair() : ValidateBase(/*full=*/false, /*background=*/false) {}
 
     void run() {
-
-        auto& executionCtx = StorageExecutionContext::get(&_opCtx);
+        SharedBufferFragmentBuilder pooledBuilder(
+            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert multikey document.
         lockDb(MODE_X);
@@ -3163,7 +3169,7 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              doc1,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kRemovingKeys,
@@ -3198,7 +3204,7 @@ public:
             {
                 WriteUnitOfWork wunit(&_opCtx);
                 KeyStringSet keys;
-                iam->getKeys(executionCtx.pooledBufferBuilder(),
+                iam->getKeys(pooledBuilder,
                              doc2,
                              IndexAccessMethod::GetKeysMode::kRelaxConstraintsUnfiltered,
                              IndexAccessMethod::GetKeysContext::kAddingKeys,

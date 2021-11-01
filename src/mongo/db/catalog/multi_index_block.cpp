@@ -661,6 +661,7 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
         // exception.
         try {
             idxStatus = _indexes[i].bulk->insert(opCtx,
+                                                 _indexes[i].block->getPooledBuilder(),
                                                  doc,
                                                  loc,
                                                  _indexes[i].options,
