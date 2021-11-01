@@ -12,6 +12,7 @@ l=`(cd .. &&
         -e '/checksum\/zseries/d' \
         -e '/config\/config_def\.c/d' \
         -e '/dist\/stat_data\.py/d' \
+        -e '/format\/config_def\.c/d' \
         -e '/include\/extern\.h/d' \
         -e '/include\/extern_posix\.h/d' \
         -e '/include\/extern_win\.h/d' \

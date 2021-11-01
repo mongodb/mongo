@@ -104,18 +104,14 @@ import(void *arg)
         copy_file_into_directory(import_session, "import.wt");
 
         /* Perform import with either repair or file metadata. */
-        memset(buf, 0, sizeof(buf));
         import_value = mmrand(NULL, 0, 1);
-        if (import_value == 0) {
+        if (import_value == 0)
             testutil_check(__wt_snprintf(buf, sizeof(buf), "import=(enabled,repair=true)"));
-            if ((ret = session->create(session, IMPORT_URI, buf)) != 0)
-                testutil_die(ret, "session.import", ret);
-        } else {
+        else
             testutil_check(__wt_snprintf(buf, sizeof(buf),
               "%s,import=(enabled,repair=false,file_metadata=(%s))", table_config, file_config));
-            if ((ret = session->create(session, IMPORT_URI, buf)) != 0)
-                testutil_die(ret, "session.import", ret);
-        }
+        if ((ret = session->create(session, IMPORT_URI, buf)) != 0)
+            testutil_die(ret, "session.import", ret);
 
         verify_import(session);
 

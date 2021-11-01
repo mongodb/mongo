@@ -2015,32 +2015,35 @@ struct __wt_connection {
 	 * @config{block_cache = (, block cache configuration options., a set of related
 	 * configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * blkcache_eviction_aggression, how many seconds an unused block remains in the cache
-	 * before it is evicted., an integer between 1 and 7200; default \c 1800.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, Cache blocks that are written by a
+	 * blkcache_eviction_aggression, seconds an unused block remains in the cache before it is
+	 * evicted., an integer between 1 and 7200; default \c 1800.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, cache blocks written by a
 	 * checkpoint., a boolean flag; default \c true.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * cache_on_writes, cache newly generated blocks., a boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable block cache., a boolean flag; default \c
-	 * false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target, a fraction of cache that must be
-	 * full before eviction will remove unused blocks., an integer between 30 and 100; default
-	 * \c 95.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that
-	 * keeps track of blocks., an integer between 512 and 256K; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;max_percent_overhead, maximum tolerated overhead
-	 * expressed as the number of blocks added and removed as percent of blocks looked up; cache
-	 * population and eviction will be suppressed if the overhead exceeds the supplied
-	 * threshold., an integer between 1 and 500; default \c 10.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;nvram_path, the absolute path to the file system mounted
-	 * on the NVRAM device., a string; default empty.}
+	 * cache_on_writes, cache blocks as they are written (other than checkpoint blocks)., a
+	 * boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable block
+	 * cache., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target,
+	 * the fraction of the block cache that must be full before eviction will remove unused
+	 * blocks., an integer between 30 and 100; default \c 95.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * percent_file_in_dram, bypass cache if that percent of file fits in DRAM., an integer
-	 * between 0 and 100; default \c 50.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory
-	 * to allocate for the block cache., an integer between 0 and 6155GB; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, amount of DRAM expected to be available on
-	 * the system., an integer between 0 and 1024GB; default \c 0.}
+	 * hashsize, number of buckets in the hashtable that keeps track of blocks., an integer
+	 * between 512 and 256K; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+	 * max_percent_overhead, maximum tolerated overhead expressed as the number of blocks added
+	 * and removed as percent of blocks looked up; cache population and eviction will be
+	 * suppressed if the overhead exceeds the supplied threshold., an integer between 1 and 500;
+	 * default \c 10.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;nvram_path, the absolute path to the file
+	 * system mounted on the NVRAM device., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;percent_file_in_dram, bypass cache for a file if the set
+	 * percentage of the file fits in system DRAM (as specified by block_cache.system_ram)., an
+	 * integer between 0 and 100; default \c 50.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum
+	 * memory to allocate for the block cache., an integer between 0 and 10TB; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, the bytes of system DRAM available for
+	 * caching filesystem blocks., an integer between 0 and 1024GB; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default
 	 * empty.}
 	 * @config{ ),,}
@@ -2703,16 +2706,18 @@ struct __wt_connection {
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{block_cache = (, block cache configuration options., a set of related configuration
  * options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;blkcache_eviction_aggression, how many
- * seconds an unused block remains in the cache before it is evicted., an integer between 1 and
- * 7200; default \c 1800.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, Cache blocks that
- * are written by a checkpoint., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * cache_on_writes, cache newly generated blocks., a boolean flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable block cache., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target, a fraction of cache that must be full before
- * eviction will remove unused blocks., an integer between 30 and 100; default \c 95.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;blkcache_eviction_aggression, seconds an
+ * unused block remains in the cache before it is evicted., an integer between 1 and 7200; default
+ * \c 1800.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_checkpoint, cache blocks written by a
+ * checkpoint., a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;cache_on_writes,
+ * cache blocks as they are written (other than checkpoint blocks)., a boolean flag; default \c
+ * true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable block cache., a boolean flag; default \c
+ * false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;full_target, the fraction of the block cache that must be
+ * full before eviction will remove unused blocks., an integer between 30 and 100; default \c 95.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;hashsize, number of buckets in the hashtable that keeps track of
  * blocks., an integer between 512 and 256K; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2722,12 +2727,15 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;nvram_path, the absolute path to the file system mounted on the
  * NVRAM device., a string; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;percent_file_in_dram,
- * bypass cache if that percent of file fits in DRAM., an integer between 0 and 100; default \c 50.}
+ * bypass cache for a file if the set percentage of the file fits in system DRAM (as specified by
+ * block_cache.system_ram)., an integer between 0 and 100; default \c 50.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the block cache., an integer
- * between 0 and 6155GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, amount of DRAM
- * expected to be available on the system., an integer between 0 and 1024GB; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default empty.}
+ * between 0 and 10TB; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;system_ram, the bytes of
+ * system DRAM available for caching filesystem blocks., an integer between 0 and 1024GB; default \c
+ * 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;type, cache location: DRAM or NVRAM., a string; default
+ * empty.}
  * @config{ ),,}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for I/O. The default
  * value of -1 indicates a platform-specific alignment value should be used (4KB on Linux systems

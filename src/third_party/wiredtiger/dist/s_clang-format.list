@@ -17,3 +17,4 @@ src/os_posix/os_getopt.c
 src/support/hash_city.c
 src/support/hash_fnv.c
 src/support/stat.c
+test/format/config_def.c

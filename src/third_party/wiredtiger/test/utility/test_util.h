@@ -245,7 +245,8 @@ extern void (*custom_die)(void);
 #ifdef _WIN32
 __declspec(noreturn)
 #endif
-  void testutil_die(int, const char *, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+  void testutil_die(int, const char *, ...) WT_GCC_FUNC_ATTRIBUTE((cold))
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 void *dcalloc(size_t, size_t);
 void *dmalloc(size_t);
