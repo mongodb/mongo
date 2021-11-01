@@ -11,6 +11,7 @@ build_variant_large_distro_exceptions:
   - enterprise-macos
   - enterprise-macos-xcode-current
   - enterprise-macos-rosetta-2
+  - enterprise-macos-rosetta-2-cxx20
   - enterprise-macos-arm64
   - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit

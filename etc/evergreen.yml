@@ -9076,8 +9076,35 @@ buildvariants:
   - macos-1100-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
-    compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --link-model=dynamic --variables-files=etc/scons/xcode_macosx.vars
+    resmoke_jobs_max: 6
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: build_variant_gen
+  - name: audit
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
+  - name: .jscore .common !.decimal !.sharding
+  - name: .logical_session_cache .one_sec
+  - name: mqlrun
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough_gen
+  - name: sasl
+
+- name: enterprise-macos-rosetta-2-cxx20
+  display_name: "Enterprise macOS Via Rosetta 2 C++20 DEBUG"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100-arm64
+  expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --link-model=dynamic --variables-files=etc/scons/xcode_macosx.vars --cxx-std=20
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -9102,7 +9129,7 @@ buildvariants:
   - macos-1100-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
-    compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl --js-engine=none -j$(sysctl -n hw.logicalcpu) --link-model=dynamic --libc++ --variables-files=etc/scons/xcode_macosx_arm.vars
     resmoke_jobs_max: 6
     num_scons_link_jobs_available: 0.99
