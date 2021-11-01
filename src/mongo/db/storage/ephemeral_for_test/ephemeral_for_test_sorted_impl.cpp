@@ -841,7 +841,9 @@ boost::optional<IndexKeyEntry> CursorBase<CursorImpl>::seekExact(
 template <class CursorImpl>
 void CursorBase<CursorImpl>::save() {
     _atEOF = false;
-    if (_lastMoveWasRestore) {
+    if (_lastMoveWasRestore || _workingCopy == nullptr) {
+        // If we just restored, or have no working copy (in which case we're already in a saved
+        // state), do nothing.
         return;
     }
 
