@@ -60,7 +60,7 @@ const doTest = replSet => {
      * Ensure {full:true} and {background:true} cannot be run together.
      */
     assert.commandFailedWithCode(testColl.validate({background: true, full: true}),
-                                 ErrorCodes.CommandNotSupported);
+                                 ErrorCodes.InvalidOptions);
 
     assert.commandWorked(testDB.adminCommand({fsync: 1}));
 

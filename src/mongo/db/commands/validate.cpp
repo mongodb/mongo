@@ -135,33 +135,33 @@ public:
 
         const bool fullValidate = cmdObj["full"].trueValue();
         if (background && fullValidate) {
-            uasserted(ErrorCodes::CommandNotSupported,
+            uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with both { background: true }"
                                     << " and { full: true } is not supported.");
         }
 
         const bool enforceFastCount = cmdObj["enforceFastCount"].trueValue();
         if (background && enforceFastCount) {
-            uasserted(ErrorCodes::CommandNotSupported,
+            uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with both { background: true }"
                                     << " and { enforceFastCount: true } is not supported.");
         }
 
         const bool repair = cmdObj["repair"].trueValue();
         if (background && repair) {
-            uasserted(ErrorCodes::CommandNotSupported,
+            uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with both {background: true }"
                                     << " and { repair: true } is not supported.");
         }
         if (enforceFastCount && repair) {
-            uasserted(ErrorCodes::CommandNotSupported,
+            uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
                           << "Running the validate command with both {enforceFastCount: true }"
                           << " and { repair: true } is not supported.");
         }
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (repair && replCoord->isReplEnabled()) {
-            uasserted(ErrorCodes::CommandNotSupported,
+            uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
                           << "Running the validate command with { repair: true } can only be"
                           << " performed in standalone mode.");
@@ -169,7 +169,7 @@ public:
 
         const bool metadata = cmdObj["metadata"].trueValue();
         if (metadata && (background || fullValidate || enforceFastCount || repair)) {
-            uasserted(ErrorCodes::CommandNotSupported,
+            uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with { metadata: true } is not"
                                     << " supported with any other options");
         }

@@ -41,7 +41,7 @@ for (let i = 0; i < numDocs; ++i) {
  * Ensure {full:true} and {background:true} cannot be run together.
  */
 assert.commandFailedWithCode(testColl.validate({background: true, full: true}),
-                             ErrorCodes.CommandNotSupported);
+                             ErrorCodes.InvalidOptions);
 
 forceCheckpoint();
 

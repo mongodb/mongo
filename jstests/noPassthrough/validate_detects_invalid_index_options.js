@@ -43,14 +43,14 @@ checkLog.containsJson(conn, 5980501);
 // foreground validation on the ephemeralForTest storage engine, making it incompatible with this
 // test.
 assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, background: true}),
-                             ErrorCodes.CommandNotSupported);
+                             ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, repair: true}),
-                             ErrorCodes.CommandNotSupported);
+                             ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, full: true}),
-                             ErrorCodes.CommandNotSupported);
+                             ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(
     db.runCommand({validate: collName, metadata: true, enforceFastCount: true}),
-    ErrorCodes.CommandNotSupported);
+    ErrorCodes.InvalidOptions);
 
 // Drop the index with the invalid index options and validate only the metadata.
 assert.commandWorked(coll.dropIndex({x: 1}));
