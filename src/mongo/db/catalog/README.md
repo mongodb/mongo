@@ -44,6 +44,12 @@ in this table is indexed with a 64-bit `RecordId`, referred to as the catalog ID
 BSON document that describes the properties of a collection and its indexes. The `DurableCatalog`
 class allows read and write access to the durable data.
 
+Starting in v5.2, catalog entries for time-series collections have a new flag called
+`timeseriesBucketsMayHaveMixedSchemaData` in the `md` field. Time-series collections upgraded from 
+versions earlier than v5.2 may have mixed-schema data in buckets. This flag gets set to `true` as
+part of the upgrade process and is removed as part of the downgrade process through the
+[collMod command](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/catalog/coll_mod.cpp#L644-L663).
+
 **Example**: an entry in the durable catalog for a collection `test.employees` with an in-progress
 index build on `{lastName: 1}`:
 

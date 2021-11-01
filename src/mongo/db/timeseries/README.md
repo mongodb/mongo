@@ -76,11 +76,16 @@ certain properties:
 
 In order to support queries on the time-series collection that could benefit from indexed access
 rather than collection scans, indexes may be created on the time, meta-data, and meta-data subfields
-of a time-series collection. The index key specification provided by the user via `createIndex` will
-be converted to the underlying buckets collection's schema.
-* The details for mapping the index specificiation between the time-series collection and the
+of a time-series collection. Starting in v5.2, indexes on time-series collection measurement fields
+are permitted. The index key specification provided by the user via `createIndex` will be converted
+to the underlying buckets collection's schema.
+* The details for mapping the index specification between the time-series collection and the
   underlying buckets collection may be found in
   [timeseries_index_schema_conversion_functions.h](timeseries_index_schema_conversion_functions.h).
+* Newly supported index types in v5.2 and up
+  [store the original user index definition](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/timeseries/timeseries_commands_conversion_helper.cpp#L140-L147)
+  on the transformed index definition. When mapping the bucket collection index to the time-series
+  collection index, the original user index definition is returned.
 
 Once the indexes have been created, they can be inspected through the `listIndexes` command or the
 `$indexStats` aggregation stage. `listIndexes` and `$indexStats` against a time-series collection
@@ -92,16 +97,28 @@ field.
 `dropIndex` and `collMod` (`hidden: <bool>`, `expireAfterSeconds: <num>`) are also supported on
 time-series collections.
 
-Most index types are supported on time-series collections, including
-[hashed](https://docs.mongodb.com/manual/core/index-hashed/),
-[wildcard](https://docs.mongodb.com/manual/core/index-wildcard/),
-[sparse](https://docs.mongodb.com/manual/core/index-sparse/),
-[multikey](https://docs.mongodb.com/manual/core/index-multikey/), and
-[indexes with collations](https://docs.mongodb.com/manual/indexes/#indexes-and-collation).
+Supported index types on the time field:
+* [Single](https://docs.mongodb.com/manual/core/index-single/).
+* [Compound](https://docs.mongodb.com/manual/core/index-compound/).
+* [Hashed](https://docs.mongodb.com/manual/core/index-hashed/).
+* [Wildcard](https://docs.mongodb.com/manual/core/index-wildcard/).
+* [Sparse](https://docs.mongodb.com/manual/core/index-sparse/).
+* [Multikey](https://docs.mongodb.com/manual/core/index-multikey/).
+* [Indexes with collations](https://docs.mongodb.com/manual/indexes/#indexes-and-collation).
+
+Supported index types on the meta-data field and meta-data subfields:
+* All of the supported index types on the time field.
+* [2d](https://docs.mongodb.com/manual/core/2d/) in v5.2 and up.
+* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) in v5.2 and up.
+* [Partial](https://docs.mongodb.com/manual/core/index-partial/) in v5.2 and up.
+
+Supported index types on measurement fields in v5.2 and up only:
+* [Single](https://docs.mongodb.com/manual/core/index-single/).
+* [Compound](https://docs.mongodb.com/manual/core/index-compound/).
+* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/).
+* [Partial](https://docs.mongodb.com/manual/core/index-partial/).
 
 Index types that are not supported on time-series collections include
-[geo](https://docs.mongodb.com/manual/core/2dsphere/),
-[partial](https://docs.mongodb.com/manual/core/index-partial/),
 [unique](https://docs.mongodb.com/manual/core/index-unique/), and
 [text](https://docs.mongodb.com/manual/core/index-text/).
 
@@ -128,14 +145,16 @@ handled by an op observer, but may be necessary to call from other places.
 
 A bucket is closed either manually, by setting the optional `control.closed` flag, or automatically
 by the `BucketCatalog` in a number of situations. If the `BucketCatalog` is using more memory than
-it's given threshold (controlled by the server paramter
+it's given threshold (controlled by the server parameter
 `timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to close idle buckets. A bucket is
 considered idle if it is open and it does not have any uncommitted measurements pending. The
-`BucketCatalog` will also close a bucket if it contains more than the maximum number of measurments
+`BucketCatalog` will also close a bucket if it contains more than the maximum number of measurements
 (`timeseriesBucketMaxCount`), if it contains more than the maximum amount of data
 (`timeseriesBucketMaxSize`), or if a new measurement would cause the bucket to span a greater
 amount of time between it's oldest and newest time stamp than is allowed (currently hard-coded to
-one hour).
+one hour). If an incoming measurement is schematically incompatible relative to the measurements 
+which have already landed in a given bucket, that bucket will be closed and is tracked with the
+`numBucketsClosedDueToSchemaChange` metric.
 
 The first time a write batch is committed for a given bucket, the newly-formed document is
 inserted. On subsequent batch commits, we perform an update operation. Instead of generating the
