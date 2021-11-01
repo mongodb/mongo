@@ -806,16 +806,25 @@ void BucketCatalog::_verifyBucketIsUnused(Bucket* bucket) const {
 void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats,
                                        std::vector<BucketCatalog::ClosedBucket>* closedBuckets) {
     // Must hold an exclusive lock on _bucketMutex from outside.
-    stdx::lock_guard lk{_idleMutex};
+    stdx::unique_lock lk{_idleMutex};
 
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
     int32_t numClosed = 0;
     while (!_idleBuckets.empty() &&
            _memoryUsage.load() >
-               static_cast<std::uint64_t>(gTimeseriesIdleBucketExpiryMemoryUsageThreshold) &&
+               static_cast<std::uint64_t>(gTimeseriesIdleBucketExpiryMemoryUsageThreshold.load()) &&
            numClosed <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = _idleBuckets.back();
+
+        lk.unlock();
         _verifyBucketIsUnused(bucket);
+        lk.lock();
+        if (!bucket->_idleListEntry) {
+            // The bucket may have become non-idle between when we unlocked _idleMutex and locked
+            // the bucket's mutex.
+            continue;
+        }
+
         ClosedBucket closed{
             bucket->id(), bucket->getTimeField().toString(), bucket->numMeasurements()};
         if (_removeBucket(bucket, true /* expiringBuckets */)) {

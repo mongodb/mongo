@@ -49,8 +49,8 @@ server_parameters:
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
         description: "The threshold for bucket catalog memory usage above which idle buckets will be
                       expired"
-        set_at: [ startup ]
-        cpp_vartype: "std::int32_t"
+        set_at: [ startup, runtime ]
+        cpp_vartype: "AtomicWord<std::int32_t>"
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThreshold"
         default:  104857600 # 100MB
         validator: { gte: 1 }
