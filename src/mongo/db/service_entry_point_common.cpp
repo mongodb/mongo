@@ -1536,11 +1536,6 @@ void ExecCommandDatabase::_initiateCommand() {
             : _invocation->ns();
 
         oss.initializeClientRoutingVersionsFromCommand(namespaceForSharding, request.body);
-
-        auto const shardingState = ShardingState::get(opCtx);
-        if (OperationShardingState::isOperationVersioned(opCtx) || oss.hasDbVersion()) {
-            uassertStatusOK(shardingState->canAcceptShardedCommands());
-        }
     }
 
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);
@@ -1578,6 +1573,21 @@ Future<void> ExecCommandDatabase::_commandExec() {
 
     _execContext->behaviors->waitForReadConcern(opCtx, _invocation.get(), request);
     _execContext->behaviors->setPrepareConflictBehaviorForReadConcern(opCtx, _invocation.get());
+
+    const auto dbname = request.getDatabase().toString();
+    const bool iAmPrimary =
+        repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    if (!opCtx->getClient()->isInDirectClient() &&
+        readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
+        (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
+        auto& oss = OperationShardingState::get(opCtx);
+        auto const shardingState = ShardingState::get(opCtx);
+        if (OperationShardingState::isOperationVersioned(opCtx) || oss.hasDbVersion()) {
+            uassertStatusOK(shardingState->canAcceptShardedCommands());
+        }
+    }
+
     _execContext->getReplyBuilder()->reset();
 
     auto runCommand = [&] {

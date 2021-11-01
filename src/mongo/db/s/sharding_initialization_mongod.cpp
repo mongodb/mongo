@@ -70,6 +70,7 @@ namespace mongo {
 
 // Failpoint for disabling updateShardIdentityConfigString calls on signaled RS nodes.
 MONGO_FAIL_POINT_DEFINE(failUpdateShardIdentityConfigString);
+MONGO_FAIL_POINT_DEFINE(hangDuringShardingInitialization);
 
 namespace {
 
@@ -403,6 +404,8 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
     auto const shardingState = ShardingState::get(opCtx);
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    hangDuringShardingInitialization.pauseWhileSet();
 
     stdx::unique_lock<Latch> ul(_initSynchronizationMutex);
 
