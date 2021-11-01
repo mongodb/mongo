@@ -92,10 +92,10 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
                                                                  BSONObjBuilder* builder) {
     // Authenticating the __system@local user to the admin database on mongos is required
     // by the auth passthrough test suite.
-    if (getTestCommandsEnabled() &&
-        userName.getUser() == internalSecurity.user->getName().getUser() &&
+    auto systemUser = internalSecurity.getUser();
+    if (getTestCommandsEnabled() && userName.getUser() == (*systemUser)->getName().getUser() &&
         userName.getDB() == "admin") {
-        userName = internalSecurity.user->getName();
+        userName = (*systemUser)->getName();
     }
 
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -126,7 +126,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
         }
 
         auto mechanismEnabled = _mechanismSupportedByConfig(factoryIt->mechanismName());
-        if (!mechanismEnabled && userName == internalSecurity.user->getName()) {
+        if (!mechanismEnabled && userName == (*systemUser)->getName()) {
             mechanismEnabled = factoryIt->isInternalAuthMech();
         }
 
@@ -163,12 +163,13 @@ std::vector<std::string> SASLServerMechanismRegistry::getMechanismNames() const 
 }
 
 StringData ServerMechanismBase::getAuthenticationDatabase() const {
+    auto systemUser = internalSecurity.getUser();
     if (getTestCommandsEnabled() && _authenticationDatabase == "admin" &&
-        getPrincipalName() == internalSecurity.user->getName().getUser()) {
+        getPrincipalName() == (*systemUser)->getName().getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
         // support the auth passthrough test framework on mongos (since you can't use the local
         // database on a mongos, so you can't auth as the internal user without this).
-        return internalSecurity.user->getName().getDB();
+        return (*systemUser)->getName().getDB();
     } else {
         return _authenticationDatabase;
     }

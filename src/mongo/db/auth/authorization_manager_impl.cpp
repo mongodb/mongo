@@ -65,35 +65,66 @@
 namespace mongo {
 namespace {
 
-MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
-                          ("EndStartupOptionStorage"),
-                          ("CreateAuthorizationManager"))
-(InitializerContext* const context) try {
-    UserHandle user(User(UserName("__system", "local")));
+std::shared_ptr<UserHandle> createSystemUserHandle() {
+    auto user = std::make_shared<UserHandle>(User(UserName("__system", "local")));
 
     ActionSet allActions;
     allActions.addAllActions();
     PrivilegeVector privileges;
     auth::generateUniversalPrivileges(&privileges);
-    user->addPrivileges(privileges);
+    (*user)->addPrivileges(privileges);
 
-    if (mongodGlobalParams.allowlistedClusterNetwork) {
-        const auto& allowlist = *mongodGlobalParams.allowlistedClusterNetwork;
-
-        auto restriction = std::make_unique<ClientSourceRestriction>(allowlist);
-        auto restrictionSet = std::make_unique<RestrictionSet<>>(std::move(restriction));
-        auto restrictionDocument =
-            std::make_unique<RestrictionDocument<>>(std::move(restrictionSet));
-
-        RestrictionDocuments clusterAllowList(std::move(restrictionDocument));
-
-        user->setRestrictions(std::move(clusterAllowList));
+    if (internalSecurity.credentials) {
+        (*user)->setCredentials(internalSecurity.credentials.value());
     }
 
-    internalSecurity.user = user;
+    return user;
+}
+
+class ClusterNetworkRestrictionManagerImpl : public ClusterNetworkRestrictionManager {
+public:
+    static void configureClusterNetworkRestrictions(std::shared_ptr<UserHandle> user) {
+        const auto allowlistedClusterNetwork =
+            std::atomic_load(&mongodGlobalParams.allowlistedClusterNetwork);  // NOLINT
+        if (allowlistedClusterNetwork) {
+            auto restriction =
+                std::make_unique<ClientSourceRestriction>(*allowlistedClusterNetwork);
+            auto restrictionSet = std::make_unique<RestrictionSet<>>(std::move(restriction));
+            auto restrictionDocument =
+                std::make_unique<RestrictionDocument<>>(std::move(restrictionSet));
+
+            RestrictionDocuments clusterAllowList(std::move(restrictionDocument));
+            (*user)->setRestrictions(clusterAllowList);
+        }
+    }
+
+    void updateClusterNetworkRestrictions() override {
+        auto user = createSystemUserHandle();
+        configureClusterNetworkRestrictions(user);
+        auto originalUser = internalSecurity.setUser(user);
+
+        // TODO: Invalidate __system sessions falling under restrictions (SERVER-61038)
+        boost::ignore_unused_variable_warning(originalUser);
+    }
+};
+
+MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
+                          ("EndStartupOptionStorage"),
+                          ("CreateAuthorizationManager"))
+(InitializerContext* const context) try {
+    auto user = createSystemUserHandle();
+    ClusterNetworkRestrictionManagerImpl::configureClusterNetworkRestrictions(user);
+    internalSecurity.setUser(user);
 } catch (...) {
     uassertStatusOK(exceptionToStatus());
 }
+
+ServiceContext::ConstructorActionRegisterer setClusterNetworkRestrictionManager{
+    "SetClusterNetworkRestrictionManager", [](ServiceContext* service) {
+        std::unique_ptr<ClusterNetworkRestrictionManager> manager =
+            std::make_unique<ClusterNetworkRestrictionManagerImpl>();
+        ClusterNetworkRestrictionManager::set(service, std::move(manager));
+    }};
 
 class PinnedUserSetParameter {
 public:
@@ -175,7 +206,7 @@ public:
 private:
     Status _checkForSystemUser(const std::vector<UserName>& names) {
         if (std::any_of(names.begin(), names.end(), [&](const UserName& userName) {
-                return (userName == internalSecurity.user->getName());
+                return (userName == (*internalSecurity.getUser())->getName());
             })) {
             return {ErrorCodes::BadValue,
                     "Cannot set __system as a pinned user, it is always pinned"};
@@ -461,8 +492,9 @@ MONGO_FAIL_POINT_DEFINE(authUserCacheSleep);
 
 StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
                                                              const UserName& userName) try {
-    if (userName == internalSecurity.user->getName()) {
-        return internalSecurity.user;
+    auto systemUser = internalSecurity.getUser();
+    if (userName == (*systemUser)->getName()) {
+        return *systemUser;
     }
 
     UserRequest request(userName, boost::none);

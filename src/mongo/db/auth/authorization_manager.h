@@ -52,13 +52,23 @@ class ServiceContext;
 /**
  * Internal secret key info.
  */
-struct AuthInfo {
-    UserHandle user;
+struct SystemAuthInfo {
+    std::shared_ptr<UserHandle> getUser() {
+        return std::atomic_load(&_user);  // NOLINT
+    }
+
+    std::shared_ptr<UserHandle> setUser(std::shared_ptr<UserHandle> user) {
+        return std::atomic_exchange(&_user, user);  // NOLINT
+    }
 
     // Used during keyfile rollover to store the alternate key used to authenticate
+    boost::optional<User::CredentialData> credentials;
     boost::optional<User::CredentialData> alternateCredentials;
+
+private:
+    std::shared_ptr<UserHandle> _user;
 };
-extern AuthInfo internalSecurity;  // set at startup and not changed after initialization.
+extern SystemAuthInfo internalSecurity;
 
 /**
  * How user management functions should structure the BSON representation of privileges and roles.

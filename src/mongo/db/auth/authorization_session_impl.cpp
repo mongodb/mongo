@@ -260,7 +260,7 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
 
 void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
     stdx::lock_guard<Client> lk(*client);
-    _authenticatedUsers.add(internalSecurity.user);
+    _authenticatedUsers.add(*internalSecurity.getUser());
     _buildAuthenticatedRolesVector();
 }
 

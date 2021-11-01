@@ -253,8 +253,9 @@ Future<void> authenticateInternalClient(
     StepDownBehavior stepDownBehavior,
     RunCommandHook runCommand,
     std::shared_ptr<InternalAuthParametersProvider> internalParamsProvider) {
+    auto systemUser = internalSecurity.getUser();
     return negotiateSaslMechanism(
-               runCommand, internalSecurity.user->getName(), mechanismHint, stepDownBehavior)
+               runCommand, (*systemUser)->getName(), mechanismHint, stepDownBehavior)
         .then([runCommand, clientSubjectName, remote, internalParamsProvider](
                   std::string mechanism) -> Future<void> {
             auto params = internalParamsProvider->get(0, mechanism);

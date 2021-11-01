@@ -174,8 +174,9 @@ public:
     BSONObj augmentIsMasterRequest(const HostAndPort& remoteHost, BSONObj cmdObj) override {
         BSONObjBuilder bob(std::move(cmdObj));
         bob.append("hangUpOnStepDown", false);
-        if (internalSecurity.user) {
-            bob.append("saslSupportedMechs", internalSecurity.user->getName().getUnambiguousName());
+        auto systemUser = internalSecurity.getUser();
+        if (systemUser && *systemUser) {
+            bob.append("saslSupportedMechs", (*systemUser)->getName().getUnambiguousName());
         }
 
         if (_x509AuthOnly) {

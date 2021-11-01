@@ -178,7 +178,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     UserName user(ServerMechanismBase::ServerMechanismBase::_principalName,
                   ServerMechanismBase::getAuthenticationDatabase());
 
-    const auto isInternalUser = (user == internalSecurity.user->getName());
+    const auto isInternalUser = (user == (*internalSecurity.getUser())->getName());
     const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
 
     // SERVER-16534, some mechanisms must be enabled for authenticating the internal user, so that
@@ -238,7 +238,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         base64::decode(scramCredentials.storedKey),
         base64::decode(scramCredentials.serverKey)));
 
-    if (userName == internalSecurity.user->getName() && internalSecurity.alternateCredentials) {
+    if (userName == (*internalSecurity.getUser())->getName() &&
+        internalSecurity.alternateCredentials) {
         auto altCredentials = internalSecurity.alternateCredentials->scram<HashBlock>();
         _secrets.push_back(scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>(
             "",

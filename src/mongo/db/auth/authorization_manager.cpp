@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-AuthInfo internalSecurity;
+SystemAuthInfo internalSecurity;
 
 constexpr StringData AuthorizationManager::USERID_FIELD_NAME;
 constexpr StringData AuthorizationManager::USER_NAME_FIELD_NAME;

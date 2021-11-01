@@ -159,7 +159,7 @@ TEST(SecurityFile, Test) {
 }
 
 TEST(SecurityKey, Test) {
-    internalSecurity.user = UserHandle(User(UserName("__system", "local")));
+    internalSecurity.setUser(std::make_shared<UserHandle>(User(UserName("__system", "local"))));
 
     for (const auto& testCase : testCases) {
         TestFile file(testCase.fileContents, testCase.mode != TestCase::FailureMode::Permissions);

@@ -32,15 +32,25 @@
 #include "mongo/db/repl/repl_settings.h"
 
 namespace mongo {
+
+class ClusterNetworkRestrictionManager {
+public:
+    virtual ~ClusterNetworkRestrictionManager() = default;
+    virtual void updateClusterNetworkRestrictions() = 0;
+    static void set(ServiceContext* service,
+                    std::unique_ptr<ClusterNetworkRestrictionManager> manager);
+};
+
 struct MongodGlobalParams {
     bool scriptingEnabled = true;  // Use "security.javascriptEnabled" to set this variable. Or use
                                    // --noscripting which will set it to false.
 
-    boost::optional<std::vector<std::string>> allowlistedClusterNetwork;
+    std::shared_ptr<std::vector<std::string>> allowlistedClusterNetwork;
 };
 
 extern MongodGlobalParams mongodGlobalParams;
 
 void setGlobalReplSettings(const repl::ReplSettings& settings);
 const repl::ReplSettings& getGlobalReplSettings();
+
 }  // namespace mongo

@@ -103,16 +103,16 @@ BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
     }
 
     auto password = internalAuthKeys.at(idx);
+    auto systemUser = internalSecurity.getUser();
     if (mechanism == kMechanismScramSha1) {
-        password =
-            mongo::createPasswordDigest(internalSecurity.user->getName().getUser(), password);
+        password = mongo::createPasswordDigest((*systemUser)->getName().getUser(), password);
     }
 
     return BSON(saslCommandMechanismFieldName
-                << mechanism << saslCommandUserDBFieldName
-                << internalSecurity.user->getName().getDB() << saslCommandUserFieldName
-                << internalSecurity.user->getName().getUser() << saslCommandPasswordFieldName
-                << password << saslCommandDigestPasswordFieldName << false);
+                << mechanism << saslCommandUserDBFieldName << (*systemUser)->getName().getDB()
+                << saslCommandUserFieldName << (*systemUser)->getName().getUser()
+                << saslCommandPasswordFieldName << password << saslCommandDigestPasswordFieldName
+                << false);
 }
 
 std::string getBSONString(BSONObj container, StringData field) {
@@ -131,8 +131,9 @@ std::string getInternalAuthDB() {
         return getBSONString(internalAuthParams, saslCommandUserDBFieldName);
     }
 
-    if (auto isu = internalSecurity.user) {
-        return isu->getName().getDB();
+    auto systemUser = internalSecurity.getUser();
+    if (systemUser && *systemUser) {
+        return (*systemUser)->getName().getDB();
     }
 
     return "admin";

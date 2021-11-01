@@ -29,11 +29,20 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/db/global_settings.h"
         - "mongo/db/mongod_options_general.h"
     configs:
         section: 'General options'
         initializer:
             register: addMongodGeneralOptions
+
+server_parameters:
+    'clusterIpSourceAllowlist':
+        description: 'Network CIDR specification of permitted origin for `__system` access'
+        set_at: runtime
+        cpp_class:
+            name: AllowListedClusterNetworkSetting
+            override_set: true
 
 configs:
     auth:

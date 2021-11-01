@@ -58,9 +58,9 @@ public:
         NetworkInterfaceIntegrationFixture::setUp();
 
         // Setup an internal user so that we can use it for external auth
-        UserHandle user(User(UserName("__system", "local")));
+        auto user = std::make_shared<UserHandle>(User(UserName("__system", "local")));
 
-        internalSecurity.user = user;
+        internalSecurity.setUser(user);
 
         sslGlobalParams.sslCAFile = "jstests/libs/ca.pem";
         // Set a client cert that should be ignored if we use the transient cert correctly.

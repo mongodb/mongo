@@ -225,7 +225,7 @@ public:
                                                         << "roles" << BSONArray()),
                                                    BSONObj()));
 
-        internalSecurity.user = UserHandle(User(UserName("__system", "local")));
+        internalSecurity.setUser(std::make_shared<UserHandle>(User(UserName("__system", "local"))));
     }
 
     BSONObj getMechsFor(const UserName user) {
@@ -319,7 +319,7 @@ TEST_F(MechanismRegistryTest, internalAuth) {
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("BAR")), getMechsFor(internalSajack));
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth"
                                                               << "BAR")),
-                      getMechsFor(internalSecurity.user->getName()));
+                      getMechsFor((*internalSecurity.getUser())->getName()));
 
     registry.setEnabledMechanisms({"BAR", "InternalAuth"});
     ASSERT_BSONOBJ_EQ(BSON("saslSupportedMechs" << BSON_ARRAY("InternalAuth"

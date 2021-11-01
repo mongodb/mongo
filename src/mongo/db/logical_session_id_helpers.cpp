@@ -141,7 +141,7 @@ LogicalSessionId makeSystemLogicalSessionId() {
     LogicalSessionId id{};
 
     id.setId(UUID::gen());
-    id.setUid(internalSecurity.user->getDigest());
+    id.setUid((*internalSecurity.getUser())->getDigest());
 
     return id;
 }

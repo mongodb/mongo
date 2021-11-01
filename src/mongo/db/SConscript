@@ -370,6 +370,7 @@ env.Library(
     ],
     LIBDEPS=[
         'repl/repl_settings',
+        'service_context',
     ],
 )
 
