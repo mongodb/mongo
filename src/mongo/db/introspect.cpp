@@ -50,9 +50,9 @@
 
 namespace mongo {
 
+using std::unique_ptr;
 using std::endl;
 using std::string;
-using std::unique_ptr;
 
 namespace {
 
@@ -117,32 +117,20 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
 
-    // True if we need to acquire an X lock on the database in order to create the system.profile
-    // collection.
-    bool acquireDbXLock = false;
-
     try {
-        // Set the opCtx to be only interruptible for replication state changes. This is needed
-        // because for some operations that are already marked as killed due to errors such as
-        // operation time exceeding maxTimeMS, we still want to output the profiler entry. Thus
-        // in these cases we do not interrupt lock acquisition even though the opCtx has already
-        // been killed. In the meantime we need to make sure replication state changes can still
-        // interrupt lock acquisition, otherwise there could be deadlocks when the state change
-        // thread is waiting for the session checked out by this opCtx while holding RSTL lock.
-        // However when maxLockTimeout is set, we want it to be always interruptible.
+        // Even if the operation we are profiling was interrupted, we still want to output the
+        // profiler entry.  This lock guard will prevent lock acquisitions from throwing exceptions
+        // before we finish writing the entry. However, our maximum lock timeout overrides
+        // uninterruptibility.
+        boost::optional<UninterruptibleLockGuard> noInterrupt;
         if (!opCtx->lockState()->hasMaxLockTimeout()) {
-            opCtx->setIgnoreInterruptsExceptForReplStateChange(true);
+            noInterrupt.emplace(opCtx->lockState());
         }
 
-        // IX lock acquisitions beyond this block will not be related to writes to system.profile.
-        ON_BLOCK_EXIT([opCtx] { opCtx->setIgnoreInterruptsExceptForReplStateChange(false); });
-
+        bool acquireDbXLock = false;
         while (true) {
             std::unique_ptr<AutoGetDb> autoGetDb;
             if (acquireDbXLock) {
-                // We should not attempt to acquire an X lock while opCtx ignores interrupts.
-                opCtx->setIgnoreInterruptsExceptForReplStateChange(false);
-
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));
                 if (autoGetDb->getDb()) {
                     createProfileCollection(opCtx, autoGetDb->getDb()).transitional_ignore();
