@@ -517,7 +517,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     invariant(storageEngine);
     storageEngine->notifyStartupComplete();
 
-    BackupCursorHooks::initialize(serviceContext, storageEngine);
+    BackupCursorHooks::initialize(serviceContext);
 
     startMongoDFTDC();
 

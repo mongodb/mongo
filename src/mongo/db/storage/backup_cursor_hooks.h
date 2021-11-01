@@ -41,11 +41,11 @@ class StorageEngine;
 
 class BackupCursorHooks {
 public:
-    using InitializerFunction = std::function<std::unique_ptr<BackupCursorHooks>(StorageEngine*)>;
+    using InitializerFunction = std::function<std::unique_ptr<BackupCursorHooks>()>;
 
     static void registerInitializer(InitializerFunction func);
 
-    static void initialize(ServiceContext* service, StorageEngine* storageEngine);
+    static void initialize(ServiceContext* service);
 
     static BackupCursorHooks* get(ServiceContext* service);
 

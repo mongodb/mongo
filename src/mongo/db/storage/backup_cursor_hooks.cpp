@@ -38,7 +38,7 @@
 namespace mongo {
 
 namespace {
-BackupCursorHooks::InitializerFunction initializer = [](StorageEngine* storageEngine) {
+BackupCursorHooks::InitializerFunction initializer = []() {
     return std::make_unique<BackupCursorHooks>();
 };
 
@@ -53,8 +53,8 @@ void BackupCursorHooks::registerInitializer(InitializerFunction func) {
     initializer = func;
 }
 
-void BackupCursorHooks::initialize(ServiceContext* service, StorageEngine* storageEngine) {
-    getBackupCursorHooks(service).ptr = initializer(storageEngine);
+void BackupCursorHooks::initialize(ServiceContext* service) {
+    getBackupCursorHooks(service).ptr = initializer();
 }
 
 BackupCursorHooks* BackupCursorHooks::get(ServiceContext* service) {
