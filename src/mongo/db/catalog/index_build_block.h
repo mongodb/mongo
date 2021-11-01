@@ -111,6 +111,13 @@ public:
         return _spec;
     }
 
+    /**
+     * Returns a memory pool for creating temporary objects for this index build.
+     */
+    SharedBufferFragmentBuilder& getPooledBuilder() {
+        return _pooledBuilder;
+    }
+
 private:
     void _completeInit(OperationContext* opCtx, Collection* collection);
 
@@ -124,5 +131,7 @@ private:
     std::string _indexNamespace;
 
     std::unique_ptr<IndexBuildInterceptor> _indexBuildInterceptor;
+
+    SharedBufferFragmentBuilder _pooledBuilder;
 };
 }  // namespace mongo

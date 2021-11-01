@@ -88,6 +88,7 @@ public:
      * The behavior of the insertion can be specified through 'options'.
      */
     virtual Status insert(OperationContext* opCtx,
+                          SharedBufferFragmentBuilder& pooledBufferBuilder,
                           const CollectionPtr& coll,
                           const BSONObj& obj,
                           const RecordId& loc,
@@ -253,6 +254,7 @@ public:
          */
         virtual Status insert(OperationContext* opCtx,
                               const CollectionPtr& collection,
+                              SharedBufferFragmentBuilder& pooledBuilder,
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
@@ -478,6 +480,7 @@ public:
                               std::unique_ptr<SortedDataInterface> btree);
 
     Status insert(OperationContext* opCtx,
+                  SharedBufferFragmentBuilder& pooledBufferBuilder,
                   const CollectionPtr& coll,
                   const BSONObj& obj,
                   const RecordId& loc,
