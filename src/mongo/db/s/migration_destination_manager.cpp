@@ -489,6 +489,7 @@ Status MigrationDestinationManager::restoreRecoveredMigrationState(
     _lsid = recoveryDoc.getLsid();
     _txnNumber = recoveryDoc.getTxnNumber();
     _state = COMMIT_START;
+    _acquireCSOnRecipient = true;
 
     LOGV2(6064500, "Recovering migration recipient", "sessionId"_attr = *_sessionId);
 
@@ -615,9 +616,12 @@ void MigrationDestinationManager::abortWithoutSessionIdCheck() {
     _errmsg = "aborted without session id check";
 }
 
-Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId) {
+Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId,
+                                                bool acquireCSOnRecipient) {
 
     stdx::unique_lock<Latch> lock(_mutex);
+
+    _acquireCSOnRecipient = acquireCSOnRecipient;
 
     const auto convergenceTimeout =
         Shard::kDefaultConfigCommandTimeout + Shard::kDefaultConfigCommandTimeout / 4;
@@ -665,8 +669,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     // Assigning a timeout slightly higher than the one used for network requests to the config
     // server. Enough time to retry at least once in case of network failures (SERVER-51397).
     deadline = Date_t::now() + convergenceTimeout;
-    if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!_acquireCSOnRecipient) {
         while (_sessionId) {
             if (stdx::cv_status::timeout ==
                 _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
@@ -1545,8 +1548,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             return;
         }
 
-        if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        if (_acquireCSOnRecipient) {
             const auto critSecReason = criticalSectionReason(*_sessionId);
 
             runWithoutSession(outerOpCtx, [&] {
@@ -1592,8 +1594,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         }
     }
 
-    if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (_acquireCSOnRecipient) {
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp();
         auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {

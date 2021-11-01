@@ -952,12 +952,17 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
     LOGV2_DEBUG(4798501, 2, "Starting migration recovery", "namespace"_attr = nss);
 
     unsigned migrationRecoveryCount = 0;
+
+    const auto acquireCSOnRecipient =
+        feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+            serverGlobalParams.featureCompatibility);
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
     store.forEach(
         opCtx,
         BSON(MigrationCoordinatorDocument::kNssFieldName << nss.toString()),
-        [&opCtx, &migrationRecoveryCount](const MigrationCoordinatorDocument& doc) {
+        [&opCtx, &migrationRecoveryCount, acquireCSOnRecipient](
+            const MigrationCoordinatorDocument& doc) {
             LOGV2_DEBUG(4798502,
                         2,
                         "Recovering migration",
@@ -973,7 +978,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
 
             if (doc.getDecision()) {
                 // The decision is already known.
-                coordinator.completeMigration(opCtx);
+                coordinator.completeMigration(opCtx, acquireCSOnRecipient);
                 return true;
             }
 
@@ -1044,7 +1049,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                 coordinator.setMigrationDecision(DecisionEnum::kCommitted);
             }
 
-            coordinator.completeMigration(opCtx);
+            coordinator.completeMigration(opCtx, acquireCSOnRecipient);
             setFilteringMetadata();
             return true;
         });
@@ -1129,11 +1134,6 @@ void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUI
 }
 
 void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
-    if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return;
-    }
-
     LOGV2_DEBUG(6064504, 2, "Starting migration recipient step-up recovery");
 
     unsigned long long ongoingMigrationRecipientsCount = 0;

@@ -226,7 +226,11 @@ public:
              BSONObjBuilder& result) override {
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
         auto const mdm = MigrationDestinationManager::get(opCtx);
-        Status const status = mdm->startCommit(sessionId);
+
+        const auto elem = cmdObj.getField("acquireCSOnRecipient");
+        const auto acquireCSOnRecipient = elem ? elem.boolean() : false;
+
+        Status const status = mdm->startCommit(sessionId, acquireCSOnRecipient);
         mdm->report(result, opCtx, false);
         if (!status.isOK()) {
             LOGV2(22014,

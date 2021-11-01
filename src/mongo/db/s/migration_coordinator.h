@@ -87,7 +87,8 @@ public:
      * If the decision was to commit, returns a future that is set when range deletion for
      * the donated range completes.
      */
-    boost::optional<SemiFuture<void>> completeMigration(OperationContext* opCtx);
+    boost::optional<SemiFuture<void>> completeMigration(OperationContext* opCtx,
+                                                        bool acquireCSOnRecipient);
 
     /**
      * Deletes the persistent state for this migration from config.migrationCoordinators.

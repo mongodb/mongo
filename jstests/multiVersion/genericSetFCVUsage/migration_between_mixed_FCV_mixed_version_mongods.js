@@ -35,6 +35,23 @@ function runTest(downgradeVersion) {
         }
     });
 
+    const featureFlagMigrationRecipientCriticalSection =
+        assert.commandWorked(st.configRS.getPrimary().adminCommand(
+            {getParameter: 1, featureFlagMigrationRecipientCriticalSection: 1}));
+    const featureFlagMigrationRecipientCriticalSectionEnabled =
+        featureFlagMigrationRecipientCriticalSection.featureFlagMigrationRecipientCriticalSection
+            .value;
+
+    // SERVER-61072: Reenable this test once 6.0 becomes last LTS.
+    // We have to skip this test because the initial state with mixed binaries and mixed FCVs
+    // doesn't honor the upgrade/downgrade procedure and breaks with the setFCV requirements of the
+    // new migration protocol.
+    if (featureFlagMigrationRecipientCriticalSectionEnabled) {
+        jsTest.log('Skipping test because featureFlagMigrationRecipientCriticalSection is enabled');
+        st.stop();
+        return;
+    }
+
     const downgradeFCV = binVersionToFCV(downgradeVersion);
     checkFCV(st.configRS.getPrimary().getDB("admin"), downgradeFCV);
     checkFCV(st.shard0.getDB("admin"), downgradeFCV);

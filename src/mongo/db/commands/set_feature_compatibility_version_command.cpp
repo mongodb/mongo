@@ -62,6 +62,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -72,6 +73,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -321,6 +323,15 @@ public:
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
+                boost::optional<MigrationBlockingGuard> drainNewMoveChunks;
+                // Downgrades from a version >= 5.2 to 5.1 or lower must drain new protocol
+                // moveChunks
+                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                        .isEnabledAndIgnoreFCV() &&
+                    actualVersion > multiversion::FeatureCompatibilityVersion::kVersion_5_1 &&
+                    requestedVersion <= multiversion::FeatureCompatibilityVersion::kVersion_5_1)
+                    drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
+
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
@@ -352,6 +363,14 @@ public:
         }
 
         {
+            boost::optional<MigrationBlockingGuard> drainOldMoveChunks;
+            // Upgrades from a version <= 5.1 to 5.2 or greater must drain old protocol moveChunks
+            if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                    .isEnabledAndIgnoreFCV() &&
+                actualVersion <= multiversion::FeatureCompatibilityVersion::kVersion_5_1 &&
+                requestedVersion > multiversion::FeatureCompatibilityVersion::kVersion_5_1)
+                drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
+
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.
             const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));

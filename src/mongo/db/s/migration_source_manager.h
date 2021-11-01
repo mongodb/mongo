@@ -273,6 +273,9 @@ private:
 
     // Information about the moveChunk to be used in the critical section.
     const BSONObj _critSecReason;
+
+    // It states whether the critical section has to be acquired on the recipient.
+    const bool _acquireCSOnRecipient;
 };
 
 }  // namespace mongo

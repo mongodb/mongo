@@ -151,7 +151,7 @@ public:
      */
     void abortWithoutSessionIdCheck();
 
-    Status startCommit(const MigrationSessionId& sessionId);
+    Status startCommit(const MigrationSessionId& sessionId, bool acquireCSOnRecipient);
 
     /*
      * Refreshes the filtering metadata and releases the migration recipient critical section for
@@ -299,6 +299,8 @@ private:
 
     // Condition variable, which is signalled every time the state of the migration changes.
     stdx::condition_variable _stateChangedCV;
+
+    bool _acquireCSOnRecipient{false};
 };
 
 }  // namespace mongo

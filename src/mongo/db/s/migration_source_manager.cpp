@@ -131,7 +131,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _critSecReason(BSON("command"
                           << "moveChunk"
                           << "fromShard" << _args.getFromShardId() << "toShard"
-                          << _args.getToShardId())) {
+                          << _args.getToShardId())),
+      _acquireCSOnRecipient(feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
+          serverGlobalParams.featureCompatibility)) {
     invariant(!_opCtx->lockState()->isLocked());
 
     LOGV2(22016,
@@ -376,7 +378,7 @@ Status MigrationSourceManager::commitChunkOnRecipient() {
     ScopeGuard scopedGuard([&] { cleanupOnError(); });
 
     // Tell the recipient shard to fetch the latest changes.
-    auto commitCloneStatus = _cloneDriver->commitClone(_opCtx);
+    auto commitCloneStatus = _cloneDriver->commitClone(_opCtx, _acquireCSOnRecipient);
 
     if (MONGO_unlikely(failMigrationCommit.shouldFail()) && commitCloneStatus.isOK()) {
         commitCloneStatus = {ErrorCodes::InternalError,
@@ -445,8 +447,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
-    if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (_acquireCSOnRecipient) {
         // Asynchronously tell the recipient to release its critical section
         _coordinator->launchReleaseRecipientCriticalSection(_opCtx);
     }
@@ -542,9 +543,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
-    if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        !MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
+    if (!_acquireCSOnRecipient && !MONGO_unlikely(doNotRefreshRecipientAfterCommit.shouldFail())) {
         // Best-effort make the recipient refresh its routing table to the new collection
         // version.
         refreshRecipientRoutingTable(
@@ -747,7 +746,8 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                 // This can be called on an exception path after the OperationContext has been
                 // interrupted, so use a new OperationContext. Note, it's valid to call
                 // getServiceContext on an interrupted OperationContext.
-                _cleanupCompleteFuture = _coordinator->completeMigration(newOpCtx);
+                _cleanupCompleteFuture =
+                    _coordinator->completeMigration(newOpCtx, _acquireCSOnRecipient);
             }
         }
 

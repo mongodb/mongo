@@ -140,7 +140,8 @@ void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
 }
 
 
-boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(OperationContext* opCtx) {
+boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(
+    OperationContext* opCtx, bool acquireCSOnRecipient) {
     auto decision = _migrationInfo.getDecision();
     if (!decision) {
         LOGV2(
@@ -159,8 +160,7 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(Operat
           "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
           "migrationId"_attr = _migrationInfo.getId());
 
-    if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (acquireCSOnRecipient) {
         if (!_releaseRecipientCriticalSectionFuture) {
             launchReleaseRecipientCriticalSection(opCtx);
         }
