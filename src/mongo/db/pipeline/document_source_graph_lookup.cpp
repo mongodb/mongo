@@ -406,6 +406,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
     // present and eliminate documents that would match the others later.
     bool matchNull = false;
     bool matchUndefined = false;
+    bool seenMissing = false;
     BSONObjBuilder match;
     {
         BSONObjBuilder query(match.subobjStart("$match"));
@@ -426,16 +427,22 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
                                 matchNull = true;
                             } else if (value.getType() == BSONType::Undefined) {
                                 matchUndefined = true;
+                            } else if (value.missing()) {
+                                seenMissing = true;
                             }
                             in << value;
                         }
                     }
                 }
             }
-            // We never want to see documents where the 'connectToField' is missing.
-            auto existsMatch = BSON(_connectToField.fullPath() << BSON("$exists" << true));
-            andObj << existsMatch;
+            // We never want to see documents where the 'connectToField' is missing. Only add a
+            // check for it in situations where we might match it accidentally.
+            if (matchNull || matchUndefined || seenMissing) {
+                auto existsMatch = BSON(_connectToField.fullPath() << BSON("$exists" << true));
+                andObj << existsMatch;
+            }
             // If matching null or undefined, make sure we don't match the other one.
+            // If seenMissing is true, we've already filtered out missing values above.
             if (matchNull || matchUndefined) {
                 if (!matchUndefined) {
                     auto notUndefined =
