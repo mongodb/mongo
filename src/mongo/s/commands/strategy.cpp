@@ -472,6 +472,7 @@ private:
     void _onStaleDbVersion(Status& status);
     void _onSnapshotError(Status& status);
     void _onShardCannotRefreshDueToLocksHeldError(Status& status);
+    void _onTenantMigrationAborted(Status& status);
 
     ParseAndRunCommand* const _parc;
 
@@ -1040,6 +1041,13 @@ void ParseAndRunCommand::RunAndRetry::_onShardCannotRefreshDueToLocksHeldError(S
         iassert(status);
 }
 
+void ParseAndRunCommand::RunAndRetry::_onTenantMigrationAborted(Status& status) {
+    invariant(status.code() == ErrorCodes::TenantMigrationAborted);
+
+    if (!_canRetry())
+        iassert(status);
+}
+
 void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     auto opCtx = _parc->_rec->getOpCtx();
     const auto command = _parc->_rec->getCommand();
@@ -1087,6 +1095,10 @@ Future<void> ParseAndRunCommand::RunAndRetry::run() {
         })
         .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status status) {
             _onShardCannotRefreshDueToLocksHeldError(status);
+            return run();  // Retry
+        })
+        .onError<ErrorCodes::TenantMigrationAborted>([this](Status status) {
+            _onTenantMigrationAborted(status);
             return run();  // Retry
         });
 }

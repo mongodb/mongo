@@ -396,6 +396,10 @@ private:
             uassertStatusOK(responseStatus.withContext("findAndModify"));
         }
 
+        if (responseStatus.code() == ErrorCodes::TenantMigrationAborted) {
+            uassertStatusOK(responseStatus.withContext("findAndModify"));
+        }
+
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
             if (isRetryableWrite) {
                 RouterOperationContextSession routerSession(opCtx);

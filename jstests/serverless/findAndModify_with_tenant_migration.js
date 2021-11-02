@@ -90,8 +90,7 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
 
     let findAndModifyThread = new Thread((mongosConnString, dbName, findAndModifyCmd) => {
         let mongos = new Mongo(mongosConnString);
-        assert.commandFailedWithCode(mongos.getDB(dbName).runCommand(findAndModifyCmd),
-                                     ErrorCodes.TenantMigrationAborted);
+        assert.commandWorked(mongos.getDB(dbName).runCommand(findAndModifyCmd));
     }, st.s0.host, kDbName, findAndModifyCmd);
     findAndModifyThread.start();
 
