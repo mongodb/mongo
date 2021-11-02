@@ -489,12 +489,10 @@ restart_read:
 
 /*
  * __cursor_row_prev --
- *     Move to the previous row-store item. Taking an optional prefix item for a special case of
- *     search near.
+ *     Move to the previous row-store item.
  */
 static inline int
-__cursor_row_prev(
-  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, WT_ITEM *prefix)
+__cursor_row_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
 {
     WT_CELL_UNPACK_KV kpack;
     WT_INSERT *ins;
@@ -502,12 +500,10 @@ __cursor_row_prev(
     WT_PAGE *page;
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
-    bool prefix_search;
 
     key = &cbt->iface.key;
     page = cbt->ref->page;
     session = CUR2S(cbt);
-    prefix_search = prefix != NULL && F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH);
     *skippedp = 0;
 
     /* If restarting after a prepare conflict, jump to the right spot. */
@@ -565,14 +561,6 @@ restart_read_insert:
             if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
                 return (0);
 
-            /*
-             * If the cursor has prefix search configured we can early exit here if the key we are
-             * visiting is before our prefix.
-             */
-            if (prefix_search && __wt_prefix_match(prefix, key) > 0) {
-                WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
-                return (WT_NOTFOUND);
-            }
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
@@ -616,14 +604,6 @@ restart_read_page:
         if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
             return (0);
 
-        /*
-         * If the cursor has prefix search configured we can early exit here if the key we are
-         * visiting is before our prefix.
-         */
-        if (prefix_search && __wt_prefix_match(prefix, &cbt->iface.key) > 0) {
-            WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
-            return (WT_NOTFOUND);
-        }
         WT_RET(
           __wt_txn_read(session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip)));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
@@ -643,11 +623,11 @@ restart_read_page:
 }
 
 /*
- * __wt_btcur_prev_prefix --
+ * __wt_btcur_prev --
  *     Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -728,7 +708,7 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
                 total_skipped += skipped;
                 break;
             case WT_PAGE_ROW_LEAF:
-                ret = __cursor_row_prev(cbt, newpage, restart, &skipped, prefix);
+                ret = __cursor_row_prev(cbt, newpage, restart, &skipped);
                 total_skipped += skipped;
                 /*
                  * We can directly return WT_NOTFOUND here as the caller will reset the cursor for
@@ -821,14 +801,4 @@ err:
     }
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_NEXT);
     return (ret);
-}
-
-/*
- * __wt_btcur_prev --
- *     Move to the previous record in the tree.
- */
-int
-__wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
-{
-    return (__wt_btcur_prev_prefix(cbt, NULL, truncating));
 }

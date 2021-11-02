@@ -190,8 +190,8 @@ class search_near_01 : public test_harness::test {
          * per search near function call. The key we search near can be different in length, which
          * will increase the number of entries search by a factor of 26.
          */
-        expected_entries = tc->thread_count * keys_per_prefix * 2 *
-          pow(ALPHABET.size(), PREFIX_KEY_LEN - srchkey_len);
+        expected_entries =
+          tc->thread_count * keys_per_prefix * pow(ALPHABET.size(), PREFIX_KEY_LEN - srchkey_len);
 
         /*
          * Read at timestamp 10, so that no keys are visible to this transaction. This allows prefix
@@ -245,8 +245,24 @@ class search_near_01 : public test_harness::test {
                  */
                 testutil_assert(
                   (expected_entries + (2 * tc->thread_count)) >= entries_stat - prev_entries_stat);
-                /* FIXME-WT-8286: Temporarily disable prefix statistics assert. */
-                // testutil_assert(prefix_stat > prev_prefix_stat);
+                /*
+                 * There is an edge case where we may not early exit the prefix search near call
+                 * because the specified prefix matches the rest of the entries in the tree.
+                 *
+                 * In this test, the keys in our database start with prefixes aaa -> zzz. If we
+                 * search with a prefix such as "z", we will not early exit the search near call
+                 * because the rest of the keys will also start with "z" and match the prefix. The
+                 * statistic will stay the same if we do not early exit search near.
+                 *
+                 * However, we still need to keep the assertion as >= rather than a strictly equals
+                 * as the test is multithreaded and other threads may increment the statistic if
+                 * they are searching with a different prefix that will early exit.
+                 */
+                if (srch_key == "z" || srch_key == "zz" || srch_key == "zzz") {
+                    testutil_assert(prefix_stat >= prev_prefix_stat);
+                } else {
+                    testutil_assert(prefix_stat > prev_prefix_stat);
+                }
 
                 tc->transaction.add_op();
                 tc->sleep();
