@@ -237,11 +237,14 @@ var $config = (function() {
 
                         const txnCollection =
                             this.session.getDatabase(txnDbName).getCollection(txnCollName);
+                        const coll = txnCollection.find().toArray();
                         const res = txnCollection.runCommand('update', {
                             updates: [{q: {_id: docId}, u: updateMods}],
                         });
-
-                        assertAlways.commandWorked(res);
+                        assertAlways.commandWorked(
+                            res,
+                            () => "Failed to update. result: " + tojson(res) +
+                                ", collection: " + tojson(coll));
                         assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
                         assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
                         committedTxnInfo.push(
