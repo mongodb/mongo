@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_fcv_47,
+ *   does_not_support_stepdowns
  * ]
  */
 (function() {
