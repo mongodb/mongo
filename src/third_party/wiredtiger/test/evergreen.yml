@@ -3139,6 +3139,34 @@ tasks:
           perf-test-name: modify-force-update-large-record-btree
           maxruns: 3
 
+    #########################################
+    # Performance Tests for perf-checkpoint #
+    #########################################
+
+  - name: perf-test-update-checkpoint-btree
+    tags: ["perf-checkpoint"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: update-checkpoint-btree
+          maxruns: 1
+          wtarg: "-a ../runners/update-checkpoint.json"
+
+  - name: perf-test-update-checkpoint-lsm
+    tags: ["perf-checkpoint"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: update-checkpoint-lsm
+          maxruns: 1
+          wtarg: "-a ../runners/update-checkpoint.json"
+
 #######################################
 #            Buildvariants            #
 #######################################
@@ -3419,6 +3447,7 @@ buildvariants:
     - name: compile
     - name: ".btree-perf"
     - name: ".lsm-perf"
+    - name: ".perf-checkpoint"
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -3426,6 +3455,9 @@ buildvariants:
     - name: Wiredtiger-perf-lsm-jobs
       execution_tasks:
       - ".lsm-perf"
+    - name: Wiredtiger-perf-checkpoint-jobs
+      execution_tasks:
+      - ".perf-checkpoint"
 
 - name: large-scale-tests
   display_name: "Large scale tests"

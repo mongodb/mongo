@@ -29,6 +29,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import re
+from typing import List
+
 from perf_stat import PerfStat
 
 
@@ -47,12 +49,12 @@ class PerfStatCollection:
     def add_stat(self, perf_stat: PerfStat):
         self.perf_stats[perf_stat.short_label] = perf_stat
 
-    def find_stats(self, test_stat_path: str, operation: str):
+    def find_stats(self, test_stat_path: str, operations: List[str]):
         for stat in self.perf_stats.values():
-            if operation is None or stat.short_label == operation:
+            if not operations or stat.short_label in operations:
                 value = find_stat(test_stat_path=test_stat_path,
-                                pattern=stat.pattern,
-                                position_of_value=stat.input_offset)
+                                  pattern=stat.pattern,
+                                  position_of_value=stat.input_offset)
                 stat.add_value(value=value)
 
     def to_value_list(self, brief: bool):

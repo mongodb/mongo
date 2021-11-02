@@ -38,6 +38,7 @@ import platform
 import psutil
 from pygit2 import discover_repository, Repository
 from pygit2 import GIT_SORT_TOPOLOGICAL, GIT_SORT_REVERSE, GIT_SORT_NONE
+from typing import List
 
 from wtperf_config import WTPerfConfig
 from perf_stat import PerfStat
@@ -48,10 +49,11 @@ from perf_stat_collection import PerfStatCollection
 test_stats_file = 'test.stat'
 
 
-def create_test_home_path(home: str, test_run: int, operation: str):
+def create_test_home_path(home: str, test_run: int, operations: List[str] = None):
     home_path = "{}_{}".format(home, test_run)
-    if operation is not None: 
-        home_path += "_{}".format(operation)
+    if operations:
+        # Use the first operation name as part of the home path
+        home_path += "_{}".format(operations[0])
     return home_path
 
 
@@ -139,15 +141,15 @@ def detailed_perf_stats(config: WTPerfConfig, perf_stats: PerfStatCollection):
     return as_dict
 
 
-def run_test_wrapper(config: WTPerfConfig, operation: str=None, argument: str=None):
+def run_test_wrapper(config: WTPerfConfig, operations: List[str] = None, argument: str = None):
     for test_run in range(config.run_max):
         print("Starting test  {}".format(test_run))
-        run_test(config=config, test_run=test_run, operation=operation, argument=argument)
+        run_test(config=config, test_run=test_run, operations=operations, argument=argument)
         print("Completed test {}".format(test_run))
 
 
-def run_test(config: WTPerfConfig, test_run: int, operation: str, argument:str):
-    test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operation=operation)
+def run_test(config: WTPerfConfig, test_run: int, operations: List[str] = None, argument: str = None):
+    test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operations=operations)
     command_line = construct_wtperf_command_line(
         wtperf=config.wtperf_path,
         env=config.environment,
@@ -157,13 +159,13 @@ def run_test(config: WTPerfConfig, test_run: int, operation: str, argument:str):
     subprocess.run(command_line)
 
 
-def process_results(config: WTPerfConfig, perf_stats: PerfStatCollection, operation: str=None):
+def process_results(config: WTPerfConfig, perf_stats: PerfStatCollection, operations: List[str] = None):
     for test_run in range(config.run_max):
-        test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operation=operation)
+        test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operations=operations)
         test_stats_path = create_test_stat_path(test_home)
         if config.verbose:
             print('Reading test stats file: {}'.format(test_stats_path))
-        perf_stats.find_stats(test_stat_path=test_stats_path, operation=operation)
+        perf_stats.find_stats(test_stat_path=test_stats_path, operations=operations)
 
 
 def setup_perf_stats():
@@ -266,8 +268,8 @@ def main():
         if config.arg_file:
             for content in arg_file_contents:
                 if args.verbose:
-                    print("Argument: {},  Operation: {}".format(content["argument"], content["operation"]))
-                run_test_wrapper(config=config, operation=content["operation"], argument=content["argument"])
+                    print("Argument: {},  Operation: {}".format(content["argument"], content["operations"]))
+                run_test_wrapper(config=config, operations=content["operations"], argument=content["argument"])
         else:
             run_test_wrapper(config=config)
 
@@ -278,7 +280,7 @@ def main():
     # Process result
     if config.arg_file:
         for content in arg_file_contents:
-            process_results(config, perf_stats, operation=content["operation"])
+            process_results(config, perf_stats, operations=content["operations"])
     else:
         process_results(config, perf_stats)
 

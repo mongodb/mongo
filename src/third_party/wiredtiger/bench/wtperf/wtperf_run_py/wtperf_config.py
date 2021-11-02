@@ -38,7 +38,9 @@ class WTPerfConfig:
                  run_max: int = 1,
                  verbose: bool = False,
                  git_root: str = None,
-                 json_info: dict = {}):
+                 json_info=None):
+        if json_info is None:
+            json_info = {}
         self.wtperf_path: str = wtperf_path
         self.home_dir: str = home_dir
         self.test: str = test

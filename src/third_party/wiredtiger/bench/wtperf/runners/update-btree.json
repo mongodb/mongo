@@ -1,14 +1,14 @@
 [
     {
       "argument": "-o threads=((count=2,inserts=1,throttle=20000),(count=2,reads=1),(count=2,updates=1,throttle=20000))",
-      "operation": "read"
+      "operations": [ "read", "load" ]
     },
     {
       "argument": "-o threads=((count=2,inserts=1,throttle=20000),(count=2,reads=1,throttle=20000),(count=2,updates=1))",
-      "operation": "update"
+      "operations": [ "update" ]
     },
     {
       "argument": "-o threads=((count=2,inserts=1),(count=2,reads=1,throttle=20000),(count=2,updates=1,throttle=20000))",
-      "operation": "insert"
+      "operations": [ "insert" ]
     }
-  ]
+]
