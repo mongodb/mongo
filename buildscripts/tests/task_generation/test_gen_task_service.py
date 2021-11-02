@@ -3,9 +3,11 @@
 import unittest
 from unittest.mock import MagicMock
 
+import inject
 from shrub.v2 import BuildVariant
 
 import buildscripts.task_generation.gen_task_service as under_test
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskService
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
@@ -43,6 +45,15 @@ def build_mocked_service():
 
 
 class TestGenerateFuzzerTask(unittest.TestCase):
+    def setUp(self) -> None:
+        def dependencies(binder: inject.Binder) -> None:
+            binder.bind(ResmokeProxyService, ResmokeProxyService())
+
+        inject.clear_and_configure(dependencies)
+
+    def tearDown(self) -> None:
+        inject.clear()
+
     def test_fuzzer_tasks_should_be_generated(self):
         mock_params = build_mock_fuzzer_params()
         build_variant = BuildVariant("mock build variant")
@@ -74,6 +85,15 @@ class TestGenerateFuzzerTask(unittest.TestCase):
 
 
 class TestGetDistro(unittest.TestCase):
+    def setUp(self) -> None:
+        def dependencies(binder: inject.Binder) -> None:
+            binder.bind(ResmokeProxyService, ResmokeProxyService())
+
+        inject.clear_and_configure(dependencies)
+
+    def tearDown(self) -> None:
+        inject.clear()
+
     def test_default_distro_should_be_used_if_use_large_distro_not_set(self):
         service = build_mocked_service()
 

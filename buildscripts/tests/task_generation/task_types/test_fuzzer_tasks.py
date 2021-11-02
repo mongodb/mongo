@@ -2,9 +2,12 @@
 
 import unittest
 
+import inject
+
 import buildscripts.task_generation.task_types.fuzzer_tasks as under_test
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 
 
 def build_mock_fuzzer_params(jstestfuzz_vars="vars for jstestfuzz", npm_command="jstestfuzz"):
@@ -55,6 +58,15 @@ class TestFuzzerGenTaskParams(unittest.TestCase):
 
 
 class TestGenerateTasks(unittest.TestCase):
+    def setUp(self) -> None:
+        def dependencies(binder: inject.Binder) -> None:
+            binder.bind(ResmokeProxyService, ResmokeProxyService())
+
+        inject.clear_and_configure(dependencies)
+
+    def tearDown(self) -> None:
+        inject.clear()
+
     def test_fuzzer_tasks_are_generated(self):
         mock_params = build_mock_fuzzer_params()
         fuzzer_service = under_test.FuzzerGenTaskService()
@@ -66,6 +78,15 @@ class TestGenerateTasks(unittest.TestCase):
 
 
 class TestBuildFuzzerSubTask(unittest.TestCase):
+    def setUp(self) -> None:
+        def dependencies(binder: inject.Binder) -> None:
+            binder.bind(ResmokeProxyService, ResmokeProxyService())
+
+        inject.clear_and_configure(dependencies)
+
+    def tearDown(self) -> None:
+        inject.clear()
+
     def test_sub_task_should_be_built_correct_no_minimize_command(self):
         mock_params = build_mock_fuzzer_params(npm_command="jstestfuzz")
         fuzzer_service = under_test.FuzzerGenTaskService()

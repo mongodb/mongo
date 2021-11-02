@@ -3,6 +3,9 @@
 import unittest
 from unittest.mock import patch
 
+import inject
+
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.task_types import multiversion_decorator as under_test
 from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskParams
 
@@ -41,6 +44,15 @@ def build_mock_sub_tasks():
 
 
 class TestDecorateFuzzerGenTask(unittest.TestCase):
+    def setUp(self) -> None:
+        def dependencies(binder: inject.Binder) -> None:
+            binder.bind(ResmokeProxyService, ResmokeProxyService())
+
+        inject.clear_and_configure(dependencies)
+
+    def tearDown(self) -> None:
+        inject.clear()
+
     def run_test(self, fixture_type):
         mock_params = build_mock_fuzzer_params()
         mock_sub_tasks = build_mock_sub_tasks()
