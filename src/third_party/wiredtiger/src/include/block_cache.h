@@ -33,14 +33,15 @@
 
 /*
  * WT_BLKCACHE_ID --
- *    Checksum, offset and size uniquely identify a block.
- *    These are the same items used to compute the cookie.
+ *    File ID, checksum, offset and size uniquely identify a block.
  */
-struct __wt_blkcache_id {
+WT_PACKED_STRUCT_BEGIN(__wt_blkcache_id)
+    uint32_t fid;
     uint32_t checksum;
-    wt_off_t offset;
     uint32_t size;
-};
+    wt_off_t offset;
+WT_PACKED_STRUCT_END
+#define WT_BLKCACHE_ID_SIZE (sizeof(wt_off_t) + 3 * sizeof(uint32_t))
 
 /*
  * WT_BLKCACHE_ITEM --

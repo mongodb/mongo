@@ -37,10 +37,8 @@ static int
 __blkcache_alloc(WT_SESSION_IMPL *session, size_t size, void **retp)
 {
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
 
     if (blkcache->type == BLKCACHE_DRAM)
         return (__wt_malloc(session, size, retp));
@@ -63,12 +61,9 @@ __blkcache_alloc(WT_SESSION_IMPL *session, size_t size, void **retp)
 static void
 __blkcache_free(WT_SESSION_IMPL *session, void *ptr)
 {
-
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
 
     if (blkcache->type == BLKCACHE_DRAM)
         __wt_free(session, ptr);
@@ -76,7 +71,7 @@ __blkcache_free(WT_SESSION_IMPL *session, void *ptr)
 #ifdef HAVE_LIBMEMKIND
         memkind_free(blkcache->pmem_kind, ptr);
 #else
-        __wt_err(session, EINVAL, "NVRAM block cache type requires libmemkind.");
+        __wt_err(session, EINVAL, "NVRAM block cache type requires libmemkind");
 #endif
     }
 }
@@ -89,11 +84,9 @@ static void
 __blkcache_update_ref_histogram(WT_SESSION_IMPL *session, WT_BLKCACHE_ITEM *blkcache_item, int type)
 {
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
     u_int bucket;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
 
     bucket = blkcache_item->num_references / BLKCACHE_HIST_BOUNDARY;
     if (bucket > BLKCACHE_HIST_BUCKETS - 1)
@@ -134,10 +127,8 @@ static inline bool
 __blkcache_high_overhead(WT_SESSION_IMPL *session)
 {
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
 
     if ((double)(blkcache->inserts + blkcache->removals) / (double)(blkcache->lookups) >
       (double)blkcache->overhead_pct)
@@ -154,10 +145,8 @@ static bool
 __blkcache_should_evict(WT_SESSION_IMPL *session, WT_BLKCACHE_ITEM *blkcache_item, int *reason)
 {
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
     *reason = BLKCACHE_EVICT_OTHER;
 
     /*
@@ -204,14 +193,12 @@ __blkcache_eviction_thread(void *arg)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item, *blkcache_item_tmp;
-    WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *session;
     int i, reason;
     bool no_eviction_candidates;
 
     session = (WT_SESSION_IMPL *)arg;
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
 
     __wt_verbose(session, WT_VERB_BLKCACHE,
       "Block cache eviction thread starting... "
@@ -337,12 +324,9 @@ __wt_blkcache_get_or_check(
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ID id;
     WT_BLKCACHE_ITEM *blkcache_item;
-    WT_CONNECTION_IMPL *conn;
     uint64_t bucket, hash;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
-    blkcache_item = NULL;
+    blkcache = &S2C(session)->blkcache;
 
     if (blkcache->type == BLKCACHE_UNCONFIGURED)
         return (-1);
@@ -366,23 +350,20 @@ __wt_blkcache_get_or_check(
     }
 
     /*
-     * We will use the item id structure as a byte array for (1) computing a hash, and
-     * (2) for comparing with the items in the hash table. We therefore need to
-     * zero the struct, because if it is padded by the compiler there could be
-     * bytes in the padding that have arbitrary values.
+     * We will use the item id structure as a byte array for (1) computing a hash, and (2) for
+     * comparing with the items in the hash table.
      */
-    memset((void *)&id, 0, sizeof(id));
-
     id.checksum = checksum;
     id.offset = offset;
     id.size = (uint32_t)size;
+    id.fid = S2BT(session)->id;
     hash = __wt_hash_city64(&id, sizeof(id));
 
     bucket = hash % blkcache->hash_size;
     __wt_spin_lock(session, &blkcache->hash_locks[bucket]);
     TAILQ_FOREACH (blkcache_item, &blkcache->hash[bucket], hashq) {
         if (blkcache_item->id.checksum == id.checksum && blkcache_item->id.offset == id.offset &&
-          blkcache_item->id.size == id.size) {
+          blkcache_item->id.size == id.size && blkcache_item->id.fid == id.fid) {
             if (data_ptr != NULL)
                 memcpy(data_ptr, blkcache_item->data, size);
 
@@ -423,14 +404,11 @@ __wt_blkcache_put(WT_SESSION_IMPL *session, wt_off_t offset, size_t size, uint32
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ID id;
     WT_BLKCACHE_ITEM *blkcache_item;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     uint64_t bucket, hash;
     void *data_ptr;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
-    blkcache_item = NULL;
+    blkcache = &S2C(session)->blkcache;
     data_ptr = NULL;
 
     if (blkcache->type == BLKCACHE_UNCONFIGURED)
@@ -482,23 +460,20 @@ __wt_blkcache_put(WT_SESSION_IMPL *session, wt_off_t offset, size_t size, uint32
     WT_RET(__blkcache_alloc(session, size, &data_ptr));
 
     /*
-     * We will use the item id structure as a byte array for (1) computing a hash, and
-     * (2) for comparing with the items in the hash table. We therefore need to
-     * zero the struct, because if it is padded by the compiler there could be
-     * bytes in the padding that have arbitrary values.
+     * We will use the item id structure as a byte array for (1) computing a hash, and (2) for
+     * comparing with the items in the hash table.
      */
-    memset((void *)&id, 0, sizeof(id));
-
     id.checksum = checksum;
     id.offset = offset;
     id.size = (uint32_t)size;
+    id.fid = S2BT(session)->id;
     hash = __wt_hash_city64(&id, sizeof(id));
 
     bucket = hash % blkcache->hash_size;
     __wt_spin_lock(session, &blkcache->hash_locks[bucket]);
     TAILQ_FOREACH (blkcache_item, &blkcache->hash[bucket], hashq) {
         if (blkcache_item->id.checksum == id.checksum && blkcache_item->id.offset == id.offset &&
-          blkcache_item->id.size == id.size)
+          blkcache_item->id.size == id.size && blkcache_item->id.fid == id.fid)
             goto item_exists;
     }
 
@@ -566,34 +541,28 @@ __wt_blkcache_remove(WT_SESSION_IMPL *session, wt_off_t offset, size_t size, uin
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ID id;
     WT_BLKCACHE_ITEM *blkcache_item;
-    WT_CONNECTION_IMPL *conn;
     uint64_t bucket, hash;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
-    blkcache_item = NULL;
+    blkcache = &S2C(session)->blkcache;
 
     if (blkcache->type == BLKCACHE_UNCONFIGURED)
         return;
 
     /*
-     * We will use the item id structure as a byte array for (1) computing a hash, and
-     * (2) for comparing with the items in the hash table. We therefore need to
-     * zero the struct, because if it is padded by the compiler there could be
-     * bytes in the padding that have arbitrary values.
+     * We will use the item id structure as a byte array for (1) computing a hash, and (2) for
+     * comparing with the items in the hash table.
      */
-    memset((void *)&id, 0, sizeof(id));
-
     id.checksum = checksum;
     id.offset = offset;
     id.size = (uint32_t)size;
+    id.fid = S2BT(session)->id;
     hash = __wt_hash_city64(&id, sizeof(id));
 
     bucket = hash % blkcache->hash_size;
     __wt_spin_lock(session, &blkcache->hash_locks[bucket]);
     TAILQ_FOREACH (blkcache_item, &blkcache->hash[bucket], hashq) {
         if (blkcache_item->id.checksum == id.checksum && blkcache_item->id.offset == id.offset &&
-          blkcache_item->id.size == id.size) {
+          blkcache_item->id.size == id.size && blkcache_item->id.fid == id.fid) {
             TAILQ_REMOVE(&blkcache->hash[bucket], blkcache_item, hashq);
             blkcache->bucket_metadata[bucket].bucket_num_data_blocks--;
             blkcache->bucket_metadata[bucket].bucket_bytes_used -= size;
@@ -625,12 +594,10 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
   float overhead_pct, u_int evict_aggressive, uint64_t full_target, bool cache_on_checkpoint)
 {
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     uint64_t i;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
     blkcache->cache_on_checkpoint = cache_on_checkpoint;
     blkcache->cache_on_writes = cache_on_writes;
     blkcache->hash_size = hash_size;
@@ -688,13 +655,10 @@ __wt_block_cache_destroy(WT_SESSION_IMPL *session)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     uint64_t i;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
-    blkcache_item = NULL;
+    blkcache = &S2C(session)->blkcache;
 
     __wt_verbose(session, WT_VERB_BLKCACHE,
       "block cache with %" PRIu64 " bytes used to be destroyed", blkcache->bytes_used);
@@ -704,7 +668,7 @@ __wt_block_cache_destroy(WT_SESSION_IMPL *session)
 
     blkcache->blkcache_exiting = true;
     WT_TRET(__wt_thread_join(session, &blkcache->evict_thread_tid));
-    __wt_verbose(session, WT_VERB_BLKCACHE, "%s", "block cache eviction thread exited...");
+    __wt_verbose(session, WT_VERB_BLKCACHE, "%s", "block cache eviction thread exited");
 
     __blkcache_aggregate_metadata(blkcache);
 
@@ -766,10 +730,8 @@ __blkcache_reconfig(WT_SESSION_IMPL *session, bool reconfig, size_t cache_size, 
   bool cache_on_checkpoint)
 {
     WT_BLKCACHE *blkcache;
-    WT_CONNECTION_IMPL *conn;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
 
     if (!reconfig || blkcache->type == BLKCACHE_UNCONFIGURED)
         return (0);
@@ -802,7 +764,6 @@ __wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfi
 {
     WT_BLKCACHE *blkcache;
     WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     float overhead_pct;
     uint64_t cache_size, full_target, system_ram;
@@ -810,8 +771,7 @@ __wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfi
     char *nvram_device_path;
     bool cache_on_checkpoint, cache_on_writes;
 
-    conn = S2C(session);
-    blkcache = &conn->blkcache;
+    blkcache = &S2C(session)->blkcache;
     cache_on_checkpoint = cache_on_writes = true;
     nvram_device_path = (char *)"";
 
@@ -854,7 +814,7 @@ __wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfi
         WT_RET_MSG(session, EINVAL, "NVRAM block cache requires libmemkind");
 #endif
     } else
-        WT_RET_MSG(session, EINVAL, "Invalid block cache type.");
+        WT_RET_MSG(session, EINVAL, "Invalid block cache type");
 
     WT_RET(__wt_config_gets(session, cfg, "block_cache.system_ram", &cval));
     system_ram = (uint64_t)cval.val;
