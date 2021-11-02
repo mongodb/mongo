@@ -1,5 +1,6 @@
 // Tests "stacking" multiple migration cleanup threads and their behavior when the collection
 // changes
+// @tags: [assumes_balancer_off]
 (function() {
 'use strict';
 
