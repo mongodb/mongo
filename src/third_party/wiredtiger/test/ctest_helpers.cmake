@@ -105,10 +105,6 @@ function(create_test_executable target)
         target_link_libraries(${target} ${CREATE_TEST_LIBS})
     endif()
 
-    if(ENABLE_TCMALLOC AND HAVE_LIBTCMALLOC)
-        target_link_libraries(${target} ${HAVE_LIBTCMALLOC})
-    endif()
-
     # If compiling for windows, additionally link in the shim library.
     if(WT_WIN)
         target_include_directories(
