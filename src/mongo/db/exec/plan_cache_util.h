@@ -91,6 +91,7 @@ void updatePlanCache(
         candidates) {
     auto winnerIdx = ranking->candidateOrder[0];
     invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
+    auto& winningPlan = candidates[winnerIdx];
 
     // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
     // write to the plan cache.
@@ -115,16 +116,15 @@ void updatePlanCache(
             auto&& [winnerExplainer, runnerUpExplainer] = [&]() {
                 if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
                     return std::make_pair(
-                        plan_explainer_factory::make(candidates[winnerIdx].root.get(),
-                                                     &candidates[winnerIdx].data,
-                                                     candidates[winnerIdx].solution.get()),
+                        plan_explainer_factory::make(
+                            winningPlan.root.get(), &winningPlan.data, winningPlan.solution.get()),
                         plan_explainer_factory::make(candidates[runnerUpIdx].root.get(),
                                                      &candidates[runnerUpIdx].data,
                                                      candidates[runnerUpIdx].solution.get()));
                 } else {
                     static_assert(std::is_same_v<PlanStageType, PlanStage*>);
                     return std::make_pair(
-                        plan_explainer_factory::make(candidates[winnerIdx].root),
+                        plan_explainer_factory::make(winningPlan.root),
                         plan_explainer_factory::make(candidates[runnerUpIdx].root));
                 }
             }();
@@ -136,18 +136,17 @@ void updatePlanCache(
                                       runnerUpExplainer->getPlanSummary());
         }
 
-        if (candidates[winnerIdx].results.empty()) {
+        if (winningPlan.results.empty()) {
             // We're using the "sometimes cache" mode, and the winning plan produced no results
             // during the plan ranking trial period. We will not write a plan cache entry.
             canCache = false;
             auto winnerExplainer = [&]() {
                 if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                    return plan_explainer_factory::make(candidates[winnerIdx].root.get(),
-                                                        &candidates[winnerIdx].data,
-                                                        candidates[winnerIdx].solution.get());
+                    return plan_explainer_factory::make(
+                        winningPlan.root.get(), &winningPlan.data, winningPlan.solution.get());
                 } else {
                     static_assert(std::is_same_v<PlanStageType, PlanStage*>);
-                    return plan_explainer_factory::make(candidates[winnerIdx].root);
+                    return plan_explainer_factory::make(winningPlan.root);
                 }
             }();
 
@@ -159,64 +158,29 @@ void updatePlanCache(
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
     if (shouldCacheQuery(query) && canCache) {
-        // Create list of candidate solutions for the cache with the best solution at the front.
-        std::vector<QuerySolution*> solutions;
-
-        // Generate solutions and ranking decisions sorted by score.
-        for (auto&& ix : ranking->candidateOrder) {
-            solutions.push_back(candidates[ix].solution.get());
-        }
-        // Insert the failed plans in the back.
-        for (auto&& ix : ranking->failedCandidates) {
-            solutions.push_back(candidates[ix].solution.get());
-        }
-
-        // Check solution cache data. Do not add to cache if we have any invalid SolutionCacheData
-        // data. One known example is 2D queries.
-        bool validSolutions = true;
-        for (size_t ix = 0; ix < solutions.size(); ++ix) {
-            if (nullptr == solutions[ix]->cacheData.get()) {
-                log_detail::logNotCachingNoData(solutions[ix]->toString());
-                validSolutions = false;
-                break;
-            }
-        }
-
         auto cacheClassicPlan = [&]() {
-            // The caller of this constructor is responsible for ensuring that the QuerySolution
-            // has valid cacheData. If there's no data to cache you shouldn't be trying to
-            // construct a PlanCacheEntry.
-            //
-            // The first solution is the winner, so we can discard the cache data from all
-            // subsequent solutions.
-            invariant(!solutions.empty());
-            invariant(solutions[0]->cacheData);
-            auto plannerDataForCache = solutions[0]->cacheData->clone();
-
             PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{query};
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
                                 ->set(plan_cache_key_factory::make(query, collection),
-                                      std::move(plannerDataForCache),
-                                      solutions,
+                                      winningPlan.solution->cacheData->clone(),
                                       std::move(ranking),
                                       opCtx->getServiceContext()->getPreciseClockSource()->now(),
                                       boost::none, /* worksGrowthCoefficient */
                                       &callbacks));
         };
 
-        if (validSolutions) {
+        if (winningPlan.solution->cacheData != nullptr) {
             if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
                 if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
                     // Clone the winning SBE plan and its auxiliary data.
                     auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
-                        candidates[winnerIdx].root->clone(), candidates[winnerIdx].data);
+                        winningPlan.root->clone(), winningPlan.data);
 
                     PlanCacheLoggingCallbacks<PlanCacheKey, sbe::CachedSbePlan> callbacks{query};
                     uassertStatusOK(sbe::getPlanCache(opCtx).set(
                         plan_cache_key_factory::make(query, collection),
                         std::move(cachedPlan),
-                        solutions,
                         std::move(ranking),
                         opCtx->getServiceContext()->getPreciseClockSource()->now(),
                         boost::none, /* worksGrowthCoefficient */

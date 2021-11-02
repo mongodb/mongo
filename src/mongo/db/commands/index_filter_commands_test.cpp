@@ -146,15 +146,11 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    QuerySolution qs{};
-    qs.cacheData.reset(new SolutionCacheData());
-    qs.cacheData->tree.reset(new PlanCacheIndexTree());
-    std::vector<QuerySolution*> solns;
-    solns.push_back(&qs);
+    auto cacheData = std::make_unique<SolutionCacheData>();
+    cacheData->tree = std::make_unique<PlanCacheIndexTree>();
     PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
     ASSERT_OK(planCache->set(makeKey(*cq),
-                             qs.cacheData->clone(),
-                             solns,
+                             std::move(cacheData),
                              createDecision(1U),
                              opCtx->getServiceContext()->getPreciseClockSource()->now(),
                              boost::none, /* worksGrowthCoefficient */

@@ -75,7 +75,6 @@ class PlanCacheEntryBase {
 public:
     template <typename KeyType>
     static std::unique_ptr<PlanCacheEntryBase<CachedPlanType>> create(
-        const std::vector<QuerySolution*>& solutions,
         std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
         std::unique_ptr<CachedPlanType> cachedPlan,
         uint32_t queryHash,
@@ -288,12 +287,10 @@ public:
     ~PlanCacheBase() = default;
 
     /**
-     * Record solutions for query. Best plan is first element in list.
-     * Each query in the cache will have more than 1 plan because we only
-     * add queries which are considered by the multi plan runner (which happens
-     * only when the query planner generates multiple candidate plans). Callers are responsible
-     * for passing the current time so that the time the plan cache entry was created is stored
-     * in the plan cache.
+     * Tries to add 'cachedPlan' into the plan cache.
+     *
+     * Callers are responsible for passing the current time so that the time the plan cache entry
+     * was created is stored in the plan cache.
      *
      * 'worksGrowthCoefficient' specifies what multiplier to use when growing the 'works' value of
      * an inactive cache entry.  If boost::none is provided, the function will use
@@ -306,7 +303,6 @@ public:
      */
     Status set(const KeyType& key,
                std::unique_ptr<CachedPlanType> cachedPlan,
-               const std::vector<QuerySolution*>& solns,
                std::unique_ptr<plan_ranker::PlanRankingDecision> why,
                Date_t now,
                boost::optional<double> worksGrowthCoefficient = boost::none,
@@ -314,26 +310,9 @@ public:
         invariant(why);
         invariant(cachedPlan);
 
-        if (solns.empty()) {
-            return Status(ErrorCodes::BadValue, "no solutions provided");
-        }
-
-        auto statsSize =
-            stdx::visit([](auto&& stats) { return stats.candidatePlanStats.size(); }, why->stats);
-        if (statsSize != solns.size()) {
-            return Status(ErrorCodes::BadValue, "number of stats in decision must match solutions");
-        }
-
         if (why->scores.size() != why->candidateOrder.size()) {
             return Status(ErrorCodes::BadValue,
                           "number of scores in decision must match viable candidates");
-        }
-
-        if (why->candidateOrder.size() + why->failedCandidates.size() != solns.size()) {
-            return Status(
-                ErrorCodes::BadValue,
-                "the number of viable candidates plus the number of failed candidates must "
-                "match the number of solutions");
         }
 
         auto newWorks = stdx::visit(
@@ -386,8 +365,7 @@ public:
             return Status::OK();
         }
 
-        auto newEntry(Entry::create(solns,
-                                    std::move(why),
+        auto newEntry(Entry::create(std::move(why),
                                     std::move(cachedPlan),
                                     queryHash,
                                     planCacheKey,
