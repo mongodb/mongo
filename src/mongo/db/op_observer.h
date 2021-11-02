@@ -47,17 +47,50 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
+enum class RetryableFindAndModifyLocation {
+    // The operation is not retryable, or not a "findAndModify" command. Do not record a
+    // pre-image.
+    kNone,
+
+    // Store the pre-image in the side collection.
+    kSideCollection,
+
+    // Store the pre-image in the oplog.
+    kOplog,
+};
+
 /**
  * Holds document update information used in logging.
  */
 struct OplogUpdateEntryArgs {
-    CollectionUpdateArgs updateArgs;
+    CollectionUpdateArgs* updateArgs;
 
     NamespaceString nss;
     CollectionUUID uuid;
 
-    OplogUpdateEntryArgs(CollectionUpdateArgs updateArgs, NamespaceString nss, CollectionUUID uuid)
-        : updateArgs(std::move(updateArgs)), nss(std::move(nss)), uuid(std::move(uuid)) {}
+    // Specifies the pre-image recording option for retryable "findAndModify" commands.
+    RetryableFindAndModifyLocation retryableFindAndModifyLocation =
+        RetryableFindAndModifyLocation::kNone;
+
+    OplogUpdateEntryArgs(CollectionUpdateArgs* updateArgs, NamespaceString nss, CollectionUUID uuid)
+        : updateArgs(updateArgs), nss(std::move(nss)), uuid(std::move(uuid)) {}
+};
+
+struct OplogDeleteEntryArgs {
+    const BSONObj* deletedDoc = nullptr;
+
+    // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
+    // should be ignored by the user as an internal maintenance operation and not a real delete.
+    bool fromMigrate = false;
+    bool preImageRecordingEnabledForCollection = false;
+    bool changeStreamPreAndPostImagesEnabledForCollection = false;
+
+    // Specifies the pre-image recording option for retryable "findAndModify" commands.
+    RetryableFindAndModifyLocation retryableFindAndModifyLocation =
+        RetryableFindAndModifyLocation::kNone;
+
+    // Set if an OpTime was reserved for the delete ahead of time.
+    boost::optional<OplogSlot> oplogSlot = boost::none;
 };
 
 struct IndexCollModInfo {
@@ -86,17 +119,6 @@ public:
         // The collection is being dropped in two phases, by renaming to a drop pending collection
         // which is registered to be reaped later.
         kTwoPhase,
-    };
-
-    enum class RetryableWriteImageRecordingType {
-        // The operation is not a retryable "findAndModify" command. No pre-images must be recorded.
-        kNotRetryable,
-
-        // Store the pre-images for retryable "findAndModify" commands in the side collection.
-        kRecordInSideCollection,
-
-        // Store the pre-images for retryable "findAndModify" commands in the oplog.
-        kRecordInOplog,
     };
 
     virtual ~OpObserver() = default;
@@ -149,24 +171,6 @@ public:
     virtual void aboutToDelete(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const BSONObj& doc) = 0;
-
-    struct OplogDeleteEntryArgs {
-        const BSONObj* deletedDoc = nullptr;
-
-        // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
-        // should be ignored by the user as an internal maintenance operation and not a real delete.
-        bool fromMigrate = false;
-        bool preImageRecordingEnabledForCollection = false;
-        bool changeStreamPreAndPostImagesEnabledForCollection = false;
-
-        // Specifies the pre-image recording options for the retryable "findAndModify" commands. Set
-        // to 'kNotRetryable' if the command is not a retryable write.
-        RetryableWriteImageRecordingType retryableWritePreImageRecordingType =
-            RetryableWriteImageRecordingType::kNotRetryable;
-
-        // Set if an OpTime was reserved for the delete ahead of time.
-        boost::optional<OplogSlot> oplogSlot = boost::none;
-    };
 
     /**
      * Handles logging before document is deleted.

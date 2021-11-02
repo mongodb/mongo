@@ -615,9 +615,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
                                   const NamespaceString&,
                                   OptionalCollectionUUID,
                                   StmtId,
-                                  const OpObserver::OplogDeleteEntryArgs&) {
-        onDeleteCalled = true;
-    };
+                                  const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -640,9 +638,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
                                   const NamespaceString&,
                                   OptionalCollectionUUID,
                                   StmtId,
-                                  const OpObserver::OplogDeleteEntryArgs&) {
-        onDeleteCalled = true;
-    };
+                                  const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -666,9 +662,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
                                   const NamespaceString&,
                                   OptionalCollectionUUID,
                                   StmtId,
-                                  const OpObserver::OplogDeleteEntryArgs&) {
-        onDeleteCalled = true;
-    };
+                                  const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -693,7 +687,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
                                   const NamespaceString& nss,
                                   OptionalCollectionUUID observer_uuid,
                                   StmtId,
-                                  const OpObserver::OplogDeleteEntryArgs& args) {
+                                  const OplogDeleteEntryArgs& args) {
         onDeleteCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));

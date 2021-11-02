@@ -64,14 +64,14 @@ void AuthOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    if (args.updateArgs.update.isEmpty()) {
+    if (args.updateArgs->update.isEmpty()) {
         return;
     }
 
-    audit::logUpdateOperation(opCtx->getClient(), args.nss, args.updateArgs.updatedDoc);
+    audit::logUpdateOperation(opCtx->getClient(), args.nss, args.updateArgs->updatedDoc);
 
     AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "u", args.nss, args.updateArgs.update, &args.updateArgs.criteria);
+        ->logOp(opCtx, "u", args.nss, args.updateArgs->update, &args.updateArgs->criteria);
 }
 
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,

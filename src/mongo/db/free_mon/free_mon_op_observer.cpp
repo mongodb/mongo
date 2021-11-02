@@ -109,11 +109,11 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntry
         return;
     }
 
-    if (args.updateArgs.updatedDoc["_id"].str() == FreeMonStorage::kFreeMonDocIdKey) {
+    if (args.updateArgs->updatedDoc["_id"].str() == FreeMonStorage::kFreeMonDocIdKey) {
         auto controller = FreeMonController::get(opCtx->getServiceContext());
 
         if (controller != nullptr) {
-            controller->notifyOnUpsert(args.updateArgs.updatedDoc.getOwned());
+            controller->notifyOnUpsert(args.updateArgs->updatedDoc.getOwned());
         }
     }
 }

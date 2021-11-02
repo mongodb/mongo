@@ -233,7 +233,7 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
     if (args.nss == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto donorStateDoc =
-            tenant_migration_access_blocker::parseDonorStateDocument(args.updateArgs.updatedDoc);
+            tenant_migration_access_blocker::parseDonorStateDocument(args.updateArgs->updatedDoc);
         switch (donorStateDoc.getState()) {
             case TenantMigrationDonorStateEnum::kDataSync:
                 break;

@@ -216,7 +216,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
 
     if (args.nss == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto newCoordinatorDoc = ReshardingCoordinatorDocument::parse(
-            IDLParserErrorContext("reshardingCoordinatorDoc"), args.updateArgs.updatedDoc);
+            IDLParserErrorContext("reshardingCoordinatorDoc"), args.updateArgs->updatedDoc);
         opCtx->recoveryUnit()->onCommit([opCtx, newCoordinatorDoc = std::move(newCoordinatorDoc)](
                                             boost::optional<Timestamp> unusedCommitTime) mutable {
             try {
@@ -238,7 +238,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
             }
         });
     } else if (args.nss.isTemporaryReshardingCollection()) {
-        const std::vector<InsertStatement> updateDoc{InsertStatement{args.updateArgs.updatedDoc}};
+        const std::vector<InsertStatement> updateDoc{InsertStatement{args.updateArgs->updatedDoc}};
         assertCanExtractShardKeyFromDocs(opCtx, args.nss, updateDoc.begin(), updateDoc.end());
     }
 }

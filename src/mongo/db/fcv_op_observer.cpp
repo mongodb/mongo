@@ -161,11 +161,11 @@ void FcvOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void FcvOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    if (args.updateArgs.update.isEmpty()) {
+    if (args.updateArgs->update.isEmpty()) {
         return;
     }
     if (args.nss.isServerConfigurationCollection()) {
-        _onInsertOrUpdate(opCtx, args.updateArgs.updatedDoc);
+        _onInsertOrUpdate(opCtx, args.updateArgs->updatedDoc);
     }
 }
 

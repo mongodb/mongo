@@ -153,7 +153,7 @@ public:
                        const NamespaceString&,
                        OptionalCollectionUUID,
                        StmtId,
-                       const OpObserver::OplogDeleteEntryArgs&)>
+                       const OplogDeleteEntryArgs&)>
         onDeleteFn;
 
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;
