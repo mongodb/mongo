@@ -2383,6 +2383,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
         if (!F_ISSET(conn, WT_CONN_RECOVERING) && __wt_cache_stuck(session)) {
             ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
+                __wt_verbose_debug(
+                  session, WT_VERB_TRANSACTION, "Rollback reason: %s", "Cache full");
                 --cache->evict_aggressive_score;
                 WT_STAT_CONN_INCR(session, txn_fail_cache);
                 if (app_thread)

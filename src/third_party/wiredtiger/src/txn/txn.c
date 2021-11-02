@@ -2212,6 +2212,7 @@ int
 __wt_txn_rollback_required(WT_SESSION_IMPL *session, const char *reason)
 {
     session->txn->rollback_reason = reason;
+    __wt_verbose_debug(session, WT_VERB_TRANSACTION, "Rollback reason: %s", reason);
     return (WT_ROLLBACK);
 }
 
