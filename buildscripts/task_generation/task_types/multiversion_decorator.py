@@ -2,6 +2,7 @@
 import copy
 from typing import List, Set, Union, Optional
 
+import inject
 import structlog
 from shrub.v2 import Task, FunctionCall
 from shrub.v2.command import ShrubCommand
@@ -26,9 +27,10 @@ class MultiversionGenTaskDecorator:
     """Multiversion decorator for basic generated tasks."""
 
     # pylint: disable=no-self-use
-    def __init__(self):
+    @inject.autoparams()
+    def __init__(self, resmoke_proxy: ResmokeProxyService):
         """Initialize multiversion decorator."""
-        self.resmoke_proxy = ResmokeProxyService()
+        self.resmoke_proxy = resmoke_proxy
         self.old_versions = self._init_old_versions()
 
     def decorate_tasks(self, sub_tasks: Set[Task], params) -> Set[Task]:

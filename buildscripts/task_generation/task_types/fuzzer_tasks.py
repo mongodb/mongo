@@ -83,7 +83,7 @@ class FuzzerGenTaskService:
 
     def __init__(self):
         """Initialize the service."""
-        self.multiversion_decorator = MultiversionGenTaskDecorator()
+        self.multiversion_decorator = MultiversionGenTaskDecorator()  # pylint: disable=no-value-for-parameter
 
     def generate_tasks(self, params: FuzzerGenTaskParams) -> FuzzerTask:
         """

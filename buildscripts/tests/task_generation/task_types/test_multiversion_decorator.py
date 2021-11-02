@@ -7,7 +7,7 @@ from buildscripts.task_generation.task_types import multiversion_decorator as un
 from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskParams
 
 
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
+# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access,no-value-for-parameter
 def build_mock_fuzzer_params():
     return FuzzerGenTaskParams(
         task_name="task_name",
