@@ -51,6 +51,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/initial_sync_state.h"
+#include "mongo/db/repl/initial_syncer_common_stats.h"
 #include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -146,28 +147,6 @@ using LockGuard = stdx::lock_guard<Latch>;
 
 // Used to reset the oldest timestamp during initial sync to a non-null timestamp.
 const Timestamp kTimestampOne(0, 1);
-
-// The number of initial sync attempts that have failed since server startup. Each instance of
-// InitialSyncer may run multiple attempts to fulfill an initial sync request that is triggered
-// when InitialSyncer::startup() is called.
-Counter64 initialSyncFailedAttempts;
-
-// The number of initial sync requests that have been requested and failed. Each instance of
-// InitialSyncer (upon successful startup()) corresponds to a single initial sync request.
-// This value does not include the number of times where a InitialSyncer is created successfully
-// but failed in startup().
-Counter64 initialSyncFailures;
-
-// The number of initial sync requests that have been requested and completed successfully. Each
-// instance of InitialSyncer corresponds to a single initial sync request.
-Counter64 initialSyncCompletes;
-
-ServerStatusMetricField<Counter64> displaySSInitialSyncFailedAttempts(
-    "repl.initialSync.failedAttempts", &initialSyncFailedAttempts);
-ServerStatusMetricField<Counter64> displaySSInitialSyncFailures("repl.initialSync.failures",
-                                                                &initialSyncFailures);
-ServerStatusMetricField<Counter64> displaySSInitialSyncCompleted("repl.initialSync.completed",
-                                                                 &initialSyncCompletes);
 
 ServiceContext::UniqueOperationContext makeOpCtx() {
     return cc().makeOperationContext();
@@ -436,13 +415,14 @@ BSONObj InitialSyncer::getInitialSyncProgress() const {
     // cleared because an initial sync attempt can fail even after initialSyncCompletes is
     // incremented, and we also check that initialSyncCompletes is positive because an initial sync
     // attempt can also fail before _initialSyncState is initialized.
-    if (!_initialSyncState && initialSyncCompletes.get() > 0) {
+    if (!_initialSyncState && initial_sync_common_stats::initialSyncCompletes.get() > 0) {
         return BSONObj();
     }
     return _getInitialSyncProgress_inlock();
 }
 
 void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob) const {
+    bob->append("method", "logical");
     _stats.append(bob);
     if (!_initialSyncState) {
         return;
@@ -615,7 +595,7 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
           "Initial sync done",
           "duration"_attr =
               duration_cast<Seconds>(_stats.initialSyncEnd - _stats.initialSyncStart));
-    initialSyncCompletes.increment();
+    initial_sync_common_stats::initialSyncCompletes.increment();
 }
 
 void InitialSyncer::_startInitialSyncAttemptCallback(
@@ -1753,16 +1733,13 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
         ++_stats.failedInitialSyncAttempts;
         // This increments the number of failed attempts across all initial sync attempts since
         // process startup.
-        initialSyncFailedAttempts.increment();
+        initial_sync_common_stats::initialSyncFailedAttempts.increment();
     }
 
     bool hasRetries = _stats.failedInitialSyncAttempts < _stats.maxFailedInitialSyncAttempts;
 
-    LOGV2(21192,
-          "Initial sync status: {status}, initial sync attempt statistics: {statistics}",
-          "Initial sync status and statistics",
-          "status"_attr = result.isOK() ? "successful" : (hasRetries ? "in_progress" : "failed"),
-          "statistics"_attr = redact(_getInitialSyncProgress_inlock()));
+    initial_sync_common_stats::LogInitialSyncAttemptStats(
+        result, hasRetries, _getInitialSyncProgress_inlock());
 
     if (result.isOK()) {
         // Scope guard will invoke _finishCallback().
@@ -1783,7 +1760,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
         LOGV2_FATAL_CONTINUE(21202,
                              "The maximum number of retries have been exhausted for initial sync");
 
-        initialSyncFailures.increment();
+        initial_sync_common_stats::initialSyncFailures.increment();
 
         // Scope guard will invoke _finishCallback().
         return;

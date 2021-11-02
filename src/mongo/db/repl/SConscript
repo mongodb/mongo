@@ -1170,6 +1170,7 @@ env.Library(
     target='initial_syncer',
     source=[
         'initial_syncer.cpp',
+        'initial_syncer_common_stats.cpp',
         'initial_syncer_factory.cpp',
     ],
     LIBDEPS=[

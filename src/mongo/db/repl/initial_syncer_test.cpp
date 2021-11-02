@@ -4570,7 +4570,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24168, "Progress after first failed response", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 11) << progress;
+        ASSERT_EQUALS(progress.nFields(), 12) << progress;
+        ASSERT_EQUALS(progress.getField("method").String(), "logical") << progress;
         ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
@@ -4638,7 +4639,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24171, "Progress after failure", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 11) << progress;
+        ASSERT_EQUALS(progress.nFields(), 12) << progress;
         ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
@@ -4742,7 +4743,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24173, "Progress after all but last successful response", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 13) << progress;
+    ASSERT_EQUALS(progress.nFields(), 14) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberLong) << progress;
@@ -4819,7 +4820,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24175, "Progress at end", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 14) << progress;
+    ASSERT_EQUALS(progress.nFields(), 15) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
