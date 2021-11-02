@@ -90,7 +90,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
     if (args.nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
-            IDLParserErrorContext("recipientStateDoc"), args.updateArgs.updatedDoc);
+            IDLParserErrorContext("recipientStateDoc"), args.updateArgs->updatedDoc);
         opCtx->recoveryUnit()->onCommit([opCtx, recipientStateDoc](boost::optional<Timestamp>) {
             auto mtab = tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
                 opCtx->getServiceContext(), recipientStateDoc.getTenantId());

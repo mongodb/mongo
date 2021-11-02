@@ -1052,7 +1052,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
             OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
             opObserver->aboutToDelete(opCtx, ns(), doc);
 
-            OpObserver::OplogDeleteEntryArgs args;
+            OplogDeleteEntryArgs args;
             // Explicitly setting values despite them being the defaults.
             args.deletedDoc = nullptr;
             args.fromMigrate = false;
@@ -1168,26 +1168,24 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
         oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
     }
-    auto retryableWritePreImageRecordingType =
-        OpObserver::RetryableWriteImageRecordingType::kNotRetryable;
+    auto retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kNone;
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On && isRetryableWrite(opCtx)) {
-        retryableWritePreImageRecordingType =
-            (oplogSlot != boost::none
-                 ? OpObserver::RetryableWriteImageRecordingType::kRecordInSideCollection
-                 : OpObserver::RetryableWriteImageRecordingType::kRecordInOplog);
+        retryableFindAndModifyLocation =
+            (oplogSlot != boost::none ? RetryableFindAndModifyLocation::kSideCollection
+                                      : RetryableFindAndModifyLocation::kOplog);
     }
-    OpObserver::OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
-                                                fromMigrate,
-                                                getRecordPreImages(),
-                                                isChangeStreamPreAndPostImagesEnabled(),
-                                                retryableWritePreImageRecordingType,
-                                                oplogSlot};
+    OplogDeleteEntryArgs deleteArgs{nullptr /* deletedDoc */,
+                                    fromMigrate,
+                                    getRecordPreImages(),
+                                    isChangeStreamPreAndPostImagesEnabled(),
+                                    retryableFindAndModifyLocation,
+                                    oplogSlot};
 
     getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
-    const bool isRecordingPreImageForRetryableWrite = retryableWritePreImageRecordingType !=
-        OpObserver::RetryableWriteImageRecordingType::kNotRetryable;
+    const bool isRecordingPreImageForRetryableWrite =
+        retryableFindAndModifyLocation != RetryableFindAndModifyLocation::kNone;
     if (isRecordingPreImageForRetryableWrite || getRecordPreImages() ||
         isChangeStreamPreAndPostImagesEnabled()) {
         deletedDoc.emplace(doc.value().getOwned());
@@ -1279,17 +1277,20 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     args->changeStreamPreAndPostImagesEnabledForCollection =
         isChangeStreamPreAndPostImagesEnabled();
 
-    const bool storePrePostImage =
+    OplogUpdateEntryArgs onUpdateArgs(args, ns(), _uuid);
+    const bool setNeedsRetryImageOplogField =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
-    if (!args->oplogSlot && storePrePostImage) {
+    if (!args->oplogSlot && setNeedsRetryImageOplogField) {
         const auto oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
         args->oplogSlot = oplogSlot;
-        args->storeImageInSideCollection = oplogSlot != boost::none;
+        onUpdateArgs.retryableFindAndModifyLocation =
+            (oplogSlot != boost::none ? RetryableFindAndModifyLocation::kSideCollection
+                                      : RetryableFindAndModifyLocation::kOplog);
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
         // function since tenant migrations and resharding rely on always being able to set
         // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
-        invariant(!(isRetryableWrite(opCtx) && storePrePostImage));
+        invariant(!(isRetryableWrite(opCtx) && setNeedsRetryImageOplogField));
     }
 
     uassertStatusOK(_shared->_recordStore->updateRecord(
@@ -1316,8 +1317,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
 
-    OplogUpdateEntryArgs entryArgs(*args, ns(), _uuid);
-    getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
+    getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
 
     return {oldLocation};
 }
@@ -1346,17 +1346,20 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     if (!args->preImageDoc && (getRecordPreImages() || isChangeStreamPreAndPostImagesEnabled())) {
         args->preImageDoc = oldRec.value().toBson().getOwned();
     }
-    const bool storePrePostImage =
+    OplogUpdateEntryArgs onUpdateArgs(args, ns(), _uuid);
+    const bool setNeedsRetryImageOplogField =
         args->storeDocOption != CollectionUpdateArgs::StoreDocOption::None;
-    if (!args->oplogSlot && storePrePostImage) {
+    if (!args->oplogSlot && setNeedsRetryImageOplogField) {
         const auto oplogSlot = reserveOplogSlotsForRetryableFindAndModify(opCtx);
         args->oplogSlot = oplogSlot;
-        args->storeImageInSideCollection = oplogSlot != boost::none;
+        onUpdateArgs.retryableFindAndModifyLocation =
+            (oplogSlot != boost::none ? RetryableFindAndModifyLocation::kSideCollection
+                                      : RetryableFindAndModifyLocation::kOplog);
     } else {
         // Retryable findAndModify commands should not reserve oplog slots before entering this
         // function since tenant migrations and resharding rely on always being able to set
         // timestamps of forged pre- and post- image entries to timestamp of findAndModify - 1.
-        invariant(!(isRetryableWrite(opCtx) && storePrePostImage));
+        invariant(!(isRetryableWrite(opCtx) && setNeedsRetryImageOplogField));
     }
 
     auto newRecStatus =
@@ -1368,8 +1371,7 @@ StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
         args->changeStreamPreAndPostImagesEnabledForCollection =
             isChangeStreamPreAndPostImagesEnabled();
 
-        OplogUpdateEntryArgs entryArgs(*args, ns(), _uuid);
-        getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, entryArgs);
+        getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
     }
     return newRecStatus;
 }

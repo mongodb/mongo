@@ -73,7 +73,7 @@ void OplogApplierImplOpObserver::onDelete(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
                                           StmtId stmtId,
-                                          const OpObserver::OplogDeleteEntryArgs& args) {
+                                          const OplogDeleteEntryArgs& args) {
     if (!onDeleteFn) {
         return;
     }
@@ -242,7 +242,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
                                   const NamespaceString& nss,
                                   OptionalCollectionUUID uuid,
                                   StmtId stmtId,
-                                  const OpObserver::OplogDeleteEntryArgs& args) {
+                                  const OplogDeleteEntryArgs& args) {
         applyOpCalled = true;
         checkOpCtx(opCtx);
         ASSERT_EQUALS(NamespaceString("test.t"), nss);

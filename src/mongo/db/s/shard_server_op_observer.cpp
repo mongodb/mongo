@@ -318,7 +318,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    const auto& updateDoc = args.updateArgs.update;
+    const auto& updateDoc = args.updateArgs->update;
     // Most of these handlers do not need to run when the update is a full document replacement.
     const bool isReplacementUpdate = (update_oplog_entry::extractUpdateType(updateDoc) ==
                                       update_oplog_entry::UpdateType::kReplacement);
@@ -347,7 +347,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             std::string coll;
             fassert(40477,
                     bsonExtractStringField(
-                        args.updateArgs.criteria, ShardCollectionType::kNssFieldName, &coll));
+                        args.updateArgs->criteria, ShardCollectionType::kNssFieldName, &coll));
             return NamespaceString(coll);
         }());
 
@@ -390,7 +390,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         std::string db;
         fassert(
             40478,
-            bsonExtractStringField(args.updateArgs.criteria, ShardDatabaseType::name.name(), &db));
+            bsonExtractStringField(args.updateArgs->criteria, ShardDatabaseType::name.name(), &db));
 
         auto enterCriticalSectionCounterFieldNewVal = update_oplog_entry::extractNewValueForField(
             updateDoc, ShardDatabaseType::enterCriticalSectionCounter.name());
@@ -410,11 +410,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             return;
 
         const auto pendingFieldRemovedStatus =
-            update_oplog_entry::isFieldRemovedByUpdate(args.updateArgs.update, "pending");
+            update_oplog_entry::isFieldRemovedByUpdate(args.updateArgs->update, "pending");
 
         if (pendingFieldRemovedStatus == update_oplog_entry::FieldRemovedStatus::kFieldRemoved) {
             auto deletionTask = RangeDeletionTask::parse(
-                IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs.updatedDoc);
+                IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
 
             if (deletionTask.getDonorShardId() != ShardingState::get(opCtx)->shardId()) {
                 // Range deletion tasks for moved away chunks are scheduled through the
@@ -431,7 +431,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             (!replCoord->getMemberState().recovering() &&
              !replCoord->getMemberState().rollback())) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-                IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs.updatedDoc);
+                IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
 
             opCtx->recoveryUnit()->onCommit(
                 [opCtx, updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
@@ -454,9 +454,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         incrementChunkOnInsertOrUpdate(opCtx,
                                        args.nss,
                                        *metadata->getChunkManager(),
-                                       args.updateArgs.updatedDoc,
-                                       args.updateArgs.updatedDoc.objsize(),
-                                       args.updateArgs.source == OperationSource::kFromMigrate);
+                                       args.updateArgs->updatedDoc,
+                                       args.updateArgs->updatedDoc.objsize(),
+                                       args.updateArgs->source == OperationSource::kFromMigrate);
     }
 }
 
