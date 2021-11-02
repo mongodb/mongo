@@ -686,6 +686,21 @@ protected:
     bool _doneCalled = false;
 };
 
+// The following forward declaration exists to enable the extern
+// declaration, which must come before the use of the matching
+// instantiation of the base class of BSONObjBuilder. Do not remove or
+// re-order these lines w.r.t BSONObjBuilderBase or BSONObjBuilder
+// without being sure that you are not undoing the advantages of the
+// extern template declaration.
+class BSONObjBuilder;
+extern template class BSONObjBuilderBase<BSONObjBuilder, BufBuilder>;
+
+// BSONObjBuilder needs this forward declared in order to declare the
+// ArrayBuilder typedef. This forward declaration is also required to
+// allow one of the extern template declarations for
+// BSONArrayBuilderBase below.
+class BSONArrayBuilder;
+
 /**
  * "Standard" class used for constructing BSONObj on the fly. Stores the BSON in a refcounted
  * buffer.
@@ -801,6 +816,21 @@ private:
     BSONObjBuilderValueStream _s;
 };
 
+// The following forward declaration exists to enable the extern
+// declaration, which must come before the use of the matching
+// instantiation of the base class of UniqueBSONObjBuilder. Do not
+// remove or re-order these lines w.r.t BSONObjBuilderBase or
+// UniqueBSONObjBuilder without being sure that you are not undoing
+// the advantages of the extern template declaration.
+class UniqueBSONObjBuilder;
+extern template class BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder>;
+
+// UniqueBSONObjBuilder needs this forward declared in order to
+// declare the ArrayBuilder typedef. This forward declaration is also
+// required to allow one of the extern template declarations for
+// BSONArrayBuilderBase below.
+class UniqueBSONArrayBuilder;
+
 /**
  * Alternative to BSONObjBuilder which uses a non-refcounted buffer (UniqueBuffer) instead of a
  * refcounted buffer (SharedBuffer).
@@ -808,7 +838,6 @@ private:
  * This should only be used when you care about having direct ownership over the BSONObj's
  * underlying memory.
  */
-class UniqueBSONArrayBuilder;
 class UniqueBSONObjBuilder : public BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder> {
 private:
     using Super = BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder>;
@@ -1024,6 +1053,15 @@ protected:
     BSONObjBuilderType _b;
 };
 
+// The following extern template declaration must come after the
+// forward declaration of BSONArrayBuilder above, and before the use
+// of the matching instantiation of the base class of
+// BSONArrayBuilder. Do not remove or re-order these lines w.r.t
+// BSONArrayBuilderBase or BSONArrayBuilder without being sure that
+// you are not undoing the advantages of the extern template
+// declaration.
+extern template class BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>;
+
 /**
  * "Standard" class used for building BSON arrays.
  */
@@ -1035,6 +1073,15 @@ public:
     BSONArrayBuilder(BufBuilder& bufBuilder)
         : BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>(bufBuilder) {}
 };
+
+// The following extern template declaration must come after the
+// forward delaration of UniqueBSONArrayBuilder above, and before the
+// use of the matching instantiation of the base class of
+// UniqueBSONArrayBuilder. Do not remove or re-order these lines w.r.t
+// BSONArrayBuilderBase or UniqueBSONArrayBuilder without being sure
+// that you are not undoing the advantages of the extern template
+// declaration.
+extern template class BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>;
 
 /**
  * Alternative to BSONArrayBuilder. This class is analogous to UniqueBSONObjBuilder.

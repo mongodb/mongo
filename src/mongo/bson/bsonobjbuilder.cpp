@@ -235,8 +235,7 @@ bool BSONObjBuilderBase<Derived, B>::hasField(StringData name) const {
 // Explicit instantiations
 template class BSONObjBuilderBase<BSONObjBuilder, BufBuilder>;
 template class BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder>;
-
-template class StringBuilderImpl<BufBuilder>;
-template class StringBuilderImpl<StackBufBuilderBase<StackSizeDefault>>;
+template class BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>;
+template class BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>;
 
 }  // namespace mongo

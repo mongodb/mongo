@@ -565,6 +565,13 @@ protected:
     friend class StringBuilderImpl;
 };
 
+// The following extern template declaration must follow
+// BasicBufBuilder and come before its instantiation as a base class
+// for BufBuilder. Do not remove or re-order these lines w.r.t those
+// types without being sure that you are not undoing the advantages of
+// the extern template declaration.
+extern template class BasicBufBuilder<SharedBufferAllocator>;
+
 class BufBuilder : public BasicBufBuilder<SharedBufferAllocator> {
 public:
     static constexpr size_t kDefaultInitSizeBytes = 512;
@@ -578,6 +585,14 @@ public:
         return _buf.release();
     }
 };
+
+// The following extern template declaration must follow
+// BasicBufBuilder and come before its instantiation as a base class
+// for PooledFragmentBuilder. Do not remove or re-order these lines
+// w.r.t those types without being sure that you are not undoing the
+// advantages of the extern template declaration.
+extern template class BasicBufBuilder<SharedBufferFragmentAllocator>;
+
 class PooledFragmentBuilder : public BasicBufBuilder<SharedBufferFragmentAllocator> {
 public:
     PooledFragmentBuilder(SharedBufferFragmentBuilder& fragmentBuilder)
@@ -588,6 +603,13 @@ public:
     }
 };
 MONGO_STATIC_ASSERT(std::is_move_constructible_v<BufBuilder>);
+
+// The following extern template declaration must follow
+// BasicBufBuilder and come before its instantiation as a base class
+// for UniqueBufBuilder. Do not remove or re-order these lines w.r.t
+// those types without being sure that you are not undoing the
+// advantages of the extern template declaration.
+extern template class BasicBufBuilder<UniqueBufferAllocator>;
 
 class UniqueBufBuilder : public BasicBufBuilder<UniqueBufferAllocator> {
 public:
@@ -618,6 +640,14 @@ public:
     StackBufBuilderBase(StackBufBuilderBase&&) = delete;
 };
 MONGO_STATIC_ASSERT(!std::is_move_constructible<StackBufBuilder>::value);
+
+// This extern template declaration must follow the declaration of
+// StackBufBuilderBase, and must come before the extern template
+// declarations of StringBuilder below. Do not remove or re-order
+// these lines w.r.t those StackBufBuilderBase or the other extern
+// template declarations without being sure that you are not undoing
+// the advantages of the extern template declaration.
+extern template class StackBufBuilderBase<StackSizeDefault>;
 
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
 template <typename Builder>
@@ -784,6 +814,12 @@ private:
     Builder _buf;
 };
 
+
+// The following extern template declaration must follow the
+// declaration of StringBuilderImpl and StackBufBuilderBase along with
+// the extern template delarations for that type. Do not remove or
+// re-order these lines w.r.t those types without being sure that you
+// are not undoing the advantages of the extern template declaration.
 extern template class StringBuilderImpl<BufBuilder>;
 extern template class StringBuilderImpl<StackBufBuilderBase<StackSizeDefault>>;
 
