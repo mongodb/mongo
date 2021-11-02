@@ -12,6 +12,11 @@
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});
 

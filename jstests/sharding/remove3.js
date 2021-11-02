@@ -2,6 +2,11 @@
 (function() {
 'use strict';
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 var st = new ShardingTest({name: "remove_shard3", shards: 2, mongos: 2});
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));

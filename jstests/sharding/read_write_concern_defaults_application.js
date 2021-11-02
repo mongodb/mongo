@@ -35,6 +35,11 @@ load('jstests/libs/profiler.js');
 load("jstests/libs/logv2_helpers.js");
 load('jstests/sharding/libs/last_lts_mongod_commands.js');
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 let db = "test";
 let coll = "foo";
 let nss = db + "." + coll;

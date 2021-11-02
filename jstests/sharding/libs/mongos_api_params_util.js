@@ -11,6 +11,11 @@ let MongosAPIParametersUtil = (function() {
     load('jstests/sharding/libs/sharded_transactions_helpers.js');
     load('jstests/libs/auto_retry_transaction_in_sharding.js');
 
+    // TODO SERVER-50144 Remove this and allow orphan checking.
+    // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+    // therefore preventing orphans from being cleaned up.
+    TestData.skipCheckOrphans = true;
+
     function validateTestCase(testCase) {
         assert(testCase.skip || testCase.run,
                "must specify exactly one of 'skip' or 'run' for test case " + tojson(testCase));

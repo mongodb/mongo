@@ -13,6 +13,11 @@
 
 load('jstests/replsets/rslib.js');
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 const expectedDocs = 1000;
 const dbName = 'test';
 const collName = 'foo';

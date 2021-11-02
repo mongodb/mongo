@@ -15,6 +15,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 load("jstests/replsets/rslib.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 function seedString(replTest) {
     var members = replTest.getReplSetConfig().members.map(function(elem) {
         return elem.host;

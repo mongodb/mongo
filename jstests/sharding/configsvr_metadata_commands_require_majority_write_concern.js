@@ -7,6 +7,11 @@
 (function() {
 'use strict';
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

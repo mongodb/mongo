@@ -2,6 +2,11 @@
 (function() {
 'use strict';
 
+// TODO SERVER-50144 Remove this and allow orphan checking.
+// This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
+// therefore preventing orphans from being cleaned up.
+TestData.skipCheckOrphans = true;
+
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 // We need the balancer to remove a shard.
