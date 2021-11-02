@@ -1325,6 +1325,12 @@ public:
     const char* getOpName() const final;
     boost::intrusive_ptr<Expression> optimize() final;
 
+    static boost::intrusive_ptr<Expression> create(
+        ExpressionContext* expCtx,
+        boost::intrusive_ptr<Expression> ifExp,
+        boost::intrusive_ptr<Expression> elseExpr,
+        boost::intrusive_ptr<Expression> thenExpr = nullptr);
+
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
@@ -2202,6 +2208,13 @@ public:
 
 class ExpressionMap final : public Expression {
 public:
+    ExpressionMap(
+        ExpressionContext* expCtx,
+        const std::string& varName,              // name of variable to set
+        Variables::Id varId,                     // id of variable to set
+        boost::intrusive_ptr<Expression> input,  // yields array to iterate
+        boost::intrusive_ptr<Expression> each);  // yields results to be added to output array
+
     boost::intrusive_ptr<Expression> optimize() final;
     Value serialize(bool explain) const final;
     Value evaluate(const Document& root, Variables* variables) const final;
@@ -2225,13 +2238,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionMap(
-        ExpressionContext* expCtx,
-        const std::string& varName,              // name of variable to set
-        Variables::Id varId,                     // id of variable to set
-        boost::intrusive_ptr<Expression> input,  // yields array to iterate
-        boost::intrusive_ptr<Expression> each);  // yields results to be added to output array
-
     std::string _varName;
     Variables::Id _varId;
     boost::intrusive_ptr<Expression>& _input;

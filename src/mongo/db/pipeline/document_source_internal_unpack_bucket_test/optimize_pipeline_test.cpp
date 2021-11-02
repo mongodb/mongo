@@ -58,8 +58,10 @@ TEST_F(OptimizePipeline, MixedMatchPushedDown) {
 
     // We should push down the $match on the metaField and the predicates on the control field.
     // The created $match stages should be added before $_internalUnpackBucket and merged.
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
-                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}},"
+                               "{$or: [ {'control.min.a': {$_internalExprLte: 4}},"
+                               "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ] } ] } } ] }]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
@@ -98,7 +100,9 @@ TEST_F(OptimizePipeline, MixedMatchOnlyControlPredicatesPushedDown) {
     // able to map the predicate on 'x' to a predicate on the control field.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(3u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {'control.min.x': {$_internalExprLte: 1}}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$or: [ {'control.min.x': {$_internalExprLte: 1}},"
+                               "{$expr: {$ne: [ {$type: [ \"$control.min.x\" ]},"
+                               "{$type: [ \"$control.max.x\" ] } ] } } ] }}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(match, stages[2].getDocument().toBson());
@@ -141,8 +145,11 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
     // The created $match stages should be added before $_internalUnpackBucket and merged.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(3u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
-                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [ {meta: {$gte: 0}},"
+                               "{meta: {$lte: 5}},"
+                               "{$or: [ {'control.min.a': {$_internalExprLte: 4}},"
+                               "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
@@ -165,8 +172,11 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
     // The created $match stages should be added before $_internalUnpackBucket and merged.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(4u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$gte: 0}}, {meta: {$lte: 5}}, "
-                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [ { meta: { $gte: 0 } },"
+                               "{meta: { $lte: 5 } },"
+                               "{$or: [ { 'control.min.a': { $_internalExprLte: 4 } },"
+                               "{$expr: { $ne: [ {$type: [ \"$control.min.a\" ] },"
+                               "{$type: [ \"$control.max.a\" ] } ] } } ] }]}}"),
                       stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(unpack, stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
@@ -232,10 +242,11 @@ TEST_F(OptimizePipeline, SortThenMixedMatchPushedDown) {
     // We should push down both the $sort and parts of the $match.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(4u, serialized.size());
-    ASSERT_BSONOBJ_EQ(
-        fromjson(
-            "{$match: {$and: [{meta: {$eq: 'abc'}}, {'control.max.a': {$_internalExprGte: 5}}]}}"),
-        serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$eq: 'abc'}},"
+                               "{$or: [ {'control.max.a': {$_internalExprGte: 5}},"
+                               "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.a\" ]},"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]} ]}}"),
+                      serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[1]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[2]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$gte: 5}}}"), serialized[3]);
@@ -295,10 +306,11 @@ TEST_F(OptimizePipeline, MixedMatchThenProjectPushedDown) {
     // We can push down part of the $match and use dependency analysis on the end of the pipeline.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(4u, stages.size());
-    ASSERT_BSONOBJ_EQ(
-        fromjson(
-            "{$match: {$and: [{meta: {$eq: 'abc'}}, {'control.min.a': {$_internalExprLte: 4}}]}}"),
-        stages[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$eq: 'abc'}},"
+                               "{$or: [ {'control.min.a': { $_internalExprLte: 4 } },"
+                               "{$expr: { $ne: [ {$type: [ \"$control.min.a\" ] },"
+                               "{$type: [ \"$control.max.a\" ] } ] } } ] } ]}}"),
+                      stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'a', 'x'], timeField: "
                                "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       stages[1].getDocument().toBson());
@@ -342,10 +354,11 @@ TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
     // We should push down part of the $match and do dependency analysis on the rest.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(4u, stages.size());
-    ASSERT_BSONOBJ_EQ(
-        fromjson(
-            "{$match: {$and: [{meta: {$eq: 'abc'}}, {'control.min.a': {$_internalExprLte: 4}}]}}"),
-        stages[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{meta: {$eq: \"abc\"}},"
+                               "{$or: [ {'control.min.a': {$_internalExprLte: 4}},"
+                               "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ] },"
+                               "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}}"),
+                      stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(
         fromjson("{$_internalUnpackBucket: { include: ['_id', 'a', 'x', 'myMeta'], timeField: "
                  "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
@@ -372,9 +385,14 @@ TEST_F(OptimizePipeline, ProjectWithRenameThenMixedMatchPushedDown) {
     // We should push down part of the $match and do dependency analysis on the end of the pipeline.
     auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(4u, stages.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{'control.max.y': {$_internalExprGte: 'abc'}}, "
-                               "{'control.min.a': {$_internalExprLte: 4}}]}}"),
-                      stages[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$match: {$and: [{$or: [ {'control.max.y': {$_internalExprGte: \"abc\"}},"
+                 "{$expr: {$ne: [ {$type: [ \"$control.min.y\" ]},"
+                 "{$type: [ \"$control.max.y\" ]} ]}} ]},"
+                 "{$or: [ {'control.min.a': {$_internalExprLte: 4}},"
+                 "{$expr: {$ne: [ {$type: [ \"$control.min.a\" ] },"
+                 "{$type: [ \"$control.max.a\" ]} ]}} ]} ]}}"),
+        stages[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'a', 'y'], timeField: "
                                "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       stages[1].getDocument().toBson());

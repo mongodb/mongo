@@ -1041,6 +1041,19 @@ boost::intrusive_ptr<Expression> ExpressionCond::optimize() {
     return this;
 }
 
+boost::intrusive_ptr<Expression> ExpressionCond::create(ExpressionContext* const expCtx,
+                                                        boost::intrusive_ptr<Expression> ifExp,
+                                                        boost::intrusive_ptr<Expression> elseExpr,
+                                                        boost::intrusive_ptr<Expression> thenExpr) {
+    intrusive_ptr<ExpressionCond> ret = new ExpressionCond(expCtx);
+    ret->_children.resize(3);
+
+    ret->_children[0] = ifExp;
+    ret->_children[1] = elseExpr;
+    ret->_children[2] = thenExpr;
+    return ret;
+}
+
 intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vps) {

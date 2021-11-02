@@ -182,6 +182,8 @@ TEST(InternalExprComparisonMatchExpression, CorrectlyComparesNaN) {
     }
 }
 
+// Note we depend on this for our ability to rewrite predicates on timeseries collections where the
+// buckets have mixed types.
 TEST(InternalExprComparisonMatchExpression, AlwaysReturnsTrueWithLeafArrays) {
     BSONObj operand = BSON("x" << 2);
     {
