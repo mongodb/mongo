@@ -33,6 +33,7 @@ class WTPerfConfig:
                  wtperf_path: str,
                  home_dir: str,
                  test: str,
+                 arg_file: str = None,
                  environment: str = None,
                  run_max: int = 1,
                  verbose: bool = False,
@@ -41,6 +42,7 @@ class WTPerfConfig:
         self.wtperf_path: str = wtperf_path
         self.home_dir: str = home_dir
         self.test: str = test
+        self.arg_file = arg_file
         self.environment: str = environment
         self.run_max: int = run_max
         self.verbose: bool = verbose
@@ -50,6 +52,7 @@ class WTPerfConfig:
     def to_value_dict(self):
         as_dict = {'wt_perf_path': self.wtperf_path,
                    'test': self.test,
+                   'arg_file': self.arg_file,
                    'home_dir': self.home_dir,
                    'environment': self.environment,
                    'run_max': self.run_max,

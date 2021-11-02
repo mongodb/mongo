@@ -605,8 +605,8 @@ functions:
           ${pip3_binary} install psutil pygit2
           JSON_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'" } }'
           echo "JSON_TASK_INFO: $JSON_TASK_INFO"
-          ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out.json
-          ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json
+          ${test_env_vars|} ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out.json ${wtarg}
+          ${test_env_vars|} ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json ${wtarg}
 
     - command: shell.exec
       params:
@@ -2959,54 +2959,66 @@ tasks:
     #############################
 
   - name: perf-test-small-lsm
+    tags: ["lsm-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: small-lsm
           maxruns: 3
 
   - name: perf-test-medium-lsm
+    tags: ["lsm-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: medium-lsm
           maxruns: 1
 
   - name: perf-test-medium-lsm-compact
+    tags: ["lsm-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: medium-lsm-compact
           maxruns: 1
 
   - name: perf-test-medium-multi-lsm
+    tags: ["lsm-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: medium-multi-lsm
           maxruns: 1
 
   - name: perf-test-parallel-pop-lsm
+    tags: ["lsm-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: parallel-pop-lsm
           maxruns: 1
 
   - name: perf-test-update-lsm
+    tags: ["lsm-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: update-lsm
@@ -3017,39 +3029,114 @@ tasks:
     ###############################
 
   - name: perf-test-small-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: small-btree
           maxruns: 1
 
   - name: perf-test-small-btree-backup
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: small-btree-backup
           maxruns: 1
 
   - name: perf-test-medium-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: medium-btree
           maxruns: 3
 
   - name: perf-test-medium-btree-backup
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
     commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
+      - func: "fetch artifacts"
       - func: "generic-perf-test"
         vars:
           perf-test-name: medium-btree-backup
+          maxruns: 3
+
+  - name: perf-test-parallel-pop-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: parallel-pop-btree
+          maxruns: 1
+
+  - name: perf-test-update-only-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: update-only-btree
+          maxruns: 3
+
+  - name: perf-test-update-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: update-btree
+          maxruns: 1
+          wtarg: "-a ../runners/update-btree.json"
+
+  - name: perf-test-update-large-record-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: update-large-record-btree
+          maxruns: 3
+
+  - name: perf-test-modify-large-record-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: modify-large-record-btree
+          maxruns: 3
+
+  - name: perf-test-modify-force-update-large-record-btree
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "generic-perf-test"
+        vars:
+          perf-test-name: modify-force-update-large-record-btree
           maxruns: 3
 
 #######################################
@@ -3309,8 +3396,18 @@ buildvariants:
   run_on:
     - ubuntu2004-large
   expansions:
-    test_env_vars: LD_LIBRARY_PATH=$(pwd) WT_BUILDDIR=$(pwd)
-    posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake -DCMAKE_C_FLAGS="-ggdb" -DHAVE_DIAGNOSTIC=1 -DENABLE_ZLIB=1  -DENABLE_SNAPPY=1 -DENABLE_STRICT=1 -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
+    test_env_vars:
+      top_dir=$(git rev-parse --show-toplevel)
+      top_builddir=$top_dir/cmake_build
+      LD_LIBRARY_PATH=$top_builddir/test/utility/:$top_builddir
+    posix_configure_flags:
+      -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
+      -DCMAKE_C_FLAGS="-ggdb"
+      -DHAVE_DIAGNOSTIC=1
+      -DENABLE_ZLIB=1
+      -DENABLE_SNAPPY=1
+      -DENABLE_STRICT=1
+      -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     pip3_binary: '/opt/mongodbtoolchain/v3/bin/pip3'
     virtualenv_binary: '/opt/mongodbtoolchain/v3/bin/virtualenv'
@@ -3319,19 +3416,16 @@ buildvariants:
     make_command: ninja
     is_cmake_build: true
   tasks:
-    # btree tests
-    - name: perf-test-small-btree
-    - name: perf-test-small-btree-backup
-    - name: perf-test-medium-btree
-    - name: perf-test-medium-btree-backup
-    # lsm tests
-    - name: perf-test-small-lsm
-    - name: perf-test-medium-lsm
-    - name: perf-test-medium-lsm-compact
-    - name: perf-test-medium-multi-lsm
-    - name: perf-test-parallel-pop-lsm
-    - name: perf-test-update-lsm
-
+    - name: compile
+    - name: ".btree-perf"
+    - name: ".lsm-perf"
+  display_tasks:
+    - name: Wiredtiger-perf-btree-jobs
+      execution_tasks:
+      - ".btree-perf"
+    - name: Wiredtiger-perf-lsm-jobs
+      execution_tasks:
+      - ".lsm-perf"
 
 - name: large-scale-tests
   display_name: "Large scale tests"

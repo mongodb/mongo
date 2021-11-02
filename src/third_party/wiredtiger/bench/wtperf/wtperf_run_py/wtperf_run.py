@@ -48,8 +48,11 @@ from perf_stat_collection import PerfStatCollection
 test_stats_file = 'test.stat'
 
 
-def create_test_home_path(home: str, test_run: int):
-    return '{}_{}'.format(home, test_run)
+def create_test_home_path(home: str, test_run: int, operation: str):
+    home_path = "{}_{}".format(home, test_run)
+    if operation is not None: 
+        home_path += "_{}".format(operation)
+    return home_path
 
 
 def create_test_stat_path(test_home_path: str):
@@ -91,7 +94,7 @@ def get_git_info(git_working_tree_dir):
     return git_info
 
 
-def construct_wtperf_command_line(wtperf: str, env: str, test: str, home: str):
+def construct_wtperf_command_line(wtperf: str, env: str, test: str, home: str, argument: str):
     command_line = []
     if env is not None:
         command_line.append(env)
@@ -99,6 +102,8 @@ def construct_wtperf_command_line(wtperf: str, env: str, test: str, home: str):
     if test is not None:
         command_line.append('-O')
         command_line.append(test)
+    if argument is not None:
+        command_line.append(argument)
     if home is not None:
         command_line.append('-h')
         command_line.append(home)
@@ -134,23 +139,31 @@ def detailed_perf_stats(config: WTPerfConfig, perf_stats: PerfStatCollection):
     return as_dict
 
 
-def run_test(config: WTPerfConfig, test_run: int):
-    test_home = create_test_home_path(home=config.home_dir, test_run=test_run)
+def run_test_wrapper(config: WTPerfConfig, operation: str=None, argument: str=None):
+    for test_run in range(config.run_max):
+        print("Starting test  {}".format(test_run))
+        run_test(config=config, test_run=test_run, operation=operation, argument=argument)
+        print("Completed test {}".format(test_run))
+
+
+def run_test(config: WTPerfConfig, test_run: int, operation: str, argument:str):
+    test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operation=operation)
     command_line = construct_wtperf_command_line(
         wtperf=config.wtperf_path,
         env=config.environment,
+        argument=argument,
         test=config.test,
         home=test_home)
     subprocess.run(command_line)
 
 
-def process_results(config: WTPerfConfig, perf_stats: PerfStatCollection):
+def process_results(config: WTPerfConfig, perf_stats: PerfStatCollection, operation: str=None):
     for test_run in range(config.run_max):
-        test_home = create_test_home_path(home=config.home_dir, test_run=test_run)
+        test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operation=operation)
         test_stats_path = create_test_stat_path(test_home)
         if config.verbose:
             print('Reading test stats file: {}'.format(test_stats_path))
-        perf_stats.find_stats(test_stat_path=test_stats_path)
+        perf_stats.find_stats(test_stat_path=test_stats_path, operation=operation)
 
 
 def setup_perf_stats():
@@ -199,6 +212,7 @@ def main():
                         help='reuse and reanalyse results from previous tests rather than running tests again')
     parser.add_argument('-g', '--git_root', help='path of the Git working directory')
     parser.add_argument('-i', '--json_info', help='additional test information in a json format string')
+    parser.add_argument('-a', '--arg_file', help='additional wtperf arguments in a json format file')
     parser.add_argument('-v', '--verbose', action="store_true", help='be verbose')
     args = parser.parse_args()
 
@@ -206,16 +220,17 @@ def main():
         print('WTPerfPy')
         print('========')
         print("Configuration:")
-        print("  WtPerf path:   {}".format(args.wtperf))
-        print("  Environment:   {}".format(args.env))
-        print("  Test path:     {}".format(args.test))
-        print("  Home base:     {}".format(args.home))
-        print("  Git root:      {}".format(args.git_root))
-        print("  Outfile:       {}".format(args.outfile))
-        print("  Runmax:        {}".format(args.runmax))
-        print("  JSON info      {}".format(args.json_info))
-        print("  Reuse results: {}".format(args.reuse))
-        print("  Brief output:  {}".format(args.brief_output))
+        print("  WtPerf path:              {}".format(args.wtperf))
+        print("  Environment:              {}".format(args.env))
+        print("  Test path:                {}".format(args.test))
+        print("  Home base:                {}".format(args.home))
+        print("  Addition arguments(file): {}".format(args.arg_file))
+        print("  Git root:                 {}".format(args.git_root))
+        print("  Outfile:                  {}".format(args.outfile))
+        print("  Runmax:                   {}".format(args.runmax))
+        print("  JSON info                 {}".format(args.json_info))
+        print("  Reuse results:            {}".format(args.reuse))
+        print("  Brief output:             {}".format(args.brief_output))
 
     if args.wtperf is None:
         sys.exit('The path to the wtperf executable is required')
@@ -223,12 +238,15 @@ def main():
         sys.exit('The path to the test file is required')
     if args.home is None:
         sys.exit('The path to the "home" directory is required')
+    if args.arg_file and not os.path.isfile(args.arg_file):
+        sys.exit("arg_file: {} not found!".format(args.arg_file))
 
     json_info = json.loads(args.json_info) if args.json_info else {}
 
     config = WTPerfConfig(wtperf_path=args.wtperf,
                           home_dir=args.home,
                           test=args.test,
+                          arg_file=args.arg_file,
                           environment=args.env,
                           run_max=args.runmax,
                           verbose=args.verbose,
@@ -237,19 +255,34 @@ def main():
 
     perf_stats: PerfStatCollection = setup_perf_stats()
 
-    # Run tests (if we're not reusing results)
+    if config.arg_file:
+        if args.verbose:
+            print("Reading arguments file {}".format(config.arg_file))
+        with open(config.arg_file, "r") as file:
+            arg_file_contents = json.load(file)
+
+    # Run test
     if not args.reuse:
-        for test_run in range(args.runmax):
-            print("Starting test  {}".format(test_run))
-            run_test(config=config, test_run=test_run)
-            print("Completed test {}".format(test_run))
+        if config.arg_file:
+            for content in arg_file_contents:
+                if args.verbose:
+                    print("Argument: {},  Operation: {}".format(content["argument"], content["operation"]))
+                run_test_wrapper(config=config, operation=content["operation"], argument=content["argument"])
+        else:
+            run_test_wrapper(config=config)
 
     if not args.verbose and not args.outfile:
         sys.exit("Enable verbosity (or provide a file path) to dump the stats. "
                  "Try 'python3 wtperf_run.py --help' for more information.")
 
-    process_results(config, perf_stats)
+    # Process result
+    if config.arg_file:
+        for content in arg_file_contents:
+            process_results(config, perf_stats, operation=content["operation"])
+    else:
+        process_results(config, perf_stats)
 
+    # Output result
     if args.brief_output:
         if args.verbose:
             print("Brief stats output (Evergreen compatible format):")

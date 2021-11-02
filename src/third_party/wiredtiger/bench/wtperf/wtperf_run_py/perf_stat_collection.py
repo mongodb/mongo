@@ -47,12 +47,13 @@ class PerfStatCollection:
     def add_stat(self, perf_stat: PerfStat):
         self.perf_stats[perf_stat.short_label] = perf_stat
 
-    def find_stats(self, test_stat_path: str):
+    def find_stats(self, test_stat_path: str, operation: str):
         for stat in self.perf_stats.values():
-            value = find_stat(test_stat_path=test_stat_path,
-                              pattern=stat.pattern,
-                              position_of_value=stat.input_offset)
-            stat.add_value(value=value)
+            if operation is None or stat.short_label == operation:
+                value = find_stat(test_stat_path=test_stat_path,
+                                pattern=stat.pattern,
+                                position_of_value=stat.input_offset)
+                stat.add_value(value=value)
 
     def to_value_list(self, brief: bool):
         as_list = []
