@@ -175,7 +175,7 @@ public:
                 return;
             sleepFor(kSleepTime);
         }
-        ASSERT(false);
+        invariant(false);
     }
 
     static inline const Milliseconds kCheckTimeIncrement{100};
