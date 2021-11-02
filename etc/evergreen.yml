@@ -9848,6 +9848,7 @@ buildvariants:
     gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     exec_timeout_secs: 16200 # 4.5 hour timeout
+    timeout_secs: 9000 # 2.5 hour idle timeout
     use_scons_cache: false
   tasks:
     - name: compile_test_and_package_serial_TG
