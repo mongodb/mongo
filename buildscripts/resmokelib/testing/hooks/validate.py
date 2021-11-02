@@ -5,7 +5,7 @@ import os.path
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 
-class ValidateCollections(jsfile.DataConsistencyHook):
+class ValidateCollections(jsfile.PerClusterDataConsistencyHook):
     """Run full validation.
 
     This will run on all collections in all databases on every stand-alone

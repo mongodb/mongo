@@ -9,6 +9,7 @@ from buildscripts.resmokelib.testing.fixtures import cluster_to_cluster
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import cluster_to_cluster_data_consistency
 from buildscripts.resmokelib.testing.hooks import cluster_to_cluster_dummy_replicator
+from buildscripts.resmokelib.testing.hooks import dbhash
 
 
 class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-instance-attributes
@@ -60,8 +61,9 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         self.logger.info("Starting the cluster to cluster replicator.")
 
         # Set up the initial replication direction.
-        self._source_cluster = self._fixture.get_cluster0_fixture()
-        self._destination_cluster = self._fixture.get_cluster1_fixture()
+        clusters = self._fixture.get_independent_clusters()
+        self._source_cluster = clusters[0]
+        self._destination_cluster = clusters[1]
 
         self._shell_options["global_vars"]["TestData"][
             "sourceConnectionString"] = self._source_cluster.get_driver_connection_url()
@@ -92,6 +94,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
             self.logger.info("Stopped the cluster to cluster replicator.")
 
             self._run_data_consistency_check(self._last_test, test_report)
+            self._run_check_repl_db_hash(self._last_test, test_report)
 
     def before_test(self, test, test_report):
         """Before test."""
@@ -118,6 +121,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
             self.logger.info("Paused the cluster to cluster replicator.")
 
             self._run_data_consistency_check(test, test_report)
+            self._run_check_repl_db_hash(test, test_report)
 
     def _run_data_consistency_check(self, test, test_report):
         """Run the data consistency check across both clusters."""
@@ -127,3 +131,11 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         data_consistency.before_test(test, test_report)
         data_consistency.after_test(test, test_report)
         data_consistency.after_suite(test_report)
+
+    def _run_check_repl_db_hash(self, test, test_report):
+        """Check the repl DB hash on each cluster."""
+        check_db_hash = dbhash.CheckReplDBHash(self.logger, self._fixture)
+        check_db_hash.before_suite(test_report)
+        check_db_hash.before_test(test, test_report)
+        check_db_hash.after_test(test, test_report)
+        check_db_hash.after_suite(test_report)
