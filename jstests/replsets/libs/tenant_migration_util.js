@@ -37,7 +37,7 @@ var TenantMigrationUtil = (function() {
      */
     function donorStartMigrationWithProtocol(cmd, db) {
         // If we don't pass "protocol", the server uses "multitenant migrations" by default.
-        if (isShardMergeEnabled(db)) {
+        if (cmd['protocol'] === undefined && isShardMergeEnabled(db)) {
             return Object.assign(Object.assign({}, cmd), {protocol: "shard merge"});
         }
 

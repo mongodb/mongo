@@ -36,6 +36,7 @@ global:
 imports:
   - "mongo/client/read_preference_setting.idl"
   - "mongo/db/repl/tenant_migration_pem_payload.idl"
+  - "mongo/db/serverless/serverless_types.idl"
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
   - "mongo/db/repl/replication_types.idl"
@@ -68,6 +69,7 @@ structs:
             The prefix from which the migrating database will be matched. The prefixes 'admin',
             'local', 'config', the empty string, are not allowed.
           type: string
+          default: '""'
           validator:
             callback: "tenant_migration_util::validateDatabasePrefix"
         readPreference:
@@ -81,6 +83,12 @@ structs:
           type: TenantMigrationPEMPayload
           # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
           optional: true
+        protocol:
+          description: "Which migration protocol to use, default 'multitenant migrations'."
+          type: MigrationProtocol
+          optional: true
+          validator:
+            callback: "tenant_migration_util::validateProtocolFCVCompatibility"
 
 commands:
   recipientSyncData:

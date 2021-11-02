@@ -305,6 +305,7 @@ TenantMigrationRecipientService::Instance::Instance(
       _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
                                                         stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
+      _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
@@ -407,7 +408,7 @@ Status TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(stateDoc.getId() == _migrationUuid);
 
-    if (stateDoc.getTenantId() == _tenantId &&
+    if (stateDoc.getProtocol() == _protocol && stateDoc.getTenantId() == _tenantId &&
         stateDoc.getDonorConnectionString() == _donorConnectionString &&
         stateDoc.getReadPreference().equals(_readPreference) &&
         stateDoc.getRecipientCertificateForDonor() == _recipientCertificateForDonor) {
@@ -1938,6 +1939,33 @@ void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() c
     }
 }
 
+bool TenantMigrationRecipientService::Instance::_checkifProtocolRemainsFCVCompatible() {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    // Ensure that the on-disk protocol and cached value remains the same.
+    invariant(!_stateDoc.getProtocol() || _stateDoc.getProtocol().value() == getProtocol());
+
+    auto isAtleastFCV52AtStart = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+        multiversion::FeatureCompatibilityVersion::kVersion_5_2);
+    if (isAtleastFCV52AtStart) {
+        // When the instance is started using state doc < 5.2 FCV format, _stateDoc._protocol field
+        // won't be set. In that case, the cached value Instance::_protocol will be set to
+        // "kMultitenantMigrations".
+        return true;
+    }
+
+    if (getProtocol() == MigrationProtocolEnum::kShardMerge) {
+        LOGV2(5949504,
+              "Must abort tenant migration as 'Merge' protocol is not supported for FCV "
+              "below 5.2");
+        return false;
+    }
+    // For backward compatibility, ensure that the 'protocol' field is not set in the
+    // document.
+    _stateDoc.setProtocol(boost::none);
+    return true;
+}
+
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -1955,16 +1983,29 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
 
     bool cancelWhenDurable = false;
+    auto isFCVUpgradingOrDowngrading = [&]() -> bool {
+        // We must abort the migration if we try to start or resume while upgrading or downgrading.
+        // We defer this until after the state doc is persisted in a started so as to make sure it
+        // it safe to abort and forget the migration. (Generic FCV reference): This FCV check should
+        // exist across LTS binary versions.
+        if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+            LOGV2(5356304, "Must abort tenant migration as recipient is upgrading or downgrading");
+            return true;
+        }
+        return false;
+    };
 
-    // We must abort the migration if we try to start or resume while upgrading or downgrading.
-    // We defer this until after the state doc is persisted in a started so as to make sure it it
-    // safe to abort and forget the migration.
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
-        LOGV2(5356304, "Must abort tenant migration as recipient is upgrading or downgrading");
+    // Tenant migrations gets aborted on FCV upgrading or downgrading state. But,
+    // due to race between between Instance::getOrCreate() and
+    // SetFeatureCompatibilityVersionCommand::_cancelTenantMigrations(), we might miss aborting this
+    // tenant migration and FCV might have updated or downgraded at this point. So, need to ensure
+    // that the protocol is still compatible with FCV.
+    if (isFCVUpgradingOrDowngrading() || !_checkifProtocolRemainsFCVCompatible()) {
         cancelWhenDurable = true;
     }
 
+    // Any FCV changes after this point will abort this migration.
+    //
     // The 'AsyncTry' is run on the cleanup executor as opposed to the scoped executor  as we rely
     // on the 'PrimaryService' to interrupt the operation contexts based on thread pool and not the
     // executor.
@@ -2460,6 +2501,10 @@ const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const 
 
 const std::string& TenantMigrationRecipientService::Instance::getTenantId() const {
     return _tenantId;
+}
+
+const MigrationProtocolEnum& TenantMigrationRecipientService::Instance::getProtocol() const {
+    return _protocol;
 }
 
 }  // namespace repl

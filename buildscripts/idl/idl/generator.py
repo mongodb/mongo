@@ -230,24 +230,15 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         with writer.IndentedScopedBlock(self._writer, 'if (MONGO_unlikely(!usedFields.all())) {',
                                         '}'):
             for field in self._fields:
-                if (not field.optional) and (not field.ignore):
+                # If 'field.default' is true, the fields(members) gets initialized with the default
+                # value in the class definition. So, it's ok to skip setting the field to
+                # default value here.
+                if (not field.optional) and (not field.ignore) and (not field.default):
                     with writer.IndentedScopedBlock(
                             self._writer,
                             'if (!usedFields[%s]) {' % (_gen_field_usage_constant(field)), '}'):
-                        if field.default:
-                            default_value = (field.type.cpp_type + "::" + field.default) \
-                                if field.type.is_enum else field.default
-                            if field.chained_struct_field:
-                                self._writer.write_line(
-                                    '%s.%s(%s);' %
-                                    (_get_field_member_name(field.chained_struct_field),
-                                     _get_field_member_setter_name(field), default_value))
-                            else:
-                                self._writer.write_line(
-                                    '%s = %s;' % (_get_field_member_name(field), default_value))
-                        else:
-                            self._writer.write_line(
-                                'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
+                        self._writer.write_line(
+                            'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
 
 
 class _SlowFieldUsageChecker(_FastFieldUsageChecker):
