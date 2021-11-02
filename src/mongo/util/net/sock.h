@@ -109,12 +109,12 @@ public:
      *  an error, or due to a timeout on connection, or due to the system socket deciding the
      *  socket is invalid.
      */
-    bool connect(SockAddr& remote, Milliseconds connectTimeoutMillis);
+    bool connect(const SockAddr& remote, Milliseconds connectTimeoutMillis);
 
     /**
      * Connect using a default connect timeout of min(_timeout * 1000, kMaxConnectTimeoutMS)
      */
-    bool connect(SockAddr& remote);
+    bool connect(const SockAddr& remote);
 
     void close();
     void send(const char* data, int len, const char* context);
