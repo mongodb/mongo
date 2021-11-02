@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/db/process_health/fault_manager.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
+#include "mongo/db/process_health/health_observer.h"
 
-#include "mongo/db/process_health/fault_manager_test_suite.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-namespace process_health {
-
-using test::FaultManagerTest;
-using test::FaultManagerTestImpl;
-
-namespace {
-
-TEST(FaultManagerTest, Registration) {
-    auto serviceCtx = ServiceContext::make();
-    ASSERT_TRUE(FaultManager::get(serviceCtx.get()));
+Status HealthMonitoringIntensitiesServerParameter::setFromString(const std::string& value) {
+    *_data = HealthObserverIntensities::parse(
+        IDLParserErrorContext("health monitoring intensities"), fromjson(value));
+    return Status::OK();
 }
 
-// Tests the default health observer intensity of non-critical
-TEST_F(FaultManagerTest, GetHealthObserverIntensity) {
-    auto config = manager().getConfig();
-    ASSERT(config->getHealthObserverIntensity(FaultFacetType::kLdap) ==
-           HealthObserverIntensityEnum::kNonCritical);
-    ASSERT(config->getHealthObserverIntensity(FaultFacetType::kDns) ==
-           HealthObserverIntensityEnum::kNonCritical);
+Status HealthMonitoringIntensitiesServerParameter::set(const BSONElement& newValueElement) {
+    *_data = HealthObserverIntensities::parse(
+        IDLParserErrorContext("health monitoring intensities"), newValueElement.Obj());
+    return Status::OK();
 }
 
-}  // namespace
-}  // namespace process_health
+void HealthMonitoringIntensitiesServerParameter::append(OperationContext*,
+                                                        BSONObjBuilder& b,
+                                                        const std::string& name) {
+    _data->serialize(&b);
+}
+
 }  // namespace mongo

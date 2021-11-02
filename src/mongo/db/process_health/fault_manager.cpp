@@ -260,7 +260,8 @@ bool FaultManager::hasCriticalFacet(const FaultInternal* fault) const {
     const auto& facets = fault->getFacets();
     for (const auto& facet : facets) {
         auto facetType = facet->getType();
-        if (_config->getHealthObserverIntensity(facetType) == HealthObserverIntensity::kCritical)
+        if (_config->getHealthObserverIntensity(facetType) ==
+            HealthObserverIntensityEnum::kCritical)
             return true;
     }
     return false;

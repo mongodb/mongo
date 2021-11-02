@@ -226,7 +226,7 @@ TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeout) {
     waitForTransitionIntoState(FaultState::kTransientFault);
     ASSERT_TRUE(manager().getFaultState() == FaultState::kTransientFault);
     advanceTime(manager().getConfig()->getActiveFaultDuration() + Milliseconds(1));
-    assertSoon([this]() { return manager().getFaultState() == FaultState::kActiveFault; });
+    waitForTransitionIntoState(FaultState::kActiveFault);
 }
 
 TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {

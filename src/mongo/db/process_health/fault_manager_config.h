@@ -30,8 +30,10 @@
 
 #include <ostream>
 
+#include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/duration.h"
+
 
 namespace mongo {
 namespace process_health {
@@ -75,13 +77,26 @@ enum class HealthObserverIntensity {
 /**
  * Types of health observers available.
  */
-enum class FaultFacetType { kMock1 = 0, kMock2, kLdap };
+enum class FaultFacetType { kMock1 = 0, kMock2, kLdap, kDns };
 
 
 class FaultManagerConfig {
 public:
-    HealthObserverIntensity getHealthObserverIntensity(FaultFacetType type) {
-        return HealthObserverIntensity::kCritical;
+    HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) {
+        auto intensities = getHealthObserverIntensities();
+        switch (type) {
+            case FaultFacetType::kLdap:
+                return intensities->_data->getLdap();
+            case FaultFacetType::kDns:
+                return intensities->_data->getDns();
+            // TODO: update this function with additional fault facets when they are added
+            case FaultFacetType::kMock1:
+                return HealthObserverIntensityEnum::kCritical;
+            case FaultFacetType::kMock2:
+                return HealthObserverIntensityEnum::kCritical;
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
     Milliseconds getActiveFaultDuration() {
         return kActiveFaultDuration;
@@ -91,6 +106,12 @@ protected:
     // If the server persists in TransientFault for more than this duration
     // it will move to the ActiveFault state and terminate.
     static inline const auto kActiveFaultDuration = Seconds(120);
+
+private:
+    static HealthMonitoringIntensitiesServerParameter* getHealthObserverIntensities() {
+        return ServerParameterSet::getGlobal()->get<HealthMonitoringIntensitiesServerParameter>(
+            "healthMonitoring");
+    }
 };
 
 }  // namespace process_health

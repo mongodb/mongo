@@ -34,6 +34,7 @@
 #include "mongo/db/process_health/fault_facet.h"
 #include "mongo/db/process_health/fault_facet_container.h"
 #include "mongo/db/process_health/fault_manager_config.h"
+#include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/process_health/health_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
