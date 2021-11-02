@@ -3,6 +3,7 @@
  * non-internal client while in the critical section.
  *
  * @tags: [
+ *   does_not_support_stepdowns
  * ]
  */
 (function() {
