@@ -411,7 +411,7 @@ def make_argument_parser(parser=None, **kwargs):
     parser.add_argument('--input-format', choices=['classic', 'thin'], default='classic')
     parser.add_argument('--output-format', choices=['classic', 'json'], default='classic',
                         help='"json" shows some extra information')
-    parser.add_argument('--debug-file-resolver', choices=['path', 's3'], default='path')
+    parser.add_argument('--debug-file-resolver', choices=['path', 's3', 'pr'], default='path')
     parser.add_argument('--src-dir-to-move', action="store", type=str, default=None,
                         help="Specify a src dir to move to /data/mci/{original_buildid}/src")
 
@@ -421,7 +421,9 @@ def make_argument_parser(parser=None, **kwargs):
     s3_group.add_argument('--s3-bucket')
 
     pr_group = parser.add_argument_group(
-        'path resolver options', description='Options used with \'--debug-file-resolver pr\'')
+        'Path Resolver options (Path Resolver uses a special web service to retrieve URL of debug symbols file for '
+        'a given BuildID), we use "pr" as a shorter/easier name for this',
+        description='Options used with \'--debug-file-resolver pr\'')
     pr_group.add_argument('--pr-host', default='',
                           help='URL of web service running the API to get debug symbol URL')
     pr_group.add_argument('--pr-cache-dir', default='',
