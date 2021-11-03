@@ -37,11 +37,11 @@
 namespace mongo {
 namespace process_health {
 
-HealthObserverBase::HealthObserverBase(ClockSource* clockSource, TickSource* tickSource)
-    : _clockSource(clockSource), _tickSource(tickSource) {}
+HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
 
 void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
-                                       std::shared_ptr<executor::TaskExecutor> taskExecutor) {
+                                       std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                                       CancellationToken token) {
     // TODO(SERVER-59368): fix this for runtime options support.
     if (getIntensity() == HealthObserverIntensity::kOff) {
         return;
@@ -53,10 +53,11 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
             return;
         }
 
-        if (_clockSource->now() - _lastTimeTheCheckWasRun < minimalCheckInterval()) {
+        const auto now = _svcCtx->getPreciseClockSource()->now();
+        if (now - _lastTimeTheCheckWasRun < minimalCheckInterval()) {
             return;
         }
-        _lastTimeTheCheckWasRun = _clockSource->now();
+        _lastTimeTheCheckWasRun = now;
 
         LOGV2_DEBUG(6007902, 2, "Start periodic health check", "observerType"_attr = getType());
 
@@ -64,10 +65,17 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
     }
 
     // Do the health check.
-    taskExecutor->schedule([this, &factory](Status status) {
-        periodicCheckImpl({})
+    taskExecutor->schedule([this, &factory, token, taskExecutor](Status status) {
+        periodicCheckImpl({token, taskExecutor})
             .then([this, &factory](HealthCheckStatus&& checkStatus) mutable {
+                const auto severity = checkStatus.getSeverity();
                 factory.updateWithCheckStatus(std::move(checkStatus));
+
+                auto lk = stdx::lock_guard(_mutex);
+                ++_completedChecksCount;
+                if (!HealthCheckStatus::isResolved(severity)) {
+                    ++_completedChecksWithFaultCount;
+                }
             })
             .onCompletion([this](Status status) {
                 if (!status.isOK()) {
@@ -75,15 +83,17 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
                     LOGV2_ERROR(
                         6007901, "Unexpected failure during health check", "status"_attr = status);
                 }
+                const auto now = _svcCtx->getPreciseClockSource()->now();
                 auto lk = stdx::lock_guard(_mutex);
                 invariant(_currentlyRunningHealthCheck);
                 _currentlyRunningHealthCheck = false;
+                _lastTimeCheckCompleted = now;
             })
             .getAsync([this](Status status) {});
     });
 }
 
-HealthObserverIntensity HealthObserverBase::getIntensity() {
+HealthObserverIntensity HealthObserverBase::getIntensity() const {
     return _intensity;
 }
 
@@ -105,6 +115,22 @@ HealthCheckStatus HealthObserverBase::makeSimpleFailedStatus(double severity,
     }
 
     return HealthCheckStatus(getType(), severity, sb.stringData());
+}
+
+HealthObserverLivenessStats HealthObserverBase::getStats() const {
+    auto lk = stdx::lock_guard(_mutex);
+    return getStatsLocked(lk);
+}
+
+HealthObserverLivenessStats HealthObserverBase::getStatsLocked(WithLock) const {
+    HealthObserverLivenessStats stats;
+    stats.isEnabled = _intensity != HealthObserverIntensity::kOff;
+    stats.currentlyRunningHealthCheck = _currentlyRunningHealthCheck;
+    stats.lastTimeCheckStarted = _lastTimeTheCheckWasRun;
+    stats.lastTimeCheckCompleted = _lastTimeCheckCompleted;
+    stats.completedChecksCount = _completedChecksCount;
+    stats.completedChecksWithFaultCount = _completedChecksWithFaultCount;
+    return stats;
 }
 
 }  // namespace process_health

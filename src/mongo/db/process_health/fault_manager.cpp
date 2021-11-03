@@ -45,6 +45,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -71,9 +72,6 @@ ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     }};
 
 }  // namespace
-
-
-static constexpr auto kPeriodicHealthCheckInterval{Milliseconds(50)};
 
 FaultManager* FaultManager::get(ServiceContext* svcCtx) {
     return sFaultManager(svcCtx).get();
@@ -112,16 +110,33 @@ FaultManager::TransientFaultDeadline::~TransientFaultDeadline() {
 FaultManager::FaultManager(ServiceContext* svcCtx,
                            std::shared_ptr<executor::TaskExecutor> taskExecutor,
                            std::unique_ptr<FaultManagerConfig> config)
-    : _config(std::move(config)), _svcCtx(svcCtx), _taskExecutor(taskExecutor) {
+    : _config(std::move(config)),
+      _svcCtx(svcCtx),
+      _taskExecutor(taskExecutor),
+      _crashCb([](std::string cause) {
+          LOGV2_ERROR(5936605,
+                      "Fault manager progress monitor is terminating the server",
+                      "cause"_attr = cause);
+          // This calls the exit_group syscall on Linux
+          ::_exit(ExitCode::EXIT_PROCESS_HEALTH_CHECK);
+      }) {
     invariant(_svcCtx);
     invariant(_svcCtx->getFastClockSource());
+    invariant(_svcCtx->getPreciseClockSource());
 }
+
+FaultManager::FaultManager(ServiceContext* svcCtx,
+                           std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                           std::unique_ptr<FaultManagerConfig> config,
+                           std::function<void(std::string cause)> crashCb)
+    : _config(std::move(config)), _svcCtx(svcCtx), _taskExecutor(taskExecutor), _crashCb(crashCb) {}
 
 void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
     if (!feature_flags::gFeatureFlagHealthMonitoring) {
         return;
     }
 
+    const auto kPeriodicHealthCheckInterval = getConfig().getPeriodicHealthCheckInterval();
     auto lk = stdx::lock_guard(_mutex);
 
     const auto cb = [this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
@@ -143,12 +158,23 @@ void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
 }
 
 FaultManager::~FaultManager() {
+    _managerShuttingDownCancellationSource.cancel();
     _taskExecutor->shutdown();
+
+    LOGV2(5936601, "Shutting down periodic health checks");
     if (_periodicHealthCheckCbHandle) {
         _taskExecutor->cancel(*_periodicHealthCheckCbHandle);
     }
 
+    // All health checks must use the _taskExecutor, joining it
+    // should guarantee that health checks are done. Hovewer, if a health
+    // check is stuck in some blocking call the _progressMonitorThread will
+    // kill the process after timeout.
     _taskExecutor->join();
+    // Must be joined after _taskExecutor.
+    if (_progressMonitor) {
+        _progressMonitor->join();
+    }
 
     if (!_initialHealthCheckCompletedPromise.getFuture().isReady()) {
         _initialHealthCheckCompletedPromise.emplaceValue();
@@ -197,15 +223,16 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
 
 void FaultManager::healthCheck() {
     // One time init.
-    _initHealthObserversIfNeeded();
+    _firstTimeInitIfNeeded();
 
     ON_BLOCK_EXIT([this] { schedulePeriodicHealthCheckThread(); });
 
     std::vector<HealthObserver*> observers = FaultManager::getHealthObservers();
 
     // Start checks outside of lock.
+    auto token = _managerShuttingDownCancellationSource.token();
     for (auto observer : observers) {
-        observer->periodicCheck(*this, _taskExecutor);
+        observer->periodicCheck(*this, _taskExecutor, token);
     }
 
     // Garbage collect all resolved fault facets.
@@ -268,6 +295,11 @@ bool FaultManager::hasCriticalFacet(const FaultInternal* fault) const {
             return true;
     }
     return false;
+}
+
+FaultManagerConfig FaultManager::getConfig() const {
+    auto lk = stdx::lock_guard(_mutex);
+    return *_config;
 }
 
 void FaultManager::processFaultExistsEvent() {
@@ -344,20 +376,19 @@ void FaultManager::transitionToState(FaultState newState) {
     _currentState = newState;
 }
 
-void FaultManager::_initHealthObserversIfNeeded() {
-    if (_initializedAllHealthObservers.load()) {
+void FaultManager::_firstTimeInitIfNeeded() {
+    if (_firstTimeInitExecuted.load()) {
         return;
     }
 
     auto lk = stdx::lock_guard(_mutex);
     // One more time under lock to avoid race.
-    if (_initializedAllHealthObservers.load()) {
+    if (_firstTimeInitExecuted.load()) {
         return;
     }
-    _initializedAllHealthObservers.store(true);
+    _firstTimeInitExecuted.store(true);
 
-    _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx->getFastClockSource(),
-                                                                     _svcCtx->getTickSource());
+    _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx);
 
     // Verify that all observer types are unique.
     std::set<FaultFacetType> allTypes;
@@ -365,6 +396,9 @@ void FaultManager::_initHealthObserversIfNeeded() {
         allTypes.insert(observer->getType());
     }
     invariant(allTypes.size() == _observers.size());
+
+    // Start the monitor thread after all observers are initialized.
+    _progressMonitor = std::make_unique<ProgressMonitor>(this, _svcCtx, _crashCb);
 
     auto lk2 = stdx::lock_guard(_stateMutex);
     LOGV2(5956701,
@@ -382,6 +416,10 @@ std::vector<HealthObserver*> FaultManager::getHealthObservers() {
                    std::back_inserter(result),
                    [](const std::unique_ptr<HealthObserver>& value) { return value.get(); });
     return result;
+}
+
+void FaultManager::progressMonitorCheckForTests(std::function<void(std::string cause)> crashCb) {
+    _progressMonitor->progressMonitorCheck(crashCb);
 }
 
 }  // namespace process_health

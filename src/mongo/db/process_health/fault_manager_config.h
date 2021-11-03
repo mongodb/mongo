@@ -98,8 +98,21 @@ public:
                 MONGO_UNREACHABLE;
         }
     }
-    Milliseconds getActiveFaultDuration() {
+
+    Milliseconds getActiveFaultDuration() const {
         return kActiveFaultDuration;
+    }
+
+    Milliseconds getPeriodicHealthCheckInterval() const {
+        return Milliseconds(50);
+    }
+
+    Milliseconds getPeriodicLivenessCheckInterval() const {
+        return Milliseconds(50);
+    }
+
+    Seconds getPeriodicLivenessDeadline() const {
+        return Seconds(300);
     }
 
 protected:

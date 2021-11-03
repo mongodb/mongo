@@ -42,15 +42,19 @@ namespace process_health {
  */
 class HealthObserverBase : public HealthObserver {
 public:
-    HealthObserverBase(ClockSource* clockSource, TickSource* tickSource);
+    explicit HealthObserverBase(ServiceContext* svcCtx);
     virtual ~HealthObserverBase() = default;
 
     ClockSource* clockSource() const {
-        return _clockSource;
+        return _svcCtx->getPreciseClockSource();
     }
 
     TickSource* tickSource() const {
-        return _tickSource;
+        return _svcCtx->getTickSource();
+    }
+
+    ServiceContext* svcCtx() const {
+        return _svcCtx;
     }
 
     /**
@@ -63,10 +67,16 @@ public:
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
     void periodicCheck(FaultFacetsContainerFactory& factory,
-                       std::shared_ptr<executor::TaskExecutor> taskExecutor) override;
+                       std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                       CancellationToken token) override;
+
+    HealthObserverLivenessStats getStats() const override;
 
 protected:
-    struct PeriodicHealthCheckContext {};
+    struct PeriodicHealthCheckContext {
+        CancellationToken cancellationToken;
+        std::shared_ptr<executor::TaskExecutor> taskExecutor;
+    };
 
     /**
      * The main method every health observer should implement for a particular
@@ -77,7 +87,7 @@ protected:
     virtual Future<HealthCheckStatus> periodicCheckImpl(
         PeriodicHealthCheckContext&& periodicCheckContext) = 0;
 
-    HealthObserverIntensity getIntensity() override;
+    HealthObserverIntensity getIntensity() const override;
 
     // Helper method to create a status without errors.
     HealthCheckStatus makeHealthyStatus() const;
@@ -85,17 +95,21 @@ protected:
     // Make a generic error status.
     HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;
 
-    ClockSource* const _clockSource;
-    TickSource* const _tickSource;
+    HealthObserverLivenessStats getStatsLocked(WithLock) const;
+
+    ServiceContext* const _svcCtx;
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "HealthObserverBase::_mutex");
-    // Initially disable all observers until enabled by config options.
-    HealthObserverIntensity _intensity = HealthObserverIntensity::kOff;
+    // TODO: remove this field, should be done in config.
+    HealthObserverIntensity _intensity = HealthObserverIntensity::kNonCritical;
     // Indicates if there any check running to prevent running checks concurrently.
     bool _currentlyRunningHealthCheck = false;
     // Enforces the safety interval.
     Date_t _lastTimeTheCheckWasRun;
+    Date_t _lastTimeCheckCompleted;
+    int _completedChecksCount = 0;
+    int _completedChecksWithFaultCount = 0;
 };
 
 }  // namespace process_health

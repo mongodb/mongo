@@ -32,9 +32,30 @@
 #include "mongo/db/process_health/fault_facets_container.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 namespace process_health {
+
+/**
+ * Liveness data and stats.
+ */
+struct HealthObserverLivenessStats {
+    // True if this observer is enabled.
+    bool isEnabled = false;
+    // true is this observer is currently running a health check.
+    bool currentlyRunningHealthCheck = false;
+    // When the last or current check started, depending if currently
+    // running one.
+    Date_t lastTimeCheckStarted = Date_t::max();
+    // When the last check completed (not the current one).
+    Date_t lastTimeCheckCompleted = Date_t::max();
+    // Incremented when a check is done.
+    int completedChecksCount = 0;
+    // Incremented when check completed with fault.
+    // This doesn't take into account critical vs non-critical.
+    int completedChecksWithFaultCount = 0;
+};
 
 /**
  * Interface to conduct periodic health checks.
@@ -65,12 +86,15 @@ public:
      * @param factory Interface to get or create the factory of facets container.
      */
     virtual void periodicCheck(FaultFacetsContainerFactory& factory,
-                               std::shared_ptr<executor::TaskExecutor> taskExecutor) = 0;
+                               std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                               CancellationToken token) = 0;
 
     /**
      * @return HealthObserverIntensity
      */
-    virtual HealthObserverIntensity getIntensity() = 0;
+    virtual HealthObserverIntensity getIntensity() const = 0;
+
+    virtual HealthObserverLivenessStats getStats() const = 0;
 };
 
 }  // namespace process_health

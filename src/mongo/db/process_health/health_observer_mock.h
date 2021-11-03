@@ -43,10 +43,9 @@ namespace process_health {
 class HealthObserverMock : public HealthObserverBase {
 public:
     HealthObserverMock(FaultFacetType mockType,
-                       ClockSource* clockSource,
-                       TickSource* tickSource,
+                       ServiceContext* svcCtx,
                        std::function<double()> getSeverityCallback)
-        : HealthObserverBase(clockSource, tickSource),
+        : HealthObserverBase(svcCtx),
           _mockType(mockType),
           _getSeverityCallback(getSeverityCallback) {}
 
@@ -64,14 +63,18 @@ protected:
 
         auto completionPf = makePromiseFuture<HealthCheckStatus>();
         if (HealthCheckStatus::isResolved(severity)) {
+            LOGV2(5936603, "Mock health observer returns a resolved severity");
             completionPf.promise.emplaceValue(HealthCheckStatus(getType()));
         } else {
+            LOGV2(5936604,
+                  "Mock health observer returns a fault severity",
+                  "severity"_attr = severity);
             completionPf.promise.emplaceValue(HealthCheckStatus(getType(), severity, "failed"));
         }
         return std::move(completionPf.future);
     }
 
-    HealthObserverIntensity getIntensity() override {
+    HealthObserverIntensity getIntensity() const override {
         return HealthObserverIntensity::kNonCritical;
     }
 
