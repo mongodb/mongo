@@ -384,6 +384,7 @@ class GDBDumper(Dumper):
             mongod_dump_sessions = "mongod-dump-sessions"
             mongodb_dump_mutexes = "mongodb-dump-mutexes"
             mongodb_dump_recovery_units = "mongodb-dump-recovery-units"
+            mongodb_dump_storage_engine_info = "mongodb-dump-storage-engine-info"
 
             for pid in pinfo.pidv:
                 if not logger.mongo_process_filename:
@@ -427,6 +428,7 @@ class GDBDumper(Dumper):
                     mongod_dump_sessions,
                     mongodb_dump_mutexes,
                     mongodb_dump_recovery_units,
+                    mongodb_dump_storage_engine_info,
                     "detach",
                 ] + set_logging_off_commands
 

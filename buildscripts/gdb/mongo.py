@@ -574,6 +574,41 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
 MongoDBDumpRecoveryUnits()
 
 
+class MongoDBDumpStorageEngineInfo(gdb.Command):
+    """Dump storage engine info in mongod process."""
+
+    def __init__(self):
+        """Initialize MongoDBDumpStorageEngineInfo."""
+        RegisterMongoCommand.register(self, "mongodb-dump-storage-engine-info", gdb.COMMAND_DATA)
+
+    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+        """Invoke MongoDBDumpStorageEngineInfo."""
+        print("Running Hang Analyzer Supplement - MongoDBDumpStorageEngineInfo")
+
+        main_binary_name = get_process_name()
+        if main_binary_name == 'mongod':
+            self.dump_mongod_storage_engine_info()
+        else:
+            print("Not invoking mongod storage engine info dump for: %s" % (main_binary_name))
+
+    @staticmethod
+    def dump_mongod_storage_engine_info():
+        """GDB in-process python supplement."""
+
+        try:
+            # Call into mongod, and dump the state of storage engine
+            # Note that output will go to mongod's standard output, not the debugger output window
+            gdb.execute(
+                "call mongo::getGlobalServiceContext()->_storageEngine._ptr._value._M_b._M_p->dump()",
+                from_tty=False, to_string=False)
+        except gdb.error as gdberr:
+            print("Ignoring error '%s' in dump_mongod_storage_engine_info" % str(gdberr))
+
+
+# Register command
+MongoDBDumpStorageEngineInfo()
+
+
 class BtIfActive(gdb.Command):
     """Print stack trace or a short message if the current thread is idle."""
 
