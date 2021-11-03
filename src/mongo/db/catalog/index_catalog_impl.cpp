@@ -1317,7 +1317,8 @@ std::vector<std::shared_ptr<const IndexCatalogEntry>> IndexCatalogImpl::getAllRe
 
 const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
                                                       Collection* collection,
-                                                      const IndexDescriptor* oldDesc) {
+                                                      const IndexDescriptor* oldDesc,
+                                                      CreateIndexEntryFlags flags) {
     invariant(_buildingIndexes.size() == 0);
 
     const std::string indexName = oldDesc->indexName();
@@ -1340,8 +1341,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // Re-register this index in the index catalog with the new spec. Also, add the new index
     // to the CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
-    auto newEntry =
-        createIndexEntry(opCtx, collection, std::move(newDesc), CreateIndexEntryFlags::kIsReady);
+    auto newEntry = createIndexEntry(opCtx, collection, std::move(newDesc), flags);
     invariant(newEntry->isReady(opCtx, collection));
     auto desc = newEntry->descriptor();
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())

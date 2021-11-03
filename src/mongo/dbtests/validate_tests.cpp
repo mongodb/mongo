@@ -3373,7 +3373,8 @@ public:
         {
             WriteUnitOfWork wunit(&_opCtx);
             auto writableCatalog = const_cast<IndexCatalog*>(indexCatalog);
-            descriptor = writableCatalog->refreshEntry(&_opCtx, writableCollection, descriptor);
+            descriptor = writableCatalog->refreshEntry(
+                &_opCtx, writableCollection, descriptor, CreateIndexEntryFlags::kIsReady);
             wunit.commit();
         }
 

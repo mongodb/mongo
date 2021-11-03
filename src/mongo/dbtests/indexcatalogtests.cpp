@@ -216,7 +216,7 @@ public:
         {
             // Notify the catalog of the change.
             WriteUnitOfWork wuow(&opCtx);
-            desc = _catalog->refreshEntry(&opCtx, _coll, desc);
+            desc = _catalog->refreshEntry(&opCtx, _coll, desc, CreateIndexEntryFlags::kIsReady);
             wuow.commit();
         }
 

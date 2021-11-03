@@ -161,7 +161,8 @@ public:
      */
     const IndexDescriptor* refreshEntry(OperationContext* opCtx,
                                         Collection* collection,
-                                        const IndexDescriptor* oldDesc) override;
+                                        const IndexDescriptor* oldDesc,
+                                        CreateIndexEntryFlags flags) override;
 
     const IndexCatalogEntry* getEntry(const IndexDescriptor* desc) const override;
 

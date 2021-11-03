@@ -203,10 +203,13 @@ void processCollModIndexRequest(OperationContext* opCtx,
         !indexUnique ? boost::optional<bool>() : newUnique.booleanSafe(),
         idx->indexName()};
 
+    // This matches the default for IndexCatalog::refreshEntry().
+    auto flags = CreateIndexEntryFlags::kIsReady;
+
     // Notify the index catalog that the definition of this index changed. This will invalidate the
     // local idx pointer. On rollback of this WUOW, the local var idx pointer will be valid again.
     autoColl->getWritableCollection()->getIndexCatalog()->refreshEntry(
-        opCtx, autoColl->getWritableCollection(), idx);
+        opCtx, autoColl->getWritableCollection(), idx, flags);
 
     opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
         oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result));

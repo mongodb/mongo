@@ -659,7 +659,7 @@ Status _collModInternal(OperationContext* opCtx,
 
             // Notify the index catalog that the definition of this index changed.
             coll.getWritableCollection()->getIndexCatalog()->refreshEntry(
-                opCtx, coll.getWritableCollection(), desc);
+                opCtx, coll.getWritableCollection(), desc, CreateIndexEntryFlags::kIsReady);
         }
 
         // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from or downgrading to
