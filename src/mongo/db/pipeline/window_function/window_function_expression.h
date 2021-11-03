@@ -254,6 +254,69 @@ public:
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
 };
 
+/**
+ * Similar to ExpressionFromAccumulator except only an expression argument is allowed.
+ */
+template <typename NonRemovableType>
+class ExpressionFromWindowlessAccumulator : public Expression {
+public:
+    ExpressionFromWindowlessAccumulator(ExpressionContext* expCtx,
+                                        std::string accumulatorName,
+                                        boost::intrusive_ptr<::mongo::Expression> input,
+                                        WindowBounds bounds)
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx) {
+        // 'obj' is something like '{$func: <expressionArg>}'
+        boost::optional<StringData> accumulatorName;
+        WindowBounds bounds = WindowBounds::defaultBounds();
+        boost::intrusive_ptr<::mongo::Expression> input;
+        bool windowFieldMissing = true;
+        for (const auto& arg : obj) {
+            auto argName = arg.fieldNameStringData();
+            if (argName == kWindowArg) {
+                windowFieldMissing = false;
+            } else if (isFunction(argName)) {
+                uassert(ErrorCodes::FailedToParse,
+                        "Cannot specify two functions in window function spec",
+                        !accumulatorName);
+                accumulatorName = argName;
+                input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
+            } else {
+                uasserted(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Window function found an unknown argument: " << argName);
+            }
+        }
+
+        uassert(ErrorCodes::FailedToParse,
+                "Must specify a window function in output field",
+                accumulatorName);
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'window' field is not allowed in " << accumulatorName,
+                windowFieldMissing);
+        return make_intrusive<ExpressionFromWindowlessAccumulator<NonRemovableType>>(
+            expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
+    }
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        return NonRemovableType::create(_expCtx);
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        tasserted(6050101,
+                  str::stream() << "Window function " << _accumulatorName
+                                << " is not supported with a window");
+    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        MutableDocument args;
+        args.addField(_accumulatorName, Value(_input->serialize(static_cast<bool>(explain))));
+        return args.freezeToValue();
+    }
+};
+
 template <typename NonRemovableType, typename RemovableType>
 class ExpressionRemovable : public Expression {
 public:

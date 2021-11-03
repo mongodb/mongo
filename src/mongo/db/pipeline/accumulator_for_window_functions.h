@@ -170,4 +170,23 @@ private:
     WindowFunctionIntegral _integralWF;
 };
 
+class AccumulatorLocf : public AccumulatorForWindowFunctions {
+public:
+    static constexpr auto kName = "$locf"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    explicit AccumulatorLocf(ExpressionContext* expCtx);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    void reset() final;
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+
+private:
+    Value _lastNonNull;
+};
+
 }  // namespace mongo

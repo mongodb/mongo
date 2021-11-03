@@ -151,6 +151,7 @@ env.Library(
         'accumulator_integral.cpp',
         'accumulator_js_reduce.cpp',
         'accumulator_last.cpp',
+        'accumulator_locf.cpp',
         'accumulator_merge_objects.cpp',
         'accumulator_min_max.cpp',
         'accumulator_multi.cpp',
