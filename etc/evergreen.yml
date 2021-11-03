@@ -88,6 +88,9 @@ parameters:
   - key: last_continuous_evg_version_id
     description: "The Evergreen Version ID of the last-continuous MongoDB binaries. Only binaries from release variants are used"
 
+  - key: antithesis_image_tag
+    description: "The docker tag to use when pushing images to Antithesis"
+
 ## Some variables for convenience:
 variables:
 
@@ -7111,10 +7114,11 @@ tasks:
   # this is not patchable to avoid hitting the docker registry excessively.
   # When iterating on this task, feel free to make this patchable for
   # testing purposes. Your image changes will be pushed with the
-  # evergreen-patch tag, so as to not clobber the waterfall
+  # evergreen-patch tag, so as to not clobber the waterfall. Use the
+  # antithesis_image_tag build parameter to override this if required.
   patchable: false
   depends_on:
-  - name: archive_dist_test_debug
+  - name: archive_dist_test
   commands:
   - *f_expansions_write
   - func: "git get project no modules"
@@ -7122,6 +7126,13 @@ tasks:
   - func: "kill processes"
   - func: "cleanup environment"
   - func: "set up venv"
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/antithesis_last_push.txt
+      local_file: antithesis_last_push.txt
+      bucket: mciuploads
   - func: "do setup"
   # TODO SERVER-60619 download debug symbols and put them where needed.
   - command: subprocess.exec
@@ -7129,6 +7140,17 @@ tasks:
       binary: bash
       args:
         - "./src/evergreen/antithesis_image_build.sh"
+  - command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: antithesis_next_push.txt
+      remote_file: ${project}/${build_variant}/antithesis_last_push.txt
+      bucket: mciuploads
+      permissions: private
+      content_type: text/plain
+      display_name: Last Push Date (seconds since epoch)
 
 #######################################
 #             Task Groups             #
@@ -7634,9 +7656,6 @@ buildvariants:
   - name: compile_ninja_TG
     distros:
     - ubuntu1804-build
-  - name: .antithesis
-    distros:
-    - ubuntu1804-large
   - name: build_variant_gen
   - name: .aggfuzzer .common
   - name: audit
