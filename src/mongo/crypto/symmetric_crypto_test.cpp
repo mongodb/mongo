@@ -522,6 +522,7 @@ public:
 
         const size_t kBufferSize = test.plaintext.size();
         {
+            // Validate encryption
             std::vector<uint8_t> encryptionResult(kBufferSize);
             auto cipherLen = uassertStatusOK(encryptor->update(asUint8(test.plaintext.c_str()),
                                                                test.plaintext.size(),
@@ -535,17 +536,21 @@ public:
                       hexblob::encode(
                           StringData(asChar(encryptionResult.data()), encryptionResult.size())));
 
+            // The symmetric crypto framework uses 12 byte GCM tags. The tags used in NIST test
+            // vectors can be larger than 12 bytes, but may be truncated.
+
             std::array<std::uint8_t, 12> tag;
             const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag.data(), tag.size()));
             ASSERT_EQ(tag.size(), taglen);
-            ASSERT_EQ(hexblob::encode(StringData(test.tag.data(), test.tag.size())).substr(0, 24),
+            ASSERT_EQ(hexblob::encode(StringData(test.tag.data(), test.tag.size()))
+                          .substr(0, aesGCMTagSize * 2),
                       hexblob::encode(StringData(asChar(tag.data()), tag.size())));
         }
         {
             // Validate decryption
             auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(
                 key, mode, asUint8(test.iv.c_str()), test.iv.size()));
-            uassertStatusOK(decryptor->updateTag(asUint8(test.tag.data()), 12));
+            uassertStatusOK(decryptor->updateTag(asUint8(test.tag.data()), aesGCMTagSize));
 
             ASSERT_OK(decryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
             std::vector<uint8_t> decryptionResult(kBufferSize);
@@ -560,6 +565,23 @@ public:
             ASSERT_EQ(hexblob::encode(StringData(test.plaintext.data(), test.plaintext.size())),
                       hexblob::encode(
                           StringData(asChar(decryptionResult.data()), decryptionResult.size())));
+        }
+        {
+            // Validate that decryption with incorrect tag does not succeed
+            auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(
+                key, mode, asUint8(test.iv.c_str()), test.iv.size()));
+            auto tag = test.tag;
+            tag[0]++;
+            uassertStatusOK(decryptor->updateTag(asUint8(tag.data()), aesGCMTagSize));
+
+            ASSERT_OK(decryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+            std::vector<uint8_t> decryptionResult(kBufferSize);
+            auto decipherLen = uassertStatusOK(decryptor->update(asUint8(test.ciphertext.c_str()),
+                                                                 test.ciphertext.size(),
+                                                                 decryptionResult.data(),
+                                                                 decryptionResult.size()));
+            ASSERT_NOT_OK(decryptor->finalize(decryptionResult.data() + decipherLen,
+                                              decryptionResult.size() - decipherLen));
         }
     }
 };
