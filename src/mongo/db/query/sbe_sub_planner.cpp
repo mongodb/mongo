@@ -43,7 +43,7 @@ CandidatePlans SubPlanner::plan(
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     std::function<mongo::PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
         createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
-            return plan_cache_key_factory::make(cq, coll);
+            return plan_cache_key_factory::make<mongo::PlanCacheKey>(cq, coll);
         };
 
     // Plan each branch of the $or.

@@ -33,45 +33,25 @@
 
 namespace mongo {
 /**
- * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
+ * Encapsulates Plan Cache key - related information used to lookup entries in the PlanCache.
  */
-class PlanCacheKey {
+class PlanCacheKeyInfo {
 public:
-    PlanCacheKey(CanonicalQuery::QueryShapeString shapeString, std::string indexabilityString) {
-        _lengthOfQueryShape = shapeString.size();
+    PlanCacheKeyInfo(CanonicalQuery::QueryShapeString shapeString, std::string indexabilityString)
+        : _lengthOfQueryShape{shapeString.size()} {
         _key = std::move(shapeString);
         _key += indexabilityString;
-    }
+    };
 
     CanonicalQuery::QueryShapeString getQueryShape() const {
         return std::string(_key, 0, _lengthOfQueryShape);
     }
 
-    StringData getQueryShapeStringData() const {
-        return StringData(_key.c_str(), _lengthOfQueryShape);
+    bool operator==(const PlanCacheKeyInfo& other) const {
+        return other._lengthOfQueryShape == _lengthOfQueryShape && other._key == _key;
     }
 
-    /**
-     * Return the 'indexability discriminators', that is, the plan cache key component after the
-     * stable key, but before the boolean indicating whether we are using the classic engine.
-     */
-    StringData getIndexabilityDiscriminators() const {
-        return StringData(_key.c_str() + _lengthOfQueryShape, _key.size() - _lengthOfQueryShape);
-    }
-
-    StringData stringData() const {
-        return _key;
-    }
-
-    const std::string& toString() const {
-        return _key;
-    }
-
-    bool operator==(const PlanCacheKey& other) const {
-        return other._key == _key && other._lengthOfQueryShape == _lengthOfQueryShape;
-    }
-
-    bool operator!=(const PlanCacheKey& other) const {
+    bool operator!=(const PlanCacheKeyInfo& other) const {
         return !(*this == other);
     }
 
@@ -83,22 +63,32 @@ public:
         return canonical_query_encoder::computeHash(stringData());
     }
 
+    const std::string& toString() const {
+        return _key;
+    }
+
+    /**
+     * Return the 'indexability discriminators', that is, the plan cache key component after the
+     * stable key, but before the boolean indicating whether we are using the classic engine.
+     */
+    StringData getIndexabilityDiscriminators() const {
+        return StringData(_key.c_str() + _lengthOfQueryShape, _key.size() - _lengthOfQueryShape);
+    }
+
+    StringData getQueryShapeStringData() const {
+        return StringData(_key.c_str(), _lengthOfQueryShape);
+    }
+
+    StringData stringData() const {
+        return _key;
+    }
+
 private:
     // Key is broken into two parts:
     // <query shape key> | <indexability discriminators>
     std::string _key;
 
     // How long the "query shape" is.
-    size_t _lengthOfQueryShape;
-};
-
-std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key);
-StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key);
-
-class PlanCacheKeyHasher {
-public:
-    std::size_t operator()(const PlanCacheKey& k) const {
-        return std::hash<std::string>{}(k.toString());
-    }
+    const size_t _lengthOfQueryShape;
 };
 }  // namespace mongo

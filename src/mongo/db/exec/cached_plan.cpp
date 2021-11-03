@@ -209,7 +209,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         // Deactivate the current cache entry.
         const auto& coll = collection();
         auto cache = CollectionQueryInfo::get(coll).getPlanCache();
-        cache->deactivate(plan_cache_key_factory::make(*_canonicalQuery, coll));
+        cache->deactivate(plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, coll));
     }
 
     // Use the query planning module to plan the whole query.

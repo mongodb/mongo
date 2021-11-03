@@ -319,6 +319,7 @@ env.CppUnitTest(
     source=[
         "canonical_query_encoder_test.cpp",
         "canonical_query_test.cpp",
+        "canonical_query_test_util.cpp",
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
@@ -340,6 +341,7 @@ env.CppUnitTest(
         "parsed_distinct_test.cpp",
         "plan_cache_indexability_test.cpp",
         "plan_cache_size_parameter_test.cpp",
+        "plan_cache_key_info_test.cpp",
         "plan_cache_test.cpp",
         "plan_ranker_test.cpp",
         "planner_access_test.cpp",

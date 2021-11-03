@@ -193,6 +193,27 @@ public:
     }
 
     /**
+     * Remove all the entries for keys for which the predicate returns true. Returns the number of
+     * removed entries.
+     */
+    template <typename UnaryPredicate>
+    size_t removeIf(UnaryPredicate predicate) {
+        size_t removed = 0;
+        for (auto it = _kvList.begin(); it != _kvList.end();) {
+            if (predicate(it->first)) {
+                std::unique_ptr<V> entryToRemove{it->second};
+                _budgetTracker.onRemove(*entryToRemove);
+                _kvMap.erase(it->first);
+                it = _kvList.erase(it);
+                ++removed;
+            } else {
+                ++it;
+            }
+        }
+        return removed;
+    }
+
+    /**
      * Deletes all entries in the kv-store.
      */
     void clear() {

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/plan_cache_key_factory.h"
 
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/planner_ixselect.h"
 
 namespace mongo {
@@ -73,10 +74,9 @@ void encodeIndexability(const MatchExpression* tree,
         encodeIndexability(tree->getChild(i), indexabilityState, keyBuilder);
     }
 }
-}  // namespace plan_cache_detail
 
-namespace plan_cache_key_factory {
-PlanCacheKey make(const CanonicalQuery& query, const CollectionPtr& collection) {
+PlanCacheKeyInfo makePlanCacheKeyInfo(const CanonicalQuery& query,
+                                      const CollectionPtr& collection) {
     const auto shapeString = query.encodeKey();
 
     StringBuilder indexabilityKeyBuilder;
@@ -85,7 +85,21 @@ PlanCacheKey make(const CanonicalQuery& query, const CollectionPtr& collection) 
         CollectionQueryInfo::get(collection).getPlanCacheIndexabilityState(),
         &indexabilityKeyBuilder);
 
-    return PlanCacheKey(shapeString, indexabilityKeyBuilder.str());
+    return PlanCacheKeyInfo(shapeString, indexabilityKeyBuilder.str());
 }
-}  // namespace plan_cache_key_factory
+
+PlanCacheKey make(const CanonicalQuery& query,
+                  const CollectionPtr& collection,
+                  PlanCacheKeyTag<PlanCacheKey>) {
+    return {makePlanCacheKeyInfo(query, collection)};
+}
+
+sbe::PlanCacheKey make(const CanonicalQuery& query,
+                       const CollectionPtr& collection,
+                       PlanCacheKeyTag<sbe::PlanCacheKey>) {
+    auto collectionVersion = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
+
+    return {makePlanCacheKeyInfo(query, collection), collection->uuid(), collectionVersion};
+}
+}  // namespace plan_cache_detail
 }  // namespace mongo

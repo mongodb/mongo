@@ -193,7 +193,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-    auto key = plan_cache_key_factory::make(*cq, collection.getCollection());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
@@ -244,7 +244,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-    auto key = plan_cache_key_factory::make(*cq, collection.getCollection());
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
@@ -295,7 +295,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanAddsActiveCacheEntries) {
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
-    auto planCacheKey = plan_cache_key_factory::make(*shapeCq, collection.getCollection());
+    auto planCacheKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollection());
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
@@ -354,7 +355,8 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
-    auto planCacheKey = plan_cache_key_factory::make(*shapeCq, collection.getCollection());
+    auto planCacheKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollection());
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
@@ -376,9 +378,11 @@ TEST_F(QueryStageCachedPlan, DeactivatesEntriesOnReplan) {
     forceReplanning(collection.getCollection(), noResultsCq.get());
 
     // The works should be 1 for the entry since the query we ran should not have any results.
-    ASSERT_EQ(
-        cache->get(plan_cache_key_factory::make(*noResultsCq, collection.getCollection())).state,
-        PlanCache::CacheEntryState::kPresentActive);
+    ASSERT_EQ(cache
+                  ->get(plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq,
+                                                                   collection.getCollection()))
+                  .state,
+              PlanCache::CacheEntryState::kPresentActive);
     auto entry = assertGet(cache->getEntry(planCacheKey));
     size_t works = 1U;
     ASSERT_EQ(entry->works, works);
@@ -415,12 +419,14 @@ TEST_F(QueryStageCachedPlan, EntriesAreNotDeactivatedWhenInactiveEntriesDisabled
     // CanonicalQueries created in this test will have this shape.
     const auto shapeCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 123}, b: {$gte: 123}}"));
-    auto planCacheKey = plan_cache_key_factory::make(*shapeCq, collection.getCollection());
+    auto planCacheKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*shapeCq, collection.getCollection());
 
     // Query can be answered by either index on "a" or index on "b".
     const auto noResultsCq =
         canonicalQueryFromFilterObj(opCtx(), nss, fromjson("{a: {$gte: 11}, b: {$gte: 11}}"));
-    auto noResultKey = plan_cache_key_factory::make(*noResultsCq, collection.getCollection());
+    auto noResultKey =
+        plan_cache_key_factory::make<PlanCacheKey>(*noResultsCq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();

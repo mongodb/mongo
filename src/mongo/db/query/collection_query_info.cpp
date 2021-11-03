@@ -77,16 +77,37 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
             projExec};
 }
 
-std::shared_ptr<PlanCache> makePlanCache() {
-    return std::make_shared<PlanCache>(internalQueryCacheMaxEntriesPerCollection.load());
-}
-
 }  // namespace
 
+CollectionQueryInfo::PlanCacheState::PlanCacheState()
+    : classicPlanCache{static_cast<size_t>(internalQueryCacheMaxEntriesPerCollection.load())} {}
+
+CollectionQueryInfo::PlanCacheState::PlanCacheState(OperationContext* opCtx,
+                                                    const CollectionPtr& collection)
+    : classicPlanCache{static_cast<size_t>(internalQueryCacheMaxEntriesPerCollection.load())},
+      planCacheInvalidator{collection, opCtx->getServiceContext()} {
+    std::vector<CoreIndexInfo> indexCores;
+
+    // TODO We shouldn't need to include unfinished indexes, but we must here because the index
+    // catalog may be in an inconsistent state.  SERVER-18346.
+    const bool includeUnfinishedIndexes = true;
+    std::unique_ptr<IndexCatalog::IndexIterator> ii =
+        collection->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
+    while (ii->more()) {
+        const IndexCatalogEntry* ice = ii->next();
+        indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
+    }
+
+    planCacheIndexabilityState.updateDiscriminators(indexCores);
+}
+
+void CollectionQueryInfo::PlanCacheState::clearPlanCache() {
+    classicPlanCache.clear();
+    planCacheInvalidator.clearPlanCache();
+}
+
 CollectionQueryInfo::CollectionQueryInfo()
-    : _keysComputed(false),
-      _planCacheIndexabilityState(std::make_shared<PlanCacheIndexabilityState>()),
-      _planCache(makePlanCache()) {}
+    : _keysComputed{false}, _planCacheState{std::make_shared<PlanCacheState>()} {}
 
 const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx) const {
     invariant(_keysComputed);
@@ -186,13 +207,13 @@ void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const Collect
     // We are operating on a cloned collection, the use_count can only be 1 if we've created a new
     // PlanCache instance for this collection clone. Checking the refcount can't race as we can't
     // start readers on this collection while it is writable
-    if (_planCache.use_count() == 1) {
+    if (_planCacheState.use_count() == 1) {
         LOGV2_DEBUG(5014501,
                     1,
                     "Clearing plan cache - collection info cache cleared",
                     "namespace"_attr = coll->ns());
 
-        _planCache->clear();
+        _planCacheState->clearPlanCache();
     } else {
         LOGV2_DEBUG(5014502,
                     1,
@@ -208,34 +229,12 @@ void CollectionQueryInfo::clearQueryCacheForSetMultikey(const CollectionPtr& col
                 1,
                 "Clearing plan cache for multikey - collection info cache cleared",
                 "namespace"_attr = coll->ns());
-    _planCache->clear();
-}
-
-PlanCache* CollectionQueryInfo::getPlanCache() const {
-    return _planCache.get();
-}
-
-const PlanCacheIndexabilityState& CollectionQueryInfo::getPlanCacheIndexabilityState() const {
-    return *_planCacheIndexabilityState;
+    _planCacheState->clearPlanCache();
 }
 
 void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
                                                       const CollectionPtr& coll) {
-    std::vector<CoreIndexInfo> indexCores;
-
-    // TODO We shouldn't need to include unfinished indexes, but we must here because the index
-    // catalog may be in an inconsistent state.  SERVER-18346.
-    const bool includeUnfinishedIndexes = true;
-    std::unique_ptr<IndexCatalog::IndexIterator> ii =
-        coll->getIndexCatalog()->getIndexIterator(opCtx, includeUnfinishedIndexes);
-    while (ii->more()) {
-        const IndexCatalogEntry* ice = ii->next();
-        indexCores.emplace_back(indexInfoFromIndexCatalogEntry(*ice));
-    }
-
-    _planCache = makePlanCache();
-    _planCacheIndexabilityState = std::make_shared<PlanCacheIndexabilityState>();
-    _planCacheIndexabilityState->updateDiscriminators(indexCores);
+    _planCacheState = std::make_shared<PlanCacheState>(opCtx, coll);
 }
 
 void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& coll) {

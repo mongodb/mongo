@@ -566,7 +566,8 @@ public:
         }
 
         // Fill in some opDebug information.
-        const PlanCacheKey planCacheKey = plan_cache_key_factory::make(*_cq, _collection);
+        const PlanCacheKey planCacheKey =
+            plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collection);
         CurOp::get(_opCtx)->debug().queryHash = planCacheKey.queryHash();
 
         // Check that the query should be cached.

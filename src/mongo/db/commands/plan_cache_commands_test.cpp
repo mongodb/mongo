@@ -42,7 +42,7 @@ static const NamespaceString nss{"test.collection"_sd};
 
 PlanCacheKey makeKey(const CanonicalQuery& cq) {
     CollectionMock coll(nss);
-    return plan_cache_key_factory::make(cq, &coll);
+    return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
 }
 
 TEST(PlanCacheCommandsTest, CannotCanonicalizeWithMissingQueryField) {

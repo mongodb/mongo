@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/sbe_plan_cache.h"
 
+#include "mongo/db/query/plan_cache_invalidator.h"
 #include "mongo/db/query/plan_cache_size_parameter.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
@@ -41,6 +42,18 @@ namespace {
 
 const auto sbePlanCacheDecoration =
     ServiceContext::declareDecoration<std::unique_ptr<sbe::PlanCache>>();
+
+class SbePlanCacheInvalidatorCallback final : public PlanCacheInvalidatorCallback {
+public:
+    SbePlanCacheInvalidatorCallback(ServiceContext* serviceCtx) : _serviceCtx{serviceCtx} {}
+
+    void invalidateCacheEntriesWith(UUID collectionUuid, size_t oldVersion) override {
+        clearPlanCache(_serviceCtx, collectionUuid, oldVersion);
+    }
+
+private:
+    ServiceContext* _serviceCtx;
+};
 
 size_t convertToSizeInBytes(const plan_cache_util::PlanCacheSizeParameter& param) {
     constexpr size_t kBytesInMB = 1014 * 1024;
@@ -116,6 +129,8 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
         plan_cache_util::sbePlanCacheSizeUpdaterDecoration(serviceCtx) =
             std::make_unique<PlanCacheSizeUpdaterImpl>();
 
+        PlanCacheInvalidatorCallback::set(
+            serviceCtx, std::make_unique<SbePlanCacheInvalidatorCallback>(serviceCtx));
         if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
             auto status = plan_cache_util::PlanCacheSizeParameter::parse(planCacheSize.get());
             uassertStatusOK(status);
@@ -141,5 +156,22 @@ sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
             feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
     tassert(5933400, "Cannot get the global SBE plan cache by a nullptr", opCtx);
     return getPlanCache(opCtx->getServiceContext());
+}
+
+void clearPlanCache(ServiceContext* serviceCtx, UUID collectionUuid, size_t collectionVersion) {
+    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        auto removed = sbe::getPlanCache(serviceCtx)
+                           .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key) {
+                               return key.getCollectionVersion() == collectionVersion &&
+                                   key.getCollectionUuid() == collectionUuid;
+                           });
+
+        LOGV2_DEBUG(6006600,
+                    1,
+                    "Clearing SBE Plan Cache",
+                    "collectionUuid"_attr = collectionUuid,
+                    "collectionVersion"_attr = collectionVersion,
+                    "removedEntries"_attr = removed);
+    }
 }
 }  // namespace mongo::sbe

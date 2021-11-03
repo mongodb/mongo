@@ -33,7 +33,6 @@
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
-#include "mongo/db/query/plan_cache_key.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/container_size_helper.h"
 
@@ -445,6 +444,21 @@ public:
      */
     void remove(const KeyType& key) {
         _partitionedCache->erase(key);
+    }
+
+
+    /**
+     * Remove all the entries for keys for which the predicate returns true. Return the number of
+     * removed entries.
+     */
+    template <typename UnaryPredicate>
+    size_t removeIf(UnaryPredicate predicate) {
+        size_t nRemoved = 0;
+        for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
+            auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
+            nRemoved += lockedPartition->removeIf(predicate);
+        }
+        return nRemoved;
     }
 
     /**

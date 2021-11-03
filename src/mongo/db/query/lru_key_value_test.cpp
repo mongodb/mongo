@@ -46,8 +46,10 @@ namespace {
 //
 
 struct TrivialBudgetEstimator {
+    static constexpr size_t kSize = 1;
+
     size_t operator()(int) {
-        return 1;
+        return kSize;
     }
 };
 
@@ -267,6 +269,33 @@ TEST(LRUKeyValueTest, IterationTest) {
     ASSERT_EQUALS(*i->second, 1);
     ++i;
     ASSERT(i == cache.end());
+}
+
+TEST(LRUKeyValueTest, RemoveIfTest) {
+    TestKeyValue cache{10};
+    for (int i = 0; i < 10; ++i) {
+        cache.add(i, new int(i));
+    }
+
+    size_t sizeBefore = cache.size();
+
+    // Remove all even keys.
+    size_t nRemoved = cache.removeIf([](int key) { return key % 2 == 0; });
+    ASSERT_EQ(5, nRemoved);
+
+    // Assert that all odd keys are in store.
+    for (int i = 1; i < 10; i += 2) {
+        assertInKVStore(cache, i, i);
+    }
+
+    // Assert that all even keys are not in store.
+    for (int i = 0; i < 10; i += 2) {
+        assertNotInKVStore(cache, i);
+    }
+
+    size_t sizeAfter = cache.size();
+
+    ASSERT_EQ(sizeAfter + nRemoved * TrivialBudgetEstimator::kSize, sizeBefore);
 }
 
 }  // namespace

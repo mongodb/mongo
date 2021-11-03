@@ -79,7 +79,7 @@ Status clear(OperationContext* opCtx,
 
         auto cq = std::move(statusWithCQ.getValue());
 
-        planCache->remove(plan_cache_key_factory::make(*cq, collection));
+        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
         return Status::OK();
     }
 

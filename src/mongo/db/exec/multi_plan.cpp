@@ -133,7 +133,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
         CollectionQueryInfo::get(collection())
             .getPlanCache()
-            ->remove(plan_cache_key_factory::make(*_query, collection()));
+            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collection()));
 
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;

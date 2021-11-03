@@ -37,15 +37,9 @@ ServerStatusMetricField<Counter64> totalPlanCacheSizeEstimateBytesMetric(
     "query.planCacheTotalSizeEstimateBytes", &PlanCacheEntry::planCacheTotalSizeEstimateBytes);
 }  // namespace
 
-
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
-    stream << key.stringData();
+    stream << key.toString();
     return stream;
-}
-
-StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key) {
-    builder << key.stringData();
-    return builder;
 }
 
 void PlanCacheIndexTree::setIndexEntry(const IndexEntry& ie) {

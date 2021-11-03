@@ -34,9 +34,53 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_key_info.h"
 
 namespace mongo {
 
+/**
+ * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
+ */
+class PlanCacheKey {
+public:
+    PlanCacheKey(PlanCacheKeyInfo&& info) : _info{std::move(info)} {}
+
+    bool operator==(const PlanCacheKey& other) const {
+        return other._info == _info;
+    }
+
+    bool operator!=(const PlanCacheKey& other) const {
+        return !(*this == other);
+    }
+
+    CanonicalQuery::QueryShapeString getQueryShape() const {
+        return _info.getQueryShape();
+    }
+
+    uint32_t queryHash() const {
+        return _info.queryHash();
+    }
+
+    uint32_t planCacheKeyHash() const {
+        return _info.planCacheKeyHash();
+    }
+
+    const std::string& toString() const {
+        return _info.toString();
+    }
+
+private:
+    PlanCacheKeyInfo _info;
+};
+
+std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key);
+
+class PlanCacheKeyHasher {
+public:
+    std::size_t operator()(const PlanCacheKey& k) const {
+        return k.planCacheKeyHash();
+    }
+};
 
 class PlanCachePartitioner {
 public:
