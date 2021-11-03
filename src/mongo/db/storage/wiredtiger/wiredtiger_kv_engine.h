@@ -361,6 +361,8 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
 
+    void dump() const override;
+
 private:
     class WiredTigerSessionSweeper;
 

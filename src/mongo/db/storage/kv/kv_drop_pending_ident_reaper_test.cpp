@@ -130,6 +130,8 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
 
+    void dump() const override {}
+
     // List of ident names removed using dropIdent().
     std::vector<std::string> droppedIdents;
 

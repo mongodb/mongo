@@ -2524,4 +2524,6 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     return tmp;
 }
 
+void WiredTigerKVEngine::dump() const {}
+
 }  // namespace mongo

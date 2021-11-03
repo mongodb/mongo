@@ -357,6 +357,8 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
 
+    void dump() const override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

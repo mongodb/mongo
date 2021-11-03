@@ -206,6 +206,8 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
 
+    void dump() const override {}
+
 private:
     void _cleanHistory(WithLock);
 

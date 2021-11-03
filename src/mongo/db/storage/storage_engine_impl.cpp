@@ -1295,4 +1295,8 @@ const DurableCatalog* StorageEngineImpl::getCatalog() const {
     return _catalog.get();
 }
 
+void StorageEngineImpl::dump() const {
+    _engine->dump();
+}
+
 }  // namespace mongo

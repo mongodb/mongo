@@ -678,6 +678,11 @@ public:
      * it.
      */
     virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) = 0;
+
+    /**
+     * Instructs the storage engine to dump its internal state.
+     */
+    virtual void dump() const = 0;
 };
 
 }  // namespace mongo
