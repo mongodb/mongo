@@ -31,11 +31,11 @@
 
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/collection_sharding_runtime_test.cpp"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -321,15 +321,14 @@ TEST_F(MigrationUtilsTest, TestInvalidUUID) {
  * Fixture that uses a mocked CatalogCacheLoader and CatalogClient to allow metadata refreshes
  * without using the mock network.
  */
-class SubmitRangeDeletionTaskTest : public ShardServerTestFixture {
+class SubmitRangeDeletionTaskTest : public CollectionShardingRuntimeWithRangeDeleterTest {
 public:
     const HostAndPort kConfigHostAndPort{"dummy", 123};
-    const NamespaceString kNss{"test.foo"};
     const ShardKeyPattern kShardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
     const UUID kDefaultUUID = UUID::gen();
     const OID kEpoch = OID::gen();
     const DatabaseType kDefaultDatabaseType =
-        DatabaseType(kNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID));
+        DatabaseType(kTestNss.db().toString(), ShardId("0"), true, DatabaseVersion(kDefaultUUID));
     const std::vector<ShardType> kShardList = {ShardType("0", "Host0:12345"),
                                                ShardType("1", "Host1:12345")};
 
@@ -418,29 +417,29 @@ public:
     }
 
     CollectionType makeCollectionType(UUID uuid, OID epoch) {
-        CollectionType coll(kNss, epoch, Date_t::now(), uuid);
+        CollectionType coll(kTestNss, epoch, Date_t::now(), uuid);
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(true);
         return coll;
     }
 
     std::vector<ChunkType> makeChangedChunks(ChunkVersion startingVersion) {
-        ChunkType chunk1(kNss,
+        ChunkType chunk1(kTestNss,
                          {kShardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                          startingVersion,
                          {"0"});
         chunk1.setName(OID::gen());
         startingVersion.incMinor();
 
-        ChunkType chunk2(kNss, {BSON("_id" << -100), BSON("_id" << 0)}, startingVersion, {"1"});
+        ChunkType chunk2(kTestNss, {BSON("_id" << -100), BSON("_id" << 0)}, startingVersion, {"1"});
         chunk2.setName(OID::gen());
         startingVersion.incMinor();
 
-        ChunkType chunk3(kNss, {BSON("_id" << 0), BSON("_id" << 100)}, startingVersion, {"0"});
+        ChunkType chunk3(kTestNss, {BSON("_id" << 0), BSON("_id" << 100)}, startingVersion, {"0"});
         chunk3.setName(OID::gen());
         startingVersion.incMinor();
 
-        ChunkType chunk4(kNss,
+        ChunkType chunk4(kTestNss,
                          {BSON("_id" << 100), kShardKeyPattern.getKeyPattern().globalMax()},
                          startingVersion,
                          {"1"});
@@ -457,7 +456,7 @@ public:
 TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataIsUnknownEvenAfterRefresh) {
     auto opCtx = operationContext();
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(kTestNss, kDefaultUUID, 0, 10, _myShardName);
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
     store.add(opCtx, deletionTask);
@@ -482,7 +481,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
 TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(kTestNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
@@ -510,7 +509,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfNamespaceIsUnshardedBeforeAndAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(kTestNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
@@ -523,7 +522,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
         Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
-    forceShardFilteringMetadataRefresh(opCtx, kNss);
+    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
 
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
 
@@ -538,8 +537,8 @@ TEST_F(SubmitRangeDeletionTaskTest,
 TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUUID) {
     auto opCtx = operationContext();
 
-    auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
+    auto deletionTask = createDeletionTask(kTestNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
@@ -554,7 +553,7 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion(1, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({coll});
-    forceShardFilteringMetadataRefresh(opCtx, kNss);
+    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
 
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
@@ -566,8 +565,8 @@ TEST_F(
     SucceedsIfFilteringMetadataInitiallyUnknownButFilteringMetadataUUIDMatchesTaskUUIDAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
+    auto deletionTask = createDeletionTask(kTestNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
@@ -582,6 +581,9 @@ TEST_F(
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion(1, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({coll});
+
+    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
+    csr().setFilteringMetadata(opCtx, metadata);
 
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
@@ -597,10 +599,10 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(kDefaultDatabaseType);
     _mockCatalogCacheLoader->setCollectionRefreshReturnValue(
         Status(ErrorCodes::NamespaceNotFound, "dummy errmsg"));
-    forceShardFilteringMetadataRefresh(opCtx, kNss);
+    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
 
-    auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
+    auto deletionTask = createDeletionTask(kTestNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
@@ -614,6 +616,9 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion(10, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({matchingColl});
+
+    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
+    csr().setFilteringMetadata(opCtx, metadata);
 
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
@@ -634,10 +639,10 @@ TEST_F(SubmitRangeDeletionTaskTest,
     _mockCatalogCacheLoader->setChunkRefreshReturnValue(
         makeChangedChunks(ChunkVersion(1, 0, staleEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({staleColl});
-    forceShardFilteringMetadataRefresh(opCtx, kNss);
+    forceShardFilteringMetadataRefresh(opCtx, kTestNss);
 
-    auto collectionUUID = createCollectionAndGetUUID(kNss);
-    auto deletionTask = createDeletionTask(kNss, collectionUUID, 0, 10, _myShardName);
+    auto collectionUUID = createCollectionAndGetUUID(kTestNss);
+    auto deletionTask = createDeletionTask(kTestNss, collectionUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
@@ -652,6 +657,9 @@ TEST_F(SubmitRangeDeletionTaskTest,
         makeChangedChunks(ChunkVersion(10, 0, kEpoch, boost::none /* timestamp */)));
     _mockCatalogClient->setCollections({matchingColl});
 
+    auto metadata = makeShardedMetadata(opCtx, collectionUUID);
+    csr().setFilteringMetadata(opCtx, metadata);
+
     // The task should have been submitted successfully.
     auto cleanupCompleteFuture = migrationutil::submitRangeDeletionTask(opCtx, deletionTask);
     cleanupCompleteFuture.get(opCtx);
@@ -661,7 +669,7 @@ TEST_F(SubmitRangeDeletionTaskTest,
        FailsAndDeletesTaskIfFilteringMetadataUUIDDifferentFromTaskUUIDEvenAfterRefresh) {
     auto opCtx = operationContext();
 
-    auto deletionTask = createDeletionTask(kNss, kDefaultUUID, 0, 10, _myShardName);
+    auto deletionTask = createDeletionTask(kTestNss, kDefaultUUID, 0, 10, _myShardName);
 
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
