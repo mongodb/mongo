@@ -36,6 +36,7 @@
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/process_health/health_observer.h"
+#include "mongo/db/process_health/progress_monitor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
@@ -60,9 +61,14 @@ class FaultManager : protected FaultFacetsContainerFactory {
 
 public:
     // The taskExecutor provided should not be already started.
-    explicit FaultManager(ServiceContext* svcCtx,
-                          std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                          std::unique_ptr<FaultManagerConfig> config);
+    FaultManager(ServiceContext* svcCtx,
+                 std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                 std::unique_ptr<FaultManagerConfig> config);
+    // Variant with explicit crash callback for tests.
+    FaultManager(ServiceContext* svcCtx,
+                 std::shared_ptr<executor::TaskExecutor> taskExecutor,
+                 std::unique_ptr<FaultManagerConfig> config,
+                 std::function<void(std::string cause)> crashCb);
     virtual ~FaultManager();
 
     // Start periodic health checks, invoke it once during server startup.
@@ -84,14 +90,17 @@ public:
     // Returns the current fault, if any. Otherwise returns an empty pointer.
     FaultConstPtr currentFault() const;
 
+    // All observers remain valid for the manager lifetime, thus returning
+    // just pointers is safe, as long as they are used while manager exists.
+    std::vector<HealthObserver*> getHealthObservers();
+
+    // Gets the aggregate configuration for all process health environment.
+    FaultManagerConfig getConfig() const;
+
 protected:
     // Starts the health check sequence and updates the internal state on completion.
     // This is invoked by the internal timer.
     virtual void healthCheck();
-
-    // All observers remain valid for the manager lifetime, thus returning
-    // just pointers is safe, as long as they are used while manager exists.
-    std::vector<HealthObserver*> getHealthObservers();
 
     // Protected interface FaultFacetsContainerFactory implementation.
 
@@ -119,23 +128,29 @@ protected:
     // TODO: move this into fault class; refactor to remove FaultInternal
     bool hasCriticalFacet(const FaultInternal* fault) const;
 
-    std::unique_ptr<FaultManagerConfig> _config;
+    void progressMonitorCheckForTests(std::function<void(std::string cause)> crashCb);
 
 private:
     // One time init.
-    void _initHealthObserversIfNeeded();
+    void _firstTimeInitIfNeeded();
 
+    std::unique_ptr<FaultManagerConfig> _config;
     ServiceContext* const _svcCtx;
+    std::shared_ptr<executor::TaskExecutor> _taskExecutor;
+    // Callback used to crash the server.
+    std::function<void(std::string cause)> _crashCb;
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManager::_mutex");
 
     std::shared_ptr<FaultInternal> _fault;
     // We lazily init all health observers.
-    AtomicWord<bool> _initializedAllHealthObservers{false};
+    AtomicWord<bool> _firstTimeInitExecuted{false};
+    // This source is canceled before the _taskExecutor shutdown(). It
+    // can be used to check for the start of the shutdown sequence.
+    CancellationSource _managerShuttingDownCancellationSource;
     // Manager owns all observer instances.
     std::vector<std::unique_ptr<HealthObserver>> _observers;
-    std::shared_ptr<executor::TaskExecutor> _taskExecutor;
     boost::optional<executor::TaskExecutor::CallbackHandle> _periodicHealthCheckCbHandle;
     SharedPromise<void> _initialHealthCheckCompletedPromise;
 
@@ -162,6 +177,8 @@ private:
         ExecutorFuture<void> activeFaultTransition;
     };
     std::unique_ptr<TransientFaultDeadline> _transientFaultDeadline;
+
+    std::unique_ptr<ProgressMonitor> _progressMonitor;
 };
 
 }  // namespace process_health

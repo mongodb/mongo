@@ -50,8 +50,7 @@ namespace {
 // by the instantiate method below will be greater than expected.
 TEST_F(FaultManagerTest, Registration) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0; });
-    auto allObservers =
-        HealthObserverRegistration::instantiateAllObservers(&clockSource(), &tickSource());
+    auto allObservers = HealthObserverRegistration::instantiateAllObservers(svcCtx());
     ASSERT_EQ(1, allObservers.size());
     ASSERT_EQ(FaultFacetType::kMock1, allObservers[0]->getType());
 }
@@ -70,7 +69,7 @@ TEST_F(FaultManagerTest, HealthCheckCreatesFacetOnHealthCheckFoundFault) {
 
     advanceTime(Milliseconds(100));
     manager().healthCheckTest();
-    waitForFaultBeingCreated();
+    waitForTransitionIntoState(FaultState::kTransientFault);
     auto currentFault = manager().currentFault();
     ASSERT_TRUE(currentFault);  // Is created.
 }
@@ -221,16 +220,58 @@ TEST_F(FaultManagerTest, InitialHealthCheckDoesNotRunIfFeatureFlagNotEnabled) {
     ASSERT_TRUE(manager().getFaultState() == FaultState::kStartupCheck);
 }
 
+TEST_F(FaultManagerTest, Stats) {
+    advanceTime(Milliseconds(100));
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.1; });
+    waitForTransitionIntoState(FaultState::kTransientFault);
+
+    auto observer = manager().getHealthObserversTest()[0];
+    auto stats = observer->getStats();
+    ASSERT_TRUE(stats.isEnabled);
+    ASSERT_FALSE(stats.currentlyRunningHealthCheck);
+    ASSERT_TRUE(stats.lastTimeCheckStarted >= clockSource().now());
+    ASSERT_TRUE(stats.lastTimeCheckCompleted >= stats.lastTimeCheckStarted);
+    ASSERT_TRUE(stats.completedChecksCount >= 1);
+    ASSERT_TRUE(stats.completedChecksWithFaultCount >= 1);
+}
+
+TEST_F(FaultManagerTest, ProgressMonitorCheck) {
+    AtomicWord<bool> shouldBlock{true};
+    registerMockHealthObserver(FaultFacetType::kMock1, [this, &shouldBlock] {
+        while (shouldBlock.load()) {
+            sleepFor(Milliseconds(1));
+        }
+        return 0.1;
+    });
+
+    // Health check should get stuck here.
+    manager().healthCheckTest();
+    // Verify that the 'crash callback' is invoked after timeout.
+    bool crashTriggered = false;
+    std::function<void(std::string cause)> crashCb = [&crashTriggered](std::string) {
+        crashTriggered = true;
+    };
+    manager().progressMonitorCheckTest(crashCb);
+    // The progress check passed because the simulated time did not advance.
+    ASSERT_FALSE(crashTriggered);
+    advanceClockSourcesTime(manager().getConfig().getPeriodicLivenessDeadline() + Seconds(1));
+    manager().progressMonitorCheckTest(crashCb);
+    // The progress check simulated a crash.
+    ASSERT_TRUE(crashTriggered);
+    shouldBlock.store(false);
+    resetManager();  // Before fields above go out of scope.
+}
+
 TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeout) {
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
     waitForTransitionIntoState(FaultState::kTransientFault);
     ASSERT_TRUE(manager().getFaultState() == FaultState::kTransientFault);
-    advanceTime(manager().getConfig()->getActiveFaultDuration() + Milliseconds(1));
+    advanceTime(manager().getConfig().getActiveFaultDuration() + Milliseconds(1));
     waitForTransitionIntoState(FaultState::kActiveFault);
 }
 
 TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
-    const auto activeFaultDuration = manager().getConfig()->getActiveFaultDuration();
+    const auto activeFaultDuration = manager().getConfigTest().getActiveFaultDuration();
     const auto start = clockSource().now();
 
     // Initially unhealthy; Transitions to healthy before the active fault timeout.
@@ -241,9 +282,8 @@ TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
             Milliseconds(durationCount<Milliseconds>(activeFaultDuration) / 4);
         if (elapsed < quarterActiveFaultDuration) {
             return 1.1;
-        } else {
-            return 0.0;
         }
+        return 0.0;
     });
     waitForTransitionIntoState(FaultState::kTransientFault);
     assertSoonWithHealthCheck([this]() { return manager().getFaultState() == FaultState::kOk; });

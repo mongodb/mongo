@@ -49,9 +49,9 @@ TEST(FaultManagerTest, Registration) {
 // Tests the default health observer intensity of non-critical
 TEST_F(FaultManagerTest, GetHealthObserverIntensity) {
     auto config = manager().getConfig();
-    ASSERT(config->getHealthObserverIntensity(FaultFacetType::kLdap) ==
+    ASSERT(config.getHealthObserverIntensity(FaultFacetType::kLdap) ==
            HealthObserverIntensityEnum::kNonCritical);
-    ASSERT(config->getHealthObserverIntensity(FaultFacetType::kDns) ==
+    ASSERT(config.getHealthObserverIntensity(FaultFacetType::kDns) ==
            HealthObserverIntensityEnum::kNonCritical);
 }
 

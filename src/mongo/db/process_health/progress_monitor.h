@@ -29,42 +29,46 @@
 #pragma once
 
 #include <functional>
-#include <vector>
-
-#include "mongo/db/process_health/health_observer.h"
+#include <string>
+#include <thread>
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 namespace process_health {
 
+class FaultManager;
+
 /**
- * Registration mechanism for all health observers.
- * This is static class not requiring an instance to work.
+ *  Tracks that the health checks are invoked regularly and have progress.
  */
-class HealthObserverRegistration {
+class ProgressMonitor {
 public:
-    /**
-     * Registers a factory method, which will be invoked later to instantiate the observer.
-     * This must be invoked by static initializers, the code is not internally synchronized.
-     *
-     * @param factoryCallback creates observer instance when invoked.
-     */
-    static void registerObserverFactory(
-        std::function<std::unique_ptr<HealthObserver>(ServiceContext* svcCtx)> factoryCallback);
+    ProgressMonitor(FaultManager* faultManager,
+                    ServiceContext* svcCtx,
+                    std::function<void(std::string cause)> crashCb);
 
-    /**
-     * Invokes all registered factories and returns new instances.
-     * The ownership of all observers is transferred to the invoker.
-     */
-    static std::vector<std::unique_ptr<HealthObserver>> instantiateAllObservers(
-        ServiceContext* svcCtx);
+    // Signals that the monitoring can stop and blocks until the thread is joined.
+    // Invoked to signal that the task executor is joined.
+    void join();
 
-    /**
-     * Test-only method to cleanup the list of registered factories.
-     */
-    static void resetObserverFactoriesForTest();
+    // Checks that the health checks are invoked and are not stuck forever. Invokes the callback
+    // after timeout configured by options.
+    void progressMonitorCheck(std::function<void(std::string cause)> crashCb);
+
+private:
+    // Checks that the periodic health checks actually make progress.
+    void _progressMonitorLoop();
+
+    FaultManager* const _faultManager;
+    ServiceContext* const _svcCtx;
+    // Callback used to crash the server.
+    const std::function<void(std::string cause)> _crashCb;
+    // This flag is set after the _taskExecutor join() returns, thus
+    // we know no more health checks are still running.
+    AtomicWord<bool> _terminate{false};
+    stdx::thread _progressMonitorThread;
 };
 
 }  // namespace process_health

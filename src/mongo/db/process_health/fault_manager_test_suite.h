@@ -56,7 +56,13 @@ class FaultManagerTestImpl : public FaultManager {
 public:
     FaultManagerTestImpl(ServiceContext* svcCtx,
                          std::shared_ptr<executor::TaskExecutor> taskExecutor)
-        : FaultManager(svcCtx, taskExecutor, std::make_unique<FaultManagerConfig>()) {}
+        : FaultManager(
+              svcCtx, taskExecutor, std::make_unique<FaultManagerConfig>(), [](std::string cause) {
+                  // In tests, do not crash.
+                  LOGV2(5936606,
+                        "Fault manager progress monitor triggered the termination",
+                        "cause"_attr = cause);
+              }) {}
 
     void transitionStateTest(FaultState newState) {
         transitionToState(newState);
@@ -88,8 +94,12 @@ public:
         return *(static_cast<FaultInternal*>(fault.get()));
     }
 
-    FaultManagerConfig* getConfig() {
-        return _config.get();
+    void progressMonitorCheckTest(std::function<void(std::string cause)> crashCb) {
+        progressMonitorCheckForTests(crashCb);
+    }
+
+    FaultManagerConfig getConfigTest() {
+        return getConfig();
     }
 };
 
@@ -104,6 +114,7 @@ public:
 
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+        _svcCtx->setPreciseClockSource(std::make_unique<ClockSourceMock>());
         _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
 
         resetManager();
@@ -130,9 +141,8 @@ public:
     void registerMockHealthObserver(FaultFacetType mockType,
                                     std::function<double()> getSeverityCallback) {
         HealthObserverRegistration::registerObserverFactory(
-            [mockType, getSeverityCallback](ClockSource* clockSource, TickSource* tickSource) {
-                return std::make_unique<HealthObserverMock>(
-                    mockType, clockSource, tickSource, getSeverityCallback);
+            [mockType, getSeverityCallback](ServiceContext* svcCtx) {
+                return std::make_unique<HealthObserverMock>(mockType, svcCtx, getSeverityCallback);
             });
     }
 
@@ -144,6 +154,10 @@ public:
         return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
     }
 
+    ServiceContext* svcCtx() const {
+        return _svcCtx.get();
+    }
+
     TickSourceMock<Milliseconds>& tickSource() {
         return *static_cast<TickSourceMock<Milliseconds>*>(_svcCtx->getTickSource());
     }
@@ -152,7 +166,13 @@ public:
     void advanceTime(Duration d) {
         executor::NetworkInterfaceMock::InNetworkGuard guard(_net);
         _net->advanceTime(_net->now() + d);
+        advanceClockSourcesTime(d);
+    }
+
+    template <typename Duration>
+    void advanceClockSourcesTime(Duration d) {
         clockSource().advance(d);
+        static_cast<ClockSourceMock*>(_svcCtx->getPreciseClockSource())->advance(d);
         tickSource().advance(d);
     }
 
