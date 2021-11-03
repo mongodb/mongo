@@ -56,7 +56,7 @@ assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 thread.join();
 
 jsTest.log("Verify that connections were denied");
-checkLog.containsJson(admin, 20240, {}, 0);
+checkLog.containsJson(admin, 20240, {}, 1);
 
 replTest.awaitReplication();
 
