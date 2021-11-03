@@ -198,7 +198,7 @@ class UnitJob(job.Job):  # pylint: disable=too-many-instance-attributes
         self.total_test_num = 0
         self.tests = {}
 
-    def _execute_test(self, test):
+    def _execute_test(self, test, hook_failure_flag=None):
         self.total_test_num += 1
         if test.test_name not in self.tests:
             self.tests[test.test_name] = 0

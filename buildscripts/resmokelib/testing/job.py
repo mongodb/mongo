@@ -48,7 +48,8 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         # Drain the queue to unblock the main thread.
         Job._drain_queue(queue)
 
-    def __call__(self, queue, interrupt_flag, setup_flag=None, teardown_flag=None):
+    def __call__(self, queue, interrupt_flag, setup_flag=None, teardown_flag=None,
+                 hook_failure_flag=None):
         """Continuously execute tests from 'queue' and records their details in 'report'.
 
         If 'setup_flag' is not None, then a test to set up the fixture will be run
@@ -81,7 +82,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
         if setup_succeeded:
             try:
-                self._run(queue, interrupt_flag, teardown_flag)
+                self._run(queue, interrupt_flag, teardown_flag, hook_failure_flag)
             except errors.StopExecution as err:
                 # Stop running tests immediately.
                 self.logger.error("Received a StopExecution exception: %s.", err)
@@ -117,26 +118,24 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         """Get current time to aid in the unit testing of the _run method."""
         return time.time()
 
-    def _run(self, queue, interrupt_flag, teardown_flag=None):
+    def _run(self, queue, interrupt_flag, teardown_flag=None, hook_failure_flag=None):
         """Call the before/after suite hooks and continuously execute tests from 'queue'."""
 
-        for hook in self.hooks:
-            hook.before_suite(self.report)
+        self._run_hooks_before_suite(hook_failure_flag)
 
         while not queue.empty() and not interrupt_flag.is_set():
             queue_elem = queue.get_nowait()
             test_time_start = self._get_time()
             try:
                 test = queue_elem.testcase
-                self._execute_test(test)
+                self._execute_test(test, hook_failure_flag)
             finally:
                 queue_elem.job_completed(self._get_time() - test_time_start)
                 queue.task_done()
 
             self._requeue_test(queue, queue_elem, interrupt_flag)
 
-        for hook in self.hooks:
-            hook.after_suite(self.report, teardown_flag)
+        self._run_hooks_after_suite(teardown_flag, hook_failure_flag)
 
     def _log_requeue_test(self, queue_elem):
         """Log the requeue of a test."""
@@ -165,11 +164,11 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
             self._log_requeue_test(queue_elem)
             queue.put(queue_elem)
 
-    def _execute_test(self, test):
+    def _execute_test(self, test, hook_failure_flag):
         """Call the before/after test hooks and execute 'test'."""
 
         test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE)
-        self._run_hooks_before_tests(test)
+        self._run_hooks_before_tests(test, hook_failure_flag)
         self.report.logging_prefix = create_fixture_table(self.fixture)
 
         test(self.report)
@@ -199,26 +198,51 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
 
             # Stop background hooks first since they can interfere with fixture startup and teardown
             # done as part of archival.
-            self._run_hooks_after_tests(test, background=True)
+            self._run_hooks_after_tests(test, hook_failure_flag, background=True)
 
             if self.archival:
                 result = TestResult(test=test, hook=None, success=success)
                 self.archival.archive(self.logger, result, self.manager)
 
-            self._run_hooks_after_tests(test, background=False)
+            self._run_hooks_after_tests(test, hook_failure_flag, background=False)
 
-    def _run_hook(self, hook, hook_function, test):
+    def _run_hook(self, hook, hook_function, test, hook_failure_flag):
         """Provide helper to run hook and archival."""
         try:
             success = False
             hook_function(test, self.report)
             success = True
         finally:
+            if not success and hook_failure_flag is not None:
+                hook_failure_flag.set()
+
             if self.archival:
                 result = TestResult(test=test, hook=hook, success=success)
                 self.archival.archive(self.logger, result, self.manager)
 
-    def _run_hooks_before_tests(self, test):
+    def _run_hooks_before_suite(self, hook_failure_flag):
+        """Run the before_suite method on each of the hooks."""
+        hooks_failed = True
+        try:
+            for hook in self.hooks:
+                hook.before_suite(self.report)
+            hooks_failed = False
+        finally:
+            if hooks_failed and hook_failure_flag is not None:
+                hook_failure_flag.set()
+
+    def _run_hooks_after_suite(self, teardown_flag, hook_failure_flag):
+        """Run the after_suite method on each of the hooks."""
+        hooks_failed = True
+        try:
+            for hook in self.hooks:
+                hook.after_suite(self.report, teardown_flag)
+            hooks_failed = False
+        finally:
+            if hooks_failed and hook_failure_flag is not None:
+                hook_failure_flag.set()
+
+    def _run_hooks_before_tests(self, test, hook_failure_flag):
         """Run the before_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
@@ -226,7 +250,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         """
         try:
             for hook in self.hooks:
-                self._run_hook(hook, hook.before_test, test)
+                self._run_hook(hook, hook.before_test, test, hook_failure_flag)
 
         except errors.StopExecution:
             raise
@@ -251,7 +275,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
             self.report.stopTest(test)
             raise
 
-    def _run_hooks_after_tests(self, test, background=False):
+    def _run_hooks_after_tests(self, test, hook_failure_flag, background=False):
         """Run the after_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
@@ -263,7 +287,7 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         try:
             for hook in self.hooks:
                 if hook.IS_BACKGROUND == background:
-                    self._run_hook(hook, hook.after_test, test)
+                    self._run_hook(hook, hook.after_test, test, hook_failure_flag)
 
         except errors.StopExecution:
             raise

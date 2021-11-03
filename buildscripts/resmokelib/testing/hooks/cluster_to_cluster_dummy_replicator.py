@@ -1,4 +1,4 @@
-"""Test hook for running the dummy replicator on two clusters."""
+"""Test implementation for running the dummy replicator on two clusters."""
 import copy
 import os.path
 

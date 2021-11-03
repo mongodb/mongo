@@ -88,7 +88,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         n_jobs_to_start = self._num_jobs_to_start(self._suite, num_tests)
         return [self._make_job(job_num) for job_num in range(n_jobs_to_start)]
 
-    def run(self):
+    def run(self):  # pylint: disable=too-many-branches
         """Execute the test suite.
 
         Any exceptions that occur during setting up or tearing down a
@@ -104,6 +104,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         # a test suite run earlier can be reused during this current test suite.
         network.PortAllocator.reset()
         teardown_flag = None
+        hook_failure_flag = None
         try:
             num_repeat_suites = self._suite.options.num_repeat_suites
             while num_repeat_suites > 0:
@@ -117,30 +118,39 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
                 # still running if an Evergreen task were to time out from a hang/deadlock being
                 # triggered.
                 teardown_flag = threading.Event() if num_repeat_suites == 1 else None
-                (report, interrupted) = self._run_tests(test_queue, setup_flag, teardown_flag)
+                # We use the 'hook_failure_flag' to distinguish hook failures from other failures,
+                # so that we can return a separate return code when a hook has failed.
+                hook_failure_flag = threading.Event()
+                (report, interrupted) = self._run_tests(test_queue, setup_flag, teardown_flag,
+                                                        hook_failure_flag)
 
                 self._suite.record_test_end(report)
 
                 if setup_flag and setup_flag.is_set():
                     self.logger.error("Setup of one of the job fixtures failed")
-                    return_code = 2
+                    return_code = max(return_code, 2)
                     return
                 # Remove the setup flag once the first suite ran.
                 setup_flag = None
+
+                if hook_failure_flag.is_set():
+                    # The hook failure return code is highest so it will take precedence when
+                    # reported.
+                    return_code = max(return_code, 3)
 
                 # If the user triggered a KeyboardInterrupt, then we should stop.
                 if interrupted:
                     raise errors.UserInterrupt("Received interrupt from user")
 
                 if teardown_flag and teardown_flag.is_set():
-                    return_code = 2
+                    return_code = max(return_code, 2)
 
                 sb = []  # String builder.
                 self._suite.summarize_latest(sb)
                 self.logger.info("Summary of latest execution: %s", "\n    ".join(sb))
 
                 if not report.wasSuccessful():
-                    return_code = 1
+                    return_code = max(return_code, 1)
                     if self._suite.options.fail_fast:
                         break
 
@@ -159,10 +169,11 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         finally:
             if not teardown_flag:
                 if not self._teardown_fixtures():
-                    return_code = 2
+                    return_code = max(return_code, 2)
+
             self._suite.return_code = return_code
 
-    def _run_tests(self, test_queue, setup_flag, teardown_flag):
+    def _run_tests(self, test_queue, setup_flag, teardown_flag, hook_failure_flag):
         """Start a thread for each Job instance and block until all of the tests are run.
 
         Returns a (combined report, user interrupted) pair, where the
@@ -178,7 +189,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
             for job in self._jobs:
                 thr = threading.Thread(
                     target=job, args=(test_queue, interrupt_flag), kwargs=dict(
-                        setup_flag=setup_flag, teardown_flag=teardown_flag))
+                        setup_flag=setup_flag, teardown_flag=teardown_flag,
+                        hook_failure_flag=hook_failure_flag))
                 # Do not wait for tests to finish executing if interrupted by the user.
                 thr.daemon = True
                 thr.start()
