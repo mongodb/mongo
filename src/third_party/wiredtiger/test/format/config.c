@@ -1401,7 +1401,7 @@ config_single(TABLE *table, const char *s, bool explicit)
      * configuration option includes JSON characters.
      */
     for (t = (const u_char *)s; *t != '\0'; ++t)
-        if (!__wt_isalnum(*t) && !__wt_isspace(*t) && strchr("()-.:=[]_,", *t) == NULL)
+        if (!__wt_isalnum(*t) && !__wt_isspace(*t) && strchr("\"'()-.:=[]_,", *t) == NULL)
             testutil_die(
               EINVAL, "%s: configuration contains unexpected character %#x", progname, (u_int)*t);
 
