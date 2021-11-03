@@ -153,38 +153,39 @@ SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(Opera
     }();
 
     stdx::lock_guard<Latch> lk(_mutex);
-    if (!readTimestamp) {
-        if (!MONGO_unlikely(tenantMigrationDonorAllowsNonTimestampedReads.shouldFail()) &&
-            _state.isReject() &&
-            commandDenyListAfterMigration.find(command) != commandDenyListAfterMigration.end()) {
-            LOGV2_DEBUG(5505100,
-                        1,
-                        "Donor blocking non-timestamped reads after committed migration",
-                        "command"_attr = command,
-                        "tenantId"_attr = _tenantId);
+
+    switch (_state.getState()) {
+        case BlockerState::State::kAllow:
+        case BlockerState::State::kBlockWrites:
+        case BlockerState::State::kAborted:
+            return SharedSemiFuture<void>();
+
+        case BlockerState::State::kBlockWritesAndReads:
+            if (!readTimestamp || *readTimestamp < *_blockTimestamp) {
+                return SharedSemiFuture<void>();
+            } else {
+                _stats.numBlockedReads.addAndFetch(1);
+                return _transitionOutOfBlockingPromise.getFuture();
+            }
+
+        case BlockerState::State::kReject:
+            if (!readTimestamp) {
+                if (MONGO_unlikely(tenantMigrationDonorAllowsNonTimestampedReads.shouldFail()) ||
+                    commandDenyListAfterMigration.find(command) ==
+                        commandDenyListAfterMigration.end()) {
+                    return SharedSemiFuture<void>();
+                }
+            } else if (*readTimestamp < *_blockTimestamp) {
+                return SharedSemiFuture<void>();
+            }
+
             return SharedSemiFuture<void>(
                 Status(ErrorCodes::TenantMigrationCommitted,
                        "Read must be re-routed to the new owner of this tenant"));
-        } else {
-            return SharedSemiFuture<void>();
-        }
+
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    auto canRead = _state.isAllow() || _state.isAborted() || _state.isBlockWrites() ||
-        *readTimestamp < *_blockTimestamp;
-
-    if (canRead) {
-        return SharedSemiFuture<void>();
-    }
-
-    if (_state.isReject()) {
-        return SharedSemiFuture<void>(
-            Status(ErrorCodes::TenantMigrationCommitted,
-                   "Read must be re-routed to the new owner of this tenant"));
-    }
-
-    _stats.numBlockedReads.addAndFetch(1);
-    return _transitionOutOfBlockingPromise.getFuture();
 }
 
 Status TenantMigrationDonorAccessBlocker::checkIfLinearizableReadWasAllowed(
