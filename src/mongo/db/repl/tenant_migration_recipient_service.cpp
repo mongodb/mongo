@@ -229,6 +229,14 @@ public:
     virtual StatusWith<ReplSetConfig> getCurrentConfig() const final {
         MONGO_UNREACHABLE;
     }
+
+    StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) const final {
+        MONGO_UNREACHABLE;
+    }
+
+    Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) final {
+        MONGO_UNREACHABLE;
+    }
 };
 
 

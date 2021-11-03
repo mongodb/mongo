@@ -121,9 +121,20 @@ public:
         ThreadPool* writerPool) = 0;
 
     /**
-     * Returns the current replica set config if there is one, or an error why there isn't.
+     * Returns the current in-memory replica set config if there is one, or an error why there
+     * isn't.
      */
     virtual StatusWith<ReplSetConfig> getCurrentConfig() const = 0;
+
+    /**
+     * Returns the current stored replica set config if there is one, or an error why there isn't.
+     */
+    virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) const = 0;
+
+    /**
+     * Stores the replica set config document in local storage, or returns an error.
+     */
+    virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
 };
 
 }  // namespace repl

@@ -124,5 +124,18 @@ StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() co
     return replSetConfigResult;
 }
 
+StatusWith<BSONObj> DataReplicatorExternalStateMock::loadLocalConfigDocument(
+    OperationContext* opCtx) const {
+    if (replSetConfigResult.isOK()) {
+        return replSetConfigResult.getValue().toBSON();
+    }
+    return replSetConfigResult.getStatus();
+}
+
+Status DataReplicatorExternalStateMock::storeLocalConfigDocument(OperationContext* opCtx,
+                                                                 const BSONObj& config) {
+    return Status::OK();
+}
+
 }  // namespace repl
 }  // namespace mongo

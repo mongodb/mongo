@@ -80,6 +80,10 @@ public:
 
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
+    StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) const override;
+
+    Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
+
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;
     ReplicationCoordinatorExternalState* getReplicationCoordinatorExternalState() const;

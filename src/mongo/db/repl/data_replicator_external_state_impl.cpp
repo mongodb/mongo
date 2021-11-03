@@ -152,6 +152,17 @@ StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() co
     return _replicationCoordinator->getConfig();
 }
 
+StatusWith<BSONObj> DataReplicatorExternalStateImpl::loadLocalConfigDocument(
+    OperationContext* opCtx) const {
+    return _replicationCoordinatorExternalState->loadLocalConfigDocument(opCtx);
+}
+
+Status DataReplicatorExternalStateImpl::storeLocalConfigDocument(OperationContext* opCtx,
+                                                                 const BSONObj& config) {
+    return _replicationCoordinatorExternalState->storeLocalConfigDocument(
+        opCtx, config, false /* write oplog entry */);
+}
+
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {
     return _replicationCoordinator;
 }

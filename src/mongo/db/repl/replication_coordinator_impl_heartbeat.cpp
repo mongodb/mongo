@@ -688,7 +688,16 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         auto status = _externalState->storeLocalConfigDocument(
             opCtx.get(), newConfig.toBSON(), false /* writeOplog */);
         // Wait for durability of the new config document.
-        JournalFlusher::get(opCtx.get())->waitForJournalFlush();
+        try {
+            JournalFlusher::get(opCtx.get())->waitForJournalFlush();
+        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
+            // Anyone changing the storage engine is responsible for copying the on-disk
+            // configuration between the old engine and the new.
+            LOGV2_DEBUG(6121300,
+                        1,
+                        "Storage engine changed while waiting for new config to become durable.",
+                        "error"_attr = e.toStatus());
+        }
 
         bool isFirstConfig;
         {
