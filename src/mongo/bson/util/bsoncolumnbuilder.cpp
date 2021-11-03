@@ -485,7 +485,7 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
                 }
                 case bsonTimestamp: {
                     int64_t currTimestampDelta =
-                        calcDelta(elem.timestamp().asULL(), previous.timestamp().asULL());
+                        calcDelta(elem.timestampValue(), previous.timestampValue());
                     value = calcDelta(currTimestampDelta, _prevDelta);
                     _prevDelta = currTimestampDelta;
                     break;

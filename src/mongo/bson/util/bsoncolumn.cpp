@@ -544,7 +544,7 @@ void BSONColumn::Iterator::DecodingState::_loadLiteral(const BSONElement& elem) 
             break;
         case bsonTimestamp:
             _lastEncodedValue64 = 0;
-            _lastEncodedValueForDeltaOfDelta = elem.timestamp().asULL();
+            _lastEncodedValueForDeltaOfDelta = elem.timestampValue();
             break;
         case NumberDecimal:
             _lastEncodedValue128 = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());

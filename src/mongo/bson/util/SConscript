@@ -55,3 +55,14 @@ env.CppUnitTest(
         'bson_extract',
     ],
 )
+
+env.Benchmark(
+    target='bsoncolumn_bm',
+    source=[
+        'bsoncolumn_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'bson_column'
+    ],
+)

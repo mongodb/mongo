@@ -1,0 +1,14 @@
+# This benchmark measures the performance of BSONColumn (compressed binary subtype 7).
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  include_files:
+  # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/install/bin/bsoncolumn_bm*
+  - build/install/bin/simple8b_bm*
+
+executor:
+  config: {}
+  hooks:
+  - class: CombineBenchmarkResults

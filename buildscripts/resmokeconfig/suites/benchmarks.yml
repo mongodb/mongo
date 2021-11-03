@@ -13,6 +13,9 @@ selector:
   - build/install/bin/sharding_write_router_bm*
   # These benchmarks are being run as part of the benchmarks_cst.yml test suite.
   - build/install/bin/cst_bm*
+  # These benchmarks are being run as part of the benchmarks_bsoncolumn.yml test suite.
+  - build/install/bin/bsoncolumn_bm*
+  - build/install/bin/simple8b_bm*
   # Hash table benchmark is really slow, don't run on evergreen
   - build/install/bin/hash_table_bm*
 
