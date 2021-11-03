@@ -53,10 +53,6 @@ testutil_die(int e, const char *fmt, ...)
     (void)fflush(stdout);
     (void)fflush(stderr);
 
-    /* Allow test programs to cleanup on fatal error. */
-    if (custom_die != NULL)
-        (*custom_die)();
-
     fprintf(stderr, "%s: FAILED", progname);
     if (fmt != NULL) {
         fprintf(stderr, ": ");
@@ -67,8 +63,14 @@ testutil_die(int e, const char *fmt, ...)
     if (e != 0)
         fprintf(stderr, ": %s", wiredtiger_strerror(e));
     fprintf(stderr, "\n");
-    fprintf(stderr, "%s: process aborting\n", progname);
+    (void)fflush(stderr);
 
+    /* Allow test programs to cleanup on fatal error. */
+    if (custom_die != NULL)
+        (*custom_die)();
+
+    /* Drop core. */
+    fprintf(stderr, "%s: process aborting\n", progname);
     __wt_abort(NULL);
 }
 

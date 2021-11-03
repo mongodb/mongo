@@ -145,6 +145,8 @@ format_process_env(void)
             set_alarm(0);                             \
     } while (0)
 
+static bool syntax_check; /* Only checking configuration syntax. */
+
 int
 main(int argc, char *argv[])
 {
@@ -160,10 +162,6 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
-    /* The monitoring program looks for this line in the log file, push it out quickly. */
-    printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
-    fflush(stdout);
-
     format_process_env();
 
     /*
@@ -176,8 +174,8 @@ main(int argc, char *argv[])
 
     /* Set values from the command line. */
     home = NULL;
-    quiet_flag = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "1BC:c:h:qRrT:t")) != EOF)
+    quiet_flag = syntax_check = false;
+    while ((ch = __wt_getopt(progname, argc, argv, "1BC:c:h:qRSrT:t")) != EOF)
         switch (ch) {
         case '1':
             /* Ignored for backward compatibility. */
@@ -200,6 +198,9 @@ main(int argc, char *argv[])
         case 'R': /* Reopen (start running on an existing database) */
             g.reopen = true;
             break;
+        case 'S': /* Configuration syntax check */
+            syntax_check = true;
+            break;
         case 'T': /* Trace specifics. */
             trace_config(__wt_optarg);
             /* FALLTHROUGH */
@@ -210,6 +211,12 @@ main(int argc, char *argv[])
             usage();
         }
     argv += __wt_optind;
+
+    /* format.sh looks for this line in the log file, push it out quickly. */
+    if (!syntax_check) {
+        printf("%s: process %" PRIdMAX " running\n", progname, (intmax_t)getpid());
+        fflush(stdout);
+    }
 
     __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
 
@@ -264,6 +271,10 @@ main(int argc, char *argv[])
     /* Configure the run. */
     config_run();
     g.configured = true;
+
+    /* If checking a CONFIG file syntax, we're done. */
+    if (syntax_check)
+        exit(0);
 
     /* Initialize locks to single-thread backups and timestamps. */
     lock_init(g.wts_session, &g.backup_lock);
@@ -358,6 +369,10 @@ main(int argc, char *argv[])
 static void
 format_die(void)
 {
+    /* If only checking configuration syntax, no need to message or drop core. */
+    if (syntax_check)
+        exit(1);
+
     /*
      * Turn off progress reports and tracing so we don't obscure the error message or drop core when
      * using a session that's being closed. The lock we're about to acquire will act as a barrier to

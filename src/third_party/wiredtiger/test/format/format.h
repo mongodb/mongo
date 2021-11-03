@@ -427,4 +427,6 @@ void wts_verify(TABLE *, void *);
 #define CUR2S(c) ((WT_SESSION_IMPL *)((WT_CURSOR *)c)->session)
 #endif
 
+#define WARN(fmt, ...) fprintf(stderr, "%s: WARNING: " fmt "\n", progname, __VA_ARGS__);
+
 #include "format.i"
