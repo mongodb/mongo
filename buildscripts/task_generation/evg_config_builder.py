@@ -15,8 +15,9 @@ from buildscripts.task_generation.suite_split import SuiteSplitService, Generate
     SuiteSplitParameters
 from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerTask
 
-
 # pylint: disable=too-many-instance-attributes
+
+
 class EvgConfigBuilder:
     """A builder class for building evergreen configuration."""
 
@@ -59,16 +60,6 @@ class EvgConfigBuilder:
             self.build_variants[build_variant] = BuildVariant(build_variant, activate=False)
         return self.build_variants[build_variant]
 
-    def _generate_suites_config(self, generated_suite: GeneratedSuite) -> List[GeneratedFile]:
-        """
-        Generate the suites files and evergreen configuration for the generated task.
-
-        :param generated_suite: Generated suite to create config files for.
-        :return: The suites files and evergreen configuration for the generated task.
-        """
-        return self.resmoke_proxy.render_suite_files(generated_suite,
-                                                     self.gen_options.create_misc_suite)
-
     def generate_suite(self, split_params: SuiteSplitParameters,
                        gen_params: ResmokeGenTaskParams) -> None:
         """
@@ -80,8 +71,9 @@ class EvgConfigBuilder:
         generated_suite = self.suite_split_service.split_suite(split_params)
         with self.lock:
             build_variant = self.get_build_variant(generated_suite.build_variant)
-            self.evg_config_gen_service.generate_task(generated_suite, build_variant, gen_params)
-        self.generated_files.extend(self._generate_suites_config(generated_suite))
+            resmoke_tasks = self.evg_config_gen_service.generate_task(generated_suite,
+                                                                      build_variant, gen_params)
+        self.generated_files.extend(self.resmoke_proxy.render_suite_files(resmoke_tasks))
 
     def generate_fuzzer(self, fuzzer_params: FuzzerGenTaskParams) -> FuzzerTask:
         """

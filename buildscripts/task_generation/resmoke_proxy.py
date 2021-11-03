@@ -1,7 +1,6 @@
 """A service to proxy requests to resmoke."""
-import os
 from copy import deepcopy
-from typing import List, Dict, Any, NamedTuple, TYPE_CHECKING
+from typing import List, Dict, Any, NamedTuple, TYPE_CHECKING, Set
 
 import inject
 import structlog
@@ -10,6 +9,7 @@ import yaml
 import buildscripts.resmokelib.parser as _parser
 import buildscripts.resmokelib.suitesconfig as _suiteconfig
 from buildscripts.task_generation.generated_config import GeneratedFile
+from buildscripts.task_generation.task_types.models.resmoke_task_model import ResmokeTask
 
 if TYPE_CHECKING:
     from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
@@ -58,38 +58,29 @@ class ResmokeProxyService:
         """
         return self._suite_config.SuiteFinder.get_config_obj(suite_name)
 
-    def render_suite_files(self, suite: "GeneratedSuite",
-                           create_misc_suite: bool) -> List[GeneratedFile]:
+    def render_suite_files(self, tasks: List[ResmokeTask]) -> List[GeneratedFile]:
         """
         Render the given list of suites.
 
         This will create a dictionary of all the resmoke config files to create with the
         filename of each file as the key and the contents as the value.
 
-        :param suite: Generated suite files belong to.
-        :param create_misc_suite: Whether to create the file for the _misc task.
+        :param tasks: resmoke tasks to generate config files for.
         :return: Dictionary of rendered resmoke config files.
         """
+        suite_configs = []
         # pylint: disable=too-many-arguments
-        original_suite_name = suite.suite_name
-        test_list = suite.get_test_list()
-
-        source_config = self._suite_config.SuiteFinder.get_config_obj(original_suite_name)
-        suite_configs = [
-            GeneratedFile(
-                file_name=suite.sub_suite_config_file(i),
-                content=sub_suite.generate_resmoke_config(source_config))
-            for i, sub_suite in enumerate(suite.sub_suites)
-        ]
-        if create_misc_suite:
+        for resmoke_task in tasks:
+            source_config = self._suite_config.SuiteFinder.get_config_obj(
+                resmoke_task.resmoke_suite_name)
             suite_configs.append(
                 GeneratedFile(
-                    file_name=suite.sub_suite_config_file(None),
-                    content=generate_resmoke_suite_config(source_config, original_suite_name,
-                                                          excludes=test_list)))
+                    file_name=resmoke_task.execution_task_suite_yaml_name,
+                    content=generate_resmoke_suite_config(
+                        source_config, resmoke_task.resmoke_suite_name,
+                        roots=resmoke_task.test_list, excludes=resmoke_task.excludes)))
 
-        LOGGER.debug("Generated files for suite", suite=original_suite_name,
-                     files=[f.file_name for f in suite_configs])
+        LOGGER.debug("Generated files", files=[f.file_name for f in suite_configs])
 
         return suite_configs
 

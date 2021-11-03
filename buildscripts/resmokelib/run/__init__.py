@@ -801,19 +801,6 @@ class RunPlugin(PluginInterface):
             " to run a particular test under a particular suite configuration.")
 
         parser.add_argument(
-            "--mixedBinVersions", type=str, dest="mixed_bin_versions",
-            metavar="version1-version2-..-versionN",
-            help="Runs the test with the provided replica set"
-            " binary version configuration. Specify 'old-new' to configure a replica set with a"
-            " 'last-lts' version primary and 'latest' version secondary. For a sharded cluster"
-            " with two shards and two replica set nodes each, specify 'old-new-old-new'.")
-
-        parser.add_argument(
-            "--oldBinVersion", type=str, dest="old_bin_version",
-            choices=config.MultiversionOptions.all_options(),
-            help="Choose the multiversion binary version as last-lts or last-continuous.")
-
-        parser.add_argument(
             "--linearChain", action="store", dest="linear_chain", choices=("on", "off"),
             metavar="ON|OFF", help="Enable or disable linear chaining for tests using "
             "ReplicaSetFixture.")

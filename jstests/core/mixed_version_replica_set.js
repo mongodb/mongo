@@ -9,9 +9,6 @@
 
 const latestBinVersion = MongoRunner.getBinVersionFor("latest");
 
-const lastContiuousBinVersion = MongoRunner.getBinVersionFor("last-continuous");
-const lastLTSBinVersion = MongoRunner.getBinVersionFor("last-lts");
-
 if (testingReplication && TestData && TestData.mixedBinVersions) {
     const replSetStatus = db.adminCommand({"replSetGetStatus": 1});
     const members = replSetStatus["members"];
@@ -23,8 +20,11 @@ if (testingReplication && TestData && TestData.mixedBinVersions) {
         const actualVersion = serverStatus["version"];
         const expectedVersion = TestData.mixedBinVersions[i] === "new"
             ? latestBinVersion
-            : (TestData.mixedBinVersions[i] === "last-lts" ? lastLTSBinVersion
-                                                           : lastContiuousBinVersion);
+            : MongoRunner.getBinVersionFor(TestData.multiversionBinVersion);
+        print(actualVersion,
+              expectedVersion,
+              MongoRunner.getBinVersionFor(TestData.multiversionBinVersion));
+        print(TestData.multiversionBinVersion);
         assert(MongoRunner.areBinVersionsTheSame(actualVersion, expectedVersion));
     }
 } else {

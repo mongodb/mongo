@@ -6,7 +6,8 @@ from shrub.v2 import Task, FunctionCall, TaskDependency
 from buildscripts.patch_builds.task_generation import TimeoutInfo
 from buildscripts.task_generation.constants import ARCHIVE_DIST_TEST_DEBUG_TASK, CONFIGURE_EVG_CREDENTIALS, \
     RUN_GENERATED_TESTS
-from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionGenTaskDecorator
+from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionGenTaskDecorator, \
+    MultiversionDecoratorParams
 from buildscripts.util import taskname
 
 _MINIMIZABLE_FUZZERS = ["agg-fuzzer", "query-fuzzer"]
@@ -98,7 +99,14 @@ class FuzzerGenTaskService:
              for index in range(params.num_tasks)})
 
         if params.require_multiversion_setup:
-            sub_tasks = self.multiversion_decorator.decorate_tasks(sub_tasks, params)
+            mv_params = MultiversionDecoratorParams(
+                base_suite=params.suite,
+                task=params.task_name,
+                variant=params.variant,
+                num_tasks=params.num_tasks,
+            )
+            sub_tasks = self.multiversion_decorator.decorate_tasks_with_dynamically_generated_files(
+                sub_tasks, mv_params)
 
         return FuzzerTask(task_name=params.task_name, sub_tasks=sub_tasks)
 

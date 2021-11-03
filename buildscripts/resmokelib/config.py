@@ -108,7 +108,7 @@ DEFAULTS = {
     "transport_layer": None,
     "user_friendly_output": None,
     "mixed_bin_versions": None,
-    "old_bin_version": "last_continuous",
+    "old_bin_version": None,
     "linear_chain": None,
     "num_replset_nodes": None,
     "num_shards": None,
@@ -274,6 +274,9 @@ ARCHIVE_LIMIT_MB = None
 
 # The limit number of tests to archive for an Evergreen task.
 ARCHIVE_LIMIT_TESTS = None
+
+# Whether to back up data when restarting a process.
+BACKUP_ON_RESTART_DIR = None
 
 # The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
 # mongo shell.

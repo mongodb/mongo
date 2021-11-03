@@ -162,10 +162,11 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         if _config.RUN_ALL_FEATURE_FLAG_TESTS:
             _config.RUN_ALL_FEATURE_FLAGS = True
 
-        all_feature_flags = []
+        all_ff = []
         enabled_feature_flags = []
         try:
-            all_feature_flags = open(ALL_FEATURE_FLAG_FILE).read().split()
+            with open(ALL_FEATURE_FLAG_FILE) as fd:
+                all_ff = fd.read().split()
         except FileNotFoundError:
             # If we ask resmoke to run with all feature flags, the feature flags file
             # needs to exist.
@@ -173,7 +174,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
                 raise
 
         if _config.RUN_ALL_FEATURE_FLAGS:
-            enabled_feature_flags = all_feature_flags[:]
+            enabled_feature_flags = all_ff[:]
 
         # Specify additional feature flags from the command line.
         # Set running all feature flag tests to True if this options is specified.
@@ -181,7 +182,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         if additional_feature_flags is not None:
             enabled_feature_flags.extend(additional_feature_flags)
 
-        return enabled_feature_flags, all_feature_flags
+        return enabled_feature_flags, all_ff
 
     _config.ENABLED_FEATURE_FLAGS, all_feature_flags = setup_feature_flags()
     not_enabled_feature_flags = list(set(all_feature_flags) - set(_config.ENABLED_FEATURE_FLAGS))
@@ -246,10 +247,6 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
     mongod_set_parameters = config.pop("mongod_set_parameters")
-    # TODO: This should eventually be migrated entirely to _builder.py
-    if _config.ENABLED_FEATURE_FLAGS and not _config.MIXED_BIN_VERSIONS:
-        feature_flag_dict = {ff: "true" for ff in _config.ENABLED_FEATURE_FLAGS}
-        mongod_set_parameters.append(str(feature_flag_dict))
 
     _config.MONGOD_SET_PARAMETERS = _merge_set_params(mongod_set_parameters)
     _config.FUZZ_MONGOD_CONFIGS = config.pop("fuzz_mongod_configs")

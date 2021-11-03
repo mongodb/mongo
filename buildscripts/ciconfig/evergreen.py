@@ -212,6 +212,10 @@ class Task(object):
         """Check if the task requires running the multiversion setup."""
         return "multiversion" in self.tags
 
+    def require_multiversion_version_combo(self):
+        """Check if the task requires generating combinations of multiversion versions."""
+        return "multiversion" in self.tags and "no_version_combination" not in self.tags
+
     def requires_npm(self):
         """Check if the task needs to run npm setup."""
         return "require_npm" in self.tags

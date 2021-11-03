@@ -217,6 +217,7 @@ class GenerateBuildVariantOrchestrator:
         return ResmokeGenTaskParams(
             use_large_distro=run_vars.get("use_large_distro"),
             require_multiversion_setup=task_def.require_multiversion_setup(),
+            require_multiversion_version_combo=task_def.require_multiversion_version_combo(),
             repeat_suites=repeat_suites,
             resmoke_args=run_vars.get("resmoke_args"),
             resmoke_jobs_max=run_vars.get("resmoke_jobs_max"),

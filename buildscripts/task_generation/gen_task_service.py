@@ -18,6 +18,7 @@ from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskPa
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 from buildscripts.task_generation.task_types.resmoke_tasks import ResmokeGenTaskParams, \
     ResmokeGenTaskService
+from buildscripts.task_generation.task_types.models.resmoke_task_model import ResmokeTask
 from buildscripts.task_generation.gen_config import GenerationConfiguration
 from buildscripts.task_generation.suite_split import GeneratedSuite
 # pylint: enable=wrong-import-position
@@ -80,7 +81,7 @@ class GenTaskService:
         return fuzzer_task
 
     def generate_task(self, generated_suite: GeneratedSuite, build_variant: BuildVariant,
-                      gen_params: ResmokeGenTaskParams) -> Set[Task]:
+                      gen_params: ResmokeGenTaskParams) -> List[ResmokeTask]:
         """
         Generate evergreen configuration for the given suite and add it to the build_variant.
 
@@ -91,7 +92,8 @@ class GenTaskService:
         execution_tasks = self.resmoke_gen_task_service.generate_tasks(generated_suite, gen_params)
         distros = self._get_distro(build_variant.name, gen_params.use_large_distro,
                                    gen_params.large_distro_name)
-        build_variant.display_task(generated_suite.task_name, execution_tasks=execution_tasks,
+        build_variant.display_task(generated_suite.task_name,
+                                   execution_tasks=[task.shrub_task for task in execution_tasks],
                                    distros=distros, activate=False)
 
         return execution_tasks

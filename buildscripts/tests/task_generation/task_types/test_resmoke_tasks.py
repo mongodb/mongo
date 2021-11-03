@@ -1,7 +1,10 @@
 """Unit tests for resmoke_tasks.py."""
 import unittest
 
+import inject
+
 import buildscripts.task_generation.task_types.resmoke_tasks as under_test
+from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.suite_split import GeneratedSuite, SubSuite
 from buildscripts.task_generation.task_types.gentask_options import GenTaskOptions
 from buildscripts.util.teststats import TestRuntime
@@ -35,6 +38,7 @@ def build_mock_gen_params(repeat_suites=1, resmoke_args="resmoke args"):
     return under_test.ResmokeGenTaskParams(
         use_large_distro=False,
         require_multiversion_setup=False,
+        require_multiversion_version_combo=False,
         repeat_suites=repeat_suites,
         resmoke_args=resmoke_args,
         resmoke_jobs_max=None,
@@ -59,6 +63,12 @@ def build_mock_suite(n_sub_suites, include_runtimes=True):
 
 
 class TestGenerateTask(unittest.TestCase):
+    def setUp(self) -> None:
+        def dependencies(binder: inject.Binder) -> None:
+            binder.bind(ResmokeProxyService, ResmokeProxyService())
+
+        inject.clear_and_configure(dependencies)
+
     def test_evg_config_does_not_overwrite_repeatSuites_resmoke_arg_with_repeatSuites_default(self):
         mock_gen_options = build_mock_gen_options()
         params = build_mock_gen_params(resmoke_args="resmoke_args --repeatSuites=5")
@@ -69,7 +79,7 @@ class TestGenerateTask(unittest.TestCase):
 
         for task in tasks:
             found_resmoke_cmd = False
-            for cmd in task.commands:
+            for cmd in task.shrub_task.commands:
                 cmd_dict = cmd.as_dict()
                 if cmd_dict.get("func") == "run generated tests":
                     found_resmoke_cmd = True
@@ -89,7 +99,7 @@ class TestGenerateTask(unittest.TestCase):
 
         for task in tasks:
             found_resmoke_cmd = False
-            for cmd in task.commands:
+            for cmd in task.shrub_task.commands:
                 cmd_dict = cmd.as_dict()
                 if cmd_dict.get("func") == "run generated tests":
                     found_resmoke_cmd = True
@@ -109,7 +119,8 @@ class TestGenerateTask(unittest.TestCase):
         tasks = resmoke_service.generate_tasks(suites, params)
 
         self.assertEqual(n_sub_suites + 1, len(tasks))
-        for task in tasks:
+        for resmoke_task in tasks:
+            task = resmoke_task.shrub_task
             if "misc" in task.name:
                 # Misc tasks should use default timeouts.
                 continue
@@ -127,7 +138,7 @@ class TestGenerateTask(unittest.TestCase):
 
         self.assertEqual(2, len(tasks))
         for task in tasks:
-            for cmd in task.commands:
+            for cmd in task.shrub_task.commands:
                 cmd_dict = cmd.as_dict()
                 self.assertNotEqual("timeout.update", cmd_dict.get("command"))
 
@@ -141,6 +152,6 @@ class TestGenerateTask(unittest.TestCase):
 
         self.assertEqual(2, len(tasks))
         for task in tasks:
-            for cmd in task.commands:
+            for cmd in task.shrub_task.commands:
                 cmd_dict = cmd.as_dict()
                 self.assertNotEqual("timeout.update", cmd_dict.get("command"))

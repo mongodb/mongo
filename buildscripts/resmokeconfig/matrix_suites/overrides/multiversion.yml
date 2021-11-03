@@ -1,17 +1,11 @@
 ### Overrides for more than 1 suite ###
-- name: replica_fixture
-  value:
-    executor:
-      fixture:
-        num_nodes: 3
-
 - name: replica_fixture_last_lts_new_new_old
   value:
     executor:
       fixture:
         num_nodes: 3
         old_bin_version: last_lts
-        mixed_bin_versions: new-new-old
+        mixed_bin_versions: new_new_old
 
 - name: replica_fixture_last_lts_new_old_new
   value:
@@ -19,7 +13,7 @@
       fixture:
         num_nodes: 3
         old_bin_version: last_lts
-        mixed_bin_versions: new-old-new
+        mixed_bin_versions: new_old_new
 
 - name: replica_fixture_last_lts_old_new_new
   value:
@@ -27,7 +21,7 @@
       fixture:
         num_nodes: 3
         old_bin_version: last_lts
-        mixed_bin_versions: old-new-new
+        mixed_bin_versions: old_new_new
 
 - name: replica_fixture_last_continuous_new_new_old
   value:
@@ -35,7 +29,7 @@
       fixture:
         num_nodes: 3
         old_bin_version: last_continuous
-        mixed_bin_versions: new-new-old
+        mixed_bin_versions: new_new_old
 
 - name: replica_fixture_last_continuous_new_old_new
   value:
@@ -43,7 +37,7 @@
       fixture:
         num_nodes: 3
         old_bin_version: last_continuous
-        mixed_bin_versions: new-old-new
+        mixed_bin_versions: new_old_new
 
 - name: replica_fixture_last_continuous_old_new_new
   value:
@@ -51,14 +45,7 @@
       fixture:
         num_nodes: 3
         old_bin_version: last_continuous
-        mixed_bin_versions: old-new-new
-
-- name: sharded_fixture
-  value:
-    executor:
-      fixture:
-        num_shards: 2
-        num_rs_nodes_per_shard: 2
+        mixed_bin_versions: old_new_new
 
 - name: sharded_fixture_last_lts_new_old_old_new
   value:
@@ -67,7 +54,7 @@
         num_shards: 2
         num_rs_nodes_per_shard: 2
         old_bin_version: last_lts
-        mixed_bin_versions: new-old-old-new
+        mixed_bin_versions: new_old_old_new
 
 - name: sharded_fixture_last_continuous_new_old_old_new
   value:
@@ -76,11 +63,7 @@
         num_shards: 2
         num_rs_nodes_per_shard: 2
         old_bin_version: last_continuous
-        mixed_bin_versions: new-old-old-new
-
-- name: test_kind
-  value:
-    test_kind: all_versions_js_test
+        mixed_bin_versions: new_old_old_new
 
 
 ### Suite-specific overrides ###
@@ -185,7 +168,7 @@
         - jstests/sharding/drop_indexes_with_stale_config_error.js
         - jstests/sharding/query/merge_write_concern.js
 
-- name: sharding_multiversion_testdata
+- name: sharding_multiversion_testdata_last_lts
   value:
     executor:
       config:
@@ -194,6 +177,16 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: 'last-lts'
               mongosBinVersion: 'last-lts'
+
+- name: sharding_multiversion_testdata_last_continuous
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              useRandomBinVersionsWithinReplicaSet: 'last-continuous'
+              mongosBinVersion: 'last-continuous'
 
 - name: jstestfuzz_replication_multiversion_hooks
   value:

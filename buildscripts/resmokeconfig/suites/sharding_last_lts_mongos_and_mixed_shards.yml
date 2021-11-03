@@ -7,12 +7,6 @@ selector:
   - jstests/sharding/query/*.js
   - jstests/sharding/change_streams/*.js
   exclude_with_any_tags:
-  - multiversion_incompatible
-  # TODO (SERVER-55857): Remove this hardcoded tag once tests are filtered out using the
-  # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
-  - requires_fcv_51
-  - backport_required_multiversion
-  - sharding_last_lts_mongos_and_mixed_shards_backport_required_multiversion
   - disabled_due_to_server_60490
   exclude_files:
   # SERVER-33683: We added a restriction on using an aggregation within a transaction against

@@ -136,10 +136,15 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     else:
         test_name = None
 
+    # the Shell fixtures uses hyphen-delimited versions (e.g. last-lts) while resmoke.py
+    # uses underscore (e.g. last_lts). resmoke's version is needed as it's part of the task name.
+    shell_mixed_version = (config.MULTIVERSION_BIN_VERSION or "").replace("_", "-")
+
     shortcut_opts = {
         "backupOnRestartDir": (config.BACKUP_ON_RESTART_DIR, None),
         "enableMajorityReadConcern": (config.MAJORITY_READ_CONCERN, True),
         "mixedBinVersions": (config.MIXED_BIN_VERSIONS, ""),
+        "multiversionBinVersion": (shell_mixed_version, ""),
         "noJournal": (config.NO_JOURNAL, False),
         "storageEngine": (config.STORAGE_ENGINE, ""),
         "storageEngineCacheSizeGB": (config.STORAGE_ENGINE_CACHE_SIZE, ""),
@@ -172,15 +177,21 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     mongos_set_parameters = test_data.get("setParametersMongos", {}).copy()
     mongocryptd_set_parameters = test_data.get("setParametersMongocryptd", {}).copy()
 
+    feature_flag_dict = {}
+    if config.ENABLED_FEATURE_FLAGS is not None:
+        feature_flag_dict = {ff: "true" for ff in config.ENABLED_FEATURE_FLAGS}
+
     # Propagate additional setParameters to mongod processes spawned by the mongo shell. Command
     # line options to resmoke.py override the YAML configuration.
     if config.MONGOD_SET_PARAMETERS is not None:
         mongod_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+        mongod_set_parameters.update(feature_flag_dict)
 
     # Propagate additional setParameters to mongos processes spawned by the mongo shell. Command
     # line options to resmoke.py override the YAML configuration.
     if config.MONGOS_SET_PARAMETERS is not None:
         mongos_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+        mongos_set_parameters.update(feature_flag_dict)
 
     # Propagate additional setParameters to mongocryptd processes spawned by the mongo shell.
     # Command line options to resmoke.py override the YAML configuration.

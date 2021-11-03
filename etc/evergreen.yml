@@ -3769,58 +3769,22 @@ tasks:
 
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template
-  name: multiversion_sanity_check_new_old_new_gen
+  name: multiversion_sanity_check_gen
   tags: ["multiversion", "multiversion_sanity_check"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: multiversion_sanity_check
-      resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: multiversion_sanity_check_old_new_new_gen
-  tags: ["multiversion", "multiversion_sanity_check"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: multiversion_sanity_check
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: multiversion_sanity_check_new_new_old_gen
-  tags: ["multiversion", "multiversion_sanity_check"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: multiversion_sanity_check
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: replica_sets_jscore_multiversion_passthrough_new_old_new_gen
+  name: replica_sets_jscore_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
   commands:
     - func: "generate resmoke tasks"
       vars:
-        suite: replica_sets_jscore_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
+        suite: replica_sets_jscore_passthrough
+        resmoke_args: --storageEngine=wiredTiger
 
-- <<: *gen_task_template
-  name: replica_sets_jscore_multiversion_passthrough_old_new_new_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: replica_sets_jscore_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: replica_sets_jscore_multiversion_passthrough_new_new_old_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: replica_sets_jscore_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
@@ -4062,34 +4026,16 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: change_streams_multiversion_new_old_new_gen
+  name: change_streams_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
   commands:
     - func: "generate resmoke tasks"
       vars:
-        suite: change_streams_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
+        suite: change_streams
+        resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: change_streams_multiversion_old_new_new_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: change_streams_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: change_streams_multiversion_new_new_old_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: change_streams_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: change_streams_multiversion_downgrade_passthrough_gen
+  name: change_streams_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
@@ -4150,13 +4096,13 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: change_streams_sharded_collections_multiversion_passthrough_gen
+  name: change_streams_sharded_collections_multiversion_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: change_streams_sharded_collections_multiversion
-      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
+      suite: change_streams_sharded_collections_passthrough
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough
@@ -4817,7 +4763,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_auth_gen
-  tags: ["auth", "multiversion"]
+  tags: ["auth", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4825,7 +4771,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_gen
-  tags: ["multiversion"]
+  tags: ["multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4836,7 +4782,7 @@ tasks:
 # build variants that enable this task.
 - <<: *gen_task_template
   name: feature_flag_multiversion_gen
-  tags: ["multiversion"]
+  tags: ["multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4916,7 +4862,8 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
+      suite: sharded_collections_jscore_passthrough
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_jscore_passthrough
@@ -4933,7 +4880,8 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
+      suite: sharding_jscore_passthrough
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_api_version_jscore_passthrough_gen
@@ -5112,31 +5060,13 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_replication_multiversion_new_old_new_gen
+  name: concurrency_replication_multiversion_gen
   tags: ["multiversion", "multiversion_passthrough"]
   commands:
     - func: "generate resmoke tasks"
       vars:
-        suite: concurrency_replication_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-old-new --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: concurrency_replication_multiversion_old_new_new_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: concurrency_replication_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=old-new-new --storageEngine=wiredTiger
-
-- <<: *gen_task_template
-  name: concurrency_replication_multiversion_new_new_old_gen
-  tags: ["multiversion", "multiversion_passthrough"]
-  commands:
-    - func: "generate resmoke tasks"
-      vars:
-        suite: concurrency_replication_multiversion
-        resmoke_args: --oldBinVersion=last_continuous --mixedBinVersions=new-new-old --storageEngine=wiredTiger
+        suite: concurrency_replication
+        resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: concurrency_replication_causal_consistency_gen
@@ -5222,8 +5152,8 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: concurrency_sharded_replication_multiversion
-      resmoke_args: --storageEngine=wiredTiger --oldBinVersion=last_continuous --mixedBinVersions="new-old-old-new"
+      suite: concurrency_sharded_replication
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
@@ -5563,8 +5493,8 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
-      suite: replica_sets_multiversion
+      suite: replica_sets
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sasl
@@ -5586,13 +5516,13 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_multiversion_gen
-  tags: ["random_multiversion_ds", "multiversion"]
+  tags: ["random_multiversion_ds", "multiversion", "sharding_multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
-      suite: sharding_multiversion
+      resmoke_args: --storageEngine=wiredTiger
+      suite: sharding
 
 - <<: *gen_task_template
   name: sharding_max_mirroring_gen
@@ -5661,12 +5591,11 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_last_lts_mongos_and_mixed_shards_gen
-  tags: ["sharding", "common", "multiversion"]
+  tags: ["sharding", "common", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
 
 - <<: *gen_task_template
   name: sharding_update_v1_oplog_gen
@@ -5801,22 +5730,30 @@ tasks:
       use_large_distro: "true"
       resmoke_args: --storageEngine=wiredTiger
 
+# Use explicit task definitions for retryable_writes_downgrade suites to avoid running
+# with all Repl multiversion combinations.
 - <<: *gen_task_template
-  name: retryable_writes_downgrade_passthrough_gen
-  tags: ["multiversion_passthrough", "multiversion"]
+  name: retryable_writes_downgrade_last_continuous_gen
+  tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: retryable_writes_downgrade_passthrough
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
-  name: sharded_retryable_writes_downgrade_passthrough_gen
+  name: retryable_writes_downgrade_last_lts_gen
+  tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        resmoke_args: --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: sharded_retryable_writes_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
     vars:
-      suite: sharded_retryable_writes_downgrade_passthrough
       resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
@@ -9399,7 +9336,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: .query_fuzzer
-  - name: .random_multiversion_ds
+  - name: .random_multiversion_ds !.sharding_multiversion
   - name: .read_write_concern .large
     distros:
     - rhel80-medium
@@ -9518,7 +9455,7 @@ buildvariants:
   - name: multiversion_gen
   - name: powercycle_smoke
   - name: .query_fuzzer
-  - name: .random_multiversion_ds
+  - name: .random_multiversion_ds !.sharding_multiversion
   - name: .read_write_concern .large
     distros:
     - rhel80-medium
@@ -9766,10 +9703,6 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-multiversion-expansions-template
-    # TODO (SERVER-55857): Remove 'requires_fcv_51' once tests are filtered out using the
-    # 'REQUIRES_FCV_TAG' list in 'multiversion_constants.py'.
-    test_flags: >-
-      --excludeWithAnyTags=requires_fcv_51,multiversion_incompatible
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl

@@ -214,13 +214,23 @@ class BurnInGenTaskService:
 
         return TimeoutInfo.default_timeout()
 
-    def _generate_resmoke_args(self, task_name: str, params: BurnInGenTaskParams,
+    def _generate_resmoke_args(self, task_name: str, suite_name: str, params: BurnInGenTaskParams,
                                test_arg: str) -> str:
         resmoke_args = f"{params.resmoke_args} {self.repeat_config.generate_resmoke_options()} {test_arg}"
 
         if params.require_multiversion_setup:
-            tag_file = EXCLUDES_TAGS_FILE_PATH
-            resmoke_args += f" --tagFile={tag_file}"
+            # TODO: inspect the suite for version instead of doing string parsing on the name.
+            tag_file_base_path = EXCLUDES_TAGS_FILE_PATH[:-4]
+            if "last_continuous" in suite_name:
+                tag_file = f"{tag_file_base_path}_last_continuous.yml"
+            elif "last_lts" in suite_name:
+                tag_file = f"{tag_file_base_path}_last_lts.yml"
+            else:
+                tag_file = None
+
+            if tag_file is not None:
+                resmoke_args += f" --tagFile={tag_file}"
+
             resmoke_args += f" --excludeWithAnyTags={EXCLUDE_TAGS},{task_name}_{BACKPORT_REQUIRED_TAG} "
 
         return resmoke_args
@@ -252,7 +262,8 @@ class BurnInGenTaskService:
             run_tests_vars = {
                 "suite":
                     gen_suite.suite_name, "resmoke_args":
-                        self._generate_resmoke_args(gen_suite.task_name, params, test_unix_style)
+                        self._generate_resmoke_args(gen_suite.task_name, gen_suite.suite_name,
+                                                    params, test_unix_style)
             }
 
             timeout_cmd = self.generate_timeouts(test_name)

@@ -140,36 +140,40 @@ class SuiteConfigInterface:
 class ExplicitSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
 
+    _named_suites = {}
+
     @classmethod
     def get_config_obj(cls, suite_name):
         """Get the suite config object in the given file."""
-        # Named executors or suites are specified as the basename of the file, without the .yml
-        # extension.
-        if not fs.is_yaml_file(suite_name) and not os.path.dirname(suite_name):
-            named_suites = cls.get_named_suites()
-            if suite_name not in named_suites:  # pylint: disable=unsupported-membership-test
-                return None
-            suite_name = named_suites[suite_name]  # pylint: disable=unsubscriptable-object
+        if suite_name in cls.get_named_suites():
+            # Check if is a named suite first for efficiency.
+            suite_path = cls.get_named_suites()[suite_name]
+        elif fs.is_yaml_file(suite_name):
+            # Check if is a path to a YAML file.
+            if os.path.isfile(suite_name):
+                suite_path = suite_name
+            else:
+                raise ValueError("Expected a suite YAML config, but got '%s'" % suite_name)
+        else:
+            # Not an explicit suite, return None.
+            return None
 
-        if not fs.is_yaml_file(suite_name) or not os.path.isfile(suite_name):
-            raise ValueError("Expected a suite YAML config, but got '%s'" % suite_name)
-        return utils.load_yaml_file(suite_name)
+        return utils.load_yaml_file(suite_path)
 
     @classmethod
     def get_named_suites(cls) -> Dict[str, str]:
         """Populate the named suites by scanning config_dir/suites."""
-        named_suites = {}
+        if not cls._named_suites:
+            suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
+            root = os.path.abspath(suites_dir)
+            files = os.listdir(root)
+            for filename in files:
+                (short_name, ext) = os.path.splitext(filename)
+                if ext in (".yml", ".yaml"):
+                    pathname = os.path.join(root, filename)
+                    cls._named_suites[short_name] = pathname
 
-        suites_dir = os.path.join(_config.CONFIG_DIR, "suites")
-        root = os.path.abspath(suites_dir)
-        files = os.listdir(root)
-        for filename in files:
-            (short_name, ext) = os.path.splitext(filename)
-            if ext in (".yml", ".yaml"):
-                pathname = os.path.join(root, filename)
-                named_suites[short_name] = pathname
-
-        return named_suites
+        return cls._named_suites
 
     @classmethod
     def get_suite_files(cls):
@@ -180,7 +184,8 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
 class MatrixSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
 
-    _all_mappings = None
+    _all_mappings = {}
+    _all_overrides = {}
 
     @staticmethod
     def get_all_yamls(target_dir):
@@ -240,20 +245,19 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     @classmethod
     def parse_override_file(cls, suites_dir):
         """Get a dictionary of all overrides in a given directory keyed by the suite name."""
-        overrides_dir = os.path.join(suites_dir, "overrides")
-        overrides_files = cls.get_all_yamls(overrides_dir)
+        if not cls._all_overrides:
+            overrides_dir = os.path.join(suites_dir, "overrides")
+            overrides_files = cls.get_all_yamls(overrides_dir)
 
-        all_overrides = {}
-        for filename, override_config_file in overrides_files.items():
-            for override_config in override_config_file:
-                if "name" in override_config and "value" in override_config:
-                    all_overrides[f"{filename}.{override_config['name']}"] = override_config[
-                        "value"]
-                else:
-                    raise ValueError("Invalid override configuration, missing required keys. ",
-                                     override_config)
-
-        return all_overrides
+            for filename, override_config_file in overrides_files.items():
+                for override_config in override_config_file:
+                    if "name" in override_config and "value" in override_config:
+                        cls._all_overrides[
+                            f"{filename}.{override_config['name']}"] = override_config["value"]
+                    else:
+                        raise ValueError("Invalid override configuration, missing required keys. ",
+                                         override_config)
+        return cls._all_overrides
 
     @classmethod
     def parse_mappings_file(cls, suites_dir, suite_name):
@@ -280,19 +284,17 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     @classmethod
     def get_all_mappings(cls, suites_dir) -> Dict[str, str]:
         """Get a dictionary of all suite mapping files keyed by the suite name."""
-        if cls._all_mappings is None:
+        if not cls._all_mappings:
             mappings_dir = os.path.join(suites_dir, "mappings")
             mappings_files = cls.get_all_yamls(mappings_dir)
 
-            all_mappings = {}
             for _, suite_config_file in mappings_files.items():
                 for suite_config in suite_config_file:
                     if "suite_name" in suite_config and "base_suite" in suite_config:
-                        all_mappings[suite_config["suite_name"]] = suite_config
+                        cls._all_mappings[suite_config["suite_name"]] = suite_config
                     else:
                         raise ValueError("Invalid suite configuration, missing required keys. ",
                                          suite_config)
-            cls._all_mappings = all_mappings
         return cls._all_mappings
 
     @classmethod

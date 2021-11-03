@@ -7,29 +7,13 @@ import inject
 
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.task_types import multiversion_decorator as under_test
-from buildscripts.task_generation.task_types.fuzzer_tasks import FuzzerGenTaskParams
+from buildscripts.task_generation.task_types.multiversion_decorator import MultiversionDecoratorParams
 
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access,no-value-for-parameter
-def build_mock_fuzzer_params():
-    return FuzzerGenTaskParams(
-        task_name="task_name",
-        variant="build_variant",
-        suite="resmoke_suite",
-        num_files=10,
-        num_tasks=5,
-        resmoke_args="args for resmoke",
-        npm_command="jstestfuzz",
-        jstestfuzz_vars="vars for jstestfuzz",
-        continue_on_failure=True,
-        resmoke_jobs_max=5,
-        should_shuffle=True,
-        timeout_secs=100,
-        require_multiversion_setup=True,
-        use_large_distro=None,
-        large_distro_name="large_distro",
-        config_location="config_location",
-    )
+def build_mock_params():
+    return MultiversionDecoratorParams(task="dummy_task", base_suite="dummy_suite",
+                                       variant="dummy_variant", num_tasks=5)
 
 
 def build_mock_sub_tasks():
@@ -54,7 +38,7 @@ class TestDecorateFuzzerGenTask(unittest.TestCase):
         inject.clear()
 
     def run_test(self, fixture_type):
-        mock_params = build_mock_fuzzer_params()
+        mock_params = build_mock_params()
         mock_sub_tasks = build_mock_sub_tasks()
         multiversion_decorator = under_test.MultiversionGenTaskDecorator()
         expected_num_tasks = mock_params.num_tasks * len(multiversion_decorator.old_versions) * len(
@@ -64,7 +48,8 @@ class TestDecorateFuzzerGenTask(unittest.TestCase):
                           "_get_suite_fixture_type") as mock_get_suite_fixture_type:
             mock_get_suite_fixture_type.return_value = fixture_type
 
-            sub_tasks = multiversion_decorator.decorate_tasks(mock_sub_tasks, mock_params)
+            sub_tasks = multiversion_decorator.decorate_tasks_with_dynamically_generated_files(
+                mock_sub_tasks, mock_params)
 
             self.assertEqual(len(sub_tasks), expected_num_tasks)
             self.assertTrue(
