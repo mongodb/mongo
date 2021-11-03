@@ -299,13 +299,13 @@ SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
 
 #endif
 
-bool Socket::connect(const SockAddr& remote) {
+bool Socket::connect(SockAddr& remote) {
     const Milliseconds connectTimeoutMillis(static_cast<int64_t>(
         _timeout > 0 ? std::min(kMaxConnectTimeoutMS, (_timeout * 1000)) : kMaxConnectTimeoutMS));
     return connect(remote, connectTimeoutMillis);
 }
 
-bool Socket::connect(const SockAddr& remote, Milliseconds connectTimeoutMillis) {
+bool Socket::connect(SockAddr& remote, Milliseconds connectTimeoutMillis) {
     _remote = remote;
 
     _fd = ::socket(remote.getType(), SOCK_STREAM, 0);

@@ -68,13 +68,12 @@ class ServiceEntryPoint;
 
 namespace transport {
 
-// Simulates reads and writes that always return 1 byte and fail with EAGAIN
+// This fail point simulates reads and writes that always return 1 byte and fail with EAGAIN
 extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
 
-// Cause an asyncConnect to timeout after it's successfully connected to the remote peer
+// This fail point will cause an asyncConnect to timeout after it's successfully connected
+// to the remote peer
 extern FailPoint transportLayerASIOasyncConnectTimesOut;
-
-extern FailPoint transportLayerASIOhangBeforeAccept;
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
@@ -116,7 +115,7 @@ public:
                        ServiceEntryPoint* sep,
                        const WireSpec& wireSpec = WireSpec::instance());
 
-    ~TransportLayerASIO() override;
+    virtual ~TransportLayerASIO();
 
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
