@@ -45,6 +45,7 @@ struct CollModIndexRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
     BSONElement indexHidden = {};
+    BSONElement indexUnique = {};
 };
 
 /**

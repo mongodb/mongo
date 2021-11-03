@@ -98,6 +98,7 @@ struct IndexCollModInfo {
     boost::optional<Seconds> oldExpireAfterSeconds;
     boost::optional<bool> hidden;
     boost::optional<bool> oldHidden;
+    boost::optional<bool> unique;
     std::string indexName;
 };
 

@@ -55,6 +55,9 @@ structs:
             hidden:
                 optional: true
                 type: safeBool
+            unique:
+                optional: true
+                type: safeBool
 
     CollModReply:
         description: "The collMod command's reply."
@@ -70,6 +73,9 @@ structs:
                 optional: true
                 type: safeBool
             hidden_new:
+                optional: true
+                type: safeBool
+            unique_new:
                 optional: true
                 type: safeBool
 

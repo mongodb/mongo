@@ -59,6 +59,9 @@ BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
             if (indexInfo->hidden)
                 indexObjBuilder.append("hidden", indexInfo->hidden.get());
 
+            if (indexInfo->unique)
+                indexObjBuilder.append("unique", indexInfo->unique.get());
+
             cmdObjBuilder.append(indexFieldName, indexObjBuilder.obj());
         } else {
             cmdObjBuilder.append(elem);

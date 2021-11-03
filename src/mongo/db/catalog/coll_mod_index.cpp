@@ -50,11 +50,13 @@ public:
                         const BSONElement& newExpireSecs,
                         const BSONElement& oldHidden,
                         const BSONElement& newHidden,
+                        const BSONElement& newUnique,
                         BSONObjBuilder* result)
         : _oldExpireSecs(oldExpireSecs),
           _newExpireSecs(newExpireSecs),
           _oldHidden(oldHidden),
           _newHidden(newHidden),
+          _newUnique(newUnique),
           _result(result) {}
 
     void commit(boost::optional<Timestamp>) override {
@@ -70,6 +72,10 @@ public:
             _result->append("hidden_old", oldValue);
             _result->appendAs(_newHidden, "hidden_new");
         }
+        if (!_newUnique.eoo()) {
+            invariant(_newUnique.trueValue());
+            _result->appendBool("unique_new", true);
+        }
     }
 
     void rollback() override {}
@@ -79,6 +85,7 @@ private:
     const BSONElement _newExpireSecs;
     const BSONElement _oldHidden;
     const BSONElement _newHidden;
+    const BSONElement _newUnique;
     BSONObjBuilder* _result;
 };
 
@@ -129,6 +136,22 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
     }
 }
 
+/**
+ * Adjusts unique setting on an index.
+ * An index can be converted to unique but removing the uniqueness property is not allowed.
+ */
+void _processCollModIndexRequestUnique(OperationContext* opCtx,
+                                       AutoGetCollection* autoColl,
+                                       const IndexDescriptor* idx,
+                                       BSONElement indexUnique,
+                                       BSONElement* newUnique) {
+    // Do not update catalog if index is already unique.
+    if (idx->infoObj().getField("unique").trueValue()) {
+        return;
+    }
+    *newUnique = indexUnique;
+}
+
 }  // namespace
 
 void processCollModIndexRequest(OperationContext* opCtx,
@@ -139,9 +162,10 @@ void processCollModIndexRequest(OperationContext* opCtx,
     auto idx = collModIndexRequest.idx;
     auto indexExpireAfterSeconds = collModIndexRequest.indexExpireAfterSeconds;
     auto indexHidden = collModIndexRequest.indexHidden;
+    auto indexUnique = collModIndexRequest.indexUnique;
 
     // Return early if there are no index modifications requested.
-    if (!indexExpireAfterSeconds && !indexHidden) {
+    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique) {
         return;
     }
 
@@ -149,6 +173,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
     BSONElement oldExpireSecs = {};
     BSONElement newHidden = {};
     BSONElement oldHidden = {};
+    BSONElement newUnique = {};
 
     // TTL Index
     if (indexExpireAfterSeconds) {
@@ -163,6 +188,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
             opCtx, autoColl, idx, indexHidden, &newHidden, &oldHidden);
     }
 
+    // User wants to convert an index to be unique.
+    if (indexUnique) {
+        _processCollModIndexRequestUnique(opCtx, autoColl, idx, indexUnique, &newUnique);
+    }
+
     *indexCollModInfo = IndexCollModInfo{
         !indexExpireAfterSeconds ? boost::optional<Seconds>()
                                  : Seconds(newExpireSecs.safeNumberLong()),
@@ -170,6 +200,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                                         : Seconds(oldExpireSecs.safeNumberLong()),
         !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
         !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
+        !indexUnique ? boost::optional<bool>() : newUnique.booleanSafe(),
         idx->indexName()};
 
     // Notify the index catalog that the definition of this index changed. This will invalidate the
@@ -178,7 +209,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
         opCtx, autoColl->getWritableCollection(), idx);
 
     opCtx->recoveryUnit()->registerChange(std::make_unique<CollModResultChange>(
-        oldExpireSecs, newExpireSecs, oldHidden, newHidden, result));
+        oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result));
 
     if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
         LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");

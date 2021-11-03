@@ -52,8 +52,10 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/views/view_catalog.h"
@@ -136,7 +138,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             for (auto&& elem : indexObj) {
                 const auto field = elem.fieldNameStringData();
                 if (field != "name" && field != "keyPattern" && field != "expireAfterSeconds" &&
-                    field != "hidden") {
+                    field != "hidden" && field != "unique") {
                     return {ErrorCodes::InvalidOptions,
                             str::stream()
                                 << "Unrecognized field '" << field << "' in 'index' option"};
@@ -172,9 +174,19 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             auto cmrIndex = &cmr.indexRequest;
             cmrIndex->indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
             cmrIndex->indexHidden = indexObj["hidden"];
+            cmrIndex->indexUnique = indexObj["unique"];
 
-            if (cmrIndex->indexExpireAfterSeconds.eoo() && cmrIndex->indexHidden.eoo()) {
-                return Status(ErrorCodes::InvalidOptions, "no expireAfterSeconds or hidden field");
+            if (cmrIndex->indexUnique) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "collMod does not support converting an index to unique",
+                        feature_flags::gCollModIndexUnique.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+            }
+
+            if (cmrIndex->indexExpireAfterSeconds.eoo() && cmrIndex->indexHidden.eoo() &&
+                cmrIndex->indexUnique.eoo()) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "no expireAfterSeconds, hidden, or unique field");
             }
             if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
                 if (isTimeseries) {
@@ -191,6 +203,9 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
             if (!cmrIndex->indexHidden.eoo() && !cmrIndex->indexHidden.isBoolean()) {
                 return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
+            }
+            if (!cmrIndex->indexUnique.eoo() && !cmrIndex->indexUnique.isBoolean()) {
+                return Status(ErrorCodes::InvalidOptions, "unique field must be a boolean");
             }
             if (!cmrIndex->indexHidden.eoo() && coll->isClustered() &&
                 !nss.isTimeseriesBucketsCollection()) {
@@ -284,6 +299,12 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 // are critical to most collection operations.
                 if (cmrIndex->idx->isIdIndex()) {
                     return Status(ErrorCodes::BadValue, "can't hide _id index");
+                }
+            }
+
+            if (cmrIndex->indexUnique) {
+                if (!cmrIndex->indexUnique.trueValue()) {
+                    return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
                 }
             }
         } else if (fieldName == "validator" && !isView && !isTimeseries) {
