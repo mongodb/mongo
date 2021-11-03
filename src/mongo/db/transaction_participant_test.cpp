@@ -315,10 +315,9 @@ protected:
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(),
-                                       *opCtx()->getTxnNumber(),
+                                       {*opCtx()->getTxnNumber()},
                                        false /* autocommit */,
-                                       startNewTxn /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+                                       startNewTxn /* startTransaction */);
         return opCtxSession;
     }
 
@@ -391,11 +390,8 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
 
         MongoDOperationContextSession newOpCtxSession(newOpCtx.get());
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
-        newTxnParticipant.beginOrContinue(newOpCtx.get(),
-                                          newTxnNum,
-                                          false /* autocommit */,
-                                          true /* startTransaction */,
-                                          boost::none /* txnRetryCounter */);
+        newTxnParticipant.beginOrContinue(
+            newOpCtx.get(), {newTxnNum}, false /* autocommit */, true /* startTransaction */);
         newTxnParticipant.unstashTransactionResources(newOpCtx.get(), "insert");
 
         Date_t t1 = Date_t::now();
@@ -466,10 +462,9 @@ TEST_F(TxnParticipantTest, CannotSpecifyStartTransactionOnInProgressTxn) {
 
     // Cannot try to start a transaction that already started.
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), boost::none},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
 }
@@ -486,20 +481,17 @@ TEST_F(TxnParticipantTest, AutocommitRequiredOnEveryTxnOp) {
 
     auto txnNum = *opCtx()->getTxnNumber();
     // Omitting 'autocommit' after the first statement of a transaction should throw an error.
-    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      txnNum,
-                                                      boost::none /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
-                       AssertionException,
-                       ErrorCodes::IncompleteTransactionHistory);
+    ASSERT_THROWS_CODE(
+        txnParticipant.beginOrContinue(
+            opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */),
+        AssertionException,
+        ErrorCodes::IncompleteTransactionHistory);
 
     // Including autocommit=false should succeed.
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber()},
                                    false /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
 }
 
 DEATH_TEST_F(TxnParticipantTest, AutocommitCannotBeTrue, "invariant") {
@@ -508,10 +500,9 @@ DEATH_TEST_F(TxnParticipantTest, AutocommitCannotBeTrue, "invariant") {
 
     // Passing 'autocommit=true' is not allowed and should crash.
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber()},
                                    true /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
 }
 
 DEATH_TEST_F(TxnParticipantTest, StartTransactionCannotBeFalse, "invariant") {
@@ -519,11 +510,8 @@ DEATH_TEST_F(TxnParticipantTest, StartTransactionCannotBeFalse, "invariant") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Passing 'startTransaction=false' is not allowed and should crash.
-    txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
-                                   false /* autocommit */,
-                                   false /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {*opCtx()->getTxnNumber()}, false /* autocommit */, false /* startTransaction */);
 }
 
 TEST_F(TxnParticipantTest, SameTransactionPreservesStoredStatements) {
@@ -547,10 +535,9 @@ TEST_F(TxnParticipantTest, SameTransactionPreservesStoredStatements) {
 
     // Re-opening the same transaction should have no effect.
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber()},
                                    false /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
     ASSERT_BSONOBJ_EQ(operation.toBSON(),
                       txnParticipant.getTransactionOperationsForTest()[0].toBSON());
 }
@@ -831,10 +818,9 @@ TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
         auto newTxnParticipant = TransactionParticipant::get(opCtx);
         newTxnParticipant.beginOrContinue(opCtx,
-                                          *(opCtx->getTxnNumber()),
+                                          {*(opCtx->getTxnNumber())},
                                           false /* autocommit */,
-                                          boost::none /* startTransaction */,
-                                          boost::none /* txnRetryCounter */);
+                                          boost::none /* startTransaction */);
 
         newTxnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
         newTxnParticipant.commitPreparedTransaction(opCtx, prepareTimestamp, boost::none);
@@ -876,10 +862,9 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
         auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
         auto newTxnParticipant = TransactionParticipant::get(opCtx);
         newTxnParticipant.beginOrContinue(opCtx,
-                                          *(opCtx->getTxnNumber()),
+                                          {*(opCtx->getTxnNumber())},
                                           false /* autocommit */,
-                                          boost::none /* startTransaction */,
-                                          boost::none /* txnRetryCounter */);
+                                          boost::none /* startTransaction */);
 
         newTxnParticipant.unstashTransactionResources(opCtx, "commitTransaction");
         newTxnParticipant.commitPreparedTransaction(opCtx, prepareTimestamp, boost::none);
@@ -1184,10 +1169,9 @@ TEST_F(TxnParticipantTest, ContinuingATransactionWithNoResourcesAborts) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber()},
                                                       false /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      boost::none /* startTransaction */),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -1201,10 +1185,9 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionIfNotPrimary) {
 
     // Include 'autocommit=false' for transactions.
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber()},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
 }
@@ -1218,10 +1201,9 @@ TEST_F(TxnParticipantTest, CannotStartRetryableWriteIfNotPrimary) {
 
     // Omit the 'autocommit' field for retryable writes.
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber()},
                                                       boost::none /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
 }
@@ -1238,10 +1220,9 @@ TEST_F(TxnParticipantTest, CannotContinueTransactionIfNotPrimary) {
     // Technically, the transaction should have been aborted on stepdown anyway, but it
     // doesn't hurt to have this kind of coverage.
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber()},
                                                       false /* autocommit */,
-                                                      false /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      false /* startTransaction */),
                        AssertionException,
                        ErrorCodes::NotWritablePrimary);
 }
@@ -1256,13 +1237,11 @@ TEST_F(TxnParticipantTest, OlderTransactionFailsOnSessionWithNewerTransaction) {
     const auto& sessionId = *opCtx()->getLogicalSessionId();
 
     StringBuilder sb;
-    sb << "Cannot start transaction 19 on session " << sessionId
-       << " because a newer transaction with txnNumber 20 has already started on this session.";
-    ASSERT_THROWS_WHAT(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber() - 1,
-                                                      autocommit,
-                                                      startTransaction,
-                                                      boost::none /* txnRetryCounter */),
+    sb << "Cannot start transaction with { txnNumber: 19 } on session " << sessionId
+       << " because a newer transaction with txnNumberAndRetryCounter { txnNumber: 20, "
+          "txnRetryCounter: 0 } has already started on this session.";
+    ASSERT_THROWS_WHAT(txnParticipant.beginOrContinue(
+                           opCtx(), {*opCtx()->getTxnNumber() - 1}, autocommit, startTransaction),
                        AssertionException,
                        sb.str());
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
@@ -1280,10 +1259,9 @@ TEST_F(TxnParticipantTest, OldRetryableWriteFailsOnSessionWithNewerTransaction) 
     sb << "Retryable write with txnNumber 19 is prohibited on session " << sessionId
        << " because a newer transaction with txnNumber 20 has already started on this session.";
     ASSERT_THROWS_WHAT(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber() - 1,
+                                                      {*opCtx()->getTxnNumber() - 1},
                                                       boost::none /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      boost::none /* startTransaction */),
                        AssertionException,
                        sb.str());
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
@@ -1314,23 +1292,22 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
         ScopeGuard guard([&]() { OperationContextSession::checkOut(opCtx()); });
         // Try to start a new transaction while there is already a prepared transaction on the
         // session. This should fail with a PreparedTransactionInProgress error.
-        runFunctionFromDifferentOpCtx([lsid = *opCtx()->getLogicalSessionId(),
-                                       txnNumberToStart = *opCtx()->getTxnNumber() +
-                                           1](OperationContext* newOpCtx) {
-            newOpCtx->setLogicalSessionId(lsid);
-            newOpCtx->setTxnNumber(txnNumberToStart);
-            newOpCtx->setInMultiDocumentTransaction();
+        runFunctionFromDifferentOpCtx(
+            [lsid = *opCtx()->getLogicalSessionId(),
+             txnNumberToStart = *opCtx()->getTxnNumber() + 1](OperationContext* newOpCtx) {
+                newOpCtx->setLogicalSessionId(lsid);
+                newOpCtx->setTxnNumber(txnNumberToStart);
+                newOpCtx->setInMultiDocumentTransaction();
 
-            MongoDOperationContextSession ocs(newOpCtx);
-            auto txnParticipant = TransactionParticipant::get(newOpCtx);
-            ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
-                                                              txnNumberToStart,
-                                                              false /* autocommit */,
-                                                              true /* startTransaction */,
-                                                              boost::none /* txnRetryCounter */),
-                               AssertionException,
-                               ErrorCodes::PreparedTransactionInProgress);
-        });
+                MongoDOperationContextSession ocs(newOpCtx);
+                auto txnParticipant = TransactionParticipant::get(newOpCtx);
+                ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
+                                                                  {txnNumberToStart},
+                                                                  false /* autocommit */,
+                                                                  true /* startTransaction */),
+                                   AssertionException,
+                                   ErrorCodes::PreparedTransactionInProgress);
+            });
     }
 
     ASSERT_FALSE(txnParticipant.transactionIsAborted());
@@ -1360,10 +1337,9 @@ TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber()},
                                                       false /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      boost::none /* txnRetryCounter */),
+                                                      boost::none /* startTransaction */),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 }
@@ -1511,11 +1487,8 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx());
         ASSERT(txnParticipant.transactionIsOpen());
 
-        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                          *opCtx()->getTxnNumber(),
-                                                          autocommit,
-                                                          startTransaction,
-                                                          boost::none /* txnRetryCounter */),
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction),
                            AssertionException,
                            50911);
     }
@@ -1531,11 +1504,8 @@ protected:
         txnParticipant.abortTransaction(opCtx());
         ASSERT(txnParticipant.transactionIsAborted());
 
-        txnParticipant.beginOrContinue(opCtx(),
-                                       *opCtx()->getTxnNumber(),
-                                       autocommit,
-                                       startTransaction,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction);
         ASSERT(txnParticipant.transactionIsOpen());
     }
 
@@ -1550,11 +1520,8 @@ protected:
         txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
         txnParticipant.commitUnpreparedTransaction(opCtx());
 
-        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                          *opCtx()->getTxnNumber(),
-                                                          autocommit,
-                                                          startTransaction,
-                                                          boost::none /* txnRetryCounter */),
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction),
                            AssertionException,
                            50911);
     }
@@ -1573,11 +1540,8 @@ protected:
         txnParticipant.addTransactionOperation(opCtx(), operation);
         txnParticipant.prepareTransaction(opCtx(), {});
 
-        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                          *opCtx()->getTxnNumber(),
-                                                          autocommit,
-                                                          startTransaction,
-                                                          boost::none /* txnRetryCounter */),
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction),
                            AssertionException,
                            50911);
     }
@@ -1598,11 +1562,8 @@ protected:
         ASSERT(txnParticipant.transactionIsAborted());
 
         startTransaction = true;
-        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                          *opCtx()->getTxnNumber(),
-                                                          autocommit,
-                                                          startTransaction,
-                                                          boost::none /* txnRetryCounter */),
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction),
                            AssertionException,
                            50911);
     }
@@ -1612,20 +1573,16 @@ protected:
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(),
-                                       *opCtx()->getTxnNumber(),
+                                       {*opCtx()->getTxnNumber()},
                                        boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+                                       boost::none /* startTransaction */);
         ASSERT_FALSE(txnParticipant.transactionIsOpen());
 
         auto autocommit = false;
         auto startTransaction = true;
 
-        txnParticipant.beginOrContinue(opCtx(),
-                                       *opCtx()->getTxnNumber(),
-                                       autocommit,
-                                       startTransaction,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction);
 
         ASSERT(txnParticipant.transactionIsOpen());
     }
@@ -2244,11 +2201,8 @@ TEST_F(TransactionsMetricsTest, TransactionErrorsBeforeUnstash) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     const bool autocommit = false;
     const boost::optional<bool> startTransaction = boost::none;
-    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
-                                                      autocommit,
-                                                      startTransaction,
-                                                      boost::none /* txnRetryCounter */),
+    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                           opCtx(), {*opCtx()->getTxnNumber()}, autocommit, startTransaction),
                        AssertionException,
                        ErrorCodes::NoSuchTransaction);
 
@@ -2507,11 +2461,8 @@ TEST_F(TransactionsMetricsTest, TimeActiveMicrosShouldBeSetUponUnstashAndStash) 
 
     // Start a new transaction.
     const auto higherTxnNum = *opCtx()->getTxnNumber() + 1;
-    txnParticipant.beginOrContinue(opCtx(),
-                                   higherTxnNum,
-                                   false /* autocommit */,
-                                   true /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {higherTxnNum}, false /* autocommit */, true /* startTransaction */);
 
     // Time active should be zero for a new transaction.
     ASSERT_EQ(txnParticipant.getSingleTransactionStatsForTest().getTimeActiveMicros(
@@ -3041,10 +2992,9 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber()},
                                    boost::none /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
     txnParticipant.unstashTransactionResources(opCtx(), "find");
 
     // Build a BSONObj containing the details which we expect to see reported when we invoke
@@ -3075,10 +3025,9 @@ TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber()},
                                    boost::none /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
 
     APIParameters secondAPIParameters = APIParameters();
     secondAPIParameters.setAPIVersion("3");
@@ -4203,7 +4152,10 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     ASSERT(txnParticipant.transactionIsPrepared());
     ASSERT_EQ(txnParticipant.getTransactionOperationsForTest().size(), 1U);
     ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), prepareTimestamp);
-    ASSERT_NE(txnParticipant.getActiveTxnNumber(), kUninitializedTxnNumber);
+    ASSERT_NE(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(),
+              kUninitializedTxnNumber);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
+
 
     txnParticipant.abortTransaction(opCtx());
     txnParticipant.invalidate(opCtx());
@@ -4213,7 +4165,10 @@ TEST_F(TxnParticipantTest, RollbackResetsInMemoryStateOfPreparedTransaction) {
     ASSERT_FALSE(txnParticipant.transactionIsPrepared());
     ASSERT_EQ(txnParticipant.getTransactionOperationsForTest().size(), 0U);
     ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp());
-    ASSERT_EQ(txnParticipant.getActiveTxnNumber(), kUninitializedTxnNumber);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(),
+              kUninitializedTxnNumber);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(),
+              kUninitializedTxnRetryCounter);
 }
 
 TEST_F(TxnParticipantTest, PrepareTransactionAsSecondarySetsThePrepareOpTime) {
@@ -4318,7 +4273,7 @@ TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsOpen());
-    ASSERT_EQ(txnParticipant.getActiveTxnNumber(), txnNumber);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(), txnNumber);
 
     txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
     txnParticipant.abortTransaction(opCtx());
@@ -4338,10 +4293,9 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfInRetryableWrite) {
 
     // Start a retryable write.
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber()},
                                    boost::none /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 }
 
@@ -4351,11 +4305,8 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyTrueIfInProgressAndOperati
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
     // Start a transaction.
-    txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
-                                   false /* autocommit */,
-                                   true /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {*opCtx()->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
     ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
 
     txnParticipant.unstashTransactionResources(opCtx(), "find");
@@ -4369,11 +4320,8 @@ TEST_F(TxnParticipantTest,
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
     // Start a transaction.
-    txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
-                                   false /* autocommit */,
-                                   true /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {*opCtx()->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
     ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
@@ -4392,11 +4340,8 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfAborted) {
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
     // Start a transaction.
-    txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
-                                   false /* autocommit */,
-                                   true /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {*opCtx()->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
     ASSERT_TRUE(txnParticipant.getResponseMetadata().getReadOnly());
 
     txnParticipant.unstashTransactionResources(opCtx(), "find");
@@ -4480,11 +4425,8 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortAfterPrepare) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
-    txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
-                                   false /* autocommit */,
-                                   true /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {*opCtx()->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
     ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
 
     txnParticipant.unstashTransactionResources(opCtx(), "find");
@@ -4510,11 +4452,8 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnCommitAfterPrepare) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
-    txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
-                                   false /* autocommit */,
-                                   true /* startTransaction */,
-                                   boost::none /* txnRetryCounter */);
+    txnParticipant.beginOrContinue(
+        opCtx(), {*opCtx()->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
     ASSERT_TRUE(txnParticipant.onExitPrepare().isReady());
 
     txnParticipant.unstashTransactionResources(opCtx(), "find");
@@ -4539,30 +4478,27 @@ TEST_F(ShardTxnParticipantTest, CanSpecifyTxnRetryCounterOnShardSvr) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 0},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   0 /* txnRetryCounter */);
+                                   true /* startTransaction */);
 }
 
 TEST_F(ConfigTxnParticipantTest, CanSpecifyTxnRetryCounterOnConfigSvr) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 0},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   0 /* txnRetryCounter */);
+                                   true /* startTransaction */);
 }
 
 TEST_F(TxnParticipantTest, CanOnlySpecifyTxnRetryCounterInShardedClusters) {
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 0},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      0 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
@@ -4573,10 +4509,9 @@ DEATH_TEST_F(ShardTxnParticipantTest,
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), -1},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   -1 /* txnRetryCounter */);
+                                   true /* startTransaction */);
 }
 
 DEATH_TEST_F(ShardTxnParticipantTest,
@@ -4585,10 +4520,9 @@ DEATH_TEST_F(ShardTxnParticipantTest,
     MongoDOperationContextSession opCtxSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 0},
                                                       boost::none /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      0 /* txnRetryCounter */),
+                                                      boost::none /* startTransaction */),
                        AssertionException,
                        ErrorCodes::InvalidOptions);
 }
@@ -4598,13 +4532,12 @@ TEST_F(ShardTxnParticipantTest,
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 1},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   1 /* txnRetryCounter */);
+                                   true /* startTransaction */);
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
 }
 
@@ -4613,18 +4546,18 @@ TEST_F(ShardTxnParticipantTest,
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0 /* txnRetryCounter */);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(),
+              0 /* txnRetryCounter */);
 
     txnParticipant.abortTransaction(opCtx());
     ASSERT(txnParticipant.transactionIsAborted());
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 1},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   1 /* txnRetryCounter */);
+                                   true /* startTransaction */);
     ASSERT(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 1);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
 }
 
 TEST_F(ShardTxnParticipantTest,
@@ -4636,15 +4569,14 @@ TEST_F(ShardTxnParticipantTest,
     txnParticipant.prepareTransaction(opCtx(), {});
     txnParticipant.abortTransaction(opCtx());
     ASSERT(txnParticipant.transactionIsAborted());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 1},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   1 /* txnRetryCounter */);
+                                   true /* startTransaction */);
     ASSERT(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 1);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
 }
 
 TEST_F(ShardTxnParticipantTest,
@@ -4655,17 +4587,16 @@ TEST_F(ShardTxnParticipantTest,
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     txnParticipant.commitUnpreparedTransaction(opCtx());
     ASSERT(txnParticipant.transactionIsCommitted());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 1},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      1 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
     ASSERT(txnParticipant.transactionIsCommitted());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 }
 
 TEST_F(ShardTxnParticipantTest,
@@ -4678,17 +4609,16 @@ TEST_F(ShardTxnParticipantTest,
     const auto commitTS = Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
     txnParticipant.commitPreparedTransaction(opCtx(), commitTS, {});
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 1},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      1 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
     ASSERT(txnParticipant.transactionIsCommitted());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 }
 
 TEST_F(ShardTxnParticipantTest,
@@ -4699,17 +4629,16 @@ TEST_F(ShardTxnParticipantTest,
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
     txnParticipant.prepareTransaction(opCtx(), {});
     ASSERT_TRUE(txnParticipant.transactionIsPrepared());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 1},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      1 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
     ASSERT(txnParticipant.transactionIsPrepared());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 }
 
 TEST_F(ShardTxnParticipantTest, CannotRestartTransactionUsingTxnRetryCounterLessThanLastUsed) {
@@ -4718,67 +4647,62 @@ TEST_F(ShardTxnParticipantTest, CannotRestartTransactionUsingTxnRetryCounterLess
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 1},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   1 /* txnRetryCounter */);
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 1);
+                                   true /* startTransaction */);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 0},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      0 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        ErrorCodes::TxnRetryCounterTooOld);
     try {
         txnParticipant.beginOrContinue(opCtx(),
-                                       *opCtx()->getTxnNumber(),
+                                       {*opCtx()->getTxnNumber(), 0},
                                        false /* autocommit */,
-                                       true /* startTransaction */,
-                                       0 /* txnRetryCounter */);
+                                       true /* startTransaction */);
         ASSERT(false);
     } catch (const TxnRetryCounterTooOldException& ex) {
         auto info = ex.extraInfo<TxnRetryCounterTooOldInfo>();
         ASSERT_EQ(info->getTxnRetryCounter(), 1);
     }
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 1);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
 }
 
 TEST_F(ShardTxnParticipantTest, CanContinueTransactionUsingTxnRetryCounterEqualToLastUsed) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     txnParticipant.stashTransactionResources(opCtx());
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 0},
                                    false /* autocommit */,
-                                   boost::none /* startTransaction */,
-                                   0 /* txnRetryCounter */);
+                                   boost::none /* startTransaction */);
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 }
 
 TEST_F(ShardTxnParticipantTest, CannotContinueTransactionUsingTxnRetryCounterGreaterThanLastUsed) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     txnParticipant.stashTransactionResources(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 1},
                                                       false /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      1 /* txnRetryCounter */),
+                                                      boost::none /* startTransaction */),
                        AssertionException,
                        ErrorCodes::IllegalOperation);
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 0);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 }
 
 TEST_F(ShardTxnParticipantTest, CannotContinueTransactionUsingTxnRetryCounterLessThanLastUsed) {
@@ -4787,34 +4711,31 @@ TEST_F(ShardTxnParticipantTest, CannotContinueTransactionUsingTxnRetryCounterLes
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 1},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   1 /* txnRetryCounter */);
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 1);
+                                   true /* startTransaction */);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     txnParticipant.stashTransactionResources(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 0},
                                                       false /* autocommit */,
-                                                      boost::none /* startTransaction */,
-                                                      0 /* txnRetryCounter */),
+                                                      boost::none /* startTransaction */),
                        AssertionException,
                        ErrorCodes::TxnRetryCounterTooOld);
     try {
         txnParticipant.beginOrContinue(opCtx(),
-                                       *opCtx()->getTxnNumber(),
+                                       {*opCtx()->getTxnNumber(), 0},
                                        false /* autocommit */,
-                                       true /* startTransaction */,
-                                       0 /* txnRetryCounter */);
+                                       true /* startTransaction */);
         ASSERT(false);
     } catch (const TxnRetryCounterTooOldException& ex) {
         auto info = ex.extraInfo<TxnRetryCounterTooOldInfo>();
         ASSERT_EQ(info->getTxnRetryCounter(), 1);
     }
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-    ASSERT_EQ(txnParticipant.getActiveTxnRetryCounter(), 1);
+    ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
 }
 
 TEST_F(ShardTxnParticipantTest, CannotRetryInProgressTransactionForRetryableWrites) {
@@ -4827,10 +4748,9 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressTransactionForRetryableWrit
     txnParticipant.stashTransactionResources(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 0},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      0 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        50911);
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
@@ -4847,10 +4767,9 @@ TEST_F(ShardTxnParticipantTest, CannotRetryPreparedTransactionForRetryableWrites
     // TODO (SERVER-60917): Make transaction participants throw RetryableTransactionInProgress if a
     // retry arrives while the transaction has been committed or aborted
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      *opCtx()->getTxnNumber(),
+                                                      {*opCtx()->getTxnNumber(), 0},
                                                       false /* autocommit */,
-                                                      true /* startTransaction */,
-                                                      0 /* txnRetryCounter */),
+                                                      true /* startTransaction */),
                        AssertionException,
                        50911);
     ASSERT(txnParticipant.transactionIsPrepared());
@@ -4866,10 +4785,9 @@ TEST_F(ShardTxnParticipantTest, CanRetryCommittedUnpreparedTransactionForRetryab
     ASSERT(txnParticipant.transactionIsCommitted());
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 0},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   0 /* txnRetryCounter */);
+                                   true /* startTransaction */);
     ASSERT(txnParticipant.transactionIsCommitted());
 }
 
@@ -4885,10 +4803,9 @@ TEST_F(ShardTxnParticipantTest, CanRetryCommittedPreparedTransactionForRetryable
     ASSERT_TRUE(txnParticipant.transactionIsCommitted());
 
     txnParticipant.beginOrContinue(opCtx(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), 0},
                                    false /* autocommit */,
-                                   true /* startTransaction */,
-                                   0 /* txnRetryCounter */);
+                                   true /* startTransaction */);
     ASSERT(txnParticipant.transactionIsCommitted());
 }
 

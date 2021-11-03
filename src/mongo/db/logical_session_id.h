@@ -132,7 +132,7 @@ using LogicalSessionIdMap = stdx::unordered_map<LogicalSessionId, T, LogicalSess
 
 class TxnNumberAndRetryCounter {
 public:
-    TxnNumberAndRetryCounter(TxnNumber txnNumber, TxnRetryCounter txnRetryCounter)
+    TxnNumberAndRetryCounter(TxnNumber txnNumber, boost::optional<TxnRetryCounter> txnRetryCounter)
         : _txnNumber(txnNumber), _txnRetryCounter(txnRetryCounter) {}
 
     TxnNumberAndRetryCounter(TxnNumber txnNumber)
@@ -155,9 +155,17 @@ public:
         return _txnRetryCounter;
     }
 
+    void setTxnNumber(const TxnNumber txnNumber) {
+        _txnNumber = txnNumber;
+    }
+
+    void setTxnRetryCounter(const boost::optional<TxnRetryCounter> txnRetryCounter) {
+        _txnRetryCounter = txnRetryCounter;
+    }
+
 private:
-    const TxnNumber _txnNumber;
-    const boost::optional<TxnRetryCounter> _txnRetryCounter;
+    TxnNumber _txnNumber;
+    boost::optional<TxnRetryCounter> _txnRetryCounter;
 };
 
 inline bool operator==(const TxnNumberAndRetryCounter& l, const TxnNumberAndRetryCounter& r) {

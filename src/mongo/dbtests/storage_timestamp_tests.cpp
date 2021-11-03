@@ -704,8 +704,9 @@ public:
 private:
     BSONObj _getTxnDoc() {
         auto txnParticipant = TransactionParticipant::get(_opCtx);
-        auto txnsFilter = BSON("_id" << _opCtx->getLogicalSessionId()->toBSON() << "txnNum"
-                                     << txnParticipant.getActiveTxnNumber());
+        auto txnsFilter =
+            BSON("_id" << _opCtx->getLogicalSessionId()->toBSON() << "txnNum"
+                       << txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber());
         return queryCollection(NamespaceString::kSessionTransactionsTableNamespace, txnsFilter);
     }
 };
@@ -1767,11 +1768,8 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
-        txnParticipant.beginOrContinue(_opCtx,
-                                       *_opCtx->getTxnNumber(),
-                                       false /* autocommit */,
-                                       true /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            _opCtx, {*_opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
             // Insert a document that will set the index as multikey.
@@ -3467,11 +3465,8 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
         // Start a retryable write.
-        txnParticipant.beginOrContinue(_opCtx,
-                                       txnNumber,
-                                       boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            _opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
     }
 
 protected:
@@ -3676,11 +3671,8 @@ public:
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
 
-        txnParticipant.beginOrContinue(_opCtx,
-                                       *_opCtx->getTxnNumber(),
-                                       false /* autocommit */,
-                                       true /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            _opCtx, {*_opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);

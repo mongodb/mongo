@@ -259,11 +259,8 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     try {
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
 
         if (stmtId && txnParticipant.checkStatementExecuted(opCtx, *stmtId)) {
             // Skip the incoming statement because it has already been logged locally.

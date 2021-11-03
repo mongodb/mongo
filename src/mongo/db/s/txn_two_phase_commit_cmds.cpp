@@ -321,10 +321,9 @@ public:
                 MongoDOperationContextSession sessionTxnState(opCtx);
                 auto txnParticipant = TransactionParticipant::get(opCtx);
                 txnParticipant.beginOrContinue(opCtx,
-                                               *opCtx->getTxnNumber(),
+                                               txnNumberAndRetryCounter,
                                                false /* autocommit */,
-                                               boost::none /* startTransaction */,
-                                               *opCtx->getTxnRetryCounter());
+                                               boost::none /* startTransaction */);
 
                 if (txnParticipant.transactionIsCommitted())
                     return;
@@ -344,10 +343,9 @@ public:
 
                 // Call beginOrContinue again in case the transaction number has changed.
                 txnParticipant.beginOrContinue(opCtx,
-                                               *opCtx->getTxnNumber(),
+                                               txnNumberAndRetryCounter,
                                                false /* autocommit */,
-                                               boost::none /* startTransaction */,
-                                               *opCtx->getTxnRetryCounter());
+                                               boost::none /* startTransaction */);
 
                 invariant(!txnParticipant.transactionIsOpen(),
                           "The participant should not be in progress after we waited for the "

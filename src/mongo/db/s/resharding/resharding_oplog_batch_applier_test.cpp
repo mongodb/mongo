@@ -181,11 +181,8 @@ public:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       false /* autocommit */,
-                                       true /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
@@ -205,11 +202,8 @@ public:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       false /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);

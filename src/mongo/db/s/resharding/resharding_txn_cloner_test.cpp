@@ -243,17 +243,11 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT(txnParticipant);
         if (multiDocTxn) {
-            txnParticipant.beginOrContinue(opCtx,
-                                           txnNum,
-                                           false /* autocommit */,
-                                           true /* startTransaction */,
-                                           boost::none /* txnRetryCounter */);
+            txnParticipant.beginOrContinue(
+                opCtx, {txnNum}, false /* autocommit */, true /* startTransaction */);
         } else {
-            txnParticipant.beginOrContinue(opCtx,
-                                           txnNum,
-                                           boost::none /* autocommit */,
-                                           boost::none /* startTransaction */,
-                                           boost::none /* txnRetryCounter */);
+            txnParticipant.beginOrContinue(
+                opCtx, {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
         }
     }
 
@@ -294,7 +288,7 @@ protected:
                            BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
 
         ASSERT_BSONOBJ_EQ(bsonOplog, {});
-        ASSERT_EQ(txnParticipant.getActiveTxnNumber(), txnNum);
+        ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(), txnNum);
     }
 
     boost::optional<ReshardingTxnClonerProgress> getTxnCloningProgress(
@@ -396,11 +390,8 @@ protected:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       false /* autocommit */,
-                                       true /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
@@ -420,11 +411,8 @@ protected:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       false /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);

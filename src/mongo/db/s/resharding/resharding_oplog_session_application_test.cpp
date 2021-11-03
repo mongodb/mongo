@@ -79,11 +79,8 @@ public:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
 
         WriteUnitOfWork wuow(opCtx);
         auto opTime = repl::getNextOpTime(opCtx);
@@ -106,11 +103,8 @@ public:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       false /* autocommit */,
-                                       true /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
@@ -130,11 +124,8 @@ public:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       false /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);
@@ -268,11 +259,8 @@ public:
 
         MongoDOperationContextSession ocs(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNumber,
-                                       boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
         ASSERT_TRUE(bool(txnParticipant.checkStatementExecuted(opCtx, stmtId)));
     }
 };

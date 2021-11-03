@@ -976,6 +976,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
                 "Migration attempting to commit transaction",
                 "sessionId"_attr = sessionId,
                 "txnNumber"_attr = txnNumber,
+                "txnRetryCounter"_attr = optTxnRetryCounter,
                 "tenantId"_attr = getTenantId(),
                 "migrationId"_attr = getMigrationUUID(),
                 "entry"_attr = entry);
@@ -996,16 +997,20 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     // If the entry's transaction number is stale/older than the current active transaction number
     // on the participant, fail the migration.
     uassert(ErrorCodes::TransactionTooOld,
-            str::stream() << "Migration cannot apply transaction " << txnNumber << " on session "
-                          << sessionId << " because a newer transaction "
-                          << txnParticipant.getActiveTxnNumber() << " has already started",
-            txnParticipant.getActiveTxnNumber() <= txnNumber);
-    if (txnParticipant.getActiveTxnNumber() == txnNumber) {
+            str::stream() << "Migration cannot apply transaction with tranaction number "
+                          << txnNumber << " and transaction retry counter " << optTxnRetryCounter
+                          << " on session " << sessionId
+                          << " because a newer transaction with txnNumberAndRetryCounter: "
+                          << txnParticipant.getActiveTxnNumberAndRetryCounter().toBSON()
+                          << " has already started",
+            txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber() <= txnNumber);
+    if (txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber() == txnNumber) {
         // If the txn numbers are equal, move on to the next entry.
         return;
     }
 
-    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber, optTxnRetryCounter);
+    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx,
+                                                             {txnNumber, optTxnRetryCounter});
 
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);

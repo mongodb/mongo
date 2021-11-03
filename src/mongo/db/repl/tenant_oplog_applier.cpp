@@ -591,6 +591,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                         "Tenant Oplog Applier committing transaction",
                         "sessionId"_attr = sessionId,
                         "txnNumber"_attr = txnNumber,
+                        "txnRetryCounter"_attr = optTxnRetryCounter,
                         "tenant"_attr = _tenantId,
                         "migrationUuid"_attr = _migrationUuid,
                         "op"_attr = redact(entry.toBSONForLogging()));
@@ -609,11 +610,12 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             uassert(5351501,
                     str::stream() << "Tenant oplog application cannot apply transaction "
                                   << txnNumber << " on session " << sessionId
-                                  << " because the transaction number "
-                                  << txnParticipant.getActiveTxnNumber() << " has already started",
-                    txnParticipant.getActiveTxnNumber() < txnNumber);
+                                  << " because the transaction with txnNumberAndRetryCounter "
+                                  << txnParticipant.getActiveTxnNumberAndRetryCounter().toBSON()
+                                  << " has already started",
+                    txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber() < txnNumber);
             txnParticipant.beginOrContinueTransactionUnconditionally(
-                opCtx.get(), txnNumber, optTxnRetryCounter);
+                opCtx.get(), {txnNumber, optTxnRetryCounter});
 
             // Only set sessionId, txnNumber and txnRetryCounter for the final applyOp in a
             // transaction.
@@ -743,11 +745,11 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     txnParticipant);
             // beginOrContinue throws on failure, which will abort the migration. Failure should
             // only result from out-of-order processing, which should not happen.
+            TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
             txnParticipant.beginOrContinue(opCtx.get(),
-                                           txnNumber,
+                                           txnNumberAndRetryCounter,
                                            boost::none /* autocommit */,
-                                           boost::none /* startTransaction */,
-                                           boost::none /* txnRetryCounter */);
+                                           boost::none /* startTransaction */);
 
             // We could have an existing lastWriteOpTime for the same retryable write chain from a
             // previously aborted migration. This could also happen if the tenant being migrated has
@@ -775,11 +777,11 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                             "migrationUuid"_attr = _migrationUuid);
                 txnParticipant.invalidate(opCtx.get());
                 txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx.get());
+                TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
                 txnParticipant.beginOrContinue(opCtx.get(),
-                                               txnNumber,
+                                               txnNumberAndRetryCounter,
                                                boost::none /* autocommit */,
-                                               boost::none /* startTransaction */,
-                                               boost::none /* txnRetryCounter */);
+                                               boost::none /* startTransaction */);
             }
 
             // We should never process the same donor statement twice, except in failover

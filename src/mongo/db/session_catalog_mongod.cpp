@@ -304,10 +304,11 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             LOGV2_DEBUG(21979,
                         3,
                         "Restoring locks of prepared transaction. SessionId: {sessionId} "
-                        "TxnNumber: {txnNumber}",
+                        "TxnNumberAndRetryCounter: {txnNumberAndRetryCounter}",
                         "Restoring locks of prepared transaction",
                         "sessionId"_attr = sessionId.getId(),
-                        "txnNumber"_attr = txnParticipant.getActiveTxnNumber());
+                        "txnNumberAndRetryCounter"_attr =
+                            txnParticipant.getActiveTxnNumberAndRetryCounter());
             txnParticipant.refreshLocksForPreparedTransaction(newOpCtx.get(), false);
         }
     }
@@ -486,7 +487,7 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinueTransactionUnconditionally(
-        opCtx, clientTxnNumber, clientTxnRetryCounter);
+        opCtx, {clientTxnNumber, clientTxnRetryCounter});
 }
 
 MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() {

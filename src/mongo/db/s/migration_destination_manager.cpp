@@ -110,10 +110,9 @@ BSONObj makeLocalReadConcernWithAfterClusterTime(Timestamp afterClusterTime) {
 void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     MongoDOperationContextSession::checkOut(opCtx);
     TransactionParticipant::get(opCtx).beginOrContinue(opCtx,
-                                                       *opCtx->getTxnNumber(),
+                                                       {*opCtx->getTxnNumber()},
                                                        boost::none /* autocommit */,
-                                                       boost::none /* startTransaction */,
-                                                       boost::none /* txnRetryCounter */);
+                                                       boost::none /* startTransaction */);
 }
 
 template <typename Callable>
@@ -1062,10 +1061,9 @@ void MigrationDestinationManager::_migrateThread(bool skipToCritSecTaken) {
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
-                                       *opCtx->getTxnNumber(),
+                                       {*opCtx->getTxnNumber()},
                                        boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+                                       boost::none /* startTransaction */);
         _migrateDriver(opCtx, skipToCritSecTaken);
     } catch (...) {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));

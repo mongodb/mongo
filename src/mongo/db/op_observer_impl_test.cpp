@@ -630,11 +630,8 @@ public:
                               NamespaceString nss,
                               TxnNumber txnNum,
                               StmtId stmtId) {
-        txnParticipant.beginOrContinue(opCtx,
-                                       txnNum,
-                                       boost::none /* autocommit */,
-                                       boost::none /* startTransaction */,
-                                       boost::none /* txnRetryCounter */);
+        txnParticipant.beginOrContinue(
+            opCtx, {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -809,10 +806,9 @@ public:
     void setUp() override {
         OpObserverTxnParticipantTest::setUp();
         txnParticipant().beginOrContinue(opCtx(),
-                                         *opCtx()->getTxnNumber(),
+                                         {*opCtx()->getTxnNumber()},
                                          false /* autocommit */,
-                                         true /* startTransaction */,
-                                         boost::none /* txnRetryCounter */);
+                                         true /* startTransaction */);
     }
 
 protected:
@@ -1500,11 +1496,8 @@ class OpObserverRetryableFindAndModifyTest : public OpObserverTxnParticipantTest
 public:
     void setUp() override {
         OpObserverTxnParticipantTest::setUp();
-        txnParticipant().beginOrContinue(opCtx(),
-                                         txnNum(),
-                                         boost::none /* autocommit */,
-                                         boost::none /* startTransaction */,
-                                         boost::none /* txnRetryCounter */);
+        txnParticipant().beginOrContinue(
+            opCtx(), {txnNum()}, boost::none /* autocommit */, boost::none /* startTransaction */);
     }
 
     void tearDown() override {
@@ -1749,10 +1742,9 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
             txnParticipant->beginOrContinue(opCtx,
-                                            TxnNumber(testIdx),
+                                            {TxnNumber(testIdx)},
                                             boost::none /* autocommit */,
-                                            boost::none /* startTransaction */,
-                                            boost::none /* txnRetryCounter */);
+                                            boost::none /* startTransaction */);
         }
 
         updateArgs.preImageDoc = boost::none;
@@ -1887,10 +1879,9 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
             txnParticipant->beginOrContinue(opCtx,
-                                            TxnNumber(testIdx),
+                                            {TxnNumber(testIdx)},
                                             boost::none /* autocommit */,
-                                            boost::none /* startTransaction */,
-                                            boost::none /* txnRetryCounter */);
+                                            boost::none /* startTransaction */);
         }
 
         // Phase 2: Call the code we're testing.
@@ -2020,10 +2011,9 @@ TEST_F(OpObserverTest, TestFundamentalOnDeleteOutputs) {
             contextSession.emplace(opCtx);
             txnParticipant.emplace(TransactionParticipant::get(opCtx));
             txnParticipant->beginOrContinue(opCtx,
-                                            TxnNumber(testIdx),
+                                            {TxnNumber(testIdx)},
                                             boost::none /* autocommit */,
-                                            boost::none /* startTransaction */,
-                                            boost::none /* txnRetryCounter */);
+                                            boost::none /* startTransaction */);
         }
         switch (testCase.retryableOptions) {
             case kNotRetryable:
