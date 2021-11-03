@@ -2524,6 +2524,14 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     return tmp;
 }
 
-void WiredTigerKVEngine::dump() const {}
+void WiredTigerKVEngine::dump() const {
+    int ret = _conn->debug_info(_conn, "cursors=true,handles=true,log=true,sessions=true,txn=true");
+    auto status = wtRCToStatus(ret, "WiredTigerKVEngine::dump()");
+    if (status.isOK()) {
+        LOGV2(6117700, "WiredTigerKVEngine::dump() completed successfully");
+    } else {
+        LOGV2(6117701, "WiredTigerKVEngine::dump() failed", "error"_attr = status);
+    }
+}
 
 }  // namespace mongo
