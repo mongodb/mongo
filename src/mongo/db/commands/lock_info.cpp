@@ -42,11 +42,9 @@
 
 namespace mongo {
 
-using std::string;
-using std::stringstream;
-
 /**
  * Admin command to display global lock information
+ * TODO(SERVER-61211): Convert to IDL.
  */
 class CmdLockInfo : public BasicCommand {
 public:
@@ -77,11 +75,14 @@ public:
     CmdLockInfo() : BasicCommand("lockInfo") {}
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());
         LockManager::get(opCtx)->getLockInfoBSON(lockToClientMap, &result);
+        if (jsobj["includeStorageEngineDump"].trueValue()) {
+            opCtx->getServiceContext()->getStorageEngine()->dump();
+        }
         return true;
     }
 } cmdLockInfo;
