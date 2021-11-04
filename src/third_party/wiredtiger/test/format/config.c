@@ -470,7 +470,7 @@ config_backward_compatible_table(TABLE *table, void *arg)
     if (TV(flag)) {                                                                        \
         if (config_explicit(table, name))                                                  \
             testutil_die(EINVAL, "%s not supported in backward compatibility mode", name); \
-        config_single(table, #name "=off", false);                                         \
+        config_single(table, name "=off", false);                                          \
     }
     BC_CHECK("btree.prefix_len", BTREE_PREFIX_LEN);
 }
@@ -487,7 +487,7 @@ config_backward_compatible(void)
     if (GV(flag)) {                                                                        \
         if (config_explicit(NULL, name))                                                   \
             testutil_die(EINVAL, "%s not supported in backward compatibility mode", name); \
-        config_single(NULL, #name "=off", false);                                          \
+        config_single(NULL, name "=off", false);                                           \
     }
 
     BC_CHECK("disk.mmap_all", DISK_MMAP_ALL);
@@ -732,7 +732,7 @@ config_directio(void)
             config_single(NULL, "disk.direct_io=off", false);                       \
             return;                                                                 \
         }                                                                           \
-        config_single(NULL, #name "=off", false);                                   \
+        config_single(NULL, name "=off", false);                                    \
     }
 
     /*
