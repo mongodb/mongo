@@ -342,7 +342,6 @@ protected:
 
     std::shared_ptr<MongoProcessInterface> makeMongoProcessInterface() {
         return std::make_shared<ShardServerProcessInterface>(
-            operationContext(),
             Grid::get(getServiceContext())->getExecutorPool()->getFixedExecutor());
     }
 

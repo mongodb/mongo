@@ -148,8 +148,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     }
 
     // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual
-    // version check but will nonetheless mark the operation as versioned, indicating that any
-    // internal operations executed by the pipeline should also be appropriately versioned.
+    // version check but will nonetheless mark the operation as versioned.
     auto mergeCmdObj = appendShardVersion(mergeCmd.freeze().toBson(), ChunkVersion::IGNORED());
 
     // Attach the read and write concerns if needed, and return the final command object.

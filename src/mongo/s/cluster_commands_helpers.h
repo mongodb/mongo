@@ -253,18 +253,6 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     Shard::RetryPolicy retryPolicy);
 
 /**
- * Utility for dispatching commands against the primary of a database. Does not attach a database or
- * shard version to the command object, but instead issues it exactly as provided. Does not retry.
- */
-AsyncRequestsSender::Response executeRawCommandAgainstDatabasePrimary(
-    OperationContext* opCtx,
-    StringData dbName,
-    const CachedDatabaseInfo& dbInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy);
-
-/**
  * Utility for dispatching commands against the shard with the MinKey chunk for the namespace and
  * attaching the appropriate shard version.
  *

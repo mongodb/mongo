@@ -862,7 +862,7 @@ ReshardingSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
     // ShardServerProcessInterface instead of getting it from the generic factory so the pipeline
     // can talk to the shards.
     auto pi = std::make_shared<ShardServerProcessInterface>(
-        opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */
