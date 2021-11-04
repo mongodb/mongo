@@ -5,7 +5,8 @@
  * 'multiversion_incompatible' tag.
  * @tags: [
  *   uses_atclustertime,
- *   multiversion_incompatible
+ *   multiversion_incompatible,
+ *   requires_persistence,
  * ]
  */
 (function() {
