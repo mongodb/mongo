@@ -79,7 +79,7 @@ public:
     WiredTigerSizeStorer(WT_CONNECTION* conn,
                          const std::string& storageUri,
                          const bool readOnly = false);
-    ~WiredTigerSizeStorer();
+    ~WiredTigerSizeStorer() = default;
 
     /**
      * Ensure that the shared SizeInfo will be stored by the next call to flush.
@@ -87,7 +87,7 @@ public:
      */
     void store(StringData uri, std::shared_ptr<SizeInfo> sizeInfo);
 
-    std::shared_ptr<SizeInfo> load(StringData uri) const;
+    std::shared_ptr<SizeInfo> load(OperationContext* opCtx, StringData uri) const;
 
     /**
      * Writes all changes to the underlying table.
@@ -95,11 +95,13 @@ public:
     void flush(bool syncToDisk);
 
 private:
-    const WiredTigerSession _session;
+    WT_CONNECTION* _conn;
+    const std::string _storageUri;
+    const uint64_t _tableId;  // Not persisted
     const bool _readOnly;
-    // Guards _cursor. Acquire *before* _bufferMutex.
-    mutable Mutex _cursorMutex = MONGO_MAKE_LATCH("WiredTigerSessionStorer::_cursorMutex");
-    WT_CURSOR* _cursor;  // pointer is const after constructor
+
+    // Serializes flushes to disk.
+    Mutex _flushMutex = MONGO_MAKE_LATCH("WiredTigerSessionStorer::_flushMutex");
 
     using Buffer = StringMap<std::shared_ptr<SizeInfo>>;
 

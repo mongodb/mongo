@@ -248,7 +248,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     rs.reset(nullptr);
 
     {
-        auto& info = *ss.load(uri);
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        auto& info = *ss.load(opCtx.get(), uri);
         ASSERT_EQUALS(N, info.numRecords.load());
     }
 
@@ -294,7 +295,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const bool enableWtLogging = false;
         WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri, enableWtLogging);
-        auto info = ss2.load(uri);
+        auto info = ss2.load(opCtx.get(), uri);
         ASSERT_EQUALS(N, info->numRecords.load());
     }
 
@@ -324,12 +325,12 @@ private:
     }
 
 protected:
-    long long getNumRecords() const {
-        return sizeStorer->load(uri)->numRecords.load();
+    long long getNumRecords(OperationContext* opCtx) const {
+        return sizeStorer->load(opCtx, uri)->numRecords.load();
     }
 
-    long long getDataSize() const {
-        return sizeStorer->load(uri)->dataSize.load();
+    long long getDataSize(OperationContext* opCtx) const {
+        return sizeStorer->load(opCtx, uri)->dataSize.load();
     }
 
     std::unique_ptr<WiredTigerHarnessHelper> harnessHelper;
@@ -344,8 +345,8 @@ TEST_F(SizeStorerUpdateTest, Basic) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     long long val = 5;
     rs->updateStatsAfterRepair(opCtx.get(), val, val);
-    ASSERT_EQUALS(getNumRecords(), val);
-    ASSERT_EQUALS(getDataSize(), val);
+    ASSERT_EQUALS(getNumRecords(opCtx.get()), val);
+    ASSERT_EQUALS(getDataSize(opCtx.get()), val);
 }
 
 }  // namespace
