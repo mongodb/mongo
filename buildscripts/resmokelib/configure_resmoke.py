@@ -262,12 +262,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
 
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
-
     mongos_set_parameters = config.pop("mongos_set_parameters")
-    if _config.ENABLED_FEATURE_FLAGS and not _config.MIXED_BIN_VERSIONS:
-        feature_flag_dict = {ff: "true" for ff in _config.ENABLED_FEATURE_FLAGS}
-        mongos_set_parameters.append(str(feature_flag_dict))
-
     _config.MONGOS_SET_PARAMETERS = _merge_set_params(mongos_set_parameters)
 
     _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))

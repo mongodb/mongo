@@ -17,11 +17,15 @@ class MongoDFixture(interface.Fixture):
 
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-            dbpath_prefix=None, preserve_dbpath=False, port=None):
+            add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None):
         """Initialize MongoDFixture with different options for the mongod process."""
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongod_options, {}))
+
+        if add_feature_flags:
+            for ff in self.config.ENABLED_FEATURE_FLAGS:
+                self.mongod_options["set_parameters"][ff] = "true"
 
         if "dbpath" in self.mongod_options and dbpath_prefix is not None:
             raise ValueError("Cannot specify both mongod_options.dbpath and dbpath_prefix")
@@ -29,9 +33,6 @@ class MongoDFixture(interface.Fixture):
         # Default to command line options if the YAML configuration is not passed in.
         self.mongod_executable = self.fixturelib.default_if_none(mongod_executable,
                                                                  self.config.MONGOD_EXECUTABLE)
-
-        self.mongod_options = self.fixturelib.make_historic(
-            self.fixturelib.default_if_none(mongod_options, {})).copy()
 
         # The dbpath in mongod_options takes precedence over other settings to make it easier for
         # users to specify a dbpath containing data to test against.

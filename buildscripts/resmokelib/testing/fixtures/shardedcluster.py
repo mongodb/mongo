@@ -373,7 +373,7 @@ class _MongoSFixture(interface.Fixture):
 
     # pylint: disable=too-many-arguments
     def __init__(self, logger, job_num, fixturelib, dbpath_prefix, mongos_executable=None,
-                 mongos_options=None):
+                 mongos_options=None, add_feature_flags=False):
         """Initialize _MongoSFixture."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib)
@@ -387,6 +387,10 @@ class _MongoSFixture(interface.Fixture):
 
         self.mongos_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongos_options, {})).copy()
+
+        if add_feature_flags:
+            for ff in self.config.ENABLED_FEATURE_FLAGS:
+                self.mongos_options["set_parameters"][ff] = "true"
 
         self.mongos = None
         self.port = fixturelib.get_next_port(job_num)

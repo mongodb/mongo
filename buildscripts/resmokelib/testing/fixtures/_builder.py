@@ -32,6 +32,13 @@ def make_fixture(class_name, logger, job_num, *args, **kwargs):
 
     if class_name not in _FIXTURES:
         raise ValueError("Unknown fixture class '%s'" % class_name)
+
+    # Special case MongoDFixture or _MongosFixture for now since we only add one option.
+    # If there's more logic, we should add a builder class for them.
+    if class_name in ["MongoDFixture", "_MongoSFixture"]:
+        return _FIXTURES[class_name](logger, job_num, fixturelib, *args,
+                                     add_feature_flags=bool(config.ENABLED_FEATURE_FLAGS), **kwargs)
+
     return _FIXTURES[class_name](logger, job_num, fixturelib, *args, **kwargs)
 
 
@@ -183,9 +190,6 @@ class ReplSetBuilder(FixtureBuilder):
             new_fixture_port = old_fixture.port
 
         new_fixture_mongod_options = replset.get_options_for_mongod(replset_node_index)
-        if config.ENABLED_FEATURE_FLAGS is not None:
-            for ff in config.ENABLED_FEATURE_FLAGS:
-                new_fixture_mongod_options["set_parameters"][ff] = True
 
         new_fixture = make_fixture(classes[BinVersionEnum.NEW], mongod_logger, replset.job_num,
                                    mongod_executable=executables[BinVersionEnum.NEW],
