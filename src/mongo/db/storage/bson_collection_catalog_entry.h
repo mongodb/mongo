@@ -97,6 +97,8 @@ public:
 
         void updateHiddenSetting(bool hidden);
 
+        void updateUniqueSetting();
+
         StringData nameStringData() const {
             return spec["name"].valueStringDataSafe();
         }

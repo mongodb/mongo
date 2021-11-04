@@ -586,6 +586,12 @@ public:
      */
     virtual void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) = 0;
 
+    /*
+     * Converts the the given index to be unique.
+     * This is a one-way transformation - the uniqueness constraint cannot be removed.
+     */
+    virtual void updateUniqueSetting(OperationContext* opCtx, StringData idxName) = 0;
+
     /**
      * Removes invalid index options on all indexes in this collection. Returns a list of index
      * names that contained invalid index options.

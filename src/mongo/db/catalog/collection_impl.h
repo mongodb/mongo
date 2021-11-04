@@ -434,6 +434,8 @@ public:
 
     void updateHiddenSetting(OperationContext* opCtx, StringData idxName, bool hidden) final;
 
+    void updateUniqueSetting(OperationContext* opCtx, StringData idxName) final;
+
     std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) final;
 
     void setIsTemp(OperationContext* opCtx, bool isTemp) final;

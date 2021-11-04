@@ -403,6 +403,10 @@ public:
         std::abort();
     }
 
+    void updateUniqueSetting(OperationContext* opCtx, StringData idxName) {
+        std::abort();
+    }
+
     std::vector<std::string> removeInvalidIndexOptions(OperationContext* opCtx) {
         std::abort();
     }

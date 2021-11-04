@@ -140,6 +140,13 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden)
 }
 
 
+void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting() {
+    BSONObjBuilder b(spec);
+    b.appendBool("unique", true);
+    spec = b.obj();
+}
+
+
 // --------------------------
 
 int BSONCollectionCatalogEntry::MetaData::getTotalIndexCount() const {
