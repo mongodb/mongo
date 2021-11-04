@@ -200,6 +200,32 @@ var {DataConsistencyChecker} = (function() {
             };
         }
 
+        static canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName) {
+            if (collName !== "image_collection") {
+                return false;
+            }
+            const sourceNode = sourceCollInfos.conn;
+            const syncingNode = syncingCollInfos.conn;
+
+            const sourceSession = sourceNode.getDB('test').getSession();
+            const syncingSession = syncingNode.getDB('test').getSession();
+            const diff = this.getCollectionDiffUsingSessions(
+                sourceSession, syncingSession, sourceCollInfos.dbName, collName);
+            for (let doc of diff.docsWithDifferentContents) {
+                const sourceDoc = doc["first"];
+                const syncingDoc = doc["second"];
+                const hasInvalidated = sourceDoc.hasOwnProperty("invalidated") &&
+                    syncingDoc.hasOwnProperty("invalidated");
+                if (!hasInvalidated || sourceDoc["invalidated"] === syncingDoc["invalidated"]) {
+                    // We only ever expect cases where the 'invalidated' fields are mismatched.
+                    return false;
+                }
+            }
+            print(`Ignoring inconsistencies for 'image_collection' because this can be expected` +
+                  ` when images are invalidated`);
+            return true;
+        }
+
         static dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName) {
             print('Dumping collection: ' + sourceCollInfos.ns(collName));
 
@@ -299,9 +325,14 @@ var {DataConsistencyChecker} = (function() {
                 if (sourceDBHash.collections[collName] !== syncingDBHash.collections[collName]) {
                     prettyPrint(`the two nodes have a different hash for the collection ${dbName}.${
                         collName}: ${dbHashesMsg}`);
+                    // Although rare, the 'config.image_collection' table can be inconsistent after
+                    // an initial sync or after a restart (see SERVER-60048). Dump the collection
+                    // diff anyways for more visibility as a sanity check.
                     this.dumpCollectionDiff(
                         collectionPrinted, sourceCollInfos, syncingCollInfos, collName);
-                    success = false;
+                    const shouldIgnoreFailure =
+                        this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName);
+                    success = shouldIgnoreFailure;
                 }
             });
 

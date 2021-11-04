@@ -2441,8 +2441,7 @@ var ReplSetTest = function(opts) {
                 // TODO SERVER-60238: remove system.preimages check when replication to secondaries
                 // is implemented.
                 const primaryCollections =
-                    Object.keys(primaryDBHash.collections)
-                        .filter((x) => x !== "config.image_collection" && x !== "system.preimages");
+                    Object.keys(primaryDBHash.collections).filter((x) => x !== "system.preimages");
                 assert.commandWorked(primaryDBHash);
 
                 // Filter only collections that were retrieved by the dbhash. listCollections
