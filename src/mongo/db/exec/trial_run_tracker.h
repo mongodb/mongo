@@ -31,6 +31,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <type_traits>
 
 namespace mongo {
@@ -56,7 +57,7 @@ public:
     };
 
     /**
-     * Constructs a `TrialRunTracker' which indicates that the trial period is over when any
+     * Constructs a 'TrialRunTracker' which indicates that the trial period is over when any
      * 'TrialRunMetric' exceeds the maximum provided at construction.
      *
      * Callers can also pass a value of zero to indicate that the given metric should not be
@@ -67,9 +68,21 @@ public:
     TrialRunTracker(MaxMetrics... maxMetrics) : _maxMetrics{maxMetrics...} {}
 
     /**
+     * Constructs a 'TrialRunTracker' that also has an '_onTrialEnd' function, which gets called
+     * when any 'TrialRunMetric' exceeds its maximum. When an '_onTrialEnd' callback is present, it
+     * must return true for 'trackProgress' to return true. By returning false, '_onTrialEnd' can
+     * prevent tracking from halting plan execution, thereby upgrading a trial run to a normal run.
+     */
+    template <typename... MaxMetrics>
+    TrialRunTracker(std::function<bool()> onTrialEnd, MaxMetrics... maxMetrics)
+        : TrialRunTracker{maxMetrics...} {
+        _onTrialEnd = std::move(onTrialEnd);
+    }
+
+    /**
      * Increments the trial run metric specified as a template parameter 'metric' by the
-     * 'metricIncrement' value and returns 'true' if the updated metric value has exceeded
-     * its maximum.
+     * 'metricIncrement' value and, if the updated metric value has exceeded its maximum, calls the
+     * '_onTrialEnd' if there is one and returns true (unless '_onTrialEnd' returned false).
      *
      * This is a no-op, and will return false, if the given metric is not being tracked by this
      * 'TrialRunTracker'.
@@ -91,7 +104,7 @@ public:
         }
 
         _metrics[metric] += metricIncrement;
-        if (_metrics[metric] > _maxMetrics[metric]) {
+        if (_metrics[metric] > _maxMetrics[metric] && callOnTrialEnd()) {
             _done = true;
         }
         return _done;
@@ -103,9 +116,14 @@ public:
         return _metrics[metric];
     }
 
+    bool callOnTrialEnd() {
+        return !_onTrialEnd || _onTrialEnd();
+    }
+
 private:
     const size_t _maxMetrics[TrialRunMetric::kLastElem];
     size_t _metrics[TrialRunMetric::kLastElem]{0};
     bool _done{false};
+    std::function<bool()> _onTrialEnd{};
 };
 }  // namespace mongo

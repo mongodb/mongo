@@ -98,6 +98,21 @@ protected:
     prepareExecutionPlan(PlanStage* root, stage_builder::PlanStageData* data) const;
 
     /**
+     * Executes a candidate plan until it
+     *   - reaches EOF,
+     *   - reaches the 'maxNumResults' limit,
+     *   - early exits via the TrialRunTracker, or
+     *   - returns a failure Status.
+     *
+     * The execution process populates the 'results' array of the 'candidate' plan with any results
+     * from execution the plan. This function also sets the 'status' and 'exitedEarly' fields of the
+     * input 'candidate' object when applicable.
+     *
+     * Returns true iff the candidate plan reaches EOF.
+     */
+    bool executeCandidateTrial(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
+
+    /**
      * Executes each plan in a round-robin fashion to collect execution stats. Stops when:
      *    * Any plan hits EOF.
      *    * Or returns a pre-defined number of results.
@@ -108,10 +123,8 @@ protected:
      * Upon completion returns a vector of candidate plans. Execution stats can be obtained for each
      * of the candidate plans by calling 'CandidatePlan->root->getStats()'.
      *
-     * After the trial period ends, all plans remain open.
-     *
-     * The number of reads allowed for a trial execution period is bounded by
-     * 'maxTrialPeriodNumReads'.
+     * After the trial period ends, all plans remain open, but 'exitedEarly' plans are in an invalid
+     * state. Any 'exitedEarly' plans must be closed and reopened before they can be executed.
      */
     std::vector<plan_ranker::CandidatePlan> collectExecutionStats(
         std::vector<std::unique_ptr<QuerySolution>> solutions,

@@ -50,14 +50,14 @@ CandidatePlans CachedSolutionPlanner::plan(
 
     const double evictionRatio = internalQueryCacheEvictionRatio;
     const size_t maxReadsBeforeReplan = evictionRatio * _decisionReads;
-    auto candidate = [&]() {
-        // In cached solution planning we collect execution stats with an upper bound on reads
-        // allowed per trial run computed based on previous decision reads.
-        auto candidates =
-            collectExecutionStats(std::move(solutions), std::move(roots), maxReadsBeforeReplan);
-        invariant(candidates.size() == 1);
-        return std::move(candidates[0]);
-    }();
+    // In cached solution planning we collect execution stats with an upper bound on reads allowed
+    // per trial run computed based on previous decision reads. If the trial run ends before
+    // reaching EOF, it will use the 'checkNumReads' function to determine if it should continue
+    // executing or immediately terminate execution.
+    auto candidate = collectExecutionStatsForCachedPlan(std::move(solutions[0]),
+                                                        std::move(roots[0].first),
+                                                        std::move(roots[0].second),
+                                                        maxReadsBeforeReplan);
     auto explainer = plan_explainer_factory::make(
         candidate.root.get(), &candidate.data, candidate.solution.get());
 
@@ -75,10 +75,15 @@ CandidatePlans CachedSolutionPlanner::plan(
     auto stats{candidate.root->getStats(false /* includeDebugInfo  */)};
     auto numReads{calculateNumberOfReads(stats.get())};
 
-    // If the cached plan hit EOF quickly enough, or still as efficient as before, then no need to
-    // replan. Finalize the cached plan and return it.
-    if (stats->common.isEOF || numReads <= maxReadsBeforeReplan) {
-        return {makeVector(finalizeExecutionPlan(std::move(stats), std::move(candidate))), 0};
+    // If the trial run executed in 'collectExecutionStats()' did not determine that a replan is
+    // necessary, then return that plan as is. The executor can continue using it. All results
+    // generated during the trial are stored with the plan so that the executor can return those to
+    // the user as well.
+    if (!candidate.needsReplanning) {
+        tassert(590800,
+                "Cached plan exited early without 'needsReplanning' set.",
+                !candidate.exitedEarly);
+        return {makeVector(std::move(candidate)), 0};
     }
 
     // If we're here, the trial period took more than 'maxReadsBeforeReplan' physical reads. This
@@ -99,22 +104,44 @@ CandidatePlans CachedSolutionPlanner::plan(
             << _decisionReads << " reads but it took at least " << numReads << " reads");
 }
 
-plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
-    std::unique_ptr<PlanStageStats> stats, plan_ranker::CandidatePlan candidate) const {
-    // If the winning stage has exited early, clear the results queue and reopen the plan stage
-    // tree, as we cannot resume such execution tree from where the trial run has stopped, and, as
-    // a result, we cannot stash the results returned so far in the plan executor.
-    if (!stats->common.isEOF && candidate.exitedEarly) {
-        if (_cq.getExplain()) {
-            // We save the stats on early exit if it's either an explain operation, as closing and
-            // re-opening the winning plan (below) changes the stats.
-            candidate.data.savedStatsOnEarlyExit =
-                candidate.root->getStats(true /* includeDebugInfo  */);
+plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCachedPlan(
+    std::unique_ptr<QuerySolution> solution,
+    std::unique_ptr<PlanStage> root,
+    stage_builder::PlanStageData data,
+    size_t maxTrialPeriodNumReads) {
+    const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
+
+    plan_ranker::CandidatePlan candidate{std::move(solution),
+                                         std::move(root),
+                                         std::move(data),
+                                         false /* exitedEarly*/,
+                                         false /* needsReplanning */,
+                                         Status::OK()};
+
+    ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
+
+    auto needsReplanningCheck = [maxTrialPeriodNumReads](PlanStage* candidateRoot) {
+        auto stats{candidateRoot->getStats(false /* includeDebugInfo  */)};
+        auto numReads{calculateNumberOfReads(stats.get())};
+        return numReads > maxTrialPeriodNumReads;
+    };
+    auto trackerRequirementCheck = [&needsReplanningCheck, &candidate]() {
+        bool shouldExitEarly = needsReplanningCheck(candidate.root.get());
+        if (!shouldExitEarly) {
+            candidate.root->detachFromTrialRunTracker();
         }
-        candidate.root->close();
-        candidate.root->open(false);
-        // Clear the results queue.
-        candidate.results = decltype(candidate.results){};
+        candidate.needsReplanning = (candidate.needsReplanning || shouldExitEarly);
+        return shouldExitEarly;
+    };
+    auto tracker = std::make_unique<TrialRunTracker>(
+        std::move(trackerRequirementCheck), maxNumResults, maxTrialPeriodNumReads);
+
+    candidate.root->attachToTrialRunTracker(std::move(tracker.get()));
+
+    auto candidateDone = executeCandidateTrial(&candidate, maxNumResults);
+    if (candidate.status.isOK() && !candidateDone && !candidate.needsReplanning) {
+        candidate.needsReplanning =
+            candidate.needsReplanning || needsReplanningCheck(candidate.root.get());
     }
 
     return candidate;
