@@ -113,6 +113,30 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
     return std::make_tuple(resultSlot, recordIdSlot, exitedEarly);
 }
 
+bool BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
+                                               size_t maxNumResults) {
+    _indexExistenceChecker.check();
+
+    auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data);
+    if (!status.isOK()) {
+        candidate->status = status.getStatus();
+        return candidate;
+    }
+
+    auto [resultAccessor, recordIdAccessor, exitedEarly] = status.getValue();
+    candidate->exitedEarly = exitedEarly;
+
+    for (size_t it = 0; it < maxNumResults && candidate->status.isOK() && !candidate->exitedEarly &&
+         !candidate->needsReplanning;
+         ++it) {
+        if (fetchNextDocument(candidate, std::make_pair(resultAccessor, recordIdAccessor))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStats(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots,
@@ -121,15 +145,6 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     std::vector<plan_ranker::CandidatePlan> candidates;
     std::vector<std::pair<value::SlotAccessor*, value::SlotAccessor*>> accessors;
-    std::vector<std::pair<PlanStage*, std::unique_ptr<TrialRunTracker>>> trialRunTrackers;
-
-    ON_BLOCK_EXIT([&] {
-        // Detach each SBE plan's TrialRunTracker.
-        while (!trialRunTrackers.empty()) {
-            trialRunTrackers.back().first->detachFromTrialRunTracker();
-            trialRunTrackers.pop_back();
-        }
-    });
 
     const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
 
@@ -169,60 +184,21 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
             // Attach a unique TrialRunTracker to the plan, which is configured to use at most
             // 'maxNumReads' reads.
             auto tracker = std::make_unique<TrialRunTracker>(trackerResultsBudget, maxNumReads);
+            ON_BLOCK_EXIT([rootPtr = root.get()] { rootPtr->detachFromTrialRunTracker(); });
             root->attachToTrialRunTracker(tracker.get());
-            trialRunTrackers.emplace_back(root.get(), std::move(tracker));
 
-            // Before preparing our plan, verify that none of the required indexes were dropped.
-            // This can occur if a yield occurred during a previously trialed plan.
-            _indexExistenceChecker.check();
-
-            auto status = prepareExecutionPlan(root.get(), &data);
-            auto [resultAccessor, recordIdAccessor, exitedEarly] =
-                [&]() -> std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool> {
-                if (status.isOK()) {
-                    return status.getValue();
-                }
-                // The candidate plan returned a failure that is not fatal to the execution of the
-                // query, as long as we have other candidates that haven't failed. We will mark the
-                // candidate as failed and keep preparing any remaining candidate plans.
-                return {};
-            }();
             candidates.push_back({std::move(solutions[planIndex]),
                                   std::move(root),
                                   std::move(data),
-                                  exitedEarly,
-                                  status.getStatus()});
-            accessors.push_back({resultAccessor, recordIdAccessor});
-
-            // The current candidate is located at the end of each vector.
-            auto endIdx = candidates.size() - 1;
-
-            // Run the plan until the plan finishes, uses up its allowed budget of storage reads,
-            // or returns 'maxNumResults' results.
-            for (size_t it = 0; it < maxNumResults; ++it) {
-                // Even if we had a candidate plan that exited early, we still want continue the
-                // trial run for the remaining plans as the early exited plan may not be the best.
-                // For example, it could be blocked in a SORT stage until one of the trial period
-                // metrics was reached, causing the plan to raise an early exit exception and return
-                // control back to the runtime planner. If that happens, we need to continue and
-                // complete the trial period for all candidates, as some of them may have a better
-                // cost.
-                if (!candidates[endIdx].status.isOK() || candidates[endIdx].exitedEarly) {
-                    break;
-                }
-
-                bool candidateDone = fetchNextDocument(&candidates[endIdx], accessors[endIdx]);
-                bool reachedMaxNumResults = (it == maxNumResults - 1);
-
-                // If this plan finished or returned 'maxNumResults', then use its number of reads
-                // as the value for 'maxNumReads' if it's the smallest we've seen.
-                if (candidateDone || reachedMaxNumResults) {
-                    maxNumReads = std::min(
-                        maxNumReads,
-                        trialRunTrackers[endIdx]
-                            .second->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>());
-                    break;
-                }
+                                  false /* exitedEarly */,
+                                  false /* needsReplanning */,
+                                  Status::OK()});
+            auto& currentCandidate = candidates.back();
+            bool candidateDone = executeCandidateTrial(&currentCandidate, maxNumResults);
+            if (candidateDone ||
+                (currentCandidate.status.isOK() && !currentCandidate.exitedEarly)) {
+                maxNumReads = std::min(
+                    maxNumReads, tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>());
             }
         }
     };

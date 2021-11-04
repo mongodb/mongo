@@ -61,10 +61,27 @@ public:
 
 private:
     /**
-     * Finalizes the winning plan before passing it to the caller as a result of the planning.
+     * Executes the "trial" portion of a single plan until it
+     *   - reaches EOF,
+     *   - reaches the 'maxNumResults' limit,
+     *   - early exits via the TrialRunTracker, or
+     *   - returns a failure Status.
+     *
+     * All documents returned by the plan are enqueued into the 'CandidatePlan->results' queue.
+     *
+     * When the trial period ends, this function checks the stats to determine if the number of
+     * reads during the trial meets the criteria for replanning, in which case it sets the
+     * 'needsReplanning' flag of the resulting CandidatePlan to true.
+     *
+     * The execution plan for the resulting CandidatePlan remains open, but if the 'exitedEarly'
+     * flag is set, the plan is in an invalid state and must be closed and reopened before it can be
+     * executed.
      */
-    plan_ranker::CandidatePlan finalizeExecutionPlan(std::unique_ptr<sbe::PlanStageStats> stats,
-                                                     plan_ranker::CandidatePlan candidate) const;
+    plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
+        std::unique_ptr<QuerySolution> solution,
+        std::unique_ptr<PlanStage> root,
+        stage_builder::PlanStageData data,
+        size_t maxTrialPeriodNumReads);
 
     /**
      * Uses the QueryPlanner and the MultiPlanner to re-generate candidate plans for this

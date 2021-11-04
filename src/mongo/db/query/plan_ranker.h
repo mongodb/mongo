@@ -186,6 +186,9 @@ struct BaseCandidatePlan {
     // Indicates whether this candidate plan has completed the trial run early by achieving one
     // of the trial run metrics.
     bool exitedEarly{false};
+    // Indicates that the trial run for a cached plan crossed the threshold of reads that should
+    // trigger a replanning phase.
+    bool needsReplanning{false};
     // If the candidate plan has failed in a recoverable fashion during the trial run, contains a
     // non-OK status.
     Status status{Status::OK()};
