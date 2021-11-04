@@ -7,6 +7,10 @@
  *  assumes_no_implicit_collection_creation_after_drop,  # common tag in collMod tests.
  *  requires_fcv_52,
  *  requires_non_retryable_commands, # common tag in collMod tests.
+ *  # TODO(SERVER-61181): Fix validation errors under ephemeralForTest.
+ *  incompatible_with_eft,
+ *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
+ *  requires_persistence,
  * ]
  */
 
@@ -72,8 +76,8 @@ if (db.getMongo().isMongos()) {
 }
 
 // Look up index details in listIndexes output.
-assert.eq(countUnique({a: 1}), 0, 'index should not be unique yet: ' + tojson(coll.getIndexes()));
+assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.getIndexes()));
 
 // Test uniqueness constraint.
-assert.commandWorked(coll.insert({_id: 100, a: 100}));
+assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);
 })();

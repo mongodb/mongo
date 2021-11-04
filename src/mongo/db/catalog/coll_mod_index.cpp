@@ -150,6 +150,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
         return;
     }
     *newUnique = indexUnique;
+    autoColl->getWritableCollection()->updateUniqueSetting(opCtx, idx->indexName());
 }
 
 }  // namespace
@@ -205,6 +206,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
     // This matches the default for IndexCatalog::refreshEntry().
     auto flags = CreateIndexEntryFlags::kIsReady;
+
+    // Update data format version in storage engine metadata for index.
+    if (indexUnique) {
+        flags = CreateIndexEntryFlags::kIsReady | CreateIndexEntryFlags::kUpdateMetadata;
+    }
 
     // Notify the index catalog that the definition of this index changed. This will invalidate the
     // local idx pointer. On rollback of this WUOW, the local var idx pointer will be valid again.
