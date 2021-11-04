@@ -800,7 +800,8 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
                                          pExpCtx);
     } else if (matchExpr->matchType() == MatchExpression::GEO) {
         auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
-        if (geoExpr.getPred() == GeoExpression::WITHIN) {
+        if (geoExpr.getPred() == GeoExpression::WITHIN ||
+            geoExpr.getPred() == GeoExpression::INTERSECT) {
             return std::make_unique<InternalBucketGeoWithinMatchExpression>(
                 geoExpr.getGeometryPtr(), geoExpr.getField());
         }

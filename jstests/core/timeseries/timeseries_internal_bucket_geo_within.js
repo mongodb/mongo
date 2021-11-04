@@ -1,6 +1,7 @@
 /**
- * Tests that $_internalBucketGeoWithin is correctly created and used to push down $geoWithin past
- * $_internalUnpackBucket when used on a non-metadata field on a time-series collection.
+ * Tests that $_internalBucketGeoWithin is correctly created and used to push down $geoWithin and
+ * $geoIntersects past $_internalUnpackBucket when used on a non-metadata field on a time-series
+ * collection.
  *
  * @tags: [
  *   requires_fcv_51,
@@ -23,7 +24,7 @@ assert.commandWorked(
     db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
-const pipeline = [{
+let pipeline = [{
     $match: {
         loc: {
             $geoWithin:
@@ -115,5 +116,162 @@ assert.docEq(results[0].a, [
     12345,
     {type: "Point", coordinates: [180, 0]},
     {"1": {type: "Point", coordinates: [0, 0]}},
+]);
+
+pipeline = [{
+    $match: {
+        loc: {
+            $geoIntersects:
+                {$geometry: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}
+        }
+    }
+}];
+
+// Test that $geoIntersects and $geoWithin are equivalent for points. Each document is in a
+// different bucket, so if $_internalBucketGeoWithin incorrectly filters a bucket out, we should
+// know.
+const now = ISODate();
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    // Point on a polygon vertex
+    {_id: 0, a: 1, loc: {type: "Point", coordinates: [0, 0]}, time: now, meta: {sensorId: 101}},
+    // Point on a polygon line
+    {_id: 1, a: 2, loc: {type: "Point", coordinates: [1, 2]}, time: now, meta: {sensorId: 102}},
+    // Point inside
+    {_id: 2, a: 3, loc: {type: "Point", coordinates: [2, 1]}, time: now, meta: {sensorId: 103}},
+    // Point outside
+    {_id: 3, a: 4, loc: {type: "Point", coordinates: [-1, -2]}, time: now, meta: {sensorId: 104}}
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(results, [
+    {_id: 0, a: 1, loc: {type: "Point", coordinates: [0, 0]}, time: now, meta: {sensorId: 101}},
+    {_id: 1, a: 2, loc: {type: "Point", coordinates: [1, 2]}, time: now, meta: {sensorId: 102}},
+    {_id: 2, a: 3, loc: {type: "Point", coordinates: [2, 1]}, time: now, meta: {sensorId: 103}},
+]);
+
+// Test if a Point with an unexpected field still matches
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {
+        _id: 0,
+        a: 1,
+        loc: {type: "Point", coordinates: [0, 1], unexpected_field: 1},
+        time: now,
+        meta: {sensorId: 101}
+    },
+    {
+        _id: 1,
+        a: 2,
+        loc: {type: "Point", coordinates: [2, 7], unexpected_field: 1},
+        time: now,
+        meta: {sensorId: 102}
+    },
+    {
+        _id: 2,
+        a: 3,
+        loc: {type: "Point", coordinates: [2, 1], unexpected_field: 1},
+        time: now,
+        meta: {sensorId: 103}
+    }
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(results, [{
+                       _id: 2,
+                       a: 3,
+                       loc: {type: "Point", coordinates: [2, 1], unexpected_field: 1},
+                       time: now,
+                       meta: {sensorId: 103}
+                   }]);
+
+// Test that we match the bucket if the types are not Point or control min and max are different
+// types such as date and array
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {_id: 0, a: 1, loc: now, time: now, meta: {sensorId: 101}},
+    {_id: 1, a: 1, loc: [5, 6, 7], time: now, meta: {sensorId: 101}},
+    {_id: 2, a: 3, loc: now, time: now, meta: {sensorId: 103}},
+    {_id: 3, a: 3, loc: [5, 6, 7], time: now, meta: {sensorId: 103}},
+    {_id: 4, a: 3, loc: {type: "Point", coordinates: [2, 1]}, time: now, meta: {sensorId: 103}}
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(
+    results,
+    [{_id: 4, a: 3, loc: {type: "Point", coordinates: [2, 1]}, time: now, meta: {sensorId: 103}}]);
+
+// Try to make $_internalBucketGeoWithin fail with null/undefined fields within a bucket
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {_id: 0, a: 3, loc: undefined, time: now, meta: {sensorId: 103}},
+    {_id: 1, a: 3, loc: null, time: now, meta: {sensorId: 103}},
+    {_id: 2, a: 3, loc: {type: "Point", coordinates: [2, 1]}, time: now, meta: {sensorId: 103}}
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(
+    results,
+    [{_id: 2, a: 3, loc: {type: "Point", coordinates: [2, 1]}, time: now, meta: {sensorId: 103}}]);
+
+// Query on a field within object, so that we can test for correct behavior if the object containing
+// the field is null/undefined/missing or other.
+pipeline = [{
+    $match: {
+        "x.y": {
+            $geoIntersects:
+                {$geometry: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}
+        }
+    }
+}];
+
+// Missing y field within x object should still allow us to match the bucket and find points within
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {_id: 0, a: 1, x: {}, time: now, meta: {sensorId: 100}},
+    {_id: 1, a: 2, x: {y: {type: "Point", coordinates: [2, 7]}}, time: now, meta: {sensorId: 100}},
+    {_id: 2, a: 3, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}}
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(results, [
+    {_id: 2, a: 3, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}}
+]);
+
+// x can be undefined/null/empty, but we should still match the bucket
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {_id: 0, a: 1, x: undefined, time: now, meta: {sensorId: 100}},
+    {_id: 1, a: 2, x: null, time: now, meta: {sensorId: 100}},
+    {_id: 2, a: 2, x: {}, time: now, meta: {sensorId: 100}},
+    {_id: 3, a: 3, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}},
+    {_id: 4, a: 3, x: {y: {type: "Point", coordinates: [3, 1]}}, time: now, meta: {sensorId: 100}}
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(results, [
+    {_id: 3, a: 3, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}},
+    {_id: 4, a: 3, x: {y: {type: "Point", coordinates: [3, 1]}}, time: now, meta: {sensorId: 100}}
+]);
+
+// x can be some other object such as a date or an array, again we still match
+coll.drop();
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+assert.commandWorked(coll.insert([
+    {_id: 0, a: 1, x: now, time: now, meta: {sensorId: 100}},
+    {_id: 1, a: 2, x: [1, 2, 3], time: now, meta: {sensorId: 100}},
+    {_id: 2, a: 3, x: {y: undefined}, time: now, meta: {sensorId: 100}},
+    {_id: 3, a: 4, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}}
+]));
+results = coll.aggregate(pipeline).toArray();
+assert.sameMembers(results, [
+    {_id: 3, a: 4, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}}
 ]);
 }());

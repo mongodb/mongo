@@ -823,5 +823,63 @@ TEST_F(OptimizePipeline, MatchWithGeoWithinOnMetaFieldIsPushedDown) {
                                "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       serialized[1]);
 }
+
+TEST_F(OptimizePipeline,
+       MatchWithGeoIntersectsOnMeasurementsPushedDownUsingInternalBucketGeoWithin) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                            "'time', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$match: {loc: {$geoIntersects: {$geometry: {type: \"Polygon\", "
+                            "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
+        getExpCtx());
+
+    ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(serialized.size(), 3U);
+
+    // $match with $geoIntersects on a non-metadata field is pushed down and
+    // $_internalBucketGeoWithin is used.
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{ $match: {$_internalBucketGeoWithin: { withinRegion: { $geometry: { type : "
+                 "\"Polygon\" ,coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 "
+                 "] ] ]}},field: \"loc\"}}}"),
+        serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                               "'time', bucketMaxSpanSeconds: 3600}}"),
+                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {loc: {$geoIntersects: {$geometry: {type: \"Polygon\", "
+                               "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}"),
+                      serialized[2]);
+}
+
+TEST_F(OptimizePipeline, MatchWithGeoIntersectsOnMetaFieldIsPushedDown) {
+    auto pipeline = Pipeline::parse(
+        makeVector(
+            fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                     "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+            fromjson("{$match: {'myMeta.loc': {$geoIntersects: {$geometry: {type: \"Polygon\", "
+                     "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
+        getExpCtx());
+
+    ASSERT_EQ(pipeline->getSources().size(), 2U);
+
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(serialized.size(), 2U);
+
+    // $match with $geoIntersects on the metadata field is pushed down without using
+    // $_internalBucketGeoWithin.
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$match: {'meta.loc': {$geoIntersects: {$geometry: {type: \"Polygon\", "
+                 "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}"),
+        serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
+                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                      serialized[1]);
+}
 }  // namespace
 }  // namespace mongo

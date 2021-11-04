@@ -86,7 +86,8 @@ public:
      *  - If false, the bucket must not contain any point that is within 'withinRegion'.
      *  - If true, the bucket may or may not contain points that are within the region. The bucket
      * will go through the subsequent "unpack" stage so as to check each point in the bucket in an
-     * equivalent $geoWithin operator individually.
+     * equivalent $geoWithin operator individually. Always returns true for any bucket containing
+     * objects not of type Point.
      */
     bool matches(const MatchableDocument* doc, MatchDetails* details) const final;
     bool matchesSingleElement(const BSONElement& element, MatchDetails* details) const final {
