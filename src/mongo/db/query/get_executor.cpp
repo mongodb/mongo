@@ -1104,24 +1104,26 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         extractAndAttachPipelineStages(cq.get());
     }
 
+    // Analyze the provided query and build the list of candidate plans for it.
     auto nss = cq->nss();
     auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, collection, nss);
     SlotBasedPrepareExecutionHelper helper{
         opCtx, *collection, cq.get(), yieldPolicy.get(), plannerOptions};
-    auto executionResult = helper.prepare();
-    if (!executionResult.isOK()) {
-        return executionResult.getStatus();
+    auto planningResultWithStatus = helper.prepare();
+    if (!planningResultWithStatus.isOK()) {
+        return planningResultWithStatus.getStatus();
     }
+    auto&& planningResult = planningResultWithStatus.getValue();
+    auto&& [roots, solutions] = planningResult->extractResultData();
 
-    auto&& result = executionResult.getValue();
-    auto&& [roots, solutions] = result->extractResultData();
-
+    // In some circumstances (e.g. when have multiple candidate plans or using a cached one), we
+    // might need to execute the plan(s) to pick the best one or to confirm the choice.
     if (auto planner = makeRuntimePlannerIfNeeded(opCtx,
                                                   *collection,
                                                   cq.get(),
                                                   solutions.size(),
-                                                  result->decisionWorks(),
-                                                  result->needsSubplanning(),
+                                                  planningResult->decisionWorks(),
+                                                  planningResult->needsSubplanning(),
                                                   yieldPolicy.get(),
                                                   plannerOptions)) {
         // Do the runtime planning and pick the best candidate plan.

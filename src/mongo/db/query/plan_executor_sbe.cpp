@@ -60,14 +60,12 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _mustReturnOwnedBson(returnOwnedBson),
       _root{std::move(candidates.winner().root)},
       _rootData{std::move(candidates.winner().data)},
+      _solution{std::move(candidates.winner().solution)},
+      _stash{std::move(candidates.winner().results)},
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)) {
     invariant(!_nss.isEmpty());
     invariant(_root);
-
-    // NOTE: 'winner.data' has been std::moved() from and is not safe to access.
-    auto winner = std::move(candidates.plans[candidates.winnerIdx]);
-    _solution = std::move(winner.solution);
 
     if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
         _result = _root->getAccessor(_rootData.ctx, *slot);
@@ -83,12 +81,11 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         _oplogTs = _rootData.env->getAccessor(_rootData.env->getSlot("oplogTs"_sd));
     }
 
-    if (winner.data.shouldUseTailableScan) {
+    if (_rootData.shouldUseTailableScan) {
         _resumeRecordIdSlot = _rootData.env->getSlot("resumeRecordId"_sd);
     }
 
-    if (!winner.results.empty()) {
-        _stash = std::move(winner.results);
+    if (!_stash.empty()) {
         // The PlanExecutor keeps an extra reference to the last object pulled out of the PlanStage
         // tree. This is because we want to ensure that the caller of PlanExecutor::getNext() does
         // not free the object and leave a dangling pointer in the PlanStage tree.
