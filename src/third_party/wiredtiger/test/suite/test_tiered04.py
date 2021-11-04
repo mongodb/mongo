@@ -181,9 +181,16 @@ class test_tiered04(wttest.WiredTigerTestCase):
         obj = self.get_stat(stat.conn.tiered_object_size, None)
         self.assertEqual(obj, self.object_sys_val)
 
-        # As we flush each object, we are currently removing the file: object. So N + 1 exists.
+        # As we flush each object, the next object exists, so N + 1 flushes is the last
+        # object number that exists (as the file:).
+        last = 'last=' + str(flush + 1)
+        # For now all earlier objects exist. So it is always 1 until garbage collection
+        # starts removing them.
+        oldest = 'oldest=1'
         fileuri = self.fileuri_base + str(flush + 1) + '.wtobj'
         self.check_metadata(self.tiereduri, intl_page)
+        self.check_metadata(self.tiereduri, last)
+        self.check_metadata(self.tiereduri, oldest)
         self.check_metadata(fileuri, intl_page)
         self.check_metadata(self.objuri, intl_page)
 

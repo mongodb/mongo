@@ -127,6 +127,7 @@ struct __wt_tiered {
 
     uint32_t current_id; /* Current object id number */
     uint32_t next_id;    /* Next object number */
+    uint32_t oldest_id;  /* Oldest object id number */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_TIERED_FLAG_UNUSED 0x1u
