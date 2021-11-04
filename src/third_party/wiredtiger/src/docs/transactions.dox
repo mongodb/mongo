@@ -246,15 +246,6 @@ For example, for the timestamp values <code>prepare_timestamp=100,
     timestamp is rounded up to the new prepare timestamp as
     <code>commit_timestamp=200</code>.
 
-Configuring <code>roundup_timestamps=(prepared=true)</code> also allows setting
-the prepared timestamps smaller than or equal to the latest active read timestamps.
-Use this feature carefully as it may break repeated read. For example, consider a
-transaction with a read timestamp set to 30 and a key that has a value with
-timestamp 20. Before a prepared transaction (in another thread), reading the key
-returns the value. Now a prepared transaction elsewhere in the system sets a prepared
-timestamp at 30. The reader, trying to do a repeat read of the key, gets return a
-prepared conflict error instead of the value.
-
 Configuring <code>roundup_timestamps=(read=true)</code> causes the read
 timestamp to be rounded up to the oldest timestamp, if the read timestamp is
 greater than the oldest timestamp no change will be made.
