@@ -170,7 +170,7 @@ class ResmokeGenTaskService:
         resmoke_args = f"--originSuite={original_suite}"
 
         if params.resmoke_args is not None:
-            resmoke_args += params.resmoke_args
+            resmoke_args += f" {params.resmoke_args} "
 
         if params.repeat_suites and not string_contains_any_of_args(resmoke_args,
                                                                     ["repeatSuites", "repeat"]):
