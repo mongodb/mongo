@@ -33,6 +33,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/cancellation.h"
@@ -141,10 +142,6 @@ public:
 
         StringData getRecipientConnectionString() const {
             return _stateDoc.getRecipientConnectionString();
-        }
-
-        const MigrationProtocolEnum& getProtocol() const {
-            return _protocol;
         }
 
     private:
@@ -267,12 +264,6 @@ public:
          */
         CancellationToken _initAbortMigrationSource(const CancellationToken& token);
 
-        /*
-         * Returns false if the protocol is FCV incompatible. Also, resets the 'protocol' field in
-         * the _stateDoc to boost::none for FCV < 5.2.
-         */
-        bool _checkifProtocolRemainsFCVCompatible();
-
         ServiceContext* const _serviceContext;
         const TenantMigrationDonorService* const _donorService;
 
@@ -283,7 +274,6 @@ public:
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
         const std::string _tenantId;
-        const MigrationProtocolEnum _protocol;
         const std::string _recipientConnectionString;
         const ReadPreferenceSetting _readPreference;
         const UUID _migrationUuid;
@@ -331,10 +321,6 @@ public:
         // interrupting the instance, e.g. receiving donorAbortMigration. Initialized in
         // _initAbortMigrationSource().
         boost::optional<CancellationSource> _abortMigrationSource;
-
-        // Value is set at the beginning of run() method. Mainly used to determine if the 'protocol'
-        // field needs to be added to recipient migration commands and state document.
-        bool _isAtleastFCV52AtStart;
     };
 
 private:

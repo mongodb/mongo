@@ -34,6 +34,7 @@
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/logv2/log.h"
 
@@ -41,7 +42,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(returnResponseOkForRecipientSyncDataCmd);
-MONGO_FAIL_POINT_DEFINE(returnResponseOkForRecipientForgetMigrationCmd);
 
 class RecipientSyncDataCmd : public TypedCommand<RecipientSyncDataCmd> {
 public:
@@ -70,17 +70,12 @@ public:
                 !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
             const auto& cmd = request();
-            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
-
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
 
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
                                                       cmd.getStartMigrationDonorTimestamp(),
                                                       cmd.getReadPreference());
-
 
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -90,14 +85,11 @@ public:
                 stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
             }
 
-            stateDoc.setProtocol(migrationProtocol);
-
             const auto stateDocBson = stateDoc.toBSON();
 
             if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
                 LOGV2(4879608,
-                      "Immediately returning OK because 'returnResponseOkForRecipientSyncDataCmd' "
-                      "failpoint is enabled.",
+                      "'returnResponseOkForRecipientSyncDataCmd' failpoint enabled.",
                       "tenantMigrationRecipientInstance"_attr = stateDoc.toBSON());
                 return Response(repl::OpTime());
             }
@@ -189,10 +181,6 @@ public:
                         serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
             const auto& cmd = request();
-            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
-
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
             auto recipientService =
@@ -217,20 +205,11 @@ public:
                         cmd.getRecipientCertificateForDonor());
                 stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
             }
-            stateDoc.setProtocol(migrationProtocol);
+
             // Set the state to 'kDone' so that we don't create a recipient access blocker
             // unnecessarily if this recipientForgetMigration command is received before a
             // recipientSyncData command or after the state doc is garbage collected.
             stateDoc.setState(TenantMigrationRecipientStateEnum::kDone);
-
-
-            if (MONGO_unlikely(returnResponseOkForRecipientForgetMigrationCmd.shouldFail())) {
-                LOGV2(5949502,
-                      "Immediately returning ok because "
-                      "'returnResponseOkForRecipientForgetMigrationCmd' failpoint is enabled",
-                      "tenantMigrationRecipientInstance"_attr = stateDoc.toBSON());
-                return;
-            }
 
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON());

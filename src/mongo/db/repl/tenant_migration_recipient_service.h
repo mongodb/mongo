@@ -141,11 +141,6 @@ public:
          */
         const std::string& getTenantId() const;
 
-        /*
-         *  Returns the migration protocol.
-         */
-        const MigrationProtocolEnum& getProtocol() const;
-
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate(). Returns an
          * error if the options this Instance was created with are incompatible with the options
@@ -308,12 +303,6 @@ public:
             // or stepdown/shutdown.
             bool _isExternalInterrupt = false;
         };
-
-        /*
-         * Returns false if the protocol is FCV incompatible. Also, resets the 'protocol' field in
-         * the _stateDoc to boost::none for FCV < 5.2.
-         */
-        bool _checkifProtocolRemainsFCVCompatible();
 
         /*
          * Helper for interrupt().
@@ -522,7 +511,6 @@ public:
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
         const std::string _tenantId;                                                     // (R)
-        const MigrationProtocolEnum _protocol;                                           // (R)
         const UUID _migrationUuid;                                                       // (R)
         const std::string _donorConnectionString;                                        // (R)
         const MongoURI _donorUri;                                                        // (R)
