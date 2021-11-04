@@ -373,7 +373,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
         const NamespaceString& nss(coll.getNss());
 
-        if (!coll.getAllowBalance() || !coll.getAllowMigrations()) {
+        if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations()) {
             LOGV2_DEBUG(21851,
                         1,
                         "Not balancing collection {namespace}; explicitly disabled.",

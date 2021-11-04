@@ -1096,7 +1096,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     const CollectionType coll(findCollResponse.docs[0]);
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Collection is undergoing changes and chunks cannot be moved",
-            coll.getAllowMigrations());
+            coll.getAllowMigrations() && coll.getPermitMigrations());
 
     const auto findChunkQuery = coll.getTimestamp()
         ? BSON(ChunkType::collectionUUID() << coll.getUuid())

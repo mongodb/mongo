@@ -145,3 +145,10 @@ structs:
                 description: "Time-series collection fields. Only set when this is a time-series
                               buckets collection."
                 optional: true
+# TODO SERVER-61033: merge this flag with allowMigrations.
+            permitMigrations:
+                type: bool
+                description: "DEPRECATED flag that determines wether this collection allows chunks to
+                               move. This will only prevent migration from committing and new balancer
+                               rounds, this flag will not be loaded by shards."
+                optional: true
