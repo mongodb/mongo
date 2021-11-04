@@ -303,7 +303,7 @@ void ScanStage::open(bool reOpen) {
             _cursor = _coll->getCursor(_opCtx, _forward);
         }
     } else {
-        _cursor.reset();
+        MONGO_UNREACHABLE_TASSERT(5959701);
     }
 
     _open = true;
@@ -316,10 +316,6 @@ PlanState ScanStage::getNext() {
     // We are about to call next() on a storage cursor so do not bother saving our internal state in
     // case it yields as the state will be completely overwritten after the next() call.
     disableSlotAccess();
-
-    if (!_cursor) {
-        return trackPlanState(PlanState::IS_EOF);
-    }
 
     checkForInterrupt(_opCtx);
 
@@ -761,38 +757,36 @@ void ParallelScanStage::open(bool reOpen) {
         _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
     }
 
-    if (_coll) {
-        {
-            stdx::unique_lock lock(_state->mutex);
-            if (_state->ranges.empty()) {
-                auto ranges = _coll->getRecordStore()->numRecords(_opCtx) / 10240;
-                if (ranges < 2) {
-                    _state->ranges.emplace_back(Range{RecordId{}, RecordId{}});
-                } else {
-                    if (ranges > 1024) {
-                        ranges = 1024;
-                    }
-                    auto randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
-                    invariant(randomCursor);
-                    std::set<RecordId> rids;
-                    while (ranges--) {
-                        auto nextRecord = randomCursor->next();
-                        if (nextRecord) {
-                            rids.emplace(nextRecord->id);
-                        }
-                    }
-                    RecordId lastid{};
-                    for (auto id : rids) {
-                        _state->ranges.emplace_back(Range{lastid, id});
-                        lastid = id;
-                    }
-                    _state->ranges.emplace_back(Range{lastid, RecordId{}});
+    {
+        stdx::unique_lock lock(_state->mutex);
+        if (_state->ranges.empty()) {
+            auto ranges = _coll->getRecordStore()->numRecords(_opCtx) / 10240;
+            if (ranges < 2) {
+                _state->ranges.emplace_back(Range{RecordId{}, RecordId{}});
+            } else {
+                if (ranges > 1024) {
+                    ranges = 1024;
                 }
+                auto randomCursor = _coll->getRecordStore()->getRandomCursor(_opCtx);
+                invariant(randomCursor);
+                std::set<RecordId> rids;
+                while (ranges--) {
+                    auto nextRecord = randomCursor->next();
+                    if (nextRecord) {
+                        rids.emplace(nextRecord->id);
+                    }
+                }
+                RecordId lastid{};
+                for (auto id : rids) {
+                    _state->ranges.emplace_back(Range{lastid, id});
+                    lastid = id;
+                }
+                _state->ranges.emplace_back(Range{lastid, RecordId{}});
             }
         }
-
-        _cursor = _coll->getCursor(_opCtx);
     }
+
+    _cursor = _coll->getCursor(_opCtx);
 
     _open = true;
 }

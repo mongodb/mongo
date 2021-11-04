@@ -326,10 +326,6 @@ PlanState IndexScanStage::getNext() {
     // state in case it yields as the state will be completely overwritten after the call.
     disableSlotAccess();
 
-    if (!_cursor) {
-        return trackPlanState(PlanState::IS_EOF);
-    }
-
     checkForInterrupt(_opCtx);
 
     if (_firstGetNext) {
