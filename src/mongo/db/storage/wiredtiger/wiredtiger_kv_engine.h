@@ -175,12 +175,6 @@ public:
                             StringData ident,
                             const IndexDescriptor* desc) override;
 
-    Status okToRename(OperationContext* opCtx,
-                      StringData fromNS,
-                      StringData toNS,
-                      StringData ident,
-                      const RecordStore* originalRecordStore) const override;
-
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;
 
     Status beginBackup(OperationContext* opCtx) override;

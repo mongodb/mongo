@@ -1062,16 +1062,6 @@ void WiredTigerKVEngine::cleanShutdown() {
     _conn = nullptr;
 }
 
-Status WiredTigerKVEngine::okToRename(OperationContext* opCtx,
-                                      StringData fromNS,
-                                      StringData toNS,
-                                      StringData ident,
-                                      const RecordStore* originalRecordStore) const {
-    syncSizeInfo(false);
-
-    return Status::OK();
-}
-
 int64_t WiredTigerKVEngine::getIdentSize(OperationContext* opCtx, StringData ident) {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     return WiredTigerUtil::getIdentSize(session->getSession(), _uri(ident));

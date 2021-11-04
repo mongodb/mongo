@@ -311,14 +311,6 @@ public:
      */
     virtual bool supportsDirectoryPerDB() const = 0;
 
-    virtual Status okToRename(OperationContext* opCtx,
-                              StringData fromNS,
-                              StringData toNS,
-                              StringData ident,
-                              const RecordStore* originalRecordStore) const {
-        return Status::OK();
-    }
-
     virtual bool hasIdent(OperationContext* opCtx, StringData ident) const = 0;
 
     virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const = 0;
