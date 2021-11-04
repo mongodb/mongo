@@ -405,6 +405,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePredicatesOnId) {
     auto date = Date_t::now();
     const auto dateMinusBucketSpan = date - Seconds{3600};
+    const auto datePlusBucketSpan = date + Seconds{3600};
     {
         auto timePred = BSON("$match" << BSON("time" << BSON("$lt" << date)));
         auto pipelines = {
@@ -427,11 +428,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
             auto children = andExpr->getChildVector();
 
-            ASSERT_EQ(children->size(), 2);
+            ASSERT_EQ(children->size(), 3);
             ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
                               BSON("control.min.time" << BSON("$_internalExprLt" << date)));
+            ASSERT_BSONOBJ_EQ(
+                (*children)[1]->serialize(true),
+                BSON("control.max.time" << BSON("$_internalExprLt" << datePlusBucketSpan)));
 
-            auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[1].get());
+            auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
             ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
@@ -470,11 +474,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
             auto children = andExpr->getChildVector();
 
-            ASSERT_EQ(children->size(), 2);
+            ASSERT_EQ(children->size(), 3);
             ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
                               BSON("control.min.time" << BSON("$_internalExprLte" << date)));
+            ASSERT_BSONOBJ_EQ(
+                (*children)[1]->serialize(true),
+                BSON("control.max.time" << BSON("$_internalExprLte" << datePlusBucketSpan)));
 
-            auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[1].get());
+            auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
             ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
@@ -505,7 +512,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.get());
             auto children = andExpr->getChildVector();
 
-            ASSERT_EQ(children->size(), 5);
+            ASSERT_EQ(children->size(), 6);
             ASSERT_BSONOBJ_EQ((*children)[0]->serialize(true),
                               BSON("control.min.time" << BSON("$_internalExprLte" << date)));
             ASSERT_BSONOBJ_EQ(
@@ -513,8 +520,11 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
                 BSON("control.min.time" << BSON("$_internalExprGte" << dateMinusBucketSpan)));
             ASSERT_BSONOBJ_EQ((*children)[2]->serialize(true),
                               BSON("control.max.time" << BSON("$_internalExprGte" << date)));
+            ASSERT_BSONOBJ_EQ(
+                (*children)[3]->serialize(true),
+                BSON("control.max.time" << BSON("$_internalExprLte" << datePlusBucketSpan)));
 
-            auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[3].get());
+            auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[4].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
             ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
@@ -523,7 +533,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             oid.init(date);
             ASSERT_TRUE(oid.compare(idPred->getData().OID()) < 0);
 
-            idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[4].get());
+            idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[5].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
             ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);

@@ -685,9 +685,11 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     }
 
     BSONObj minTime;
+    BSONObj maxTime;
     if (isTimeField) {
         auto timeField = matchExprData.Date();
         minTime = BSON("" << timeField - Seconds(bucketMaxSpanSeconds));
+        maxTime = BSON("" << timeField + Seconds(bucketMaxSpanSeconds));
     }
 
     auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprPath;
@@ -703,15 +705,17 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // is adjusted by the max range for a bucket to approximate the max bucket value given
             // the min. Also include a predicate against the _id field which is converted to the
             // minimum for the range of ObjectIds corresponding to the given date. In
-            // addition, we include a {'control.min' : {$gte: 'time - bucketMaxSpanSeconds'}}
-            // predicate which will be helpful in reducing bounds for index scans on 'time' field
-            // and routing on mongos.
+            // addition, we include a {'control.min' : {$gte: 'time - bucketMaxSpanSeconds'}} and
+            // a {'control.max' : {$lte: 'time + bucketMaxSpanSeconds'}} predicate which will be
+            // helpful in reducing bounds for index scans on 'time' field and routing on mongos.
             return isTimeField
                 ? makePredicate(
                       MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
                       MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
                                                                          minTime.firstElement()),
                       MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
+                      MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
+                                                                         maxTime.firstElement()),
                       MatchExprPredicate<LTEMatchExpression, Value>(
                           kBucketIdFieldName,
                           constructObjectIdValue<LTEMatchExpression>(matchExprData,
@@ -775,12 +779,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // For $lt, make a $lt predicate against 'control.min'. In addition, if the comparison
             // is against the 'time' field, include a predicate against the _id field which is
             // converted to the minimum for the corresponding range of ObjectIds. In
-            // addition, we include a {'control.min' : {$lt: 'time - bucketMaxSpanSeconds'}}
+            // addition, we include a {'control.max' : {$lt: 'time + bucketMaxSpanSeconds'}}
             // predicate which will be helpful in reducing bounds for index scans on 'time' field
             // and routing on mongos.
             return isTimeField
                 ? makePredicate(
                       MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
+                      MatchExprPredicate<InternalExprLTMatchExpression>(maxPath,
+                                                                        maxTime.firstElement()),
                       MatchExprPredicate<LTMatchExpression, Value>(
                           kBucketIdFieldName,
                           constructObjectIdValue<LTMatchExpression>(matchExprData,
@@ -793,12 +799,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // For $lte, make a $lte predicate against 'control.min'. In addition, if the comparison
             // is against the 'time' field, include a predicate against the _id field which is
             // converted to the maximum for the corresponding range of ObjectIds. In
-            // addition, we include a {'control.min' : {$lte: 'time - bucketMaxSpanSeconds'}}
+            // addition, we include a {'control.max' : {$lte: 'time + bucketMaxSpanSeconds'}}
             // predicate which will be helpful in reducing bounds for index scans on 'time' field
             // and routing on mongos.
             return isTimeField
                 ? makePredicate(
                       MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
+                      MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
+                                                                         maxTime.firstElement()),
                       MatchExprPredicate<LTEMatchExpression, Value>(
                           kBucketIdFieldName,
                           constructObjectIdValue<LTEMatchExpression>(matchExprData,
