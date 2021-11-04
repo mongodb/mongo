@@ -1646,6 +1646,20 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     return std::move(rs);
 }
 
+void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,
+                                            StringData ident,
+                                            const IndexDescriptor* desc) {
+    WiredTigerSession session(_conn);
+    std::string uri = _uri(ident);
+
+    // Make the alter call to update metadata without taking exclusive lock to avoid conflicts with
+    // concurrent operations.
+    std::string alterString =
+        WiredTigerIndex::generateAppMetadataString(*desc) + "exclusive_refreshed=false,";
+    invariantWTOK(
+        session.getSession()->alter(session.getSession(), uri.c_str(), alterString.c_str()));
+}
+
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                                      StringData ident,
                                      StorageEngine::DropIdentCallback&& onDrop) {

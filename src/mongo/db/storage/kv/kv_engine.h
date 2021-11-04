@@ -175,6 +175,10 @@ public:
         return status;
     }
 
+    virtual void alterIdentMetadata(OperationContext* opCtx,
+                                    StringData ident,
+                                    const IndexDescriptor* desc) {}
+
     /**
      * See StorageEngine::flushAllFiles for details
      */

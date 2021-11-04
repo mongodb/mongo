@@ -431,6 +431,15 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         opCtx, collection, ident, std::move(descriptor), frozen);
 
     IndexDescriptor* desc = entry->descriptor();
+
+    // In some cases, it may be necessary to update the index metadata in the storage engine in
+    // order to obtain the correct SortedDataInterface. One such scenario is found in converting an
+    // index to be unique.
+    bool isUpdateMetadata = CreateIndexEntryFlags::kUpdateMetadata & flags;
+    if (isUpdateMetadata) {
+        engine->getEngine()->alterIdentMetadata(opCtx, ident, desc);
+    }
+
     const auto& collOptions = collection->getCollectionOptions();
     std::unique_ptr<SortedDataInterface> sdi =
         engine->getEngine()->getSortedDataInterface(opCtx, collOptions, ident, desc);
