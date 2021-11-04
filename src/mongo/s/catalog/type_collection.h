@@ -163,6 +163,11 @@ public:
             setPre50CompatibleAllowMigrations(false);
     }
 
+    // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.
+    bool getPermitMigrations() const {
+        return CollectionTypeBase::getPermitMigrations().get_value_or(true);
+    }
+
     SupportingLongNameStatusEnum getSupportingLongName() const;
 
     void setSupportingLongName(SupportingLongNameStatusEnum value);

@@ -62,6 +62,38 @@ const setUpDb = function setUpDatabaseAndEnableSharding() {
     assert.eq(false, cachedEntry.allowMigrations);
 })();
 
+// TODO SERVER-61033: remove after permitMigrations have been merged with allowMigrations.
+// Tests that moveChunk does not succeed when {permitMigrations: false}
+(function testPermitMigrationsFalsePreventsMoveChunk() {
+    setUpDb();
+
+    const collName = "collA";
+    const ns = dbName + "." + collName;
+
+    assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 0}));
+    assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+    // Confirm that an inProgress moveChunk fails once {allowMigrations: false}
+    const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
+    const awaitResult = startParallelShell(
+        funWithArgs(function(ns, toShardName) {
+            assert.commandFailedWithCode(
+                db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                ErrorCodes.ConflictingOperationInProgress);
+        }, ns, st.shard1.shardName), st.s.port);
+    fp.wait();
+    assert.commandWorked(configDB.collections.updateOne(
+        {_id: ns}, {$set: {permitMigrations: false}}, {writeConcern: {w: "majority"}}));
+    fp.off();
+    awaitResult();
+
+    // {permitMigrations: false} is set, sending a new moveChunk command should also fail.
+    assert.commandFailedWithCode(
+        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
+        ErrorCodes.ConflictingOperationInProgress);
+})();
+
 // Tests {allowMigrations: false} disables balancing for collB and does not interfere with balancing
 // for collA.
 //
@@ -205,6 +237,9 @@ const testConfigsvrSetAllowMigrationsCommand = function() {
 testBalancer(false /* allowMigrations */, {});
 testBalancer(false /* allowMigrations */, {noBalance: false});
 testBalancer(false /* allowMigrations */, {noBalance: true});
+
+// TODO SERVER-61033: merge permitMigrations with allowMigrations.
+testBalancer(true /* allowMigrations */, {permitMigrations: false});
 
 // Test the _configsvrSetAllowMigrations internal command
 testConfigsvrSetAllowMigrationsCommand();

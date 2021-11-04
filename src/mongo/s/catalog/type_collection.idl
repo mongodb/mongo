@@ -162,3 +162,10 @@ structs:
                               sharded collection UUID, instead of the namespace, as part of their
                               names, i.e., system.cache.chunks.<UUID>."
                 optional: true
+# TODO SERVER-61033: merge this flag with allowMigrations.
+            permitMigrations:
+                type: bool
+                description: "DEPRECATED flag that determines wether this collection allows chunks to
+                               move. This will only prevent migration from committing and new balancer
+                               rounds, this flag will not be loaded by shards."
+                optional: true
