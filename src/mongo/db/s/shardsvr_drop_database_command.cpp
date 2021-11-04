@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/drop_database_legacy.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -88,6 +89,13 @@ public:
                 feature_flags::gShardingFullDDLSupport.isEnabled(*fixedFCVRegion);
 
             if (!useNewPath) {
+                {
+                    Lock::GlobalLock lock(opCtx, MODE_IX);
+                    uassert(ErrorCodes::PrimarySteppedDown,
+                            str::stream() << "Not primary while running " << Request::kCommandName,
+                            repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
+                }
+
                 LOGV2_DEBUG(
                     5281110, 1, "Running legacy drop database procedure", "db"_attr = dbName);
                 dropDatabaseLegacy(opCtx, dbName);

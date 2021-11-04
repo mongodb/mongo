@@ -38,6 +38,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
@@ -289,6 +290,13 @@ public:
             }();
 
             if (!useNewPath) {
+                {
+                    Lock::GlobalLock lock(opCtx, MODE_IX);
+                    uassert(ErrorCodes::PrimarySteppedDown,
+                            str::stream() << "Not primary while running " << Request::kCommandName,
+                            repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
+                }
+
                 LOGV2_DEBUG(5277911,
                             1,
                             "Running legacy create collection procedure",

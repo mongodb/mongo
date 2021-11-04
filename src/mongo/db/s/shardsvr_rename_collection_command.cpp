@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
@@ -142,6 +143,12 @@ public:
             }
 
             if (!useNewPath) {
+                {
+                    Lock::GlobalLock lock(opCtx, MODE_IX);
+                    uassert(ErrorCodes::PrimarySteppedDown,
+                            str::stream() << "Not primary while running " << Request::kCommandName,
+                            repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
+                }
                 return renameCollectionLegacy(opCtx, req, fromNss);
             }
 

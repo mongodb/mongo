@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_legacy.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
@@ -94,6 +95,13 @@ public:
 
             bool useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion);
             if (!useNewPath) {
+                {
+                    Lock::GlobalLock lock(opCtx, MODE_IX);
+                    uassert(ErrorCodes::PrimarySteppedDown,
+                            str::stream() << "Not primary while running " << Request::kCommandName,
+                            repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
+                }
+
                 LOGV2_DEBUG(5280951,
                             1,
                             "Running legacy drop collection procedure",
