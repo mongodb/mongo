@@ -48,6 +48,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/bits.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
@@ -428,7 +429,7 @@ public:
             _nextByte += by;
             return oldNextByte;
         }
-        return _growReallocate(by);
+        return _growOutOfLineSlowPath(by);
     }
 
     /**
@@ -441,10 +442,11 @@ public:
             return;
         }
 
-        _growReallocate(bytes);
+        _growOutOfLineSlowPath(bytes);
 
-        // _growReallocate adds to _nextByte to speed up the common case of grow(). Now remove
-        // those bytes, and put them after _end.
+        // _growOutOfLineSlowPath adds to _nextByte to speed up the
+        // common case of grow(). Now remove those bytes, and put them
+        // after _end.
         _nextByte -= bytes;
         _end -= bytes;
     }
@@ -490,14 +492,28 @@ protected:
         // we bake that assumption in here. This decision should be revisited soon.
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
-    /* "slow" portion of 'grow()'  */
-    char* _growReallocate(size_t by) {
+
+    /**
+     * The "slow" portion of 'grow()', for when we actually need to go
+     * to the underlying allocator for more memory. This function must
+     * not be inlined. It has managed to accidentally become inlined
+     * again several times, and each time has resulted in performance
+     * regressions. If you are looking at this function sometime in
+     * the future, and it not in header scope and lacks an attribute
+     * that ensures it is not inlined, and you are, once again, moving
+     * it back to header scope, you must re-add the necessary
+     * annotation to ensure the function will not be inlined.
+     */
+    MONGO_COMPILER_NOINLINE char* _growOutOfLineSlowPath(size_t by) {
         const size_t oldLen = len();
         const size_t oldReserved = reservedBytes();
         size_t minSize = oldLen + by + oldReserved;
+
         // Going beyond the maximum buffer size is not likely.
         if (MONGO_unlikely(minSize > BufferMaxSize)) {
-            growFailure(minSize);
+            std::stringstream ss;
+            ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
+            msgasserted(13548, ss.str().c_str());
         }
 
         // We add 'BufferAllocator::kBuffHolderSize' to the requested reallocation size, as it will
@@ -545,16 +561,6 @@ protected:
         invariant(_buf.get() + _buf.capacity() >= _end);
 
         return _buf.get() + oldLen;
-    }
-
-    /*
-     * A failure path of 'grow' is marked as noinline as it is almost never called and needlesly
-     * expands the callee stack if inlined.
-     */
-    MONGO_COMPILER_NOINLINE void growFailure(int minSize) {
-        std::stringstream ss;
-        ss << "BufBuilder attempted to grow() to " << minSize << " bytes, past the 64MB limit.";
-        msgasserted(13548, ss.str().c_str());
     }
 
     BufferAllocator _buf;
