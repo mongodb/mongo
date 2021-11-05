@@ -24,8 +24,7 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
     /* Reset the compaction state information. */
     block->compact_pct_tenths = 0;
-    block->compact_blocks_moved = 0;
-    block->compact_cache_pages_dealt = 0;
+    block->compact_pages_rewritten = 0;
     block->compact_pages_reviewed = 0;
     block->compact_pages_skipped = 0;
 
@@ -52,6 +51,23 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
+ * __wt_block_compact_get_progress_stats --
+ *     Collect compact progress stats.
+ */
+void
+__wt_block_compact_get_progress_stats(WT_SESSION_IMPL *session, WT_BM *bm,
+  uint64_t *pages_reviewedp, uint64_t *pages_skippedp, uint64_t *pages_rewrittenp)
+{
+    WT_BLOCK *block;
+
+    WT_UNUSED(session);
+    block = bm->block;
+    *pages_reviewedp = block->compact_pages_reviewed;
+    *pages_skippedp = block->compact_pages_skipped;
+    *pages_rewrittenp = block->compact_pages_rewritten;
+}
+
+/*
  * __wt_block_compact_progress --
  *     Output compact progress message.
  */
@@ -72,9 +88,9 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
         ++*msg_countp;
         __wt_verbose_debug(session, WT_VERB_COMPACT_PROGRESS,
           " compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, skipped %" PRIu64
-          " pages, cache pages evicted %" PRIu64 ", on-disk pages moved %" PRIu64,
+          " pages, rewritten %" PRIu64 "pages",
           block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_skipped,
-          block->compact_cache_pages_dealt, block->compact_blocks_moved);
+          block->compact_pages_rewritten);
     }
 }
 /*
@@ -144,7 +160,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
       "%s: total reviewed %" PRIu64 " pages, total skipped %" PRIu64 " pages, total wrote %" PRIu64
       " pages",
       block->name, block->compact_pages_reviewed, block->compact_pages_skipped,
-      block->compact_cache_pages_dealt);
+      block->compact_pages_rewritten);
     __wt_verbose_debug(session, WT_VERB_COMPACT,
       "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first 80%% of the file",
       block->name, (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty);
@@ -223,7 +239,7 @@ __wt_block_compact_page_skip(
     if (*skipp)
         ++block->compact_pages_skipped;
     else
-        ++block->compact_cache_pages_dealt;
+        ++block->compact_pages_rewritten;
 
     return (0);
 }
@@ -254,14 +270,6 @@ __wt_block_compact_page_rewrite(
     /* Check if the block is worth rewriting. */
     __compact_page_skip(session, block, offset, size, skipp);
 
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG) ||
-      WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG)) {
-        ++block->compact_pages_reviewed;
-        if (*skipp)
-            ++block->compact_pages_skipped;
-        else
-            ++block->compact_blocks_moved;
-    }
     if (*skipp)
         return (0);
 
@@ -359,10 +367,8 @@ __block_dump_file_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
           session, WT_VERB_COMPACT, "pages reviewed: %" PRIu64, block->compact_pages_reviewed);
         __wt_verbose_debug(
           session, WT_VERB_COMPACT, "pages skipped: %" PRIu64, block->compact_pages_skipped);
-        __wt_verbose_debug(session, WT_VERB_COMPACT,
-          "cache pages read/flushed out of the cache: %" PRIu64, block->compact_cache_pages_dealt);
         __wt_verbose_debug(
-          session, WT_VERB_COMPACT, "blocks moved : %" PRIu64, block->compact_blocks_moved);
+          session, WT_VERB_COMPACT, "pages rewritten : %" PRIu64, block->compact_pages_rewritten);
     }
 
     __wt_verbose_debug(session, WT_VERB_COMPACT,

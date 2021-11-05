@@ -185,7 +185,6 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         if (!*skipp) {
             copy.size = (uint8_t)addr_size;
             WT_ERR(__compact_page_replace_addr(session, ref, &copy));
-            WT_STAT_DATA_INCR(session, btree_compact_pages_rewritten);
         }
     }
 
@@ -204,8 +203,6 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      */
     if (previous_state == WT_REF_MEM) {
         WT_ERR(__compact_page_inmem(session, ref, skipp));
-        if (!*skipp)
-            WT_STAT_DATA_INCR(session, btree_compact_pages_rewritten);
     }
 
 err:
@@ -302,6 +299,10 @@ __wt_compact(WT_SESSION_IMPL *session)
     u_int i, msg_count;
     bool skip;
 
+    uint64_t stats_pages_rewritten; /* Pages rewritten */
+    uint64_t stats_pages_reviewed;  /* Pages reviewed */
+    uint64_t stats_pages_skipped;   /* Pages skipped */
+
     bm = S2BT(session)->bm;
     ref = NULL;
 
@@ -322,10 +323,11 @@ __wt_compact(WT_SESSION_IMPL *session)
     for (i = 0;;) {
 
         /* Track progress. */
-        WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, bm->block->compact_pages_reviewed);
-        WT_STAT_DATA_SET(session, btree_compact_pages_skipped, bm->block->compact_pages_skipped);
-        WT_STAT_DATA_SET(
-          session, btree_compact_pages_write_selected, bm->block->compact_cache_pages_dealt);
+        __wt_block_compact_get_progress_stats(
+          session, bm, &stats_pages_reviewed, &stats_pages_skipped, &stats_pages_rewritten);
+        WT_STAT_DATA_SET(session, btree_compact_pages_reviewed, stats_pages_reviewed);
+        WT_STAT_DATA_SET(session, btree_compact_pages_skipped, stats_pages_skipped);
+        WT_STAT_DATA_SET(session, btree_compact_pages_rewritten, stats_pages_rewritten);
 
         /*
          * Periodically check if we've timed out or eviction is stuck. Quit if eviction is stuck,

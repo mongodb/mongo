@@ -86,7 +86,6 @@ class test_compact03(wttest.WiredTigerTestCase):
         statDict = {}
         statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
         statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_selected"] = cstat[stat.dsrc.btree_compact_pages_write_selected][2]
         statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
         cstat.close()
         return statDict
@@ -162,8 +161,9 @@ class test_compact03(wttest.WiredTigerTestCase):
         # Verify that we did indeed rewrote some pages but that didn't help with the file size.
         statDict = self.getCompactProgressStats()
         self.assertGreater(statDict["pages_reviewed"],0)
-        self.assertGreater(statDict["pages_selected"],0)
         self.assertGreater(statDict["pages_rewritten"],0)
+        self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
+                            statDict["pages_reviewed"])
 
         # 9. Insert some normal values and expect that file size won't increase as free extents
         #    in the middle of the file will be used to write new data.

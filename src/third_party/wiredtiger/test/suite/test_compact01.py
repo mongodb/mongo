@@ -67,7 +67,6 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         statDict = {}
         statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
         statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
-        statDict["pages_selected"] = cstat[stat.dsrc.btree_compact_pages_write_selected][2]
         statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
         cstat.close()
         return statDict
@@ -120,8 +119,9 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         if self.utility == 0 and self.reopen == 0:
             statDict = self.getCompactProgressStats(uri)
             self.assertGreater(statDict["pages_reviewed"],0)
-            self.assertGreater(statDict["pages_selected"],0)
             self.assertGreater(statDict["pages_rewritten"],0)
+            self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
+                                statDict["pages_reviewed"])
 
         # Confirm compaction worked: check the number of on-disk pages
         self.reopen_conn()

@@ -215,7 +215,7 @@ workload_compact(const char *home, const char *table_config)
     uint32_t i;
     uint64_t key_range_start;
 
-    uint64_t pages_reviewed, pages_rewritten, pages_selected;
+    uint64_t pages_reviewed, pages_rewritten, pages_skipped;
 
     first_ckpt = false;
 
@@ -263,10 +263,10 @@ workload_compact(const char *home, const char *table_config)
         log_db_size(session, uri1);
 
         /* If we made progress with compact, verify that compact stats support that. */
-        get_compact_progress(session, uri1, &pages_reviewed, &pages_rewritten, &pages_selected);
+        get_compact_progress(session, uri1, &pages_reviewed, &pages_rewritten, &pages_skipped);
         printf(" - Pages reviewed: %" PRIu64 "\n", pages_reviewed);
-        printf(" - Pages selected for being rewritten: %" PRIu64 "\n", pages_selected);
-        printf(" - Pages actually rewritten: %" PRIu64 "\n", pages_rewritten);
+        printf(" - Pages selected for being rewritten: %" PRIu64 "\n", pages_rewritten);
+        printf(" - Pages skipped: %" PRIu64 "\n", pages_skipped);
 
         /* Put the deleted records back. */
         populate(session, key_range_start, key_range_start + NUM_RECORDS / 3);
@@ -425,7 +425,7 @@ log_db_size(WT_SESSION *session, const char *uri)
 
 static void
 get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_reviewed,
-  uint64_t *pages_selected, uint64_t *pages_rewritten)
+  uint64_t *pages_skipped, uint64_t *pages_rewritten)
 {
 
     WT_CURSOR *cur_stat;
@@ -438,9 +438,9 @@ get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_revie
     cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REVIEWED);
     testutil_check(cur_stat->search(cur_stat));
     testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_reviewed));
-    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_WRITE_SELECTED);
+    cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_SKIPPED);
     testutil_check(cur_stat->search(cur_stat));
-    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_selected));
+    testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_skipped));
     cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REWRITTEN);
     testutil_check(cur_stat->search(cur_stat));
     testutil_check(cur_stat->get_value(cur_stat, &descr, &str_val, pages_rewritten));

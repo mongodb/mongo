@@ -882,7 +882,7 @@ struct __wt_dsrc_stats {
     int64_t btree_checkpoint_generation;
     int64_t btree_clean_checkpoint_timer;
     int64_t btree_compact_pages_reviewed;
-    int64_t btree_compact_pages_write_selected;
+    int64_t btree_compact_pages_rewritten;
     int64_t btree_compact_pages_skipped;
     int64_t btree_compact_skipped;
     int64_t btree_column_fix;
@@ -899,7 +899,6 @@ struct __wt_dsrc_stats {
     int64_t btree_maximum_depth;
     int64_t btree_entries;
     int64_t btree_overflow;
-    int64_t btree_compact_pages_rewritten;
     int64_t btree_row_empty_values;
     int64_t btree_row_internal;
     int64_t btree_row_leaf;

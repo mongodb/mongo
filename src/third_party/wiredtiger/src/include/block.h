@@ -278,11 +278,10 @@ struct __wt_block {
     WT_CKPT *final_ckpt; /* Final live checkpoint write */
 
     /* Compaction support */
-    int compact_pct_tenths;             /* Percent to compact */
-    uint64_t compact_blocks_moved;      /* Pages moved by the block manager */
-    uint64_t compact_cache_pages_dealt; /* Pages dealt with in cache */
-    uint64_t compact_pages_reviewed;    /* Pages reviewed */
-    uint64_t compact_pages_skipped;     /* Pages skipped */
+    int compact_pct_tenths;           /* Percent to compact */
+    uint64_t compact_pages_rewritten; /* Pages rewritten */
+    uint64_t compact_pages_reviewed;  /* Pages reviewed */
+    uint64_t compact_pages_skipped;   /* Pages skipped */
 
     /* Salvage support */
     wt_off_t slvg_off; /* Salvage file offset */
