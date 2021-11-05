@@ -713,9 +713,12 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         }
 
         // Write a pre-image to the change streams pre-images collection if the node is the primary
-        // and not performing an initial sync or a tenant migration.
+        // and not performing an initial sync or a tenant migration. A request to update a pre-image
+        // can come from chunk-migrate, ie. source of the request is 'fromMigrate', such events are
+        // filtered out by change streams and storing them in pre-image collection is redundant.
         if (opCtx->isEnforcingConstraints() &&
-            args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
+            args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection &&
+            args.updateArgs->source != OperationSource::kFromMigrate) {
             const auto& preImageDoc = args.updateArgs->preImageDoc;
             tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.get().isEmpty());
 
@@ -852,9 +855,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         }
 
         // Write a pre-image to the change streams pre-images collection if the node is the primary
-        // and not performing an initial sync or a tenant migration.
+        // and not performing an initial sync or a tenant migration. A request to delete a pre-image
+        // can come from chunk-migrate, ie. source of the request is 'fromMigrate', such events are
+        // filtered out by change streams and storing them in pre-image collection is redundant.
         if (opCtx->isEnforcingConstraints() &&
-            args.changeStreamPreAndPostImagesEnabledForCollection) {
+            args.changeStreamPreAndPostImagesEnabledForCollection && !args.fromMigrate) {
             tassert(5868704, "Deleted document must be set", args.deletedDoc);
 
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
