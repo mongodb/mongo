@@ -223,6 +223,13 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
             if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status) {
                 uassertStatusOK(status);
             }
+
+            if (ErrorCodes::TenantMigrationAborted == status) {
+                uassertStatusOK(status.withContext(
+                    str::stream() << "got TenantMigrationAborted response from shard "
+                                  << response.shardId << " at host "
+                                  << response.shardHostAndPort->toString()));
+            }
         }
         responses.push_back(std::move(response));
     }

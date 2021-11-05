@@ -9,12 +9,12 @@
 
 load("jstests/libs/fail_point_util.js");
 
-function donorStartMigrationCmd(_tenantID, _realConnUrl) {
+function donorStartMigrationCmd(tenantID, realConnUrl) {
     return {
         donorStartMigration: 1,
-        tenantId: _tenantID.str,
+        tenantId: tenantID.str,
         migrationId: UUID(),
-        recipientConnectionString: _realConnUrl,
+        recipientConnectionString: realConnUrl,
         readPreference: {mode: "primary"}
     };
 }
