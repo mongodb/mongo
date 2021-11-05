@@ -754,14 +754,14 @@ TEST(ExpressionFromAccumulators, FirstNLastN) {
                               spec.firstElement(),
                               Value(expected));
     };
-    firstNFn(fromjson("{$firstN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+    firstNFn(fromjson("{$firstN: {n: 3, input: [19, 7, 28, 3, 5]}}"),
              BSONArray(fromjson("[19, 7, 28]")));
-    firstNFn(fromjson("{$firstN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+    firstNFn(fromjson("{$firstN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
              BSONArray(fromjson("[19, 7, 28, 3, 5]")));
-    firstNFn(fromjson("{$firstN: {n: 3, output: [1,2,3,4,5,6]}}"), BSONArray(fromjson("[1,2,3]")));
-    firstNFn(fromjson("{$firstN: {n: 3, output: [1,2,null,null]}}"),
+    firstNFn(fromjson("{$firstN: {n: 3, input: [1,2,3,4,5,6]}}"), BSONArray(fromjson("[1,2,3]")));
+    firstNFn(fromjson("{$firstN: {n: 3, input: [1,2,null,null]}}"),
              BSONArray(fromjson("[1,2,null]")));
-    firstNFn(fromjson("{$firstN: {n: 3, output: [1.1, 2.713, 3, 3.4]}}"),
+    firstNFn(fromjson("{$firstN: {n: 3, input: [1.1, 2.713, 3, 3.4]}}"),
              BSONArray(fromjson("[1.1, 2.713, 3]")));
 
     // $lastN
@@ -770,13 +770,13 @@ TEST(ExpressionFromAccumulators, FirstNLastN) {
                               spec.firstElement(),
                               Value(expected));
     };
-    lastNFn(fromjson("{$lastN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+    lastNFn(fromjson("{$lastN: {n: 3, input: [19, 7, 28, 3, 5]}}"),
             BSONArray(fromjson("[28,3,5]")));
-    lastNFn(fromjson("{$lastN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+    lastNFn(fromjson("{$lastN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
             BSONArray(fromjson("[19, 7, 28, 3, 5]")));
-    lastNFn(fromjson("{$lastN: {n: 3, output: [3,2,1,4,5,6]}}"), BSONArray(fromjson("[4,5,6]")));
-    lastNFn(fromjson("{$lastN: {n: 3, output: [1,2,null,3]}}"), BSONArray(fromjson("[2,null,3]")));
-    lastNFn(fromjson("{$lastN: {n: 3, output: [3, 2.713, 1.1, 2.7]}}"),
+    lastNFn(fromjson("{$lastN: {n: 3, input: [3,2,1,4,5,6]}}"), BSONArray(fromjson("[4,5,6]")));
+    lastNFn(fromjson("{$lastN: {n: 3, input: [1,2,null,3]}}"), BSONArray(fromjson("[2,null,3]")));
+    lastNFn(fromjson("{$lastN: {n: 3, input: [3, 2.713, 1.1, 2.7]}}"),
             BSONArray(fromjson("[2.713, 1.1, 2.7]")));
 }
 
@@ -811,13 +811,13 @@ TEST(ExpressionFromAccumulators, MinNMaxN) {
     };
 
     // $maxN
-    maxNFn(fromjson("{$maxN: {n: 3, output: [19, 7, 28, 3, 5]}}"),
+    maxNFn(fromjson("{$maxN: {n: 3, input: [19, 7, 28, 3, 5]}}"),
            BSONArray(fromjson("[28, 19, 7]")));
-    maxNFn(fromjson("{$maxN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+    maxNFn(fromjson("{$maxN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
            BSONArray(fromjson("[28, 19, 7, 5, 3]")));
-    maxNFn(fromjson("{$maxN: {n: 3, output: [1,2,3]}}"), BSONArray(fromjson("[3,2,1]")));
-    maxNFn(fromjson("{$maxN: {n: 3, output: [1,2,null]}}"), BSONArray(fromjson("[2,1]")));
-    maxNFn(fromjson("{$maxN: {n: 3, output: [1.1, 2.713, 3]}}"),
+    maxNFn(fromjson("{$maxN: {n: 3, input: [1,2,3]}}"), BSONArray(fromjson("[3,2,1]")));
+    maxNFn(fromjson("{$maxN: {n: 3, input: [1,2,null]}}"), BSONArray(fromjson("[2,1]")));
+    maxNFn(fromjson("{$maxN: {n: 3, input: [1.1, 2.713, 3]}}"),
            BSONArray(fromjson("[3, 2.713, 1.1]")));
 
     auto minNFn = [&](const BSONObj& spec, const BSONArray& expected) {
@@ -826,12 +826,12 @@ TEST(ExpressionFromAccumulators, MinNMaxN) {
     };
 
     // $minN
-    minNFn(fromjson("{$minN: {n: 3, output: [19, 7, 28, 3, 5]}}"), BSONArray(fromjson("[3,5,7]")));
-    minNFn(fromjson("{$minN: {n: 6, output: [19, 7, 28, 3, 5]}}"),
+    minNFn(fromjson("{$minN: {n: 3, input: [19, 7, 28, 3, 5]}}"), BSONArray(fromjson("[3,5,7]")));
+    minNFn(fromjson("{$minN: {n: 6, input: [19, 7, 28, 3, 5]}}"),
            BSONArray(fromjson("[3,5,7,19, 28]")));
-    minNFn(fromjson("{$minN: {n: 3, output: [3,2,1]}}"), BSONArray(fromjson("[1,2,3]")));
-    minNFn(fromjson("{$minN: {n: 3, output: [1,2,null]}}"), BSONArray(fromjson("[1,2]")));
-    minNFn(fromjson("{$minN: {n: 3, output: [3, 2.713, 1.1]}}"),
+    minNFn(fromjson("{$minN: {n: 3, input: [3,2,1]}}"), BSONArray(fromjson("[1,2,3]")));
+    minNFn(fromjson("{$minN: {n: 3, input: [1,2,null]}}"), BSONArray(fromjson("[1,2]")));
+    minNFn(fromjson("{$minN: {n: 3, input: [3, 2.713, 1.1]}}"),
            BSONArray(fromjson("[1.1, 2.713, 3]")));
 }
 

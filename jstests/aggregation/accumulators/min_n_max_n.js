@@ -14,7 +14,7 @@ if (!isExactTopNEnabled) {
     // Verify that $minN/$maxN cannot be used if the feature flag is set to false and ignore the
     // rest of the test.
     assert.commandFailedWithCode(coll.runCommand("aggregate", {
-        pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales', n: 2}}}}],
+        pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales', n: 2}}}}],
         cursor: {}
     }),
                                  15952);
@@ -56,7 +56,7 @@ assert.commandWorked(coll.insert(docs));
 // expected groups (we cannot perform unordered comparison because order matters for $minN/$maxN).
 const actualMinNResults =
     coll.aggregate([
-            {$group: {_id: '$state', minSales: {$minN: {output: '$sales', n: n}}}},
+            {$group: {_id: '$state', minSales: {$minN: {input: '$sales', n: n}}}},
             {$sort: {_id: 1}}
         ])
         .toArray();
@@ -64,7 +64,7 @@ assert.eq(expectedMinNResults, actualMinNResults);
 
 const actualMaxNResults =
     coll.aggregate([
-            {$group: {_id: '$state', maxSales: {$maxN: {output: '$sales', n: n}}}},
+            {$group: {_id: '$state', maxSales: {$maxN: {input: '$sales', n: n}}}},
             {$sort: {_id: 1}}
         ])
         .toArray();
@@ -76,7 +76,7 @@ const groupKeyNExpr = {
 };
 const dynamicMinNResults =
     coll.aggregate([{
-            $group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales', n: groupKeyNExpr}}}
+            $group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales', n: groupKeyNExpr}}}
         }])
         .toArray();
 
@@ -103,7 +103,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
         $bucketAuto: {
             groupBy: "$state",
             buckets: 2,
-            output: {minSales: {$minN: {output: '$sales', n: groupKeyNExpr}}}
+            output: {minSales: {$minN: {input: '$sales', n: groupKeyNExpr}}}
         }
     }],
     cursor: {}
@@ -113,19 +113,19 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
 // Reject non-integral/negative values of n.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
     pipeline:
-        [{$group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales', n: 'string'}}}}],
+        [{$group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales', n: 'string'}}}}],
     cursor: {}
 }),
                              5787902);
 
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales', n: 3.2}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales', n: 3.2}}}}],
     cursor: {}
 }),
                              5787903);
 
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales', n: -1}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales', n: -1}}}}],
     cursor: {}
 }),
                              5787908);
@@ -134,7 +134,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
 
 // Missing arguments.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {output: '$sales'}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales'}}}}],
     cursor: {}
 }),
                              5787906);
@@ -150,7 +150,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     pipeline: [{
         $group: {
             _id: {'st': '$state'},
-            minSales: {$minN: {output: '$sales', n: 2, randomField: "randomArg"}}
+            minSales: {$minN: {input: '$sales', n: 2, randomField: "randomArg"}}
         }
     }],
     cursor: {}

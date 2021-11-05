@@ -199,11 +199,11 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
                         const BSONObj& args,
                         VariablesParseState vps) {
     boost::intrusive_ptr<Expression> n;
-    boost::intrusive_ptr<Expression> output;
+    boost::intrusive_ptr<Expression> input;
     for (auto&& element : args) {
         auto fieldName = element.fieldNameStringData();
-        if (fieldName == kFieldNameOutput) {
-            output = Expression::parseOperand(expCtx, element, vps);
+        if (fieldName == kFieldNameInput) {
+            input = Expression::parseOperand(expCtx, element, vps);
         } else if (fieldName == kFieldNameN) {
             n = Expression::parseOperand(expCtx, element, vps);
         } else {
@@ -211,8 +211,8 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
         }
     }
     uassert(5787906, str::stream() << "Missing value for '" << kFieldNameN << "'", n);
-    uassert(5787907, str::stream() << "Missing value for '" << kFieldNameOutput << "'", output);
-    return std::make_tuple(n, output);
+    uassert(5787907, str::stream() << "Missing value for '" << kFieldNameInput << "'", input);
+    return std::make_tuple(n, input);
 }
 
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
@@ -220,7 +220,7 @@ void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initi
                                    bool explain,
                                    MutableDocument& md) {
     md.addField(kFieldNameN, Value(initializer->serialize(explain)));
-    md.addField(kFieldNameOutput, Value(argument->serialize(explain)));
+    md.addField(kFieldNameInput, Value(argument->serialize(explain)));
 }
 
 template <MinMaxSense s>
@@ -241,7 +241,7 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
             elem.type() == BSONType::Object);
     BSONObj obj = elem.embeddedObject();
 
-    auto [n, output] = AccumulatorN::parseArgs(expCtx, obj, vps);
+    auto [n, input] = AccumulatorN::parseArgs(expCtx, obj, vps);
 
     auto factory = [expCtx] {
         if constexpr (s == MinMaxSense::kMin) {
@@ -251,7 +251,7 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
         }
     };
 
-    return {std::move(n), std::move(output), std::move(factory), name};
+    return {std::move(n), std::move(input), std::move(factory), name};
 }
 
 void AccumulatorMinMaxN::processValue(const Value& val) {
@@ -332,7 +332,7 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
             elem.type() == BSONType::Object);
     auto obj = elem.embeddedObject();
 
-    auto [n, output] = AccumulatorN::parseArgs(expCtx, obj, vps);
+    auto [n, input] = AccumulatorN::parseArgs(expCtx, obj, vps);
 
     auto factory = [expCtx] {
         if constexpr (v == Sense::kFirst) {
@@ -342,7 +342,7 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
         }
     };
 
-    return {std::move(n), std::move(output), std::move(factory), name};
+    return {std::move(n), std::move(input), std::move(factory), name};
 }
 
 void AccumulatorFirstLastN::processValue(const Value& val) {

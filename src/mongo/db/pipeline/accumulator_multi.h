@@ -42,14 +42,19 @@ namespace mongo {
  * has different criteria for how to pick values and order the final array, but any common behavior
  * shared by derived classes is implemented in this class. In particular:
  * - Initializing 'n' during 'startNewGroup'.
- * - Parsing the expressions for 'n' and 'output'.
+ * - Parsing the expressions for 'n' and 'input'.
  */
 class AccumulatorN : public AccumulatorState {
 public:
     static constexpr auto kFieldNameN = "n"_sd;
-    static constexpr auto kFieldNameOutput = "output"_sd;
+    static constexpr auto kFieldNameInput = "input"_sd;
 
     // Field names related to top/bottom/topN/bottomN.
+
+    // Whereas other 'n' accumulators accept an 'input' parameter, top/bottom/topN/bottomN accept
+    // 'output'. This is done in order to disambiguate the expression that will be used to
+    // compute the output from the 'sortBy' expression, which will be used to order the output.
+    static constexpr auto kFieldNameOutput = "output"_sd;
     // Sort specification given by user.
     static constexpr auto kFieldNameSortBy = "sortBy"_sd;
     // Array containing only the fields needed to generate a sortKey from the input document.
@@ -72,7 +77,7 @@ public:
     void startNewGroup(const Value& input) final;
 
     /**
-     * Helper which appends the 'n' and 'output' fields to 'md'.
+     * Helper which appends the 'n' and 'input' fields to 'md'.
      */
     static void serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                 const boost::intrusive_ptr<Expression>& argument,
@@ -80,7 +85,7 @@ public:
                                 MutableDocument& md);
 
 protected:
-    // Parses 'args' for the 'n' and 'output' arguments that are common to the 'N' family of
+    // Parses 'args' for the 'n' and 'input' arguments that are common to the 'N' family of
     // accumulators.
     static std::tuple<boost::intrusive_ptr<Expression>, boost::intrusive_ptr<Expression>> parseArgs(
         ExpressionContext* expCtx, const BSONObj& args, VariablesParseState vps);

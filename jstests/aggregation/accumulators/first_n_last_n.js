@@ -17,7 +17,7 @@ if (!isExactTopNEnabled) {
     // rest of the test.
     assert.commandFailedWithCode(coll.runCommand("aggregate", {
         pipeline:
-            [{$group: {_id: {'st': '$state'}, firstValues: {$firstN: {output: '$sales', n: 2}}}}],
+            [{$group: {_id: {'st': '$state'}, firstValues: {$firstN: {input: '$sales', n: 2}}}}],
         cursor: {}
     }),
                                  15952);
@@ -43,7 +43,7 @@ assert.commandWorked(coll.insert(docs));
 const actualFirstNResults =
     coll.aggregate([
             {$sort: {_id: 1}},
-            {$group: {_id: '$state', sales: {$firstN: {output: "$sales", n: n}}}},
+            {$group: {_id: '$state', sales: {$firstN: {input: "$sales", n: n}}}},
         ])
         .toArray();
 
@@ -53,7 +53,7 @@ const expectedFirstNResults =
 const actualLastNResults =
     coll.aggregate([
             {$sort: {_id: 1}},
-            {$group: {_id: '$state', sales: {$lastN: {output: "$sales", n: n}}}},
+            {$group: {_id: '$state', sales: {$lastN: {input: "$sales", n: n}}}},
         ])
         .toArray();
 
@@ -71,20 +71,19 @@ arrayEq(expectedLastNResults, actualLastNResults);
 
 // Reject non-integral values of n.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline:
-        [{$group: {_id: {'st': '$state'}, sales: {$firstN: {output: '$sales', n: 'string'}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {input: '$sales', n: 'string'}}}}],
     cursor: {}
 }),
                              5787902);
 
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {output: '$sales', n: 3.2}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {input: '$sales', n: 3.2}}}}],
     cursor: {}
 }),
                              5787903);
 
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$firstN: {output: '$sales', n: -1}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$firstN: {input: '$sales', n: -1}}}}],
     cursor: {}
 }),
                              5787908);
@@ -96,7 +95,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     pipeline: [{
         $group: {
             _id: {'st': '$state'},
-            sales: {$firstN: {output: '$sales', n: 2, randomField: "randomArg"}}
+            sales: {$firstN: {input: '$sales', n: 2, randomField: "randomArg"}}
         }
     }],
     cursor: {}
@@ -105,7 +104,7 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
 
 // Missing arguments.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {output: '$sales'}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {input: '$sales'}}}}],
     cursor: {}
 }),
                              5787906);
