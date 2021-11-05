@@ -252,7 +252,8 @@ private:
      * Waits for _state to transition to EXIT_CRIT_SEC. Then, it performs a filtering metadata
      * refresh, releases the critical section and finally deletes the recovery document.
      */
-    void awaitCriticalSectionReleaseSignalAndCompleteMigration(OperationContext* opCtx);
+    void awaitCriticalSectionReleaseSignalAndCompleteMigration(OperationContext* opCtx,
+                                                               const Timer& timeInCriticalSection);
 
     // Mutex to guard all fields
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationDestinationManager::_mutex");

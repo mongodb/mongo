@@ -1084,6 +1084,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     invariant(!_max.isEmpty());
 
     boost::optional<MoveTimingHelper> timing;
+    boost::optional<Timer> timeInCriticalSection;
 
     if (!skipToCritSecTaken) {
         timing.emplace(
@@ -1568,6 +1569,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                         opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
 
                 LOGV2(5899114, "Entered migration recipient critical section", "nss"_attr = _nss);
+                timeInCriticalSection.emplace();
             });
 
             if (getState() == FAIL) {
@@ -1580,6 +1582,17 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                             _nss,
                             critSecReason,
                             ShardingCatalogClient::kMajorityWriteConcern);
+
+                    invariant(timeInCriticalSection);
+                    const auto timeInCriticalSectionMs = timeInCriticalSection->millis();
+                    ShardingStatistics::get(opCtx)
+                        .totalRecipientCriticalSectionTimeMillis.addAndFetch(
+                            timeInCriticalSectionMs);
+
+                    LOGV2(5899115,
+                          "Exited migration recipient critical section",
+                          "nss"_attr = _nss,
+                          "durationMillis"_attr = timeInCriticalSectionMs);
 
                     // Delete the recovery document
                     migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);
@@ -1606,9 +1619,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
         auto opCtx = newOpCtxPtr.get();
 
+        if (skipToCritSecTaken) {
+            timeInCriticalSection.emplace();
+        }
+        invariant(timeInCriticalSection);
+
         // Wait until signaled to exit the critical section and then release it.
-        runWithoutSession(outerOpCtx,
-                          [&] { awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx); });
+        runWithoutSession(outerOpCtx, [&] {
+            awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx, *timeInCriticalSection);
+        });
     }
 
     _setState(DONE);
@@ -1754,7 +1773,7 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
 }
 
 void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMigration(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, const Timer& timeInCriticalSection) {
     // Wait until the migrate thread is signaled to release the critical section
     LOGV2_DEBUG(5899111, 3, "Waiting for release critical section signal");
     {
@@ -1791,7 +1810,14 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
-    LOGV2(5899108, "Exited migration recipient critical section", "nss"_attr = _nss);
+    const auto timeInCriticalSectionMs = timeInCriticalSection.millis();
+    ShardingStatistics::get(opCtx).totalRecipientCriticalSectionTimeMillis.addAndFetch(
+        timeInCriticalSectionMs);
+
+    LOGV2(5899108,
+          "Exited migration recipient critical section",
+          "nss"_attr = _nss,
+          "durationMillis"_attr = timeInCriticalSectionMs);
 
     // Wait for the updates to the catalog cache to be written to disk before removing the
     // recovery document. This ensures that on case of stepdown, the new primary will know of a

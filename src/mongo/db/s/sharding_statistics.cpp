@@ -58,6 +58,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("totalCriticalSectionCommitTimeMillis",
                     totalCriticalSectionCommitTimeMillis.load());
     builder->append("totalCriticalSectionTimeMillis", totalCriticalSectionTimeMillis.load());
+    builder->append("totalRecipientCriticalSectionTimeMillis",
+                    totalRecipientCriticalSectionTimeMillis.load());
     builder->append("countDocsClonedOnRecipient", countDocsClonedOnRecipient.load());
     builder->append("countDocsClonedOnDonor", countDocsClonedOnDonor.load());
     builder->append("countRecipientMoveChunkStarted", countRecipientMoveChunkStarted.load());

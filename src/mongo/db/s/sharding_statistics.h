@@ -91,6 +91,11 @@ struct ShardingStatistics {
     // after timing out waiting to acquire a lock.
     AtomicWord<long long> countDonorMoveChunkLockTimeout{0};
 
+    // Cumulative, always-increasing counter of how much time the migration recipient critical
+    // section took (this is the period of time when write operations on the collection on the
+    // recipient are blocked).
+    AtomicWord<long long> totalRecipientCriticalSectionTimeMillis{0};
+
     // Cumulative, always-increasing counter of the number of migrations aborted on this node
     // due to concurrent index operations.
     AtomicWord<long long> countDonorMoveChunkAbortConflictingIndexOperation{0};
