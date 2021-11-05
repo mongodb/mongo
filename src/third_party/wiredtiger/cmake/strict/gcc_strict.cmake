@@ -30,4 +30,14 @@ list(APPEND gcc_flags "-Wold-style-definition")
 list(APPEND gcc_flags "-Wpointer-sign")
 list(APPEND gcc_flags "-Wstrict-prototypes")
 
+# We only turn on the unsafe-loop-optimizations warning before gcc7,
+# it's too noisy to tolerate otherwise.
+if(${CMAKE_C_COMPILER_VERSION} VERSION_EQUAL 4.7)
+    list(APPEND gcc_flags "-Wunsafe-loop-optimizations")
+elseif(${CMAKE_C_COMPILER_VERSION} VERSION_EQUAL 5)
+    list(APPEND gcc_flags "-Wunsafe-loop-optimizations")
+elseif(${CMAKE_C_COMPILER_VERSION} VERSION_EQUAL 6)
+    list(APPEND gcc_flags "-Wunsafe-loop-optimizations")
+endif()
+
 set(COMPILER_DIAGNOSTIC_C_FLAGS ${gcc_flags})

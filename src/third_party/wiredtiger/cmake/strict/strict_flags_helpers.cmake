@@ -58,22 +58,13 @@ function(get_gnu_base_flags flags)
     list(APPEND gnu_flags "-Wwrite-strings")
 
     # Non-fatal informational warnings.
-    # We don't turn on the unsafe-loop-optimizations warning after gcc7,
-    # it's too noisy to tolerate. Regardless, don't fail even when it's
-    # configured.
+    # The unsafe-loop-optimizations warning is only enabled for specific gcc versions.
+    # Regardless, don't fail when it's configured.
     list(APPEND gnu_flags "-Wno-error=unsafe-loop-optimizations")
 
-    # Create a function to return the base flags!
-    # We cannot return a value, pass in a parent variable, the function will set it.
     if(${cmake_compiler_version} VERSION_EQUAL 4.7)
         list(APPEND gnu_flags "-Wno-c11-extensions")
-        list(APPEND gnu_flags "-Wunsafe-loop-optimizations")
-    elseif(${cmake_compiler_version} VERSION_EQUAL 5)
-        list(APPEND gnu_flags "-Wunsafe-loop-optimizations")
-    elseif(${cmake_compiler_version} VERSION_EQUAL 6)
-        list(APPEND gnu_flags "-Wunsafe-loop-optimizations")
     endif()
-
     if(${cmake_compiler_version} VERSION_GREATER_EQUAL 5)
         list(APPEND gnu_flags "-Wformat-signedness")
         list(APPEND gnu_flags "-Wunused-macros")

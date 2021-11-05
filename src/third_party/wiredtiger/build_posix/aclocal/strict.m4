@@ -26,9 +26,8 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wwrite-strings"
 
 	# Non-fatal informational warnings.
-	# We don't turn on the unsafe-loop-optimizations warning after gcc7,
-	# it's too noisy to tolerate. Regardless, don't fail even when it's
-	# configured.
+	# The unsafe-loop-optimizations warning is only enabled for specific gcc versions.
+	# Regardless, don't fail when it's configured.
 	w="$w -Wno-error=unsafe-loop-optimizations"
 
 	# GCC 4.7
@@ -40,13 +39,10 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	gcc8=0
 	case "$1" in
 	[*4.7.[0-9]*])					# gcc4.7
-		w="$w -Wno-c11-extensions"
-		w="$w -Wunsafe-loop-optimizations";;
+		w="$w -Wno-c11-extensions";;
 	[*5.[0-9].[0-9]*])				# gcc5.X
-		w="$w -Wunsafe-loop-optimizations"
 		gcc5=1;;
 	[*6.[0-9].[0-9]*])				# gcc6.X
-		w="$w -Wunsafe-loop-optimizations"
 		gcc5=1
 		gcc6=1;;
 	[*7.[0-9].[0-9]*])				# gcc7.X
@@ -101,6 +97,17 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w_c="$w_c -Wold-style-definition"
 	w_c="$w_c -Wpointer-sign"
 	w_c="$w_c -Wstrict-prototypes"
+
+	# We only turn on the unsafe-loop-optimizations warning before gcc7,
+	# it's too noisy to tolerate otherwise.
+	case "$1" in
+	[*4.7.[0-9]*])					# gcc4.7
+		w_c="$w_c -Wunsafe-loop-optimizations";;
+	[*5.[0-9].[0-9]*])				# gcc5.X
+		w_c="$w_c -Wunsafe-loop-optimizations";;
+	[*6.[0-9].[0-9]*])				# gcc6.X
+		w_c="$w_c -Wunsafe-loop-optimizations";;
+	esac
 
 	wt_c_strict_warnings="$w_c"
 	wt_cxx_strict_warnings="$w_cxx"
