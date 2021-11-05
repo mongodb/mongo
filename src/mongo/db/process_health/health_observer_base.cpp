@@ -42,11 +42,8 @@ HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx)
 void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
                                        std::shared_ptr<executor::TaskExecutor> taskExecutor,
                                        CancellationToken token) {
-    // TODO(SERVER-59368): fix this for runtime options support.
-    if (getIntensity() == HealthObserverIntensity::kOff) {
-        return;
-    }
 
+    // If we have reached here, the intensity of this health observer must not be off
     {
         auto lk = stdx::lock_guard(_mutex);
         if (_currentlyRunningHealthCheck) {
@@ -93,10 +90,6 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
     });
 }
 
-HealthObserverIntensity HealthObserverBase::getIntensity() const {
-    return _intensity;
-}
-
 HealthCheckStatus HealthObserverBase::makeHealthyStatus() const {
     return HealthCheckStatus(getType());
 }
@@ -124,7 +117,6 @@ HealthObserverLivenessStats HealthObserverBase::getStats() const {
 
 HealthObserverLivenessStats HealthObserverBase::getStatsLocked(WithLock) const {
     HealthObserverLivenessStats stats;
-    stats.isEnabled = _intensity != HealthObserverIntensity::kOff;
     stats.currentlyRunningHealthCheck = _currentlyRunningHealthCheck;
     stats.lastTimeCheckStarted = _lastTimeTheCheckWasRun;
     stats.lastTimeCheckCompleted = _lastTimeCheckCompleted;

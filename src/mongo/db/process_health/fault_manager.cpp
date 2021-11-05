@@ -229,7 +229,10 @@ void FaultManager::healthCheck() {
     // Start checks outside of lock.
     auto token = _managerShuttingDownCancellationSource.token();
     for (auto observer : observers) {
-        observer->periodicCheck(*this, _taskExecutor, token);
+        // TODO: fix bug where health observer is turned off which in transient fault state
+        if (_config->getHealthObserverIntensity(observer->getType()) !=
+            HealthObserverIntensityEnum::kOff)
+            observer->periodicCheck(*this, _taskExecutor, token);
     }
 
     // Garbage collect all resolved fault facets.

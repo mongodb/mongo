@@ -41,8 +41,6 @@ namespace process_health {
  * Liveness data and stats.
  */
 struct HealthObserverLivenessStats {
-    // True if this observer is enabled.
-    bool isEnabled = false;
     // true is this observer is currently running a health check.
     bool currentlyRunningHealthCheck = false;
     // When the last or current check started, depending if currently
@@ -88,11 +86,6 @@ public:
     virtual void periodicCheck(FaultFacetsContainerFactory& factory,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
                                CancellationToken token) = 0;
-
-    /**
-     * @return HealthObserverIntensity
-     */
-    virtual HealthObserverIntensity getIntensity() const = 0;
 
     virtual HealthObserverLivenessStats getStats() const = 0;
 };

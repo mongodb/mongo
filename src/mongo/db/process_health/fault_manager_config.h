@@ -60,20 +60,6 @@ StringBuilder& operator<<(StringBuilder& s, const FaultState& state);
 std::ostream& operator<<(std::ostream& os, const FaultState& state);
 
 
-enum class HealthObserverIntensity {
-    // Health checks enabled and the health observer can cause the process to transition to the
-    // ActiveFault state.
-    kCritical = 0,
-
-    // Health checks enabled, but the health observer cannot cause the process to transition to the
-    // ActiveFault state.
-    kNonCritical,
-
-    // Health checks not enabled.
-    kOff
-};
-
-
 /**
  * Types of health observers available.
  */
@@ -97,6 +83,10 @@ public:
             default:
                 MONGO_UNREACHABLE;
         }
+    }
+
+    bool isHealthObserverEnabled(FaultFacetType type) {
+        return getHealthObserverIntensity(type) != HealthObserverIntensityEnum::kOff;
     }
 
     Milliseconds getActiveFaultDuration() const {

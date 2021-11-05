@@ -87,8 +87,6 @@ protected:
     virtual Future<HealthCheckStatus> periodicCheckImpl(
         PeriodicHealthCheckContext&& periodicCheckContext) = 0;
 
-    HealthObserverIntensity getIntensity() const override;
-
     // Helper method to create a status without errors.
     HealthCheckStatus makeHealthyStatus() const;
 
@@ -101,8 +99,7 @@ protected:
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "HealthObserverBase::_mutex");
-    // TODO: remove this field, should be done in config.
-    HealthObserverIntensity _intensity = HealthObserverIntensity::kNonCritical;
+
     // Indicates if there any check running to prevent running checks concurrently.
     bool _currentlyRunningHealthCheck = false;
     // Enforces the safety interval.
