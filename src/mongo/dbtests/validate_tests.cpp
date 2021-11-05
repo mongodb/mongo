@@ -3765,8 +3765,9 @@ public:
 template <bool background>
 class ValidateInvalidRecordIdOnClusteredCollection : public ValidateBase {
 public:
-    ValidateInvalidRecordIdOnClusteredCollection()
-        : ValidateBase(/*full=*/true, /*background=*/background, /*clustered=*/true) {}
+    ValidateInvalidRecordIdOnClusteredCollection(bool withSecondaryIndex)
+        : ValidateBase(/*full=*/true, /*background=*/background, /*clustered=*/true),
+          _withSecondaryIndex(withSecondaryIndex) {}
 
     void run() {
         if (_background && !_supportsBackgroundValidation) {
@@ -3778,15 +3779,17 @@ public:
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, _nss);
         ASSERT(coll);
 
-        // Create index on {a: 1}
-        const auto indexName = "a";
-        const auto indexKey = BSON("a" << 1);
-        auto status = dbtests::createIndexFromSpec(
-            &_opCtx,
-            coll->ns().ns(),
-            BSON("name" << indexName << "key" << indexKey << "v" << static_cast<int>(kIndexVersion)
-                        << "background" << false));
-        ASSERT_OK(status);
+        if (_withSecondaryIndex) {
+            // Create index on {a: 1}
+            const auto indexName = "a";
+            const auto indexKey = BSON("a" << 1);
+            auto status = dbtests::createIndexFromSpec(
+                &_opCtx,
+                coll->ns().ns(),
+                BSON("name" << indexName << "key" << indexKey << "v"
+                            << static_cast<int>(kIndexVersion) << "background" << false));
+            ASSERT_OK(status);
+        }
 
         // Insert documents
         OpDebug* const nullOpDebug = nullptr;
@@ -3873,6 +3876,9 @@ public:
             dumpOnErrorGuard.dismiss();
         }
     }
+
+private:
+    const bool _withSecondaryIndex;
 };
 
 class ValidateTests : public OldStyleSuiteSpecification {
@@ -3944,8 +3950,11 @@ public:
         add<ValidateReportInfoOnClusteredCollection<false>>();
         add<ValidateReportInfoOnClusteredCollection<true>>();
         add<ValidateRepairOnClusteredCollection>();
-        add<ValidateInvalidRecordIdOnClusteredCollection<false>>();
-        add<ValidateInvalidRecordIdOnClusteredCollection<true>>();
+
+        add<ValidateInvalidRecordIdOnClusteredCollection<false>>(false /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection<false>>(true /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(false /*withSecondaryIndex*/);
+        add<ValidateInvalidRecordIdOnClusteredCollection<true>>(true /*withSecondaryIndex*/);
     }
 };
 

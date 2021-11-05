@@ -118,10 +118,6 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     }
 
     const CollectionPtr& coll = _validateState->getCollection();
-    if (!coll->getIndexCatalog()->haveAnyIndexes()) {
-        return status;
-    }
-
     if (coll->isClustered()) {
         _validateClusteredCollectionRecordId(
             opCtx, recordId, recordBson, coll->getClusteredInfo()->getIndexSpec(), results);
