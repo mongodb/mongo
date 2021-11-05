@@ -181,6 +181,8 @@ void openCatalog(OperationContext* opCtx,
 
     // Open all databases and repopulate the CollectionCatalog.
     LOGV2(20276, "openCatalog: reopening all databases");
+    boost::optional<BatchedCollectionCatalogWriter> catalogBatchWriter;
+    catalogBatchWriter.emplace(opCtx);
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<std::string> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
@@ -215,7 +217,12 @@ void openCatalog(OperationContext* opCtx,
             // to the oplog.
             if (collNss.isOplog()) {
                 LOGV2(20277, "openCatalog: updating cached oplog pointer");
+
+                // The oplog collection must be visible when establishing for repl. Finish our
+                // batched catalog write and continue on a new batch afterwards.
+                catalogBatchWriter.reset();
                 collection->establishOplogCollectionForLogging(opCtx);
+                catalogBatchWriter.emplace(opCtx);
             }
         }
     }

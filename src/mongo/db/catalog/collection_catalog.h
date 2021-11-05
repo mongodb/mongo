@@ -522,4 +522,24 @@ struct LookupCollectionForYieldRestore {
     const Collection* operator()(OperationContext* opCtx, CollectionUUID uuid) const;
 };
 
+/**
+ * RAII class to perform multiple writes to the CollectionCatalog on a single copy of the
+ * CollectionCatalog instance. Requires the global lock to be held in exclusive write mode (MODE_X)
+ * for the lifetime of this object.
+ */
+class BatchedCollectionCatalogWriter {
+public:
+    BatchedCollectionCatalogWriter(OperationContext* opCtx);
+    ~BatchedCollectionCatalogWriter();
+
+    BatchedCollectionCatalogWriter(const BatchedCollectionCatalogWriter&) = delete;
+    BatchedCollectionCatalogWriter(BatchedCollectionCatalogWriter&&) = delete;
+
+private:
+    OperationContext* _opCtx;
+    // Store base when we clone the CollectionCatalog so we can verify that there has been no other
+    // writers during the batching.
+    std::shared_ptr<CollectionCatalog> _base = nullptr;
+};
+
 }  // namespace mongo
