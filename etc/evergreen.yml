@@ -5027,6 +5027,15 @@ tasks:
       fallback_num_sub_suites: 10
 
 - <<: *gen_task_template
+  name: clustered_collection_passthrough
+  tags: ["large"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
+
+- <<: *gen_task_template
   name: parallel_gen
   tags: ["misc_js", "parallel"]
   commands:
@@ -7493,6 +7502,7 @@ buildvariants:
   - name: .auth !.audit !.multiversion
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
+  - name: clustered_collection_passthrough
   - name: .misc_js
   - name: disk_wiredtiger
   - name: free_monitoring
@@ -9488,6 +9498,7 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
+  - name: clustered_collection_passthrough
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:

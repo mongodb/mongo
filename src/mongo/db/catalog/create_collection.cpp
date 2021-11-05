@@ -65,6 +65,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
+MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -450,7 +451,12 @@ Status _createCollection(OperationContext* opCtx,
                           str::stream() << "A view already exists. NS: " << nss);
         }
 
-
+        if (!collectionOptions.clusteredIndex && (!idIndex || idIndex->isEmpty()) &&
+            // Capped, clustered collections different in behavior significantly from normal capped
+            // collections. Notably, they allow out-of-order insertion.
+            !collectionOptions.capped && clusterAllCollectionsByDefault.shouldFail()) {
+            collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        }
         if (auto clusteredIndex = collectionOptions.clusteredIndex) {
             bool clusteredIndexesEnabled =
                 feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility);
@@ -653,9 +659,8 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
     CollectionOptions preImagesCollectionOptions;
 
     // Make the collection clustered by _id.
-    auto preImagesCollectionKey = BSON("_id" << 1);
     preImagesCollectionOptions.clusteredIndex.emplace(
-        ClusteredIndexSpec{preImagesCollectionKey, true /*unique*/}, false /*legacyFormat*/);
+        clustered_util::makeDefaultClusteredIdIndex());
     const auto status =
         _createCollection(opCtx, nss, std::move(preImagesCollectionOptions), BSONObj());
     uassert(status.code(),

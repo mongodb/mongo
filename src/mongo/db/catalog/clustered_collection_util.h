@@ -42,6 +42,11 @@ namespace clustered_util {
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat();
 
 /**
+ * Generates the default _id clustered index.
+ */
+ClusteredCollectionInfo makeDefaultClusteredIdIndex();
+
+/**
  * Constructs ClusteredCollectionInfo according to the 'indexSpec'. Constructs a 'name' by default
  * if the field is not yet defined. Stores the information is provided in the non-legacy format.
  */

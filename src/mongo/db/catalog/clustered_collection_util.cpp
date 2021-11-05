@@ -48,9 +48,15 @@ void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
 }
 
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
-    auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true};
+    auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true /* unique */};
     indexSpec.setName(kDefaultClusteredIndexName);
-    return ClusteredCollectionInfo(std::move(indexSpec), true);
+    return ClusteredCollectionInfo(std::move(indexSpec), true /* legacy */);
+}
+
+ClusteredCollectionInfo makeDefaultClusteredIdIndex() {
+    auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true /* unique */};
+    indexSpec.setName(kDefaultClusteredIndexName);
+    return makeCanonicalClusteredInfo(indexSpec);
 }
 
 ClusteredCollectionInfo makeCanonicalClusteredInfo(ClusteredIndexSpec indexSpec) {

@@ -52,8 +52,7 @@ var res = assert.commandWorked(
     collDbNotExist.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
 checkImplicitCreate(res);
-assert.eq(1, res.numIndexesBefore);
-assert.eq(2, res.numIndexesAfter);
+assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
 assert.isnull(
     res.note,
     'createIndexes.note should not be present in results when adding a new index: ' + tojson(res));
@@ -64,8 +63,7 @@ var res =
     assert.commandWorked(t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
 checkImplicitCreate(res);
-assert.eq(1, res.numIndexesBefore);
-assert.eq(2, res.numIndexesAfter);
+assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
 assert.isnull(
     res.note,
     'createIndexes.note should not be present in results when adding a new index: ' + tojson(res));
@@ -74,8 +72,7 @@ assert.isnull(
 res = assert.commandWorked(t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
 assert(!res.createdCollectionAutomatically);
-assert.eq(2, res.numIndexesBefore);
-assert.eq(2,
+assert.eq(res.numIndexesBefore,
           res.numIndexesAfter,
           'numIndexesAfter missing from createIndexes result when adding a duplicate index: ' +
               tojson(res));
@@ -87,15 +84,13 @@ res = t.runCommand("createIndexes",
                    {indexes: [{key: {"x": 1}, name: "x_1"}, {key: {"y": 1}, name: "y_1"}]});
 res = extractResult(res);
 assert(!res.createdCollectionAutomatically);
-assert.eq(2, res.numIndexesBefore);
-assert.eq(3, res.numIndexesAfter);
+assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
 
 res = assert.commandWorked(t.runCommand(
     'createIndexes', {indexes: [{key: {a: 1}, name: 'a_1'}, {key: {b: 1}, name: 'b_1'}]}));
 res = extractResult(res);
 assert(!res.createdCollectionAutomatically);
-assert.eq(3, res.numIndexesBefore);
-assert.eq(5, res.numIndexesAfter);
+assert.eq(res.numIndexesAfter, res.numIndexesBefore + 2);
 assert.isnull(
     res.note,
     'createIndexes.note should not be present in results when adding new indexes: ' + tojson(res));
@@ -104,8 +99,7 @@ res = assert.commandWorked(t.runCommand(
     'createIndexes', {indexes: [{key: {a: 1}, name: 'a_1'}, {key: {b: 1}, name: 'b_1'}]}));
 
 res = extractResult(res);
-assert.eq(5, res.numIndexesBefore);
-assert.eq(5,
+assert.eq(res.numIndexesBefore,
           res.numIndexesAfter,
           'numIndexesAfter missing from createIndexes result when adding duplicate indexes: ' +
               tojson(res));

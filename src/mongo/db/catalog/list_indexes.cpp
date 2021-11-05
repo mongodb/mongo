@@ -78,6 +78,10 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
         std::list<BSONObj> indexSpecs;
         collection->getAllIndexes(&indexNames);
 
+        if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
+            indexSpecs.push_back(clustered_util::formatClusterKeyForListIndexes(
+                collection->getClusteredInfo().get()));
+        }
         for (size_t i = 0; i < indexNames.size(); i++) {
             if (!includeBuildUUIDs.value_or(false) || collection->isIndexReady(indexNames[i])) {
                 indexSpecs.push_back(collection->getIndexSpec(indexNames[i]));
@@ -95,10 +99,6 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
             builder.append("spec"_sd, collection->getIndexSpec(indexNames[i]));
             durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
             indexSpecs.push_back(builder.obj());
-        }
-        if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
-            indexSpecs.push_back(clustered_util::formatClusterKeyForListIndexes(
-                collection->getClusteredInfo().get()));
         }
         return indexSpecs;
     });
