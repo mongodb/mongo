@@ -3,6 +3,7 @@
  * across catalog changes.
  * @tags: [
  *   assumes_read_concern_local,
+ *   requires_fcv_51,
  * ]
  */
 (function() {
