@@ -334,6 +334,22 @@ function isRHEL8() {
     return false;
 }
 
+function isSUSE15SP1() {
+    if (_isWindows()) {
+        return false;
+    }
+
+    // SUSE 15 SP1 FIPS module does not work. SP2 does work.
+    // The FIPS code returns FIPS_R_IN_ERROR_STATE in what is likely a race condition
+    // since it only happens in sharded clusters.
+    const grep_result = runProgram('grep', '15-SP1', '/etc/os-release');
+    if (grep_result == 0) {
+        return true;
+    }
+
+    return false;
+}
+
 function isUbuntu2004() {
     if (_isWindows()) {
         return false;
