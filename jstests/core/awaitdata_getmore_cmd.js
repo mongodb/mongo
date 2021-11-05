@@ -165,6 +165,7 @@ let insertshell = startParallelShell(() => {
     assert.commandWorked(db.await_data.insert({_id: "signal parent shell"}));
 
     // Wait for the parent shell to start watching for the next document.
+    jsTestLog("Checking getMore is being blocked...");
     assert.soon(() => db.currentOp({
                             op: "getmore",
                             "cursor.originatingCommand.comment": "uniquifier_comment"
@@ -176,6 +177,7 @@ let insertshell = startParallelShell(() => {
 
     // Make sure the getMore has not ended after a while.
     sleep(2000);
+    jsTestLog("Checking getMore is still being blocked...");
     assert.eq(
         db.currentOp({op: "getmore", "cursor.originatingCommand.comment": "uniquifier_comment"})
             .inprog.length,
@@ -183,7 +185,9 @@ let insertshell = startParallelShell(() => {
         tojson(db.currentOp().inprog));
 
     // Now write a matching document to wake it up.
+    jsTestLog("Sending signal to getMore...");
     assert.commandWorked(db.await_data.insert({_id: "match", x: 1}));
+    jsTestLog("Insertion shell finished successfully.");
 });
 
 // Wait until we receive confirmation that the parallel shell has started.
@@ -192,13 +196,16 @@ assert.soon(() => db.await_data.findOne({_id: "signal parent shell"}) !== null);
 // Now issue a getMore which will match the parallel shell's currentOp filter, signalling it to
 // write a non-matching document into the collection. Confirm that we do not receive this
 // document and that we subsequently time out.
-now = new Date();
 cmdRes = db.runCommand(
     {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
 assert.commandWorked(cmdRes);
+jsTestLog("Waiting insertion shell to terminate...");
+assert.eq(insertshell(), 0);
+jsTestLog("Insertion shell terminated.");
 assert.gt(cmdRes.cursor.id, NumberLong(0));
 assert.eq(cmdRes.cursor.ns, coll.getFullName());
-assert.eq(cmdRes.cursor.nextBatch.length, 1);
+assert.eq(cmdRes.cursor.nextBatch.length,
+          1,
+          'Collection documents: ' + tojson(db.await_data.find({}).toArray()));
 assert.docEq(cmdRes.cursor.nextBatch[0], {_id: "match", x: 1});
-insertshell();
 })();
