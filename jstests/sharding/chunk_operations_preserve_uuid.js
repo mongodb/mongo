@@ -3,8 +3,6 @@
  */
 // @tags: [multiversion_incompatible]
 
-// TODO SERVER-53093 write unit tests checking for UUID in documents and throw out this test
-
 (function() {
 'use strict';
 
