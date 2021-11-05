@@ -9,6 +9,10 @@
           {
             "ok": 1,
             "ismaster": true,
+            "setVersion": 1,
+            "electionId": {
+                "$oid": "000000000000000000000001"
+            },
             "minWireVersion": 0,
             "maxWireVersion": 6
           }
@@ -41,6 +45,10 @@
             "hosts": [
               "a:27017"
             ],
+            "setVersion": 1,
+            "electionId": {
+                "$oid": "000000000000000000000001"
+            },
             "minWireVersion": 0,
             "maxWireVersion": 6
           }

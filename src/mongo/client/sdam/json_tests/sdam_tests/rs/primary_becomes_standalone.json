@@ -13,6 +13,10 @@
               "a:27017"
             ],
             "setName": "rs",
+            "setVersion": 1,
+            "electionId": {
+              "$oid": "000000000000000000000001"
+            },
             "minWireVersion": 0,
             "maxWireVersion": 6
           }
@@ -45,7 +49,7 @@
         "servers": {
           "a:27017": {
             "type": "Unknown",
-	    "setName": null
+      	    "setName": null
           }
         },
         "topologyType": "ReplicaSetNoPrimary",
