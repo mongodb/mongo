@@ -42,7 +42,7 @@ assertWorked({query: {}, update: {$set: {value: "emptyQuery"}}, new: true}, "emp
 assertWorked({sort: {_id: -1}, update: {$set: {value: "sort"}}, new: true}, "sort");
 assertWorked({sort: null, update: {value: 2}, new: true}, 2);
 
-// Verify that invaid 'sort' object fails.
+// Verify that invalid 'sort' object fails.
 assertFailedWithCode({sort: 1, update: {value: 2}}, ErrorCodes.TypeMismatch);
 assertFailedWithCode({sort: "{_id: 1}", update: {value: 2}}, ErrorCodes.TypeMismatch);
 assertFailedWithCode({sort: false, update: {value: 2}}, ErrorCodes.TypeMismatch);
@@ -90,8 +90,12 @@ assert.eq(out.value, "findOneAndUpdate");
 out = coll.findOneAndReplace(null, {value: "findOneAndReplace"}, {returnNewDocument: true});
 assert.eq(out.value, "findOneAndReplace");
 
+// Verify that find-one-and-delete allows null arguments and that one of the document will be
+// deleted based on natural ordering.
 out = coll.findOneAndDelete(null);
-assert.eq(out.value, "findOneAndReplace");
+assert.contains(out.value, ["findOneAndReplace", "sort"]);
+const curDocs = coll.find().toArray();
+assert.eq(curDocs.length, 1);
 
 // Incompatiable parameters with 'remove'.
 coll.drop();
