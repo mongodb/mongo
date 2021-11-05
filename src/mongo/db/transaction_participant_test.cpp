@@ -4925,5 +4925,100 @@ TEST_F(ShardTxnParticipantTest, CannotAddOperationToPreparedTransactionForRetrya
     ASSERT(txnParticipant.getTransactionOperationsForTest().empty());
 }
 
+TEST_F(ShardTxnParticipantTest, CannotModifyParentLsidOfChildSession) {
+    const auto lsid = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
+    opCtx()->setLogicalSessionId(lsid);
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_TRUE(txnParticipant.transactionIsOpen());
+
+    Timestamp ts(1, 1);
+    SessionTxnRecord sessionTxnRecord;
+    sessionTxnRecord.setSessionId(lsid);
+    sessionTxnRecord.setTxnNum(*opCtx()->getTxnNumber());
+    sessionTxnRecord.setParentSessionId(*getParentSessionId(lsid));
+    sessionTxnRecord.setLastWriteOpTime(repl::OpTime(ts, 0));
+    sessionTxnRecord.setLastWriteDate(Date_t::now());
+
+    // Insert.
+    {
+        WriteUnitOfWork wuow(opCtx());
+        txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord);
+        wuow.commit();
+    }
+
+    // Update that does not modify "parentLsid".
+    {
+        WriteUnitOfWork wuow(opCtx());
+        txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord);
+        wuow.commit();
+    }
+
+    // Updates that try to modify "parentLsid".
+    {
+        WriteUnitOfWork wuow(opCtx());
+        sessionTxnRecord.setParentSessionId(makeLogicalSessionIdForTest());
+        ASSERT_THROWS_CODE(
+            txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord),
+            AssertionException,
+            5875700);
+    }
+    {
+        WriteUnitOfWork wuow(opCtx());
+        sessionTxnRecord.setParentSessionId(lsid);
+        ASSERT_THROWS_CODE(
+            txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord),
+            AssertionException,
+            5875700);
+    }
+    {
+        WriteUnitOfWork wuow(opCtx());
+        sessionTxnRecord.setParentSessionId(boost::none);
+        ASSERT_THROWS_CODE(
+            txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord),
+            AssertionException,
+            5875700);
+    }
+}
+
+TEST_F(ShardTxnParticipantTest, CannotModifyParentLsidOfNonChildSession) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    opCtx()->setLogicalSessionId(lsid);
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_TRUE(txnParticipant.transactionIsOpen());
+
+    Timestamp ts(1, 1);
+    SessionTxnRecord sessionTxnRecord;
+    sessionTxnRecord.setSessionId(lsid);
+    sessionTxnRecord.setTxnNum(*opCtx()->getTxnNumber());
+    sessionTxnRecord.setLastWriteOpTime(repl::OpTime(ts, 0));
+    sessionTxnRecord.setLastWriteDate(Date_t::now());
+
+    // Insert.
+    {
+        WriteUnitOfWork wuow(opCtx());
+        txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord);
+        wuow.commit();
+    }
+
+    // Update that does not set/modify "parentLsid".
+    {
+        WriteUnitOfWork wuow(opCtx());
+        txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord);
+        wuow.commit();
+    }
+
+    // Update that tries to set "parentLsid".
+    {
+        WriteUnitOfWork wuow(opCtx());
+        sessionTxnRecord.setParentSessionId(makeLogicalSessionIdForTest());
+        ASSERT_THROWS_CODE(
+            txnParticipant.onWriteOpCompletedOnPrimary(opCtx(), {}, sessionTxnRecord),
+            AssertionException,
+            5875700);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

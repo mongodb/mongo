@@ -92,7 +92,11 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
 
     const auto updateBSON = [&] {
         SessionTxnRecord newTxnRecord;
-        newTxnRecord.setSessionId(*sessionInfo.getSessionId());
+        const auto lsid = *sessionInfo.getSessionId();
+        newTxnRecord.setSessionId(lsid);
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            newTxnRecord.setParentSessionId(*getParentSessionId(lsid));
+        }
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
         newTxnRecord.setTxnRetryCounter(sessionInfo.getTxnRetryCounter());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());
@@ -308,7 +312,11 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
 
     const auto updateBSON = [&] {
         SessionTxnRecord newTxnRecord;
-        newTxnRecord.setSessionId(*sessionInfo.getSessionId());
+        const auto lsid = *sessionInfo.getSessionId();
+        newTxnRecord.setSessionId(lsid);
+        if (isInternalSessionForRetryableWrite(lsid)) {
+            newTxnRecord.setParentSessionId(*getParentSessionId(lsid));
+        }
         newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
         newTxnRecord.setTxnRetryCounter(sessionInfo.getTxnRetryCounter());
         newTxnRecord.setLastWriteOpTime(entry.getOpTime());

@@ -131,7 +131,11 @@ void onWriteOpCompleted(OperationContext* opCtx,
         return;
 
     // We add these here since they may not exist if we return early.
-    sessionTxnRecord.setSessionId(*opCtx->getLogicalSessionId());
+    const auto lsid = *opCtx->getLogicalSessionId();
+    sessionTxnRecord.setSessionId(lsid);
+    if (isInternalSessionForRetryableWrite(lsid)) {
+        sessionTxnRecord.setParentSessionId(*getParentSessionId(lsid));
+    }
     sessionTxnRecord.setTxnNum(*opCtx->getTxnNumber());
     txnParticipant.onWriteOpCompletedOnPrimary(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
 }

@@ -311,6 +311,13 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     auto originalRecordData = collection->getRecordStore()->dataFor(opCtx, recordId);
     auto originalDoc = originalRecordData.toBson();
 
+    const auto parentLsidFieldName = SessionTxnRecord::kParentSessionIdFieldName;
+    uassert(5875700,
+            str::stream() << "Cannot modify the '" << parentLsidFieldName << "' field of "
+                          << NamespaceString::kSessionTransactionsTableNamespace << " entries",
+            updateMod.getObjectField(parentLsidFieldName)
+                    .woCompare(originalDoc.getObjectField(parentLsidFieldName)) == 0);
+
     invariant(collection->getDefaultCollator() == nullptr);
     boost::intrusive_ptr<ExpressionContext> expCtx(
         new ExpressionContext(opCtx, nullptr, updateRequest.getNamespaceString()));
@@ -326,11 +333,13 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     args.update = updateMod;
     args.criteria = toUpdateIdDoc;
 
+    // Specify indexesAffected = false because the sessions collection has two indexes: {_id: 1} and
+    // {parentLsid: 1, _id.txnNumber: 1, _id: 1}, and none of the fields are mutable.
     collection->updateDocument(opCtx,
                                recordId,
                                Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
                                updateMod,
-                               false,  // indexesAffected = false because _id is the only index
+                               false, /* indexesAffected */
                                nullptr,
                                &args);
 

@@ -92,10 +92,13 @@ const kConfigSessionNs = "config.system.sessions";
     // document).
     const sessionUUID = UUID();
 
-    const lsid0 = {id: sessionUUID};
+    const parentLsid = {id: sessionUUID};
     assert.commandWorked(testDB.runCommand(
-        {insert: kCollName, documents: [{x: 0}], lsid: lsid0, txnNumber: NumberLong(0)}));
-    assert.neq(null, shard0Primary.getCollection(kConfigTxnNs).findOne({"_id.id": sessionUUID}));
+        {insert: kCollName, documents: [{x: 0}], lsid: parentLsid, txnNumber: NumberLong(0)}));
+    const parentSessionDoc =
+        shard0Primary.getCollection(kConfigTxnNs).findOne({"_id.id": sessionUUID});
+    assert.neq(parentSessionDoc, null);
+    assert(!parentSessionDoc.hasOwnProperty("parentLsid"));
 
     const minLastUse = new Date();
     sleep(1000);
@@ -109,40 +112,46 @@ const kConfigSessionNs = "config.system.sessions";
     // Starting child sessions should succeed since parent and child sessions are tracked as one
     // logical session.
     jsTest.log("Test running an internal transaction with lsid containing txnNumber and txnUUID");
-    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()};
+    const childLsid1 = {id: sessionUUID, txnNumber: NumberLong(35), txnUUID: UUID()};
     const txnNumber1 = NumberLong(0);
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 1}],
-        lsid: lsid1,
+        lsid: childLsid1,
         txnNumber: txnNumber1,
         startTransaction: true,
         autocommit: false
     }));
     assert.commandWorked(testDB.adminCommand(
-        {commitTransaction: 1, lsid: lsid1, txnNumber: txnNumber1, autocommit: false}));
-    assert.neq(null, shard0Primary.getCollection(kConfigTxnNs).findOne({
+        {commitTransaction: 1, lsid: childLsid1, txnNumber: txnNumber1, autocommit: false}));
+    const childSessionDoc1 = shard0Primary.getCollection(kConfigTxnNs).findOne({
         "_id.id": sessionUUID,
-        "_id.txnNumber": lsid1.txnNumber,
-        "_id.txnUUID": lsid1.txnUUID
-    }));
+        "_id.txnNumber": childLsid1.txnNumber,
+        "_id.txnUUID": childLsid1.txnUUID
+    });
+    assert.neq(childSessionDoc1, null);
+    assert.eq(childSessionDoc1.parentLsid,
+              {id: childSessionDoc1._id.id, uid: childSessionDoc1._id.uid});
 
     jsTest.log("Test running an internal transaction with lsid containing txnUUID");
-    const lsid2 = {id: sessionUUID, txnUUID: UUID()};
+    const childLsid2 = {id: sessionUUID, txnUUID: UUID()};
     const txnNumber2 = NumberLong(35);
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 2}],
-        lsid: lsid2,
+        lsid: childLsid2,
         txnNumber: txnNumber2,
         startTransaction: true,
         autocommit: false
     }));
     assert.commandWorked(testDB.adminCommand(
-        {commitTransaction: 1, lsid: lsid2, txnNumber: txnNumber2, autocommit: false}));
-    assert.neq(null,
-               shard0Primary.getCollection(kConfigTxnNs)
-                   .findOne({"_id.id": sessionUUID, "_id.txnUUID": lsid2.txnUUID}));
+        {commitTransaction: 1, lsid: childLsid2, txnNumber: txnNumber2, autocommit: false}));
+    const childSessionDoc2 = shard0Primary.getCollection(kConfigTxnNs).findOne({
+        "_id.id": sessionUUID,
+        "_id.txnUUID": childLsid2.txnUUID
+    });
+    assert.neq(childSessionDoc2, null);
+    assert(!childSessionDoc2.hasOwnProperty("parentLsid"));
 
     assert.eq(3, shard0Primary.getCollection(kConfigTxnNs).count({"_id.id": sessionUUID}));
     assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));

@@ -740,6 +740,8 @@ env.Library(
         'catalog_raii',
         'curop_failpoint_helpers',
         'dbdirectclient',
+        'index_builds_coordinator_interface',
+        'index_commands_idl',
         'internal_transactions_feature_flag',
         'not_primary_error_tracker',
         'query_exec',

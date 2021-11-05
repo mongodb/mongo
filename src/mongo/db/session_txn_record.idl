@@ -58,6 +58,12 @@ structs:
                 cpp_name: sessionId
                 type: LogicalSessionId
                 description: "The id of the session this transaction belongs to."
+            parentLsid:
+                cpp_name: parentSessionId
+                type: LogicalSessionId
+                description: "If this transaction is a retryable internal transaction, stores the id
+                              of the parent session for the session the transaction belongs to."
+                optional: true
             txnNum:
                 type: TxnNumber
                 description: "The id representing this transaction."
