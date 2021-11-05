@@ -29,6 +29,7 @@
 import argparse
 import logging
 import os
+import re
 import shutil
 from subprocess import check_output
 from typing import List
@@ -40,10 +41,26 @@ LOGGER_NAME = 'checkout-idl'
 LOGGER = logging.getLogger(LOGGER_NAME)
 
 
+def get_current_git_version() -> Version:
+    """Return current git version'.
+
+    If the version is a release like "2.3.4" or "2.3.4-rc0", or a pre-release like
+    "2.3.4-325-githash" or "2.3.4-pre-" these will return "2.3.4". If the version begins with the
+    letter 'r', it will also match, e.g. r2.3.4, r2.3.4-rc0, r2.3.4-git234, r2.3.4-rc0-234-githash
+    If the version is invalid (i.e. doesn't start with "2.3.4" or "2.3.4-rc0", this will return
+    False.
+    """
+    git_describe = check_output(['git', 'describe']).decode()
+    git_version = re.match(r'^r?(\d+\.\d+\.\d+)(?:-rc\d+|-alpha\d+)?(?:-.*)?', git_describe)
+    assert git_version, f"git describe output '{git_describe}' does not match pattern."
+    return Version(git_version.groups()[0])
+
+
 def get_release_tags() -> List[str]:
     """Get a list of release git tags since API Version 1 was introduced."""
     # Use packaging.version.Version's parsing and comparison logic.
     min_version = Version(FIRST_API_V1_RELEASE)
+    max_version = get_current_git_version()
 
     def gen_versions_and_tags():
         for tag in check_output(['git', 'tag']).decode().split():
@@ -61,7 +78,7 @@ def get_release_tags() -> List[str]:
         #  gen_versions_and_tags yields pairs (version, tag). Sort them by version using
         #  packaging.version.Version's comparison rules.
         for version, tag in sorted(gen_versions_and_tags()):
-            if version < min_version:
+            if version < min_version or version > max_version:
                 continue
 
             # Skip alphas, betas, etc.
