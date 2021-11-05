@@ -929,7 +929,17 @@ Status shutdownProcessByDBPathPidFile(const std::string& dbpath) {
                 str::stream() << "Failed to kill process: " << errnoWithDescription(e)};
     }
 
-    while (boost::filesystem::exists(pidfile)) {
+    // Wait for process to terminate.
+    for (;;) {
+        std::uintmax_t pidsize = boost::filesystem::file_size(pidfile);
+        if (pidsize == 0) {
+            // File empty.
+            break;
+        }
+        if (pidsize == static_cast<decltype(pidsize)>(-1)) {
+            // File does not exist.
+            break;
+        }
         sleepsecs(1);
     }
 
