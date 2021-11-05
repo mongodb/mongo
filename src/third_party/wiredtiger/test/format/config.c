@@ -47,6 +47,7 @@ static void config_lsm_reset(TABLE *);
 static void config_map_backup_incr(const char *, u_int *);
 static void config_map_checkpoint(const char *, u_int *);
 static void config_map_file_type(const char *, u_int *);
+static void config_off(TABLE *, const char *);
 static void config_pct(TABLE *);
 static void config_transaction(void);
 
@@ -292,7 +293,7 @@ config_table(TABLE *table, void *arg)
 
     /* Only row-store tables support a collation order. */
     if (table->type != ROW)
-        config_single(table, "btree.reverse=off", false);
+        config_off(table, "btree.reverse");
 
     /* Give LSM a final review and flag if there's at least one LSM data source. */
     if (DATASOURCE(table, "lsm")) {
@@ -366,7 +367,7 @@ static void
 config_backup_incr(void)
 {
     if (GV(BACKUP) == 0) {
-        config_single(NULL, "backup.incremental=off", false);
+        config_off(NULL, "backup.incremental");
         return;
     }
 
@@ -390,14 +391,14 @@ config_backup_incr(void)
     case 1: /* 30% full backup only */
     case 2:
     case 3:
-        config_single(NULL, "backup.incremental=off", false);
+        config_off(NULL, "backup.incremental");
         break;
     case 4: /* 30% log based incremental */
     case 5:
     case 6:
         if (!GV(LOGGING_ARCHIVE) || !config_explicit(NULL, "logging.archive")) {
             if (GV(LOGGING_ARCHIVE))
-                config_single(NULL, "logging.archive=0", false);
+                config_off(NULL, "logging.archive");
             config_single(NULL, "backup.incremental=log", false);
             break;
         }
@@ -470,7 +471,7 @@ config_backward_compatible_table(TABLE *table, void *arg)
     if (TV(flag)) {                                                                        \
         if (config_explicit(table, name))                                                  \
             testutil_die(EINVAL, "%s not supported in backward compatibility mode", name); \
-        config_single(table, name "=off", false);                                          \
+        config_off(table, name);                                                           \
     }
     BC_CHECK("btree.prefix_len", BTREE_PREFIX_LEN);
 }
@@ -487,7 +488,7 @@ config_backward_compatible(void)
     if (GV(flag)) {                                                                        \
         if (config_explicit(NULL, name))                                                   \
             testutil_die(EINVAL, "%s not supported in backward compatibility mode", name); \
-        config_single(NULL, name "=off", false);                                           \
+        config_off(NULL, name);                                                            \
     }
 
     BC_CHECK("disk.mmap_all", DISK_MMAP_ALL);
@@ -594,7 +595,7 @@ config_checkpoint(void)
             config_single(NULL, "checkpoint=wiredtiger", false);
             break;
         case 5: /* 5 % */
-            config_single(NULL, "checkpoint=off", false);
+            config_off(NULL, "checkpoint");
             break;
         default: /* 75% */
             config_single(NULL, "checkpoint=on", false);
@@ -619,7 +620,7 @@ config_checksum(TABLE *table)
             config_single(table, "disk.checksum=on", false);
             break;
         case 5: /* 10% */
-            config_single(table, "disk.checksum=off", false);
+            config_off(table, "disk.checksum");
             break;
         case 6: /* 10% */
             config_single(table, "disk.checksum=uncompressed", false);
@@ -642,18 +643,18 @@ config_compression(TABLE *table, const char *conf_name)
 
     /* Ignore logging compression if we're not doing logging. */
     if (strcmp(conf_name, "logging.compression") == 0 && GV(LOGGING) == 0) {
-        config_single(NULL, "logging.compression=none", false);
+        config_off(NULL, "logging.compression");
         return;
     }
 
     /* Return if already specified and it's a current compression engine. */
     if (config_explicit(table, conf_name)) {
-        cstr = "none";
+        cstr = "off";
         if (strcmp(conf_name, "logging.compression") == 0)
             cstr = GVS(LOGGING_COMPRESSION);
-        if (strcmp(conf_name, "btree.compression") == 0)
+        else if (strcmp(conf_name, "btree.compression") == 0)
             cstr = TVS(BTREE_COMPRESSION);
-        if (cstr == NULL || memcmp(cstr, "bzip", strlen("bzip")) != 0)
+        if (memcmp(cstr, "bzip", strlen("bzip")) != 0)
             return;
         WARN("%s: bzip compression no longer supported", conf_name);
     }
@@ -662,7 +663,7 @@ config_compression(TABLE *table, const char *conf_name)
      * Select a compression type from the list of built-in engines. Listed percentages are only
      * correct if all of the possible engines are compiled in.
      */
-    cstr = "none";
+    cstr = "off";
     switch (mmrand(NULL, 1, 20)) {
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
     case 1:
@@ -729,10 +730,10 @@ config_directio(void)
     if (GV(flag)) {                                                                 \
         if (config_explicit(NULL, name)) {                                          \
             WARN("%s not supported with direct I/O, turning off direct I/O", name); \
-            config_single(NULL, "disk.direct_io=off", false);                       \
+            config_off(NULL, "disk.direct_io");                                     \
             return;                                                                 \
         }                                                                           \
-        config_single(NULL, name "=off", false);                                    \
+        config_off(NULL, name);                                                     \
     }
 
     /*
@@ -767,31 +768,15 @@ config_directio(void)
 static void
 config_encryption(void)
 {
-    const char *cstr;
+    /* Encryption: choose something if encryption wasn't specified. */
+    if (config_explicit(NULL, "disk.encryption"))
+        return;
 
-    /*
-     * Encryption: choose something if encryption wasn't specified.
-     */
-    if (!config_explicit(NULL, "disk.encryption")) {
-        cstr = "disk.encryption=none";
-        switch (mmrand(NULL, 1, 10)) {
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5: /* 70% no encryption */
-        case 6:
-        case 7:
-            break;
-        case 8:
-        case 9:
-        case 10: /* 30% rotn */
-            cstr = "disk.encryption=rotn-7";
-            break;
-        }
-
-        config_single(NULL, cstr, false);
-    }
+    /* 70% no encryption, 30% rotn */
+    if (mmrand(NULL, 1, 10) < 8)
+        config_off(NULL, "disk.encryption");
+    else
+        config_single(NULL, "disk.encryption=rotn-7", false);
 }
 
 /*
@@ -850,23 +835,23 @@ config_in_memory_reset(void)
 {
     /* Turn off a lot of stuff. */
     if (!config_explicit(NULL, "backup"))
-        config_single(NULL, "backup=off", false);
+        config_off(NULL, "backup");
     if (!config_explicit(NULL, "btree.compression"))
-        config_single(NULL, "btree.compression=none", false);
+        config_off(NULL, "btree.compression");
     if (!config_explicit(NULL, "checkpoint"))
-        config_single(NULL, "checkpoint=off", false);
+        config_off(NULL, "checkpoint");
     if (!config_explicit(NULL, "import"))
-        config_single(NULL, "import=off", false);
+        config_off(NULL, "import");
     if (!config_explicit(NULL, "logging"))
-        config_single(NULL, "logging=off", false);
+        config_off(NULL, "logging");
     if (!config_explicit(NULL, "ops.alter"))
-        config_single(NULL, "ops.alter=off", false);
+        config_off(NULL, "ops.alter");
     if (!config_explicit(NULL, "ops.hs_cursor"))
-        config_single(NULL, "ops.hs_cursor=off", false);
+        config_off(NULL, "ops.hs_cursor");
     if (!config_explicit(NULL, "ops.salvage"))
-        config_single(NULL, "ops.salvage=off", false);
+        config_off(NULL, "ops.salvage");
     if (!config_explicit(NULL, "ops.verify"))
-        config_single(NULL, "ops.verify=off", false);
+        config_off(NULL, "ops.verify");
 
     /*
      * Keep keys/values small, overflow items aren't an issue for in-memory configurations and it
@@ -894,7 +879,7 @@ config_backup_incr_log_compatibility_check(void)
           "backup.incremental=log is incompatible with logging.archive, turning off "
           "logging.archive");
     if (GV(LOGGING_ARCHIVE))
-        config_single(NULL, "logging.archive=0", false);
+        config_off(NULL, "logging.archive");
 }
 
 /*
@@ -911,7 +896,7 @@ config_lsm_reset(TABLE *table)
     if (config_explicit(table, "ops.truncate")) {
         if (DATASOURCE(table, "lsm"))
             testutil_die(EINVAL, "LSM (currently) incompatible with truncate configurations");
-        config_single(table, "ops.truncate=off", false);
+        config_off(table, "ops.truncate");
     }
 
     /*
@@ -921,10 +906,10 @@ config_lsm_reset(TABLE *table)
      */
     if (config_explicit(NULL, "ops.prepare"))
         testutil_die(EINVAL, "LSM (currently) incompatible with prepare configurations");
-    config_single(NULL, "ops.prepare=off", false);
+    config_off(NULL, "ops.prepare");
     if (config_explicit(NULL, "transaction.timestamps"))
         testutil_die(EINVAL, "LSM (currently) incompatible with timestamp configurations");
-    config_single(NULL, "transaction.timestamps=off", false);
+    config_off(NULL, "transaction.timestamps");
 
     /*
      * LSM does not work with block-based incremental backup, change the incremental backup
@@ -1068,22 +1053,22 @@ config_transaction(void)
      */
     if (GV(OPS_PREPARE)) {
         if (!config_explicit(NULL, "logging"))
-            config_single(NULL, "logging=off", false);
+            config_off(NULL, "logging");
         if (!config_explicit(NULL, "transaction.timestamps"))
             config_single(NULL, "transaction.timestamps=on", false);
     }
     if (GV(TRANSACTION_TIMESTAMPS)) {
         if (!config_explicit(NULL, "transaction.implicit"))
-            config_single(NULL, "transaction.implicit=0", false);
+            config_off(NULL, "transaction.implicit");
         if (!config_explicit(NULL, "ops.salvage"))
-            config_single(NULL, "ops.salvage=off", false);
+            config_off(NULL, "ops.salvage");
     }
     if (GV(LOGGING))
-        config_single(NULL, "ops.prepare=off", false);
+        config_off(NULL, "ops.prepare");
     if (GV(TRANSACTION_IMPLICIT))
-        config_single(NULL, "transaction.timestamps=off", false);
+        config_off(NULL, "transaction.timestamps");
     if (GV(OPS_SALVAGE))
-        config_single(NULL, "transaction.timestamps=off", false);
+        config_off(NULL, "transaction.timestamps");
 
     /* Transaction timestamps configures format behavior, flag it. */
     if (GV(TRANSACTION_TIMESTAMPS))
@@ -1328,6 +1313,22 @@ config_find(const char *s, size_t len, bool fatal)
 }
 
 /*
+ * config_off --
+ *     Turn a configuration value off.
+ */
+static void
+config_off(TABLE *table, const char *s)
+{
+    CONFIG *cp;
+    char buf[100];
+
+    cp = config_find(s, strlen(s), true);
+    testutil_check(
+      __wt_snprintf(buf, sizeof(buf), "%s=%s", s, F_ISSET(cp, C_BOOL | C_STRING) ? "off" : "0"));
+    config_single(table, buf, false);
+}
+
+/*
  * config_value --
  *     String to long helper function.
  */
@@ -1448,6 +1449,13 @@ config_single(TABLE *table, const char *s, bool explicit)
     v = &table->v[cp->off];
 
     if (F_ISSET(cp, C_STRING)) {
+        /*
+         * Historically, both "none" and "off" were used for turning off string configurations, now
+         * we only use "off".
+         */
+        if (strcmp(equalp, "none") == 0)
+            equalp = "off";
+
         if (strncmp(s, "backup.incremental", strlen("backup.incremental")) == 0)
             config_map_backup_incr(equalp, &g.backup_incr_flag);
         else if (strncmp(s, "checkpoint", strlen("checkpoint")) == 0)

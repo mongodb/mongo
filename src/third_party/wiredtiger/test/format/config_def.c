@@ -12,7 +12,7 @@ CONFIG configuration_list[] = {
   {"backup", "configure backups",
     C_BOOL, 20, 0, 0, V_GLOBAL_BACKUP},
 
-  {"backup.incremental", "backup type (block | log | off)",
+  {"backup.incremental", "backup type (off | block | log)",
     C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_BACKUP_INCREMENTAL},
 
   {"backup.incr_granularity", "incremental backup block granularity (KB)",
@@ -33,7 +33,7 @@ CONFIG configuration_list[] = {
   {"btree.bitcnt", "fixed-length column-store object size (number of bits)",
     C_TABLE | C_TYPE_FIX, 1, 8, 8, V_TABLE_BTREE_BITCNT},
 
-  {"btree.compression", "data compression (none | lz4 | snappy | zlib | zstd)",
+  {"btree.compression", "data compression (off | lz4 | snappy | zlib | zstd)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_BTREE_COMPRESSION},
 
   {"btree.dictionary", "configure dictionary compressed values",
@@ -111,7 +111,7 @@ CONFIG configuration_list[] = {
   {"disk.direct_io", "configure direct I/O for data objects",
     C_BOOL | C_IGNORE, 0, 0, 1, V_GLOBAL_DISK_DIRECT_IO},
 
-  {"disk.encryption", "encryption type (none | rotn-7)",
+  {"disk.encryption", "encryption type (off | rotn-7)",
     C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_DISK_ENCRYPTION},
 
   {"disk.firstfit", "configure first-fit allocation",
@@ -146,7 +146,7 @@ CONFIG configuration_list[] = {
   {"logging.archive", "configure log file archival",
     C_BOOL, 50, 0, 0, V_GLOBAL_LOGGING_ARCHIVE},
 
-  {"logging.compression", "logging compression (none | lz4 | snappy | zlib | zstd)",
+  {"logging.compression", "logging compression (off | lz4 | snappy | zlib | zstd)",
     C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_LOGGING_COMPRESSION},
 
   {"logging.file_max", "maximum log file size (KB)",

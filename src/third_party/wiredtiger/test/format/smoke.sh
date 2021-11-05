@@ -4,9 +4,9 @@ set -e
 
 # Smoke-test format as part of running "make check".
 args="-c . "
-args="$args btree.compression=none "
+args="$args btree.compression=off "
 args="$args cache.minimum=40 "
-args="$args logging_compression=none"
+args="$args logging_compression=off"
 args="$args runs.rows=100000 "
 args="$args runs.source=table "
 args="$args runs.tables=3 "
