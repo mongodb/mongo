@@ -810,7 +810,9 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // builds since this check can be expensive.
         int cmpData;
         if (_descriptor->unique()) {
-            cmpData = data.first.compareWithoutRecordIdLong(previousKey);
+            cmpData = (_newInterface->rsKeyFormat() == KeyFormat::Long)
+                ? data.first.compareWithoutRecordIdLong(previousKey)
+                : data.first.compareWithoutRecordIdStr(previousKey);
         }
 
         if (kDebugBuild && data.first.compare(previousKey) < 0) {
@@ -988,7 +990,9 @@ std::string nextFileName() {
 Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
                                                       const KeyString::Value& dataKey,
                                                       const RecordIdHandlerFn& onDuplicateRecord) {
-    RecordId recordId = KeyString::decodeRecordIdLongAtEnd(dataKey.getBuffer(), dataKey.getSize());
+    RecordId recordId = (KeyFormat::Long == _newInterface->rsKeyFormat())
+        ? KeyString::decodeRecordIdLongAtEnd(dataKey.getBuffer(), dataKey.getSize())
+        : KeyString::decodeRecordIdStrAtEnd(dataKey.getBuffer(), dataKey.getSize());
     if (onDuplicateRecord) {
         return onDuplicateRecord(recordId);
     }

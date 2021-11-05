@@ -130,8 +130,8 @@ public:
         invariantWTOK(WiredTigerIndex::Create(&opCtx, uri, result.getValue()));
 
         if (unique) {
-            invariant(keyFormat == KeyFormat::Long);
-            return std::make_unique<WiredTigerIndexUnique>(&opCtx, uri, "" /* ident */, &desc);
+            return std::make_unique<WiredTigerIndexUnique>(
+                &opCtx, uri, "" /* ident */, keyFormat, &desc);
         }
         return std::make_unique<WiredTigerIndexStandard>(
             &opCtx, uri, "" /* ident */, keyFormat, &desc);

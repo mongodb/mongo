@@ -654,11 +654,13 @@ public:
     }
 
     Status addKey(const KeyString::Value& newKeyString) override {
-        dassertRecordIdAtEnd(newKeyString, KeyFormat::Long);
+        dassertRecordIdAtEnd(newKeyString, _idx->rsKeyFormat());
 
         // Do a duplicate check, but only if dups aren't allowed.
         if (!_dupsAllowed) {
-            const int cmp = newKeyString.compareWithoutRecordIdLong(_previousKeyString);
+            const int cmp = (_idx->_rsKeyFormat == KeyFormat::Long)
+                ? newKeyString.compareWithoutRecordIdLong(_previousKeyString)
+                : newKeyString.compareWithoutRecordIdStr(_previousKeyString);
             if (cmp == 0) {
                 // Duplicate found!
                 auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
@@ -842,6 +844,8 @@ public:
         dassert(KeyString::decodeDiscriminator(
                     key.getBuffer(), key.getSize(), _idx.getOrdering(), key.getTypeBits()) ==
                 KeyString::Discriminator::kInclusive);
+        // seekExact is only used on the _id index, which only uses the Long format.
+        invariant(KeyFormat::Long == _idx.rsKeyFormat());
 
         auto ksEntry = [&]() {
             if (_forward) {
@@ -1303,6 +1307,9 @@ private:
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
     void _updateIdAndTypeBitsFromValue() {
+        // Old-format unique index keys always use the Long format.
+        invariant(_idx.rsKeyFormat() == KeyFormat::Long);
+
         // We assume that cursors can only ever see unique indexes in their "pristine" state,
         // where no duplicates are possible. The cases where dups are allowed should hold
         // sufficient locks to ensure that no cursor ever sees them.
@@ -1340,6 +1347,9 @@ public:
     // Must not throw WriteConflictException, throwing a WriteConflictException will retry the
     // operation effectively skipping over this key.
     void updateIdAndTypeBits() override {
+        // _id index keys always use the Long format.
+        invariant(_idx.rsKeyFormat() == KeyFormat::Long);
+
         WT_CURSOR* c = _cursor->get();
         WT_ITEM item;
         auto ret = c->get_value(c, &item);
@@ -1365,10 +1375,10 @@ public:
 WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const std::string& uri,
                                              StringData ident,
+                                             KeyFormat rsKeyFormat,
                                              const IndexDescriptor* desc,
                                              bool isReadOnly)
-    : WiredTigerIndex(ctx, uri, ident, KeyFormat::Long, desc, isReadOnly),
-      _partial(desc->isPartial()) {
+    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isReadOnly), _partial(desc->isPartial()) {
     // _id indexes must use WiredTigerIdIndex
     invariant(!isIdIndex());
     // All unique indexes should be in the timestamp-safe format version as of version 4.2.
@@ -1488,6 +1498,7 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
                                   WT_CURSOR* c,
                                   const KeyString::Value& keyString,
                                   bool dupsAllowed) {
+    invariant(KeyFormat::Long == _rsKeyFormat);
     invariant(!dupsAllowed);
     const RecordId id =
         KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
@@ -1534,8 +1545,9 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
     if (!dupsAllowed) {
         // A prefix key is KeyString of index key. It is the component of the index entry that
         // should be unique.
-        auto sizeWithoutRecordId =
-            KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+        auto sizeWithoutRecordId = (_rsKeyFormat == KeyFormat::Long)
+            ? KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize())
+            : KeyString::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
         WiredTigerItem prefixKeyItem(keyString.getBuffer(), sizeWithoutRecordId);
 
         // First phase inserts the prefix key to prohibit concurrent insertions of same key
@@ -1611,6 +1623,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
                                  WT_CURSOR* c,
                                  const KeyString::Value& keyString,
                                  bool dupsAllowed) {
+    invariant(KeyFormat::Long == _rsKeyFormat);
     const RecordId id =
         KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
     invariant(id.isValid());
@@ -1698,6 +1711,12 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
 
     if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
+        return;
+    }
+
+    if (KeyFormat::String == _rsKeyFormat) {
+        // This is a unique index on a clustered collection. These indexes will only have keys
+        // in the timestamp safe format where the RecordId is appended at the end of the key.
         return;
     }
 

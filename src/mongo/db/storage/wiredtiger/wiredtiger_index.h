@@ -201,6 +201,7 @@ public:
     WiredTigerIndexUnique(OperationContext* ctx,
                           const std::string& uri,
                           StringData ident,
+                          KeyFormat rsKeyFormat,
                           const IndexDescriptor* desc,
                           bool readOnly = false);
 

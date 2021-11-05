@@ -2705,6 +2705,15 @@ void Value::serializeWithoutRecordIdLong(BufBuilder& buf) const {
     buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
 }
 
+void Value::serializeWithoutRecordIdStr(BufBuilder& buf) const {
+    dassert(decodeRecordIdStrAtEnd(_buffer.get(), _ksSize).isValid());
+
+    const int32_t sizeWithoutRecordId = sizeWithoutRecordIdStrAtEnd(_buffer.get(), _ksSize);
+    buf.appendNum(sizeWithoutRecordId);                 // Serialize size of KeyString
+    buf.appendBuf(_buffer.get(), sizeWithoutRecordId);  // Serialize KeyString
+    buf.appendBuf(_buffer.get() + _ksSize, _buffer.size() - _ksSize);  // Serialize TypeBits
+}
+
 size_t Value::getApproximateSize() const {
     auto size = sizeof(Value);
     size += !_buffer.isShared() ? SharedBuffer::kHolderSize + _buffer.size() : 0;

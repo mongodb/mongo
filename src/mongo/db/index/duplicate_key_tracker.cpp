@@ -85,7 +85,12 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx, const KeyString::
     // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
     // we exclude it from the serialization.
     BufBuilder builder;
-    key.serializeWithoutRecordIdLong(builder);
+    if (KeyFormat::Long ==
+        _indexCatalogEntry->accessMethod()->getSortedDataInterface()->rsKeyFormat()) {
+        key.serializeWithoutRecordIdLong(builder);
+    } else {
+        key.serializeWithoutRecordIdStr(builder);
+    }
 
     auto status =
         _keyConstraintsTable->rs()->insertRecord(opCtx, builder.buf(), builder.len(), Timestamp());

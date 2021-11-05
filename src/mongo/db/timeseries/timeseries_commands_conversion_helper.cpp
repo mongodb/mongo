@@ -112,6 +112,13 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                           "TTL indexes are not supported on time-series collections");
             }
 
+
+            if (elem.fieldNameStringData() == IndexDescriptor::kUniqueFieldName) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Unique indexes are not supported on time-series collections",
+                        !elem.trueValue());
+            }
+
             if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
                 auto pluginName = IndexNames::findPluginName(elem.Obj());
                 uassert(ErrorCodes::InvalidOptions,

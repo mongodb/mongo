@@ -796,10 +796,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
     }
 
-    uassert(ErrorCodes::InvalidOptions,
-            "Unique indexes are not supported on clustered collections",
-            !collection->isClustered() || !spec[IndexDescriptor::kUniqueFieldName].trueValue());
-
     if (IndexDescriptor::isIdIndexPattern(key)) {
         if (collection->isClustered()) {
             return Status(ErrorCodes::CannotCreateIndex,

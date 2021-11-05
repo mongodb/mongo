@@ -1579,12 +1579,12 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
         invariant(!collOptions.clusteredIndex);
         return std::make_unique<WiredTigerIdIndex>(opCtx, _uri(ident), ident, desc, _readOnly);
     }
+    auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
     if (desc->unique()) {
-        invariant(!collOptions.clusteredIndex);
-        return std::make_unique<WiredTigerIndexUnique>(opCtx, _uri(ident), ident, desc, _readOnly);
+        return std::make_unique<WiredTigerIndexUnique>(
+            opCtx, _uri(ident), ident, keyFormat, desc, _readOnly);
     }
 
-    auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
     return std::make_unique<WiredTigerIndexStandard>(
         opCtx, _uri(ident), ident, keyFormat, desc, _readOnly);
 }

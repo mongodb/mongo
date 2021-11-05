@@ -110,6 +110,87 @@ TEST(SortedDataInterface, KeyFormatStringInsertDuplicates) {
     }
 }
 
+TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
+        /*unique=*/true, /*partial=*/false, KeyFormat::String));
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ASSERT(sorted->isEmpty(opCtx.get()));
+
+    std::string buf1(12, 0);
+    std::string buf2(12, 1);
+    std::string buf3(12, 0xff);
+
+    RecordId rid1(buf1.c_str(), 12);
+    RecordId rid2(buf2.c_str(), 12);
+    RecordId rid3(buf3.c_str(), 12);
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key1, rid1),
+                                 /*dupsAllowed*/ true));
+        Status status = sorted->insert(opCtx.get(),
+                                       makeKeyString(sorted.get(), key1, rid2),
+                                       /*dupsAllowed*/ false);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
+
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key1, rid3),
+                                 /*dupsAllowed*/ true));
+        uow.commit();
+    }
+
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        sorted->unindex(opCtx.get(),
+                        makeKeyString(sorted.get(), key1, rid1),
+                        /*dupsAllowed*/ true);
+
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key2, rid1),
+                                 /*dupsAllowed*/ true));
+        uow.commit();
+    }
+
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
+
+    auto ksSeek = makeKeyStringForSeek(sorted.get(), key1, true, true);
+    {
+        auto cursor = sorted->newCursor(opCtx.get());
+        auto entry = cursor->seek(ksSeek);
+        ASSERT(entry);
+        ASSERT_EQ(*entry, IndexKeyEntry(key1, rid3));
+
+        entry = cursor->next();
+        ASSERT(entry);
+        ASSERT_EQ(*entry, IndexKeyEntry(key2, rid1));
+
+        entry = cursor->next();
+        ASSERT_FALSE(entry);
+    }
+
+    {
+        auto cursor = sorted->newCursor(opCtx.get());
+        auto entry = cursor->seekForKeyString(ksSeek);
+        ASSERT(entry);
+        ASSERT_EQ(entry->loc, rid3);
+        auto ks1 = makeKeyString(sorted.get(), key1, rid3);
+        ASSERT_EQ(entry->keyString, ks1);
+
+        entry = cursor->nextKeyString();
+        ASSERT(entry);
+        ASSERT_EQ(entry->loc, rid1);
+        auto ks2 = makeKeyString(sorted.get(), key2, rid1);
+        ASSERT_EQ(entry->keyString, ks2);
+
+        entry = cursor->nextKeyString();
+        ASSERT_FALSE(entry);
+    }
+}
+
 TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
@@ -223,6 +304,58 @@ TEST(SortedDataInterface, KeyFormatStringUnindex) {
         sorted->unindex(opCtx.get(),
                         makeKeyString(sorted.get(), key1, rid3),
                         /*dupsAllowed*/ true);
+        uow.commit();
+    }
+    ASSERT_EQUALS(0, sorted->numEntries(opCtx.get()));
+}
+
+TEST(SortedDataInterface, KeyFormatStringUniqueUnindex) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
+        /*unique=*/true, /*partial=*/false, KeyFormat::String));
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ASSERT(sorted->isEmpty(opCtx.get()));
+
+    std::string buf1(12, 0);
+    std::string buf2(12, 1);
+    std::string buf3(12, 0xff);
+
+    RecordId rid1(buf1.c_str(), 12);
+    RecordId rid2(buf2.c_str(), 12);
+    RecordId rid3(buf3.c_str(), 12);
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key1, rid1),
+                                 /*dupsAllowed*/ false));
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key2, rid2),
+                                 /*dupsAllowed*/ false));
+        ASSERT_OK(sorted->insert(opCtx.get(),
+                                 makeKeyString(sorted.get(), key3, rid3),
+                                 /*dupsAllowed*/ false));
+        uow.commit();
+    }
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        // Does not exist, does nothing.
+        sorted->unindex(opCtx.get(),
+                        makeKeyString(sorted.get(), key1, rid3),
+                        /*dupsAllowed*/ false);
+
+        sorted->unindex(opCtx.get(),
+                        makeKeyString(sorted.get(), key1, rid1),
+                        /*dupsAllowed*/ false);
+        sorted->unindex(opCtx.get(),
+                        makeKeyString(sorted.get(), key2, rid2),
+                        /*dupsAllowed*/ false);
+        sorted->unindex(opCtx.get(),
+                        makeKeyString(sorted.get(), key3, rid3),
+                        /*dupsAllowed*/ false);
+
         uow.commit();
     }
     ASSERT_EQUALS(0, sorted->numEntries(opCtx.get()));
