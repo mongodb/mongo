@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
@@ -55,6 +56,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
+
 
 namespace mongo {
 using Parser = Expression::Parser;
@@ -2534,6 +2536,9 @@ intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCt
     BSONElement inputElem;
     BSONElement asElem;
     BSONElement condElem;
+    BSONElement limitElem;
+
+
     for (auto elem : expr.Obj()) {
         if (elem.fieldNameStringData() == "input") {
             inputElem = elem;
@@ -2541,6 +2546,12 @@ intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCt
             asElem = elem;
         } else if (elem.fieldNameStringData() == "cond") {
             condElem = elem;
+        } else if (elem.fieldNameStringData() == "limit") {
+            assertLanguageFeatureIsAllowed(expCtx->opCtx,
+                                           "limit argument of $filter operator",
+                                           AllowedWithApiStrict::kNeverInVersion1,
+                                           AllowedWithClientType::kAny);
+            limitElem = elem;
         } else {
             uasserted(28647,
                       str::stream() << "Unrecognized parameter to $filter: " << elem.fieldName());
@@ -2553,17 +2564,21 @@ intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCt
     // Parse "input", only has outer variables.
     intrusive_ptr<Expression> input = parseOperand(expCtx, inputElem, vpsIn);
 
-    // Parse "as".
     VariablesParseState vpsSub(vpsIn);  // vpsSub gets our variable, vpsIn doesn't.
-
-    // If "as" is not specified, then use "this" by default.
-    auto varName = asElem.eoo() ? "this" : asElem.str();
+    // Parse "as". If "as" is not specified, then use "this" by default.
+    auto const varName = asElem.eoo() ? "this" : asElem.str();
 
     variableValidation::validateNameForUserWrite(varName);
     Variables::Id varId = vpsSub.defineVariable(varName);
 
     // Parse "cond", has access to "as" variable.
     intrusive_ptr<Expression> cond = parseOperand(expCtx, condElem, vpsSub);
+
+    if (limitElem) {
+        intrusive_ptr<Expression> limit = parseOperand(expCtx, limitElem, vpsIn);
+        return new ExpressionFilter(
+            expCtx, std::move(varName), varId, std::move(input), std::move(cond), std::move(limit));
+    }
 
     return new ExpressionFilter(
         expCtx, std::move(varName), varId, std::move(input), std::move(cond));
@@ -2573,28 +2588,43 @@ ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
                                    string varName,
                                    Variables::Id varId,
                                    intrusive_ptr<Expression> input,
-                                   intrusive_ptr<Expression> filter)
-    : Expression(expCtx, {std::move(input), std::move(filter)}),
+                                   intrusive_ptr<Expression> cond,
+                                   intrusive_ptr<Expression> limit)
+    : Expression(expCtx,
+                 limit ? makeVector(std::move(input), std::move(cond), std::move(limit))
+                       : makeVector(std::move(input), std::move(cond))),
       _varName(std::move(varName)),
       _varId(varId),
       _input(_children[0]),
-      _filter(_children[1]) {}
+      _cond(_children[1]),
+      _limit(_children.size() == 3
+                 ? _children[2]
+                 : boost::optional<boost::intrusive_ptr<Expression>&>(boost::none)) {}
 
 intrusive_ptr<Expression> ExpressionFilter::optimize() {
     // TODO handle when _input is constant.
     _input = _input->optimize();
-    _filter = _filter->optimize();
+    _cond = _cond->optimize();
+    if (_limit)
+        *_limit = (*_limit)->optimize();
+
     return this;
 }
 
 Value ExpressionFilter::serialize(bool explain) const {
+    if (_limit) {
+        return Value(DOC("$filter" << DOC("input" << _input->serialize(explain) << "as" << _varName
+                                                  << "cond" << _cond->serialize(explain) << "limit"
+                                                  << (*_limit)->serialize(explain))));
+    }
     return Value(DOC("$filter" << DOC("input" << _input->serialize(explain) << "as" << _varName
-                                              << "cond" << _filter->serialize(explain))));
+                                              << "cond" << _cond->serialize(explain))));
 }
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
     // We are guaranteed at parse time that this isn't using our _varId.
     const Value inputVal = _input->evaluate(root, variables);
+
     if (inputVal.nullish())
         return Value(BSONNULL);
 
@@ -2608,12 +2638,44 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
     if (input.empty())
         return inputVal;
 
+
+    // This counter ensures we don't return more array elements than our limit arg has specified.
+    // For example, given the query, {$project: {b: {$filter: {input: '$a', as: 'x', cond: {$gt:
+    // ['$$x', 1]}, limit: {$literal: 3}}}}} remainingLimitCounter would be 3 and we would return up
+    // to the first 3 elements matching our condition, per doc.
+    auto approximateOutputSize = input.size();
+    boost::optional<int> remainingLimitCounter;
+    if (_limit) {
+        auto limitValue = (*_limit)->evaluate(root, variables);
+        // If the $filter query contains limit: null, we interpret the query as being "limit-less"
+        // and therefore return all matching elements per doc.
+        if (!limitValue.nullish()) {
+            uassert(
+                327391,
+                str::stream() << "$filter: limit must be represented as a 32-bit integral value: "
+                              << limitValue.toString(),
+                limitValue.integral());
+            int coercedLimitValue = limitValue.coerceToInt();
+            uassert(327392,
+                    str::stream() << "$filter: limit must be greater than 0: "
+                                  << limitValue.toString(),
+                    coercedLimitValue > 0);
+            remainingLimitCounter = coercedLimitValue;
+            approximateOutputSize =
+                std::min(approximateOutputSize, static_cast<size_t>(coercedLimitValue));
+        }
+    }
+
     vector<Value> output;
+    output.reserve(approximateOutputSize);
     for (const auto& elem : input) {
         variables->setValue(_varId, elem);
 
-        if (_filter->evaluate(root, variables).coerceToBool()) {
+        if (_cond->evaluate(root, variables).coerceToBool()) {
             output.push_back(std::move(elem));
+            if (remainingLimitCounter && --*remainingLimitCounter == 0) {
+                return Value(std::move(output));
+            }
         }
     }
 
@@ -2622,7 +2684,10 @@ Value ExpressionFilter::evaluate(const Document& root, Variables* variables) con
 
 void ExpressionFilter::_doAddDependencies(DepsTracker* deps) const {
     _input->addDependencies(deps);
-    _filter->addDependencies(deps);
+    _cond->addDependencies(deps);
+    if (_limit) {
+        (*_limit)->addDependencies(deps);
+    }
 }
 
 /* ------------------------- ExpressionFloor -------------------------- */

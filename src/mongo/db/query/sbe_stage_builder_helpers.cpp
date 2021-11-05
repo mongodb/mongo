@@ -157,6 +157,13 @@ std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable&
                                                    sbe::value::bitcastFrom<int32_t>(0)));
 }
 
+std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var) {
+    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::greater,
+                        var.clone(),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                   sbe::value::bitcastFrom<int32_t>(0)));
+}
+
 std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
     return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::less,
                         var.clone(),

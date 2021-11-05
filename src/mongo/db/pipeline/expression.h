@@ -1883,7 +1883,8 @@ public:
                      std::string varName,
                      Variables::Id varId,
                      boost::intrusive_ptr<Expression> input,
-                     boost::intrusive_ptr<Expression> filter);
+                     boost::intrusive_ptr<Expression> cond,
+                     boost::intrusive_ptr<Expression> limit = nullptr);
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
         return visitor->visit(this);
@@ -1897,6 +1898,10 @@ public:
         return _varId;
     }
 
+    bool hasLimit() const {
+        return this->_limit ? true : false;
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
@@ -1908,7 +1913,9 @@ private:
     // The array to iterate over.
     boost::intrusive_ptr<Expression>& _input;
     // The expression determining whether each element should be present in the result array.
-    boost::intrusive_ptr<Expression>& _filter;
+    boost::intrusive_ptr<Expression>& _cond;
+    // The optional expression determining how many elements should be present in the result array.
+    boost::optional<boost::intrusive_ptr<Expression>&> _limit;
 };
 
 

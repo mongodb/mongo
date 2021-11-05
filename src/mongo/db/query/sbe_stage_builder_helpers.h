@@ -109,6 +109,12 @@ std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& va
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var);
 
 /**
+ * Generates an EExpression that checks if the input expression is a positive number (i.e. > 0)
+ * _assuming that_ it has already been verified to be numeric.
+ */
+std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var);
+
+/**
  * Generates an EExpression that checks if the input expression is a negative (i.e., < 0) number
  * _assuming that_ it has already been verified to be numeric.
  */
