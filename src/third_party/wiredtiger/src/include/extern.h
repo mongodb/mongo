@@ -761,7 +761,6 @@ extern int __wt_filename(WT_SESSION_IMPL *session, const char *name, char **path
 extern int __wt_filename_construct(WT_SESSION_IMPL *session, const char *path,
   const char *file_prefix, uintmax_t id_1, uint32_t id_2, WT_ITEM *buf)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_floatcmp(float f1, float f2) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_fopen(WT_SESSION_IMPL *session, const char *name, uint32_t open_flags,

@@ -101,22 +101,22 @@ struct __wt_blkcache {
     char *nvram_device_path; /* The absolute path of the file system on NVRAM device */
 
     uint64_t full_target; /* Number of bytes in the block cache that triggers eviction */
-    float overhead_pct;   /* Overhead percentage that suppresses population and eviction */
+    u_int overhead_pct;   /* Overhead percentage that suppresses population and eviction */
 
     size_t estimated_file_size;        /* Estimated size of all files used by the workload. */
     int refs_since_filesize_estimated; /* Counter for recalculating the aggregate file size */
 
     /*
-     * This fraction tells us the good enough ratio of file data cached in the DRAM
-     * resident OS buffer cache, which makes the use of this block cache unnecessary.
-     * Suppose we set that fraction to 50%. Then if half of our file data fits into
-     * system DRAM, we consider this block cache unhelpful.
+     * This fraction tells us the good enough ratio of file data cached in the DRAM resident OS
+     * buffer cache, which makes the use of this block cache unnecessary. Suppose we set that
+     * fraction to 50%. Then if half of our file data fits into system DRAM, we consider this block
+     * cache unhelpful.
      *
-     * E.g., if the fraction is set to 50%, our aggregate file size is
-     * 500GB, and we have 300GB of RAM, then we will not use this block cache,
-     * because we know that half of our files (250GB) must be cached by the OS in DRAM.
+     * E.g., if the fraction is set to 50%, our aggregate file size is 500GB, and we have 300GB of
+     * RAM, then we will not use this block cache, because we know that half of our files (250GB)
+     * must be cached by the OS in DRAM.
      */
-    float fraction_in_os_cache;
+    u_int percent_file_in_os_cache;
 
     u_int hash_size;                   /* Number of block cache hash buckets */
     u_int type;                        /* Type of block cache (NVRAM or DRAM) */

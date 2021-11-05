@@ -127,14 +127,12 @@ static inline bool
 __blkcache_high_overhead(WT_SESSION_IMPL *session)
 {
     WT_BLKCACHE *blkcache;
+    uint64_t ops;
 
     blkcache = &S2C(session)->blkcache;
 
-    if ((double)(blkcache->inserts + blkcache->removals) / (double)(blkcache->lookups) >
-      (double)blkcache->overhead_pct)
-        return (true);
-
-    return (false);
+    ops = blkcache->inserts + blkcache->removals;
+    return (blkcache->lookups > ops && ((ops * 100) / blkcache->lookups) > blkcache->overhead_pct);
 }
 
 /*
@@ -343,8 +341,8 @@ __wt_blkcache_get_or_check(
      * If more than the configured fraction of all file objects is likely to fit in the OS buffer
      * cache, don't use this cache.
      */
-    if (blkcache->system_ram >=
-      __blkcache_estimate_filesize(session) * blkcache->fraction_in_os_cache) {
+    if ((__blkcache_estimate_filesize(session) * blkcache->percent_file_in_os_cache) / 100 <
+      blkcache->system_ram) {
         WT_STAT_CONN_INCR(session, block_cache_bypass_get);
         return (WT_BLKCACHE_BYPASS);
     }
@@ -428,8 +426,8 @@ __wt_blkcache_put(WT_SESSION_IMPL *session, wt_off_t offset, size_t size, uint32
      * If more than the configured fraction of the file is likely to fit into the OS buffer cache,
      * don't use this cache.
      */
-    if (blkcache->system_ram >=
-      __blkcache_estimate_filesize(session) * blkcache->fraction_in_os_cache) {
+    if ((__blkcache_estimate_filesize(session) * blkcache->percent_file_in_os_cache) / 100 <
+      blkcache->system_ram) {
         WT_STAT_CONN_INCR(session, block_cache_bypass_put);
         return (WT_BLKCACHE_BYPASS);
     }
@@ -591,7 +589,7 @@ __wt_blkcache_remove(WT_SESSION_IMPL *session, wt_off_t offset, size_t size, uin
 static int
 __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_int type,
   char *nvram_device_path, size_t system_ram, u_int percent_file_in_os_cache, bool cache_on_writes,
-  float overhead_pct, u_int evict_aggressive, uint64_t full_target, bool cache_on_checkpoint)
+  u_int overhead_pct, u_int evict_aggressive, uint64_t full_target, bool cache_on_checkpoint)
 {
     WT_BLKCACHE *blkcache;
     WT_DECL_RET;
@@ -601,7 +599,7 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
     blkcache->cache_on_checkpoint = cache_on_checkpoint;
     blkcache->cache_on_writes = cache_on_writes;
     blkcache->hash_size = hash_size;
-    blkcache->fraction_in_os_cache = (float)percent_file_in_os_cache / 100;
+    blkcache->percent_file_in_os_cache = percent_file_in_os_cache;
     blkcache->full_target = full_target;
     blkcache->max_bytes = cache_size;
     blkcache->overhead_pct = overhead_pct;
@@ -726,7 +724,7 @@ done:
 static int
 __blkcache_reconfig(WT_SESSION_IMPL *session, bool reconfig, size_t cache_size, size_t hash_size,
   u_int type, char *nvram_device_path, size_t system_ram, u_int percent_file_in_os_cache,
-  bool cache_on_writes, float overhead_pct, u_int evict_aggressive, uint64_t full_target,
+  bool cache_on_writes, u_int overhead_pct, u_int evict_aggressive, uint64_t full_target,
   bool cache_on_checkpoint)
 {
     WT_BLKCACHE *blkcache;
@@ -738,10 +736,9 @@ __blkcache_reconfig(WT_SESSION_IMPL *session, bool reconfig, size_t cache_size, 
 
     if (blkcache->cache_on_checkpoint != cache_on_checkpoint ||
       blkcache->cache_on_writes != cache_on_writes || blkcache->hash_size != hash_size ||
-      __wt_floatcmp(blkcache->fraction_in_os_cache, (float)percent_file_in_os_cache / 100) != 0 ||
+      blkcache->percent_file_in_os_cache != percent_file_in_os_cache ||
       blkcache->full_target != full_target || blkcache->max_bytes != cache_size ||
-      __wt_floatcmp(blkcache->overhead_pct, overhead_pct) != 0 ||
-      blkcache->system_ram != system_ram ||
+      blkcache->overhead_pct != overhead_pct || blkcache->system_ram != system_ram ||
       blkcache->evict_aggressive != -((int)evict_aggressive) || blkcache->type != type ||
       (nvram_device_path != NULL && blkcache->nvram_device_path == NULL) ||
       (nvram_device_path == NULL && blkcache->nvram_device_path != NULL) ||
@@ -765,9 +762,8 @@ __wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfi
     WT_BLKCACHE *blkcache;
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
-    float overhead_pct;
     uint64_t cache_size, full_target, system_ram;
-    u_int cache_type, evict_aggressive, hash_size, percent_file_in_os_cache;
+    u_int cache_type, evict_aggressive, hash_size, overhead_pct, percent_file_in_os_cache;
     char *nvram_device_path;
     bool cache_on_checkpoint, cache_on_writes;
 
@@ -837,7 +833,7 @@ __wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfi
         cache_on_writes = false;
 
     WT_RET(__wt_config_gets(session, cfg, "block_cache.max_percent_overhead", &cval));
-    overhead_pct = (float)cval.val / (float)100;
+    overhead_pct = (u_int)cval.val;
 
     WT_RET(__blkcache_reconfig(session, reconfig, cache_size, hash_size, cache_type,
       nvram_device_path, system_ram, percent_file_in_os_cache, cache_on_writes, overhead_pct,
