@@ -36,6 +36,7 @@
 
 #include "mongo/bson/oid.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
@@ -67,8 +68,10 @@ public:
     TopologyType getType() const;
     const boost::optional<std::string>& getSetName() const;
 
+    // TODO(SERVER-59409): remove next 2 methods and keep only pair getter.
     const boost::optional<int>& getMaxSetVersion() const;
     const boost::optional<OID>& getMaxElectionId() const;
+    const ElectionIdSetVersionPair getMaxElectionIdSetVersionPair() const;
 
     const std::vector<ServerDescriptionPtr>& getServers() const;
 

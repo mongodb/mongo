@@ -121,6 +121,9 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target='topology_state_machine_test',
-    source=['topology_state_machine_test.cpp'],
+    source=[
+        'election_id_set_version_pair_test.cpp',
+        'topology_state_machine_test.cpp',
+    ],
     LIBDEPS=['sdam', 'sdam_test'],
 )
