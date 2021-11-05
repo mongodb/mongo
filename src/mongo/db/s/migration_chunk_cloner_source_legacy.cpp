@@ -1033,23 +1033,29 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
         stdx::lock_guard<Latch> sl(_mutex);
 
         const std::size_t cloneLocsRemaining = _cloneLocs.size();
+        int64_t untransferredModsSizeBytes = _untransferredDeletesCounter * _averageObjectIdSize +
+            _untransferredUpsertsCounter * _averageObjectSizeForCloneLocs;
 
         if (_forceJumbo && _jumboChunkCloneState) {
             LOGV2(21992,
                   "moveChunk data transfer progress: {response} mem used: {memoryUsedBytes} "
-                  "documents cloned so far: {docsCloned}",
+                  "documents cloned so far: {docsCloned} remaining amount: "
+                  "{untransferredModsSizeBytes}",
                   "moveChunk data transfer progress",
                   "response"_attr = redact(res),
                   "memoryUsedBytes"_attr = _memoryUsed,
-                  "docsCloned"_attr = _jumboChunkCloneState->docsCloned);
+                  "docsCloned"_attr = _jumboChunkCloneState->docsCloned,
+                  "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes);
         } else {
             LOGV2(21993,
                   "moveChunk data transfer progress: {response} mem used: {memoryUsedBytes} "
-                  "documents remaining to clone: {docsRemainingToClone}",
+                  "documents remaining to clone: {docsRemainingToClone} estimated remaining size "
+                  "{untransferredModsSizeBytes}",
                   "moveChunk data transfer progress",
                   "response"_attr = redact(res),
                   "memoryUsedBytes"_attr = _memoryUsed,
-                  "docsRemainingToClone"_attr = cloneLocsRemaining);
+                  "docsRemainingToClone"_attr = cloneLocsRemaining,
+                  "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes);
         }
 
         if (res["state"].String() == "steady" && sessionCatalogSourceInCatchupPhase &&
@@ -1080,11 +1086,8 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
 
         if ((res["state"].String() == "steady" || res["state"].String() == "catchup") &&
             sessionCatalogSourceInCatchupPhase && supportsCriticalSectionDuringCatchUp) {
-            int64_t estimatedUntransferredModsSize =
-                _untransferredDeletesCounter * _averageObjectIdSize +
-                _untransferredUpsertsCounter * _averageObjectSizeForCloneLocs;
             auto estimatedUntransferredChunkPercentage =
-                (std::min(_args.getMaxChunkSizeBytes(), estimatedUntransferredModsSize) * 100) /
+                (std::min(_args.getMaxChunkSizeBytes(), untransferredModsSizeBytes) * 100) /
                 _args.getMaxChunkSizeBytes();
             int64_t maxUntransferredSessionsSize = BSONObjMaxUserSize *
                 _args.getMaxChunkSizeBytes() / ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes;
@@ -1092,17 +1095,16 @@ Status MigrationChunkClonerSourceLegacy::_checkRecipientCloningStatus(OperationC
                 estimateUntransferredSessionsSize < maxUntransferredSessionsSize) {
                 // The recipient is sufficiently caught-up with the writes on the donor.
                 // Block writes, so that it can drain everything.
-                LOGV2_DEBUG(5630700,
-                            1,
-                            "moveChunk data transfer within threshold to allow write blocking",
-                            "_untransferredUpsertsCounter"_attr = _untransferredUpsertsCounter,
-                            "_untransferredDeletesCounter"_attr = _untransferredDeletesCounter,
-                            "_averageObjectSizeForCloneLocs"_attr = _averageObjectSizeForCloneLocs,
-                            "_averageObjectIdSize"_attr = _averageObjectIdSize,
-                            "untransferredSessionDataInBytes"_attr =
-                                estimateUntransferredSessionsSize,
-                            "maxChunksSizeBytes"_attr = _args.getMaxChunkSizeBytes(),
-                            "_sessionId"_attr = _sessionId.toString());
+                LOGV2(5630700,
+                      "moveChunk data transfer within threshold to allow write blocking",
+                      "_untransferredUpsertsCounter"_attr = _untransferredUpsertsCounter,
+                      "_untransferredDeletesCounter"_attr = _untransferredDeletesCounter,
+                      "_averageObjectSizeForCloneLocs"_attr = _averageObjectSizeForCloneLocs,
+                      "_averageObjectIdSize"_attr = _averageObjectIdSize,
+                      "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes,
+                      "untransferredSessionDataInBytes"_attr = estimateUntransferredSessionsSize,
+                      "maxChunksSizeBytes"_attr = _args.getMaxChunkSizeBytes(),
+                      "_sessionId"_attr = _sessionId.toString());
                 return Status::OK();
             }
         }
