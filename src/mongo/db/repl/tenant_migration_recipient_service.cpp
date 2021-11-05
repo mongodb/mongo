@@ -525,23 +525,14 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
             opCtx, returnAfterReachingTimestamp, donorRecipientOpTimePair.recipientOpTime));
     }
     _stopOrHangOnFailPoint(&fpBeforePersistingRejectReadsBeforeTimestamp, opCtx);
-
-    auto lastOpBeforeUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
-    auto lastOpAfterUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
-    if (lastOpBeforeUpdate == lastOpAfterUpdate) {
-        // updateStateDoc was a no-op, but we still must ensure it's all-replicated.
-        lastOpAfterUpdate = uassertStatusOK(replCoord->getLatestWriteOpTime(opCtx));
-        LOGV2(6096900,
-              "Fixed write timestamp for recording rejectReadsBeforeTimestamp",
-              "newWriteOpTime"_attr = lastOpAfterUpdate);
-    }
 
+    auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
     WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
                                      WriteConcernOptions::SyncMode::NONE,
                                      opCtx->getWriteConcern().wTimeout);
-    uassertStatusOK(replCoord->awaitReplication(opCtx, lastOpAfterUpdate, writeConcern).status);
+    uassertStatusOK(replCoord->awaitReplication(opCtx, writeOpTime, writeConcern).status);
 
     _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp, opCtx);
 
