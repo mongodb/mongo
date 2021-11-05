@@ -125,6 +125,7 @@ def brief_perf_stats(config: WTPerfConfig, perf_stats: PerfStatCollection):
 def detailed_perf_stats(config: WTPerfConfig, perf_stats: PerfStatCollection):
     total_memory_gb = psutil.virtual_memory().total / (1024 * 1024 * 1024)
     as_dict = {
+                'Test Name': os.path.basename(config.test),
                 'config': config.to_value_dict(),
                 'metrics': perf_stats.to_value_list(brief=False),
                 'system': {
@@ -156,7 +157,7 @@ def run_test(config: WTPerfConfig, test_run: int, operations: List[str] = None, 
         argument=argument,
         test=config.test,
         home=test_home)
-    subprocess.run(command_line)
+    subprocess.run(command_line, check=True)
 
 
 def process_results(config: WTPerfConfig, perf_stats: PerfStatCollection, operations: List[str] = None):

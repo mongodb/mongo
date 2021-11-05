@@ -590,12 +590,12 @@ functions:
           done
         done
 
-  "generic-perf-test":
+  "run-perf-test":
     # Run a performance test
     # Parameterised using the 'perf-test-name' and 'maxruns' variables
     - command: shell.exec
       params:
-        working_dir: "wiredtiger/bench/wtperf/wtperf_run_py"
+        working_dir: "wiredtiger/cmake_build/bench/wtperf"
         shell: bash
         script: |
           set -o errexit
@@ -605,12 +605,13 @@ functions:
           ${pip3_binary} install psutil pygit2
           JSON_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'" } }'
           echo "JSON_TASK_INFO: $JSON_TASK_INFO"
-          ${test_env_vars|} ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out.json ${wtarg}
-          ${test_env_vars|} ${python_binary} wtperf_run.py -p ../../../cmake_build/bench/wtperf/wtperf -t ../runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json ${wtarg}
+          ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out.json ${wtarg}
+          ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json ${wtarg}
 
+  "upload-perf-test-stats":
     - command: shell.exec
       params:
-        working_dir: "wiredtiger/bench/wtperf/wtperf_run_py"
+        working_dir: "wiredtiger/cmake_build/bench/wtperf"
         shell: bash
         silent: true
         script: |
@@ -623,7 +624,7 @@ functions:
 
     - command: perf.send
       params:
-        file: ./wiredtiger/bench/wtperf/wtperf_run_py/test_stats/evergreen_out.json
+        file: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out.json
 
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'perf-test-name' variable
@@ -631,7 +632,7 @@ functions:
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        local_files_include_filter: wiredtiger/bench/wtperf/wtperf_run_py/test_stats/*
+        local_files_include_filter: wiredtiger/cmake_build/bench/wtperf/test_stats/*
         bucket: build_external
         permissions: public-read
         content_type: text/html
@@ -2964,10 +2965,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: small-lsm
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: small-lsm
 
   - name: perf-test-medium-lsm
     tags: ["lsm-perf"]
@@ -2975,10 +2979,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: medium-lsm
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: medium-lsm
 
   - name: perf-test-medium-lsm-compact
     tags: ["lsm-perf"]
@@ -2986,10 +2993,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: medium-lsm-compact
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: medium-lsm-compact
 
   - name: perf-test-medium-multi-lsm
     tags: ["lsm-perf"]
@@ -2997,10 +3007,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: medium-multi-lsm
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: medium-multi-lsm
 
   - name: perf-test-parallel-pop-lsm
     tags: ["lsm-perf"]
@@ -3008,10 +3021,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: parallel-pop-lsm
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: parallel-pop-lsm
 
   - name: perf-test-update-lsm
     tags: ["lsm-perf"]
@@ -3019,10 +3035,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: update-lsm
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-lsm
 
     ###############################
     # Performance Tests for btree #
@@ -3034,10 +3053,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: small-btree
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: small-btree
 
   - name: perf-test-small-btree-backup
     tags: ["btree-perf"]
@@ -3045,10 +3067,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: small-btree-backup
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: small-btree-backup
 
   - name: perf-test-medium-btree
     tags: ["btree-perf"]
@@ -3056,10 +3081,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: medium-btree
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: medium-btree
 
   - name: perf-test-medium-btree-backup
     tags: ["btree-perf"]
@@ -3067,10 +3095,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: medium-btree-backup
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: medium-btree-backup
 
   - name: perf-test-parallel-pop-btree
     tags: ["btree-perf"]
@@ -3078,10 +3109,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: parallel-pop-btree
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: parallel-pop-btree
 
   - name: perf-test-update-only-btree
     tags: ["btree-perf"]
@@ -3089,10 +3123,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: update-only-btree
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-only-btree
 
   - name: perf-test-update-btree
     tags: ["btree-perf"]
@@ -3100,11 +3137,14 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: update-btree
           maxruns: 1
-          wtarg: "-a ../runners/update-btree.json"
+          wtarg: "-a ../../../bench/wtperf/runners/update-btree.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-btree
 
   - name: perf-test-update-large-record-btree
     tags: ["btree-perf"]
@@ -3112,10 +3152,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: update-large-record-btree
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-large-record-btree
 
   - name: perf-test-modify-large-record-btree
     tags: ["btree-perf"]
@@ -3123,10 +3166,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: modify-large-record-btree
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: modify-large-record-btree
 
   - name: perf-test-modify-force-update-large-record-btree
     tags: ["btree-perf"]
@@ -3134,38 +3180,208 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: modify-force-update-large-record-btree
           maxruns: 3
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: modify-force-update-large-record-btree
 
     #########################################
     # Performance Tests for perf-checkpoint #
     #########################################
 
   - name: perf-test-update-checkpoint-btree
-    tags: ["perf-checkpoint"]
+    tags: ["checkpoint-perf"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: update-checkpoint-btree
           maxruns: 1
-          wtarg: "-a ../runners/update-checkpoint.json"
+          wtarg: "-a ../../../bench/wtperf/runners/update-checkpoint.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-checkpoint-btree
 
   - name: perf-test-update-checkpoint-lsm
-    tags: ["perf-checkpoint"]
+    tags: ["checkpoint-perf"]
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: update-checkpoint-lsm
           maxruns: 1
-          wtarg: "-a ../runners/update-checkpoint.json"
+          wtarg: "-a ../../../bench/wtperf/runners/update-checkpoint.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-checkpoint-lsm
+
+    ###############################
+    # Performance Tests for stress #
+    ###############################
+
+  - name: perf-test-overflow-10k
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: overflow-10k
+          maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: overflow-10k
+
+  - name: perf-test-overflow-130k
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: overflow-130k
+          maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: overflow-130k
+
+  - name: perf-test-parallel-pop-stress
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: parallel-pop-stress
+          maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: parallel-pop-stress
+
+  - name: perf-test-update-grow-stress
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: update-grow-stress
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/update-stress.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-grow-stress
+
+  - name: perf-test-update-shrink-stress
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: update-shrink-stress
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/update-stress.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-shrink-stress
+
+  - name: perf-test-update-delta-mix1
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: update-delta-mix1
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/update-stress.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-delta-mix1
+
+  - name: perf-test-update-delta-mix2
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: update-delta-mix2
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/update-stress.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-delta-mix2
+
+  - name: perf-test-update-delta-mix3
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: update-delta-mix3
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/update-stress.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: update-delta-mix3
+
+  - name: perf-test-multi-btree-zipfian
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: multi-btree-zipfian-populate
+          maxruns: 1
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: multi-btree-zipfian-workload
+          maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: multi-btree-zipfian
+
+  - name: perf-test-many-table-stress
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: many-table-stress
+          maxruns: 1
+
+  - name: perf-test-many-table-stress-backup
+    tags: ["stress-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: many-table-stress-backup
+          maxruns: 1
 
     ##################################
     # Performance Tests for eviction #
@@ -3177,10 +3393,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: evict-btree
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: evict-btree
 
   - name: perf-test-evict-btree-1 
     tags: ["evict-perf"]
@@ -3188,10 +3407,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: evict-btree-1
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: evict-btree-1
 
   - name: perf-test-evict-lsm 
     tags: ["evict-perf"]
@@ -3199,10 +3421,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: evict-lsm
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: evict-lsm
       
   - name: perf-test-evict-lsm-1 
     tags: ["evict-perf"]
@@ -3210,10 +3435,13 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "generic-perf-test"
+      - func: "run-perf-test"
         vars:
           perf-test-name: evict-lsm-1
           maxruns: 1
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: evict-lsm-1
 
 #######################################
 #            Buildvariants            #
@@ -3495,7 +3723,8 @@ buildvariants:
     - name: compile
     - name: ".btree-perf"
     - name: ".lsm-perf"
-    - name: ".perf-checkpoint"
+    - name: ".stress-perf"
+    - name: ".checkpoint-perf"
     - name: ".evict-perf"
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
@@ -3504,9 +3733,12 @@ buildvariants:
     - name: Wiredtiger-perf-lsm-jobs
       execution_tasks:
       - ".lsm-perf"
+    - name: Wiredtiger-perf-stress-jobs
+      execution_tasks:
+      - ".stress-perf"
     - name: Wiredtiger-perf-checkpoint-jobs
       execution_tasks:
-      - ".perf-checkpoint"
+      - ".checkpoint-perf"
     - name: Wiredtiger-perf-evict-jobs
       execution_tasks:
       - ".evict-perf"
