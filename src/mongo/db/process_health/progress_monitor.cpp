@@ -65,7 +65,7 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
     // Check the liveness of every health observer.
     for (auto observer : observers) {
         const auto stats = observer->getStats();
-        if (!stats.isEnabled) {
+        if (!_faultManager->getConfig().isHealthObserverEnabled(observer->getType())) {
             continue;
         }
 
@@ -96,7 +96,8 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
     sleepFor(_faultManager->getConfig().getPeriodicHealthCheckInterval() * 2);
     for (auto observer : secondPass) {
         const auto stats = observer->getStats();
-        if (stats.isEnabled && !stats.currentlyRunningHealthCheck &&
+        if (!_faultManager->getConfig().isHealthObserverEnabled(observer->getType()) &&
+            !stats.currentlyRunningHealthCheck &&
             now - stats.lastTimeCheckStarted >
                 _faultManager->getConfig().getPeriodicLivenessDeadline() * 2) {
             // Crash because this health checker was never started.

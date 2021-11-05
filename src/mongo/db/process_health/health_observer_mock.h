@@ -74,10 +74,6 @@ protected:
         return std::move(completionPf.future);
     }
 
-    HealthObserverIntensity getIntensity() const override {
-        return HealthObserverIntensity::kNonCritical;
-    }
-
 private:
     const FaultFacetType _mockType;
     std::function<double()> _getSeverityCallback;
