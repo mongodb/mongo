@@ -78,11 +78,17 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
     std::vector<mongo::BSONObj> indexes;
     for (const auto& origIndex : origIndexes) {
         BSONObjBuilder builder;
-        bool isBucketsIndexSpecCompatibleForDowngrade = false;
+        bool isBucketsIndexSpecCompatibleForDowngrade = true;
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
-                uasserted(ErrorCodes::InvalidOptions,
-                          "Partial indexes are not supported on time-series collections");
+                if (feature_flags::gTimeseriesMetricIndexes.isEnabledAndIgnoreFCV() &&
+                    serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
+                    // Partial indexes are not supported in FCV < 5.2.
+                    isBucketsIndexSpecCompatibleForDowngrade = false;
+                } else {
+                    uasserted(ErrorCodes::InvalidOptions,
+                              "Partial indexes are not supported on time-series collections");
+                }
             }
 
             if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
@@ -132,10 +138,12 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                                       << " Command request: " << redact(origCmd.toBSON({})),
                         bucketsIndexSpecWithStatus.isOK());
 
-                isBucketsIndexSpecCompatibleForDowngrade =
-                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                if (!timeseries::isBucketsIndexSpecCompatibleForDowngrade(
                         options,
-                        BSON(NewIndexSpec::kKeyFieldName << bucketsIndexSpecWithStatus.getValue()));
+                        BSON(NewIndexSpec::kKeyFieldName
+                             << bucketsIndexSpecWithStatus.getValue()))) {
+                    isBucketsIndexSpecCompatibleForDowngrade = false;
+                }
 
                 builder.append(NewIndexSpec::kKeyFieldName,
                                std::move(bucketsIndexSpecWithStatus.getValue()));

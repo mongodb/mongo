@@ -56,6 +56,7 @@ static constexpr StringData kMetaFieldName = "metaField"_sd;
 // These are hard-coded field names in index specs.
 static constexpr StringData kKeyFieldName = "key"_sd;
 static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
+static constexpr StringData kPartialFilterExpressionFieldName = "partialFilterExpression"_sd;
 
 static constexpr int kTimeseriesControlDefaultVersion = 1;
 static constexpr int kTimeseriesControlCompressedVersion = 2;

@@ -389,6 +389,11 @@ bool isBucketsIndexSpecCompatibleForDowngrade(const TimeseriesOptions& timeserie
         return false;
     }
 
+    if (bucketsIndex.hasField(kPartialFilterExpressionFieldName)) {
+        // Partial indexes are not supported in FCV < 5.2.
+        return false;
+    }
+
     return createTimeseriesIndexSpecFromBucketsIndexSpec(
                timeseriesOptions,
                bucketsIndex.getField(kKeyFieldName).Obj(),

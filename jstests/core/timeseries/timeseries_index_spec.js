@@ -30,48 +30,68 @@ TimeseriesTest.run(() => {
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-    assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
-    assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
-
-    if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
-        assert.commandWorked(coll.createIndex({x: 1}, {name: "x"}));
-    }
-
-    const checkIndexSpec = function(spec, userIndex) {
+    const checkIndexSpec = function(spec, userIndex, isDowngradeCompatible) {
         assert(spec.hasOwnProperty("v"));
         assert(spec.hasOwnProperty("name"));
         assert(spec.hasOwnProperty("key"));
 
         if (userIndex) {
             assert(!spec.hasOwnProperty("originalSpec"));
-
-            if (spec.name == "x") {
-                assert.eq(spec.key, {x: 1});
-            }
-
             return;
         }
 
-        if (spec.name == "x") {
+        if (!isDowngradeCompatible) {
             assert(spec.hasOwnProperty("originalSpec"));
             assert.eq(spec.v, spec.originalSpec.v);
             assert.eq(spec.name, spec.originalSpec.name);
             assert.neq(spec.key, spec.originalSpec.key);
-
-            assert.eq(spec.key, {"control.min.x": 1, "control.max.x": 1});
         } else {
             assert(!spec.hasOwnProperty("originalSpec"));
         }
     };
 
-    let userIndexes = coll.getIndexes();
-    for (const index of userIndexes) {
-        checkIndexSpec(index, /*userIndex=*/true);
-    }
+    const verifyAndDropIndex = function(isDowngradeCompatible) {
+        let userIndexes = coll.getIndexes();
+        for (const index of userIndexes) {
+            checkIndexSpec(index, /*userIndex=*/true, isDowngradeCompatible);
+        }
 
-    let bucketIndexes = bucketsColl.getIndexes();
-    for (const index of bucketIndexes) {
-        checkIndexSpec(index, /*userIndex=*/false);
+        let bucketIndexes = bucketsColl.getIndexes();
+        for (const index of bucketIndexes) {
+            checkIndexSpec(index, /*userIndex=*/false, isDowngradeCompatible);
+        }
+
+        assert.commandWorked(coll.dropIndexes("*"));
+    };
+
+    assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
+    verifyAndDropIndex(/*isDowngradeCompatible=*/true);
+
+    assert.commandWorked(coll.createIndex({[metaFieldName]: 1}));
+    verifyAndDropIndex(/*isDowngradeCompatible=*/true);
+
+    assert.commandWorked(coll.createIndex({[timeFieldName]: 1, [metaFieldName]: 1}));
+    verifyAndDropIndex(/*isDowngradeCompatible=*/true);
+
+    if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+        assert.commandWorked(coll.createIndex({x: 1}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+
+        assert.commandWorked(
+            coll.createIndex({x: 1}, {partialFilterExpression: {x: {$type: "number"}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+
+        assert.commandWorked(coll.createIndex({[timeFieldName]: 1},
+                                              {partialFilterExpression: {x: {$type: "number"}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+
+        assert.commandWorked(coll.createIndex({[metaFieldName]: 1},
+                                              {partialFilterExpression: {x: {$type: "number"}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
+
+        assert.commandWorked(coll.createIndex({[metaFieldName]: 1, x: 1},
+                                              {partialFilterExpression: {x: {$type: "number"}}}));
+        verifyAndDropIndex(/*isDowngradeCompatible=*/false);
     }
 
     // Creating an index directly on the buckets collection is permitted. However, these types of
@@ -82,7 +102,7 @@ TimeseriesTest.run(() => {
             bucketsColl.createIndex({"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
 
         let foundIndex = false;
-        bucketIndexes = bucketsColl.getIndexes();
+        let bucketIndexes = bucketsColl.getIndexes();
         for (const index of bucketIndexes) {
             if (index.name == "y") {
                 foundIndex = true;
@@ -94,7 +114,7 @@ TimeseriesTest.run(() => {
 
         // Verify that the bucket index can map to a user index.
         foundIndex = false;
-        userIndexes = coll.getIndexes();
+        let userIndexes = coll.getIndexes();
         for (const index of userIndexes) {
             if (index.name == "y") {
                 foundIndex = true;

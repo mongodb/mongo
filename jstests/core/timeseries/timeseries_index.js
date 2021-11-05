@@ -4,7 +4,7 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_fcv_51,
+ *   requires_fcv_52,
  *   requires_getmore,
  * ]
  */
@@ -275,10 +275,13 @@ TimeseriesTest.run((insert) => {
                                      [ErrorCodes.CannotCreateIndex, ErrorCodes.InvalidOptions]);
     };
 
-    // Partial indexes are not supported on time-series collections.
-    testCreateIndexFailed({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}});
-    testCreateIndexFailed({[metaFieldName]: 1},
-                          {partialFilterExpression: {[metaFieldName]: {$gt: 5}}});
+    if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+        // Partial indexes are not supported on time-series collections if the time-series metric
+        // feature flag is disabled.
+        testCreateIndexFailed({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}});
+        testCreateIndexFailed({[metaFieldName]: 1},
+                              {partialFilterExpression: {[metaFieldName]: {$gt: 5}}});
+    }
 
     // Unique indexes are not supported on clustered collections.
     testCreateIndexFailed({[metaFieldName]: 1}, {unique: true});
