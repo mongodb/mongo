@@ -31,7 +31,6 @@ function copyCollection(c0Conn, c1Conn, c0Topology, c1Topology, dbName, collInfo
         if (Object.keys(index.key).length !== 1 || !index.key._id) {
             jsTestLog("Creating index for: " + c0Coll + "with key: " + tojson(index.key));
             let options = Object.assign({}, index);
-            delete options.v;
             delete options.key;
             assert.commandWorked(c1Coll.createIndex(index.key, options));
         }
