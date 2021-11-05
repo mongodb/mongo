@@ -52,9 +52,11 @@ structs:
             range:
                 type: chunk_range
                 description: "The range being migrated."
-            donorShardId:
+            donorShardIdForLoggingPurposesOnly:
                 type: shard_id
-                description: "The shard from which the chunk is being migrated."
+                description: "The shard from which the chunk is being migrated. This field should
+                              only be used for logging purposes and it is not properly updated
+                              during the automated restores procedure."
             lsid:
                 type: LogicalSessionId
                 description: "The sessionId that the donor uses to communicate with the recipient."

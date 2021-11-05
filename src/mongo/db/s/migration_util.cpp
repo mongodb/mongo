@@ -1161,7 +1161,7 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
             // to prevent a new migration from starting while a receiveChunk was ongoing.
             auto scopedReceiveChunk(
                 uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
-                    opCtx, nss, doc.getRange(), doc.getDonorShardId())));
+                    opCtx, nss, doc.getRange(), doc.getDonorShardIdForLoggingPurposesOnly())));
 
             const auto mdm = MigrationDestinationManager::get(opCtx);
             uassertStatusOK(
