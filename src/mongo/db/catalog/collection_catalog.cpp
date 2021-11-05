@@ -51,6 +51,8 @@ struct LatestCollectionCatalog {
 const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
     ServiceContext::declareDecoration<LatestCollectionCatalog>();
 
+std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
+
 /**
  * Decoration on OperationContext to store cloned Collections until they are committed or rolled
  * back TODO SERVER-51236: This should be merged with UncommittedCollections
@@ -398,6 +400,13 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(ServiceContext* 
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext* opCtx) {
+    // If there is a batched catalog write ongoing and we are the one doing it return this instance
+    // so we can observe our own writes. There may be other callers that reads the CollectionCatalog
+    // without any locks, they must see the immutable regular instance.
+    if (batchedCatalogWriteInstance && opCtx->lockState()->isW()) {
+        return batchedCatalogWriteInstance;
+    }
+
     const auto& stashed = stashedCatalog(opCtx);
     if (stashed)
         return stashed;
@@ -410,6 +419,11 @@ void CollectionCatalog::stash(OperationContext* opCtx,
 }
 
 void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
+    // We should never have ongoing batching here. When batching is in progress the caller should
+    // use the overload with OperationContext so we can verify that the global exlusive lock is
+    // being held.
+    invariant(!batchedCatalogWriteInstance);
+
     // It is potentially expensive to copy the collection catalog so we batch the operations by only
     // having one concurrent thread copying the catalog and executing all the write jobs.
 
@@ -532,6 +546,14 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
 
 void CollectionCatalog::write(OperationContext* opCtx,
                               std::function<void(CollectionCatalog&)> job) {
+    // If global MODE_X lock are held we can re-use a cloned CollectionCatalog instance when
+    // 'batchedCatalogWriteInstance' is set. Make sure we are the one holding the write lock.
+    if (batchedCatalogWriteInstance) {
+        invariant(opCtx->lockState()->isW());
+        job(*batchedCatalogWriteInstance);
+        return;
+    }
+
     write(opCtx->getServiceContext(), std::move(job));
 }
 
@@ -1190,6 +1212,31 @@ const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* 
     }
 
     return collection;
+}
+
+BatchedCollectionCatalogWriter::BatchedCollectionCatalogWriter(OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    invariant(_opCtx->lockState()->isW());
+    invariant(!batchedCatalogWriteInstance);
+
+    auto& storage = getCatalog(_opCtx->getServiceContext());
+    // hold onto base so if we need to delete it we can do it outside of the lock
+    _base = atomic_load(&storage.catalog);
+    // copy the collection catalog, this could be expensive, store it for future writes during this
+    // batcher
+    batchedCatalogWriteInstance = std::make_shared<CollectionCatalog>(*_base);
+}
+BatchedCollectionCatalogWriter::~BatchedCollectionCatalogWriter() {
+    invariant(_opCtx->lockState()->isW());
+
+    // Publish out batched instance, validate that no other writers have been able to write during
+    // the batcher.
+    auto& storage = getCatalog(_opCtx->getServiceContext());
+    invariant(
+        atomic_compare_exchange_strong(&storage.catalog, &_base, batchedCatalogWriteInstance));
+
+    // Clear out batched pointer so no more attempts of batching are made
+    batchedCatalogWriteInstance = nullptr;
 }
 
 }  // namespace mongo
