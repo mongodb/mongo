@@ -408,7 +408,7 @@ class TestSetResmokeArgs(unittest.TestCase):
     def test__set_resmoke_args(self):
         resmoke_args = "--suites=suite1 test1.js"
         task = Mock()
-        task.combined_resmoke_args = resmoke_args
+        task.resmoke_args = resmoke_args
         task.is_generate_resmoke_task = False
         self.assertEqual(resmoke_args, under_test._set_resmoke_args(task))
 
@@ -417,7 +417,7 @@ class TestSetResmokeArgs(unittest.TestCase):
         new_suite = "suite2"
         new_resmoke_args = "--suites={} test1.js".format(new_suite)
         task = Mock()
-        task.combined_resmoke_args = resmoke_args
+        task.resmoke_args = resmoke_args
         task.is_generate_resmoke_task = True
         task.get_vars_suite_name = lambda cmd_vars: cmd_vars["suite"]
         task.generate_resmoke_tasks_command = {"vars": {"suite": new_suite}}
@@ -427,7 +427,7 @@ class TestSetResmokeArgs(unittest.TestCase):
         suite = "suite1"
         resmoke_args = "--suites={} test1.js".format(suite)
         task = Mock()
-        task.combined_resmoke_args = resmoke_args
+        task.resmoke_args = resmoke_args
         task.is_generate_resmoke_task = True
         task.get_vars_suite_name = lambda cmd_vars: cmd_vars["task"]
         task.generate_resmoke_tasks_command = {"vars": {"task": suite}}
@@ -723,7 +723,7 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     variant_task.generated_task_name = task_name
     variant_task.resmoke_suite = suite_name
     variant_task.get_vars_suite_name.return_value = suite_name
-    variant_task.combined_resmoke_args = f"--suites={suite_name}"
+    variant_task.resmoke_args = f"--suites={suite_name}"
     variant_task.multiversion_path = None
     variant_task.run_on = [distro]
     return variant_task

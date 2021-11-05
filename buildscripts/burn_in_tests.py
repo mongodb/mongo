@@ -298,7 +298,7 @@ def _set_resmoke_args(task):
     resmoke_args.
     """
 
-    resmoke_args = task.combined_resmoke_args
+    resmoke_args = task.resmoke_args
     suite_name = ResmokeArgs.get_arg(resmoke_args, "suites")
     if task.is_generate_resmoke_task:
         suite_name = task.get_vars_suite_name(task.generate_resmoke_tasks_command["vars"])

@@ -333,7 +333,7 @@ class VariantTask(Task):
 
     @property
     def combined_resmoke_args(self):
-        """Get the combined resmoke arguments.
+        """Get the resmoke arguments.
 
         This results from the concatenation of the task's resmoke_args parameter and the
         variant's test_flags parameter.

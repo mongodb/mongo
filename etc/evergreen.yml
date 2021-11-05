@@ -1189,7 +1189,9 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
-        resmoke_cmd_args="${resmoke_args}"
+        # Assign the "resmoke_args" expansion to a variable with the value wrapped in single quotes
+        # to avoid any "/" characters getting interpreted incorrectly on windows.
+        resmoke_cmd_args='${resmoke_args}'
 
         # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
         # invocation. It doesn't set any environment variables and should therefore come last in
