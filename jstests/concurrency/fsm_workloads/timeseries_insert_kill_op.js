@@ -4,6 +4,7 @@
  * Tests killing time-series inserts.
  *
  * @tags: [
+ *   requires_fcv_50,
  *   requires_timeseries,
  *   uses_curop_agg_stage,
  * ]
