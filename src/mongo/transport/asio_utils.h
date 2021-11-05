@@ -63,7 +63,7 @@ inline HostAndPort endpointToHostAndPort(const asio::generic::stream_protocol::e
 
 Status errorCodeToStatus(const std::error_code& ec);
 
-/*
+/**
  * The ASIO implementation of poll (i.e. socket.wait()) cannot poll for a mask of events, and
  * doesn't support timeouts.
  *
@@ -77,6 +77,30 @@ Status errorCodeToStatus(const std::error_code& ec);
 StatusWith<unsigned> pollASIOSocket(asio::generic::stream_protocol::socket& socket,
                                     unsigned mask,
                                     Milliseconds timeout);
+
+/**
+ * Attempts to fill up the passed in buffer sequence with bytes from the underlying stream
+ * without blocking. Returns the number of bytes we were actually able to fill in. Throws
+ * on failure to read socket for reasons other than blocking.
+ */
+template <typename Stream, typename MutableBufferSequence>
+size_t peekASIOStream(Stream& stream, const MutableBufferSequence& buffers) {
+    std::error_code ec;
+    size_t bytesRead;
+    do {
+        bytesRead = stream.receive(buffers, stream.message_peek, ec);
+    } while (ec == asio::error::interrupted);
+
+    // On a completely empty socket, receive returns 0 bytes read and sets
+    // the error code to either would_block or try_again. Since this isn't
+    // actually an error condition for our purposes, we ignore these two
+    // errors.
+    if (ec != asio::error::would_block && ec != asio::error::try_again) {
+        uassertStatusOK(errorCodeToStatus(ec));
+    }
+
+    return bytesRead;
+}
 
 #ifdef MONGO_CONFIG_SSL
 /**

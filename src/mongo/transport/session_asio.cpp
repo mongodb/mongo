@@ -33,6 +33,8 @@
 
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/asio_utils.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::transport {
 
@@ -246,17 +248,20 @@ bool TransportLayerASIO::ASIOSession::isConnected() {
 
     auto revents = swPollEvents.getValue();
     if (revents & POLLIN) {
-        char testByte;
-        int size = ::recv(getSocket().native_handle(), &testByte, sizeof(testByte), MSG_PEEK);
-        if (size == sizeof(testByte)) {
+        try {
+            char testByte;
+            const auto bytesRead =
+                peekASIOStream(getSocket(), asio::buffer(&testByte, sizeof(testByte)));
+            uassert(ErrorCodes::SocketException,
+                    "Couldn't peek from underlying socket",
+                    bytesRead == sizeof(testByte));
             return true;
-        } else if (size == -1) {
+        } catch (const DBException& e) {
             LOGV2_WARNING(4615610,
                           "Failed to check socket connectivity: {error}",
                           "Failed to check socket connectivity",
-                          "error"_attr = errnoWithDescription(errno));
+                          "error"_attr = e);
         }
-        // If size == 0 then we got disconnected and we should return false.
     }
 
     return false;

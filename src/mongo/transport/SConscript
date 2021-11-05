@@ -181,6 +181,7 @@ env.Library(
 tlEnv.CppUnitTest(
     target='transport_test',
     source=[
+        'asio_utils_test.cpp',
         'message_compressor_manager_test.cpp',
         'message_compressor_registry_test.cpp',
         'transport_layer_asio_test.cpp',
