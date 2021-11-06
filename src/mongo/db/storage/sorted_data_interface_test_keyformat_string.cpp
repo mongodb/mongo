@@ -119,7 +119,7 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
 
     std::string buf1(12, 0);
     std::string buf2(12, 1);
-    std::string buf3(12, 0xff);
+    std::string buf3(12, '\xff');
 
     RecordId rid1(buf1.c_str(), 12);
     RecordId rid2(buf2.c_str(), 12);
@@ -318,7 +318,7 @@ TEST(SortedDataInterface, KeyFormatStringUniqueUnindex) {
 
     std::string buf1(12, 0);
     std::string buf2(12, 1);
-    std::string buf3(12, 0xff);
+    std::string buf3(12, '\xff');
 
     RecordId rid1(buf1.c_str(), 12);
     RecordId rid2(buf2.c_str(), 12);
