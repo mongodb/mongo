@@ -477,7 +477,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreSetVersionAndName) {
                                     kBsonSetVersionName,
                                     duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
-    ASSERT_EQUALS(kBsonSetVersionName.getIntField("setVersion"), description.getSetVersion());
+    ASSERT_EQUALS(kBsonSetVersionName.getIntField("setVersion"),
+                  description.getElectionIdSetVersionPair().setVersion);
     ASSERT_EQUALS(std::string(kBsonSetVersionName.getStringField("setName")),
                   description.getSetName());
 }
@@ -487,7 +488,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreElectionId) {
                                     kBsonElectionId,
                                     duration_cast<IsMasterRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
-    ASSERT_EQUALS(kBsonElectionId.getField("electionId").OID(), description.getElectionId());
+    ASSERT_EQUALS(kBsonElectionId.getField("electionId").OID(),
+                  description.getElectionIdSetVersionPair().electionId);
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStorePrimary) {
@@ -540,8 +542,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnSuccess) {
     ASSERT_EQUALS(static_cast<size_t>(0), description.getPassives().size());
     ASSERT_EQUALS(static_cast<size_t>(0), description.getTags().size());
     ASSERT_EQUALS(boost::none, description.getSetName());
-    ASSERT_EQUALS(boost::none, description.getSetVersion());
-    ASSERT_EQUALS(boost::none, description.getElectionId());
+    ASSERT_EQUALS(boost::none, description.getElectionIdSetVersionPair().setVersion);
+    ASSERT_EQUALS(boost::none, description.getElectionIdSetVersionPair().electionId);
     ASSERT_EQUALS(boost::none, description.getPrimary());
     ASSERT_EQUALS(boost::none, description.getLogicalSessionTimeoutMinutes());
     ASSERT(boost::none == description.getTopologyVersion());
@@ -560,8 +562,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreCorrectDefaultValuesOnFailure) {
     ASSERT_EQUALS(static_cast<size_t>(0), description.getPassives().size());
     ASSERT_EQUALS(static_cast<size_t>(0), description.getTags().size());
     ASSERT_EQUALS(boost::none, description.getSetName());
-    ASSERT_EQUALS(boost::none, description.getSetVersion());
-    ASSERT_EQUALS(boost::none, description.getElectionId());
+    ASSERT_EQUALS(boost::none, description.getElectionIdSetVersionPair().setVersion);
+    ASSERT_EQUALS(boost::none, description.getElectionIdSetVersionPair().electionId);
     ASSERT_EQUALS(boost::none, description.getPrimary());
     ASSERT_EQUALS(boost::none, description.getLogicalSessionTimeoutMinutes());
     ASSERT(boost::none == description.getTopologyVersion());
