@@ -142,6 +142,33 @@ void safeClose(int fd) {
     }
 }
 
+#ifdef _WIN32
+
+constexpr auto kFilesystemErrorRetry = 10;
+constexpr auto kFilesystemErrorSleepIntervalMillis = 100;
+
+void retryWithBackOff(std::function<void(void)> func) {
+    for (int i = 0; i < kFilesystemErrorRetry - 1; i++) {
+        try {
+            func();
+            return;
+        } catch (const boost::filesystem::filesystem_error& fe) {
+            LOGV2_WARNING(6088701,
+                          "retryWithBackOff: Filesystem error",
+                          "desc"_attr = fe.what(),
+                          "waitMillis"_attr = (100 * i));
+        }
+
+        // A small sleep allows Windows an opportunity to close locked file
+        // handlers, and reduce false errors on remove_all
+        sleepmillis(100 * i);
+    }
+
+    // Try one last time. If this still fails, we propagate the error.
+    func();
+}
+#endif
+
 Mutex _createProcessMtx;
 }  // namespace
 
@@ -903,32 +930,41 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
         LOGV2_WARNING(22824, "ResetDbpath(): nothing to do, path was empty");
         return undefinedReturn;
     }
+
     if (boost::filesystem::exists(path)) {
-        try {
-            boost::filesystem::remove_all(path);
-        } catch (const boost::filesystem::filesystem_error&) {
+        auto removeAllIfNeeded = [path]() {
+            if (boost::filesystem::exists(path)) {
+                boost::filesystem::remove_all(path);
+            }
+        };
+
 #ifdef _WIN32
-            // A small sleep allows Windows an opportunity to close locked file
-            // handlers, and reduce false errors on remove_all
-            sleepmillis(100);
-            boost::filesystem::remove_all(path);
+        retryWithBackOff(removeAllIfNeeded);
 #else
-            throw;
+        removeAllIfNeeded();
 #endif
+    }
+
+#ifdef _WIN32
+    // Removing the directory may take non-zero time since it is executed asynchronously on Windows.
+    // If the directory is in process of getting removed, then the CreateDirectory fails with access
+    // denied so retry create directory on any error. We only expect to see access denied but we
+    // will retry on all errors.
+    auto wpath = toNativeString(path.c_str());
+    retryWithBackOff([wpath]() {
+        BOOL ret = CreateDirectoryW(wpath.c_str(), NULL);
+        if (!ret) {
+            auto gle = GetLastError();
+            uassert(6088702,
+                    str::stream() << "CreateDirectory failed with unexpected error: "
+                                  << errnoWithDescription(gle),
+                    gle != ERROR_SUCCESS);
         }
-    }
-    try {
-        boost::filesystem::create_directory(path);
-    } catch (const boost::filesystem::filesystem_error&) {
-#ifdef _WIN32
-        // A small sleep allows Windows an opportunity to close locked file
-        // handlers, and reduce false errors on create_directory
-        sleepmillis(100);
-        boost::filesystem::create_directory(path);
+    });
 #else
-        throw;
+    boost::filesystem::create_directory(path);
 #endif
-    }
+
     return undefinedReturn;
 }
 
