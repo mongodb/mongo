@@ -217,7 +217,7 @@ builtin_libraries = [b[1] for b in builtins]
 # Here's the configure/make operations we perform before the python extension
 # is linked.
 configure_cmds = [
-    'cmake -B cmake_pip_build -G Ninja -DENABLE_STATIC=1 -DCMAKE_C_FLAGS="${CFLAGS:-}" -DENABLE_PYTHON=1 ' + \
+    'cmake -B cmake_pip_build -G Ninja -DENABLE_STATIC=1 -DENABLE_SHARED=0 -DWITH_PIC=1 -DCMAKE_C_FLAGS="${CFLAGS:-}" -DENABLE_PYTHON=1 ' + \
     ' '.join(map(lambda name: '-DHAVE_BUILTIN_EXTENSION_' + name.upper() + '=1', builtin_names)),
 ]
 
@@ -280,12 +280,7 @@ wt_ext = Extension('_wiredtiger',
     extra_compile_args = cflags + cppflags,
     extra_link_args = ldflags,
     libraries = builtin_libraries,
-    # FIXME-WT-7905: Remove manual linking of static extension libraries.
-    # Unfortunately CMake's use of the builtin doesn't currently support linking in the extension
-    # objects into a static libwiredtiger archive. As a workaround, we need to manually link
-    # the ext/compressor libraries.
-    extra_objects = [ os.path.join(build_dir, 'libwiredtiger.a') ] + \
-        list(map(lambda name: os.path.join(build_dir, 'ext', 'compressors', name) + '/libwiredtiger_' + name + '.a', builtin_names)),
+    extra_objects = [ os.path.join(build_dir, 'libwiredtiger.a') ],
     include_dirs = inc_paths,
     library_dirs = lib_paths,
 )
