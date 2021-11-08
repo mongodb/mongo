@@ -93,6 +93,9 @@ private:
     void modifySetName(TopologyDescription& topologyDescription,
                        const boost::optional<std::string>& setName);
 
+    void modifyMaxElectionId(TopologyDescription& topologyDescription, const OID& newMaxElectionId);
+    void modifyMaxSetVersion(TopologyDescription& topologyDescription, int& newMaxSetVersion);
+
     StateTransitionTable _stt;
     SdamConfiguration _config;
 };

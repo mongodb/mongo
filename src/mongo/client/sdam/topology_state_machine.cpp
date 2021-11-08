@@ -27,16 +27,13 @@
  *    it in the license file.
  */
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
 #include "mongo/client/sdam/topology_state_machine.h"
 
 #include <functional>
 #include <ostream>
 
-#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
 
 namespace mongo::sdam {
 namespace {
@@ -279,24 +276,28 @@ void TopologyStateMachine::updateRSFromPrimary(TopologyDescription& topologyDesc
         return;
     }
 
-    const ElectionIdSetVersionPair incomingElectionIdSetVersion =
-        serverDescription->getElectionIdSetVersionPair();
-    const ElectionIdSetVersionPair currentMaxElectionIdSetVersion =
-        topologyDescription.getMaxElectionIdSetVersionPair();
-
-    if (incomingElectionIdSetVersion < currentMaxElectionIdSetVersion) {
-        LOGV2(5940901,
-              "Stale primary detected, marking its state as unknown",
-              "primary"_attr = serverDescription->getAddress(),
-              "incomingElectionIdSetVersion"_attr = incomingElectionIdSetVersion,
-              "currentMaxElectionIdSetVersion"_attr = currentMaxElectionIdSetVersion);
-        installServerDescription(
-            topologyDescription, std::make_shared<ServerDescription>(serverDescAddress), false);
-        checkIfHasPrimary(topologyDescription, serverDescription);
-        return;
+    auto serverDescSetVersion = serverDescription->getSetVersion();
+    auto serverDescElectionId = serverDescription->getElectionId();
+    auto topologyMaxSetVersion = topologyDescription.getMaxSetVersion();
+    auto topologyMaxElectionId = topologyDescription.getMaxElectionId();
+    if (serverDescSetVersion && serverDescElectionId) {
+        if (topologyMaxSetVersion && topologyMaxElectionId &&
+            ((topologyMaxSetVersion > serverDescSetVersion) ||
+             (topologyMaxSetVersion == serverDescSetVersion &&
+              (*topologyMaxElectionId).compare(*serverDescElectionId) > 0))) {
+            // stale primary
+            installServerDescription(
+                topologyDescription, std::make_shared<ServerDescription>(serverDescAddress), false);
+            checkIfHasPrimary(topologyDescription, serverDescription);
+            return;
+        }
+        modifyMaxElectionId(topologyDescription, *serverDescription->getElectionId());
     }
 
-    topologyDescription.updateMaxElectionIdSetVersionPair(incomingElectionIdSetVersion);
+    if (serverDescSetVersion &&
+        (!topologyMaxSetVersion || (serverDescSetVersion > topologyMaxSetVersion))) {
+        modifyMaxSetVersion(topologyDescription, *serverDescSetVersion);
+    }
 
     auto oldPrimaries = topologyDescription.findServers(
         [serverDescAddress](const ServerDescriptionPtr& description) {
@@ -403,5 +404,15 @@ void TopologyStateMachine::installServerDescription(TopologyDescription& topolog
                                                     ServerDescriptionPtr newServerDescription,
                                                     bool newServer) {
     topologyDescription.installServerDescription(newServerDescription);
+}
+
+void TopologyStateMachine::modifyMaxElectionId(TopologyDescription& topologyDescription,
+                                               const OID& newMaxElectionId) {
+    topologyDescription._maxElectionId = newMaxElectionId;
+}
+
+void TopologyStateMachine::modifyMaxSetVersion(TopologyDescription& topologyDescription,
+                                               int& newMaxSetVersion) {
+    topologyDescription._maxSetVersion = newMaxSetVersion;
 }
 }  // namespace mongo::sdam
