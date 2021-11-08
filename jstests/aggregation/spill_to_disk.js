@@ -3,9 +3,16 @@
 // Run only when pipeline optimization is enabled, otherwise the type of sorter being used can be
 // different (NoLimitSort vs TopKSort) causing an aggregation request to fail with different error
 // codes.
+//
+// Some in memory variants will error because this test uses too much memory. As such, we do not
+// run this test on in-memory variants.
+//
+// TODO SERVER-61300 investigate the memory usage when the inMemory storage engine is used and
+// remove the 'requires_persistence tag'.
 // @tags: [
 //   requires_collstats,
 //   requires_pipeline_optimization,
+//   requires_persistence,
 // ]
 (function() {
 'use strict';
@@ -22,7 +29,7 @@ const memoryLimitMB = sharded ? 200 : 100;
 
 const bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
 for (let i = 0; i < memoryLimitMB + 1; i++)
-    coll.insert({_id: i, bigStr: i + bigStr, random: Math.random()});
+    assert.commandWorked(coll.insert({_id: i, bigStr: i + bigStr, random: Math.random()}));
 
 assert.gt(coll.stats().size, memoryLimitMB * 1024 * 1024);
 
@@ -117,6 +124,46 @@ test({
     canSpillToDisk: false
 });
 
+const isExactTopNEnabled = db.adminCommand({getParameter: 1, featureFlagExactTopNAccumulator: 1})
+                               .featureFlagExactTopNAccumulator.value;
+
+if (isExactTopNEnabled) {
+    for (const op of ['$firstN', '$lastN', '$minN', '$maxN', '$topN', '$bottomN']) {
+        jsTestLog("Testing op " + op);
+        let spec = {n: 100000000};
+        if (op === '$topN' || op === '$bottomN') {
+            spec['sortBy'] = {random: 1};
+            spec['output'] = '$bigStr';
+        } else {
+            // $firstN/$lastN/$minN/$maxN accept 'input'.
+            spec['input'] = '$bigStr';
+        }
+
+        // By grouping all of the entries in the same group, it is the case that we will either
+        // exceed the per group limit for the 'n' family of accumulators, or the total $group
+        // limit when disk use is disabled. Hence, we allow both possible error codes. Also note
+        // that we configure 'canSpillToDisk' to be false because spilling to disk will not
+        // reduce the memory consumption of our group in this case.
+        test({
+            pipeline: [{$group: {_id: null, bigArray: {[op]: spec}}}],
+            expectedCodes: [
+                ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+                ErrorCodes.ExceededMemoryLimit
+            ],
+            canSpillToDisk: false
+        });
+
+        // Because each group uses less than the configured limit, but cumulatively they exceed
+        // the limit for $group, we only check for 'QueryExceededMemoryLimitNoDiskUseAllowed'
+        // when disk use is disabled.
+        test({
+            pipeline: [{$group: {_id: '$_id', bigArray: {[op]: spec}}}],
+            expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed],
+            canSpillToDisk: true
+        });
+    }
+}
+
 // don't leave large collection laying around
-coll.drop();
+assert(coll.drop());
 })();

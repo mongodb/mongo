@@ -124,7 +124,7 @@ REGISTER_ACCUMULATOR_CONDITIONALLY(
 // TODO SERVER-57886 Add $topN/$bottomN/$top/$bottom as window functions.
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx), _maxMemUsageBytes(internalQueryMaxNAccumulatorBytes.load()) {}
+    : AccumulatorState(expCtx), _maxMemUsageBytes(internalQueryTopNAccumulatorBytes.load()) {}
 
 long long AccumulatorN::validateN(const Value& input) {
     // Obtain the value for 'n' and error if it's not a positive integral.
@@ -151,10 +151,10 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
         tassert(5787803, "input must be an array when 'merging' is true", input.isArray());
         auto array = input.getArray();
         for (auto&& val : array) {
-            processValue(val);
+            _processValue(val);
         }
     } else {
-        processValue(input);
+        _processValue(input);
     }
 }
 
@@ -215,6 +215,16 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
     return std::make_tuple(n, input);
 }
 
+void AccumulatorN::updateAndCheckMemUsage(size_t memAdded) {
+    _memUsageBytes += memAdded;
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << getOpName()
+                          << " used too much memory and spilling to disk cannot reduce memory "
+                             "consumption any further. Memory limit: "
+                          << _maxMemUsageBytes << " bytes",
+            _memUsageBytes < _maxMemUsageBytes);
+}
+
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                    const boost::intrusive_ptr<Expression>& argument,
                                    bool explain,
@@ -254,7 +264,7 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
     return {std::move(n), std::move(input), std::move(factory), name};
 }
 
-void AccumulatorMinMaxN::processValue(const Value& val) {
+void AccumulatorMinMaxN::_processValue(const Value& val) {
     // Ignore nullish values.
     if (val.nullish())
         return;
@@ -272,12 +282,8 @@ void AccumulatorMinMaxN::processValue(const Value& val) {
             return;
         }
     }
-    _memUsageBytes += val.getApproximateSize();
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << getOpName()
-                          << " used too much memory and cannot spill to disk. Memory limit: "
-                          << _maxMemUsageBytes << " bytes",
-            _memUsageBytes < _maxMemUsageBytes);
+
+    updateAndCheckMemUsage(val.getApproximateSize());
     _set.emplace(val);
 }
 
@@ -345,7 +351,7 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
     return {std::move(n), std::move(input), std::move(factory), name};
 }
 
-void AccumulatorFirstLastN::processValue(const Value& val) {
+void AccumulatorFirstLastN::_processValue(const Value& val) {
     // Only insert in the lastN case if we have 'n' elements.
     if (static_cast<long long>(_deque.size()) == *_n) {
         if (_variant == Sense::kLast) {
@@ -356,12 +362,7 @@ void AccumulatorFirstLastN::processValue(const Value& val) {
         }
     }
 
-    _memUsageBytes += val.getApproximateSize();
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << getOpName()
-                          << " used too much memory and cannot spill to disk. Memory limit: "
-                          << _maxMemUsageBytes << " bytes",
-            _memUsageBytes < _maxMemUsageBytes);
+    updateAndCheckMemUsage(val.getApproximateSize());
     _deque.push_back(val);
 }
 
@@ -521,15 +522,21 @@ Document AccumulatorTopBottomN<sense, single>::serialize(
     boost::intrusive_ptr<Expression> argument,
     bool explain) const {
     MutableDocument args;
+
     if constexpr (!single) {
         args.addField(kFieldNameN, Value(initializer->serialize(explain)));
     }
-    auto output = argument->serialize(explain)[kFieldNameOutput];
-    tassert(5788000,
-            str::stream() << "expected argument expression to have " << kFieldNameOutput
-                          << " field",
-            !output.missing());
-    args.addField(kFieldNameOutput, Value(output));
+    auto serializedArg = argument->serialize(explain);
+
+    // If 'argument' contains a field named 'output', this means that we are serializing the
+    // accumulator's original output expression under the field name 'output'. Otherwise, we are
+    // serializing a custom argument under the field name 'output'. For instance, a merging $group
+    // will provide an argument that merges multiple partial groups.
+    if (auto output = serializedArg[kFieldNameOutput]; !output.missing()) {
+        args.addField(kFieldNameOutput, Value(output));
+    } else {
+        args.addField(kFieldNameOutput, serializedArg);
+    }
     args.addField(kFieldNameSortBy,
                   Value(_sortPattern.serialize(
                       SortPattern::SortKeySerialization::kForPipelineSerialization)));
@@ -572,10 +579,9 @@ AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     // Construct argument expression. If given sortBy: {field1: 1, field2: 1} it will be shaped like
     // {output: <output expression>, sortFields: ["$field1", "$field2"]}. This projects out only the
     // fields we need for sorting so we can use SortKeyComparator without copying the entire
-    // document. This argument expression will be evaluated and become the input to processValue.
+    // document. This argument expression will be evaluated and become the input to _processValue.
     boost::intrusive_ptr<Expression> argument = Expression::parseObject(
         expCtx, BSON(output << AccumulatorN::kFieldNameSortFields << sortFieldsExp), vps);
-
     auto factory = [expCtx, sortPattern = std::move(sortPattern)] {
         return make_intrusive<AccumulatorTopBottomN<sense, single>>(expCtx, sortPattern);
     };
@@ -591,16 +597,12 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorTopBottomN<sense, single>::cre
 }
 
 template <TopBottomSense sense, bool single>
-void AccumulatorTopBottomN<sense, single>::processValue(const Value& val) {
-    tassert(5788014,
-            str::stream() << "processValue of " << getName() << "should have recieved an object",
-            val.isObject());
-
+void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
     Value output = val[AccumulatorN::kFieldNameOutput];
     Value sortKey;
 
-    // In the case that processValue() is getting called in the context of merging, a previous
-    // processValue has already generated the sortKey for us, so we don't need to regenerate it.
+    // In the case that _processValue() is getting called in the context of merging, a previous
+    // _processValue has already generated the sortKey for us, so we don't need to regenerate it.
     Value generatedSortKey = val[kFieldNameGeneratedSortKey];
     if (!generatedSortKey.missing()) {
         sortKey = generatedSortKey;
@@ -634,14 +636,41 @@ void AccumulatorTopBottomN<sense, single>::processValue(const Value& val) {
             return;
         }
     }
-    _memUsageBytes +=
+
+    const auto memUsage =
         sortKey.getApproximateSize() + output.getApproximateSize() + sizeof(KeyOutPair);
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << getOpName()
-                          << " used too much memory and cannot spill to disk. Memory limit: "
-                          << _maxMemUsageBytes << " bytes",
-            _memUsageBytes < _maxMemUsageBytes);
+    updateAndCheckMemUsage(memUsage);
     _map->emplace(keyOutPair);
+}
+
+template <TopBottomSense sense, bool single>
+void AccumulatorTopBottomN<sense, single>::processInternal(const Value& input, bool merging) {
+    if (merging) {
+        if (input.isArray()) {
+            // In the simplest case, we are merging arrays. This happens when we are merging
+            // results that were spilled to disk or on mongos.
+            for (auto&& val : input.getArray()) {
+                _processValue(val);
+            }
+        } else if (input.isObject()) {
+            // In the more complicated case, we are merging objects of the form {output: <output
+            // array>, sortFields: <...>}, where <output array> contains already generated <output
+            // value, sort pattern part array> pairs. This happens when we have to merge on a
+            // shard because we may need to spill to disk.
+            auto doc = input.getDocument();
+            auto vals = doc[kFieldNameOutput];
+            tassert(5872600, "Expected 'output' field to contain an array", vals.isArray());
+            for (auto&& val : vals.getArray()) {
+                _processValue(val);
+            }
+        } else {
+            tasserted(5872602,
+                      "argument to top/bottom processInternal must be an array or an "
+                      "object when merging");
+        }
+    } else {
+        _processValue(input);
+    }
 }
 
 template <TopBottomSense sense, bool single>

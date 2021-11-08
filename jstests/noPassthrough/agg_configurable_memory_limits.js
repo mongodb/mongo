@@ -32,5 +32,39 @@ assert.throwsWithCode(
     () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {$addToSet: "$y"}}}]),
     ErrorCodes.ExceededMemoryLimit);
 
+const isExactTopNEnabled = db.adminCommand({getParameter: 1, featureFlagExactTopNAccumulator: 1})
+                               .featureFlagExactTopNAccumulator.value;
+
+if (isExactTopNEnabled) {
+    // Capture the default value of 'internalQueryTopNAccumulatorBytes' to reset in between runs.
+    const res = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryTopNAccumulatorBytes: 1}));
+    const topNDefault = res["internalQueryTopNAccumulatorBytes"];
+
+    // Test that the 'n' family of accumulators behaves similarly.
+    for (const op of ["$firstN", "$lastN", "$minN", "$maxN", "$topN", "$bottomN"]) {
+        let spec = {n: 200};
+
+        // $topN/$bottomN both require a sort specification.
+        if (op === "$topN" || op === "$bottomN") {
+            spec["sortBy"] = {y: 1};
+            spec["output"] = "$y";
+        } else {
+            // $firstN/$lastN/$minN/$maxN accept 'input'.
+            spec["input"] = "$y";
+        }
+
+        // First, verify that the accumulator doesn't throw.
+        db.adminCommand({setParameter: 1, internalQueryTopNAccumulatorBytes: topNDefault});
+        assert.doesNotThrow(
+            () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {[op]: spec}}}]));
+
+        // Then, verify that the memory limit throws when lowered.
+        db.adminCommand({setParameter: 1, internalQueryTopNAccumulatorBytes: 100});
+        assert.throwsWithCode(
+            () => coll.aggregate([{$unwind: "$y"}, {$group: {_id: null, strings: {[op]: spec}}}]),
+            ErrorCodes.ExceededMemoryLimit);
+    }
+}
 MongoRunner.stopMongod(conn);
 }());
