@@ -58,6 +58,7 @@ structs:
             unique:
                 optional: true
                 type: safeBool
+                unstable: true
 
     CollModReply:
         description: "The collMod command's reply."
@@ -78,6 +79,7 @@ structs:
             unique_new:
                 optional: true
                 type: safeBool
+                unstable: true
 
     CollModTimeseries:
         description: "A type representing the adjustable options on timeseries collections"
