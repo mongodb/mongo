@@ -181,7 +181,15 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     // If partitionBy is a more complex expression, we will need to generate a $set stage,
     // which will bind the value of the expression to the name in simplePartitionBy.
     if (partitionBy) {
-        partitionBy = (*partitionBy)->optimize();
+        // Catch any failures that may surface during optimizing the partitionBy expression and add
+        // context. This allows for the testing infrastructure to detect when parsing fails due to
+        // a new optimization, which passed on an earlier version without the optimization.
+        try {
+            partitionBy = (*partitionBy)->optimize();
+        } catch (DBException& ex) {
+            ex.addContext("Failed to optimize partitionBy expression");
+            throw;
+        }
         if (auto exprConst = dynamic_cast<ExpressionConstant*>(partitionBy->get())) {
             uassert(ErrorCodes::TypeMismatch,
                     "An expression used to partition cannot evaluate to value of type array",
