@@ -108,13 +108,19 @@ private:
      * the donor as ready to be processed. Returns a future that is set when range deletion for
      * the donated range completes.
      */
-    SemiFuture<void> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    SemiFuture<void> _commitMigrationOnDonorAndRecipient(OperationContext* opCtx,
+                                                         bool acquireCSOnRecipient);
 
     /**
      * Deletes the range deletion task from the donor node and marks the range deletion task on the
      * recipient node as ready to be processed.
      */
-    void _abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
+    void _abortMigrationOnDonorAndRecipient(OperationContext* opCtx, bool acquireCSOnRecipient);
+
+    /**
+     * Waits for the completion of _releaseRecipientCriticalSectionFuture
+     */
+    void waitForReleaseRecipientCriticalSectionFuture(OperationContext* opCtx);
 
     MigrationCoordinatorDocument _migrationInfo;
     bool _waitForDelete = false;

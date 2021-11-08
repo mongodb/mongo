@@ -164,27 +164,18 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(
         if (!_releaseRecipientCriticalSectionFuture) {
             launchReleaseRecipientCriticalSection(opCtx);
         }
-
-        try {
-            invariant(_releaseRecipientCriticalSectionFuture);
-            _releaseRecipientCriticalSectionFuture->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
-            LOGV2(5899100,
-                  "Failed to releaseCriticalSectionOnRecipient",
-                  "shardId"_attr = _migrationInfo.getRecipientShardId(),
-                  "error"_attr = exShardNotFound);
-        }
     }
 
     boost::optional<SemiFuture<void>> cleanupCompleteFuture = boost::none;
 
     switch (*decision) {
         case DecisionEnum::kAborted:
-            _abortMigrationOnDonorAndRecipient(opCtx);
+            _abortMigrationOnDonorAndRecipient(opCtx, acquireCSOnRecipient);
             hangBeforeForgettingMigrationAfterAbortDecision.pauseWhileSet();
             break;
         case DecisionEnum::kCommitted:
-            cleanupCompleteFuture = _commitMigrationOnDonorAndRecipient(opCtx);
+            cleanupCompleteFuture =
+                _commitMigrationOnDonorAndRecipient(opCtx, acquireCSOnRecipient);
             hangBeforeForgettingMigrationAfterCommitDecision.pauseWhileSet();
             break;
     }
@@ -195,12 +186,16 @@ boost::optional<SemiFuture<void>> MigrationCoordinator::completeMigration(
 }
 
 SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, bool acquireCSOnRecipient) {
     hangBeforeMakingCommitDecisionDurable.pauseWhileSet();
 
     LOGV2_DEBUG(
         23894, 2, "Making commit decision durable", "migrationId"_attr = _migrationInfo.getId());
     migrationutil::persistCommitDecision(opCtx, _migrationInfo);
+
+    if (acquireCSOnRecipient) {
+        waitForReleaseRecipientCriticalSectionFuture(opCtx);
+    }
 
     LOGV2_DEBUG(
         23895,
@@ -250,7 +245,8 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     return migrationutil::submitRangeDeletionTask(opCtx, deletionTask).semi();
 }
 
-void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx) {
+void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* opCtx,
+                                                              bool acquireCSOnRecipient) {
     hangBeforeMakingAbortDecisionDurable.pauseWhileSet();
 
     LOGV2_DEBUG(
@@ -258,6 +254,10 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     migrationutil::persistAbortDecision(opCtx, _migrationInfo);
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
+
+    if (acquireCSOnRecipient) {
+        waitForReleaseRecipientCriticalSectionFuture(opCtx);
+    }
 
     // Ensure removing the local range deletion document to prevent incoming migrations with
     // overlapping ranges to hang.
@@ -318,6 +318,18 @@ void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContex
             _migrationInfo.getRecipientShardId(),
             _migrationInfo.getNss(),
             _migrationInfo.getMigrationSessionId());
+}
+
+void MigrationCoordinator::waitForReleaseRecipientCriticalSectionFuture(OperationContext* opCtx) {
+    invariant(_releaseRecipientCriticalSectionFuture);
+    try {
+        _releaseRecipientCriticalSectionFuture->get(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& exShardNotFound) {
+        LOGV2(5899100,
+              "Failed to releaseCriticalSectionOnRecipient",
+              "shardId"_attr = _migrationInfo.getRecipientShardId(),
+              "error"_attr = exShardNotFound);
+    }
 }
 
 }  // namespace migrationutil

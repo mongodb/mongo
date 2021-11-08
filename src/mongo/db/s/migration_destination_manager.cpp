@@ -1531,7 +1531,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     sleepmillis(10);
             }
 
-            if (getState() == FAIL) {
+            if (getState() == FAIL || getState() == ABORT) {
                 _setStateFail("timed out waiting for commit");
                 return;
             }
@@ -1572,36 +1572,17 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 timeInCriticalSection.emplace();
             });
 
-            if (getState() == FAIL) {
+            if (getState() == FAIL || getState() == ABORT) {
                 _setStateFail("timed out waiting for critical section acquisition");
-
-                runWithoutSession(outerOpCtx, [&] {
-                    RecoverableCriticalSectionService::get(opCtx)
-                        ->releaseRecoverableCriticalSection(
-                            opCtx,
-                            _nss,
-                            critSecReason,
-                            ShardingCatalogClient::kMajorityWriteConcern);
-
-                    invariant(timeInCriticalSection);
-                    const auto timeInCriticalSectionMs = timeInCriticalSection->millis();
-                    ShardingStatistics::get(opCtx)
-                        .totalRecipientCriticalSectionTimeMillis.addAndFetch(
-                            timeInCriticalSectionMs);
-
-                    LOGV2(5899115,
-                          "Exited migration recipient critical section",
-                          "nss"_attr = _nss,
-                          "durationMillis"_attr = timeInCriticalSectionMs);
-
-                    // Delete the recovery document
-                    migrationutil::deleteMigrationRecipientRecoveryDocument(opCtx, *_migrationId);
-                });
-
-                return;
             }
 
-            _setState(ENTERED_CRIT_SEC);
+            {
+                stdx::lock_guard<Latch> sl(_mutex);
+                if (_state != FAIL || _state != ABORT) {
+                    _state = ENTERED_CRIT_SEC;
+                    _stateChangedCV.notify_all();
+                }
+            }
         }
     }
 
@@ -1779,28 +1760,32 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     {
         stdx::unique_lock<Latch> lock(_mutex);
         opCtx->waitForConditionOrInterrupt(
-            _stateChangedCV, lock, [&]() { return _state == EXIT_CRIT_SEC; });
+            _stateChangedCV, lock, [&]() { return _state != ENTERED_CRIT_SEC; });
     }
 
+    invariant(_state == EXIT_CRIT_SEC || _state == FAIL || _state == ABORT);
+
     // Refresh the filtering metadata
-    LOGV2_DEBUG(5899112, 3, "Refreshing filtering metadata before exiting critical section");
+    if (_state == EXIT_CRIT_SEC) {
+        LOGV2_DEBUG(5899112, 3, "Refreshing filtering metadata before exiting critical section");
 
-    try {
-        if (MONGO_unlikely(migrationRecipientFailPostCommitRefresh.shouldFail())) {
-            uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+        try {
+            if (MONGO_unlikely(migrationRecipientFailPostCommitRefresh.shouldFail())) {
+                uasserted(ErrorCodes::InternalError, "skipShardFilteringMetadataRefresh failpoint");
+            }
+
+            forceShardFilteringMetadataRefresh(opCtx, _nss);
+        } catch (const DBException& ex) {
+            LOGV2_DEBUG(5899103,
+                        2,
+                        "Post-migration commit refresh failed on recipient",
+                        "migrationId"_attr = _migrationId,
+                        "error"_attr = redact(ex));
+
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+            CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
         }
-
-        forceShardFilteringMetadataRefresh(opCtx, _nss);
-    } catch (const DBException& ex) {
-        LOGV2_DEBUG(5899103,
-                    2,
-                    "Post-migration commit refresh failed on recipient",
-                    "migrationId"_attr = _migrationId,
-                    "error"_attr = redact(ex));
-
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        CollectionShardingRuntime::get(opCtx, _nss)->clearFilteringMetadata(opCtx);
     }
 
     // Release the critical section
