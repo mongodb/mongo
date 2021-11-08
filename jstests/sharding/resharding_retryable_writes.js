@@ -79,6 +79,16 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             ],
         },
         () => {
+            // Ideally, we want to start the timer right when the coordinator enters the cloning
+            // stage. However, since the coordinator is running independently of this thread, it
+            // is possible that any delays that occur in this thread can also cause the delay of
+            // starting the timer. This has a consequence of getting an elapsed time that is shorter
+            // than the minimumOperationDurationMS. To work around this, we start the timer earlier
+            // with the trade off that it can add few extra seconds to the elapsed time. This is ok
+            // as minimumOperationDurationMS is sufficiently large enough that we can confidently
+            // say that the resharding coordinator waited for minimumOperationDurationMS.
+            let startTime = Date.now();
+
             runRetryableWrite("during resharding");
 
             assert.soon(() => {
@@ -100,8 +110,6 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             });
 
             runRetryableWrite("during resharding when in coordinator in cloning state");
-
-            let startTime = Date.now();
 
             assert.soon(() => {
                 const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
