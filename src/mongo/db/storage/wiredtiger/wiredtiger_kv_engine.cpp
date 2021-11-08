@@ -126,9 +126,7 @@ const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
 }  // namespace
 
-bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
-                                            bool repairMode,
-                                            bool hasRecoveryTimestamp) {
+bool WiredTigerFileVersion::shouldDowngrade(bool readOnly, bool hasRecoveryTimestamp) {
     if (readOnly) {
         // A read-only state must not have upgraded. Nor could it downgrade.
         return false;
@@ -781,7 +779,7 @@ void WiredTigerKVEngine::cleanShutdown() {
         quickExit(EXIT_SUCCESS);
     }
 
-    if (_fileVersion.shouldDowngrade(_readOnly, _inRepairMode, !_recoveryTimestamp.isNull())) {
+    if (_fileVersion.shouldDowngrade(_readOnly, !_recoveryTimestamp.isNull())) {
         auto startTime = Date_t::now();
         LOGV2(22324,
               "Closing WiredTiger in preparation for reconfiguring",

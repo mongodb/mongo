@@ -65,7 +65,7 @@ struct WiredTigerFileVersion {
     enum class StartupVersion { IS_42, IS_44_FCV_42, IS_44_FCV_44 };
 
     StartupVersion _startupVersion;
-    bool shouldDowngrade(bool readOnly, bool repairMode, bool hasRecoveryTimestamp);
+    bool shouldDowngrade(bool readOnly, bool hasRecoveryTimestamp);
     std::string getDowngradeString();
 };
 
