@@ -28,8 +28,7 @@ function copyCollection(c0Conn, c1Conn, c0Topology, c1Topology, dbName, collInfo
     const c0Coll = c0Conn.getDB(dbName).getCollection(collName);
     const c1Coll = c1Conn.getDB(dbName).getCollection(collName);
     for (const index of c0Coll.getIndexes()) {
-        if (Object.keys(index.key).length !== 1 || !index.key._id) {
-            jsTestLog("Creating index for: " + c0Coll + "with key: " + tojson(index.key));
+        if (Object.keys(index.key).length !== 1 || !index.key._id || index.key._id === "hashed") {
             let options = Object.assign({}, index);
             delete options.key;
             assert.commandWorked(c1Coll.createIndex(index.key, options));
