@@ -194,10 +194,8 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
         maxMemoryUsageBytes = sortStatsPtr->maxMemoryUsageBytes;
     }
 
-    return DocumentSourceSort::create(sort.getContext(),
-                                      SortPattern{updatedPattern},
-                                      sort.getLimit().get_value_or(0),
-                                      maxMemoryUsageBytes);
+    return DocumentSourceSort::create(
+        sort.getContext(), SortPattern{updatedPattern}, 0, maxMemoryUsageBytes);
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
@@ -958,6 +956,13 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                 // We have a sort on metadata field following this stage. Reorder the two stages
                 // and return a pointer to the preceding stage.
                 auto sortForReorder = createMetadataSortForReorder(*sortPtr);
+
+                // If the original sort had a limit, we will not preserve that in the swapped sort.
+                // Instead we will add a $limit to the end of the pipeline to keep the number of
+                // expected results.
+                if (auto limit = sortPtr->getLimit(); limit && *limit != 0) {
+                    container->push_back(DocumentSourceLimit::create(pExpCtx, *limit));
+                }
 
                 // Reorder sort and current doc.
                 *std::next(itr) = std::move(*itr);

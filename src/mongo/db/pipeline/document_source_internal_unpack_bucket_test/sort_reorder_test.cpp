@@ -41,9 +41,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto countSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
+    auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, countSpecObj), getExpCtx());
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
     pipeline->optimizePipeline();
 
     auto serialized = pipeline->serializeToBson();
@@ -58,9 +58,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto countSpecObj = fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}");
+    auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, countSpecObj), getExpCtx());
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
     pipeline->optimizePipeline();
 
     auto serialized = pipeline->serializeToBson();
@@ -69,6 +69,30 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
     ASSERT_EQ(2, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}"), serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1', "
+        "bucketMaxSpanSeconds: 3600}}");
+    // The $match is necessary here to allow the sort-limit to coalesce.
+    auto matchSpecObj = fromjson("{$match: {meta1: {$gt: 2}}}");
+    auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
+    auto limitSpecObj = fromjson("{$limit: 2}");
+
+    auto pipeline = Pipeline::parse(
+        makeVector(unpackSpecObj, matchSpecObj, sortSpecObj, limitSpecObj), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+
+    // $match and $sort are now before $_internalUnpackBucket, with a new $limit added after the
+    // stage.
+    ASSERT_EQ(4, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$gt: 2}}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$sort: {'meta.a': 1, 'meta.b': -1}}"), serialized[1]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[2]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$limit: 2}"), serialized[3]);
 }
 
 }  // namespace
