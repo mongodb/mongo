@@ -61,7 +61,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
     def before_test(self, test, test_report):
         """Before test."""
         self.logger.info("Resuming the tenant migration thread.")
-        self._tenant_migration_thread.resume()
+        self._tenant_migration_thread.resume(test)
 
     def after_test(self, test, test_report):
         """After test."""
@@ -249,6 +249,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self._tenant_migration_fixture = tenant_migration_fixture
         self._tenant_id = shell_options["global_vars"]["TestData"]["tenantId"]
         self._auth_options = shell_options["global_vars"]["TestData"]["authOptions"]
+        self._test = None
         self._test_report = test_report
         self._shell_options = shell_options
         self._skip_dbhash = False
@@ -325,7 +326,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self.__lifecycle.stop()
         self._is_stopped_evt.set()
         # Unpause to allow the thread to finish.
-        self.resume()
+        self.resume(self._test)
         self.join()
 
     def pause(self):
@@ -344,8 +345,9 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 " ContinuousTenantMigration, but wasn't".format(
                     self._tenant_migration_fixture.pids()))
 
-    def resume(self):
+    def resume(self, test):
         """Resume the thread before test."""
+        self._test = test
         self.__lifecycle.mark_test_started()
 
     def _wait(self, timeout):
@@ -392,8 +394,8 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         dbhash_test_case = dbhash_tenant_migration.CheckTenantMigrationDBHash(
             self.logger, self._tenant_migration_fixture, self._shell_options)
         dbhash_test_case.before_suite(self._test_report)
-        dbhash_test_case.before_test(self, self._test_report)
-        dbhash_test_case.after_test(self, self._test_report)
+        dbhash_test_case.before_test(self._test, self._test_report)
+        dbhash_test_case.after_test(self._test, self._test_report)
         dbhash_test_case.after_suite(self._test_report)
 
     def _run_migration(self, migration_opts):  # noqa: D205,D400
