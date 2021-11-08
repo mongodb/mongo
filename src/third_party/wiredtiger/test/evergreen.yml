@@ -1091,6 +1091,21 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/run -t hs_cleanup -f configs/hs_cleanup_stress.txt -l 2
+  
+  - name: cppsuite-search-near-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_stress.txt -l 2
+            ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_stress.txt -l 2
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
@@ -3793,8 +3808,9 @@ buildvariants:
       --enable-zlib
   tasks:
     - name: compile
-    - name: cppsuite-hs-cleanup-stress
     - name: cppsuite-base-test-stress
+    - name: cppsuite-hs-cleanup-stress
+    - name: cppsuite-search-near-stress
 
 - name: package
   display_name: "~ Package"

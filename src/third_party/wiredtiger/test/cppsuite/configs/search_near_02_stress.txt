@@ -1,0 +1,34 @@
+# Configuration for search_near_02 stress test.
+# The configuration creates:
+# - threads that continuously insert random keys and values.
+# - threads that continuously perform prefix search_near calls on random keys.
+duration_seconds=1800,
+cache_size_mb=500,
+timestamp_manager=
+(
+    # This will let us randomly pick a read timestamp in a bigger range to trigger visibility
+    # checks.
+    oldest_lag=50,
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=10,
+    ),
+    insert_config=
+    (
+        key_size=5,
+        op_rate=10ms,
+        thread_count=10
+    ),
+    read_config=
+    (
+        # The key size parameter is used to generate the prefix 
+        # used in search_near. Use a smaller size to increase
+        # the chances to match an existing key.
+        key_size=3,
+        op_rate=10ms,
+        thread_count=10
+    )
+)

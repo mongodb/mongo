@@ -1,7 +1,7 @@
-# Configuration for search_near_01.
+# Configuration for search_near_01 stress test.
 # The test will generate key_count_per_collection number of keys for each prefix in aaa -> zzz.
-# This config will have a 3 minute duration, with 3 tables of an entry for each prefix.
-duration_seconds=180,
+# This config will have a 30 minute duration, with 3 tables of an entry for each prefix.
+duration_seconds=1800,
 cache_size_mb=1000,
 timestamp_manager=
 (
@@ -12,11 +12,11 @@ workload_generator=
     populate_config=
     (
         collection_count=3,
-        key_count_per_collection=1,
-        key_size=5,
+        key_count_per_collection=100,
     ),
     read_config=
     (
+        op_rate=10ms,
         thread_count=10
     )
 ),
