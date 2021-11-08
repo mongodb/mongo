@@ -759,6 +759,34 @@ class TestParser(testcase.IDLTestcase):
                     v1: 0
             """))
 
+        # Test extended value
+        self.assert_parse(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: foo
+                values:
+                    v1:
+                        description: foo
+                        value: 0
+            """))
+
+        # Test extra_data
+        self.assert_parse(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: foo
+                values:
+                    v1:
+                        description: foo
+                        value: 0
+                        extra_data:
+                            bar: baz
+            """))
+
     def test_enum_negative(self):
         # type: () -> None
         """Negative enum test cases."""
@@ -911,6 +939,69 @@ class TestParser(testcase.IDLTestcase):
                     v1: 0
                     v1: 1
             """), idl.errors.ERROR_ID_DUPLICATE_NODE)
+
+        # Test extra_data invalid type
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1: [ 'foo' ]
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # Test extended value missing fields (description)
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1:
+                        value: 0
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+        # Test extended value missing fields (value)
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1:
+                        description: foo
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+        # Test invalid extra_data (scalar)
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1:
+                        description: foo
+                        value: 0
+                        extra_data: foo
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # Test invalid extra_data (sequence)
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1:
+                        description: foo
+                        value: 0
+                        extra_data: [ foo ]
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
 
     def test_command_positive(self):
         # type: () -> None

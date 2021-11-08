@@ -663,7 +663,9 @@ class EnumValue(common.SourceLocation):
         # type: (str, int, int) -> None
         """Construct an Enum."""
         self.name = None  # type: str
+        self.description = None  # type: str
         self.value = None  # type: str
+        self.extra_data = None  # type: Dict[str, Any]
 
         super(EnumValue, self).__init__(file_name, line, column)
 

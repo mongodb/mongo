@@ -34,7 +34,7 @@ This is a lossy translation from the IDL Syntax tree as the IDL AST only contain
 the enums and structs that need code generated for them, and just enough information to do that.
 """
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from . import common, errors
 
@@ -341,7 +341,9 @@ class EnumValue(common.SourceLocation):
         # type: (str, int, int) -> None
         """Construct an Enum."""
         self.name = None  # type: str
+        self.description = None  # type: str
         self.value = None  # type: str
+        self.extra_data = None  # type: Dict[str, Any]
 
         super(EnumValue, self).__init__(file_name, line, column)
 

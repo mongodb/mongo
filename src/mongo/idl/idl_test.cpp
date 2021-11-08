@@ -2220,6 +2220,18 @@ TEST(IDLEnum, TestStringEnumNegative) {
     }
 }
 
+TEST(IDLEnum, ExtraDataEnum) {
+    auto s0Data = ExtraDataEnum_get_extra_data(ExtraDataEnumEnum::s0);
+    ASSERT_BSONOBJ_EQ(s0Data, BSONObj());
+
+    auto s1Data = ExtraDataEnum_get_extra_data(ExtraDataEnumEnum::s1);
+    ASSERT_BSONOBJ_EQ(s1Data, BSONObj());
+
+    auto s2Data = ExtraDataEnum_get_extra_data(ExtraDataEnumEnum::s2);
+    auto s2Expected = fromjson(R"json({ foo: [{bar: "baz"}], baz: "\"qu\\\\nx\"" })json");
+    ASSERT_BSONOBJ_EQ(s2Data, s2Expected);
+}
+
 OpMsgRequest makeOMR(BSONObj obj) {
     OpMsgRequest request;
     request.body = obj;

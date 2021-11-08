@@ -678,6 +678,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_line("%s;" % (enum_type_info.get_serializer_declaration()))
 
+        extra_data_decl = enum_type_info.get_extra_data_declaration()
+        if extra_data_decl is not None:
+            self._writer.write_line("%s;" % (extra_data_decl))
+
     def gen_enum_declaration(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum."""
@@ -686,6 +690,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         with self._block('enum class %s : std::int32_t {' % (enum_type_info.get_cpp_type_name()),
                          '};'):
             for enum_value in idl_enum.values:
+                if enum_value.description is not None:
+                    self.gen_description_comment(enum_value.description)
                 self._writer.write_line(
                     common.template_args('${name} ${value},', name=enum_value.name,
                                          value=enum_type_info.get_cpp_value_assignment(enum_value)))
@@ -2204,6 +2210,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         enum_type_info.gen_serializer_definition(self._writer)
         self._writer.write_empty_line()
+
+        enum_type_info.gen_extra_data_definition(self._writer)
 
     def _gen_known_fields_declaration(self, struct, name, include_op_msg_implicit):
         # type: (ast.Struct, str, bool) -> None

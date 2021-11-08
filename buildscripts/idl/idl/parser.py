@@ -635,6 +635,21 @@ def _parse_generic_reply_field_list_entries(ctxt, node):
     return _parse_field_list_entries(ctxt, node, False)
 
 
+def _parse_arbitrary_value(ctxt, node):
+    # type: (errors.ParserContext, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> Any
+    """Parse a generic YAML type to a Python type."""
+
+    if node.id == 'mapping':
+        return {k.value: _parse_arbitrary_value(ctxt, v) for (k, v) in node.value}
+    elif node.id == 'sequence':
+        return [_parse_arbitrary_value(ctxt, node) for node in node.value]
+    elif ctxt.is_scalar_node(node, 'node'):
+        return node.value
+    else:
+        # Error added to context by is_scalar_node case above
+        return None
+
+
 def _parse_enum_values(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> List[syntax.EnumValue]
     """Parse a values section in an enum in the IDL file."""
@@ -651,13 +666,20 @@ def _parse_enum_values(ctxt, node):
             ctxt.add_duplicate_error(first_node, first_name)
             continue
 
-        # Simple Type
-        if ctxt.is_scalar_node(second_node, first_name):
-            enum_value = syntax.EnumValue(ctxt.file_name, node.start_mark.line,
-                                          node.start_mark.column)
-            enum_value.name = first_name
+        enum_value = syntax.EnumValue(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+        enum_value.name = first_name
+
+        if second_node.id == 'mapping':
+            _generic_parser(
+                ctxt, second_node, first_name, enum_value, {
+                    "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+                    "value": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+                    "extra_data": _RuleDesc('mapping', mapping_parser_func=_parse_arbitrary_value),
+                })
+        elif ctxt.is_scalar_node(second_node, first_name):
             enum_value.value = second_node.value
-            enum_values.append(enum_value)
+
+        enum_values.append(enum_value)
 
         field_name_set.add(first_name)
 
@@ -667,7 +689,7 @@ def _parse_enum_values(ctxt, node):
 def _parse_enum(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse an enum section in the IDL file."""
-    if not ctxt.is_mapping_node(node, "struct"):
+    if not ctxt.is_mapping_node(node, "enum"):
         return
 
     idl_enum = syntax.Enum(ctxt.file_name, node.start_mark.line, node.start_mark.column)

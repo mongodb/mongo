@@ -105,7 +105,7 @@ types:
 
 ##################################################################################################
 #
-# Unit test structs for a single value to ensure type validation works correctly
+# Unit test enums
 #
 ##################################################################################################
 enums:
@@ -118,6 +118,39 @@ enums:
             s1: "one"
             s2: "two"
 
+    ExtendedValueEnum:
+        description: "An enum with descriptions"
+        type: string
+        values:
+            s0: "zero"
+            s1:
+                description: "String 1"
+                value: "one"
+
+    ExtraDataEnum:
+        description: "An enum with look-aside data"
+        type: string
+        values:
+            s0:
+                description: "String 0"
+                value: "zero"
+            s1:
+                description: "String 1"
+                value: "one"
+                extra_data: {}
+            s2:
+                description: "String 2"
+                value: "two"
+                extra_data:
+                    foo:
+                        - { bar: "baz" }
+                    baz: '"qu\\nx"'
+
+##################################################################################################
+#
+# Unit test structs for a single value to ensure type validation works correctly
+#
+##################################################################################################
 structs:
 
     one_plain_object:

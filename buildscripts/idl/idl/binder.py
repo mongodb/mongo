@@ -1238,7 +1238,9 @@ def _bind_enum(ctxt, idl_enum):
     for enum_value in idl_enum.values:
         ast_enum_value = ast.EnumValue(enum_value.file_name, enum_value.line, enum_value.column)
         ast_enum_value.name = enum_value.name
+        ast_enum_value.description = enum_value.description
         ast_enum_value.value = enum_value.value
+        ast_enum_value.extra_data = enum_value.extra_data
         ast_enum.values.append(ast_enum_value)
 
     values_set = set()  # type: Set[str]

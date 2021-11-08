@@ -32,8 +32,10 @@ Support the code generation for enums
 """
 
 from abc import ABCMeta, abstractmethod
+import json
 import textwrap
 from typing import cast, List, Optional, Union
+import bson
 
 from . import ast
 from . import common
@@ -90,6 +92,12 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         return "::" + common.qualify_cpp_name(self._enum.cpp_namespace,
                                               self._get_enum_serializer_name())
 
+    def _get_enum_extra_data_name(self):
+        # type: () -> str
+        """Return the name of the get_extra_data function without prefix."""
+        return common.template_args("${enum_name}_get_extra_data",
+                                    enum_name=common.title_case(self._enum.name))
+
     @abstractmethod
     def get_cpp_value_assignment(self, enum_value):
         # type: (ast.EnumValue) -> str
@@ -119,6 +127,66 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         # type: (writer.IndentedTextWriter) -> None
         """Generate the serializer function definition."""
         pass
+
+    def _get_populated_extra_values(self):
+        # type: () -> List[Union[syntax.EnumValue,ast.EnumValue]]
+        """Filter the enum values to just those containing extra_data."""
+        return [val for val in self._enum.values if val.extra_data is not None]
+
+    def get_extra_data_declaration(self):
+        # type: () -> Optional[str]
+        """Get the get_extra_data function declaration minus trailing semicolon."""
+        if len(self._get_populated_extra_values()) == 0:
+            return None
+
+        return common.template_args("BSONObj ${function_name}(${enum_name} value)",
+                                    enum_name=self.get_cpp_type_name(),
+                                    function_name=self._get_enum_extra_data_name())
+
+    def gen_extra_data_definition(self, indented_writer):
+        # type: (writer.IndentedTextWriter) -> None
+        """Generate the get_extra_data function definition."""
+
+        extra_values = self._get_populated_extra_values()
+        if len(extra_values) == 0:
+            # No extra data present on this enum.
+            return
+
+        # Generate an anonymous namespace full of BSON constants.
+        #
+        with writer.NamespaceScopeBlock(indented_writer, ['']):
+            for enum_value in extra_values:
+                indented_writer.write_line(
+                    common.template_args('// %s' % json.dumps(enum_value.extra_data)))
+
+                bson_value = ''.join(
+                    [('\\x%02x' % (b)) for b in bson.BSON.encode(enum_value.extra_data)])
+                indented_writer.write_line(
+                    common.template_args(
+                        'const BSONObj ${const_name}("${bson_value}");',
+                        const_name=_get_constant_enum_extra_data_name(self._enum, enum_value),
+                        bson_value=bson_value))
+
+        indented_writer.write_empty_line()
+
+        # Generate implementation of get_extra_data function.
+        #
+        template_params = {
+            'enum_name': self.get_cpp_type_name(),
+            'function_name': self.get_extra_data_declaration(),
+        }
+
+        with writer.TemplateContext(indented_writer, template_params):
+            with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
+                with writer.IndentedScopedBlock(indented_writer, "switch (value) {", "}"):
+                    for enum_value in extra_values:
+                        indented_writer.write_template(
+                            'case ${enum_name}::%s: return %s;' %
+                            (enum_value.name,
+                             _get_constant_enum_extra_data_name(self._enum, enum_value)))
+                    if len(extra_values) != len(self._enum.values):
+                        # One or more enums does not have associated extra data.
+                        indented_writer.write_line('default: return BSONObj();')
 
 
 class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
@@ -192,6 +260,13 @@ def _get_constant_enum_name(idl_enum, enum_value):
     """Return the C++ name for a string constant of string enum value."""
     return common.template_args('k${enum_name}_${name}', enum_name=common.title_case(idl_enum.name),
                                 name=enum_value.name)
+
+
+def _get_constant_enum_extra_data_name(idl_enum, enum_value):
+    # type: (Union[syntax.Enum,ast.Enum], Union[syntax.EnumValue,ast.EnumValue]) -> str
+    """Return the C++ name for a string constant of enum extra data value."""
+    return common.template_args('k${enum_name}_${name}_extra_data',
+                                enum_name=common.title_case(idl_enum.name), name=enum_value.name)
 
 
 class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
