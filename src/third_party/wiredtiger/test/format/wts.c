@@ -558,6 +558,26 @@ struct stats_args {
 };
 
 /*
+ * stats_data_print --
+ *     Print out the statistics.
+ */
+static void
+stats_data_print(WT_SESSION *session, const char *uri, FILE *fp)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    uint64_t v;
+    const char *desc, *pval;
+
+    wiredtiger_open_cursor(session, uri, NULL, &cursor);
+    while (
+      (ret = cursor->next(cursor)) == 0 && (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+        testutil_assert(fprintf(fp, "%s=%s\n", desc, pval) >= 0);
+    testutil_assert(ret == WT_NOTFOUND);
+    testutil_check(cursor->close(cursor));
+}
+
+/*
  * stats_data_source --
  *     Dump each data source's statistics.
  */
@@ -566,28 +586,16 @@ stats_data_source(TABLE *table, void *arg)
 {
     struct stats_args *args;
     FILE *fp;
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
     WT_SESSION *session;
-    uint64_t v;
     char buf[1024];
-    const char *desc, *pval;
 
     args = arg;
     fp = args->fp;
     session = args->session;
 
-    fprintf(fp, "\n\n====== Data source statistics: %s\n", table->uri);
-
+    testutil_assert(fprintf(fp, "\n\n====== Data source statistics: %s\n", table->uri) >= 0);
     testutil_check(__wt_snprintf(buf, sizeof(buf), "statistics:%s", table->uri));
-    testutil_check(session->open_cursor(session, buf, NULL, NULL, &cursor));
-    while (
-      (ret = cursor->next(cursor)) == 0 && (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-        if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-            testutil_die(errno, "fprintf");
-
-    testutil_assert(ret == WT_NOTFOUND);
-    testutil_check(cursor->close(cursor));
+    stats_data_print(session, buf, fp);
 }
 
 /*
@@ -600,11 +608,7 @@ wts_stats(void)
     struct stats_args args;
     FILE *fp;
     WT_CONNECTION *conn;
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
     WT_SESSION *session;
-    uint64_t v;
-    const char *desc, *pval;
 
     /* Ignore statistics if they're not configured. */
     if (GV(STATISTICS) == 0)
@@ -613,28 +617,17 @@ wts_stats(void)
     conn = g.wts_conn;
     track("stat", 0ULL);
 
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    if ((fp = fopen(g.home_stats, "w")) == NULL)
-        testutil_die(errno, "fopen: %s", g.home_stats);
-
     /* Connection statistics. */
-    fprintf(fp, "====== Connection statistics:\n");
-    testutil_check(session->open_cursor(session, "statistics:", NULL, NULL, &cursor));
-
-    while (
-      (ret = cursor->next(cursor)) == 0 && (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-        if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
-            testutil_die(errno, "fprintf");
-    testutil_assert(ret == WT_NOTFOUND);
-    testutil_check(cursor->close(cursor));
+    testutil_assert((fp = fopen(g.home_stats, "w")) != NULL);
+    testutil_assert(fprintf(fp, "====== Connection statistics:\n") >= 0);
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    stats_data_print(session, "statistics:", fp);
 
     /* Data source statistics. */
     args.fp = fp;
     args.session = session;
     tables_apply(stats_data_source, &args);
 
-    fclose_and_clear(&fp);
-
     testutil_check(session->close(session, NULL));
+    fclose_and_clear(&fp);
 }

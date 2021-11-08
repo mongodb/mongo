@@ -243,6 +243,8 @@ wiredtiger_open_cursor(
 {
     WT_DECL_RET;
 
+    *cursorp = NULL;
+
     /* WT_SESSION.open_cursor can return EBUSY if concurrent with a metadata operation, retry. */
     while ((ret = session->open_cursor(session, uri, NULL, config, cursorp)) == EBUSY)
         __wt_yield();
