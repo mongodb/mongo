@@ -148,9 +148,12 @@ bool WiredTigerFileVersion::shouldDowngrade(bool readOnly, bool hasRecoveryTimes
             _startupVersion == StartupVersion::IS_42;
     }
 
-    // (Generic FCV reference): Only consider downgrading when FCV is set to the last LTS
-    // release. This FCV gate must remain across binary version releases.
-    if (serverGlobalParams.featureCompatibility.isGreaterThan(multiversion::GenericFCV::kLastLTS)) {
+    // (Generic FCV reference): Only consider downgrading when FCV has been fully downgraded to last
+    // continuous or last LTS. It's possible for WiredTiger to introduce a data format change in a
+    // continuous release. This FCV gate must remain across binary version releases.
+    const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentVersion != multiversion::GenericFCV::kLastContinuous &&
+        currentVersion != multiversion::GenericFCV::kLastLTS) {
         return false;
     }
 
@@ -185,7 +188,27 @@ std::string WiredTigerFileVersion::getDowngradeString() {
                 MONGO_UNREACHABLE;
         }
     }
-    return "compatibility=(release=10.0)";
+
+    // With the introduction of continuous releases, there are two downgrade paths from kLatest.
+    // Either to kLastContinuous or kLastLTS. It's possible for the data format to differ between
+    // kLastContinuous and kLastLTS and we'll need to handle that appropriately here. We only
+    // consider downgrading when FCV has been fully downgraded. This will have to be updated for new
+    // releases.
+    const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
+    if (currentVersion == multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
+        // If the data format between kLatest (v5.2) and kLastContinuous (v5.1) differs, change the
+        // 'kLastContinuousWTRelease' version.
+        return kLastContinuousWTRelease;
+    } else if (currentVersion ==
+               multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0) {
+        // If the data format between kLatest (v5.2) and kLastLTS (v5.0) differs, change the
+        // 'kLastLTSWTRelease' version.
+        return kLastLTSWTRelease;
+    }
+
+    // We're in a state that's not ready to downgrade. Use the latest WiredTiger version for this
+    // binary.
+    return kLatestWTRelease;
 }
 
 using std::set;
@@ -637,6 +660,9 @@ void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
  * |                  4.2.6 |      3.3.0 |   3 |
  * | 4.2.6 (blessed by 4.4) |      3.3.0 |   4 |
  * |                  4.4.0 |     10.0.0 |   5 |
+ * |                  5.0.0 |     10.0.1 |   5 |
+ * |                  5.1.0 |     10.0.1 |   5 |
+ * |                  5.2.0 |     10.0.1 |   5 |
  */
 void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
     // MongoDB 4.4 will always run in compatibility version 10.0.

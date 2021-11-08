@@ -501,6 +501,37 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
     ASSERT_EQ(initTs, _engine->getOldestTimestamp());
 }
 
+TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
+    WiredTigerFileVersion version;
+
+    // (Generic FCV reference): When FCV is kLatest, no downgrade is necessary.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+    ASSERT_FALSE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
+
+    // (Generic FCV reference): When FCV is kLastContinuous or kLastLTS, a downgrade may be needed.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::GenericFCV::kLastContinuous);
+    ASSERT_TRUE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_EQ(WiredTigerFileVersion::kLastContinuousWTRelease, version.getDowngradeString());
+
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+    ASSERT_TRUE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_EQ(WiredTigerFileVersion::kLastLTSWTRelease, version.getDowngradeString());
+
+    // (Generic FCV reference): While we're in a semi-downgraded state, we shouldn't try downgrading
+    // the WiredTiger compatibility version.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous);
+    ASSERT_FALSE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
+
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
+    ASSERT_FALSE(version.shouldDowngrade(/*readOnly=*/false, /*hasRecoveryTimestamp=*/false));
+    ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
+}
+
 
 std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
     return std::make_unique<WiredTigerKVHarnessHelper>(svcCtx);
