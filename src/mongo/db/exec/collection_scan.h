@@ -60,6 +60,13 @@ public:
                    WorkingSet* workingSet,
                    const MatchExpression* filter);
 
+    CollectionScan(ExpressionContext* expCtx,
+                   const CollectionPtr& collection,
+                   const CollectionScanParams& params,
+                   WorkingSet* workingSet,
+                   const MatchExpression* filter,
+                   bool relaxCappedConstraints);
+
     StageState doWork(WorkingSetID* out) final;
     bool isEOF() final;
 

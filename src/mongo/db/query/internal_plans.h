@@ -144,7 +144,8 @@ private:
         Direction direction,
         boost::optional<RecordId> resumeAfterRecordId = boost::none,
         boost::optional<RecordId> minRecord = boost::none,
-        boost::optional<RecordId> maxRecord = boost::none);
+        boost::optional<RecordId> maxRecord = boost::none,
+        bool relaxCappedConstraints = false);
 
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.

@@ -171,8 +171,24 @@ void appendFinalIndexFieldsToResult(CreateIndexesReply* reply,
 /**
  * Ensures that the options passed in for TTL indexes are valid.
  */
-void validateTTLOptions(OperationContext* opCtx, const CreateIndexesCommand& cmd) {
+void validateTTLOptions(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CreateIndexesCommand& cmd) {
+    const auto clusteredAndCapped = [&](LockMode mode) {
+        AutoGetCollection collection(opCtx, ns, mode);
+        if (collection) {
+            const auto c = collection.getCollection().get();
+            if (c->getClusteredInfo() && c->isCapped()) {
+                return true;
+            }
+        }
+        return false;
+    }(MODE_IS);
+
     for (const auto& index : cmd.getIndexes()) {
+        uassert(ErrorCodes::Error(6049202),
+                "TTL secondary indexes are not allowed on a capped clustered collection",
+                !(clusteredAndCapped && index_key_validate::isIndexTTL(index)));
         uassertStatusOK(index_key_validate::validateIndexSpecTTL(index));
     }
 }
@@ -395,7 +411,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum.get()));
     }
 
-    validateTTLOptions(opCtx, cmd);
+    validateTTLOptions(opCtx, ns, cmd);
 
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
     // 1) We are in a replication mode that allows for index creation.

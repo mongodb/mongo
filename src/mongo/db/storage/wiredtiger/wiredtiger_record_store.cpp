@@ -709,7 +709,7 @@ public:
         }
     }
 
-    bool restore() final {
+    bool restore(bool tolerateCappedRepositioning = true) final {
         // We can't use the CursorCache since this cursor needs a special config string.
         WT_SESSION* session = WiredTigerRecoveryUnit::get(_opCtx)->getSession()->getSession();
 
@@ -2202,7 +2202,7 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
     _lastReturnedId = RecordId();
 }
 
-bool WiredTigerRecordStoreCursorBase::restore() {
+bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
     if (_rs._isOplog && _forward) {
         auto wtRu = WiredTigerRecoveryUnit::get(_opCtx);
         wtRu->setIsOplogReader();
@@ -2234,18 +2234,26 @@ bool WiredTigerRecordStoreCursorBase::restore() {
     int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
     if (ret == WT_NOTFOUND) {
         _eof = true;
-        return !_rs._isCapped;
+
+        if (_rs._isCapped && !tolerateCappedRepositioning) {
+            // Capped read collscans do not tolerate cursor repositioning.
+            // By contrast, write collscans on a clustered collection like TTL deletion
+            // tolerate cursor repositioning like normal collections.
+            return false;
+        }
+        return true;
     }
     invariantWTOK(ret);
 
     if (cmp == 0)
         return true;  // Landed right where we left off.
 
-    if (_rs._isCapped) {
-        // Document was removed by capped collection operations. It is important that we error out
-        // in this case so that consumers don't silently get 'holes' when scanning capped
-        // collections. We don't make this guarantee for normal collections so it is ok to skip
-        // ahead in that case.
+    if (_rs._isCapped && !tolerateCappedRepositioning) {
+        // The cursor has been repositioned as it was sitting on a document that has been
+        // removed by capped collection deletion. It is important that we error out in this case
+        // so that consumers don't silently get 'holes' when scanning capped collections.
+        // We don't make this guarantee for normal collections or for write operations like
+        // capped TTL deletion so it is ok to skip ahead in that case.
         _eof = true;
         return false;
     }

@@ -357,7 +357,7 @@ CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
       _recordStore(std::move(recordStore)),
       _cappedNotifier(_recordStore && options.capped ? std::make_shared<CappedInsertNotifier>()
                                                      : nullptr),
-      _needCappedLock(options.capped && collection->ns().db() != "local"),
+      _needCappedLock(options.capped && collection->ns().isReplicated()),
       _isCapped(options.capped),
       _cappedMaxDocs(options.cappedMaxDocs) {
     if (_cappedNotifier) {
@@ -491,9 +491,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
     if (collectionOptions.clusteredIndex) {
         if (collectionOptions.expireAfterSeconds) {
-            // TTL indexes are not compatible with capped collections.
-            invariant(!collectionOptions.capped);
-
             // If this collection has been newly created, we need to register with the TTL cache at
             // commit time, otherwise it is startup and we can register immediately.
             auto svcCtx = opCtx->getClient()->getServiceContext();
@@ -953,6 +950,11 @@ bool CollectionImpl::_cappedAndNeedDelete(OperationContext* opCtx) const {
         return false;
     }
 
+    if (getClusteredInfo()) {
+        // Capped clustered collections use TTL-based deletion.
+        return false;
+    }
+
     if (ns().isOplog() && _shared->_recordStore->selfManagedOplogTruncation()) {
         // Storage engines can choose to manage oplog truncation internally.
         return false;
@@ -1157,9 +1159,9 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     bool fromMigrate,
                                     bool noWarn,
                                     Collection::StoreDeletedDoc storeDeletedDoc) const {
-    if (isCapped() && opCtx->isEnforcingConstraints()) {
-        // System operations such as tenant migration or secondary batch application can delete from
-        // capped collections.
+    if (isCapped() && !isClustered() && opCtx->isEnforcingConstraints()) {
+        // System operations such as tenant migration, secondary batch application or TTL on a
+        // capped clustered collection can delete from capped collections.
         LOGV2(20291, "failing remove on a capped ns", "namespace"_attr = _ns);
         uasserted(10089, "cannot remove from a capped collection");
     }

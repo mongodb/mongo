@@ -217,7 +217,12 @@ void ScanStage::doRestoreState(bool relinquishCursor) {
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
 
     if (_cursor && relinquishCursor) {
-        const bool couldRestore = _cursor->restore();
+        // Unlike the classic query engine CollectionScan::doSaveStateRequiresCollection(), the SBE
+        // engine does not support clustered collections. As a consequence, capped collection scans
+        // only serve read operations and do not need to relax capped collection constraints like
+        // tolerating cursor repositioning.
+        const auto tolerateCappedCursorRepositioning = false;
+        const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. ",

@@ -58,8 +58,9 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                                const CollectionPtr& collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
-                               const MatchExpression* filter)
-    : RequiresCollectionStage(kStageType, expCtx, collection),
+                               const MatchExpression* filter,
+                               bool relaxCappedConstraints)
+    : RequiresCollectionStage(kStageType, expCtx, collection, relaxCappedConstraints),
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _params(params) {
@@ -96,6 +97,14 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         invariant(params.direction == CollectionScanParams::FORWARD);
     }
 }
+
+CollectionScan::CollectionScan(ExpressionContext* expCtx,
+                               const CollectionPtr& collection,
+                               const CollectionScanParams& params,
+                               WorkingSet* workingSet,
+                               const MatchExpression* filter)
+    : CollectionScan(
+          expCtx, collection, params, workingSet, filter, false /* relaxCappedConstraints */) {}
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF) {
@@ -316,7 +325,13 @@ void CollectionScan::doSaveStateRequiresCollection() {
 
 void CollectionScan::doRestoreStateRequiresCollection() {
     if (_cursor) {
-        const bool couldRestore = _cursor->restore();
+        // If this collection scan serves a read operation on a capped collection, only restore the
+        // cursor if it can be repositioned exactly where it was, so that consumers don't silently
+        // get 'holes' when scanning capped collections. If this collection scan serves a write
+        // operation on a capped collection like a clustered TTL deletion, exempt this operation
+        // from the guarantees above.
+        const auto tolerateCappedCursorRepositioning = _relaxCappedConstraints;
+        const bool couldRestore = _cursor->restore(tolerateCappedCursorRepositioning);
         uassert(ErrorCodes::CappedPositionLost,
                 str::stream()
                     << "CollectionScan died due to position in capped collection being deleted. "

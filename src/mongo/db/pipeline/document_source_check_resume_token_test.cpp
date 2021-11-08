@@ -82,7 +82,7 @@ public:
         return boost::none;
     }
     void save() override {}
-    bool restore() override {
+    bool restore(bool tolerateCappedRepositioning) override {
         return true;
     }
     void detachFromOperationContext() override {}

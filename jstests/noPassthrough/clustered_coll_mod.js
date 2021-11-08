@@ -9,6 +9,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/clustered_collection_util.js");
+
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 
@@ -28,16 +30,6 @@ const collName = "coll";
 
 // Set the original expireAfterSeconds to a day.
 const expireAfterSeconds = 60 * 60 * 24;
-
-const waitForTTL = () => {
-    // The 'ttl.passes' metric is incremented when the TTL monitor starts processing the indexes, so
-    // we wait for it to be incremented twice to know that the TTL monitor finished processing the
-    // indexes at least once.
-    const ttlPasses = testDB.serverStatus().metrics.ttl.passes;
-    assert.soon(function() {
-        return testDB.serverStatus().metrics.ttl.passes > ttlPasses + 1;
-    });
-};
 
 assert.commandWorked(testDB.createCollection(
     collName, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds}));
@@ -59,13 +51,13 @@ const coll = testDB[collName];
 assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 assert.eq(coll.find().itcount(), batchSize);
 
-waitForTTL();
+ClusteredCollectionUtil.waitForTTL(testDB);
 assert.eq(coll.find().itcount(), batchSize);
 
 // Shorten the expireAfterSeconds so all the documents in the collection are expired.
 assert.commandWorked(testDB.runCommand({collMod: collName, expireAfterSeconds: 1}));
 
-waitForTTL();
+ClusteredCollectionUtil.waitForTTL(testDB);
 
 // Confirm all documents were deleted once the expireAfterSeconds was shortened.
 assert.eq(coll.find().itcount(), 0);
@@ -74,11 +66,11 @@ assert.eq(coll.find().itcount(), 0);
 assert.commandWorked(testDB.runCommand({collMod: collName, expireAfterSeconds: "off"}));
 
 // Ensure there is no outstanding TTL pass in progress that will still remove entries.
-waitForTTL();
+ClusteredCollectionUtil.waitForTTL(testDB);
 
 assert.commandWorked(coll.insert({_id: now, info: "unexpired"}));
 
-waitForTTL();
+ClusteredCollectionUtil.waitForTTL(testDB);
 
 assert.eq(coll.find().itcount(), 1);
 

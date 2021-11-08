@@ -188,7 +188,7 @@ private:
         boost::optional<Record> seekNear(const RecordId& id) final override;
         void save() final;
         void saveUnpositioned() final override;
-        bool restore() final;
+        bool restore(bool tolerateCappedRepositioning = true) final;
         void detachFromOperationContext() final;
         void reattachToOperationContext(OperationContext* opCtx) final;
 
@@ -224,7 +224,7 @@ private:
         boost::optional<Record> seekNear(const RecordId& id) final override;
         void save() final;
         void saveUnpositioned() final override;
-        bool restore() final;
+        bool restore(bool tolerateCappedRepositioning = true) final;
         void detachFromOperationContext() final;
         void reattachToOperationContext(OperationContext* opCtx) final;
 

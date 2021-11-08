@@ -88,6 +88,11 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
 Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds);
 
 /**
+ * Returns true if 'indexSpec' refers to a TTL index.
+ */
+bool isIndexTTL(const BSONObj& indexSpec);
+
+/**
  * Validates the key pattern and the 'expireAfterSeconds' duration in the index specification
  * 'indexSpec' for a TTL index. Returns success if 'indexSpec' does not refer to a TTL index.
  */

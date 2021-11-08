@@ -253,8 +253,8 @@ private:
         if (!coll || coll->uuid() != uuid)
             return;
 
-        // TTL indexes are not compatible with capped collections.
-        invariant(!coll->isCapped());
+        // Allow TTL deletion on non-capped collections, and on capped clustered collections.
+        invariant(!coll->isCapped() || (coll->isCapped() && coll->isClustered()));
 
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             LOGV2(22534,

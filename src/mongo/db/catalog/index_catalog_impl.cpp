@@ -125,6 +125,8 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
         // TTL indexes are not compatible with capped collections.
+        // Note that TTL deletion is supported on capped clustered collections via bounded
+        // collection scan, which does not use an index.
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
             !collection->isCapped()) {
             TTLCollectionCache::get(opCtx->getServiceContext())

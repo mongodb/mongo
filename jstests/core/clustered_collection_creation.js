@@ -22,7 +22,7 @@ if (!ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo())) {
     return;
 }
 
-// Cannot create an index with the same key as the cluster key
+// Cannot create an index with the same key as the cluster key.
 const validateClusteredIndexAlreadyExists = function(db, collName, fullCreateOptions) {
     const clusterKey = fullCreateOptions.clusteredIndex.key;
     const res = db[collName].createIndex(clusterKey);
@@ -71,6 +71,55 @@ const runSuccessfulCreate = function(db, coll, createOptions) {
     coll.drop();
 };
 
+const validateClusteredCappedCollections = function(db, coll, clusterKey) {
+    runSuccessfulCreate(
+        db,
+        coll,
+        {clusteredIndex: {key: clusterKey, unique: true}, capped: true, expireAfterSeconds: 10});
+    assert.commandFailedWithCode(
+        db.createCollection(coll.getName(),
+                            {clusteredIndex: {key: clusterKey, unique: true}, size: 10}),
+        6049200);
+    assert.commandFailedWithCode(
+        db.createCollection(coll.getName(),
+                            {clusteredIndex: {key: clusterKey, unique: true}, max: 10}),
+        6049204);
+    assert.commandFailedWithCode(
+        db.createCollection(coll.getName(),
+                            {clusteredIndex: {key: clusterKey, unique: true}, size: 10, max: 10}),
+        6049200);
+    assert.commandFailedWithCode(
+        db.createCollection(
+            coll.getName(),
+            {clusteredIndex: {key: clusterKey, unique: true}, size: 10, expireAfterSeconds: 10}),
+        6049200);
+    assert.commandFailedWithCode(
+        db.createCollection(
+            coll.getName(),
+            {clusteredIndex: {key: clusterKey, unique: true}, capped: true, size: 10}),
+        6049200);
+    assert.commandFailedWithCode(
+        db.createCollection(
+            coll.getName(),
+            {clusteredIndex: {key: clusterKey, unique: true}, capped: true, max: 10}),
+        6049204);
+    assert.commandFailedWithCode(
+        db.createCollection(
+            coll.getName(),
+            {clusteredIndex: {key: clusterKey, unique: true}, capped: true, size: 10, max: 10}),
+        6049200);
+    assert.commandFailedWithCode(
+        db.createCollection(coll.getName(),
+                            {clusteredIndex: {key: clusterKey, unique: true}, capped: true}),
+        6049201);
+
+    assert.commandWorked(db.createCollection(
+        coll.getName(),
+        {clusteredIndex: {key: clusterKey, unique: true}, capped: true, expireAfterSeconds: 10}));
+    assert.commandFailedWithCode(coll.createIndex({a: 1}, {expireAfterSeconds: 10}), 6049202);
+    coll.drop();
+};
+
 const replicatedDB = db.getSiblingDB(jsTestName());
 const nonReplicatedDB = db.getSiblingDB('local');
 const replicatedColl = replicatedDB.coll;
@@ -112,6 +161,10 @@ runSuccessfulCreate(nonReplicatedDB,
                     nonReplicatedColl,
                     {clusteredIndex: {key: {ts: 1}, name: "index_on_ts", unique: true, v: 2}});
 
+// Capped clustered collections creation.
+validateClusteredCappedCollections(replicatedDB, replicatedColl, {_id: 1});
+validateClusteredCappedCollections(nonReplicatedDB, nonReplicatedColl, {ts: 1});
+
 // Validate that it's not possible to create a clustered collection as a view.
 assert.commandFailedWithCode(
     replicatedDB.createCollection(
@@ -136,7 +189,7 @@ assert.commandFailedWithCode(
         {clusteredIndex: {key: {ts: 1}, unique: true}, autoIndexId: false}),
     6026501);
 
-// 'unique' field must be present and set to true
+// 'unique' field must be present and set to true.
 assert.commandFailedWithCode(
     replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}}}),
     40414);

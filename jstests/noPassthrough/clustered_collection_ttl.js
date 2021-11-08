@@ -21,21 +21,13 @@ if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
 }
 
 const dbName = jsTestName();
-const testDB = conn.getDB(dbName);
-const coll = testDB.getCollection('coll');
+const replicatedDB = conn.getDB(dbName);
+const replicatedColl = replicatedDB.getCollection('coll');
+const nonReplicatedDB = conn.getDB('local');
+const nonReplicatedColl = nonReplicatedDB.getCollection('coll');
 
 // Set expireAfterSeconds to a day to safely test that only expired documents are deleted.
 const expireAfterSeconds = 60 * 60 * 24;
-
-const waitForTTL = () => {
-    // The 'ttl.passes' metric is incremented when the TTL monitor starts processing the indexes, so
-    // we wait for it to be incremented twice to know that the TTL monitor finished processing the
-    // indexes at least once.
-    const ttlPasses = testDB.serverStatus().metrics.ttl.passes;
-    assert.soon(function() {
-        return testDB.serverStatus().metrics.ttl.passes > ttlPasses + 1;
-    });
-};
 
 // Generates an ObjectId with timestamp corresponding to 'date'.
 const makeObjectIdFromDate = (date) => {
@@ -93,7 +85,7 @@ const insertAndValidateTTL = (coll, ttlFieldName) => {
     }
     assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 
-    waitForTTL();
+    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
 
     // The unexpired documents should still be preserved.
     assert.eq(coll.find().itcount(), batchSize * 2);
@@ -102,18 +94,18 @@ const insertAndValidateTTL = (coll, ttlFieldName) => {
 };
 
 jsTest.log(`Test TTL on cluster key _id`);
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds}));
-insertAndValidateTTL(coll, "_id");
-coll.drop();
+assert.commandWorked(replicatedDB.createCollection(
+    replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds}));
+insertAndValidateTTL(replicatedColl, "_id");
+replicatedColl.drop();
 
 jsTest.log(`Test TTL on secondary index`);
 // The collection is clustered, but not TTL on cluster key _id.
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
-assert.commandWorked(coll.createIndex({ttlField: 1}, {expireAfterSeconds}));
-insertAndValidateTTL(coll, "ttlField");
-coll.drop();
+assert.commandWorked(replicatedDB.createCollection(
+    replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(replicatedColl.createIndex({ttlField: 1}, {expireAfterSeconds}));
+insertAndValidateTTL(replicatedColl, "ttlField");
+replicatedColl.drop();
 
 MongoRunner.stopMongod(conn);
 })();

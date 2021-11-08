@@ -715,8 +715,12 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds) {
     return Status::OK();
 }
 
+bool isIndexTTL(const BSONObj& indexSpec) {
+    return indexSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName);
+}
+
 Status validateIndexSpecTTL(const BSONObj& indexSpec) {
-    if (!indexSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+    if (!isIndexTTL(indexSpec)) {
         return Status::OK();
     }
 

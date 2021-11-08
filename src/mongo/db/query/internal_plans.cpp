@@ -93,8 +93,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
-    auto root = _collectionScan(
-        expCtx, ws.get(), &collection, direction, boost::none, minRecord, maxRecord);
+    auto root = _collectionScan(expCtx,
+                                ws.get(),
+                                &collection,
+                                direction,
+                                boost::none,
+                                minRecord,
+                                maxRecord,
+                                true /* relaxCappedConstraints */);
 
     root = std::make_unique<DeleteStage>(
         expCtx.get(), std::move(params), ws.get(), collection, root.release());
@@ -229,7 +235,8 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     Direction direction,
     boost::optional<RecordId> resumeAfterRecordId,
     boost::optional<RecordId> minRecord,
-    boost::optional<RecordId> maxRecord) {
+    boost::optional<RecordId> maxRecord,
+    bool relaxCappedConstraints) {
 
     const auto& collection = *coll;
     invariant(collection);
@@ -247,7 +254,8 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
         params.direction = CollectionScanParams::BACKWARD;
     }
 
-    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, nullptr);
+    return std::make_unique<CollectionScan>(
+        expCtx.get(), collection, params, ws, nullptr, relaxCappedConstraints);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(

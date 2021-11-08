@@ -51,12 +51,19 @@ class RequiresCollectionStage : public PlanStage {
 public:
     RequiresCollectionStage(const char* stageType,
                             ExpressionContext* expCtx,
-                            const CollectionPtr& coll)
+                            const CollectionPtr& coll,
+                            bool relaxCappedConstraints)
         : PlanStage(stageType, expCtx),
+          _relaxCappedConstraints(relaxCappedConstraints),
           _collection(&coll),
           _collectionUUID(coll->uuid()),
           _catalogEpoch(getCatalogEpoch()),
           _nss(coll->ns()) {}
+
+    RequiresCollectionStage(const char* stageType,
+                            ExpressionContext* expCtx,
+                            const CollectionPtr& coll)
+        : RequiresCollectionStage(stageType, expCtx, coll, false /* relaxCappedConstraints */) {}
 
     virtual ~RequiresCollectionStage() = default;
 
@@ -82,6 +89,11 @@ protected:
     UUID uuid() const {
         return _collectionUUID;
     }
+
+    // Whether this collection scan should be exempted from capped collection constratints, like
+    // forbidding cursor repositioning across yield restore. Ignored if this is not a capped
+    // collection.
+    const bool _relaxCappedConstraints;
 
 private:
     // This can only be called when the plan stage is attached to an operation context.

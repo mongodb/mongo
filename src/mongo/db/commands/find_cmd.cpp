@@ -476,6 +476,23 @@ public:
                 query_request_helper::refreshNSS(ctx->getNss(), findCommand.get());
             }
 
+            // Tailing a replicated capped clustered collection requires majority read concern.
+            const auto coll = ctx->getCollection().get();
+            if (coll) {
+                const bool isTailable = findCommand->getTailable();
+                const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
+                    repl::ReadConcernLevel::kMajorityReadConcern;
+                const bool isClusteredCollection = coll->isClustered();
+                const bool isCapped = coll->isCapped();
+                const bool isReplicated = coll->ns().isReplicated();
+                if (isClusteredCollection && isCapped && isReplicated && isTailable) {
+                    uassert(ErrorCodes::Error(6049203),
+                            "A tailable cursor on a capped clustered collection requires majority "
+                            "read concern",
+                            isMajorityReadConcern);
+                }
+            }
+
             // Check whether we are allowed to read from this node after acquiring our locks.
             uassertStatusOK(replCoord->checkCanServeReadsFor(
                 opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
