@@ -1125,9 +1125,17 @@ config_error(void)
 static void
 config_print_one(FILE *fp, CONFIG *cp, CONFIGV *v, const char *prefix)
 {
-    if (F_ISSET(cp, C_STRING))
-        fprintf(fp, "%s%s=%s\n", prefix, cp->name, v->vstr == NULL ? "" : v->vstr);
-    else
+    const char *cstr;
+
+    if (F_ISSET(cp, C_STRING)) {
+        /* Historic versions of format expect "none", instead of "off", for a few configurations. */
+        cstr = v->vstr == NULL ? "off" : v->vstr;
+        if (strcmp(cstr, "off") == 0 &&
+          (cp->off == V_GLOBAL_DISK_ENCRYPTION || cp->off == V_GLOBAL_LOGGING_COMPRESSION ||
+            cp->off == V_TABLE_BTREE_COMPRESSION))
+            cstr = "none";
+        fprintf(fp, "%s%s=%s\n", prefix, cp->name, cstr);
+    } else
         fprintf(fp, "%s%s=%" PRIu32 "\n", prefix, cp->name, v->v);
 }
 
