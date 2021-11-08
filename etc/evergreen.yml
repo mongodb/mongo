@@ -1403,6 +1403,31 @@ functions:
         content_type: application/gzip
         display_name: Generated Tests - Execution ${execution}
 
+  "upload npm logs":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/move_npm_logs.sh"
+    - command: archive.targz_pack
+      params:
+        target: "npm-logs.tgz"
+        source_dir: "${workdir}/"
+        include:
+          - "_logs/*"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: npm-logs.tgz
+        remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}-npm-logs.tgz
+        bucket: mciuploads
+        permissions: private
+        visibility: signed
+        content_type: application/gzip
+        display_name: npm logs - Execution ${execution}
+
   "minimize jstestfuzz":
     - *f_expansions_write
     - command: subprocess.exec
@@ -1429,7 +1454,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/jstestfuzz/out/minimizer-outputs-minimizedtest.js
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-minimizedtest-${build_id}.json
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-minimizedtest-${build_id}.js
         bucket: mciuploads
         permissions: private
         visibility: signed
@@ -2014,6 +2039,7 @@ pre:
 # Post task steps
 post:
   - func: "f_expansions_write"
+  - func: "upload npm logs"
   - func: "attach report"
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
