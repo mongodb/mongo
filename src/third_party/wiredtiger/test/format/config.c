@@ -249,6 +249,23 @@ config_table(TABLE *table, void *arg)
     table->max_mem_page = MEGABYTE(TV(BTREE_MEMORY_PAGE_MAX));
 
     /*
+     * Keep the number of rows and keys/values small for in-memory runs (overflow items aren't an
+     * issue for in-memory configurations and it helps prevents cache overflow).
+     */
+    if (GV(RUNS_IN_MEMORY)) {
+        if (!config_explicit(table, "runs.rows") && TV(RUNS_ROWS) > 1000000)
+            config_single(table, "runs.rows=1000000", false);
+        if (!config_explicit(table, "btree.key_max"))
+            config_single(table, "btree.key_max=32", false);
+        if (!config_explicit(table, "btree.key_min"))
+            config_single(table, "btree.key_min=15", false);
+        if (!config_explicit(table, "btree.value_max"))
+            config_single(table, "btree.value_max=80", false);
+        if (!config_explicit(table, "btree.value_min"))
+            config_single(table, "btree.value_min=20", false);
+    }
+
+    /*
      * Key/value minimum/maximum are related, correct unless specified by the configuration. Key
      * sizes are a row-store consideration: column-store doesn't store keys, a constant of 8 will
      * reserve a small amount of additional space.
@@ -805,6 +822,8 @@ config_in_memory(void)
      */
     if (config_explicit(NULL, "backup"))
         return;
+    if (config_explicit(NULL, "block_cache"))
+        return;
     if (config_explicit(NULL, "btree.compression"))
         return;
     if (config_explicit(NULL, "checkpoint"))
@@ -814,6 +833,8 @@ config_in_memory(void)
     if (config_explicit(NULL, "import"))
         return;
     if (config_explicit(NULL, "logging"))
+        return;
+    if (config_explicit(NULL, "ops.alter"))
         return;
     if (config_explicit(NULL, "ops.hs_cursor"))
         return;
@@ -836,8 +857,8 @@ config_in_memory_reset(void)
     /* Turn off a lot of stuff. */
     if (!config_explicit(NULL, "backup"))
         config_off(NULL, "backup");
-    if (!config_explicit(NULL, "btree.compression"))
-        config_off(NULL, "btree.compression");
+    if (!config_explicit(NULL, "block_cache"))
+        config_off(NULL, "block_cache");
     if (!config_explicit(NULL, "checkpoint"))
         config_off(NULL, "checkpoint");
     if (!config_explicit(NULL, "import"))
@@ -852,15 +873,6 @@ config_in_memory_reset(void)
         config_off(NULL, "ops.salvage");
     if (!config_explicit(NULL, "ops.verify"))
         config_off(NULL, "ops.verify");
-
-    /*
-     * Keep keys/values small, overflow items aren't an issue for in-memory configurations and it
-     * keeps us from overflowing the cache.
-     */
-    if (!config_explicit(NULL, "btree.key_max"))
-        config_single(NULL, "btree.key_max=32", false);
-    if (!config_explicit(NULL, "btree.value_max"))
-        config_single(NULL, "btree.value_max=80", false);
 }
 
 /*
