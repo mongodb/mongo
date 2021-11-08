@@ -899,9 +899,4 @@ var ReshardingTest = class {
 
         return cloneTimestamp;
     }
-
-    isMixedVersionCluster() {
-        const clusterVersionInfo = this._st.getClusterVersionInfo();
-        return clusterVersionInfo.isMixedVersion;
-    }
 };

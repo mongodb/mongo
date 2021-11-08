@@ -112,6 +112,8 @@ last-continuous:
       test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
     - ticket: SERVER-58744
       test_file: jstests/replsets/apply_ops_capped_collection.js
+    - ticket: SERVER-57700
+      test_file: jstests/sharding/resharding_histogram_metrics.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -367,6 +369,8 @@ last-lts:
       test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
     - ticket: SERVER-35649
       test_file: jstests/replsets/disallow_adding_initialized_node1.js
+    - ticket: SERVER-57700
+      test_file: jstests/sharding/resharding_histogram_metrics.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
