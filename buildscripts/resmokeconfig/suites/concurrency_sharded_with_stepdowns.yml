@@ -207,6 +207,9 @@ executor:
     configsvr_options:
       num_nodes: 3
       all_nodes_electable: true
+      mongod_options:
+        set_parameters:
+          reshardingMinimumOperationDurationMillis: 30000 # 30 seconds
       replset_config_options:
         settings:
           catchUpTimeoutMillis: 0

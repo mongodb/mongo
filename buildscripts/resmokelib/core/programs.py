@@ -200,9 +200,6 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     if config.FLOW_CONTROL is not None:
         mongod_set_parameters.setdefault("enableFlowControl", config.FLOW_CONTROL == "on")
 
-    # Set the default value for minimum resharding operation duration to 5 seconds.
-    mongod_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
-
     mongos_launcher = shardedcluster.MongosLauncher(fixturelib)
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.

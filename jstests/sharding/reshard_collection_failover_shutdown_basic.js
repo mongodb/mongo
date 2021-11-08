@@ -1,11 +1,12 @@
 /**
  * Tests that reshardCollection succeeds when a participant experiences a failover or clean/unclean
  * restart during the operation.
- *
- * TODO SERVER-58343: re-enable this test.
+ * Multiversion testing does not support tests that kill and restart nodes. So we had to add the
+ * 'multiversion_incompatible' tag.
  * @tags: [
- *   __TEMPORARILY_DISABLED__,
  *   uses_atclustertime,
+ *   multiversion_incompatible,
+ *   requires_persistence,
  * ]
  */
 (function() {

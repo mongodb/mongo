@@ -216,6 +216,9 @@ executor:
       replset_config_options:
         settings:
           catchUpTimeoutMillis: 0
+      mongod_options:
+        set_parameters:
+          reshardingMinimumOperationDurationMillis: 30000 # 30 seconds
     shard_options:
       all_nodes_electable: true
       mongod_options:
