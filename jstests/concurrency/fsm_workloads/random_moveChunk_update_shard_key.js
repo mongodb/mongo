@@ -83,15 +83,15 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.WriteConflict,
             ErrorCodes.LockTimeout,
             ErrorCodes.PreparedTransactionInProgress,
-            ErrorCodes.ShardInvalidatedForTargeting
+            ErrorCodes.ShardInvalidatedForTargeting,
+            ErrorCodes.NoSuchTransaction
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
         // interact with stepdowns and transactions to cause the following errors. We only expect
         // these errors in stepdown suites and not in other suites, so we surface them to the test
         // runner in other scenarios.
-        const stepdownErrors =
-            [ErrorCodes.NoSuchTransaction, ErrorCodes.ConflictingOperationInProgress];
+        const stepdownErrors = [ErrorCodes.ConflictingOperationInProgress];
 
         if (this.runningWithStepdowns) {
             skippableErrors.push(...stepdownErrors);
