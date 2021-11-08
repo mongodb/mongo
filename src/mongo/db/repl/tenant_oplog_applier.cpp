@@ -346,7 +346,7 @@ void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,
                         "Namespace does not belong to tenant being migrated",
                         "tenant"_attr = _tenantId,
                         "migrationUuid"_attr = _migrationUuid,
-                        "nss"_attr = op.getNss());
+                        logAttrs(op.getNss()));
             uasserted(4886016, "Namespace does not belong to tenant being migrated");
         }
         if (!op.getUuid())
@@ -361,7 +361,7 @@ void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,
                             "tenant"_attr = _tenantId,
                             "migrationUuid"_attr = _migrationUuid,
                             "UUID"_attr = *op.getUuid(),
-                            "nss"_attr = nss.ns());
+                            logAttrs(nss));
                 uasserted(4886014, "UUID does not belong to tenant being migrated");
             }
             _knownGoodUuids.insert(*op.getUuid());
@@ -372,7 +372,7 @@ void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,
                         "tenant"_attr = _tenantId,
                         "migrationUuid"_attr = _migrationUuid,
                         "UUID"_attr = *op.getUuid(),
-                        "nss"_attr = op.getNss().ns());
+                        logAttrs(op.getNss()));
         }
     };
 

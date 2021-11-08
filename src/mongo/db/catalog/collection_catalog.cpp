@@ -971,9 +971,9 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 
     LOGV2_DEBUG(20280,
                 1,
-                "Registering collection {ns} with UUID {uuid}",
+                "Registering collection {namespace} with UUID {uuid}",
                 "Registering collection",
-                "namespace"_attr = ns,
+                logAttrs(ns),
                 "uuid"_attr = uuid);
 
     auto dbName = ns.db().toString();
@@ -1014,7 +1014,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     auto dbName = ns.db().toString();
     auto dbIdPair = std::make_pair(dbName, uuid);
 
-    LOGV2_DEBUG(20281, 1, "Deregistering collection", "namespace"_attr = ns, "uuid"_attr = uuid);
+    LOGV2_DEBUG(20281, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
 
     // Make sure collection object exists.
     invariant(_collections.find(ns) != _collections.end());
@@ -1051,8 +1051,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
         auto dbName = ns.db().toString();
         auto dbIdPair = std::make_pair(dbName, uuid);
 
-        LOGV2_DEBUG(
-            20283, 1, "Deregistering collection", "namespace"_attr = ns, "uuid"_attr = uuid);
+        LOGV2_DEBUG(20283, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
 
         entry.second.reset();
     }
@@ -1068,7 +1067,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
 
 void CollectionCatalog::registerView(const NamespaceString& ns) {
     if (_collections.contains(ns)) {
-        LOGV2(5706100, "Conflicted creating a view", "ns"_attr = ns);
+        LOGV2(5706100, "Conflicted creating a view", logAttrs(ns));
         throw WriteConflictException();
     }
 

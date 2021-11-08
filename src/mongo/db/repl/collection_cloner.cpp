@@ -135,7 +135,7 @@ void CollectionCloner::preStage() {
                     1,
                     "Skipping the recording of some initial sync metrics due to failure in the "
                     "'collStats' command",
-                    "ns"_attr = _sourceNss.coll().toString(),
+                    logAttrs(_sourceNss),
                     "status"_attr = status);
     }
 }

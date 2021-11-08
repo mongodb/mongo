@@ -1361,8 +1361,8 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(22331,
                 2,
-                "WiredTigerKVEngine::createRecordStore ns: {ns} uri: {uri} config: {config}",
-                "ns"_attr = ns,
+                "WiredTigerKVEngine::createRecordStore ns: {namespace} uri: {uri} config: {config}",
+                logAttrs(NamespaceString(ns)),
                 "uri"_attr = uri,
                 "config"_attr = config);
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));

@@ -623,7 +623,7 @@ void ShardingCatalogManager::_enableSupportForLongCollectionName(OperationContex
         } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
             LOGV2_ERROR(5857400,
                         "Failed to refresh collection on shards after enabling long name support",
-                        "nss"_attr = collNss.ns(),
+                        logAttrs(collNss),
                         "error"_attr = redact(e));
         }
     }
@@ -673,7 +673,7 @@ void ShardingCatalogManager::_disableSupportForLongCollectionName(OperationConte
         } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
             LOGV2_ERROR(5857401,
                         "Failed to refresh collection on shards after disabling long name support",
-                        "nss"_attr = collNss.ns(),
+                        logAttrs(collNss),
                         "error"_attr = redact(e));
         }
     }

@@ -905,7 +905,8 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
     }
 
     if (!isTemp()) {
-        LOGV2_DEBUG(22395, 1, "~WiredTigerRecordStore for: {ns}", "ns"_attr = ns());
+        LOGV2_DEBUG(
+            22395, 1, "~WiredTigerRecordStore for: {namespace}", logAttrs(NamespaceString(ns())));
     } else {
         LOGV2_DEBUG(22396,
                     1,

@@ -163,10 +163,10 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
     // be possible, so these are an invariant rather than fassert.
     if (collator == ErrorCodes::IncompatibleCollationVersion) {
         LOGV2(20288,
-              "Collection {nss} has a default collation which is incompatible with this version: "
-              "{collationSpec}",
+              "Collection {namespace} has a default collation which is incompatible with this "
+              "version: {collationSpec}"
               "Collection has a default collation incompatible with this version",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "collationSpec"_attr = collationSpec);
         fassertFailedNoTrace(40144);
     }
@@ -483,9 +483,9 @@ void CollectionImpl::init(OperationContext* opCtx) {
         // Log an error and startup warning if the collection validator is malformed.
         LOGV2_WARNING_OPTIONS(20293,
                               {logv2::LogTag::kStartupWarnings},
-                              "Collection {ns} has malformed validator: {validatorStatus}",
+                              "Collection {namespace} has malformed validator: {validatorStatus}",
                               "Collection has malformed validator",
-                              "namespace"_attr = _ns,
+                              logAttrs(_ns),
                               "validatorStatus"_attr = _validator.getStatus());
     }
 
@@ -626,7 +626,7 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
         ValidationActionEnum::warn) {
         LOGV2_WARNING(20294,
                       "Document would fail validation",
-                      "namespace"_attr = ns(),
+                      logAttrs(ns()),
                       "document"_attr = redact(document),
                       "errInfo"_attr = generatedError);
         return Status::OK();
@@ -765,7 +765,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
             LOGV2(20289,
                   "hangAfterCollectionInserts fail point enabled. Blocking "
                   "until fail point is disabled.",
-                  "namespace"_attr = _ns,
+                  logAttrs(_ns),
                   "whenFirst"_attr = whenFirst);
             hangAfterCollectionInserts.pauseWhileSet(opCtx);
         },
@@ -827,7 +827,7 @@ Status CollectionImpl::insertDocumentForBulkLoader(
         LOGV2(20290,
               "Failpoint failAfterBulkLoadDocInsert enabled. Throwing "
               "WriteConflictException",
-              "namespace"_attr = _ns);
+              logAttrs(_ns));
         throw WriteConflictException();
     }
 
@@ -1162,7 +1162,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     if (isCapped() && !isClustered() && opCtx->isEnforcingConstraints()) {
         // System operations such as tenant migration, secondary batch application or TTL on a
         // capped clustered collection can delete from capped collections.
-        LOGV2(20291, "failing remove on a capped ns", "namespace"_attr = _ns);
+        LOGV2(20291, "failing remove on a capped ns", logAttrs(_ns));
         uasserted(10089, "cannot remove from a capped collection");
     }
 
@@ -1530,9 +1530,9 @@ bool CollectionImpl::isEmpty(OperationContext* opCtx) const {
 
         LOGV2_DEBUG(20292,
                     2,
-                    "Detected erroneous fast count for collection {ns}({uuid}) "
+                    "Detected erroneous fast count for collection {namespace}({uuid}) "
                     "[{getRecordStore_getIdent}]. Record count reported by: {bob_obj}",
-                    "ns"_attr = ns(),
+                    logAttrs(ns()),
                     "uuid"_attr = uuid(),
                     "getRecordStore_getIdent"_attr = getRecordStore()->getIdent(),
                     "bob_obj"_attr = bob.obj());

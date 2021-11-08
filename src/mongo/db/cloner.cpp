@@ -238,7 +238,7 @@ void Cloner::_copy(OperationContext* opCtx,
     LOGV2_DEBUG(20414,
                 2,
                 "\t\tcloning collection",
-                "ns"_attr = nss,
+                logAttrs(nss),
                 "conn_getServerAddress"_attr = conn->getServerAddress());
 
     Fun f(opCtx, toDBName);
@@ -276,7 +276,7 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
     LOGV2_DEBUG(20415,
                 2,
                 "\t\t copyIndexes",
-                "ns"_attr = nss,
+                logAttrs(nss),
                 "conn_getServerAddress"_attr = conn->getServerAddress());
 
     uassert(ErrorCodes::PrimarySteppedDown,
@@ -574,7 +574,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
 
         clonedColls->insert(nss.ns());
 
-        LOGV2_DEBUG(20421, 1, "\t\t cloning", "ns"_attr = nss, "host"_attr = masterHost);
+        LOGV2_DEBUG(20421, 1, "\t\t cloning", logAttrs(nss), "host"_attr = masterHost);
 
         _copy(opCtx,
               dBName,

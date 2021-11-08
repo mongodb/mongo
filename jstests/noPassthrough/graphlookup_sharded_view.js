@@ -79,8 +79,11 @@ function getMatchingLogsForTestRun(logs, fields) {
 
 function getShardedViewExceptions(shard) {
     const shardLog = assert.commandWorked(sharded[shard].adminCommand({getLog: "global"})).log;
-    return ["test.docs", "test.subjects"].map(ns => {
-        return {ns: ns, count: [...getMatchingLogsForTestRun(shardLog, {id: 5865400, ns})].length};
+    return ["test.docs", "test.subjects"].map(namespace => {
+        return {
+            ns: namespace,
+            count: [...getMatchingLogsForTestRun(shardLog, {id: 5865400, namespace})].length
+        };
     });
 }
 

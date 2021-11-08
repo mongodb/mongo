@@ -798,7 +798,7 @@ void Balancer::_mergeChunksIfNeeded(OperationContext* opCtx) {
             continue;
         }
 
-        LOGV2(8423321, "Move chunk phase on {nss}", "nss"_attr = coll.getNss());
+        LOGV2(8423321, "Move chunk phase on {namespace}", logAttrs(coll.getNss()));
 
         progress = _chunkMerger->moveMergeOrSplitChunks(opCtx, coll);
         if (progress != Progress::Done) {

@@ -555,9 +555,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
             LOGV2_DEBUG(3254800,
                         3,
-                        "$lookup found view definition. ns: {ns}, pipeline: {pipeline}. New "
+                        "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                         "$lookup sub-pipeline: {new_pipe}",
-                        "ns"_attr = e->getNamespace(),
+                        logAttrs(e->getNamespace()),
                         "pipeline"_attr = Value(e->getPipeline()),
                         "new_pipe"_attr = _resolvedPipeline);
 
@@ -605,9 +605,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
             LOGV2_DEBUG(3254801,
                         3,
-                        "$lookup found view definition. ns: {ns}, pipeline: {pipeline}. New "
+                        "$lookup found view definition. ns: {namespace}, pipeline: {pipeline}. New "
                         "$lookup sub-pipeline: {new_pipe}",
-                        "ns"_attr = e->getNamespace(),
+                        logAttrs(e->getNamespace()),
                         "pipeline"_attr = Value(e->getPipeline()),
                         "new_pipe"_attr = _resolvedPipeline);
 

@@ -59,11 +59,11 @@ void DeferredWriter::_logFailure(const Status& status) {
 void DeferredWriter::_logDroppedEntry() {
     _droppedEntries += 1;
     if (TimePoint::clock::now() - _lastLoggedDrop > kLogInterval) {
-        LOGV2(
-            20517,
-            "Deferred write buffer for {nss} is full. {droppedEntries} entries have been dropped.",
-            "nss"_attr = _nss.toString(),
-            "droppedEntries"_attr = _droppedEntries);
+        LOGV2(20517,
+              "Deferred write buffer for {namespace} is full. {droppedEntries} entries have been "
+              "dropped.",
+              logAttrs(_nss),
+              "droppedEntries"_attr = _droppedEntries);
         _lastLoggedDrop = stdx::chrono::system_clock::now();
         _droppedEntries = 0;
     }

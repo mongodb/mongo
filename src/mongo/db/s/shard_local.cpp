@@ -183,7 +183,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
             const auto& indexSpec = indexSpecs[0];
             LOGV2(5173300,
                   "Creating index on sharding collection with existing data",
-                  "ns"_attr = ns,
+                  logAttrs(ns),
                   "uuid"_attr = collection->uuid(),
                   "index"_attr = indexSpec);
             auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;

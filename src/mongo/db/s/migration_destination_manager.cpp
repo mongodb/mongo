@@ -1568,7 +1568,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx, _nss, critSecReason, ShardingCatalogClient::kLocalWriteConcern);
 
-                LOGV2(5899114, "Entered migration recipient critical section", "nss"_attr = _nss);
+                LOGV2(5899114, "Entered migration recipient critical section", logAttrs(_nss));
                 timeInCriticalSection.emplace();
             });
 
@@ -1801,7 +1801,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
 
     LOGV2(5899108,
           "Exited migration recipient critical section",
-          "nss"_attr = _nss,
+          logAttrs(_nss),
           "durationMillis"_attr = timeInCriticalSectionMs);
 
     // Wait for the updates to the catalog cache to be written to disk before removing the

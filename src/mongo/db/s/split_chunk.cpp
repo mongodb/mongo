@@ -217,8 +217,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     if (!collection) {
         LOGV2_WARNING(
             23778,
-            "will not perform top-chunk checking since {nss} does not exist after splitting",
-            "nss"_attr = nss.toString());
+            "will not perform top-chunk checking since {namespace} does not exist after splitting",
+            logAttrs(nss));
         return boost::optional<ChunkRange>(boost::none);
     }
 

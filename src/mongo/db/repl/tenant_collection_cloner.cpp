@@ -184,7 +184,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
         LOGV2_WARNING(5426601,
                       "Skipping recording of data size metrics for collection due to failure in the"
                       " 'collStats' command, tenant migration stats may be inaccurate.",
-                      "nss"_attr = _sourceNss,
+                      logAttrs(_sourceNss),
                       "migrationId"_attr = getSharedData()->getMigrationId(),
                       "tenantId"_attr = _tenantId,
                       "status"_attr = status);

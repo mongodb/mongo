@@ -153,12 +153,12 @@ void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyServ
                             << ") with state document namespace \"" << ns
                             << "\" that is already in use by service "
                             << existingService->getServiceName());
-    LOGV2_INFO(
-        5123008,
-        "Successfully registered PrimaryOnlyService {service} with state documents stored in {ns}",
-        "Successfully registered PrimaryOnlyService",
-        "service"_attr = name,
-        "ns"_attr = ns);
+    LOGV2_INFO(5123008,
+               "Successfully registered PrimaryOnlyService {service} with state documents stored "
+               "in {namespace}",
+               "Successfully registered PrimaryOnlyService",
+               "service"_attr = name,
+               logAttrs(ns));
 }
 
 PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(StringData serviceName) {
@@ -644,13 +644,14 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
 
     if (!MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
         auto ns = getStateDocumentsNS();
-        LOGV2_DEBUG(5123004,
-                    2,
-                    "Querying {ns} to look for state documents while rebuilding PrimaryOnlyService "
-                    "{service}",
-                    "Querying to look for state documents while rebuilding PrimaryOnlyService",
-                    "ns"_attr = ns,
-                    "service"_attr = serviceName);
+        LOGV2_DEBUG(
+            5123004,
+            2,
+            "Querying {namespace} to look for state documents while rebuilding PrimaryOnlyService "
+            "{service}",
+            "Querying to look for state documents while rebuilding PrimaryOnlyService",
+            logAttrs(ns),
+            "service"_attr = serviceName);
 
         // The PrimaryOnlyServiceClientObserver will make any OpCtx created as part of a
         // PrimaryOnlyService immediately get interrupted if the service is not in state kRunning.
@@ -673,11 +674,11 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         } catch (const DBException& e) {
             LOGV2_ERROR(
                 4923601,
-                "Failed to start PrimaryOnlyService {service} because the query on {ns} "
+                "Failed to start PrimaryOnlyService {service} because the query on {namespace} "
                 "for state documents failed due to {error}",
                 "Failed to start PrimaryOnlyService because the query for state documents failed",
                 "service"_attr = serviceName,
-                "ns"_attr = ns,
+                logAttrs(ns),
                 "error"_attr = e);
 
             Status status = e.toStatus();

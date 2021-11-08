@@ -160,7 +160,7 @@ void applyImportCollectionDefault(OperationContext* opCtx,
                         "Applying importCollection is not supported with MongoDB Community "
                         "Edition, please use MongoDB Enterprise Edition",
                         "importUUID"_attr = importUUID,
-                        "nss"_attr = nss,
+                        logAttrs(nss),
                         "numRecords"_attr = numRecords,
                         "dataSize"_attr = dataSize,
                         "catalogEntry"_attr = redact(catalogEntry),
@@ -226,7 +226,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
         if (ErrorCodes::IndexBuildAlreadyInProgress == prepareSpecResult) {
             LOGV2(4924900,
                   "Index build: already in progress during initial sync",
-                  "ns"_attr = indexNss,
+                  logAttrs(indexNss),
                   "uuid"_attr = indexCollection->uuid(),
                   "spec"_attr = indexSpec);
             return;

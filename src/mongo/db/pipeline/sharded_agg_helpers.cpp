@@ -1344,7 +1344,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                     LOGV2_DEBUG(5837600,
                                 3,
                                 "Performing local read",
-                                "ns"_attr = expCtx->ns,
+                                logAttrs(expCtx->ns),
                                 "pipeline"_attr = pipelineToTarget->serializeToBson(),
                                 "comment"_attr = expCtx->opCtx->getComment());
 

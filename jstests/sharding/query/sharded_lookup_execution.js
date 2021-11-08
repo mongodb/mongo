@@ -46,9 +46,11 @@ const updatesColl = mongosDB.updates;
 const freshMongos = st.s1;
 const freshReviews = freshMongos.getDB(testName)[reviewsColl.getName()];
 
-function getLocalReadCount(node, ns, comment) {
+function getLocalReadCount(node, namespace, comment) {
     const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
-    return [...findMatchingLogLines(log, {id: 5837600, ns, comment: {comment: comment}})].length;
+    return [
+        ...findMatchingLogLines(log, {id: 5837600, namespace, comment: {comment: comment}})
+    ].length;
 }
 
 function assertLookupExecution(pipeline, opts, expected) {

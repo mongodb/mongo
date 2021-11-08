@@ -418,8 +418,7 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_importEntry(OperationCont
     _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
     opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, res.getValue()));
 
-    LOGV2_DEBUG(
-        5095101, 1, "imported meta data", "nss"_attr = nss.ns(), "metadata"_attr = res.getValue());
+    LOGV2_DEBUG(5095101, 1, "imported meta data", logAttrs(nss), "metadata"_attr = res.getValue());
     return {{res.getValue(), ident, nss}};
 }
 
@@ -655,8 +654,8 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
 
     LOGV2_DEBUG(22213,
                 1,
-                "stored meta data for orphaned collection {ns} @ {res_getValue}",
-                "ns"_attr = ns,
+                "stored meta data for orphaned collection {namespace} @ {res_getValue}",
+                logAttrs(ns),
                 "res_getValue"_attr = res.getValue());
     return {ns.ns()};
 }

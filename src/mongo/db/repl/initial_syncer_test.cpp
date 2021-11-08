@@ -342,7 +342,7 @@ protected:
             if (collInfo->stats->initCalled) {
                 LOGV2(24165,
                       "reusing collection during test which may cause problems",
-                      "nss"_attr = nss);
+                      logAttrs(nss));
             }
             auto localLoader = std::make_unique<CollectionBulkLoaderMock>(collInfo->stats);
             auto status = localLoader->init(secondaryIndexSpecs);

@@ -105,7 +105,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
                   "registerDonateChunk ",
                   "keys"_attr = ChunkRange(args.getMinKey(), args.getMaxKey()).toString(),
                   "toShardId"_attr = args.getToShardId(),
-                  "ns"_attr = args.getNss().ns());
+                  logAttrs(args.getNss()));
             return {ScopedDonateChunk(nullptr, false, _activeMoveChunkState->notification)};
         }
 
@@ -117,7 +117,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
               "currentToShardId"_attr = _activeMoveChunkState->args.getToShardId(),
               "newKeys"_attr = ChunkRange(args.getMinKey(), args.getMaxKey()).toString(),
               "newToShardId"_attr = args.getToShardId(),
-              "ns"_attr = args.getNss().ns());
+              logAttrs(args.getNss()));
 
         return _activeMoveChunkState->constructErrorStatus();
     }
@@ -148,7 +148,7 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
                                               _activeMoveChunkState->args.getMaxKey())
                                        .toString(),
               "currentToShardId"_attr = _activeMoveChunkState->args.getToShardId(),
-              "ns"_attr = _activeMoveChunkState->args.getNss().ns());
+              logAttrs(_activeMoveChunkState->args.getNss()));
         return _activeMoveChunkState->constructErrorStatus();
     }
 

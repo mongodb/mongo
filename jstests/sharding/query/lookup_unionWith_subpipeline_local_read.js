@@ -75,7 +75,9 @@ function getLocalReadCount(node, foreignNs, comment) {
     const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
 
     const countMatchingLogs =
-        ns => [...findMatchingLogLines(log, {id: 5837600, ns, comment: {comment: comment}})].length;
+        namespace => [...findMatchingLogLines(
+                          log, {id: 5837600, namespace, comment: {comment: comment}})]
+                         .length;
 
     // Query the logs for local reads against the namespace specified in the top-level stage and the
     // 'foreign' namespace. The latter case catches reads when the original namespace was a view.

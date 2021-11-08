@@ -441,7 +441,7 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                                LOGV2(55557,
                                      "cleanUpRange failed due to keyPattern shorter than range "
                                      "deletion bounds. Refreshing collection metadata to retry.",
-                                     "nss"_attr = deletionTask.getNss(),
+                                     logAttrs(deletionTask.getNss()),
                                      "status"_attr = redact(status));
 
                                onShardVersionMismatch(

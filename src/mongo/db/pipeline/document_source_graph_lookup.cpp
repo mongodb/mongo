@@ -295,13 +295,14 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
                 _fromExpCtx = _fromExpCtx->copyWith(e->getNamespace());
                 _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
-                LOGV2_DEBUG(5865400,
-                            3,
-                            "$graphLookup found view definition. ns: {ns}, pipeline: {pipeline}. "
-                            "New $graphLookup sub-pipeline: {new_pipe}",
-                            "ns"_attr = e->getNamespace(),
-                            "pipeline"_attr = Value(e->getPipeline()),
-                            "new_pipe"_attr = _fromPipeline);
+                LOGV2_DEBUG(
+                    5865400,
+                    3,
+                    "$graphLookup found view definition. ns: {namespace}, pipeline: {pipeline}. "
+                    "New $graphLookup sub-pipeline: {new_pipe}",
+                    logAttrs(e->getNamespace()),
+                    "pipeline"_attr = Value(e->getPipeline()),
+                    "new_pipe"_attr = _fromPipeline);
 
                 // We can now safely optimize and reattempt attaching the cursor source.
                 pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);

@@ -63,6 +63,6 @@ void WriteConflictException::logAndBackoff(int attempt, StringData operation, St
                          static_cast<size_t>(attempt),
                          "Caught WriteConflictException",
                          "operation"_attr = operation,
-                         "ns"_attr = ns);
+                         logAttrs(NamespaceString(ns)));
 }
 }  // namespace mongo
