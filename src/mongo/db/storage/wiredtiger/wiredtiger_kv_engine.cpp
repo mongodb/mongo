@@ -946,8 +946,6 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
 void WiredTigerKVEngine::cleanShutdown() {
     log() << "WiredTigerKVEngine shutting down";
 
-    if (!_readOnly)
-        syncSizeInfo(true);
     if (!_conn) {
         return;
     }
@@ -971,7 +969,6 @@ void WiredTigerKVEngine::cleanShutdown() {
     LOG_FOR_RECOVERY(2) << "Shutdown timestamps. StableTimestamp: " << _stableTimestamp.load()
                         << " Initial data timestamp: " << _initialDataTimestamp.load();
 
-    _sizeStorer.reset();
     _sessionCache->shuttingDown();
 
 // We want WiredTiger to leak memory for faster shutdown except when we are running tools to look
@@ -981,6 +978,16 @@ void WiredTigerKVEngine::cleanShutdown() {
 #else
     bool leak_memory = false;
 #endif
+    if (!_readOnly) {
+        syncSizeInfo(/*syncToDisk=*/true);
+    }
+
+    // The size storer has to be destructed after the session cache has shut down. This sets the
+    // shutdown flag internally in the session cache. As operations get interrupted during shutdown,
+    // they release their session back to the session cache. If the shutdown flag has been set,
+    // released sessions will skip flushing the size storer.
+    _sizeStorer.reset();
+
     std::string closeConfig = "";
 
     if (RUNNING_ON_VALGRIND) {
