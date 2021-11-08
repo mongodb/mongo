@@ -521,6 +521,12 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                     auto* const csr = CollectionShardingRuntime::get(opCtx, deletedNss);
+
+                    // Secondary nodes must clear the filtering metadata before releasing the
+                    // in-memory critical section
+                    if (!isStandaloneOrPrimary(opCtx))
+                        csr->clearFilteringMetadata(opCtx);
+
                     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
                     csr->exitCriticalSection(csrLock, reason);
                 });
