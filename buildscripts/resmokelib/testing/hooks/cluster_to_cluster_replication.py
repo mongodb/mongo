@@ -154,7 +154,7 @@ class _ReplicatorActionTestCase(interface.DynamicTestCase):
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, base_test_name, hook, action, action_options):
         """Initialize _ReplicatorActionTestCase."""
-        interface.DynamicTestCase.__init__(self, logger, "replicator_action",
+        interface.DynamicTestCase.__init__(self, logger, f"replicator_action:{action.__name__}",
                                            "Run a replicator action.", base_test_name, hook)
         self._action = action
         self._action_options = action_options
