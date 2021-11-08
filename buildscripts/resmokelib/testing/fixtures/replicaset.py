@@ -11,8 +11,6 @@ import pymongo.write_concern
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
 
-USE_LEGACY_MULTIVERSION = False
-
 
 def compare_timestamp(timestamp1, timestamp2):
     """Compare the timestamp object ts part."""
@@ -47,9 +45,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             dbpath_prefix=None, preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
             write_concern_majority_journal_default=None, auth_options=None,
             replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
-            use_replica_set_connection_string=None, linear_chain=False, mixed_bin_versions=None,
-            default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
-            replicaset_logging_prefix=None):
+            use_replica_set_connection_string=None, linear_chain=False, default_read_concern=None,
+            default_write_concern=None, shard_logging_prefix=None, replicaset_logging_prefix=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -69,7 +66,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.use_replica_set_connection_string = use_replica_set_connection_string
         self.default_read_concern = default_read_concern
         self.default_write_concern = default_write_concern
-        self.mixed_bin_versions = mixed_bin_versions
         self.shard_logging_prefix = shard_logging_prefix
         self.replicaset_logging_prefix = replicaset_logging_prefix
         self.num_nodes = num_nodes
@@ -123,17 +119,6 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         if self.initial_sync_node:
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
-
-        # Legacy multiversion line
-        if self.mixed_bin_versions:
-            for i in range(self.num_nodes):
-                print("node[i] version: " + self.nodes[i].mongod_executable +
-                      "mixed_bin_version[i]: " + self.mixed_bin_versions[i])
-                if self.nodes[i].mongod_executable != self.mixed_bin_versions[i]:
-                    msg = (f"Executable of node{i}: {self.nodes[i].mongod_executable} does not "
-                           f"match the executable assigned by mixedBinVersions: "
-                           f"{self.mixed_bin_versions[i]}.")
-                    raise self.fixturelib.ServerFailure(msg)
 
         # We need only to wait to connect to the first node of the replica set because we first
         # initiate it as a single node replica set.
