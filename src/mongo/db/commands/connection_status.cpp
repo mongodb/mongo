@@ -114,6 +114,10 @@ public:
         return false;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }

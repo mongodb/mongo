@@ -54,32 +54,36 @@ using std::vector;
 
 class PingCommand : public PingCmdVersion1Gen<PingCommand> {
 public:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
-    std::string help() const override {
+
+    std::string help() const final {
         return "a way to check that the server is alive. responds immediately even if server is "
                "in a db lock.";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool requiresAuth() const override {
+
+    bool requiresAuth() const final {
         return false;
     }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
-        virtual bool supportsWriteConcern() const override {
+        bool supportsWriteConcern() const final {
             return false;
         }
-        virtual bool allowsAfterClusterTime() const override {
+        bool allowsAfterClusterTime() const final {
             return false;
         }
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
-        virtual Reply typedRun(OperationContext* opCtx) override {
+        Reply typedRun(OperationContext* opCtx) final {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
             return Reply{};
         }

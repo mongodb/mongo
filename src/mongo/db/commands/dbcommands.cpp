@@ -715,24 +715,30 @@ class CmdBuildInfo : public BasicCommand {
 public:
     CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool requiresAuth() const override {
+    bool requiresAuth() const final {
         return false;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return false;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    std::string help() const override {
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const final {}  // No auth required
+    std::string help() const final {
         return "get version #, etc.\n"
                "{ buildinfo:1 }";
     }
@@ -740,13 +746,13 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& jsobj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) final {
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;
     }
 
-    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, std::string) override {
+    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, std::string) final {
         auto opCtx = rec->getOpCtx();
         return BuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }

@@ -54,12 +54,17 @@
 namespace mongo {
 namespace {
 
-template <typename RequestT, bool AdminOnly = true>
-class GenericTC : public TypedCommand<GenericTC<RequestT, AdminOnly>> {
+struct AdminOnlyNoTenant {
+    static constexpr bool kAdminOnly = true;
+    static constexpr bool kAllowedWithSecurityToken = false;
+};
+
+template <typename RequestT, typename Traits = AdminOnlyNoTenant>
+class GenericTC : public TypedCommand<GenericTC<RequestT, Traits>> {
 public:
     using Request = RequestT;
     using Reply = typename RequestT::Reply;
-    using TC = TypedCommand<GenericTC<RequestT, AdminOnly>>;
+    using TC = TypedCommand<GenericTC<RequestT, Traits>>;
 
     class Invocation final : public TC::InvocationBase {
     public:
@@ -79,7 +84,11 @@ public:
     };
 
     bool adminOnly() const final {
-        return AdminOnly;
+        return Traits::kAdminOnly;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return Traits::kAllowedWithSecurityToken;
     }
 
     typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
@@ -87,8 +96,13 @@ public:
     }
 };
 
+struct AnyDbAllowTenant {
+    static constexpr bool kAdminOnly = false;
+    static constexpr bool kAllowedWithSecurityToken = true;
+};
+
 // { features: 1 }
-using FeaturesCmd = GenericTC<FeaturesCommand, false>;
+using FeaturesCmd = GenericTC<FeaturesCommand, AnyDbAllowTenant>;
 template <>
 void FeaturesCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     if (request().getOidReset().value_or(false)) {
@@ -116,8 +130,13 @@ FeaturesReply FeaturesCmd::Invocation::typedRun(OperationContext*) {
 }
 FeaturesCmd featuresCmd;
 
+struct AnyDbNoTenant {
+    static constexpr bool kAdminOnly = false;
+    static constexpr bool kAllowedWithSecurityToken = false;
+};
+
 // { hostInfo: 1 }
-using HostInfoCmd = GenericTC<HostInfoCommand, false>;
+using HostInfoCmd = GenericTC<HostInfoCommand, AnyDbNoTenant>;
 template <>
 void HostInfoCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     auto* as = AuthorizationSession::get(opCtx->getClient());

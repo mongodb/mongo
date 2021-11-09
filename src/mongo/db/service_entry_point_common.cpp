@@ -1290,6 +1290,10 @@ void ExecCommandDatabase::_initiateCommand() {
     });
 
     rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Command " << command->getName()
+                          << " is not supported in multitenancy mode",
+            command->allowedWithSecurityToken() || auth::getSecurityToken(opCtx) == boost::none);
     _tokenAuthorizationSessionGuard.emplace(opCtx);
 
     rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());

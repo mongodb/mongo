@@ -579,6 +579,13 @@ public:
         return true;
     }
 
+    /**
+     * By default, no newly created command is permitted under multitenancy.
+     * Implementations must override this to true to permit use.
+     */
+    virtual bool allowedWithSecurityToken() const {
+        return false;
+    }
 
     /**
      * Get the authorization contract for this command. nullptr means no contract has been
