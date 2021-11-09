@@ -824,10 +824,6 @@ var ReshardingTest = class {
 
             if (res.ok === 1) {
                 replSet.awaitNodesAgreeOnPrimary();
-                // We wait for replication to ensure all nodes have finished their rollback before
-                // another round of rollback may triggered by the test. TODO SERVER-59721: Remove
-                // this wait.
-                replSet.awaitReplication();
                 assert.eq(newPrimary, replSet.getPrimary());
                 return;
             }
@@ -841,9 +837,6 @@ var ReshardingTest = class {
         jsTest.log(`ReshardingTestFixture failed to step up secondaries, trying to step` +
                    ` original primary back up`);
         replSet.stepUp(originalPrimary, {awaitReplicationBeforeStepUp: false});
-        // We wait for replication to ensure all nodes have finished their rollback before another
-        // round of rollback may triggered by the test. TODO SERVER-59721: Remove this wait.
-        replSet.awaitReplication();
     }
 
     killAndRestartPrimaryOnShard(shardName) {
@@ -856,9 +849,6 @@ var ReshardingTest = class {
         const opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
         replSet.restart(originalPrimaryConn, opts, SIGKILL);
         replSet.awaitNodesAgreeOnPrimary();
-        // We wait for replication to ensure all nodes have finished their rollback before another
-        // round of rollback may triggered by the test. TODO SERVER-59721: Remove this wait.
-        replSet.awaitReplication();
     }
 
     shutdownAndRestartPrimaryOnShard(shardName) {
@@ -871,9 +861,6 @@ var ReshardingTest = class {
         const SIGTERM = 15;
         replSet.restart(originalPrimaryConn, {}, SIGTERM);
         replSet.awaitNodesAgreeOnPrimary();
-        // We wait for replication to ensure all nodes have finished their rollback before another
-        // round of rollback may triggered by the test. TODO SERVER-59721: Remove this wait.
-        replSet.awaitReplication();
     }
 
     /**

@@ -40,12 +40,11 @@ reshardingTest.withReshardingInBackground(  //
         reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
         assert.commandWorked(sourceCollection.insert({oldKey: 1, newKey: 2}));
 
-        /* TODO SERVER-59721: Enable tests for update and remove
         reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
         assert.commandWorked(sourceCollection.update({oldKey: 1, newKey: 2}, {$set: {extra: 3}}));
 
         reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
-        assert.commandWorked(sourceCollection.remove({oldKey: 1, newKey: 2}, {justOne: true})); */
+        assert.commandWorked(sourceCollection.remove({oldKey: 1, newKey: 2}, {justOne: true}));
     });
 
 reshardingTest.teardown();
