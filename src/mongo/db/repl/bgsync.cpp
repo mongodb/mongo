@@ -297,16 +297,10 @@ void BackgroundSync::_produce() {
 
     // find a target to sync from the last optime fetched
     {
-        OpTime minValidSaved;
-        {
-            auto opCtx = cc().makeOperationContext();
-            minValidSaved = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
-        }
         stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
         }
-        const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
         lastOpTimeFetched = _lastOpTimeFetched;
         if (!_syncSourceHost.empty()) {
             LOGV2(21080,
@@ -319,7 +313,7 @@ void BackgroundSync::_produce() {
             _replicationCoordinatorExternalState->getTaskExecutor(),
             _replCoord,
             lastOpTimeFetched,
-            requiredOpTime,
+            OpTime(),
             [&syncSourceResp](const SyncSourceResolverResponse& resp) { syncSourceResp = resp; });
     }
     // This may deadlock if called inside the mutex because SyncSourceResolver::startup() calls
