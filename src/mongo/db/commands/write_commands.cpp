@@ -206,9 +206,9 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
     options.mustCheckExistenceForInsertOperations =
         static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx));
     write_ops::UpdateModification u(updateBuilder.obj(), options);
-    write_ops::UpdateOpEntry update(BSON("_id" << batch->bucket()->id()), std::move(u));
-    invariant(!update.getMulti(), batch->bucket()->id().toString());
-    invariant(!update.getUpsert(), batch->bucket()->id().toString());
+    write_ops::UpdateOpEntry update(BSON("_id" << batch->bucketId()), std::move(u));
+    invariant(!update.getMulti(), batch->bucketId().toString());
+    invariant(!update.getUpsert(), batch->bucketId().toString());
     return update;
 }
 
@@ -249,7 +249,7 @@ BSONObj makeTimeseriesInsertDocument(std::shared_ptr<BucketCatalog::WriteBatch> 
     }
 
     BSONObjBuilder builder;
-    builder.append("_id", batch->bucket()->id());
+    builder.append("_id", batch->bucketId());
     {
         BSONObjBuilder bucketControlBuilder(builder.subobjStart("control"));
         bucketControlBuilder.append(kBucketControlVersionFieldName,
@@ -573,7 +573,7 @@ public:
     private:
         using TimeseriesBatches =
             std::vector<std::pair<std::shared_ptr<BucketCatalog::WriteBatch>, size_t>>;
-        using TimeseriesStmtIds = stdx::unordered_map<BucketCatalog::Bucket*, std::vector<StmtId>>;
+        using TimeseriesStmtIds = stdx::unordered_map<OID, std::vector<StmtId>, OID::Hasher>;
         struct TimeseriesSingleWriteResult {
             StatusWith<SingleWriteResult> result;
             bool canContinue = true;
@@ -764,7 +764,7 @@ public:
                                      std::vector<size_t>* docsToRetry) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
-            auto metadata = bucketCatalog.getMetadata(batch->bucket());
+            auto metadata = bucketCatalog.getMetadata(batch->bucketId());
             bool prepared = bucketCatalog.prepareCommit(batch);
             if (!prepared) {
                 invariant(batch->finished());
@@ -785,7 +785,7 @@ public:
 
             hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
-            const auto docId = batch->bucket()->id();
+            const auto docId = batch->bucketId();
             const bool performInsert = batch->numPreviouslyCommittedMeasurements() == 0;
             if (performInsert) {
                 const auto output =
@@ -861,7 +861,7 @@ public:
 
             // Sort by bucket so that preparing the commit for each batch cannot deadlock.
             std::sort(batchesToCommit.begin(), batchesToCommit.end(), [](auto left, auto right) {
-                return left.get()->bucket() < right.get()->bucket();
+                return left.get()->bucketId() < right.get()->bucketId();
             });
 
             boost::optional<Status> abortStatus;
@@ -877,17 +877,17 @@ public:
             std::vector<write_ops::UpdateCommandRequest> updateOps;
 
             for (auto batch : batchesToCommit) {
-                auto metadata = bucketCatalog.getMetadata(batch.get()->bucket());
+                auto metadata = bucketCatalog.getMetadata(batch.get()->bucketId());
                 if (!bucketCatalog.prepareCommit(batch)) {
                     return false;
                 }
 
                 if (batch.get()->numPreviouslyCommittedMeasurements() == 0) {
                     insertOps.push_back(_makeTimeseriesInsertOp(
-                        batch, metadata, std::move(stmtIds[batch.get()->bucket()])));
+                        batch, metadata, std::move(stmtIds[batch.get()->bucketId()])));
                 } else {
                     updateOps.push_back(_makeTimeseriesUpdateOp(
-                        opCtx, batch, metadata, std::move(stmtIds[batch.get()->bucket()])));
+                        opCtx, batch, metadata, std::move(stmtIds[batch.get()->bucketId()])));
                 }
             }
 
@@ -989,7 +989,7 @@ public:
                     const auto& batch = result.getValue().batch;
                     batches.emplace_back(batch, index);
                     if (isTimeseriesWriteRetryable(opCtx)) {
-                        stmtIds[batch->bucket()].push_back(stmtId);
+                        stmtIds[batch->bucketId()].push_back(stmtId);
                     }
                 }
 
@@ -1190,7 +1190,7 @@ public:
                 auto& [batch, index] = batches[itr];
                 if (batch->claimCommitRights()) {
                     auto stmtIds = isTimeseriesWriteRetryable(opCtx)
-                        ? std::move(bucketStmtIds[batch->bucket()])
+                        ? std::move(bucketStmtIds[batch->bucketId()])
                         : std::vector<StmtId>{};
 
                     canContinue = _commitTimeseriesBucket(opCtx,
