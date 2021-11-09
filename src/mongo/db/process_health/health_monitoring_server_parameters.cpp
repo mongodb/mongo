@@ -49,7 +49,9 @@ Status HealthMonitoringIntensitiesServerParameter::set(const BSONElement& newVal
 void HealthMonitoringIntensitiesServerParameter::append(OperationContext*,
                                                         BSONObjBuilder& b,
                                                         const std::string& name) {
-    _data->serialize(&b);
+    BSONObjBuilder healthMonitoring;
+    _data->serialize(&healthMonitoring);
+    b.append(name, healthMonitoring.obj());
 }
 
 }  // namespace mongo
