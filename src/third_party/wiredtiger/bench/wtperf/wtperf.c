@@ -1088,7 +1088,7 @@ monitor(void *arg)
       "insert maximum latency(uS),"
       "modify average latency(uS),"
       "modify min latency(uS),"
-      "modify maximum latency(uS)"
+      "modify maximum latency(uS),"
       "read average latency(uS),"
       "read minimum latency(uS),"
       "read maximum latency(uS),"
