@@ -140,12 +140,9 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         "totalApplyTimeElapsedSecs": undefined,
         "recipientState": undefined,
         "opStatus": "running",
+        "oplogApplierApplyBatchLatencyMillis": undefined,
+        "collClonerFillBatchForInsertLatencyMillis": undefined,
     };
-
-    if (!reshardingTest.isMixedVersionCluster()) {
-        expectedRecipientMetrics.oplogApplierApplyBatchLatencyMillis = undefined;
-        expectedRecipientMetrics.collClonerFillBatchForInsertLatencyMillis = undefined;
-    }
 
     reshardingTest.recipientShardNames.forEach(function(shardName) {
         checkCurrentOp(new Mongo(topology.shards[shardName].primary),

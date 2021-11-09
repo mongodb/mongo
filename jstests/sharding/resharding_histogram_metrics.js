@@ -2,7 +2,6 @@
 // during resharding.
 //
 // @tags: [
-//   requires_fcv_51,
 //   uses_atclustertime,
 // ]
 //
@@ -60,7 +59,7 @@ function getReshardingMetricsReport(mongo, role) {
     } else {
         const report = getCurrentOpReport(mongo, role);
         assert(report.inprog.length === 1,
-               `expected report.inprog.length === 1, 
+               `expected report.inprog.length === 1,
             instead found ${report.inprog.length}`);
         return report.inprog[0];
     }
@@ -125,14 +124,14 @@ reshardingTest.withReshardingInBackground(
                 const expectedBatchInserts = reshardingMetrics[kDocumentsCopied] + 1;
                 const receivedBatchInserts = collClonerFillBatchForInsertHist["ops"];
                 assert(expectedBatchInserts == receivedBatchInserts,
-                       `expected ${expectedBatchInserts} batch inserts, 
+                       `expected ${expectedBatchInserts} batch inserts,
                        received ${receivedBatchInserts}`);
 
                 firstReshardBatchApplies += oplogApplierApplyBatchHist["ops"];
             });
 
             assert(firstReshardBatchApplies > 0,
-                   `Expected greater than 0 recorded batch applies, 
+                   `Expected greater than 0 recorded batch applies,
                     got ${firstReshardBatchApplies} instead.`);
         }
     });
@@ -184,8 +183,8 @@ recipientShardNames.forEach(function(shardName) {
 // copied during cloning plus one empty batch for each recipient for both resharding operations.
 const expectedCumulativeBatchInserts = totalDocumentsCopied + 2 * recipientShardNames.length;
 
-assert(cumulativeBatchApplies > firstReshardBatchApplies, `Expected batch oplog applies 
-       to accumluate. Instead found ${cumulativeBatchApplies} cumulative applies, 
+assert(cumulativeBatchApplies > firstReshardBatchApplies, `Expected batch oplog applies
+       to accumluate. Instead found ${cumulativeBatchApplies} cumulative applies,
        compared to ${firstReshardBatchApplies} from first reshard operation.`);
 assert(cumulativeBatchInserts == expectedCumulativeBatchInserts, `Expected
        ${expectedCumulativeBatchInserts} cumulative batch inserts. Instead found
