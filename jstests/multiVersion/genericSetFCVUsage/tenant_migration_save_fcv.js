@@ -52,6 +52,9 @@ function runTest(downgradeFCV) {
     migrationThread.start();
     hangAfterSavingFCV.wait();
 
+    const isRunningMergeProtocol =
+        (TenantMigrationUtil.isShardMergeEnabled(recipientDb)) ? true : false;
+
     // Downgrade the FCV for the recipient set.
     assert.commandWorked(
         recipientPrimary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
@@ -66,7 +69,12 @@ function runTest(downgradeFCV) {
 
     // The migration will not be able to continue in the downgraded version.
     TenantMigrationTest.assertAborted(migrationThread.returnData());
-    checkLog.containsJson(newRecipientPrimary, 5356200);  // Change-of-FCV detection message.
+    // Change-of-FCV detection message.
+    if (isRunningMergeProtocol) {
+        checkLog.containsJson(newRecipientPrimary, 5949504);
+    } else {
+        checkLog.containsJson(newRecipientPrimary, 5356200);
+    }
 
     tenantMigrationTest.stop();
     recipientRst.stopSet();

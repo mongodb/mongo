@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -36,9 +37,12 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(returnResponseCommittedForDonorStartMigrationCmd);
 
 class DonorStartMigrationCmd : public TypedCommand<DonorStartMigrationCmd> {
 public:
@@ -68,16 +72,11 @@ public:
                 !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
             const auto& cmd = request();
+            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
 
-            if (cmd.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
-                MigrationProtocolEnum::kShardMerge) {
-                uassert(5949300,
-                        "protocol \"shard merge\" not supported",
-                        repl::feature_flags::gShardMerge.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-            }
+            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
+                                                                      cmd.getTenantId().toString());
 
-            // TODO (SERVER-59494): tenantId should be optional in the state doc. Include protocol.
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
                                                   cmd.getRecipientConnectionString().toString(),
                                                   cmd.getReadPreference(),
@@ -96,7 +95,17 @@ public:
                 stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
             }
 
+            stateDoc.setProtocol(migrationProtocol);
+
             const auto stateDocBson = stateDoc.toBSON();
+
+            if (MONGO_unlikely(returnResponseCommittedForDonorStartMigrationCmd.shouldFail())) {
+                LOGV2(5949401,
+                      "Immediately returning committed because "
+                      "'returnResponseCommittedForDonorStartMigrationCmd' failpoint is enabled",
+                      "tenantMigrationDonorInstance"_attr = stateDoc.toBSON());
+                return Response(TenantMigrationDonorStateEnum::kCommitted);
+            }
 
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())

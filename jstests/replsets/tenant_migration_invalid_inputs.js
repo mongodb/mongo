@@ -9,6 +9,7 @@
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_persistence,
+ *   requires_fcv_51,
  * ]
  */
 
@@ -31,6 +32,21 @@ const readPreference = {
 const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
 jsTestLog("Testing 'donorStartMigration' command provided with invalid options.");
+
+// Test missing tenantId field for protocol 'multitenant migrations'.
+assert.commandFailedWithCode(
+    donorPrimary.adminCommand(
+        TenantMigrationUtil.donorStartMigrationWithProtocol({
+            donorStartMigration: 1,
+            protocol: 'multitenant migrations',
+            migrationId: UUID(),
+            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+        },
+                                                            donorPrimary.getDB("admin"))),
+    ErrorCodes.InvalidOptions);
 
 // Test unsupported database prefixes.
 const unsupportedtenantIds = ['', 'admin', 'local', 'config'];
@@ -97,6 +113,18 @@ assert.commandFailedWithCode(
     ErrorCodes.BadValue);
 
 jsTestLog("Testing 'recipientSyncData' command provided with invalid options.");
+
+// Test missing tenantId field for protocol 'multitenant migrations'.
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientSyncData: 1,
+    protocol: 'multitenant migrations',
+    migrationId: UUID(),
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+    startMigrationDonorTimestamp: Timestamp(1, 1),
+    readPreference: readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+}),
+                             ErrorCodes.InvalidOptions);
 
 // Test unsupported database prefixes.
 unsupportedtenantIds.forEach((invalidTenantId) => {

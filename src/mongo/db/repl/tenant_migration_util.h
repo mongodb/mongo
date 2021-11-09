@@ -38,12 +38,16 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+constexpr auto kDefaulMigrationProtocol = MigrationProtocolEnum::kMultitenantMigrations;
 
 namespace {
 
@@ -61,6 +65,26 @@ inline Status validateDatabasePrefix(const std::string& tenantId) {
         ? Status::OK()
         : Status(ErrorCodes::BadValue,
                  str::stream() << "cannot migrate databases for tenant \'" << tenantId << "'");
+}
+
+inline Status validateProtocolFCVCompatibility(
+    const boost::optional<MigrationProtocolEnum>& protocol) {
+    if (!protocol)
+        return Status::OK();
+
+    if (!serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+            multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "'protocol' field is not supported for FCV below 5.2'");
+    }
+
+    if (*protocol == MigrationProtocolEnum::kShardMerge &&
+        !repl::feature_flags::gShardMerge.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "protocol '" << MigrationProtocol_serializer(*protocol)
+                                    << "' not supported");
+    }
+    return Status::OK();
 }
 
 inline Status validateTimestampNotNull(const Timestamp& ts) {
@@ -126,6 +150,28 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
         ssl_util::findPEMBlob(payload, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
     return swBlob.getStatus().withContext("Invalid private key field");
 #endif
+}
+
+inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& protocol,
+                                               const std::string& tenantId) {
+    switch (protocol) {
+        case MigrationProtocolEnum::kShardMerge: {
+            // TODO SERVER-59794: Add a check to ensure tenantId is not provided for 'Merge'
+            // protocol.
+            break;
+        }
+        case MigrationProtocolEnum::kMultitenantMigrations: {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "'tenantId' is required for protocol '"
+                                  << MigrationProtocol_serializer(protocol) << "'",
+                    !tenantId.empty());
+
+
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 /*
