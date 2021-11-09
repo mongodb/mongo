@@ -509,7 +509,7 @@ run_workload(uint32_t nth, const char *build_dir)
      */
     free(thr);
     free(td);
-    exit(EXIT_SUCCESS);
+    _exit(EXIT_SUCCESS);
 }
 
 extern int __wt_optind;
@@ -674,7 +674,7 @@ main(int argc, char *argv[])
 
         if (pid == 0) { /* child */
             run_workload(nth, build_dir);
-            return (EXIT_SUCCESS);
+            /* NOTREACHED */
         }
 
         /* parent */

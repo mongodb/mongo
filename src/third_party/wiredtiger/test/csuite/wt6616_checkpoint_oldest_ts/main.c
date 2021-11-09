@@ -228,7 +228,7 @@ run_workload(void)
 
     /* NOTREACHED */
     free(thr);
-    exit(EXIT_SUCCESS);
+    _exit(EXIT_SUCCESS);
 }
 
 /*
@@ -316,7 +316,7 @@ main(int argc, char *argv[])
 
     if (pid == 0) { /* child */
         run_workload();
-        return (EXIT_SUCCESS);
+        /* NOTREACHED */
     }
 
     /* parent */
