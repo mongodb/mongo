@@ -164,9 +164,8 @@ char* BSONColumn::ElementStorage::allocate(int bytes) {
         // Copy data from the previous block if contiguous mode is enabled.
         if (bytesFromPrevBlock > 0) {
             memcpy(_block.get(), _blocks.back().get() + _contiguousPos, bytesFromPrevBlock);
-            _contiguousPos = 0;
         }
-
+        _contiguousPos = 0;
         _pos = bytesFromPrevBlock;
     }
 
