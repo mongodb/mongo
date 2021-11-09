@@ -270,9 +270,7 @@ class SetupMultiversion(Subcommand):
         try:
             evg_version = next(evg_versions)
         except HTTPError as err:
-            # Evergreen currently returns 500 if the version does not exist.
-            # TODO (SERVER-59675): Remove the check for 500 once evergreen returns 404 instead.
-            if not (err.response.status_code == 500 or err.response.status_code == 404):
+            if err.response.status_code != 404:
                 raise
         except StopIteration:
             return EvgURLInfo()

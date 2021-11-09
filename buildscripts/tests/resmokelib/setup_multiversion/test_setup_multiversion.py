@@ -164,7 +164,7 @@ class TestSetupMultiversionGetLatestUrls(TestSetupMultiversionBase):
                 if self.current == 0:
                     self.current += 1
                     resp = requests.models.Response()
-                    resp.status_code = 500
+                    resp.status_code = 404
                     raise requests.HTTPError(response=resp)
                 raise StopIteration
 
