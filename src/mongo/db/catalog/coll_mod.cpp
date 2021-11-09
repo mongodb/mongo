@@ -195,6 +195,10 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                   "Please refer to the documentation and use the top-level "
                                   "'expireAfterSeconds' option instead");
                 }
+                if (coll->isCapped()) {
+                    return Status(ErrorCodes::InvalidOptions,
+                                  "TTL indexes are not supported for capped collections.");
+                }
                 if (auto status = index_key_validate::validateExpireAfterSeconds(
                         cmrIndex->indexExpireAfterSeconds.safeNumberLong());
                     !status.isOK()) {
