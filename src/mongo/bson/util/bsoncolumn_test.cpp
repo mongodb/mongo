@@ -2456,6 +2456,41 @@ TEST_F(BSONColumnTest, InterleavedDoubleDifferentScale) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, InterleavedDoubleIncreaseScaleFromDeltaNoRescale) {
+    BSONColumnBuilder cb("test"_sd);
+
+    std::vector<BSONElement> elems;
+    elems.push_back(createElementObj(BSON("x" << 1.1)));
+    elems.push_back(createElementObj(BSON("x" << 2.1)));
+    elems.push_back(createElementObj(BSON("x" << 2.2)));
+    elems.push_back(createElementObj(BSON("x" << 2.3)));
+    elems.push_back(createElementObj(BSON("x" << 3.12345678)));
+
+    for (const auto& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+
+    appendSimple8bControl(expected, 0b1010, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaDouble(elems[1].Obj()["x"_sd], elems[0].Obj()["x"_sd], 10),
+                            deltaDouble(elems[2].Obj()["x"_sd], elems[1].Obj()["x"_sd], 10),
+                            deltaDouble(elems[3].Obj()["x"_sd], elems[2].Obj()["x"_sd], 10)},
+                           1);
+    appendSimple8bControl(expected, 0b1101, 0b0000);
+    appendSimple8bBlocks64(
+        expected, {deltaDouble(elems[4].Obj()["x"_sd], elems[3].Obj()["x"_sd], 100000000)}, 1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, InterleavedMix64And128Bit) {
     BSONColumnBuilder cb("test"_sd);
 

@@ -656,6 +656,10 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
 
         // Re-scale not possible, flush and start new block with the higher scale factor
         _simple8bBuilder64.flush();
+        if (_controlBlockWriter && _controlByteOffset != kNoSimple8bControl) {
+            _controlBlockWriter(_bufBuilder->buf() + _controlByteOffset,
+                                _bufBuilder->len() - _controlByteOffset);
+        }
         _controlByteOffset = kNoSimple8bControl;
 
         // Make sure value and previous are using the same scale factor.
