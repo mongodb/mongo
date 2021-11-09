@@ -65,4 +65,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                 BSONObjBuilder* result,
                                 boost::optional<repl::OplogApplication::Mode> mode);
 
+/**
+ * Scans index to ensure there are no duplicates.
+ */
+void scanIndexForDuplicates(OperationContext* opCtx,
+                            const CollectionPtr& collection,
+                            const IndexDescriptor* idx);
+
 }  // namespace mongo

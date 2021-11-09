@@ -64,8 +64,13 @@ const applyOpsCmd = {
     ]
 };
 
+// Conversion should fail when there are existing duplicates.
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
+const duplicateKeyError =
+    assert.commandFailedWithCode(db.adminCommand(applyOpsCmd), ErrorCodes.DuplicateKey);
+jsTestLog('Duplicate key error from failed conversion: ' + tojson(duplicateKeyError));
+assert.eq(1, duplicateKeyError.applied, tojson(duplicateKeyError));
 assert.commandWorked(coll.remove({_id: 2}));
 
 // Successfully converts to a unique index.

@@ -474,10 +474,13 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/views/views',
@@ -490,6 +493,7 @@ env.Library(
         'index_key_validate',
         'local_oplog_info',
         'multi_index_block',
+        'throttle_cursor',
     ],
 )
 

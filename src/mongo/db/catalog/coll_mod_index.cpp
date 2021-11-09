@@ -32,6 +32,10 @@
 #include "mongo/db/catalog/coll_mod_index.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
@@ -150,6 +154,13 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     if (idx->infoObj().getField("unique").trueValue()) {
         return;
     }
+
+    // Checks for duplicates on the primary or for the 'applyOps' command.
+    // TODO(SERVER-61356): revisit this condition for tenant migration, which uses kInitialSync.
+    if (!mode || *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+        scanIndexForDuplicates(opCtx, autoColl->getCollection(), idx);
+    }
+
     *newUnique = indexUnique;
     autoColl->getWritableCollection()->updateUniqueSetting(opCtx, idx->indexName());
 }
@@ -225,6 +236,45 @@ void processCollModIndexRequest(OperationContext* opCtx,
     if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
         LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");
         uasserted(50970, "trigger rollback after the index update");
+    }
+}
+
+void scanIndexForDuplicates(OperationContext* opCtx,
+                            const CollectionPtr& collection,
+                            const IndexDescriptor* idx) {
+    auto entry = idx->getEntry();
+    auto accessMethod = entry->accessMethod();
+
+    // Starting point of index traversal.
+    auto keyStringVersion = accessMethod->getSortedDataInterface()->getKeyStringVersion();
+    KeyString::Builder firstKeyStringBuilder(
+        keyStringVersion, BSONObj(), entry->ordering(), KeyString::Discriminator::kExclusiveBefore);
+    KeyString::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
+
+    // Scan index for duplicates, comparing consecutive index entries.
+    // KeyStrings will be in strictly increasing order because all keys are sorted and they are
+    // in the format (Key, RID), and all RecordIDs are unique.
+    DataThrottle dataThrottle(opCtx);
+    dataThrottle.turnThrottlingOff();
+    SortedDataInterfaceThrottleCursor indexCursor(opCtx, accessMethod, &dataThrottle);
+    boost::optional<KeyStringEntry> prevIndexEntry;
+    for (auto indexEntry = indexCursor.seekForKeyString(opCtx, firstKeyString); indexEntry;
+         indexEntry = indexCursor.nextKeyString(opCtx)) {
+
+        if (prevIndexEntry &&
+            indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString) == 0) {
+            auto dupKeyErrorStatus =
+                buildDupKeyErrorStatus(opCtx, indexEntry->keyString, entry->ordering(), idx);
+            auto firstDoc = collection->docFor(opCtx, prevIndexEntry->loc);
+            auto secondDoc = collection->docFor(opCtx, indexEntry->loc);
+            uassertStatusOK(dupKeyErrorStatus.withContext(
+                str::stream() << "Failed to convert index to unique. firstRecordId: "
+                              << prevIndexEntry->loc << "; firstDoc: " << firstDoc.value()
+                              << "; secondRecordId" << indexEntry->loc << "; secondDoc: "
+                              << secondDoc.value() << "; collectionUUID: " << collection->uuid()));
+        }
+
+        prevIndexEntry = indexEntry;
     }
 }
 
