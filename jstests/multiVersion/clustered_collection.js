@@ -25,51 +25,135 @@ const kClusteredCollName = 'clusteredColl';
 let mongodOptions5dot0 = Object.extend({binVersion: '5.0'}, defaultOptions);
 let mongodOptions5dot1 = Object.extend(
     {binVersion: '5.1', setParameter: 'featureFlagClusteredIndexes=true'}, defaultOptions);
+let mongodOptionsLatest = Object.extend(
+    {binVersion: 'latest', setParameter: 'featureFlagClusteredIndexes=true'}, defaultOptions);
 
-// Create a clustered collection in 5.1, then downgrade to 5.0 and validate that the
-// server is unable to start up.
-// Then upgrade back to 5.1, drop the clustered collection and validate that the 5.0
+// Create a clustered collection with the server running version 'from', then downgrade to
+// 5.0 and validate that the server is unable to start up.
+// Then upgrade back to the 'from' version, drop the clustered collection and verify that the 5.0
 // server starts up correctly.
-function testGeneralPurposeClusteredCollection() {
-    // Create clustered collection on 5.1.
-    jsTestLog("[general-purpose clustered collection] Starting version: 5.1");
-    let conn = MongoRunner.runMongod(mongodOptions5dot1);
-    assert.neq(
-        null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptions5dot1));
+function testGeneralPurposeClusteredCollectionDowngradeTo5Dot0(from) {
+    // Verify from > '5.0'.
+    assert.eq(typeof (from.binVersion), "string");
+    assert.eq(true, from.binVersion === "latest" || from.binVersion > "5.0");
 
-    let db = conn.getDB('test');
-    assert.commandWorked(
-        db.createCollection(kClusteredCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    // Start server version 'from' and create a clustered collection.
+    jsTestLog("[general-purpose clustered collection] Starting version: " + from.binVersion);
+    {
+        const conn = MongoRunner.runMongod(from);
+        assert.neq(
+            null, conn, 'mongod was unable able to start with version ' + tojson(from.binVersion));
 
-    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "5.0"}));
-    MongoRunner.stopMongod(conn);
+        const db = conn.getDB('test');
 
-    // Expect 5.0 to fail due to the presence of a clustered collection.
+        const fcv = from.binVersion === 'latest' ? latestFCV : from.binVersion;
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv}));
+
+        assert.commandWorked(db.createCollection(kClusteredCollName,
+                                                 {clusteredIndex: {key: {_id: 1}, unique: true}}));
+
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "5.0"}));
+        MongoRunner.stopMongod(conn);
+    }
+
+    // Dowgrade to 5.0 and expect to fail due to the presence of a clustered collection.
     jsTestLog("[general-purpose clustered collection] Starting version: 5.0");
     assert.throws(
         () => MongoRunner.runMongod(mongodOptions5dot0), [], "The server unexpectedly started");
 
-    // Restart on 5.1, drop the clustered collection.
-    jsTestLog("[general-purpose clustered collection] Starting version: 5.1");
-    conn = MongoRunner.runMongod(mongodOptions5dot1);
-    assert.neq(
-        null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptions5dot1));
+    // Upgrade back to the 'from' version, drop the clustered collection.
+    jsTestLog("[general-purpose clustered collection] Starting version: " + from.binVersion);
+    {
+        const conn = MongoRunner.runMongod(from);
+        assert.neq(
+            null, conn, 'mongod was unable able to start with version ' + tojson(from.binVersion));
 
-    db = conn.getDB('test');
-    assert.commandWorked(db.runCommand({drop: kClusteredCollName}));
-    MongoRunner.stopMongod(conn);
+        const db = conn.getDB('test');
+        assert.commandWorked(db.runCommand({drop: kClusteredCollName}));
+        MongoRunner.stopMongod(conn);
+    }
 
-    // Expect 5.0 to start up successfully as there's no clustered collection around.
+    // Downgrade again to 5.0 and verify we start up successfully as there's no clustered collection
+    // around.
     jsTestLog("[general-purpose clustered collection] Starting version: 5.0");
-    conn = MongoRunner.runMongod(mongodOptions5dot0);
-    assert.neq(
-        null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptions5dot0));
-    MongoRunner.stopMongod(conn);
+    {
+        const conn = MongoRunner.runMongod(mongodOptions5dot0);
+        assert.neq(null,
+                   conn,
+                   'mongod was unable able to start with version ' +
+                       tojson(mongodOptions5dot0.binVersion));
+        MongoRunner.stopMongod(conn);
+    }
+}
+
+// Create a clustered collection with the server running version 'from', then downgrade to
+// 5.1 and validate that the server is able to access the clustered collection, and similarly
+// that it's possible to upgrade back to 5.1.
+function testGeneralPurposeClusteredCollectionDowngradeTo5Dot1(from) {
+    // Verify from > '5.1'.
+    assert.eq(typeof (from.binVersion), "string");
+    assert.eq(true, from.binVersion === "latest" || from.binVersion > "5.1");
+
+    // Start server version 'from' and populate a clustered collection.
+    jsTestLog("[general-purpose clustered collection] Starting version: " + from.binVersion);
+    {
+        const conn = MongoRunner.runMongod(from);
+        assert.neq(
+            null, conn, 'mongod was unable able to start with version ' + tojson(from.binVersion));
+
+        const db = conn.getDB('test');
+
+        const fcv = from.binVersion === 'latest' ? latestFCV : from.binVersion;
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv}));
+
+        assert.commandWorked(db.createCollection(kClusteredCollName,
+                                                 {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(
+            db[kClusteredCollName].insertOne({_id: 'latest', info: "my latest doc"}));
+
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "5.1"}));
+        MongoRunner.stopMongod(conn);
+    }
+
+    // Downgrade to 5.1 and verify we're able to read and write the existing clustered collection.
+    jsTestLog("[general-purpose clustered collection] Starting version: 5.1");
+    {
+        const conn = MongoRunner.runMongod(mongodOptions5dot1);
+        assert.neq(null,
+                   conn,
+                   'mongod was unable able to start with version ' +
+                       tojson(mongodOptions5dot1.binVersion));
+        const db = conn.getDB('test');
+
+        assert.eq(db[kClusteredCollName].findOne({_id: 'latest'})['info'], "my latest doc");
+        assert.commandWorked(db[kClusteredCollName].insertOne({_id: '5.1', info: "my 5.1 doc"}));
+        MongoRunner.stopMongod(conn);
+    }
+
+    // Upgrade back to the 'from' version, verify we read documents inserted with both server
+    // versions.
+    jsTestLog("[general-purpose clustered collection] Starting version: " + from.binVersion);
+    {
+        const conn = MongoRunner.runMongod(from);
+        assert.neq(
+            null, conn, 'mongod was unable able to start with version ' + tojson(from.binVersion));
+
+        const db = conn.getDB('test');
+        assert.eq(db[kClusteredCollName].findOne({_id: 'latest'})['info'], "my latest doc");
+        assert.eq(db[kClusteredCollName].findOne({_id: '5.1'})['info'], "my 5.1 doc");
+
+        // Clean up
+        assert.commandWorked(db.runCommand({drop: kClusteredCollName}));
+        MongoRunner.stopMongod(conn);
+    }
 }
 
 // Create a time series buckets collection in 5.1 and insert a RecordId > 127 bytes
 // Then downgrade to 5.0 and validate the RecordId cannot be decoded as too large.
 // Then upgrade back to 5.1 and validate correct operation.
+// This test uses the timeseries 'system.buckets* loophole', which is a way to
+// internally access a clustered collection in 5.0 where the feature is not generally
+// available.
 function testTimeSeriesBucketsCollection() {
     jsTestLog("[time series buckets collection] Starting version: 5.1");
     let conn = MongoRunner.runMongod(mongodOptions5dot1);
@@ -77,6 +161,7 @@ function testTimeSeriesBucketsCollection() {
         null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptions5dot1));
 
     let db = conn.getDB('test');
+    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "5.1"}));
     assert.commandWorked(db.createCollection(kBucketsCollName, {clusteredIndex: true}));
     assert.commandWorked(db[kBucketsCollName].createIndex({a: 1}));
     // 126 characters + kStringLike CType + NULL terminator == 128 bytes
@@ -109,6 +194,12 @@ function testTimeSeriesBucketsCollection() {
     MongoRunner.stopMongod(conn);
 }
 
-testGeneralPurposeClusteredCollection();
+// 5.1 -> 5.0 downgrade path
+testGeneralPurposeClusteredCollectionDowngradeTo5Dot0(mongodOptions5dot1);
+// latest -> 5.0 downgrade path
+testGeneralPurposeClusteredCollectionDowngradeTo5Dot0(mongodOptionsLatest);
+// latest -> 5.1 downgrade path
+testGeneralPurposeClusteredCollectionDowngradeTo5Dot1(mongodOptionsLatest);
+
 testTimeSeriesBucketsCollection();
 })();
