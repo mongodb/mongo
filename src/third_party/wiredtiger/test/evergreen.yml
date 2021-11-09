@@ -603,7 +603,7 @@ functions:
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
           ${pip3_binary} install psutil pygit2
-          JSON_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'" } }'
+          JSON_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'", "distro_id": "'${distro_id}'" } }'
           echo "JSON_TASK_INFO: $JSON_TASK_INFO"
           ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out.json ${wtarg}
           ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json ${wtarg}
