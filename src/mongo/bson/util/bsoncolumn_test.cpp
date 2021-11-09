@@ -454,6 +454,17 @@ private:
     std::forward_list<BSONObj> _elementMemory;
 };
 
+TEST_F(BSONColumnTest, Empty) {
+    BSONColumnBuilder cb("test"_sd);
+
+    BufBuilder expected;
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {});
+}
+
 TEST_F(BSONColumnTest, BasicValue) {
     BSONColumnBuilder cb("test"_sd);
 

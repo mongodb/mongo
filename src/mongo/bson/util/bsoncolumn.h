@@ -114,6 +114,9 @@ public:
         void _incrementRegular();
         void _incrementInterleaved();
 
+        // Handles EOO when in regular mode. Iterator is set to end.
+        void _handleEOO();
+
         // Checks if control byte is literal
         static bool _isLiteral(uint8_t control) {
             return (control & 0xE0) == 0;

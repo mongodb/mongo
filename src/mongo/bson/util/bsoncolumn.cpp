@@ -280,6 +280,12 @@ void BSONColumn::Iterator::_initialize(size_t index) {
         _states.front()._lastValue = *current;
     }
 
+    // If we are at EOO then start at end.
+    if (*_control == EOO) {
+        _handleEOO();
+        return;
+    }
+
     // previous doesn't matter when we load literals
     auto result = _states.front()._loadControl(*_column, _control, _end, current);
     if (!current) {
@@ -356,9 +362,7 @@ void BSONColumn::Iterator::_incrementRegular() {
 
     // Decoders are exhausted, load next control byte. If we are at EOO then decoding is done.
     if (*_control == EOO) {
-        ++_control;
-        _index = kEndIndex;
-        _column->_fullyDecompressed = true;
+        _handleEOO();
         return;
     }
 
@@ -499,6 +503,12 @@ void BSONColumn::Iterator::_incrementInterleaved() {
     }
 
     _column->_decompressed.emplace_back(obj);
+}
+
+void BSONColumn::Iterator::_handleEOO() {
+    ++_control;
+    _index = kEndIndex;
+    _column->_fullyDecompressed = true;
 }
 
 bool BSONColumn::Iterator::operator==(const Iterator& rhs) const {
