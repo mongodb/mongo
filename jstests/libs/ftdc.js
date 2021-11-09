@@ -28,13 +28,6 @@ function verifyGetDiagnosticData(adminDb) {
                    "does not have 'serverStatus' in '" + tojson(data) + "'");
             assert(data.hasOwnProperty("end"), "does not have 'end' in '" + tojson(data) + "'");
 
-            if (getBuildInfo().buildEnvironment.target_os == "linux") {
-                assert(data.hasOwnProperty("systemMetrics"),
-                       "has property 'systemMetrics' on linux");
-                assert(data.systemMetrics.hasOwnProperty("mounts"),
-                       "has property 'systemMetrics.mounts' on linux");
-            }
-
             foundGoodDocument = true;
 
             jsTestLog("Got good getDiagnosticData: " + tojson(result));
