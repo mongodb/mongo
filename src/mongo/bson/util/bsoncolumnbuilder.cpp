@@ -67,8 +67,7 @@ bool objectIdDeltaPossible(BSONElement elem, BSONElement prev) {
                    OID::kInstanceUniqueSize);
 }
 
-// Internal recursion function for traverseLockStep() when we just need to traverse reference
-// object.
+// Traverses object and calls 'ElementFunc' on every scalar subfield encountered.
 template <typename ElementFunc>
 void _traverse(const BSONObj& reference, const ElementFunc& elemFunc) {
     for (const auto& elem : reference) {
@@ -78,6 +77,29 @@ void _traverse(const BSONObj& reference, const ElementFunc& elemFunc) {
             elemFunc(elem, BSONElement());
         }
     }
+}
+
+// Internal recursion function for traverseLockStep() when we just need to traverse reference
+// object. Like '_traverse' above but exits when an empty sub object is encountered. Returns 'true'
+// if empty subobject found.
+template <typename ElementFunc>
+bool _traverseUntilEmptyObj(const BSONObj& obj, const ElementFunc& elemFunc) {
+    for (const auto& elem : obj) {
+        if (elem.type() == Object) {
+            if (_traverseUntilEmptyObj(elem.Obj(), elemFunc)) {
+                return true;
+            }
+        } else {
+            elemFunc(elem, BSONElement());
+        }
+    }
+
+    return obj.isEmpty();
+}
+
+// Helper function for mergeObj() to detect if Object contain subfields of empty Objects
+bool _hasEmptyObj(const BSONObj& obj) {
+    return _traverseUntilEmptyObj(obj, [](const BSONElement&, const BSONElement&) {});
 }
 
 // Internal recursion function for traverseLockStep(). See documentation for traverseLockStep.
@@ -90,14 +112,7 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
     for (const auto& elem : reference) {
         if (elem.type() == Object) {
             BSONObj refObj = elem.Obj();
-            bool hasIt = it != end;
-            // If refObj is empty, there must also exist an empty object on 'it' for this to be
-            // valid. First we check that we have something on 'it'
-            if (!hasIt && refObj.isEmpty()) {
-                return {it, false};
-            }
-
-            bool elemMatch = hasIt && elem.fieldNameStringData() == it->fieldNameStringData();
+            bool elemMatch = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
             if (elemMatch) {
                 // If 'reference' element is Object then 'obj' must also be Object.
                 if (it->type() != Object) {
@@ -117,9 +132,12 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
             } else {
                 // Assume field name at 'it' is coming later in 'reference'. Traverse as if it is
                 // missing from 'obj'. We don't increment the iterator in this case. If it is a
-                // mismatch we will detect that at end when 'it' is not at 'end'.
-                // Nothing can fail below this so traverse without all the checks.
-                _traverse(refObj, elemFunc);
+                // mismatch we will detect that at end when 'it' is not at 'end'. Nothing can fail
+                // below this so traverse without all the checks. Any empty object detected is an
+                // error.
+                if (_traverseUntilEmptyObj(refObj, elemFunc)) {
+                    return {it, false};
+                }
             }
         } else {
             // Non-object, call provided function with the two elements
@@ -196,11 +214,20 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
             n, end, [&name](const auto& elem) { return elem.fieldNameStringData() == name; });
         if (namePos == end) {
             // Reference element does not exist in 'obj' so add it and continue merging with just
-            // this iterator incremented.
+            // this iterator incremented. Unless it is or contains an empty object which is
+            // incompatible.
+            if (refIt->type() == Object && _hasEmptyObj(refIt->Obj())) {
+                return false;
+            }
+
             builder->append(*(refIt++));
         } else {
             // Reference element do exist later in 'obj'. Add element in 'it' if it is the first
-            // time we see it, fail otherwise (incompatible ordering).
+            // time we see it, fail otherwise (incompatible ordering). Unless 'it' is or contains an
+            // empty object which is incompatible.
+            if (it->type() == Object && _hasEmptyObj(it->Obj())) {
+                return false;
+            }
             if (builder->hasField(it->fieldNameStringData())) {
                 return false;
             }
