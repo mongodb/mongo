@@ -267,8 +267,14 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
 
         // Use the OplogBuffer to populate a local OplogBatch. Note that the buffer may be empty.
         OplogBatch ops(batchLimits.ops);
-        {
+        try {
             auto opCtx = cc().makeOperationContext();
+
+            // During storage change operations, we may shut down storage under a global lock
+            // and wait for any storage-using opCtxs to exit.  This results in a deadlock with
+            // uninterruptible global locks, so we will take the global lock here to block the
+            // storage change.  The rest of the batch acquisition remains uninterruptible.
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
             // This use of UninterruptibleLockGuard is intentional. It is undesirable to use an
             // UninterruptibleLockGuard in client operations because stepdown requires the
@@ -286,18 +292,24 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             for (const auto& oplogEntry : oplogEntries) {
                 ops.emplace_back(oplogEntry);
             }
+        } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
+            LOGV2_DEBUG(6133400,
+                        1,
+                        "Interrupted getting the global lock in Repl Batcher",
+                        "error"_attr = e.toStatus());
+            invariant(ops.empty());
+        }
 
-            // If we don't have anything in the batch, wait a bit for something to appear.
-            if (oplogEntries.empty()) {
-                if (_oplogApplier->inShutdown()) {
-                    ops.setMustShutdownFlag();
+        // If we don't have anything in the batch, wait a bit for something to appear.
+        if (ops.empty()) {
+            if (_oplogApplier->inShutdown()) {
+                ops.setMustShutdownFlag();
+            } else {
+                // Block up to 1 second. Skip waiting if the failpoint is enabled.
+                if (MONGO_unlikely(skipOplogBatcherWaitForData.shouldFail())) {
+                    // do no waiting.
                 } else {
-                    // Block up to 1 second. Skip waiting if the failpoint is enabled.
-                    if (MONGO_unlikely(skipOplogBatcherWaitForData.shouldFail())) {
-                        // do no waiting.
-                    } else {
-                        _oplogBuffer->waitForData(Seconds(1));
-                    }
+                    _oplogBuffer->waitForData(Seconds(1));
                 }
             }
         }
