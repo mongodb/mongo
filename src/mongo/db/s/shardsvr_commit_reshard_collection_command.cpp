@@ -106,6 +106,7 @@ public:
             // If commit actually went through, the resharding documents will be cleaned up. If
             // documents still exist, it could be because that commit was interrupted or that the
             // underlying replica set node is no longer primary.
+            doNoopWrite(opCtx, "_shardsvrCommitReshardCollection no-op", ns());
             PersistentTaskStore<CommonReshardingMetadata> donorReshardingOpStore(
                 NamespaceString::kDonorReshardingOperationsNamespace);
             uassert(5795302,
@@ -122,8 +123,6 @@ public:
                 recipientReshardingOpStore.count(
                     opCtx, BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << uuid())) ==
                     0);
-
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
 
     private:

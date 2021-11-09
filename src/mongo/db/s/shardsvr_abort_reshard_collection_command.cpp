@@ -98,6 +98,7 @@ public:
             // If abort actually went through, the resharding documents should be cleaned up.
             // If they still exists, it could be because that it was interrupted or it is no
             // longer primary.
+            doNoopWrite(opCtx, "_shardsvrAbortReshardCollection no-op", ns());
             PersistentTaskStore<CommonReshardingMetadata> donorReshardingOpStore(
                 NamespaceString::kDonorReshardingOperationsNamespace);
             uassert(5563802,
@@ -114,11 +115,6 @@ public:
                 recipientReshardingOpStore.count(
                     opCtx, BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << uuid())) ==
                     0);
-
-            // Most of the work for this command is done on the donor/recipient executor thread, so
-            // set the last OpTime so that waitForWriteConcern can wait for the correct event
-            // to get majority committed.
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
 
     private:
