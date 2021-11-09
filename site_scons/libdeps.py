@@ -730,13 +730,7 @@ def _libdeps_visit(n, tsorted, marked, walking, debug=False):
                 _libdeps_visit_private(child, marked, walking, debug)
 
         marked[n.target_node] = LibdepsVisitationMark.MARKED_PUBLIC
-
-        # If the node has been marked as a virtual libdep in the tags,
-        # we don't add it to tsorted because it isn't a real
-        # dependency, just a node that adds further transitive
-        # dependencies.
-        if not 'virtual-libdep' in n.target_node.get_env().get('LIBDEPS_TAGS', []):
-            tsorted.append(n.target_node)
+        tsorted.append(n.target_node)
 
     except DependencyCycleError as e:
         if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
@@ -903,12 +897,16 @@ def _append_direct_libdeps(node, prereq_nodes):
     node.attributes.libdeps_direct.extend(prereq_nodes)
 
 
-def _get_flagged_libdeps(source, target, env, for_signature):
+def _get_libdeps_with_link_flags(source, target, env, for_signature):
     for lib in get_libdeps(source, target, env, for_signature):
         # Make sure lib is a Node so we can get the env to check for flags.
         libnode = lib
         if not isinstance(lib, (str, SCons.Node.FS.File, SCons.Node.FS.Entry)):
             libnode = env.File(lib)
+
+        # Virtual libdeps don't appear on the link line
+        if 'virtual-libdep' in libnode.get_env().get('LIBDEPS_TAGS', []):
+            continue
 
         # Create a libdep and parse the prefix and postfix (and separators if any)
         # flags from the environment.
@@ -1131,7 +1129,7 @@ def expand_libdeps_tags(source, target, env, for_signature):
     return results
 
 
-def expand_libdeps_with_flags(source, target, env, for_signature):
+def expand_libdeps_for_link(source, target, env, for_signature):
 
     libdeps_with_flags = []
 
@@ -1140,7 +1138,7 @@ def expand_libdeps_with_flags(source, target, env, for_signature):
     # below a bit cleaner.
     prev_libdep = None
 
-    for flagged_libdep in _get_flagged_libdeps(source, target, env, for_signature):
+    for flagged_libdep in _get_libdeps_with_link_flags(source, target, env, for_signature):
 
         # If there are no flags to process we can move on to the next lib.
         # start_index wont mater in the case because if there are no flags
@@ -1404,11 +1402,11 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
         PROGEMITTER=lambda target, source, env: env["LIBDEPS_PROGEMITTER"](target, source, env),
     )
 
-    env["_LIBDEPS_LIBS_WITH_TAGS"] = expand_libdeps_with_flags
+    env["_LIBDEPS_LIBS_FOR_LINK"] = expand_libdeps_for_link
 
     env["_LIBDEPS_LIBS"] = (
         "$LINK_LIBGROUP_START "
-        "$_LIBDEPS_LIBS_WITH_TAGS "
+        "$_LIBDEPS_LIBS_FOR_LINK "
         "$LINK_LIBGROUP_END "
     )
 
