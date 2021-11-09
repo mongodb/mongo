@@ -227,9 +227,11 @@ constexpr std::array<std::array<uint8_t, 16>, 4> kIntsStoreForSelector = {
     std::array<uint8_t, 16>{0, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0},
     std::array<uint8_t, 16>{0, 0, 0, 0, 0, 0, 0, 0, 6, 5, 4, 3, 2, 1, 0, 0}};
 
+// Calculates number of bits needed to store value. Must be less than
+// numeric_limits<uint64_t>::max().
 uint8_t _countBitsWithoutLeadingZeros(uint64_t value) {
     // All 1s is reserved for skip encoding so we add 1 to value to account for that case.
-    return 64 - countLeadingZeros64(value + 1);
+    return 64 - countLeadingZerosNonZero64(value + 1);
 }
 
 uint8_t _countTrailingZerosWithZero(uint64_t value) {
@@ -247,6 +249,8 @@ uint8_t _countTrailingZerosWithZero(uint128_t value) {
     }
 }
 
+// Calculates number of bits needed to store value. Must be less than
+// numeric_limits<uint128_t>::max().
 uint8_t _countBitsWithoutLeadingZeros(uint128_t value) {
     uint64_t high = static_cast<uint64_t>(value >> 64);
     if (high == 0) {
@@ -457,6 +461,10 @@ void Simple8bBuilder<T>::flush() {
 
 template <typename T>
 bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
+    // Early exit if we try to store max value. They are not handled when counting zeros.
+    if (value == std::numeric_limits<T>::max())
+        return false;
+
     uint8_t trailingZerosCount = _countTrailingZerosWithZero(value);
     // Initially set every selector as invalid.
     uint8_t bitCountWithoutLeadingZeros = _countBitsWithoutLeadingZeros(value);
