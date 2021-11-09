@@ -380,7 +380,7 @@ TEST_F(TransactionCoordinatorServiceTest,
     {
         // Set this server parameter so coordinateCommit returns the decision future instead of the
         // completion future.
-        RAIIServerParameterControllerForTest _controller{
+        RAIIServerParameterControllerForTest controller{
             "coordinateCommitReturnImmediatelyAfterPersistingDecision", true};
         auto decisionFuture = *coordinatorService->coordinateCommit(
             operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
@@ -425,7 +425,7 @@ TEST_F(TransactionCoordinatorServiceTest,
 
     // Progress the transaction up until the point where it has sent commit and is waiting for
     // commit acks.
-    auto oldTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
+    auto oldTxnCommitCompletionFuture = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kTwoShardIdSet);
 
     // Simulate all participants acking prepare/voting to commit.
@@ -446,10 +446,10 @@ TEST_F(TransactionCoordinatorServiceTest,
     assertCommitSentAndRespondWithSuccess();
 
     // The old transaction should now be committed.
-    ASSERT_EQ(static_cast<int>(oldTxnCommitDecisionFuture.get()),
+    ASSERT_EQ(static_cast<int>(oldTxnCommitCompletionFuture.get()),
               static_cast<int>(txn::CommitDecision::kCommit));
 
-    auto newTxnCommitDecisionFuture = coordinatorService->coordinateCommit(
+    auto newTxnCompletionDecisionFuture = coordinatorService->coordinateCommit(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kTwoShardIdSet);
 
     commitTransaction(*coordinatorService, _lsid, newTxnNumberAndRetryCounter, kTwoShardIdSet);
@@ -462,11 +462,20 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kCommitDeadline);
 
-    // Progress the transaction up until the point where one participant voted to abort and the
-    // coordinator has sent abort and is waiting for an abort ack.
-    auto oldTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
-        operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
-    assertPrepareSentAndRespondWithNoSuchTransaction();
+    {
+        // Progress the transaction up until the point where one participant voted to abort and the
+        // coordinator has sent abort and is waiting for an abort ack.
+
+        // Set this server parameter so coordinateCommit returns the decision future instead of the
+        // completion future.
+        RAIIServerParameterControllerForTest controller{
+            "coordinateCommitReturnImmediatelyAfterPersistingDecision", true};
+
+        auto oldTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
+            operationContext(), _lsid, _txnNumberAndRetryCounter, kOneShardIdSet);
+        assertPrepareSentAndRespondWithNoSuchTransaction();
+        oldTxnCommitDecisionFuture.wait();
+    }
 
     // Create a coordinator with a higher transaction retry counter.
     TxnNumberAndRetryCounter newTxnNumberAndRetryCounter{
@@ -475,10 +484,13 @@ TEST_F(TransactionCoordinatorServiceTest,
     coordinatorService->createCoordinator(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline);
 
+    auto oldTxnCommitCompletionFuture =
+        *coordinatorService->recoverCommit(operationContext(), _lsid, _txnNumberAndRetryCounter);
+
     // Finish aborting the original commit by sending an abort ack.
     assertAbortSentAndRespondWithSuccess();
 
-    auto newTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
+    auto newTxnCompletionDecisionFuture = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kOneShardIdSet);
 
     // Simulate acking prepare/voting to commit.
@@ -486,8 +498,8 @@ TEST_F(TransactionCoordinatorServiceTest,
     assertCommitSentAndRespondWithSuccess();
 
     ASSERT_THROWS_CODE(
-        oldTxnCommitDecisionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
-    ASSERT_EQ(static_cast<int>(newTxnCommitDecisionFuture.get()),
+        oldTxnCommitCompletionFuture.get(), AssertionException, ErrorCodes::NoSuchTransaction);
+    ASSERT_EQ(static_cast<int>(newTxnCompletionDecisionFuture.get()),
               static_cast<int>(txn::CommitDecision::kCommit));
 }
 
@@ -627,16 +639,16 @@ TEST_F(
         *_txnNumberAndRetryCounter.getTxnRetryCounter()};
     coordinatorService->createCoordinator(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kCommitDeadline);
-    auto newTxnCommitDecisionFuture = *coordinatorService->coordinateCommit(
+    auto newTxnCompletionDecisionFuture = *coordinatorService->coordinateCommit(
         operationContext(), _lsid, newTxnNumberAndRetryCounter, kTwoShardIdSet);
 
     // Since this transaction has already been canceled, this should return boost::none.
-    auto oldTxnCommitDecisionFuture = coordinatorService->coordinateCommit(
+    auto oldTxnCommitCompletionFuture = coordinatorService->coordinateCommit(
         operationContext(), _lsid, _txnNumberAndRetryCounter, kTwoShardIdSet);
 
     // The old transaction should now be canceled.
-    if (oldTxnCommitDecisionFuture) {
-        ASSERT_THROWS_CODE(oldTxnCommitDecisionFuture->get(),
+    if (oldTxnCommitCompletionFuture) {
+        ASSERT_THROWS_CODE(oldTxnCommitCompletionFuture->get(),
                            AssertionException,
                            ErrorCodes::TransactionCoordinatorCanceled);
     }

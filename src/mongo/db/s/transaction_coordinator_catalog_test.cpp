@@ -143,6 +143,8 @@ TEST_F(TransactionCoordinatorCatalogTest,
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
+    coordinator1InCatalog->getDecision().wait();
+
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     coordinator1InCatalog =
@@ -283,6 +285,8 @@ TEST_F(
         _coordinatorCatalog->get(operationContext(), lsid, txnNumberAndRetryCounter1);
     coordinator1InCatalog->runCommit(operationContext(), kOneShardIdList);
     assertCommandSentAndRespondWith("prepareTransaction", kNoSuchTransaction, boost::none);
+    coordinator1InCatalog->getDecision().wait();
+
     createCoordinatorInCatalog(operationContext(), lsid, txnNumberAndRetryCounter2);
 
     auto latestTxnNumberRetryCounterAndCoordinator =
