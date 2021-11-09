@@ -271,10 +271,6 @@ make sure it actually is able to fetch from the sync source candidate’s oplog.
 * If the oldest entry in the sync source candidate's oplog is newer than the node's newest entry,
   then the node denylists that sync source candidate as well because the candidate is too far
   ahead.
-* During initial sync, rollback, or recovery from unclean shutdown, nodes will set a specific
-  OpTime, [**`minValid`**](#replication-timestamp-glossary), that they must reach before it is safe
-  to read from the node and before the node can transition into `SECONDARY` state. If the secondary
-  has a `minValid`, then the sync source candidate is checked for that `minValid` entry.
 * The sync source's **RollbackID** is also fetched to be checked after the first batch is returned
   by the `OplogFetcher`.
 
