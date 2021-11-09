@@ -3460,6 +3460,100 @@ tasks:
         vars:
           perf-test-name: evict-lsm-1
 
+    ###########################################
+    # Performance Tests for log consolidation #
+    ###########################################
+
+  - name: perf-test-log
+    tags: ["log-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: log
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/log.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: log
+
+  - name: perf-test-log-small-files
+    tags: ["log-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: log
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/log_small_files.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: log-small-files
+
+  - name: perf-test-log-no-checkpoints
+    tags: ["log-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: log
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/log_no_checkpoints.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: log-no-checkpoints
+
+  - name: perf-test-log-no-prealloc
+    tags: ["log-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: log
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/log_no_prealloc.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: log-no-prealloc
+
+  - name: perf-test-log-zero-fill
+    tags: ["log-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: log
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/log_zero_fill.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: log-zero-fill
+
+  - name: perf-test-log-many-threads
+    tags: ["log-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: log
+          maxruns: 1
+          wtarg: "-a ../../../bench/wtperf/runners/log_many_threads.json"
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: log-many-threads
+
 #######################################
 #            Buildvariants            #
 #######################################
@@ -3743,6 +3837,7 @@ buildvariants:
     - name: ".stress-perf"
     - name: ".checkpoint-perf"
     - name: ".evict-perf"
+    - name: ".log-perf"
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -3759,6 +3854,9 @@ buildvariants:
     - name: Wiredtiger-perf-evict-jobs
       execution_tasks:
       - ".evict-perf"
+    - name: Wiredtiger-perf-log-jobs
+      execution_tasks:
+      - ".log-perf"
 
 - name: large-scale-tests
   display_name: "Large scale tests"

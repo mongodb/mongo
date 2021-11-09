@@ -1,0 +1,6 @@
+[
+  {
+    "arguments": ["-C log=(enabled,file_max=1M,prealloc=false)"],
+    "operations": ["update"]
+  }
+]

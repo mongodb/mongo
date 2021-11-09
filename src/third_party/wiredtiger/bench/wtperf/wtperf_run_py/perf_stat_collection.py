@@ -35,11 +35,12 @@ from perf_stat import PerfStat
 
 
 def find_stat(test_stat_path: str, pattern: str, position_of_value: int):
+    matches = []
     for line in open(test_stat_path):
-        match = re.match(pattern, line)
+        match = re.search(pattern, line)
         if match:
-            return float(line.split()[position_of_value])
-    return 0
+            matches.append(float(line.split()[position_of_value]))
+    return matches
 
 
 class PerfStatCollection:
@@ -52,10 +53,10 @@ class PerfStatCollection:
     def find_stats(self, test_stat_path: str, operations: List[str]):
         for stat in self.perf_stats.values():
             if not operations or stat.short_label in operations:
-                value = find_stat(test_stat_path=test_stat_path,
-                                  pattern=stat.pattern,
-                                  position_of_value=stat.input_offset)
-                stat.add_value(value=value)
+                values = find_stat(test_stat_path=test_stat_path,
+                                   pattern=stat.pattern,
+                                   position_of_value=stat.input_offset)
+                stat.add_values(values=values)
 
     def to_value_list(self, brief: bool):
         as_list = []
@@ -63,7 +64,7 @@ class PerfStatCollection:
             if not stat.are_values_all_zero():
                 as_dict = {
                     'name': stat.output_label,
-                    'value': stat.get_core_average()
+                    'value': stat.get_value()
                 }
                 if not brief:
                     as_dict['values'] = stat.values
