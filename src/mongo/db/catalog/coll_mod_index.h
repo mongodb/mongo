@@ -33,6 +33,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
 
@@ -61,6 +62,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
                                 const CollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
-                                BSONObjBuilder* result);
+                                BSONObjBuilder* result,
+                                boost::optional<repl::OplogApplication::Mode> mode);
 
 }  // namespace mongo

@@ -473,7 +473,8 @@ void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceStringOrUUID& nsOrUUID,
                         const CollMod& cmd,
-                        BSONObjBuilder* result) {
+                        BSONObjBuilder* result,
+                        boost::optional<repl::OplogApplication::Mode> mode) {
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
     auto nss = coll.getNss();
     StringData dbName = nss.db();
@@ -615,7 +616,8 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         // Handle index modifications.
-        processCollModIndexRequest(opCtx, &coll, cmrNew.indexRequest, &indexCollModInfo, result);
+        processCollModIndexRequest(
+            opCtx, &coll, cmrNew.indexRequest, &indexCollModInfo, result, mode);
 
         if (cmrNew.collValidator) {
             coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);
@@ -704,7 +706,15 @@ Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
                              BSONObjBuilder* result) {
-    return _collModInternal(opCtx, nsOrUUID, cmd, result);
+    return _collModInternal(opCtx, nsOrUUID, cmd, result, boost::none);
+}
+
+Status processCollModCommandForApplyOps(OperationContext* opCtx,
+                                        const NamespaceStringOrUUID& nsOrUUID,
+                                        const CollMod& cmd,
+                                        repl::OplogApplication::Mode mode) {
+    BSONObjBuilder resultWeDontCareAbout;
+    return _collModInternal(opCtx, nsOrUUID, cmd, &resultWeDontCareAbout, mode);
 }
 
 }  // namespace mongo

@@ -143,6 +143,7 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
 void _processCollModIndexRequestUnique(OperationContext* opCtx,
                                        AutoGetCollection* autoColl,
                                        const IndexDescriptor* idx,
+                                       boost::optional<repl::OplogApplication::Mode> mode,
                                        BSONElement indexUnique,
                                        BSONElement* newUnique) {
     // Do not update catalog if index is already unique.
@@ -159,7 +160,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
                                 const CollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
-                                BSONObjBuilder* result) {
+                                BSONObjBuilder* result,
+                                boost::optional<repl::OplogApplication::Mode> mode) {
     auto idx = collModIndexRequest.idx;
     auto indexExpireAfterSeconds = collModIndexRequest.indexExpireAfterSeconds;
     auto indexHidden = collModIndexRequest.indexHidden;
@@ -191,7 +193,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
     // User wants to convert an index to be unique.
     if (indexUnique) {
-        _processCollModIndexRequestUnique(opCtx, autoColl, idx, indexUnique, &newUnique);
+        _processCollModIndexRequestUnique(opCtx, autoColl, idx, mode, indexUnique, &newUnique);
     }
 
     *indexCollModInfo = IndexCollModInfo{

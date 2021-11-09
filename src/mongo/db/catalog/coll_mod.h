@@ -31,6 +31,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/coll_mod_gen.h"
+#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
 class BSONObj;
@@ -53,5 +54,14 @@ Status processCollModCommand(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              const CollMod& cmd,
                              BSONObjBuilder* result);
+
+/**
+ * Performs the collection modification described in "cmd" on the collection "ns". Only checks for
+ * duplicates for the 'applyOps' command.
+ */
+Status processCollModCommandForApplyOps(OperationContext* opCtx,
+                                        const NamespaceStringOrUUID& nsOrUUID,
+                                        const CollMod& cmd,
+                                        repl::OplogApplication::Mode mode);
 
 }  // namespace mongo

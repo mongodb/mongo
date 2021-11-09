@@ -928,8 +928,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
               return {collModCmd.getDbName().toString(), *entry.getUuid()};
           }());
-          BSONObjBuilder resultWeDontCareAbout;
-          return processCollModCommand(opCtx, nssOrUUID, collModCmd, &resultWeDontCareAbout);
+          return processCollModCommandForApplyOps(opCtx, nssOrUUID, collModCmd, mode);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},
