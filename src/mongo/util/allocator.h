@@ -31,7 +31,7 @@
 
 #include <cstddef>
 
-#include <mongo/platform/compiler.h>
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 

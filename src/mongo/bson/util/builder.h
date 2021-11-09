@@ -423,7 +423,7 @@ public:
     }
 
     /* returns the pre-grow write position */
-    inline char* grow(int by) {
+    char* grow(int by) {
         if (MONGO_likely(_nextByte + by <= _end)) {
             char* oldNextByte = _nextByte;
             _nextByte += by;
@@ -496,13 +496,7 @@ protected:
     /**
      * The "slow" portion of 'grow()', for when we actually need to go
      * to the underlying allocator for more memory. This function must
-     * not be inlined. It has managed to accidentally become inlined
-     * again several times, and each time has resulted in performance
-     * regressions. If you are looking at this function sometime in
-     * the future, and it not in header scope and lacks an attribute
-     * that ensures it is not inlined, and you are, once again, moving
-     * it back to header scope, you must re-add the necessary
-     * annotation to ensure the function will not be inlined.
+     * not be inlined.
      */
     MONGO_COMPILER_NOINLINE char* _growOutOfLineSlowPath(size_t by) {
         const size_t oldLen = len();
