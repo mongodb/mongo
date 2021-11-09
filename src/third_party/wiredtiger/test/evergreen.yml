@@ -647,8 +647,9 @@ variables:
 #########################################################################################
 # The following stress tests are configured to run for six hours via the "-t 360"
 # argument to format.sh: format-stress-test, format-stress-sanitizer-test, and
-# race-condition-stress-sanitizer-test. The smoke and recovery tests run in a loop,
-# with the number of runs adjusted to provide aproximately six hours of testing.
+# race-condition-stress-sanitizer-test. The recovery tests run in a loop, with
+# the number of runs adjusted to provide aproximately six hours of testing.  The
+# smoke tests are run just once.
 #########################################################################################
 
   - &format-stress-test
@@ -673,17 +674,16 @@ variables:
             ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
 
   - &format-stress-smoke-test
-    exec_timeout_secs: 25200
+    exec_timeout_secs: 3600
     commands:
       - func: "get project"
       - func: "compile wiredtiger with builtins"
       - func: "format test script"
         vars:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -S
-          times: 30
 
   - &format-stress-sanitizer-smoke-test
-    exec_timeout_secs: 25200
+    exec_timeout_secs: 3600
     commands:
       - func: "get project"
       - func: "compile wiredtiger address sanitizer"
@@ -693,7 +693,6 @@ variables:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
             ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
           format_test_script_args: -S
-          times: 20
 
   - &race-condition-stress-sanitizer-test
     exec_timeout_secs: 25200
@@ -2843,15 +2842,9 @@ tasks:
   - <<: *format-stress-smoke-test
     name: format-stress-smoke-test-1
     tags: ["stress-test-1", "stress-test-ppc-1", "stress-test-zseries-1"]
-  - <<: *format-stress-smoke-test
-    name: format-stress-smoke-test-2
-    tags: ["stress-test-2", "stress-test-ppc-2", "stress-test-zseries-2"]
   - <<: *format-stress-sanitizer-smoke-test
     name: format-stress-sanitizer-smoke-test-1
     tags: ["stress-test-1"]
-  - <<: *format-stress-sanitizer-smoke-test
-    name: format-stress-sanitizer-smoke-test-2
-    tags: ["stress-test-2"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-1
     tags: ["stress-test-1"]
@@ -4169,7 +4162,6 @@ buildvariants:
   - name: unit-test
   - name: format-wtperf-test
   - name: ".stress-test-ppc-1"
-  - name: ".stress-test-ppc-2"
 
 - name: ubuntu1804-ppc-cmake
   display_name: "* Ubuntu 18.04 PPC CMake"
