@@ -1577,8 +1577,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             }
 
             {
+                // Make sure we don't overwrite a FAIL or ABORT state.
                 stdx::lock_guard<Latch> sl(_mutex);
-                if (_state != FAIL || _state != ABORT) {
+                if (_state != FAIL && _state != ABORT) {
                     _state = ENTERED_CRIT_SEC;
                     _stateChangedCV.notify_all();
                 }
