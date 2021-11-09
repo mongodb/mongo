@@ -91,7 +91,9 @@ public:
     public:
         WriteBatch() = delete;
 
-        WriteBatch(Bucket* bucket, OperationId opId, const std::shared_ptr<ExecutionStats>& stats);
+        WriteBatch(const OID& bucketId,
+                   OperationId opId,
+                   const std::shared_ptr<ExecutionStats>& stats);
 
         /**
          * Attempt to claim the right to commit (or abort) a batch. If it returns true, rights are
@@ -106,7 +108,7 @@ public:
          */
         StatusWith<CommitInfo> getResult() const;
 
-        Bucket* bucket() const;
+        const OID& bucketId() const;
 
         const std::vector<BSONObj>& measurements() const;
         const BSONObj& min() const;
@@ -142,7 +144,7 @@ public:
          * that have previously been committed to the bucket, and marks the batch inactive. Must
          * have commit rights.
          */
-        void _prepareCommit();
+        void _prepareCommit(Bucket* bucket);
 
         /**
          * Report the result and status of a commit, and notify anyone waiting on getResult(). Must
@@ -152,13 +154,12 @@ public:
 
         /**
          * Abandon the write batch and notify any waiters that the bucket has been cleared. Must
-         * have commit rights. Parameter controls whether the function is allowed to access the
-         * bucket.
+         * have commit rights. Parameter 'bucket' provides a pointer to the bucket if still
+         * available, nullptr otherwise.
          */
-        void _abort(const boost::optional<Status>& status, bool canAccessBucket);
+        void _abort(const boost::optional<Status>& status, const Bucket* bucket);
 
-
-        Bucket* const _bucket;
+        const OID _bucketId;
         OperationId _opId;
         std::shared_ptr<ExecutionStats> _stats;
 
@@ -199,7 +200,7 @@ public:
      * Returns an empty document if the given bucket cannot be found or if this time-series
      * collection was not created with a metadata field name.
      */
-    BSONObj getMetadata(Bucket* bucket) const;
+    BSONObj getMetadata(const OID& bucketId) const;
 
     /**
      * Returns the WriteBatch into which the document was inserted and optional information about a
@@ -356,6 +357,8 @@ public:
         friend class BucketAccess;
         friend class BucketCatalog;
 
+        Bucket(const OID& id);
+
         /**
          * Returns the ID for the underlying bucket.
          */
@@ -404,7 +407,7 @@ public:
             MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "BucketCatalog::Bucket::_mutex");
 
         // The bucket ID for the underlying document
-        OID _id = OID::gen();
+        const OID _id;
 
         // The namespace that this bucket is used for.
         NamespaceString _ns;
@@ -586,7 +589,7 @@ private:
                      ClosedBuckets* closedBuckets,
                      const Date_t& time);
         BucketAccess(BucketCatalog* catalog,
-                     Bucket* bucket,
+                     const OID& bucketId,
                      boost::optional<BucketState> targetState = boost::none);
         ~BucketAccess();
 
@@ -730,8 +733,6 @@ private:
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
     const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
 
-    void _setIdTimestamp(Bucket* bucket, const Date_t& time, const TimeseriesOptions& options);
-
     /**
      * Changes the bucket state, taking into account the current state, the specified target state,
      * and allowed state transitions. The return value, if set, is the final state of the bucket
@@ -761,7 +762,7 @@ private:
     mutable StripedMutex _bucketMutex;
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
-    stdx::unordered_set<std::unique_ptr<Bucket>> _allBuckets;
+    stdx::unordered_map<OID, std::unique_ptr<Bucket>, OID::Hasher> _allBuckets;
 
     // The current open bucket for each namespace and metadata pair.
     stdx::unordered_map<BucketKey, Bucket*, BucketHasher, BucketEq> _openBuckets;
