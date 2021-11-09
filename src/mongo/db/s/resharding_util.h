@@ -299,4 +299,6 @@ NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorSha
 
 NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId);
 
+void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceString& nss);
+
 }  // namespace mongo

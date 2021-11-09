@@ -42,6 +42,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -51,29 +52,6 @@
 
 namespace mongo {
 namespace {
-
-void doNoopWrite(OperationContext* opCtx, const NamespaceString& nss) {
-    writeConflictRetry(
-        opCtx, "_flushReshardingStateChange no-op", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-
-            const std::string msg = str::stream()
-                << "no-op for _flushReshardingStateChange on " << nss;
-            WriteUnitOfWork wuow(opCtx);
-            opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                opCtx,
-                {},
-                boost::none,
-                BSON("msg" << msg),
-                boost::none,
-                boost::none,
-                boost::none,
-                boost::none,
-                boost::none);
-            wuow.commit();
-        });
-}
-
 class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingStateChangeCmd> {
 public:
     using Request = _flushReshardingStateChange;
@@ -152,7 +130,7 @@ public:
                 .getAsync([](auto) {});
 
             // Ensure the command isn't run on a stale primary.
-            doNoopWrite(opCtx, ns());
+            doNoopWrite(opCtx, "_flushReshardingStateChange no-op", ns());
         }
     };
 } _flushReshardingStateChange;
