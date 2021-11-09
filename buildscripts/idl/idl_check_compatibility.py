@@ -836,14 +836,15 @@ def check_namespace(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command, new_
 
 
 def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
-                      import_directories: List[str]) -> IDLCompatibilityErrorCollection:
+                      old_import_directories: List[str],
+                      new_import_directories: List[str]) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new ErrorReply."""
     old_idl_dir = os.path.dirname(old_basic_types_path)
     new_idl_dir = os.path.dirname(new_basic_types_path)
     ctxt = IDLCompatibilityContext(old_idl_dir, new_idl_dir, IDLCompatibilityErrorCollection())
     with open(old_basic_types_path) as old_file:
         old_idl_file = parser.parse(old_file, old_basic_types_path,
-                                    CompilerImportResolver(import_directories))
+                                    CompilerImportResolver(old_import_directories))
         if old_idl_file.errors:
             old_idl_file.errors.dump_errors()
             raise ValueError(f"Cannot parse {old_basic_types_path}")
@@ -855,7 +856,7 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
         else:
             with open(new_basic_types_path) as new_file:
                 new_idl_file = parser.parse(new_file, new_basic_types_path,
-                                            CompilerImportResolver(import_directories))
+                                            CompilerImportResolver(new_import_directories))
                 if new_idl_file.errors:
                     new_idl_file.errors.dump_errors()
                     raise ValueError(f"Cannot parse {new_basic_types_path}")
@@ -947,14 +948,14 @@ def check_security_access_checks(ctxt: IDLCompatibilityContext,
         ctxt.add_added_access_check_field_error(cmd_name, new_idl_file_path)
 
 
-def check_compatibility(old_idl_dir: str, new_idl_dir: str,
-                        import_directories: List[str]) -> IDLCompatibilityErrorCollection:
+def check_compatibility(old_idl_dir: str, new_idl_dir: str, old_import_directories: List[str],
+                        new_import_directories: List[str]) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new IDL commands."""
     # pylint: disable=too-many-locals
     ctxt = IDLCompatibilityContext(old_idl_dir, new_idl_dir, IDLCompatibilityErrorCollection())
 
     new_commands, new_command_file, new_command_file_path = get_new_commands(
-        ctxt, new_idl_dir, import_directories)
+        ctxt, new_idl_dir, new_import_directories)
 
     # Check new commands' compatibility with old ones.
     # Note, a command can be added to V1 at any time, it's ok if a
@@ -969,7 +970,7 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
             with open(old_idl_file_path) as old_file:
                 old_idl_file = parser.parse(
                     old_file, old_idl_file_path,
-                    CompilerImportResolver(import_directories + [old_idl_dir]))
+                    CompilerImportResolver(old_import_directories + [old_idl_dir]))
                 if old_idl_file.errors:
                     old_idl_file.errors.dump_errors()
                     raise ValueError(f"Cannot parse {old_idl_file_path}")
@@ -1075,21 +1076,25 @@ def main():
     """Run the script."""
     arg_parser = argparse.ArgumentParser(description=__doc__)
     arg_parser.add_argument("-v", "--verbose", action="count", help="Enable verbose logging")
-    arg_parser.add_argument("--include", type=str, action="append",
-                            help="Directory to search for IDL import files")
+    arg_parser.add_argument("--old-include", dest="old_include", type=str, action="append",
+                            default=[], help="Directory to search for old IDL import files")
+    arg_parser.add_argument("--new-include", dest="new_include", type=str, action="append",
+                            default=[], help="Directory to search for new IDL import files")
     arg_parser.add_argument("old_idl_dir", metavar="OLD_IDL_DIR",
                             help="Directory where old IDL files are located")
     arg_parser.add_argument("new_idl_dir", metavar="NEW_IDL_DIR",
                             help="Directory where new IDL files are located")
     args = arg_parser.parse_args()
 
-    error_coll = check_compatibility(args.old_idl_dir, args.new_idl_dir, args.include)
+    error_coll = check_compatibility(args.old_idl_dir, args.new_idl_dir, args.old_include,
+                                     args.new_include)
     if error_coll.has_errors():
         sys.exit(1)
 
     old_basic_types_path = os.path.join(args.old_idl_dir, "mongo/idl/basic_types.idl")
     new_basic_types_path = os.path.join(args.new_idl_dir, "mongo/idl/basic_types.idl")
-    error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path, args.include)
+    error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path,
+                                         args.old_include, args.new_include)
     if error_reply_coll.has_errors():
         sys.exit(1)
 

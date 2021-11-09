@@ -50,7 +50,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertFalse(
             idl_check_compatibility.check_compatibility(
                 path.join(dir_path, "compatibility_test_pass/old"),
-                path.join(dir_path, "compatibility_test_pass/new"), ["src"]).has_errors())
+                path.join(dir_path, "compatibility_test_pass/new"), ["src"], ["src"]).has_errors())
 
     def test_should_abort(self):
         """Tests that invalid old and new IDL commands should cause script to abort."""
@@ -60,28 +60,28 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             idl_check_compatibility.check_compatibility(
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_reply_field_type"),
                 path.join(dir_path, "compatibility_test_fail/abort/valid_reply_field_type"),
-                ["src"])
+                ["src"], ["src"])
 
         # Test that when new command has a reply field with an invalid reply type, the script aborts.
         with self.assertRaises(SystemExit):
             idl_check_compatibility.check_compatibility(
                 path.join(dir_path, "compatibility_test_fail/abort/valid_reply_field_type"),
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_reply_field_type"),
-                ["src"])
+                ["src"], ["src"])
 
         # Test that when new command has a parameter with an invalid type, the script aborts.
         with self.assertRaises(SystemExit):
             idl_check_compatibility.check_compatibility(
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
                 path.join(dir_path, "compatibility_test_fail/abort/valid_command_parameter_type"),
-                ["src"])
+                ["src"], ["src"])
 
         # Test that when new command has a parameter with an invalid type, the script aborts.
         with self.assertRaises(SystemExit):
             idl_check_compatibility.check_compatibility(
                 path.join(dir_path, "compatibility_test_fail/abort/valid_command_parameter_type"),
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
-                ["src"])
+                ["src"], ["src"])
 
     # pylint: disable=too-many-locals,too-many-statements,invalid-name
     def test_should_fail(self):
@@ -89,7 +89,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         dir_path = path.dirname(path.realpath(__file__))
         error_collection = idl_check_compatibility.check_compatibility(
             path.join(dir_path, "compatibility_test_fail/old"),
-            path.join(dir_path, "compatibility_test_fail/new"), ["src"])
+            path.join(dir_path, "compatibility_test_fail/new"), ["src"], ["src"])
 
         self.assertTrue(error_collection.has_errors())
         self.assertEqual(error_collection.count(), 170)
@@ -1290,12 +1290,12 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertFalse(
             idl_check_compatibility.check_error_reply(
                 path.join(dir_path, "compatibility_test_pass/old/error_reply.idl"),
-                path.join(dir_path, "compatibility_test_pass/new/error_reply.idl"),
+                path.join(dir_path, "compatibility_test_pass/new/error_reply.idl"), [],
                 []).has_errors())
 
         error_collection_fail = idl_check_compatibility.check_error_reply(
             path.join(dir_path, "compatibility_test_fail/old/error_reply.idl"),
-            path.join(dir_path, "compatibility_test_fail/new/error_reply.idl"), [])
+            path.join(dir_path, "compatibility_test_fail/new/error_reply.idl"), [], [])
 
         self.assertTrue(error_collection_fail.has_errors())
         self.assertTrue(error_collection_fail.count() == 1)
