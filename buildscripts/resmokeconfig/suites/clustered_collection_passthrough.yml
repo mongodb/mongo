@@ -57,6 +57,8 @@ selector:
   - jstests/core/txns/create_indexes.js
   - jstests/core/txns/create_indexes_parallel.js
   - jstests/core/txns/commands_in_txns_read_concern.js
+  # TODO (SERVER-61009) "cannot create an index with the same key as the cluster key: {keyPattern: {_id: 1, "a.b": 1}}"
+  - jstests/core/null_query_semantics.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
