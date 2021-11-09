@@ -200,6 +200,8 @@ public:
 
     virtual bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
 
+    JournalListener* getReplicationJournalListener() final;
+
 private:
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;

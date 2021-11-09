@@ -327,5 +327,9 @@ bool ReplicationCoordinatorExternalStateMock::isShardPartOfShardedCluster(
     return true;
 }
 
+JournalListener* ReplicationCoordinatorExternalStateMock::getReplicationJournalListener() {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

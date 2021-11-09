@@ -84,6 +84,8 @@ public:
 
     Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
 
+    JournalListener* getReplicationJournalListener() override;
+
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;
     ReplicationCoordinatorExternalState* getReplicationCoordinatorExternalState() const;

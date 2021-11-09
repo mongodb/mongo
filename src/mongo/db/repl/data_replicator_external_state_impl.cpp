@@ -163,6 +163,10 @@ Status DataReplicatorExternalStateImpl::storeLocalConfigDocument(OperationContex
         opCtx, config, false /* write oplog entry */);
 }
 
+JournalListener* DataReplicatorExternalStateImpl::getReplicationJournalListener() {
+    return _replicationCoordinatorExternalState->getReplicationJournalListener();
+}
+
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {
     return _replicationCoordinator;
 }

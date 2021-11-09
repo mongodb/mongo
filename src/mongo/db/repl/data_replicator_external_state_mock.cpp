@@ -137,5 +137,9 @@ Status DataReplicatorExternalStateMock::storeLocalConfigDocument(OperationContex
     return Status::OK();
 }
 
+JournalListener* DataReplicatorExternalStateMock::getReplicationJournalListener() {
+    return nullptr;
+}
+
 }  // namespace repl
 }  // namespace mongo

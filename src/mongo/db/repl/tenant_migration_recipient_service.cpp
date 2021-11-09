@@ -237,6 +237,10 @@ public:
     Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) final {
         MONGO_UNREACHABLE;
     }
+
+    JournalListener* getReplicationJournalListener() final {
+        MONGO_UNREACHABLE;
+    }
 };
 
 

@@ -334,6 +334,11 @@ public:
      * addShard.
      */
     virtual bool isShardPartOfShardedCluster(OperationContext* opCtx) const = 0;
+
+    /**
+     * Returns the JournalListener used by storage to inform replication of durability.
+     */
+    virtual JournalListener* getReplicationJournalListener() = 0;
 };
 
 }  // namespace repl

@@ -74,6 +74,8 @@ public:
 
     Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) override;
 
+    JournalListener* getReplicationJournalListener() override;
+
     // Task executor.
     std::shared_ptr<executor::TaskExecutor> taskExecutor = nullptr;
 

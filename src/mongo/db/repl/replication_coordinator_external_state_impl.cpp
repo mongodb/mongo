@@ -331,6 +331,10 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
 }
 
 
+JournalListener* ReplicationCoordinatorExternalStateImpl::getReplicationJournalListener() {
+    return this;
+}
+
 void ReplicationCoordinatorExternalStateImpl::startThreads() {
     stdx::lock_guard<Latch> lk(_threadMutex);
     if (_startedThreads) {

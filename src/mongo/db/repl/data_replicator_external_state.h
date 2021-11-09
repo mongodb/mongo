@@ -135,6 +135,11 @@ public:
      * Stores the replica set config document in local storage, or returns an error.
      */
     virtual Status storeLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
+
+    /**
+     * Returns the replication journal listener.
+     */
+    virtual JournalListener* getReplicationJournalListener() = 0;
 };
 
 }  // namespace repl

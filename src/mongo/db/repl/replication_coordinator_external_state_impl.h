@@ -112,6 +112,8 @@ public:
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual std::size_t getOplogFetcherSteadyStateMaxFetcherRestarts() const override;
     virtual std::size_t getOplogFetcherInitialSyncMaxFetcherRestarts() const override;
+    JournalListener* getReplicationJournalListener() final;
+
 
     // Methods from JournalListener.
     virtual JournalListener::Token getToken(OperationContext* opCtx);
