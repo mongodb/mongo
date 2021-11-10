@@ -99,6 +99,8 @@ selector:
   # This test runs createIndexes commands without asserting they succeed and depends on a particular
   # index to exist.
   - jstests/core/index_many2.js
+  # Causes CappedPositionLost on recipient, which is not recoverable.
+  - jstests/core/rename_collection_capped.js
 
   #
   # From retryable writes jscore stepdown passthrough

@@ -94,6 +94,8 @@ selector:
   # require a collection scan and return an error.
   - jstests/core/notablescan.js
   - jstests/core/notablescan_capped.js
+  # Causes CappedPositionLost on recipient, which is not recoverable.
+  - jstests/core/rename_collection_capped.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
