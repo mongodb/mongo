@@ -180,7 +180,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             // Don't do anything until a targeter refresh
             targeter.noteCouldNotTarget();
             refreshedTargeter = true;
-            ++stats->numTargetErrors;
             dassert(childBatches.size() == 0u);
 
             if (TransactionRouter::get(opCtx)) {

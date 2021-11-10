@@ -85,12 +85,7 @@ typedef std::map<ConnectionString, HostOpTime> HostOpTimeMap;
 
 class BatchWriteExecStats {
 public:
-    BatchWriteExecStats()
-        : numRounds(0),
-          numTargetErrors(0),
-          numResolveErrors(0),
-          numStaleShardBatches(0),
-          numStaleDbBatches(0) {}
+    BatchWriteExecStats() : numRounds(0), numStaleShardBatches(0), numStaleDbBatches(0) {}
 
     void noteWriteAt(const HostAndPort& host, repl::OpTime opTime, const OID& electionId);
     void noteTargetedShard(const ShardId& shardId);
@@ -104,10 +99,6 @@ public:
 
     // Number of round trips required for the batch
     int numRounds;
-    // Number of times targeting failed
-    int numTargetErrors;
-    // Number of times host resolution failed
-    int numResolveErrors;
     // Number of stale batches due to StaleShardVersion
     int numStaleShardBatches;
     // Number of stale batches due to StaleDbVersion
