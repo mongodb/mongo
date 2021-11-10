@@ -1,0 +1,6 @@
+[
+    {
+      "arguments": null,
+      "operations": ["warnings", "max_latencies"]
+    }
+]

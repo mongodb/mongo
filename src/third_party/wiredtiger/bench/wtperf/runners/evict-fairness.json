@@ -1,0 +1,6 @@
+[
+    {
+      "arguments": ["-C statistics_log=(wait=10000,on_close=true,json=false,sources=[file:])", "-o reopen_connection=false"],
+      "operations": ["eviction_page_seen"]
+    }
+]

@@ -28,19 +28,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import re
+import os
+from perf_stat import PerfStat
 from typing import List
 
-from perf_stat import PerfStat
 
-
-def find_stat(test_stat_path: str, pattern: str, position_of_value: int):
-    matches = []
-    for line in open(test_stat_path):
-        match = re.search(pattern, line)
-        if match:
-            matches.append(float(line.split()[position_of_value]))
-    return matches
+def create_test_stat_path(test_home_path: str, test_stats_file: str):
+    return os.path.join(test_home_path, test_stats_file)
 
 
 class PerfStatCollection:
@@ -50,23 +44,17 @@ class PerfStatCollection:
     def add_stat(self, perf_stat: PerfStat):
         self.perf_stats[perf_stat.short_label] = perf_stat
 
-    def find_stats(self, test_stat_path: str, operations: List[str]):
+    def find_stats(self, test_home: str, operations: List[str]):
         for stat in self.perf_stats.values():
             if not operations or stat.short_label in operations:
-                values = find_stat(test_stat_path=test_stat_path,
-                                   pattern=stat.pattern,
-                                   position_of_value=stat.input_offset)
+                test_stat_path = create_test_stat_path(test_home, stat.stat_file)
+                values = stat.find_stat(test_stat_path=test_stat_path)
                 stat.add_values(values=values)
 
     def to_value_list(self, brief: bool):
-        as_list = []
+        stats_list = []
         for stat in self.perf_stats.values():
             if not stat.are_values_all_zero():
-                as_dict = {
-                    'name': stat.output_label,
-                    'value': stat.get_value()
-                }
-                if not brief:
-                    as_dict['values'] = stat.values
-                as_list.append(as_dict)
-        return as_list
+                stat_list = stat.get_value_list(brief = brief)
+                stats_list.extend(stat_list)
+        return stats_list

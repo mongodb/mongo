@@ -29,23 +29,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import argparse
-import json
 import os.path
-import subprocess
-import sys
 import platform
 import psutil
+import subprocess
+import sys
+import json
+from perf_stat import PerfStat, PerfStatCount, PerfStatLatency, PerfStatMax, PerfStatMin
+from perf_stat_collection import PerfStatCollection
 from pygit2 import discover_repository, Repository
 from pygit2 import GIT_SORT_NONE
 from typing import List
-
 from wtperf_config import WTPerfConfig
-from perf_stat import PerfStat, PerfStatMax, PerfStatMin
-from perf_stat_collection import PerfStatCollection
-
-# the 'test.stat' file is where wt-perf.c writes out it's statistics
-# (within the directory specified by the 'home' parameter)
-test_stats_file = 'test.stat'
 
 
 def create_test_home_path(home: str, test_run: int, operations: List[str] = None):
@@ -54,10 +49,6 @@ def create_test_home_path(home: str, test_run: int, operations: List[str] = None
         # Use the first operation name as part of the home path
         home_path += "_{}".format(operations[0])
     return home_path
-
-
-def create_test_stat_path(test_home_path: str):
-    return os.path.join(test_home_path, test_stats_file)
 
 
 def get_git_info(git_working_tree_dir):
@@ -158,10 +149,9 @@ def run_test(config: WTPerfConfig, test_run: int, operations: List[str] = None, 
 def process_results(config: WTPerfConfig, perf_stats: PerfStatCollection, operations: List[str] = None):
     for test_run in range(config.run_max):
         test_home = create_test_home_path(home=config.home_dir, test_run=test_run, operations=operations)
-        test_stats_path = create_test_stat_path(test_home)
         if config.verbose:
-            print('Reading test stats file: {}'.format(test_stats_path))
-        perf_stats.find_stats(test_stat_path=test_stats_path, operations=operations)
+            print('Reading stats from {} directory.'.format(test_home))
+        perf_stats.find_stats(test_home=test_home, operations=operations)
 
 
 def setup_perf_stats():
@@ -200,6 +190,17 @@ def setup_perf_stats():
                                     pattern=r'updates,',
                                     input_offset=8,
                                     output_label='Min update throughput'))
+    perf_stats.add_stat(PerfStatCount(short_label="warnings",
+                                      pattern='WARN',
+                                      output_label='Warnings'))
+    perf_stats.add_stat(PerfStatLatency(short_label="max_latencies",
+                                        stat_file='monitor.json',
+                                        output_label='Latency Max',
+                                        num_max = 5))
+    perf_stats.add_stat(PerfStatCount(short_label="eviction_page_seen",
+                                      stat_file='WiredTigerStat*',
+                                      pattern='[0-9].wt cache: pages seen by eviction',
+                                      output_label='Pages seen by eviction'))
     return perf_stats
 
 
