@@ -42,7 +42,6 @@ HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx)
 void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
                                        std::shared_ptr<executor::TaskExecutor> taskExecutor,
                                        CancellationToken token) {
-
     // If we have reached here, the intensity of this health observer must not be off
     {
         auto lk = stdx::lock_guard(_mutex);
@@ -52,6 +51,10 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
 
         const auto now = _svcCtx->getPreciseClockSource()->now();
         if (now - _lastTimeTheCheckWasRun < minimalCheckInterval()) {
+            LOGV2_DEBUG(6136802,
+                        3,
+                        "Safety interval prevented new health check",
+                        "observerType"_attr = getType());
             return;
         }
         _lastTimeTheCheckWasRun = now;

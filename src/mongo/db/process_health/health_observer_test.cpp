@@ -181,8 +181,7 @@ TEST_F(FaultManagerTest, DoesNotRestartCheckBeforeIntervalExpired) {
     ASSERT_TRUE(!currentFault);
 
     advanceTime(Milliseconds(100));
-    manager().healthCheckTest();
-    waitForFaultBeingCreated();
+    assertSoonWithHealthCheck([this]() { return hasFault(); });
     currentFault = manager().currentFault();
     ASSERT_TRUE(currentFault);  // The fault was created.
     resetManager();             // Before atomic fields above go out of scope.
@@ -201,7 +200,7 @@ TEST_F(FaultManagerTest, InitialHealthCheckDoesNotBlockIfTransitionToOkSucceeds)
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
 
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0.0; });
-    manager().startPeriodicHealthChecks();
+    manager().healthCheckTest();
 
     auto currentFault = manager().currentFault();
     ASSERT_TRUE(!currentFault);  // Is not created.
@@ -254,7 +253,7 @@ TEST_F(FaultManagerTest, ProgressMonitorCheck) {
     manager().progressMonitorCheckTest(crashCb);
     // The progress check passed because the simulated time did not advance.
     ASSERT_FALSE(crashTriggered);
-    advanceClockSourcesTime(manager().getConfig().getPeriodicLivenessDeadline() + Seconds(1));
+    advanceTime(manager().getConfig().getPeriodicLivenessDeadline() + Seconds(1));
     manager().progressMonitorCheckTest(crashCb);
     // The progress check simulated a crash.
     ASSERT_TRUE(crashTriggered);
@@ -263,10 +262,13 @@ TEST_F(FaultManagerTest, ProgressMonitorCheck) {
 }
 
 TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeout) {
+    auto config = test::getConfigWithDisabledPeriodicChecks();
+    config->setActiveFaultDurationForTests(Milliseconds(10));
+    resetManager(std::move(config));
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
     waitForTransitionIntoState(FaultState::kTransientFault);
     ASSERT_TRUE(manager().getFaultState() == FaultState::kTransientFault);
-    advanceTime(manager().getConfig().getActiveFaultDuration() + Milliseconds(1));
+    advanceTime(Milliseconds(10));
     waitForTransitionIntoState(FaultState::kActiveFault);
 }
 

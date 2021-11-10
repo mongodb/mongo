@@ -175,6 +175,7 @@ FaultManager::~FaultManager() {
     if (!_initialHealthCheckCompletedPromise.getFuture().isReady()) {
         _initialHealthCheckCompletedPromise.emplaceValue();
     }
+    LOGV2_DEBUG(6136801, 1, "Done shutting down periodic health checks");
 }
 
 void FaultManager::startPeriodicHealthChecks() {
@@ -222,7 +223,11 @@ void FaultManager::healthCheck() {
     // One time init.
     _firstTimeInitIfNeeded();
 
-    ON_BLOCK_EXIT([this] { schedulePeriodicHealthCheckThread(); });
+    ON_BLOCK_EXIT([this] {
+        if (!_config->periodicChecksDisabledForTests()) {
+            schedulePeriodicHealthCheckThread();
+        }
+    });
 
     std::vector<HealthObserver*> observers = FaultManager::getHealthObservers();
 

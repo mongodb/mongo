@@ -72,12 +72,13 @@ public:
 
     HealthObserverLivenessStats getStats() const override;
 
-protected:
+    // Common params for every health check.
     struct PeriodicHealthCheckContext {
         CancellationToken cancellationToken;
         std::shared_ptr<executor::TaskExecutor> taskExecutor;
     };
 
+protected:
     /**
      * The main method every health observer should implement for a particular
      * health check it does.
