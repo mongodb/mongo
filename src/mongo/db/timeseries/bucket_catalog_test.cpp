@@ -235,9 +235,9 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                      .getValue();
     ASSERT(batch->claimCommitRights());
-    auto bucket = batch->bucket();
+    auto bucketId = batch->bucketId();
     _bucketCatalog->abort(batch);
-    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucket));
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucketId));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
@@ -270,10 +270,10 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"),
-                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+                      _bucketCatalog->getMetadata(result1.getValue()->bucketId()));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
-                      _bucketCatalog->getMetadata(result2.getValue()->bucket()));
-    ASSERT(_bucketCatalog->getMetadata(result3.getValue()->bucket()).isEmpty());
+                      _bucketCatalog->getMetadata(result2.getValue()->bucketId()));
+    ASSERT(_bucketCatalog->getMetadata(result3.getValue()->bucketId()).isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
@@ -302,9 +302,9 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
-                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+                      _bucketCatalog->getMetadata(result1.getValue()->bucketId()));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
-                      _bucketCatalog->getMetadata(result2.getValue()->bucket()));
+                      _bucketCatalog->getMetadata(result2.getValue()->bucketId()));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
@@ -333,11 +333,11 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj(BSON(
                  "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
-        _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+        _bucketCatalog->getMetadata(result1.getValue()->bucketId()));
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj(BSON(
                  "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
-        _bucketCatalog->getMetadata(result2.getValue()->bucket()));
+        _bucketCatalog->getMetadata(result2.getValue()->bucketId()));
 }
 
 
@@ -369,11 +369,11 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
                                                                         << BSON_ARRAY("123"
                                                                                       << "456"))))),
-                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+                      _bucketCatalog->getMetadata(result1.getValue()->bucketId()));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
                                                                         << BSON_ARRAY("123"
                                                                                       << "456"))))),
-                      _bucketCatalog->getMetadata(result2.getValue()->bucket()));
+                      _bucketCatalog->getMetadata(result2.getValue()->bucketId()));
 }
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
@@ -397,8 +397,8 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
-                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
-    ASSERT(_bucketCatalog->getMetadata(result2.getValue()->bucket()).isEmpty());
+                      _bucketCatalog->getMetadata(result1.getValue()->bucketId()));
+    ASSERT(_bucketCatalog->getMetadata(result2.getValue()->bucketId()).isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
@@ -501,7 +501,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                      .getValue();
 
-    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(batch->bucket()));
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(batch->bucketId()));
 
     _commit(batch, 0);
 }
@@ -514,9 +514,9 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                                          _getTimeseriesOptions(_ns1),
                                          BSON(_timeField << Date_t::now() << "a" << 0),
                                          BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result);
+    ASSERT(result.isOK());
     auto batch = result.getValue();
-    auto oldId = batch->bucket()->id();
+    auto oldId = batch->bucketId();
     _commit(batch, 0);
     ASSERT_EQ(2U, batch->newFieldNamesToBeInserted().size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted().count(_timeField)) << batch->toBSON();
@@ -572,7 +572,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
         BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     auto& batch2 = result2.getValue();
-    ASSERT_NE(oldId, batch2->bucket()->id());
+    ASSERT_NE(oldId, batch2->bucketId());
     _commit(batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted().size()) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted().count(_timeField)) << batch2->toBSON();
@@ -672,7 +672,7 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     ASSERT_EQ(batch->measurements().size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
 
-    ASSERT_THROWS(_bucketCatalog->clear(batch->bucket()->id()), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->clear(batch->bucketId()), WriteConflictException);
 
     _bucketCatalog->abort(batch);
     ASSERT(batch->finished());
@@ -703,10 +703,10 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                       .getValue();
     ASSERT_NE(batch1, batch2);
-    ASSERT_EQ(batch1->bucket(), batch2->bucket());
+    ASSERT_EQ(batch1->bucketId(), batch2->bucketId());
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucket()->id()), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucketId()), WriteConflictException);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(batch2->claimCommitRights());
@@ -715,7 +715,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
     // Make sure we didn't clear the bucket state when we aborted the second batch.
-    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucket()->id()), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->clear(batch1->bucketId()), WriteConflictException);
 
     // Make sure a subsequent insert, which opens a new bucket, doesn't corrupt the old bucket
     // state and prevent us from finishing the first batch.
@@ -729,7 +729,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                       .getValue();
     ASSERT_NE(batch1, batch3);
     ASSERT_NE(batch2, batch3);
-    ASSERT_NE(batch1->bucket(), batch3->bucket());
+    ASSERT_NE(batch1->bucketId(), batch3->bucketId());
     // Clean up this batch
     ASSERT(batch3->claimCommitRights());
     _bucketCatalog->abort(batch3);
