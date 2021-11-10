@@ -107,6 +107,7 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
+#include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
@@ -764,6 +765,23 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
     }
 
+    // Start a background task to periodically remove expired pre-images from the 'system.preimages'
+    // collection if not in standalone mode.
+    const auto isStandalone =
+        repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
+        repl::ReplicationCoordinator::modeNone;
+    if (!isStandalone) {
+        try {
+            PeriodicChangeStreamExpiredPreImagesRemover::get(serviceContext)->start();
+        } catch (ExceptionFor<ErrorCodes::PeriodicJobIsStopped>&) {
+            LOGV2_WARNING(5869107, "Not starting periodic jobs as shutdown is in progress");
+            // Shutdown has already started before initialization is complete. Wait for the
+            // shutdown task to complete and return.
+            MONGO_IDLE_THREAD_BLOCK;
+            return waitForShutdown();
+        }
+    }
+
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -1219,6 +1237,16 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             4784907, {LogComponent::kReplication}, "Shutting down the replica set node executor");
         exec->shutdown();
         exec->join();
+    }
+
+    const auto isStandalone =
+        repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
+        repl::ReplicationCoordinator::modeNone;
+    if (!isStandalone) {
+        LOGV2_OPTIONS(5869108,
+                      {LogComponent::kQuery},
+                      "Shutting down the ChangeStreamExpiredPreImagesRemover");
+        PeriodicChangeStreamExpiredPreImagesRemover::get(serviceContext)->stop();
     }
 
     if (auto storageEngine = serviceContext->getStorageEngine()) {

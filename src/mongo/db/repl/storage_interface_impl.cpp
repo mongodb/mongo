@@ -1222,6 +1222,39 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     }
 }
 
+Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCtx) {
+    auto statusWithTimestamp = [&]() {
+        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        return oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+    }();
+
+    // If the storage engine does not support getEarliestOplogTimestamp(), then fall back to higher
+    // level (above the storage engine) logic to fetch the earliest oplog entry timestamp.
+    if (statusWithTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
+        // Reset the snapshot so that it is ensured to see the latest oplog entries.
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        BSONObj oplogEntryBSON;
+        tassert(5869100,
+                "Failed reading the earliest oplog entry",
+                Helpers::getSingleton(
+                    opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+
+        auto optime = OpTime::parseFromOplogEntry(oplogEntryBSON);
+        tassert(5869101,
+                str::stream() << "Found an invalid oplog entry: " << oplogEntryBSON
+                              << ", error: " << optime.getStatus(),
+                optime.isOK());
+        return optime.getValue().getTimestamp();
+    }
+
+    tassert(5869102,
+            str::stream() << "Expected oplog entries to exist: " << statusWithTimestamp.getStatus(),
+            statusWithTimestamp.isOK());
+
+    return statusWithTimestamp.getValue();
+}
+
 Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx) {
     auto statusWithTimestamp = [&]() {
         AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);

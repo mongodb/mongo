@@ -33,6 +33,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
@@ -441,6 +442,22 @@ env.Library(
         '$BUILD_DIR/mongo/s/common_s',
         'runtime_constants_idl',
     ],
+)
+
+env.Library(
+    target='change_stream_expired_pre_image_remover',
+    source=[
+        'change_stream_expired_pre_image_remover.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/db/repl/storage_interface',
+        '$BUILD_DIR/mongo/util/periodic_runner',
+        'change_stream_preimage',
+    ]
 )
 
 env.CppUnitTest(

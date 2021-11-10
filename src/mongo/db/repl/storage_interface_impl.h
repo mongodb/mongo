@@ -156,6 +156,7 @@ public:
     boost::optional<BSONObj> findOplogEntryLessThanOrEqualToTimestampRetryOnWCE(
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) override;
 
+    Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) override;
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override;
 
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(

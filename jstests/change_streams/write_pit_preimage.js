@@ -12,8 +12,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPostImagesEnabled.
+load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection,
+                                                   // assertDropAndRecreateCollection.
 
 const testDB = db.getSiblingDB(jsTestName());
 const localDB = db.getSiblingDB("local");
@@ -51,7 +51,8 @@ function assertValidChangeStreamPreImageDocument(preImage) {
 
 function testFunc(collOptions = {}) {
     let coll = assertDropAndRecreateCollection(testDB, collName, collOptions);
-    const preImagesColl = assertDropAndRecreateCollection(configDB, preImagesCollName);
+    assertDropCollection(configDB, preImagesCollName);
+    const preImagesColl = configDB.getCollection(preImagesCollName);
 
     // Perform an insert and an update modification.
     assert.commandWorked(coll.insert(originalDoc));

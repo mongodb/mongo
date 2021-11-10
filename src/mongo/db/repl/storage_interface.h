@@ -357,6 +357,11 @@ public:
         OperationContext* opCtx, const CollectionPtr& oplog, const Timestamp& timestamp) = 0;
 
     /**
+     * Fetches the oldest oplog entry's timestamp.
+     */
+    virtual Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) = 0;
+
+    /**
      * Fetches the latest oplog entry's timestamp. Bypasses the oplog visibility rules.
      */
     virtual Timestamp getLatestOplogTimestamp(OperationContext* opCtx) = 0;

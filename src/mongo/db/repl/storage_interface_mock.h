@@ -287,6 +287,10 @@ public:
         return boost::none;
     }
 
+    Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) override {
+        return Timestamp();
+    }
+
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override {
         return Timestamp();
     }
