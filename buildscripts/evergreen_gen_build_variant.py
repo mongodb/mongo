@@ -208,7 +208,7 @@ class GenerateBuildVariantOrchestrator:
         :return: Parameters for how task should be generated.
         """
         run_func = task_def.generate_resmoke_tasks_command
-        run_vars = run_func["vars"]
+        run_vars = run_func.get("vars", {})
 
         repeat_suites = 1
         if self.evg_expansions.resmoke_repeat_suites:
@@ -234,7 +234,7 @@ class GenerateBuildVariantOrchestrator:
         :return: Parameters for how a fuzzer task should be generated.
         """
         variant = self.evg_project_config.get_variant(build_variant)
-        run_vars = task_def.generate_resmoke_tasks_command["vars"]
+        run_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
         run_vars = {k: translate_run_var(v, variant) for k, v in run_vars.items()}
 
         return FuzzerGenTaskParams(
@@ -295,7 +295,7 @@ class GenerateBuildVariantOrchestrator:
                 if task_def.is_generate_resmoke_task:
                     tasks_to_hide.add(task_name)
 
-                    run_vars = task_def.generate_resmoke_tasks_command["vars"]
+                    run_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
                     requires_npm = run_vars.get("is_jstestfuzz", False)
 
                     if requires_npm:

@@ -2475,7 +2475,6 @@ tasks:
     - func: "run tests"
       vars:
         suite: dbtest
-        resmoke_args: --storageEngine=wiredTiger
         install_dir: build/install/bin
 
 - name: archive_dbtest
@@ -3374,7 +3373,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: jstestfuzz
 
 ## jstestfuzz concurrent ##
@@ -3389,7 +3388,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 ## jstestfuzz concurrent replica set ##
 - <<: *jstestfuzz_template
@@ -3403,7 +3402,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 ## jstestfuzz concurrent replica set with logical session ##
 - <<: *jstestfuzz_template
@@ -3417,7 +3416,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_session
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 ## jstestfuzz concurrent sharded cluster ##
 - <<: *jstestfuzz_template
@@ -3431,7 +3430,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 ## jstestfuzz concurrent sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
@@ -3445,7 +3444,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_causal_consistency
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 ## jstestfuzz concurrent sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
@@ -3459,7 +3458,7 @@ tasks:
       num_tasks: 2
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 ## jstestfuzz concurrent sharded cluster with logical session ##
 - <<: *jstestfuzz_template
@@ -3473,7 +3472,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_session
-      resmoke_args: --storageEngine=wiredTiger --numClientsPerFixture=10
+      resmoke_args: --numClientsPerFixture=10
 
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
@@ -3485,7 +3484,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_interrupt
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
@@ -3497,7 +3496,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_interrupt_replication
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 # jstestfuzz write conflict #
 - <<: *jstestfuzz_template
@@ -3509,7 +3508,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_write_conflicts
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 # jstestfuzz concurrent conflict #
 - <<: *jstestfuzz_template
@@ -3521,7 +3520,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_write_conflicts
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}' --numClientsPerFixture=10"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}' --numClientsPerFixture=10"
 
 # jstestfuzz interrupt with flow control engaged #
 - <<: *jstestfuzz_template
@@ -3535,7 +3534,7 @@ tasks:
       num_tasks: 1
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_interrupt_replication
-      resmoke_args: "--flowControlTicketOverride=1 --storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--flowControlTicketOverride=1 --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
@@ -3551,7 +3550,6 @@ tasks:
       suite: jstestfuzz_sharded_continuous_stepdown
       resmoke_args: >-
           --flowControlTicketOverride=3
-          --storageEngine=wiredTiger
           --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
 
 ## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
@@ -3568,7 +3566,6 @@ tasks:
       suite: jstestfuzz_sharded_continuous_stepdown
       resmoke_args: >-
           --flowControlTicketOverride=30
-          --storageEngine=wiredTiger
           --numClientsPerFixture=10
 
 # jstestfuzz replication continuous stepdown with flow control engaged #
@@ -3585,7 +3582,6 @@ tasks:
       suite: jstestfuzz_replication_continuous_stepdown
       resmoke_args: >-
           --flowControlTicketOverride=1
-          --storageEngine=wiredTiger
           --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
 
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
@@ -3602,7 +3598,6 @@ tasks:
       suite: jstestfuzz_replication_continuous_stepdown
       resmoke_args: >-
           --flowControlTicketOverride=10
-          --storageEngine=wiredTiger
           --numClientsPerFixture=10
 
 ## jstestfuzz replica set ##
@@ -3615,7 +3610,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz replica set multiversion ##
 - <<: *jstestfuzz_template
@@ -3626,7 +3621,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       suite: jstestfuzz_replication
       npm_command: jstestfuzz
 
@@ -3642,7 +3637,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_initsync
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz replica set with logical session ##
 - <<: *jstestfuzz_template
@@ -3654,7 +3649,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_replication_session
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz sharded cluster ##
 - <<: *jstestfuzz_template
@@ -3666,7 +3661,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz sharded multiversion cluster ##
 - <<: *jstestfuzz_template
@@ -3677,7 +3672,7 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       suite: jstestfuzz_sharded
       npm_command: jstestfuzz
 
@@ -3691,7 +3686,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_causal_consistency
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
@@ -3705,7 +3700,7 @@ tasks:
       num_tasks: 5
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## jstestfuzz sharded cluster with logical session ##
 - <<: *jstestfuzz_template
@@ -3717,7 +3712,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_sharded_session
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
 ## resharding generational fuzzer ##
 - <<: *jstestfuzz_template
@@ -3732,7 +3727,6 @@ tasks:
       npm_command: resharding-fuzzer
       jstestfuzz_vars: --numDonors 2 --numRecipients 2 --inPlace yes
       suite: resharding_fuzzer
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_split_gen
@@ -3746,7 +3740,6 @@ tasks:
       npm_command: resharding-fuzzer
       jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no
       suite: resharding_fuzzer
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_merge_gen
@@ -3760,7 +3753,6 @@ tasks:
       npm_command: resharding-fuzzer
       jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no
       suite: resharding_fuzzer
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_shuffle_gen
@@ -3774,7 +3766,6 @@ tasks:
       npm_command: resharding-fuzzer
       jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no
       suite: resharding_fuzzer
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_idempotency_gen
@@ -3788,8 +3779,6 @@ tasks:
       npm_command: resharding-fuzzer
       jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no
       suite: resharding_fuzzer_idempotency
-      resmoke_args: >-
-        --storageEngine=wiredTiger
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_stepup_gen
@@ -3805,7 +3794,6 @@ tasks:
         --numDonors 3 --numRecipients 3 --inPlace yes
         --electionMech stepup --electionRole donor --electionRole recipient
       suite: resharding_fuzzer
-      resmoke_args: --storageEngine=wiredTiger
 
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template
@@ -3813,8 +3801,6 @@ tasks:
   tags: ["multiversion", "multiversion_sanity_check"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_jscore_multiversion_gen
@@ -3823,7 +3809,6 @@ tasks:
     - func: "generate resmoke tasks"
       vars:
         suite: replica_sets_jscore_passthrough
-        resmoke_args: --storageEngine=wiredTiger
 
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
@@ -3862,8 +3847,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_disabled_optimization
@@ -3873,8 +3856,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_ese
@@ -3884,8 +3865,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_ese_gcm
@@ -3895,8 +3874,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_auth
@@ -3906,8 +3883,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_facet_unwind_passthrough
@@ -3917,8 +3892,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_mongos_passthrough
@@ -3928,8 +3901,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_one_shard_sharded_collections
@@ -3939,8 +3910,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_read_concern_majority_passthrough
@@ -3951,7 +3920,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_factor: 0.5
 
 - <<: *gen_task_template
@@ -3961,7 +3929,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -3972,8 +3939,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: aggregation_sharded_collections_causally_consistent_passthrough
@@ -3983,8 +3948,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: audit
@@ -3992,16 +3955,12 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: auth_gen
   tags: ["auth"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - name: burn_in_tags_gen
   tags: []
@@ -4053,8 +4012,6 @@ tasks:
   tags: ["auth", "audit"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams
@@ -4062,8 +4019,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: change_streams_multiversion_gen
@@ -4072,15 +4027,12 @@ tasks:
     - func: "generate resmoke tasks"
       vars:
         suite: change_streams
-        resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: change_streams_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_update_v1_oplog
@@ -4088,8 +4040,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_mongos_sessions_passthrough
@@ -4099,8 +4049,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_mongos_passthrough
@@ -4110,8 +4058,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_secondary_reads
@@ -4121,8 +4067,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_sharded_collections_passthrough
@@ -4132,8 +4076,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: change_streams_sharded_collections_multiversion_gen
@@ -4142,7 +4084,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: change_streams_sharded_collections_passthrough
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough
@@ -4152,8 +4093,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_db_mongos_passthrough
@@ -4163,8 +4102,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_db_secondary_reads_passthrough
@@ -4174,8 +4111,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_db_sharded_collections_passthrough
@@ -4185,8 +4120,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_cluster_passthrough
@@ -4196,8 +4129,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_cluster_mongos_passthrough
@@ -4207,8 +4138,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_cluster_secondary_reads_passthrough
@@ -4218,8 +4147,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_whole_cluster_sharded_collections_passthrough
@@ -4229,8 +4156,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_passthrough
@@ -4240,8 +4165,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_mongos_passthrough
@@ -4251,8 +4174,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_sharded_collections_passthrough
@@ -4262,8 +4183,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: disk_wiredtiger
@@ -4271,7 +4190,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -4280,8 +4198,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: failpoints
@@ -4289,8 +4205,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: failpoints_auth
@@ -4298,8 +4212,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_standalone
@@ -4317,8 +4229,6 @@ tasks:
       compiling_for_test: true
   - func: "attach scons logs"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_standalone_audit
@@ -4336,8 +4246,6 @@ tasks:
       compiling_for_test: true
   - func: "attach scons logs"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_replset
@@ -4355,8 +4263,6 @@ tasks:
       compiling_for_test: true
   - func: "attach scons logs"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_replset_ssl_auth
@@ -4374,8 +4280,6 @@ tasks:
       compiling_for_test: true
   - func: "attach scons logs"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: integration_tests_sharded
@@ -4394,8 +4298,6 @@ tasks:
       compiling_for_test: true
   - func: "attach scons logs"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: external_auth
@@ -4411,7 +4313,7 @@ tasks:
         - "src/evergreen/external_auth_pip.sh"
   - func: "run tests"
     vars:
-      resmoke_args: --excludeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
+      resmoke_args: --excludeWithAnyTags=requires_domain_controller
 
 - <<: *task_template
   name: external_auth_aws
@@ -4432,8 +4334,6 @@ tasks:
       args:
         - "src/evergreen/external_auth_aws_pip.sh"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 
 - <<: *task_template
@@ -4444,7 +4344,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: external_auth
-      resmoke_args: --includeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
+      resmoke_args: --includeWithAnyTags=requires_domain_controller
 
 - <<: *task_template
   name: jsCore
@@ -4454,7 +4354,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: config_fuzzer_jsCore
@@ -4464,7 +4363,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: core
-      resmoke_args: --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --fuzzMongodConfigs
 
 - <<: *task_template
   name: config_fuzzer_concurrency
@@ -4474,7 +4373,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: concurrency
-      resmoke_args: --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --fuzzMongodConfigs
 
 - <<: *task_template
   name: config_fuzzer_concurrency_replication
@@ -4484,7 +4383,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: concurrency_replication
-      resmoke_args: --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --fuzzMongodConfigs
 
 - <<: *task_template
   name: config_fuzzer_replica_sets_jscore_passthrough
@@ -4494,7 +4393,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: replica_sets_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger --fuzzMongodConfigs
+      resmoke_args: --fuzzMongodConfigs
 
 - <<: *task_template
   name: jsCore_ese
@@ -4504,7 +4403,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core_ese
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_ese_gcm
@@ -4514,7 +4412,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core_ese_gcm
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_auth
@@ -4533,7 +4430,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core_minimum_batch_size
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_txns
@@ -4543,7 +4439,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core_txns
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_txns_large_txns_format
@@ -4553,7 +4448,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core_txns_large_txns_format
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_jscore_txns
@@ -4561,8 +4455,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_jscore_txns_without_snapshot
@@ -4572,7 +4464,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: sharded_jscore_txns
-      resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
+      resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
 
 - <<: *task_template
   name: sharded_jscore_txns_sharded_collections
@@ -4580,8 +4472,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: cst_jscore_passthrough
@@ -4589,8 +4479,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: libunwind_tests
@@ -4600,7 +4488,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: libunwind
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
@@ -4608,16 +4495,12 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharded_causally_consistent_jscore_txns_passthrough_gen
   tags: ["sharding", "jscore", "causally_consistent", "txns"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
@@ -4626,15 +4509,13 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: sharded_causally_consistent_jscore_txns_passthrough
-      resmoke_args: --storageEngine=wiredTiger --excludeWithAnyTags=uses_snapshot_read_concern
+      resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
 
 - <<: *gen_task_template
   name: causally_consistent_hedged_reads_jscore_passthrough_gen
   tags: ["causally_consistent", "sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_collections_causally_consistent_jscore_txns_passthrough
@@ -4642,8 +4523,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_jscore_passthrough
@@ -4651,8 +4530,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_reconfig_jscore_passthrough_gen
@@ -4661,23 +4538,18 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
   tags: []
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_api_version_jscore_passthrough_gen
@@ -4685,7 +4557,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
 - <<: *gen_task_template
@@ -4695,7 +4566,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_large_txns_format_jscore_passthrough
@@ -4703,8 +4573,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_jscore_passthrough
@@ -4712,8 +4580,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
@@ -4722,15 +4588,12 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_multi_stmt_txn_kill_primary_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_multi_stmt_txn_terminate_primary_jscore_passthrough
@@ -4738,24 +4601,18 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_update_v1_oplog_jscore_passthrough_gen
   tags: ["replica_sets", "non_maj_read"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_initsync_jscore_passthrough_gen
   tags: ["replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_initsync_static_jscore_passthrough
@@ -4763,16 +4620,12 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_kill_primary_jscore_passthrough_gen
   tags: ["replica_sets", "large", "non_maj_read", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_terminate_primary_jscore_passthrough
@@ -4780,8 +4633,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_kill_secondaries_jscore_passthrough
@@ -4789,8 +4640,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: mongosTest
@@ -4806,16 +4655,12 @@ tasks:
   tags: ["auth", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: "--storageEngine=wiredTiger"
 
 - <<: *gen_task_template
   name: multiversion_gen
   tags: ["multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: "--storageEngine=wiredTiger"
 
 # Tests the runFeatureFlagMultiversionTest helper.
 # This requires the 'featureFlagToaster' and 'featureFlagSpoon' parameters to be set to true on
@@ -4825,8 +4670,6 @@ tasks:
   tags: ["multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: "--storageEngine=wiredTiger"
 
 - <<: *gen_task_template
   name: unittest_shell_hang_analyzer_gen
@@ -4834,7 +4677,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
 
 - <<: *gen_task_template
@@ -4844,7 +4686,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: no_passthrough
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
 
 # Only run hot_backups tests for hot_backups variant.
@@ -4855,7 +4696,7 @@ tasks:
     - func: "generate resmoke tasks"
       vars:
         suite: no_passthrough
-        resmoke_args: --storageEngine=wiredTiger src/mongo/db/modules/*/jstests/hot_backups/*.js
+        resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/*.js
         use_large_distro: "true"
 
 - <<: *gen_task_template
@@ -4866,7 +4707,6 @@ tasks:
     vars:
       suite: no_passthrough_with_mongod
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: slow1_gen
@@ -4874,7 +4714,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -4884,7 +4723,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -4893,8 +4731,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharded_collections_jscore_multiversion_gen
@@ -4903,7 +4739,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: sharded_collections_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_jscore_passthrough
@@ -4911,8 +4746,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_jscore_multiversion_gen
@@ -4921,7 +4754,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: sharding_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_api_version_jscore_passthrough_gen
@@ -4929,7 +4761,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 5
 
 - <<: *task_template
@@ -4940,7 +4771,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: sharding_jscore_passthrough
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharded_multi_stmt_txn_jscore_passthrough
@@ -4948,8 +4778,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
@@ -4958,7 +4786,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
 - <<: *gen_task_template
@@ -4966,8 +4793,6 @@ tasks:
   tags: ["multi_shard", "common"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -4976,7 +4801,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
@@ -4985,7 +4809,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
@@ -4994,7 +4817,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: tenant_migration_jscore_passthrough_gen
@@ -5003,7 +4825,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: tenant_migration_causally_consistent_jscore_passthrough_gen
@@ -5012,7 +4833,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
@@ -5021,7 +4841,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: tenant_migration_stepdown_jscore_passthrough_gen
@@ -5030,7 +4849,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: tenant_migration_terminate_primary_jscore_passthrough_gen
@@ -5039,7 +4857,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
 
 - <<: *gen_task_template
@@ -5049,7 +4866,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
 
 - <<: *gen_task_template
@@ -5058,8 +4874,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: parallel_gen
@@ -5067,7 +4881,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5076,7 +4889,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5086,7 +4898,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5096,7 +4907,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5105,7 +4915,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5115,7 +4924,6 @@ tasks:
     - func: "generate resmoke tasks"
       vars:
         suite: concurrency_replication
-        resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: concurrency_replication_causal_consistency_gen
@@ -5123,7 +4931,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
       use_large_distro: "true"
 
@@ -5133,7 +4940,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
   # TODO: SERVER-35964 revert the addition of UBSAN concurrency_replication suites.
@@ -5144,7 +4950,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5154,7 +4959,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5164,7 +4968,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5173,7 +4976,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5182,7 +4984,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5191,7 +4992,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5202,7 +5002,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_sharded_replication
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
@@ -5210,7 +5009,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5221,7 +5019,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_sharded_replication
-      resmoke_args: "--excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger"
+      resmoke_args: "--excludeWithAnyTags=uses_transactions"
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5232,7 +5030,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_sharded_replication_with_balancer
-      resmoke_args: "--excludeWithAnyTags=uses_transactions --storageEngine=wiredTiger"
+      resmoke_args: "--excludeWithAnyTags=uses_transactions"
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5242,7 +5040,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5252,7 +5049,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5262,7 +5058,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5272,7 +5067,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5282,7 +5076,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5293,7 +5086,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5303,7 +5095,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5313,7 +5104,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5323,7 +5113,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5333,7 +5122,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5343,7 +5131,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5353,7 +5140,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5363,7 +5149,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5373,7 +5158,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5382,7 +5166,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
@@ -5391,7 +5174,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5401,7 +5183,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5411,7 +5192,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5420,8 +5200,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: read_concern_majority_passthrough_gen
@@ -5430,7 +5208,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: write_concern_majority_passthrough
@@ -5438,8 +5215,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: cwrwc_passthrough
@@ -5447,8 +5222,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: cwrwc_rc_majority_passthrough_gen
@@ -5457,7 +5230,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: cwrwc_wc_majority_passthrough
@@ -5465,8 +5237,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: secondary_reads_passthrough_gen
@@ -5475,15 +5245,12 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_gen
   tags: ["replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_ese_gen
@@ -5492,7 +5259,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_ese_gcm_gen
@@ -5501,7 +5267,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_auth_gen
@@ -5510,31 +5275,24 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_large_txns_format_gen
   tags: ["replica_sets", "multi_oplog", "san"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_max_mirroring_gen
   tags: ["replica_sets", "san"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_update_v1_oplog_gen
   tags: ["replica_sets", "san"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: replica_sets_multiversion_gen
@@ -5543,7 +5301,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: replica_sets
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sasl
@@ -5551,8 +5308,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_gen
@@ -5561,7 +5316,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_multiversion_gen
@@ -5570,7 +5324,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
       suite: sharding
 
 - <<: *gen_task_template
@@ -5580,7 +5333,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_csrs_continuous_config_stepdown_gen
@@ -5590,7 +5342,6 @@ tasks:
     vars:
       suite: sharding_continuous_config_stepdown
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_ese_gen
@@ -5599,7 +5350,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_ese_gcm_gen
@@ -5608,7 +5358,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_auth_gen
@@ -5617,7 +5366,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_auth_audit_gen
@@ -5626,7 +5374,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharding_hello_failures_gen
@@ -5634,7 +5381,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -5653,7 +5399,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: snmp
@@ -5665,7 +5410,6 @@ tasks:
   - func: "run tests"
     vars:
       snmp_config_path: SNMPCONFPATH=snmpconf
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: ssl_gen
@@ -5673,7 +5417,7 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
 
 - <<: *gen_task_template
   name: sslSpecial_gen
@@ -5682,7 +5426,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: ssl_special
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: ssl_x509_gen
@@ -5691,7 +5434,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: ssl_x509
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: jsCore_decimal
@@ -5701,7 +5443,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: decimal
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: read_only
@@ -5709,8 +5450,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: read_only_sharded
@@ -5718,8 +5457,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: session_jscore_passthrough
@@ -5727,48 +5464,36 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: causally_consistent_jscore_passthrough_auth_gen
   tags: ["causally_consistent"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharded_causally_consistent_jscore_passthrough_gen
   tags: ["causally_consistent"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: retryable_writes_jscore_passthrough_gen
@@ -5777,7 +5502,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      resmoke_args: --storageEngine=wiredTiger
 
 # Use explicit task definitions for retryable_writes_downgrade suites to avoid running
 # with all Repl multiversion combinations.
@@ -5786,136 +5510,102 @@ tasks:
   tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: retryable_writes_downgrade_last_lts_gen
   tags: ["multiversion_passthrough", "multiversion", "no_version_combination"]
   commands:
     - func: "generate resmoke tasks"
-      vars:
-        resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: sharded_retryable_writes_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec", "repl"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "repl"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_sharding_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_sharding_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_sharding_100ms_refresh_jscore_txns_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_sharding_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_standalone_default_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_standalone_100ms_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache", "one_sec"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: logical_session_cache_standalone_10sec_refresh_jscore_passthrough_gen
   tags: ["logical_session_cache"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *gen_task_template
   name: retryable_writes_jscore_stepdown_passthrough_gen
   tags: ["retry"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: watchdog_wiredtiger
@@ -5927,7 +5617,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: watchdog
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
@@ -5951,7 +5640,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5961,7 +5649,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5972,7 +5659,6 @@ tasks:
   - func: "load aws test credentials"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -5991,7 +5677,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - name: powercycle_gen
@@ -7045,7 +6730,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -7055,7 +6739,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - <<: *task_template
@@ -7065,7 +6748,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
 - name: shared_scons_cache_pruning

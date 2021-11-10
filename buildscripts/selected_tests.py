@@ -163,7 +163,7 @@ class TaskConfigService:
         for run_task_func in POSSIBLE_RUN_TASK_FUNCS:
             task_def = task.find_func_command(run_task_func)
             if task_def:
-                task_vars = task_def["vars"]
+                task_vars = task_def.get("vars", {})
                 break
 
         task_vars.update({"suite": task.get_suite_name()})
@@ -408,7 +408,7 @@ class SelectedTestsOrchestrator:
                 require_multiversion_setup=task_def.require_multiversion_setup(),
                 require_multiversion_version_combo=False,
                 repeat_suites=task_config.get("repeat_suites", 1),
-                resmoke_args=task_config["resmoke_args"],
+                resmoke_args=task_config.get("resmoke_args", {}),
                 resmoke_jobs_max=task_config.get("resmoke_jobs_max"),
                 config_location=self.evg_expansions.get_config_location(),
             )

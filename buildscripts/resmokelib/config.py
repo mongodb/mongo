@@ -100,7 +100,7 @@ DEFAULTS = {
     "spawn_using": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
-    "storage_engine": None,
+    "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
     "tag_files": [],

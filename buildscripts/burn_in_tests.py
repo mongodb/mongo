@@ -225,7 +225,7 @@ def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectC
     """
     task_def = evg_proj_config.get_task(task.name)
     if task_def.is_generate_resmoke_task:
-        resmoke_vars = task_def.generate_resmoke_tasks_command["vars"]
+        resmoke_vars = task_def.generate_resmoke_tasks_command.get("vars", {})
         if "use_large_distro" in resmoke_vars:
             evg_build_variant = _get_evg_build_variant_by_name(evg_proj_config, build_variant)
             if "large_distro_name" in evg_build_variant.raw["expansions"]:
