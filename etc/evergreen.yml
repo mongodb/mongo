@@ -10906,6 +10906,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    num_scons_link_jobs_available: 0.0625
     multiversion_platform: debian92
     multiversion_edition: enterprise
     has_packages: true
@@ -10951,6 +10952,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    num_scons_link_jobs_available: 0.0625
     multiversion_platform: debian92
     multiversion_edition: targeted
     has_packages: true
