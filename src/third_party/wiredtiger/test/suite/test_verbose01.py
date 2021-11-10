@@ -32,12 +32,8 @@ from contextlib import contextmanager
 import wiredtiger, wttest
 import re
 
-# test_verbose01.py
-# Tests that basic uses of the verbose configuration API work as intended i.e. passing
-# single & multiple valid and invalid verbose categories. This test is mainly focused on uses
-# of the interface prior to the introduction of verbosity levels, ensuring 'legacy'-style
-# uses of the interface are still supported.
-class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
+# Shared base class used by verbose tests.
+class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
     # The maximum number of lines we will read from stdout in any given context.
     nlines = 30000
 
@@ -47,7 +43,7 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
         return 'verbose=[' + ','.join(categories) + ']'
 
     @contextmanager
-    def expect_verbose(self, categories, patterns):
+    def expect_verbose(self, categories, patterns, expect_output = True):
         # Clean the stdout resource before yielding the context to the execution block. We only want to
         # capture the verbose output of the using context (ignoring any previous output up to this point).
         self.cleanStdout()
@@ -63,8 +59,9 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
         # to ensure we've only generated verbose messages for the expected categories.
         verbose_messages = output.splitlines()
 
-        # If no categories were passed, we aren't expecting any output.
-        if len(categories) == 0:
+        if expect_output:
+            self.assertGreater(len(verbose_messages), 0)
+        else:
             self.assertEqual(len(verbose_messages), 0)
 
         # Test the contents of each verbose message, ensuring it satisfies the expected pattern.
@@ -77,6 +74,13 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
         conn.close()
         self.cleanStdout()
 
+# test_verbose01.py
+# Verify basic uses of the verbose configuration API work as intended i.e. passing
+# single & multiple valid and invalid verbose categories. These tests are mainly focused on uses
+# of the interface prior to the introduction of verbosity levels, ensuring 'legacy'-style
+# uses of the interface are still supported.
+class test_verbose01(test_verbose_base):
+    collection_cfg = 'key_format=S,value_format=S'
     # Test use cases passing single verbose categories, ensuring we only produce verbose output for the single category.
     def test_verbose_single(self):
         # Close the initial connection. We will be opening new connections with different verbosity settings throughout
@@ -90,7 +94,7 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
             # messages.
             uri = 'table:test_verbose01_api'
             session = conn.open_session()
-            session.create(uri, 'key_format=S,value_format=S')
+            session.create(uri, self.collection_cfg)
             c = session.open_cursor(uri)
             c['api'] = 'api'
             c.close()
@@ -104,7 +108,7 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
             # generate verbose messages.
             uri = 'table:test_verbose01_compact'
             session = conn.open_session()
-            session.create(uri, 'key_format=S,value_format=S')
+            session.create(uri, self.collection_cfg)
             session.compact(uri)
             session.close()
 
@@ -119,7 +123,7 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
             # category.
             uri = 'table:test_verbose01_multiple'
             session = conn.open_session()
-            session.create(uri, 'key_format=S,value_format=S')
+            session.create(uri, self.collection_cfg)
             c = session.open_cursor(uri)
             c['multiple'] = 'multiple'
             c.close()
@@ -128,22 +132,23 @@ class test_verbose01(wttest.WiredTigerTestCase, suite_subprocess):
     def test_verbose_none(self):
         self.close_conn()
         # Testing passing an empty set of categories. Ensuring no verbose output is generated.
-        with self.expect_verbose([], []) as conn:
+        with self.expect_verbose([], [], False) as conn:
             # Perform a set of simple API operations (table creations and cursor operations). Ensuring no verbose messages
             # are generated.
             uri = 'table:test_verbose01_none'
             session = conn.open_session()
-            session.create(uri, 'key_format=S,value_format=S')
+            session.create(uri, self.collection_cfg)
             c = session.open_cursor(uri)
             c['none'] = 'none'
             c.close()
 
-    # Test use cases passing invalid verbose categories, ensuring the appropriate error message is raised.
+    # Test use cases passing invalid verbose categories, ensuring the appropriate error message is
+    # raised.
     def test_verbose_invalid(self):
         self.close_conn()
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
                 lambda:self.wiredtiger_open(self.home, 'verbose=[test_verbose_invalid]'),
-                '/\'test_verbose_invalid\' not a permitted choice/')
+                '/\'test_verbose_invalid\' not a permitted choice for key \'verbose\'/')
 
 if __name__ == '__main__':
     wttest.run()
