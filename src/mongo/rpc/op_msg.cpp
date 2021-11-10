@@ -40,6 +40,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
@@ -193,7 +194,7 @@ OpMsg OpMsg::parse(const Message& message) try {
             case Section::kSecurityToken: {
                 uassert(ErrorCodes::Unauthorized,
                         "Unsupported Security Token provided",
-                        auth::gAcceptOpMsgSecurityToken);
+                        gSupportMultitenancy);
                 msg.securityToken = sectionsBuf.read<Validated<BSONObj>>();
                 break;
             }

@@ -35,6 +35,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_detail.h"
@@ -45,9 +46,9 @@ namespace {
 const auto securityTokenDecoration = OperationContext::declareDecoration<MaybeSecurityToken>();
 MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
     uassert(ErrorCodes::BadValue,
-            "acceptOpMsgSecurityToken may not be specified if featureFlagMongoStore is not enabled",
-            !gAcceptOpMsgSecurityToken || gFeatureFlagMongoStore.isEnabledAndIgnoreFCV());
-    if (gAcceptOpMsgSecurityToken) {
+            "supportMultitenancy may not be specified if featureFlagMongoStore is not enabled",
+            !gSupportMultitenancy || gFeatureFlagMongoStore.isEnabledAndIgnoreFCV());
+    if (gSupportMultitenancy) {
         logv2::detail::setGetTenantIDCallback([]() -> boost::optional<OID> {
             auto* client = Client::getCurrent();
             auto* opCtx = client ? client->getOperationContext() : nullptr;
@@ -67,9 +68,7 @@ void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) t
         return;
     }
 
-    uassert(ErrorCodes::BadValue,
-            "Server not configured to accept security token",
-            gAcceptOpMsgSecurityToken);
+    uassert(ErrorCodes::BadValue, "Multitenancy not enabled", gSupportMultitenancy);
 
     securityTokenDecoration(opCtx) = SecurityToken::parse({"Security Token"}, securityToken);
     LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = securityToken);

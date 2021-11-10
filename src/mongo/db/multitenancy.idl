@@ -27,17 +27,13 @@
 #
 
 global:
-    cpp_namespace: "mongo::auth"
+    cpp_namespace: "mongo"
 
-imports:
-    - "mongo/idl/basic_types.idl"
-
-structs:
-    SecurityToken:
-        description: "Security Token as passed in OP_MSG"
-        strict: true
-        fields:
-            tenant:
-                description: Tenant identifier
-                type: objectid
+server_parameters:
+  supportMultitenancy:
+    description: Configure mongod to act as a serverless data store
+    set_at: [ startup ]
+    cpp_vartype: bool
+    cpp_varname: gSupportMultitenancy
+    default: false
 

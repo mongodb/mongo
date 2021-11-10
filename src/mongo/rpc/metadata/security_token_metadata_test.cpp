@@ -34,6 +34,7 @@
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -51,7 +52,7 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = BSON(kTenantFieldName << OID::gen());
 
-    auth::gAcceptOpMsgSecurityToken = false;
+    gSupportMultitenancy = false;
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
     ASSERT_THROWS_CODE_AND_WHAT(msgBytes.parse(),
                                 DBException,
@@ -64,7 +65,7 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = BSON(kTenantFieldName << kOid);
 
-    auth::gAcceptOpMsgSecurityToken = true;
+    gSupportMultitenancy = true;
     auto msg = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody}.parse();
     ASSERT_BSONOBJ_EQ(msg.body, kPingBody);
     ASSERT_EQ(msg.sequences.size(), 0u);

@@ -11,7 +11,7 @@ const isMongoStoreEnabled = TestData.setParameters.featureFlagMongoStore;
 
 if (!isMongoStoreEnabled) {
     assert.throws(() => MongoRunner.runMongod({
-        setParameter: "acceptOpMsgSecurityToken=true",
+        setParameter: "supportMultitenancy=true",
     }));
     return;
 }
@@ -94,7 +94,7 @@ function runShardTest(mongos, mongod, command) {
 
 function runTests(enabled) {
     const opts = {
-        setParameter: "acceptOpMsgSecurityToken=" + (enabled ? 'true' : 'false'),
+        setParameter: "supportMultitenancy=" + (enabled ? 'true' : 'false'),
     };
     {
         const standalone = MongoRunner.runMongod(opts);
