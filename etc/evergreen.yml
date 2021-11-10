@@ -7833,6 +7833,38 @@ buildvariants:
     <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20
 
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-pm-1328-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG + PM-1328"
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  expansions:
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
+
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG + PM-1328"
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  expansions:
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
+
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
+  display_name: "~ Enterprise RHEL 8.0 v4 Toolchain GCC C++20 + PM-1328"
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  expansions:
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
+
+- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
+  name: enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
+  display_name: "~ Enterprise RHEL 8.0 v4 Toolchain Clang C++20 + PM-1328"
+  cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
+  expansions:
+    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    compile_flags: --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=*
+
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
   cron: "0 12 * * *" # Every day starting at 12:00
