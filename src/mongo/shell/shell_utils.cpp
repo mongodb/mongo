@@ -313,8 +313,17 @@ BSONObj JSSrand(const BSONObj& a, void* data) {
     } else {
         seed = SecureRandom().nextInt64();
     }
-    _prng = PseudoRandom(seed);
-    return BSON("" << static_cast<double>(seed));
+    // Make sure the seed is representable as both an int64_t and a double, so that the value we
+    // return (as a double) can be fed back in to JSSrand() to initialize the prng (as an int64_t)
+    // to the same state. To do so, we cast to the double first which may lose precision for large
+    // numbers. Then after the potential precision loss we go back to an int64_t which should not
+    // change precision at all. Using that (potentially) new int64_t as the seed, we can now
+    // confidently return the double version and know it can be used to set the same exact seed
+    // later.
+    double asDouble = static_cast<double>(seed);
+    int64_t asInt64 = static_cast<int64_t>(asDouble);
+    _prng = PseudoRandom(asInt64);
+    return BSON("" << asDouble);
 }
 
 BSONObj JSRand(const BSONObj& a, void* data) {
