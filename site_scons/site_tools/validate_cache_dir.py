@@ -153,6 +153,9 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         self.CacheDebugJson({'type': cache_event}, node, cachefile)
 
     def retrieve(self, node):
+        if not self.is_enabled():
+            return False
+
         self.log_json_cachedebug(node)
         try:
             return super().retrieve(node)
@@ -165,6 +168,8 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             return False
 
     def push(self, node):
+        if self.is_readonly() or not self.is_enabled():
+            return
         self.log_json_cachedebug(node, pushing=True)
         try:
             return super().push(node)
@@ -247,6 +252,9 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
                 return f_out.read().decode()
 
     def cachepath(self, node):
+        if not self.is_enabled():
+            return None, None
+
         dir, path = super().cachepath(node)
         if node.fs.exists(path):
             return dir, path
