@@ -51,6 +51,7 @@ public:
 
     // Field names and types in the mongos collection type.
     static const BSONField<std::string> name;
+    static const BSONField<Date_t> created;
     static const BSONField<Date_t> ping;
     static const BSONField<long long> uptime;
     static const BSONField<bool> waiting;
@@ -84,6 +85,11 @@ public:
         return _name.get();
     }
     void setName(const std::string& name);
+
+    const Date_t& getCreated() const {
+        return _created.get();
+    }
+    void setCreated(const Date_t& created);
 
     const Date_t& getPing() const {
         return _ping.get();
@@ -126,6 +132,8 @@ private:
 
     // (M) "host:port" for this mongos
     boost::optional<std::string> _name;
+    // (M) Time of mongos creation
+    boost::optional<Date_t> _created;
     // (M) last time it was seen alive
     boost::optional<Date_t> _ping;
     // (M) uptime at the last ping

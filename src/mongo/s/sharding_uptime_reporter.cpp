@@ -65,9 +65,11 @@ std::string constructInstanceIdString(const std::string& hostName) {
 void reportStatus(OperationContext* opCtx,
                   const std::string& instanceId,
                   const std::string& hostName,
+                  const Date_t& created,
                   const Timer& upTimeTimer) {
     MongosType mType;
     mType.setName(instanceId);
+    mType.setCreated(created);
     mType.setPing(jsTime());
     mType.setUptime(upTimeTimer.seconds());
     // balancer is never active in mongos. Here for backwards compatibility only.
@@ -77,11 +79,15 @@ void reportStatus(OperationContext* opCtx,
         getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse));
 
     try {
+        // Field "created" should not be updated every time.
+        auto BSONObjForUpdate = mType.toBSON().removeField("created");
+        BSONObjBuilder createdBSON;
+        createdBSON.append("created", mType.getCreated());
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
             opCtx,
             MongosType::ConfigNS,
             BSON(MongosType::name(instanceId)),
-            BSON("$set" << mType.toBSON()),
+            BSON("$set" << BSONObjForUpdate << "$setOnInsert" << createdBSON.obj()),
             true,
             ShardingCatalogClient::kMajorityWriteConcern));
     } catch (const DBException& e) {
@@ -104,7 +110,9 @@ ShardingUptimeReporter::~ShardingUptimeReporter() {
 void ShardingUptimeReporter::startPeriodicThread() {
     invariant(!_thread.joinable());
 
-    _thread = stdx::thread([] {
+    Date_t created = jsTime();
+
+    _thread = stdx::thread([created] {
         Client::initThread("Uptime-reporter");
 
         const std::string hostName(getHostNameCached());
@@ -119,7 +127,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
                     LOGV2(426322,
                           "Disabling the reporting of the uptime status for the current instance.");
                 } else {
-                    reportStatus(opCtx.get(), instanceId, hostName, upTimeTimer);
+                    reportStatus(opCtx.get(), instanceId, hostName, created, upTimeTimer);
                 }
 
                 auto status = Grid::get(opCtx.get())

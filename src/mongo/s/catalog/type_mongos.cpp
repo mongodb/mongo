@@ -39,6 +39,7 @@ namespace mongo {
 const NamespaceString MongosType::ConfigNS("config.mongos");
 
 const BSONField<std::string> MongosType::name("_id");
+const BSONField<Date_t> MongosType::created("created");
 const BSONField<Date_t> MongosType::ping("ping");
 const BSONField<long long> MongosType::uptime("up");
 const BSONField<bool> MongosType::waiting("waiting");
@@ -87,6 +88,15 @@ StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
         if (!status.isOK())
             return status;
         mt._mongoVersion = mtMongoVersion;
+    }
+
+    if (source.hasField(created.name())) {
+        BSONElement mtCreatedElem;
+        Status status =
+            bsonExtractTypedField(source, created.name(), BSONType::Date, &mtCreatedElem);
+        if (!status.isOK())
+            return status;
+        mt._created = mtCreatedElem.date();
     }
 
     if (source.hasField(configVersion.name())) {
@@ -153,6 +163,8 @@ BSONObj MongosType::toBSON() const {
         builder.append(waiting.name(), getWaiting());
     if (_mongoVersion)
         builder.append(mongoVersion.name(), getMongoVersion());
+    if (_created)
+        builder.append(created.name(), getCreated());
     if (_configVersion)
         builder.append(configVersion.name(), getConfigVersion());
     if (_advisoryHostFQDNs)
@@ -164,6 +176,10 @@ BSONObj MongosType::toBSON() const {
 void MongosType::setName(const std::string& name) {
     invariant(!name.empty());
     _name = name;
+}
+
+void MongosType::setCreated(const Date_t& created) {
+    _created = created;
 }
 
 void MongosType::setPing(const Date_t& ping) {
