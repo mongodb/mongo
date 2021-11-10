@@ -149,6 +149,9 @@ selector:
   - jstests/core/crud_api.js
   - jstests/core/batch_write_command_w0.js
 
+  # Causes CappedPositionLost on recipient, which is not recoverable.
+  - jstests/core/rename_collection_capped.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.
