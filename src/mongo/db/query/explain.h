@@ -33,6 +33,7 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 
 namespace mongo {
 
@@ -128,6 +129,7 @@ public:
      * the plan cache.
      */
     static void planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out);
+    static void planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuilder* out);
 };
 
 }  // namespace mongo

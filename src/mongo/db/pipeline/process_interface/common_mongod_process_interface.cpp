@@ -54,6 +54,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -403,7 +404,7 @@ BackupCursorExtendState CommonMongodProcessInterface::extendBackupCursor(
 
 std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStats(
     OperationContext* opCtx, const NamespaceString& nss, const MatchExpression* matchExp) const {
-    const auto serializer = [](const PlanCacheEntry& entry) {
+    const auto serializer = [](const auto& entry) {
         BSONObjBuilder out;
         Explain::planCacheEntryToBSON(entry, &out);
         return out.obj();
@@ -417,10 +418,30 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     uassert(
         50933, str::stream() << "collection '" << nss.toString() << "' does not exist", collection);
 
-    const auto planCache = CollectionQueryInfo::get(collection.getCollection()).getPlanCache();
+    const auto& collQueryInfo = CollectionQueryInfo::get(collection.getCollection());
+    const auto planCache = collQueryInfo.getPlanCache();
     invariant(planCache);
 
-    return planCache->getMatchingStats(serializer, predicate);
+    auto planCacheEntries =
+        planCache->getMatchingStats({} /* cacheKeyFilterFunc */, serializer, predicate);
+
+    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        // Retrieve plan cache entries from the SBE plan cache.
+        const auto cacheKeyFilter = [uuid = collection->uuid(),
+                                     collVersion = collQueryInfo.getPlanCacheInvalidatorVersion()](
+                                        const sbe::PlanCacheKey& key) {
+            // Only fetch plan cache entries with keys matching given UUID and collectionVersion.
+            return uuid == key.getCollectionUuid() && collVersion == key.getCollectionVersion();
+        };
+
+        auto planCacheEntriesSBE =
+            sbe::getPlanCache(opCtx).getMatchingStats(cacheKeyFilter, serializer, predicate);
+
+        planCacheEntries.insert(
+            planCacheEntries.end(), planCacheEntriesSBE.begin(), planCacheEntriesSBE.end());
+    }
+
+    return planCacheEntries;
 }
 
 bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(

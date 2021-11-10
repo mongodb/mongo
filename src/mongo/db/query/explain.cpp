@@ -287,6 +287,15 @@ void executePlan(PlanExecutor* exec) {
 BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
     return BSON("explainVersion" << version);
 }
+
+template <typename EntryType>
+void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder* out) {
+    out->append("queryHash", zeroPaddedHex(entry.queryHash));
+    out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
+    out->append("isActive", entry.isActive);
+    out->append("works", static_cast<long long>(entry.works));
+    out->append("timeOfCreation", entry.timeOfCreation);
+}
 }  // namespace
 
 void Explain::explainStages(PlanExecutor* exec,
@@ -383,15 +392,10 @@ void Explain::explainStages(PlanExecutor* exec,
     explain_common::generateServerParameters(out);
 }
 
-
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {
-    out->append("queryHash", zeroPaddedHex(entry.queryHash));
-    out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
+    out->append("version", "1");
 
-    // Append whether or not the entry is active.
-    out->append("isActive", entry.isActive);
-    out->append("works", static_cast<long long>(entry.works));
-    out->append("timeOfCreation", entry.timeOfCreation);
+    appendBasicPlanCacheEntryInfoToBSON(entry, out);
 
     if (entry.debugInfo) {
         const auto& debugInfo = *entry.debugInfo;
@@ -447,6 +451,18 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
     }
 
     out->append("indexFilterSet", entry.cachedPlan->indexFilterApplied);
+
+    out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
+}
+
+void Explain::planCacheEntryToBSON(const sbe::PlanCacheEntry& entry, BSONObjBuilder* out) {
+    out->append("version", "2");
+
+    appendBasicPlanCacheEntryInfoToBSON(entry, out);
+
+    out->append("cachedPlan",
+                BSON("slots" << entry.cachedPlan->planStageData.debugString() << "stages"
+                             << sbe::DebugPrinter().print(*entry.cachedPlan->root)));
 
     out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 }

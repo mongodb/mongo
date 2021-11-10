@@ -521,19 +521,29 @@ public:
     }
 
     /**
-     * Iterates over the plan cache. For each entry, serializes the PlanCacheEntryBase according to
+     * Iterates over the plan cache. For each entry, first filters according to the predicate
+     * function 'cacheKeyFilterFunc', (Note that 'cacheKeyFilterFunc' could be empty, if so, we
+     * don't filter by plan cache key.), then serializes the PlanCacheEntryBase according to
      * 'serializationFunc'. Returns a vector of all serialized entries which match 'filterFunc'.
-     * This does not guarantee a point-in-time view of the cache.
      */
     std::vector<BSONObj> getMatchingStats(
+        const std::function<bool(const KeyType&)>& cacheKeyFilterFunc,
         const std::function<BSONObj(const Entry&)>& serializationFunc,
         const std::function<bool(const BSONObj&)>& filterFunc) const {
+        tassert(6033900,
+                "serialization function and filter function are required when retrieving plan "
+                "cache entries",
+                serializationFunc && filterFunc);
+
         std::vector<BSONObj> results;
 
         for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
             auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
 
             for (auto&& cacheEntry : *lockedPartition) {
+                if (cacheKeyFilterFunc && !cacheKeyFilterFunc(cacheEntry.first)) {
+                    continue;
+                }
                 const auto& entry = cacheEntry.second;
                 auto serializedEntry = serializationFunc(*entry);
                 if (filterFunc(serializedEntry)) {

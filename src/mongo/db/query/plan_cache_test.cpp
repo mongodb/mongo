@@ -680,7 +680,8 @@ TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
     };
 
     // Verify the output of getMatchingStats().
-    auto getStatsResult = planCache.getMatchingStats(serializer, matcher);
+    auto getStatsResult =
+        planCache.getMatchingStats({} /* cacheKeyFilterFunc */, serializer, matcher);
     ASSERT_EQ(1U, getStatsResult.size());
     ASSERT_BSONOBJ_EQ(BSON("works" << 5), getStatsResult[0]);
 }
