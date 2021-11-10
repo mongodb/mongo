@@ -68,6 +68,8 @@ enum class FaultFacetType { kMock1 = 0, kMock2, kLdap, kDns };
 
 class FaultManagerConfig {
 public:
+    static auto inline constexpr kPeriodicHealthCheckInterval{Milliseconds(50)};
+
     HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) {
         auto intensities = getHealthObserverIntensities();
         switch (type) {
@@ -90,11 +92,11 @@ public:
     }
 
     Milliseconds getActiveFaultDuration() const {
-        return kActiveFaultDuration;
+        return _activeFaultDuration;
     }
 
     Milliseconds getPeriodicHealthCheckInterval() const {
-        return Milliseconds(50);
+        return kPeriodicHealthCheckInterval;
     }
 
     Milliseconds getPeriodicLivenessCheckInterval() const {
@@ -103,6 +105,21 @@ public:
 
     Seconds getPeriodicLivenessDeadline() const {
         return Seconds(300);
+    }
+
+    /** @returns true if the periodic checks are disabled for testing purposes. This is
+     *    always false in production.
+     */
+    bool periodicChecksDisabledForTests() const {
+        return _periodicChecksDisabledForTests;
+    }
+
+    void disablePeriodicChecksForTests() {
+        _periodicChecksDisabledForTests = true;
+    }
+
+    void setActiveFaultDurationForTests(Milliseconds duration) {
+        _activeFaultDuration = duration;
     }
 
 protected:
@@ -115,6 +132,9 @@ private:
         return ServerParameterSet::getGlobal()->get<HealthMonitoringIntensitiesServerParameter>(
             "healthMonitoring");
     }
+
+    bool _periodicChecksDisabledForTests = false;
+    Milliseconds _activeFaultDuration = kActiveFaultDuration;
 };
 
 }  // namespace process_health

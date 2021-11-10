@@ -51,6 +51,10 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
 
         const auto now = _svcCtx->getPreciseClockSource()->now();
         if (now - _lastTimeTheCheckWasRun < minimalCheckInterval()) {
+            LOGV2_DEBUG(6136802,
+                        3,
+                        "Safety interval prevented new health check",
+                        "observerType"_attr = getType());
             return;
         }
         _lastTimeTheCheckWasRun = now;
