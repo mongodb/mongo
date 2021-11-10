@@ -186,7 +186,10 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             # nodes are subsequently added to the set, since such nodes cannot set their FCV to
             # "latest". Therefore, we make sure the primary is "last-lts" FCV before adding in
             # nodes of different binary versions to the replica set.
-            client.admin.command({"setFeatureCompatibilityVersion": self.fcv})
+            client.admin.command({
+                "setFeatureCompatibilityVersion": self.fcv,
+                "fromConfigServer": True,
+            })
 
         if self.nodes[1:]:
             # Wait to connect to each of the secondaries before running the replSetReconfig
