@@ -70,7 +70,9 @@ static char home[1024]; /* Program working dir */
 #define RECORDS_FILE "records-%" PRIu32
 /* Include worker threads and extra sessions */
 #define SESSION_MAX (MAX_TH + 4)
+#ifndef WT_STORAGE_LIB
 #define WT_STORAGE_LIB "ext/storage_sources/local_store/.libs/libwiredtiger_local_store.so"
+#endif
 
 static const char *table_pfx = "table";
 static const char *const uri_collection = "collection";
@@ -577,7 +579,8 @@ main(int argc, char *argv[])
     bool fatal, rand_th, rand_time, verify_only;
 
     (void)testutil_set_progname(argv);
-
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
     use_ts = true;
     nth = MIN_TH;
     rand_th = rand_time = true;
@@ -585,8 +588,11 @@ main(int argc, char *argv[])
     verify_only = false;
     working_dir = "WT_TEST.tiered-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "f:h:T:t:vz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "b:f:h:T:t:vz")) != EOF)
         switch (ch) {
+        case 'b': /* Build directory */
+            opts->build_dir = dstrdup(__wt_optarg);
+            break;
         case 'f':
             flush_calls = (uint32_t)atoi(__wt_optarg);
             break;
@@ -624,8 +630,6 @@ main(int argc, char *argv[])
      * the opts variable other than for building the directory. We have already parsed the args
      * we're interested in above.
      */
-    opts = &_opts;
-    memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_build_dir(opts, build_dir, 512);
 
