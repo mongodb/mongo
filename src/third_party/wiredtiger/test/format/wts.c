@@ -319,7 +319,7 @@ create_object(TABLE *table, void *arg)
     WT_CONNECTION *conn;
     WT_SESSION *session;
     size_t max;
-    uint32_t maxintlkey, maxleafkey, maxleafvalue;
+    uint32_t maxleafkey, maxleafvalue;
     char config[4096], *p;
     const char *s;
 
@@ -340,9 +340,6 @@ create_object(TABLE *table, void *arg)
      * Configure the maximum key/value sizes, but leave it as the default if we come up with
      * something crazy.
      */
-    maxintlkey = mmrand(NULL, table->max_intl_page / 50, table->max_intl_page / 40);
-    if (maxintlkey > 20)
-        CONFIG_APPEND(p, ",internal_key_max=%" PRIu32, maxintlkey);
     maxleafkey = mmrand(NULL, table->max_leaf_page / 50, table->max_leaf_page / 40);
     if (maxleafkey > 20)
         CONFIG_APPEND(p, ",leaf_key_max=%" PRIu32, maxleafkey);

@@ -847,7 +847,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     uint64_t cache_size;
-    uint32_t intl_split_size, leaf_split_size, max;
+    uint32_t leaf_split_size, max;
     const char **cfg;
 
     btree = S2BT(session);
@@ -924,7 +924,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
           session->dhandle->name, WT_BTREE_MIN_SPLIT_PCT));
     } else
         btree->split_pct = (int)cval.val;
-    intl_split_size = __wt_split_page_size(btree->split_pct, btree->maxintlpage, btree->allocsize);
     leaf_split_size = __wt_split_page_size(btree->split_pct, btree->maxleafpage, btree->allocsize);
 
     /*
@@ -948,23 +947,15 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
      * item in an in-memory configuration.
      */
     if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
-        btree->maxintlkey = WT_BTREE_MAX_OBJECT_SIZE;
         btree->maxleafkey = WT_BTREE_MAX_OBJECT_SIZE;
         btree->maxleafvalue = WT_BTREE_MAX_OBJECT_SIZE;
         return (0);
     }
 
     /*
-     * In historic versions of WiredTiger, the maximum internal/leaf page key/value sizes were set
-     * by the internal_item_max and leaf_item_max configuration strings. Look for those strings if
-     * we don't find the newer ones.
+     * In historic versions of WiredTiger, the maximum leaf page key/value sizes were set by the
+     * leaf_item_max configuration string. Look for that string if we don't find the newer ones.
      */
-    WT_RET(__wt_config_gets(session, cfg, "internal_key_max", &cval));
-    btree->maxintlkey = (uint32_t)cval.val;
-    if (btree->maxintlkey == 0) {
-        WT_RET(__wt_config_gets(session, cfg, "internal_item_max", &cval));
-        btree->maxintlkey = (uint32_t)cval.val;
-    }
     WT_RET(__wt_config_gets(session, cfg, "leaf_key_max", &cval));
     btree->maxleafkey = (uint32_t)cval.val;
     WT_RET(__wt_config_gets(session, cfg, "leaf_value_max", &cval));
@@ -976,16 +967,12 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     }
 
     /*
-     * Default/maximum for internal and leaf page keys: split-page / 10. Default for leaf page
-     * values: split-page / 2.
+     * Default max for leaf keys: split-page / 10. Default max for leaf values: split-page / 2.
      *
      * It's difficult for applications to configure this in any exact way as they have to duplicate
      * our calculation of how many keys must fit on a page, and given a split-percentage and page
-     * header, that isn't easy to do. If the maximum internal key value is too large for the page,
-     * reset it to the default.
+     * header, that isn't easy to do.
      */
-    if (btree->maxintlkey == 0 || btree->maxintlkey > intl_split_size / 10)
-        btree->maxintlkey = intl_split_size / 10;
     if (btree->maxleafkey == 0)
         btree->maxleafkey = leaf_split_size / 10;
     if (btree->maxleafvalue == 0)

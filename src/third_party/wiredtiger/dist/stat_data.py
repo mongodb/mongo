@@ -232,7 +232,6 @@ conn_stats = [
     CacheStat('cache_eviction_fail_active_children_on_an_internal_page', 'pages selected for eviction unable to be evicted because of active children on an internal page'),
     CacheStat('cache_eviction_fail_checkpoint_out_of_order_ts', 'pages selected for eviction unable to be evicted because of race between checkpoint and out of order timestamps handling'),
     CacheStat('cache_eviction_fail_in_reconciliation', 'pages selected for eviction unable to be evicted because of failure in reconciliation'),
-    CacheStat('cache_eviction_fail_parent_has_overflow_items', 'pages selected for eviction unable to be evicted as the parent page has overflow items'),
     CacheStat('cache_eviction_force', 'forced eviction - pages selected count'),
     CacheStat('cache_eviction_force_long_update_list', 'forced eviction - pages selected because of a large number of updates to a single item'),
     CacheStat('cache_eviction_force_clean', 'forced eviction - pages evicted that were clean count'),
@@ -488,7 +487,6 @@ conn_stats = [
     # Reconciliation statistics
     ##########################################
     RecStat('rec_maximum_seconds', 'maximum seconds spent in a reconciliation call', 'no_clear,no_scale,size'),
-    RecStat('rec_overflow_key_internal', 'internal-page overflow keys'),
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_pages_with_prepare', 'page reconciliation calls that resulted in values with prepared transaction metadata'),
     RecStat('rec_pages_with_ts', 'page reconciliation calls that resulted in values with timestamps'),
@@ -662,7 +660,6 @@ dsrc_stats = [
     BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale,tree_walk'),
     BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maximum_depth', 'maximum tree depth', 'max_aggregate,no_scale'),
-    BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxintlpage', 'maximum internal page size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
@@ -768,7 +765,6 @@ dsrc_stats = [
     RecStat('rec_multiblock_internal', 'internal page multi-block writes'),
     RecStat('rec_multiblock_leaf', 'leaf page multi-block writes'),
     RecStat('rec_multiblock_max', 'maximum blocks required for a page', 'max_aggregate,no_scale'),
-    RecStat('rec_overflow_key_internal', 'internal-page overflow keys'),
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_match', 'page checksum matches'),

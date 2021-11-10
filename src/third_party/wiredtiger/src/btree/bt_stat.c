@@ -33,7 +33,6 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 
     WT_STAT_SET(session, stats, btree_fixed_len, btree->bitcnt);
     WT_STAT_SET(session, stats, btree_maximum_depth, btree->maximum_depth);
-    WT_STAT_SET(session, stats, btree_maxintlkey, btree->maxintlkey);
     WT_STAT_SET(session, stats, btree_maxintlpage, btree->maxintlpage);
     WT_STAT_SET(session, stats, btree_maxleafkey, btree->maxleafkey);
     WT_STAT_SET(session, stats, btree_maxleafpage, btree->maxleafpage);

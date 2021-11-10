@@ -1128,7 +1128,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
         WT_RET(ds->f(ds, ", disk-mapped"));
     if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
         WT_RET(ds->f(ds, ", evict-lru"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS))
+    if (F_ISSET_ATOMIC(page, WT_PAGE_INTL_OVERFLOW_KEYS))
         WT_RET(ds->f(ds, ", overflow-keys"));
     if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
         WT_RET(ds->f(ds, ", split-insert"));

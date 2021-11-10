@@ -82,9 +82,8 @@ their position in the page.
 
 (3) Overflow Pages - overflow pages are needed when keys/values that are
 too large must be stored separately in the file, apart from where the item
-is logically placed. Page sizes and configuration values such as
-internal_key_max, leaf_key_max and leaf_value_max are used to determine
-overflow items.
+is logically placed. Page sizes and configuration values such as leaf_key_max
+and leaf_value_max are used to determine overflow items.
 
 While the above gives a general overview of how different page types are
 structured, it is a simplified representation. Due to the large amount of

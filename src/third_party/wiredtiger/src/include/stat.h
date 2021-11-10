@@ -498,7 +498,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_pages_seen;
     int64_t cache_eviction_pages_already_queued;
     int64_t cache_eviction_fail;
-    int64_t cache_eviction_fail_parent_has_overflow_items;
     int64_t cache_eviction_fail_active_children_on_an_internal_page;
     int64_t cache_eviction_fail_in_reconciliation;
     int64_t cache_eviction_fail_checkpoint_out_of_order_ts;
@@ -696,7 +695,6 @@ struct __wt_connection_stats {
     int64_t rec_time_window_bytes_ts;
     int64_t rec_time_window_bytes_txn;
     int64_t rec_page_delete_fast;
-    int64_t rec_overflow_key_internal;
     int64_t rec_overflow_key_leaf;
     int64_t rec_maximum_seconds;
     int64_t rec_pages;
@@ -891,7 +889,6 @@ struct __wt_dsrc_stats {
     int64_t btree_column_deleted;
     int64_t btree_column_variable;
     int64_t btree_fixed_len;
-    int64_t btree_maxintlkey;
     int64_t btree_maxintlpage;
     int64_t btree_maxleafkey;
     int64_t btree_maxleafpage;
@@ -1040,7 +1037,6 @@ struct __wt_dsrc_stats {
     int64_t rec_page_delete_fast;
     int64_t rec_suffix_compression;
     int64_t rec_multiblock_internal;
-    int64_t rec_overflow_key_internal;
     int64_t rec_prefix_compression;
     int64_t rec_multiblock_leaf;
     int64_t rec_overflow_key_leaf;

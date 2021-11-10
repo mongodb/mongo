@@ -660,17 +660,17 @@ struct __wt_page {
     uint8_t type;               /* Page type */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_PAGE_BUILD_KEYS 0x001u        /* Keys have been built in memory */
-#define WT_PAGE_COMPACTION_WRITE 0x002u  /* Writing the page for compaction */
-#define WT_PAGE_DISK_ALLOC 0x004u        /* Disk image in allocated memory */
-#define WT_PAGE_DISK_MAPPED 0x008u       /* Disk image in mapped memory */
-#define WT_PAGE_EVICT_LRU 0x010u         /* Page is on the LRU queue */
-#define WT_PAGE_EVICT_NO_PROGRESS 0x020u /* Eviction doesn't count as progress */
-#define WT_PAGE_OVERFLOW_KEYS 0x040u     /* Page has overflow keys */
-#define WT_PAGE_SPLIT_INSERT 0x080u      /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x100u     /* Ignore updates on page discard */
-                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 9 */
-    uint8_t flags_atomic;                /* Atomic flags, use F_*_ATOMIC */
+#define WT_PAGE_BUILD_KEYS 0x001u         /* Keys have been built in memory */
+#define WT_PAGE_COMPACTION_WRITE 0x002u   /* Writing the page for compaction */
+#define WT_PAGE_DISK_ALLOC 0x004u         /* Disk image in allocated memory */
+#define WT_PAGE_DISK_MAPPED 0x008u        /* Disk image in mapped memory */
+#define WT_PAGE_EVICT_LRU 0x010u          /* Page is on the LRU queue */
+#define WT_PAGE_EVICT_NO_PROGRESS 0x020u  /* Eviction doesn't count as progress */
+#define WT_PAGE_INTL_OVERFLOW_KEYS 0x040u /* Internal page has overflow keys (historic only) */
+#define WT_PAGE_SPLIT_INSERT 0x080u       /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x100u      /* Ignore updates on page discard */
+                                          /* AUTOMATIC FLAG VALUE GENERATION STOP 9 */
+    uint8_t flags_atomic;                 /* Atomic flags, use F_*_ATOMIC */
 
     uint8_t unused[2]; /* Unused padding */
 
