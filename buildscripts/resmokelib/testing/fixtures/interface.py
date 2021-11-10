@@ -78,6 +78,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
     _CONFIGURATION_IN_PROGRESS = 109
     _CURRENT_CONFIG_NOT_COMMITTED_YET = 308
     _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
+    _INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
 
     # We explicitly set the 'REGISTERED_NAME' attribute so that PyLint realizes that the attribute
     # is defined for all subclasses of Fixture.

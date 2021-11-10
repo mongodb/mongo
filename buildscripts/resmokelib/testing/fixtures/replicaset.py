@@ -232,11 +232,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 # These error codes may be transient, and so we retry the reconfig with a
                 # (potentially) higher config version. We should not receive these codes
                 # indefinitely.
+                # pylint: disable=too-many-boolean-expressions
                 if (err.code != ReplicaSetFixture._NEW_REPLICA_SET_CONFIGURATION_INCOMPATIBLE
                         and err.code != ReplicaSetFixture._CURRENT_CONFIG_NOT_COMMITTED_YET
                         and err.code != ReplicaSetFixture._CONFIGURATION_IN_PROGRESS
                         and err.code != ReplicaSetFixture._NODE_NOT_FOUND
-                        and err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE):
+                        and err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
+                        and err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                     msg = ("Operation failure while setting up the "
                            "replica set fixture: {}").format(err)
                     self.logger.error(msg)
@@ -328,9 +330,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             while True:
                 self.logger.info("Waiting for secondary on port %d to become available.",
                                  secondary.port)
-                is_secondary = client.admin.command("isMaster")["secondary"]
-                if is_secondary:
-                    break
+                try:
+                    is_secondary = client.admin.command("isMaster")["secondary"]
+                    if is_secondary:
+                        break
+                except pymongo.errors.OperationFailure as err:
+                    if err.code != ReplicaSetFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE:
+                        raise
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info("Secondary on port %d is now available.", secondary.port)
 
