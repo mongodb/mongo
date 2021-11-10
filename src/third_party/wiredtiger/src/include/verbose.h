@@ -163,5 +163,13 @@ struct __wt_verbose_multi_category {
  *     Display a verbose message, given a set of multiple verbose categories using the default
  *     verbosity level.
  */
-#define __wt_verbose_multi(session, multi_category, fmt, ...) \
-    __wt_verbose_level_multi(session, multi_category, WT_VERBOSE_DEFAULT, fmt, __VA_ARGS__)
+#define __wt_verbose_multi(session, multi_category, fmt, ...)                            \
+    do {                                                                                 \
+        uint32_t __v_idx;                                                                \
+        for (__v_idx = 0; __v_idx < multi_category.cnt; __v_idx++) {                     \
+            if (WT_VERBOSE_ISSET(session, multi_category.categories[__v_idx])) {         \
+                __wt_verbose_worker(session, "[" #multi_category "] " fmt, __VA_ARGS__); \
+                break;                                                                   \
+            }                                                                            \
+        }                                                                                \
+    } while (0)
