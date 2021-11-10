@@ -101,6 +101,9 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
 }
 
 struct CollModRequest {
+    // Internal fields of this 'cmdObj' are referenced by BSONElement fields here
+    // and CollModIndexRequest.
+    BSONObj cmdObj;  // owned
     CollModIndexRequest indexRequest;
     BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement viewPipeLine = {};
@@ -116,7 +119,7 @@ struct CollModRequest {
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const CollectionPtr& coll,
-                                               const BSONObj& cmdObj,
+                                               const CollMod& cmd,
                                                BSONObjBuilder* oplogEntryBuilder) {
 
     bool isView = !coll;
@@ -124,7 +127,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
     CollModRequest cmr;
 
-    BSONForEach(e, cmdObj) {
+    cmr.cmdObj = cmd.toBSON(BSONObj());
+    for (const auto& e : cmr.cmdObj) {
         const auto fieldName = e.fieldNameStringData();
         if (isGenericArgument(fieldName)) {
             continue;  // Don't add to oplog builder.
@@ -530,10 +534,8 @@ Status _collModInternal(OperationContext* opCtx,
                       str::stream() << "Not primary while setting collection options on " << nss);
     }
 
-    auto cmdObj = cmd.toBSON(BSONObj());
     BSONObjBuilder oplogEntryBuilder;
-    auto statusW =
-        parseCollModRequest(opCtx, nss, coll.getCollection(), cmdObj, &oplogEntryBuilder);
+    auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd, &oplogEntryBuilder);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -547,7 +549,7 @@ Status _collModInternal(OperationContext* opCtx,
     auto ts = cmrNew.timeseries;
 
     if (!serverGlobalParams.quiet.load()) {
-        LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmdObj);
+        LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON(BSONObj()));
     }
 
     if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
