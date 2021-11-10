@@ -103,7 +103,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
                 csig = f_out.read().decode().strip()
         except OSError as ex:
             raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"failed to read hash file: {ex}") from ex
-        finally:
+        else:
             if not csig:
                 raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"no content_hash data found")
 
@@ -223,14 +223,12 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
     def clean_bad_cachefile(self, node, cache_csig, computed_csig):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1])
-
-        try:
-            pathlib.Path(self.get_bad_cachefile_path(cksum_dir)).touch()
-        except FileExistsError:
-            pass
-
         rm_path = f"{cksum_dir}.{SCons.CacheDir.cache_tmp_uuid}.del"
         try:
+            try:
+                pathlib.Path(self.get_bad_cachefile_path(cksum_dir)).touch()
+            except FileExistsError:
+                pass
             cksum_dir.replace(rm_path)
         except OSError as ex:
             msg = f"Failed to rename {cksum_dir} to {rm_path}: {ex}"
