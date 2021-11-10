@@ -238,7 +238,7 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
     // Add remaining reference elements when we reached end in 'obj'.
     for (; refIt != refEnd; ++refIt) {
         // We cannot allow empty object mismatch
-        if (refIt->type() == Object && refIt->Obj().isEmpty()) {
+        if (refIt->type() == Object && _hasEmptyObj(refIt->Obj())) {
             return false;
         }
         if (builder->hasField(refIt->fieldNameStringData())) {
@@ -250,7 +250,7 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
     // Add remaining 'obj' elements when we reached end in 'reference'.
     for (; it != end; ++it) {
         // We cannot allow empty object mismatch
-        if (it->type() == Object && it->Obj().isEmpty()) {
+        if (it->type() == Object && _hasEmptyObj(it->Obj())) {
             return false;
         }
 
