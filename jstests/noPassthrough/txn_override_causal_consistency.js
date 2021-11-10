@@ -62,7 +62,7 @@ function inspectFirstCommandForAfterClusterTime(conn, cmdName, isCausal, expectR
     // retrying more than once or expects to end with a commit.
     let cmds = [];
     if (!expectRetry) {
-        assert.eq(1, cmdObjsSeen.length);
+        assert.lte(1, cmdObjsSeen.length);
         cmds.push(cmdObjsSeen[0]);
     } else {
         assert.lt(1, cmdObjsSeen.length);
