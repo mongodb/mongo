@@ -551,9 +551,9 @@ void TenantCollectionCloner::insertDocumentsCallback(
     }
 
     // Disabling the internal document validation for inserts on recipient side as those
-    // validation should have already been performed on donor's primary during tenant
+    // validations should have already been performed on donor's primary during tenant
     // collection document insertion.
-    DisableDocumentValidation doumentValidationDisabler(
+    DisableDocumentValidation documentValidationDisabler(
         cbd.opCtx,
         DocumentValidationSettings::kDisableSchemaValidation |
             DocumentValidationSettings::kDisableInternalValidation);

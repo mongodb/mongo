@@ -318,11 +318,9 @@ void TenantDatabaseCloner::postStage() {
                         "namespace"_attr = sourceNss,
                         "error"_attr = collStatus.toString(),
                         "tenantId"_attr = _tenantId);
-            setSyncFailedStatus({collStatus.code(),
-                                 collStatus
-                                     .withContext(str::stream() << "Error cloning collection '"
-                                                                << sourceNss.toString() << "'")
-                                     .toString()});
+            auto message = collStatus.withContext(str::stream() << "Error cloning collection '"
+                                                                << sourceNss.toString() << "'");
+            setSyncFailedStatus(collStatus.withReason(message.toString()));
         }
         {
             stdx::lock_guard<Latch> lk(_mutex);
