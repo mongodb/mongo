@@ -364,9 +364,10 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
         }
     }
 
-    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
-
     if (!_duringInitialSync) {
+        // Initial sync will reconstruct prepared transactions when it is completely done.
+        reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
+
         LOGV2_WARNING(21558,
                       "Setting mongod to readOnly mode as a result of specifying "
                       "'recoverFromOplogAsStandalone'");
