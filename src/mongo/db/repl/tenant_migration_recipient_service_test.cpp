@@ -61,7 +61,7 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -3316,6 +3316,93 @@ TEST_F(TenantMigrationRecipientServiceTest, WaitUntilMigrationReachesReturnAfter
     auto lastAppliedOpTime =
         ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime();
     ASSERT_GTE(lastAppliedOpTime, newOpTime);
+}
+
+// When the recipientSyncData command is called with returnAfterReachingTimestamp, mongod updates
+// the state document's rejectReadsBeforeTimestamp value and waits for w:all acknowledgment.
+// If there are two concurrent calls to the command with the same
+// returnAfterReachingTimestamp, then two threads may write the same rejectReadsBeforeTimestamp
+// value. Whichever thread writes it second is therefore a no-op, and its
+// ReplClientInfo::getLastOp() will be null. Test that the second thread detects the problem.
+TEST_F(TenantMigrationRecipientServiceTest, DuplicateReturnAfterReachingTimestamp) {
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.threadNamePrefix = "TenantMigrationRecipientServiceTest-";
+    threadPoolOptions.poolName = "TenantMigrationRecipientServiceTestThreadPool";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        std::make_unique<executor::NetworkInterfaceMock>());
+    executor->startup();
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Skip the cloners in this test, so we provide an empty list of databases.
+    MockRemoteDBServer* const _donorServer =
+        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
+    _donorServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
+    _donorServer->setCommandReply("find", makeFindResponse());
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        // Create and start the instance.
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    instance->waitUntilMigrationReachesConsistentState(opCtx.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
+
+    // Simulate recipient receiving a donor timestamp.
+    auto returnAfterReachingTimestamp =
+        ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime().getTimestamp() +
+        1;
+
+    auto fp = globalFailPointRegistry().find("fpBeforePersistingRejectReadsBeforeTimestamp");
+    auto timesEntered = fp->setMode(FailPoint::alwaysOn,
+                                    0,
+                                    BSON("action"
+                                         << "hang"));
+    startCapturingLogMessages();
+    auto future1 = ExecutorFuture<void>(executor).then([&]() {
+        auto innerOpCtx = makeOperationContext();
+        instance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
+            innerOpCtx.get(), returnAfterReachingTimestamp);
+    });
+    auto future2 = ExecutorFuture<void>(executor).then([&]() {
+        auto innerOpCtx = makeOperationContext();
+        instance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
+            innerOpCtx.get(), returnAfterReachingTimestamp);
+    });
+
+    fp->waitForTimesEntered(timesEntered + 2);
+    fp->setMode(FailPoint::off);
+    advanceTime(Seconds(10));  // Wake threads that were blocked on fp.
+    future1.wait();
+    future2.wait();
+    ASSERT_EQ(1, countBSONFormatLogLinesIsSubset(BSON("id" << 6096900)));
+    executor->shutdown();
+    executor->join();
+    stopCapturingLogMessages();
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableFetcherError) {
