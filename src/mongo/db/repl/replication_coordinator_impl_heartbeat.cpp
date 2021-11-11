@@ -744,10 +744,24 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
     // Start data replication after the config has been installed.
     if (shouldStartDataReplication) {
-        auto opCtx = cc().makeOperationContext();
-        _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx.get());
-        _externalState->startThreads();
-        _startDataReplication(opCtx.get());
+        while (true) {
+            try {
+                auto opCtx = cc().makeOperationContext();
+                // Initializing minvalid is not allowed to be interrupted.  Make sure it
+                // can't be interrupted by a storage change by taking the global lock first.
+                Lock::GlobalLock lk(opCtx.get(), MODE_IX);
+                _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(
+                    opCtx.get());
+                _externalState->startThreads();
+                _startDataReplication(opCtx.get());
+                break;
+            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
+                LOGV2_DEBUG(6137701,
+                            1,
+                            "Interrupted while trying to start data replication",
+                            "error"_attr = e.toStatus());
+            }
+        }
     }
 }
 
