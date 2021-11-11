@@ -38,7 +38,22 @@ var $config = (function() {
             assertAlways.eq(roleName, res.role);
             assertAlways(!res.isBuiltin, 'role should be user-defined');
 
-            assertAlways(db.dropRole(roleName));
+            // Some test machines may hit high contention during these concurrency tests
+            // allow for occaisional failure with retries.
+            for (var i = 3; i >= 0; --i) {
+                var dropResult = db.dropRole(roleName);
+                if (dropResult === true) {
+                    // Success
+                    break;
+                } else if (i > 0) {
+                    // Failure, try again
+                    print("Retrying a dropRole() which resulted in: " + tojson(dropResult));
+                } else {
+                    // Out of do-overs, just die.
+                    assertAlways(dropResult);
+                }
+            }
+
             assertAlways.isnull(db.getRole(roleName), "role '" + roleName + "' should not exist");
         }
 
