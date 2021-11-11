@@ -33,7 +33,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     calculated_tags_file_path="failedtesttags/${tags_build_variant}/${display_task_name}.yml"
 
     if [[ -f $calculated_tags_file_path ]]; then
-      extra_args="$extra_args --tagFile=failedtesttags/${tags_build_variant}/${display_task_name}.yml --includeWithAllTags=recent_failure,recent_change"
+      extra_args="$extra_args --tagFile=failedtesttags/${tags_build_variant}/${display_task_name}.yml --includeWithAnyTags=recent_failure,recent_change"
     else
       echo "calculated tags file does not exist: $calculated_tags_file_path"
     fi
