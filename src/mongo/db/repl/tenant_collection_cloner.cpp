@@ -43,6 +43,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -385,6 +386,9 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
             }
         }
     } else {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx.get());
+
         // No collection with the same UUID exists. But if this still fails with NamespaceExists, it
         // means that we have a collection with the same namespace but a different UUID.
         auto status =

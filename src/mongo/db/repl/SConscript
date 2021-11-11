@@ -1021,6 +1021,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         'base_cloner',
         'cloner_utils',
         'repl_sync_shared_data',
