@@ -4,6 +4,7 @@
 //  requires_sharding,
 //  uses_transactions,
 //  uses_multi_shard_transaction,
+//  assumes_balancer_off
 // ]
 (function() {
 "use strict";
@@ -31,7 +32,8 @@ const nodeOptions = {
     setParameter: {enableShardedIndexConsistencyCheck: false}
 };
 
-const st = new ShardingTest({shards: 3, mongos: 2, other: {configOptions: nodeOptions}});
+const st = new ShardingTest(
+    {shards: 3, mongos: 2, other: {configOptions: nodeOptions, enableBalancer: false}});
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
