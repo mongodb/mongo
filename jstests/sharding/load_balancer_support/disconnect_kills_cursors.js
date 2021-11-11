@@ -84,14 +84,16 @@
     assert.eq(idleCursor.cursorId, cursorId);
 
     // Make sure we can't find that cursor anymore/it has been killed.
-    const numCursorsFoundWithId =
-        admin
-            .aggregate([
-                {$currentOp: {allUsers: true, idleCursors: true, localOps: true}},
-                {$match: {type: "idleCursor"}},
-                {$match: {"cursor.cursorId": cursorId}}
-            ])
-            .itcount();
-    assert.eq(numCursorsFoundWithId, NumberLong(0));
+    assert.soon(() => {
+        const numCursorsFoundWithId =
+            admin
+                .aggregate([
+                    {$currentOp: {allUsers: true, idleCursors: true, localOps: true}},
+                    {$match: {type: "idleCursor"}},
+                    {$match: {"cursor.cursorId": cursorId}}
+                ])
+                .itcount();
+        return (numCursorsFoundWithId == 0);
+    });
     st.stop();
 })();
