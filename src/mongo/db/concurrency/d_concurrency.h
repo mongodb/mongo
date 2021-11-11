@@ -43,29 +43,6 @@ class NamespaceStringOrUUID;
 class Lock {
 public:
     /**
-     * NOTE: DO NOT add any new usages of TempRelease. It is being deprecated/removed.
-     */
-    class TempRelease {
-        TempRelease(const TempRelease&) = delete;
-        TempRelease& operator=(const TempRelease&) = delete;
-
-    public:
-        explicit TempRelease(Locker* lockState);
-        ~TempRelease();
-
-    private:
-        // Not owned
-        Locker* const _lockState;
-
-        // If _locksReleased is true, this stores the persisted lock information to be restored
-        // in the destructor. Otherwise it is empty.
-        Locker::LockSnapshot _lockSnapshot;
-
-        // False if locks could not be released because of recursive locking
-        const bool _locksReleased;
-    };
-
-    /**
      * General purpose RAII wrapper for a resource managed by the lock manager
      *
      * See LockMode for the supported modes. Unlike DBLock/Collection lock, this will not do
@@ -130,9 +107,9 @@ public:
 
     /**
      * For use as general mutex or readers/writers lock, outside the general multi-granularity
-     * model. A ResourceMutex is not affected by yielding/temprelease and two phase locking
-     * semantics inside WUOWs. Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same
-     * fairness as other LockManager locks.
+     * model. A ResourceMutex is not affected by yielding and two phase locking semantics inside
+     * WUOWs. Lock with ResourceLock, SharedLock or ExclusiveLock. Uses same fairness as other
+     * LockManager locks.
      */
     class ResourceMutex {
     public:

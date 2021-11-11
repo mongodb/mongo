@@ -1821,32 +1821,16 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 throw WriteConflictException();
             }
             case ErrorCodes::BackgroundOperationInProgressForDatabase: {
-                if (mode == OplogApplication::Mode::kInitialSync) {
-                    abortIndexBuilds(opCtx,
-                                     entry.getCommandType(),
-                                     nss,
-                                     "Aborting index builds during initial sync");
-                    LOGV2_DEBUG(4665900,
-                                1,
-                                "Conflicting DDL operation encountered during initial sync; "
-                                "aborting index build and retrying",
-                                "db"_attr = nss.db());
-                }
-
-                Lock::TempRelease release(opCtx->lockState());
-
-                IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, nss.db());
-                opCtx->recoveryUnit()->abandonSnapshot();
-                opCtx->checkForInterrupt();
-
-                LOGV2_DEBUG(51774,
+                invariant(mode == OplogApplication::Mode::kInitialSync);
+                abortIndexBuilds(opCtx,
+                                 entry.getCommandType(),
+                                 nss,
+                                 "Aborting index builds during initial sync");
+                LOGV2_DEBUG(4665900,
                             1,
-                            "Acceptable error during oplog application: background operation in "
-                            "progress for DB '{db}' from oplog entry {oplogEntry}",
-                            "Acceptable error during oplog application: background operation in "
-                            "progress for database",
-                            "db"_attr = nss.db(),
-                            "oplogEntry"_attr = redact(entry.toBSONForLogging()));
+                            "Conflicting DDL operation encountered during initial sync; "
+                            "aborting index build and retrying",
+                            "db"_attr = nss.db());
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -1855,43 +1839,15 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
 
-                if (mode == OplogApplication::Mode::kInitialSync) {
-                    abortIndexBuilds(opCtx,
-                                     entry.getCommandType(),
-                                     ns,
-                                     "Aborting index builds during initial sync");
-                    LOGV2_DEBUG(4665901,
-                                1,
-                                "Conflicting DDL operation encountered during initial sync; "
-                                "aborting index build and retrying",
-                                "namespace"_attr = ns);
-                }
-
-                Lock::TempRelease release(opCtx->lockState());
-
-                auto swUUID = entry.getUuid();
-                if (!swUUID) {
-                    LOGV2_ERROR(21261,
-                                "Failed command {command} on {namespace} during oplog application. "
-                                "Expected a UUID.",
-                                "Failed command during oplog application. Expected a UUID",
-                                "command"_attr = redact(o),
-                                "namespace"_attr = ns);
-                }
-                IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
-                    opCtx, swUUID.get());
-
-                opCtx->recoveryUnit()->abandonSnapshot();
-                opCtx->checkForInterrupt();
-
-                LOGV2_DEBUG(51775,
+                invariant(mode == OplogApplication::Mode::kInitialSync);
+                abortIndexBuilds(
+                    opCtx, entry.getCommandType(), ns, "Aborting index builds during initial sync");
+                LOGV2_DEBUG(4665901,
                             1,
-                            "Acceptable error during oplog application: background operation in "
-                            "progress for ns '{namespace}' from oplog entry {oplogEntry}",
-                            "Acceptable error during oplog application: background operation in "
-                            "progress for namespace",
-                            "namespace"_attr = ns,
-                            "oplogEntry"_attr = redact(entry.toBSONForLogging()));
+                            "Conflicting DDL operation encountered during initial sync; "
+                            "aborting index build and retrying",
+                            "namespace"_attr = ns);
+
                 break;
             }
             default: {

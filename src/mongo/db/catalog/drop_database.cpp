@@ -304,85 +304,74 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
         }
     });
 
-    {
-        // Holding of any locks is disallowed while awaiting replication because this can
-        // potentially block for long time while doing network activity.
-        //
-        // Even though dropDatabase() does not explicitly acquire any locks before awaiting
-        // replication, it is possible that the caller of this function may already have acquired
-        // a lock. The applyOps command is an example of a dropDatabase() caller that does this.
-        // Therefore, we have to release any locks using a TempRelease RAII object.
-        //
-        // TODO: Remove the use of this TempRelease object when SERVER-29802 is completed.
-        // The work in SERVER-29802 will adjust the locking rules around applyOps operations and
-        // dropDatabase is expected to be one of the operations where we expect to no longer acquire
-        // the global lock.
-        Lock::TempRelease release(opCtx->lockState());
+    // Holding of any locks is disallowed while awaiting replication because this can potentially
+    // block for long time while doing network activity.
+    invariant(!opCtx->lockState()->isLocked());
 
-        auto awaitOpTime = [&]() {
-            if (numCollectionsToDrop > 0U) {
-                const auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
-                return clientInfo.getLastOp();
-            }
-            invariant(!latestDropPendingOpTime.isNull());
-            return latestDropPendingOpTime;
-        }();
+    auto awaitOpTime = [&]() {
+        if (numCollectionsToDrop > 0U) {
+            const auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+            return clientInfo.getLastOp();
+        }
+        invariant(!latestDropPendingOpTime.isNull());
+        return latestDropPendingOpTime;
+    }();
 
-        // The user-supplied wTimeout should be used when waiting for majority write concern.
-        const auto& userWriteConcern = opCtx->getWriteConcern();
-        const auto wTimeout = !userWriteConcern.isImplicitDefaultWriteConcern()
-            ? Milliseconds{userWriteConcern.wTimeout}
-            : duration_cast<Milliseconds>(Minutes(10));
+    // The user-supplied wTimeout should be used when waiting for majority write concern.
+    const auto& userWriteConcern = opCtx->getWriteConcern();
+    const auto wTimeout = !userWriteConcern.isImplicitDefaultWriteConcern()
+        ? Milliseconds{userWriteConcern.wTimeout}
+        : duration_cast<Milliseconds>(Minutes(10));
 
-        // This is used to wait for the collection drops to replicate to a majority of the replica
-        // set. Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling
-        // is supported by mongod and writeConcernMajorityJournalDefault is set to true in the
-        // ReplSetConfig.
-        const WriteConcernOptions dropDatabaseWriteConcern(
-            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wTimeout);
+    // This is used to wait for the collection drops to replicate to a majority of the replica
+    // set. Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling
+    // is supported by mongod and writeConcernMajorityJournalDefault is set to true in the
+    // ReplSetConfig.
+    const WriteConcernOptions dropDatabaseWriteConcern(
+        WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wTimeout);
 
-        LOGV2(20340,
+    LOGV2(20340,
+          "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
+          "{dropDatabaseWriteConcern}. Dropping {numCollectionsToDrop} collection(s), with "
+          "last collection drop at {latestDropPendingOpTime}",
+          "dropDatabase waiting for replication and dropping collections",
+          "db"_attr = dbName,
+          "awaitOpTime"_attr = awaitOpTime,
+          "dropDatabaseWriteConcern"_attr = dropDatabaseWriteConcern.toBSON(),
+          "numCollectionsToDrop"_attr = numCollectionsToDrop,
+          "latestDropPendingOpTime"_attr = latestDropPendingOpTime);
+
+    auto result = replCoord->awaitReplication(opCtx, awaitOpTime, dropDatabaseWriteConcern);
+
+    // If the user-provided write concern is weaker than majority, this is effectively a no-op.
+    if (result.status.isOK() && !userWriteConcern.usedDefaultConstructedWC) {
+        LOGV2(20341,
               "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
-              "{dropDatabaseWriteConcern}. Dropping {numCollectionsToDrop} collection(s), with "
-              "last collection drop at {latestDropPendingOpTime}",
-              "dropDatabase waiting for replication and dropping collections",
+              "{userWriteConcern}",
+              "dropDatabase waiting for replication",
               "db"_attr = dbName,
               "awaitOpTime"_attr = awaitOpTime,
-              "dropDatabaseWriteConcern"_attr = dropDatabaseWriteConcern.toBSON(),
-              "numCollectionsToDrop"_attr = numCollectionsToDrop,
-              "latestDropPendingOpTime"_attr = latestDropPendingOpTime);
-
-        auto result = replCoord->awaitReplication(opCtx, awaitOpTime, dropDatabaseWriteConcern);
-
-        // If the user-provided write concern is weaker than majority, this is effectively a no-op.
-        if (result.status.isOK() && !userWriteConcern.usedDefaultConstructedWC) {
-            LOGV2(20341,
-                  "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
-                  "{userWriteConcern}",
-                  "dropDatabase waiting for replication",
-                  "db"_attr = dbName,
-                  "awaitOpTime"_attr = awaitOpTime,
-                  "writeConcern"_attr = userWriteConcern.toBSON());
-            result = replCoord->awaitReplication(opCtx, awaitOpTime, userWriteConcern);
-        }
-
-        if (!result.status.isOK()) {
-            return result.status.withContext(str::stream()
-                                             << "dropDatabase " << dbName << " failed waiting for "
-                                             << numCollectionsToDrop
-                                             << " collection drop(s) (most recent drop optime: "
-                                             << awaitOpTime.toString() << ") to replicate.");
-        }
-
-        LOGV2(20342,
-              "dropDatabase {dbName} - successfully dropped {numCollectionsToDrop} collection(s) "
-              "(most recent drop optime: {awaitOpTime}) after {result_duration}. dropping database",
-              "dropDatabase - successfully dropped collections",
-              "db"_attr = dbName,
-              "numCollectionsDropped"_attr = numCollectionsToDrop,
-              "mostRecentDropOpTime"_attr = awaitOpTime,
-              "duration"_attr = result.duration);
+              "writeConcern"_attr = userWriteConcern.toBSON());
+        result = replCoord->awaitReplication(opCtx, awaitOpTime, userWriteConcern);
     }
+
+    if (!result.status.isOK()) {
+        return result.status.withContext(str::stream()
+                                         << "dropDatabase " << dbName << " failed waiting for "
+                                         << numCollectionsToDrop
+                                         << " collection drop(s) (most recent drop optime: "
+                                         << awaitOpTime.toString() << ") to replicate.");
+    }
+
+    LOGV2(20342,
+          "dropDatabase {dbName} - successfully dropped {numCollectionsToDrop} collection(s) "
+          "(most recent drop optime: {awaitOpTime}) after {result_duration}. dropping database",
+          "dropDatabase - successfully dropped collections",
+          "db"_attr = dbName,
+          "numCollectionsDropped"_attr = numCollectionsToDrop,
+          "mostRecentDropOpTime"_attr = awaitOpTime,
+          "duration"_attr = result.duration);
+
 
     if (MONGO_unlikely(dropDatabaseHangAfterAllCollectionsDrop.shouldFail())) {
         LOGV2(20343,

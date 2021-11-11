@@ -249,22 +249,15 @@ void Cloner::_copy(OperationContext* opCtx,
     f.saveLast = time(nullptr);
 
     int options = QueryOption_NoCursorTimeout | QueryOption_Exhaust;
-    {
-        Lock::TempRelease tempRelease(opCtx->lockState());
-        conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
-                    nss,
-                    BSONObj{} /* filter */,
-                    Query() /* querySettings */,
-                    nullptr,
-                    options,
-                    0 /* batchSize */,
-                    repl::ReadConcernArgs::kImplicitDefault);
-    }
 
-    uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while cloning collection " << nss.ns(),
-            !opCtx->writesAreReplicated() ||
-                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
+    conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
+                nss,
+                BSONObj{} /* filter */,
+                Query() /* querySettings */,
+                nullptr,
+                options,
+                0 /* batchSize */,
+                repl::ReadConcernArgs::kImplicitDefault);
 }
 
 void Cloner::_copyIndexes(OperationContext* opCtx,
@@ -438,7 +431,10 @@ Status Cloner::copyDb(OperationContext* opCtx,
                       const std::string& masterHost,
                       const std::vector<NamespaceString>& shardedColls,
                       std::set<std::string>* clonedColls) {
-    invariant(clonedColls, str::stream() << masterHost << ":" << dBName);
+    invariant(clonedColls && clonedColls->empty(), str::stream() << masterHost << ":" << dBName);
+    // This function can potentially block for a long time on network activity, so holding of locks
+    // is disallowed.
+    invariant(!opCtx->lockState()->isLocked());
 
     auto statusWithMasterHost = ConnectionString::parse(masterHost);
     if (!statusWithMasterHost.isOK()) {
@@ -478,23 +474,14 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     // Gather the list of collections to clone
-    std::vector<BSONObj> toClone;
-    clonedColls->clear();
+    std::list<BSONObj> initialCollections =
+        conn->getCollectionInfos(dBName, ListCollectionsFilter::makeTypeCollectionFilter());
 
-    {
-        // getCollectionInfos may make a remote call, which may block indefinitely, so release
-        // the global lock that we are entering with.
-        Lock::TempRelease tempRelease(opCtx->lockState());
-
-        std::list<BSONObj> initialCollections =
-            conn->getCollectionInfos(dBName, ListCollectionsFilter::makeTypeCollectionFilter());
-
-        auto status = _filterCollectionsForClone(dBName, initialCollections);
-        if (!status.isOK()) {
-            return status.getStatus();
-        }
-        toClone = status.getValue();
+    auto statusWithCollections = _filterCollectionsForClone(dBName, initialCollections);
+    if (!statusWithCollections.isOK()) {
+        return statusWithCollections.getStatus();
     }
+    auto toClone = statusWithCollections.getValue();
 
     std::vector<CreateCollectionParams> createCollectionParams;
     for (auto&& collection : toClone) {
@@ -514,50 +501,50 @@ Status Cloner::copyDb(OperationContext* opCtx,
 
     // Get index specs for each collection.
     std::map<StringData, std::list<BSONObj>> collectionIndexSpecs;
-    {
-        Lock::TempRelease tempRelease(opCtx->lockState());
-        for (auto&& params : createCollectionParams) {
-            const NamespaceString nss(dBName, params.collectionName);
-            const bool includeBuildUUIDs = false;
-            const int options = 0;
-            auto indexSpecs = conn->getIndexSpecs(nss, includeBuildUUIDs, options);
+    for (auto&& params : createCollectionParams) {
+        const NamespaceString nss(dBName, params.collectionName);
+        const bool includeBuildUUIDs = false;
+        const int options = 0;
+        auto indexSpecs = conn->getIndexSpecs(nss, includeBuildUUIDs, options);
 
-            collectionIndexSpecs[params.collectionName] = indexSpecs;
+        collectionIndexSpecs[params.collectionName] = indexSpecs;
 
-            if (params.idIndexSpec.isEmpty()) {
-                params.idIndexSpec = _getIdIndexSpec(indexSpecs);
-            }
+        if (params.idIndexSpec.isEmpty()) {
+            params.idIndexSpec = _getIdIndexSpec(indexSpecs);
         }
     }
 
-    uassert(
-        ErrorCodes::NotWritablePrimary,
-        str::stream() << "Not primary while cloning database " << dBName
-                      << " (after getting list of collections to clone)",
-        !opCtx->writesAreReplicated() ||
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, dBName));
+    {
+        Lock::DBLock dbXLock(opCtx, dBName, MODE_X);
+        uassert(ErrorCodes::NotWritablePrimary,
+                str::stream() << "Not primary while cloning database " << dBName
+                              << " (after getting list of collections to clone)",
+                !opCtx->writesAreReplicated() ||
+                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
+                                                                                         dBName));
 
-    auto status = _createCollectionsForDb(opCtx, createCollectionParams, dBName);
-    if (!status.isOK()) {
-        return status;
-    }
+        auto status = _createCollectionsForDb(opCtx, createCollectionParams, dBName);
+        if (!status.isOK()) {
+            return status;
+        }
 
-    // now build the secondary indexes
-    for (auto&& params : createCollectionParams) {
-        LOGV2(20422,
-              "copying indexes for: {collectionInfo}",
-              "Copying indexes",
-              "collectionInfo"_attr = params.collectionInfo);
+        // now build the secondary indexes
+        for (auto&& params : createCollectionParams) {
+            LOGV2(20422,
+                  "copying indexes for: {collectionInfo}",
+                  "Copying indexes",
+                  "collectionInfo"_attr = params.collectionInfo);
 
-        const NamespaceString nss(dBName, params.collectionName);
+            const NamespaceString nss(dBName, params.collectionName);
 
 
-        _copyIndexes(opCtx,
-                     dBName,
-                     nss,
-                     params.collectionInfo["options"].Obj(),
-                     collectionIndexSpecs[params.collectionName],
-                     conn.get());
+            _copyIndexes(opCtx,
+                         dBName,
+                         nss,
+                         params.collectionInfo["options"].Obj(),
+                         collectionIndexSpecs[params.collectionName],
+                         conn.get());
+        }
     }
 
     for (auto&& params : createCollectionParams) {

@@ -369,59 +369,6 @@ TEST_F(DropDatabaseTest,
 }
 
 TEST_F(DropDatabaseTest,
-       DropDatabaseReleasesLocksWhileCallingAwaitReplicationIfCalledWhileHoldingGlobalLock) {
-    // The applyOps command holds the global lock while calling dropDatabase().
-    // dropDatabase() should detect this and release the global lock temporarily if it needs to call
-    // ReplicationCoordinator::awaitReplication().
-    bool isAwaitReplicationCalled = false;
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [&, this](OperationContext*, const repl::OpTime& opTime) {
-            isAwaitReplicationCalled = true;
-            // This test does not set the client's last optime.
-            ASSERT_EQUALS(opTime, repl::OpTime());
-            ASSERT_FALSE(_opCtx->lockState()->isW());
-            ASSERT_FALSE(_opCtx->lockState()->isDbLockedForMode(_nss.db(), MODE_X));
-            ASSERT_FALSE(_opCtx->lockState()->isLocked());
-            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
-        });
-
-    {
-        Lock::DBLock lk(_opCtx.get(), _nss.db(), MODE_X);
-        _testDropDatabase(_opCtx.get(), _opObserver, _nss, true);
-    }
-
-    ASSERT_TRUE(isAwaitReplicationCalled);
-}
-
-TEST_F(DropDatabaseTest,
-       DropDatabaseReleasesLocksWhileCallingAwaitReplicationForDropPendingCollection) {
-    // The applyOps command holds the global lock while calling dropDatabase().
-    // dropDatabase() should detect this and release the global lock temporarily if it needs to call
-    // ReplicationCoordinator::awaitReplication().
-    bool isAwaitReplicationCalled = false;
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [&, this](OperationContext*, const repl::OpTime& opTime) {
-            isAwaitReplicationCalled = true;
-            ASSERT_GREATER_THAN(opTime, repl::OpTime());
-            ASSERT_FALSE(_opCtx->lockState()->isW());
-            ASSERT_FALSE(_opCtx->lockState()->isDbLockedForMode(_nss.db(), MODE_X));
-            ASSERT_FALSE(_opCtx->lockState()->isLocked());
-            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
-        });
-
-    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
-    auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
-    _createCollection(_opCtx.get(), dpns);
-
-    {
-        Lock::DBLock lk(_opCtx.get(), _nss.db(), MODE_X);
-        ASSERT_OK(dropDatabaseForApplyOps(_opCtx.get(), _nss.db().toString()));
-    }
-
-    ASSERT_TRUE(isAwaitReplicationCalled);
-}
-
-TEST_F(DropDatabaseTest,
        DropDatabaseReturnsNamespaceNotFoundIfDatabaseIsRemovedAfterCollectionsDropsAreReplicated) {
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction(

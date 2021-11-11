@@ -211,9 +211,6 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
 
         // Step 4: Wait for t2 to regain its shared lock
         {
-            // Check that TempRelease does not actually unlock anything
-            Lock::TempRelease yield(&locker1);
-
             state.waitFor(4);
             state.waitFor([&locker2]() { return locker2.getWaitingResource().isValid(); });
             state.finish(4);
@@ -739,42 +736,6 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_TimeoutDueToGlobalLockX) {
                        ErrorCodes::LockTimeout);
 }
 
-TEST_F(DConcurrencyTestFixture, TempReleaseGlobalWrite) {
-    auto opCtx = makeOperationContext();
-    getClient()->swapLockState(std::make_unique<LockerImpl>());
-    auto lockState = opCtx->lockState();
-    Lock::GlobalWrite globalWrite(opCtx.get());
-    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
-
-    {
-        Lock::TempRelease tempRelease(lockState);
-        ASSERT(!lockState->isLocked());
-        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_NONE);
-    }
-
-    ASSERT(lockState->isW());
-    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
-}
-
-TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
-    auto opCtx = makeOperationContext();
-    getClient()->swapLockState(std::make_unique<LockerImpl>());
-    auto lockState = opCtx->lockState();
-    Lock::GlobalWrite globalWrite(opCtx.get());
-    Lock::DBLock lk(opCtx.get(), "SomeDBName", MODE_X);
-    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
-
-    {
-        Lock::TempRelease tempRelease(lockState);
-        ASSERT(lockState->isW());
-        ASSERT(lockState->isDbLockedForMode("SomeDBName", MODE_X));
-        ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
-    }
-
-    ASSERT(lockState->isW());
-    ASSERT_EQ(lockState->getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
-}
-
 TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
     auto clients = makeKClientsWithLockers(2);
     auto opCtx1 = clients[0].second.get();
@@ -1278,13 +1239,8 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                 ;
 
             for (int i = 0; i < kNumIterations; i++) {
-                const bool sometimes = (i % 15 == 0);
-
                 if (i % 7 == 0 && threadId == 0 /* Only one upgrader legal */) {
                     Lock::GlobalWrite w(clients[threadId].second.get());
-                    if (i % 7 == 2) {
-                        Lock::TempRelease t(clients[threadId].second->lockState());
-                    }
 
                     ASSERT(clients[threadId].second->lockState()->isW());
                 } else if (i % 7 == 1) {
@@ -1292,19 +1248,12 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                     ASSERT(clients[threadId].second->lockState()->isReadLocked());
                 } else if (i % 7 == 2) {
                     Lock::GlobalWrite w(clients[threadId].second.get());
-                    if (sometimes) {
-                        Lock::TempRelease t(clients[threadId].second->lockState());
-                    }
 
                     ASSERT(clients[threadId].second->lockState()->isW());
                 } else if (i % 7 == 3) {
                     Lock::GlobalWrite w(clients[threadId].second.get());
-                    { Lock::TempRelease t(clients[threadId].second->lockState()); }
 
                     Lock::GlobalRead r(clients[threadId].second.get());
-                    if (sometimes) {
-                        Lock::TempRelease t(clients[threadId].second->lockState());
-                    }
 
                     ASSERT(clients[threadId].second->lockState()->isW());
                 } else if (i % 7 == 4) {
@@ -1338,9 +1287,6 @@ TEST_F(DConcurrencyTestFixture, Stress) {
 
                             Lock::DBLock x(clients[threadId].second.get(), "local", MODE_X);
 
-                            if (sometimes) {
-                                Lock::TempRelease t(clients[threadId].second.get()->lockState());
-                            }
                         } else if (q == 2) {
                             { Lock::DBLock x(clients[threadId].second.get(), "admin", MODE_S); }
                             { Lock::DBLock x(clients[threadId].second.get(), "admin", MODE_X); }
@@ -1357,8 +1303,6 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                             Lock::DBLock y(clients[threadId].second.get(), "local", MODE_IX);
                         } else {
                             Lock::DBLock w(clients[threadId].second.get(), "foo", MODE_X);
-
-                            { Lock::TempRelease t(clients[threadId].second->lockState()); }
 
                             Lock::DBLock r2(clients[threadId].second.get(), "foo", MODE_S);
                             Lock::DBLock r3(clients[threadId].second.get(), "local", MODE_S);

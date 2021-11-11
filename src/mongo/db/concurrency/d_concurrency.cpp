@@ -49,18 +49,6 @@
 
 namespace mongo {
 
-Lock::TempRelease::TempRelease(Locker* lockState)
-    : _lockState(lockState),
-      _lockSnapshot(),
-      _locksReleased(_lockState->saveLockStateAndUnlock(&_lockSnapshot)) {}
-
-Lock::TempRelease::~TempRelease() {
-    if (_locksReleased) {
-        invariant(!_lockState->isLocked());
-        _lockState->restoreLockState(_lockSnapshot);
-    }
-}
-
 namespace {
 
 /**

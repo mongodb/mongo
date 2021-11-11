@@ -129,7 +129,6 @@ public:
 
         // Clone the non-ignored collections.
         std::set<std::string> clonedColls;
-        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
         Cloner cloner;
         uassertStatusOK(cloner.copyDb(opCtx, dbname, from.toString(), shardedColls, &clonedColls));
