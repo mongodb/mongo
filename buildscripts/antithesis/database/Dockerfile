@@ -22,4 +22,4 @@ COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version
 
-CMD /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log
+CMD /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
