@@ -104,7 +104,7 @@ void validateIpv6Address(StringData addr) {
                 ErrorCodes::FailedToParse,
                 "Proxy Protocol Version 1 address string contains malformed IPv6 hexadectet: {}"_format(
                     hexadectet),
-                hexadectet.size() == 4 && value >= 0);
+                hexadectet.size() == 4);
         };
 
         if (buffer.empty())
