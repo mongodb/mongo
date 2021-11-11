@@ -276,11 +276,11 @@ public:
      * Initialize plan cache with the total cache size in bytes and number of partitions.
      */
     explicit PlanCacheBase(size_t cacheSize, size_t numPartitions = 1)
-        : _numPartitions(numPartitions),
-          _partitionedCache(std::make_unique<Partitioned<Lru, Partitioner>>(
-              numPartitions, Lru(cacheSize / numPartitions))) {
+        : _numPartitions(numPartitions) {
         invariant(numPartitions > 0);
         invariant(cacheSize / numPartitions > 0);
+        auto lru = Lru(cacheSize / numPartitions);
+        _partitionedCache = std::make_unique<Partitioned<Lru, Partitioner>>(numPartitions, lru);
     }
 
     ~PlanCacheBase() = default;
