@@ -526,14 +526,23 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
             opCtx, returnAfterReachingTimestamp, donorRecipientOpTimePair.recipientOpTime));
     }
     _stopOrHangOnFailPoint(&fpBeforePersistingRejectReadsBeforeTimestamp, opCtx);
-    uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
 
-    auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    auto lastOpBeforeUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
+    auto lastOpAfterUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+    if (lastOpBeforeUpdate == lastOpAfterUpdate) {
+        // updateStateDoc was a no-op, but we still must ensure it's all-replicated.
+        lastOpAfterUpdate = uassertStatusOK(replCoord->getLatestWriteOpTime(opCtx));
+        LOGV2(6096900,
+              "Fixed write timestamp for recording rejectReadsBeforeTimestamp",
+              "newWriteOpTime"_attr = lastOpAfterUpdate);
+    }
+
     WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
                                      WriteConcernOptions::SyncMode::NONE,
                                      opCtx->getWriteConcern().wTimeout);
-    uassertStatusOK(replCoord->awaitReplication(opCtx, writeOpTime, writeConcern).status);
+    uassertStatusOK(replCoord->awaitReplication(opCtx, lastOpAfterUpdate, writeConcern).status);
 
     _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp, opCtx);
 
@@ -1476,6 +1485,7 @@ void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status opl
 
 void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint* fp,
                                                                        OperationContext* opCtx) {
+    auto shouldHang = false;
     fp->executeIf(
         [&](const BSONObj& data) {
             LOGV2(4881103,
@@ -1485,11 +1495,8 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
                   "name"_attr = fp->getName(),
                   "args"_attr = data);
             if (data["action"].str() == "hang") {
-                if (opCtx) {
-                    fp->pauseWhileSet(opCtx);
-                } else {
-                    fp->pauseWhileSet();
-                }
+                // fp is locked. If we call pauseWhileSet here, another thread can't disable fp.
+                shouldHang = true;
             } else {
                 uasserted(data["stopErrorCode"].numberInt(),
                           "Skipping remaining processing due to fail point");
@@ -1499,6 +1506,14 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
             auto action = data["action"].str();
             return (action == "hang" || action == "stop");
         });
+
+    if (shouldHang) {
+        if (opCtx) {
+            fp->pauseWhileSet(opCtx);
+        } else {
+            fp->pauseWhileSet();
+        }
+    }
 }
 
 bool TenantMigrationRecipientService::Instance::_isCloneCompletedMarkerSet(WithLock) const {
