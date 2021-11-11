@@ -79,6 +79,24 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
             invariant(collection->isClustered());
         }
     }
+
+    if (params.boundInclusion !=
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords) {
+        // A collection must be clustered if the bounds aren't both included by default.
+        tassert(6125000,
+                "Only collection scans on clustered collections may specify recordId "
+                "BoundInclusion policies",
+                collection->isClustered());
+
+        if (filter) {
+            // The filter is applied after the ScanBoundInclusion is considered.
+            LOGV2_DEBUG(6125007,
+                        5,
+                        "Running a bounded collection scan with a ScanInclusionBound may cause "
+                        "the filter to be overriden");
+        }
+    }
+
     LOGV2_DEBUG(5400802,
                 5,
                 "collection scan bounds",
@@ -261,22 +279,60 @@ void CollectionScan::assertTsHasNotFallenOffOplog(const Record& record) {
 }
 
 namespace {
+bool shouldIncludeStartRecord(const CollectionScanParams& params) {
+    return params.boundInclusion ==
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
+        params.boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+}
+
+bool shouldIncludeEndRecord(const CollectionScanParams& params) {
+    return params.boundInclusion ==
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
+        params.boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+}
+
 bool pastEndOfRange(const CollectionScanParams& params, const WorkingSetMember& member) {
     if (params.direction == CollectionScanParams::FORWARD) {
-        return params.maxRecord && member.recordId > *params.maxRecord;
+        // A forward scan ends with the maxRecord when it is specified.
+        if (!params.maxRecord) {
+            return false;
+        }
+
+        auto endRecord = *params.maxRecord;
+        return member.recordId > endRecord ||
+            (member.recordId == endRecord && !shouldIncludeEndRecord(params));
     } else {
-        return params.minRecord && member.recordId < *params.minRecord;
+        // A backward scan ends with the minRecord when it is specified.
+        if (!params.minRecord) {
+            return false;
+        }
+        auto endRecord = *params.minRecord;
+
+        return member.recordId < endRecord ||
+            (member.recordId == endRecord && !shouldIncludeEndRecord(params));
     }
 }
 
 bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMember& member) {
     if (params.direction == CollectionScanParams::FORWARD) {
-        return params.minRecord && member.recordId < *params.minRecord;
+        // A forward scan begins with the minRecord when it is specified.
+        if (!params.minRecord) {
+            return false;
+        }
+
+        auto startRecord = *params.minRecord;
+        return member.recordId < startRecord ||
+            (member.recordId == startRecord && !shouldIncludeStartRecord(params));
     } else {
-        return params.maxRecord && member.recordId > *params.maxRecord;
+        // A backward scan begins with the maxRecord when specified.
+        if (!params.maxRecord) {
+            return false;
+        }
+        auto startRecord = *params.maxRecord;
+        return member.recordId > startRecord ||
+            (member.recordId == startRecord && !shouldIncludeStartRecord(params));
     }
 }
-
 }  // namespace
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,

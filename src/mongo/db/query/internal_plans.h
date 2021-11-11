@@ -80,6 +80,12 @@ public:
         boost::optional<RecordId> minRecord = boost::none,
         boost::optional<RecordId> maxRecord = boost::none);
 
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
+        OperationContext* opCtx,
+        const CollectionPtr* collection,
+        const CollectionScanParams& params,
+        PlanYieldPolicy::YieldPolicy yieldPolicy);
+
     /**
      * Returns a FETCH => DELETE plan.
      */
@@ -146,6 +152,12 @@ private:
         boost::optional<RecordId> minRecord = boost::none,
         boost::optional<RecordId> maxRecord = boost::none,
         bool relaxCappedConstraints = false);
+
+    static std::unique_ptr<PlanStage> _collectionScan(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        WorkingSet* ws,
+        const CollectionPtr* collection,
+        const CollectionScanParams& params);
 
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.
