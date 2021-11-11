@@ -39,6 +39,7 @@ env.CppUnitTest(
         'fault_manager_test.cpp',
         'fault_state_machine_test.cpp',
         'health_observer_test.cpp',
+        'state_machine_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
