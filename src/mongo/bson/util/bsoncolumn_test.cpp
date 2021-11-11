@@ -3366,6 +3366,51 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleMerge) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, InterleavedIncompatibleMergeMiddle) {
+    BSONColumnBuilder cb("test"_sd);
+
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("a" << 1 << "x" << 2 << "y" << 2 << "b" << 2)),
+        createElementObj(BSON("a" << 1 << "y" << 3 << "x" << 3 << "b" << 2))};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+
+    appendInterleavedStart(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendInterleavedStart(expected, elems[1].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
     BSONColumnBuilder cb("test"_sd);
 

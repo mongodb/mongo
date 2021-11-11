@@ -220,6 +220,10 @@ bool _mergeObj(BSONObjBuilder* builder, const BSONObj& reference, const BSONObj&
                 return false;
             }
 
+            if (builder->hasField(refIt->fieldNameStringData())) {
+                return false;
+            }
+
             builder->append(*(refIt++));
         } else {
             // Reference element do exist later in 'obj'. Add element in 'it' if it is the first
