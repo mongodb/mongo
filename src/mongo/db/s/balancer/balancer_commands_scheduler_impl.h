@@ -580,14 +580,14 @@ private:
 };
 
 /**
- * Helper data structure for submitting the shard command associated to a Request to the
- * BalancerCommandsScheduler.
+ * Helper data structure for submitting the remote command associated to a BalancerCommandsScheduler
+ * Request.
  */
-struct CommandSubmissionHandle {
-    CommandSubmissionHandle(UUID id, const std::shared_ptr<CommandInfo>& commandInfo)
+struct CommandSubmissionParameters {
+    CommandSubmissionParameters(UUID id, const std::shared_ptr<CommandInfo>& commandInfo)
         : id(id), commandInfo(commandInfo) {}
 
-    CommandSubmissionHandle(CommandSubmissionHandle&& rhs)
+    CommandSubmissionParameters(CommandSubmissionParameters&& rhs)
         : id(rhs.id), commandInfo(std::move(rhs.commandInfo)) {}
 
     const UUID id;
@@ -614,12 +614,12 @@ struct CommandSubmissionResult {
 /**
  * The class encapsulating all the properties supporting a request to BalancerCommandsSchedulerImpl
  * as it gets created, executed and completed/cancelled.
- * It offers helper methods to generate supporting classes to support the request processing.
  */
 class RequestData {
 public:
     RequestData(UUID id, std::shared_ptr<CommandInfo>&& commandInfo)
         : _id(id),
+          _holdingDistLock(false),
           _commandInfo(std::move(commandInfo)),
           _deferredResponse(std::make_shared<Notification<executor::RemoteCommandResponse>>()),
           _executionContext(boost::none) {
@@ -628,6 +628,7 @@ public:
 
     RequestData(RequestData&& rhs)
         : _id(rhs._id),
+          _holdingDistLock(rhs._holdingDistLock),
           _commandInfo(std::move(rhs._commandInfo)),
           _deferredResponse(std::move(rhs._deferredResponse)),
           _executionContext(std::move(rhs._executionContext)) {}
@@ -638,16 +639,27 @@ public:
         return _id;
     }
 
-    const CommandInfo& getCommandInfo() const {
-        return *_commandInfo;
+    CommandSubmissionParameters getSubmissionParameters() const {
+        return CommandSubmissionParameters(_id, _commandInfo);
     }
 
-    CommandSubmissionHandle getSubmissionInfo() const {
-        return CommandSubmissionHandle(_id, _commandInfo);
-    }
-
-    void addExecutionContext(ExecutionContext&& executionContext) {
-        _executionContext = std::move(executionContext);
+    Status applySubmissionResult(CommandSubmissionResult&& submissionResult) {
+        invariant(_id == submissionResult.id);
+        _holdingDistLock = submissionResult.acquiredDistLock;
+        if (!!(*_deferredResponse)) {
+            // The request has been already completed by the time the submission gets processed.
+            // Keep the original outcome and continue the workflow.
+            return Status::OK();
+        }
+        auto submissionStatus = submissionResult.context.getStatus();
+        if (submissionStatus.isOK()) {
+            // store the execution context to be able to serve future cancel requests.
+            _executionContext = std::move(submissionResult.context.getValue());
+        } else {
+            // cascade the submission failure
+            setOutcome(submissionStatus);
+        }
+        return submissionStatus;
     }
 
     const boost::optional<executor::TaskExecutor::CallbackHandle>& getExecutionContext() {
@@ -656,6 +668,18 @@ public:
 
     ResponseHandle getResponseHandle() {
         return ResponseHandle(_id, _deferredResponse);
+    }
+
+    const NamespaceString& getNamespace() const {
+        return _commandInfo->getNameSpace();
+    }
+
+    const bool holdsDistributedLock() const {
+        return _holdingDistLock;
+    }
+
+    const bool isRecoverable() const {
+        return _commandInfo->requiresRecoveryOnCrash();
     }
 
     void setOutcome(const executor::TaskExecutor::ResponseStatus& response) {
@@ -668,6 +692,8 @@ private:
     RequestData(const RequestData& rhs) = delete;
 
     const UUID _id;
+
+    bool _holdingDistLock;
 
     std::shared_ptr<CommandInfo> _commandInfo;
 
@@ -729,10 +755,8 @@ private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };
 
     // Protects the in-memory state of the Scheduler
+    // (_state, _requests, _unsubmittedRequestIds, _recentlyCompletedRequests).
     Mutex _mutex = MONGO_MAKE_LATCH("BalancerCommandsSchedulerImpl::_mutex");
-
-    // Ensures that concurrent calls to start() and stop() get serialised
-    Mutex _startStopMutex = MONGO_MAKE_LATCH("BalancerCommandsSchedulerImpl::_startStopMutex");
 
     SchedulerState _state{SchedulerState::Stopped};
 
@@ -741,24 +765,21 @@ private:
     stdx::thread _workerThreadHandle;
 
     /**
-     * Collection of all pending + running requests currently managed by
+     * List of all unsubmitted + submitted + completed, but not cleaned up yet requests managed by
      * BalancerCommandsSchedulerImpl, organized by ID.
      */
-    stdx::unordered_map<UUID, RequestData, UUID::Hash> _incompleteRequests;
+    stdx::unordered_map<UUID, RequestData, UUID::Hash> _requests;
 
     /**
-     * List of request IDs that have not been yet submitted.
+     * List of request IDs that have not been yet submitted for remote execution.
      */
-    std::list<UUID> _pendingRequestIds;
+    std::vector<UUID> _unsubmittedRequestIds;
 
     /**
-     * List of request IDs that are currently running (submitted, but not yet completed).
+     * List of completed/cancelled requests IDs that may still hold synchronisation resources or
+     * persisted state that the scheduler needs to release/clean up.
      */
-    stdx::unordered_set<UUID, UUID::Hash> _runningRequestIds;
-
-    std::vector<UUID> _obsoleteRecoveryDocumentIds;
-
-    std::vector<NamespaceString> _lockedReferencesToRelease;
+    std::vector<UUID> _recentlyCompletedRequestIds;
 
     /**
      * Centralised accessor for all the distributed locks required by the Scheduler.
@@ -766,18 +787,22 @@ private:
      */
     BalancerDistLocks _distributedLocks;
 
+    /*
+     * Counter of oustanding requests that were interrupted by a prior step-down/crash event,
+     * and that the scheduler is currently submitting as part of its initial recovery phase.
+     */
+    size_t _numRequestsToRecover{0};
+
     ResponseHandle _buildAndEnqueueNewRequest(OperationContext* opCtx,
                                               std::shared_ptr<CommandInfo>&& commandInfo);
 
     ResponseHandle _enqueueRequest(WithLock, RequestData&& request);
 
-    bool _canSubmitNewRequests(WithLock);
+    void _performDeferredCleanup(OperationContext* opCtx,
+                                 std::vector<RequestData>&& requestsHoldingResources);
 
-    bool _deferredCleanupRequired(WithLock);
-
-    void _performDeferredCleanup(WithLock, OperationContext* opCtx);
-
-    CommandSubmissionResult _submit(OperationContext* opCtx, const CommandSubmissionHandle& data);
+    CommandSubmissionResult _submit(OperationContext* opCtx,
+                                    const CommandSubmissionParameters& data);
 
     void _applySubmissionResult(WithLock, CommandSubmissionResult&& submissionResult);
 

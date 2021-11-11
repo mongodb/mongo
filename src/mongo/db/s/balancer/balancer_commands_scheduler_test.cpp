@@ -117,11 +117,6 @@ TEST_F(BalancerCommandsSchedulerTest, StartAndStopScheduler) {
     _scheduler.stop();
 }
 
-TEST_F(BalancerCommandsSchedulerTest, ResilientToMultipleStarts) {
-    _scheduler.start(operationContext());
-    _scheduler.start(operationContext());
-}
-
 TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
     auto deferredCleanupCompletedCheckpoint =
         globalFailPointRegistry().find("deferredCleanupCompletedCheckpoint");
@@ -308,7 +303,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
 TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
     std::unique_ptr<MoveChunkResponse> resp;
     {
-        FailPointEnableBlock failPoint("pauseBalancerWorkerThread");
+        FailPointEnableBlock failPoint("pauseSubmissionsFailPoint");
         _scheduler.start(operationContext());
         ChunkType moveChunk = makeChunk(0, kShardId0);
         resp = _scheduler.requestMoveChunk(operationContext(),
@@ -335,7 +330,7 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfBalancerStops) {
 
 TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenRequestIsSubmitted) {
     // This prevents the request from being submitted by the scheduler worker thread.
-    FailPointEnableBlock failPoint("pauseBalancerWorkerThread");
+    FailPointEnableBlock failPoint("pauseSubmissionsFailPoint");
 
     auto opCtx = operationContext();
     _scheduler.start(opCtx);
@@ -374,7 +369,7 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
 }
 
 TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecoveringFromCrash) {
-    FailPoint* failpoint = globalFailPointRegistry().find("pauseBalancerWorkerThread");
+    FailPoint* failpoint = globalFailPointRegistry().find("pauseSubmissionsFailPoint");
     failpoint->setMode(FailPoint::Mode::alwaysOn);
     auto opCtx = operationContext();
     _scheduler.start(opCtx);
@@ -431,7 +426,7 @@ TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecovering
 
 TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL) {
     OperationContext* opCtx;
-    FailPoint* failpoint = globalFailPointRegistry().find("pauseBalancerWorkerThread");
+    FailPoint* failpoint = globalFailPointRegistry().find("pauseSubmissionsFailPoint");
     failpoint->setMode(FailPoint::Mode::alwaysOn);
     {
         _scheduler.start(operationContext());
