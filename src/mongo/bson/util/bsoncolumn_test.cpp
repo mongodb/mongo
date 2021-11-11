@@ -2139,7 +2139,7 @@ TEST_F(BSONColumnTest, StringDeltaLarge) {
     verifyDecompression(binData, {elemString, elemString2});
 }
 
-TEST_F(BSONColumnTest, StringDeltaAfterInvalid) {
+TEST_F(BSONColumnTest, StringAfterInvalid) {
     BSONColumnBuilder cb("test"_sd);
     auto elem = createElementString("mongo");
     cb.append(elem);
@@ -2154,16 +2154,55 @@ TEST_F(BSONColumnTest, StringDeltaAfterInvalid) {
     appendLiteral(expected, elem);
     appendLiteral(expected, elemInvalid);
     appendSimple8bControl(expected, 0b1000, 0b0000);
-
-    // If previous is not encodable use 0 as previous. An empty string will encode as 0
-    auto elemEmpty = createElementString(""_sd);
-    ASSERT_EQ(*Simple8bTypeUtil::encodeString(elemEmpty.valueStringData()), 0);
-    appendSimple8bBlock128(expected, deltaString(elem2, elemEmpty));
+    appendSimple8bBlock128(
+        expected,
+        Simple8bTypeUtil::encodeInt128(*Simple8bTypeUtil::encodeString(elem2.valueStringData())));
     appendEOO(expected);
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, {elem, elemInvalid, elem2});
+}
+
+TEST_F(BSONColumnTest, StringEmptyAfterLarge) {
+    BSONColumnBuilder cb("test"_sd);
+    auto large = createElementString(std::string(32, 'a'));
+    cb.append(large);
+    auto empty = createElementString("");
+    // Confirm that empty string is encoded as 0 which this test relies on.
+    ASSERT_EQ(*Simple8bTypeUtil::encodeString(empty.valueStringData()), 0);
+    cb.append(empty);
+
+    BufBuilder expected;
+    appendLiteral(expected, large);
+    // The empty string must be stored as full literal to avoid ambiguity with repeat of previous.
+    appendLiteral(expected, empty);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {large, empty});
+}
+
+TEST_F(BSONColumnTest, RepeatInvalidString) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elem = createElementString("mongo");
+    cb.append(elem);
+
+    auto elemInvalid = createElementString("\0mongo"_sd);
+    cb.append(elemInvalid);
+    cb.append(elemInvalid);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendLiteral(expected, elemInvalid);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, kDeltaForBinaryEqualValues128);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem, elemInvalid, elemInvalid});
 }
 
 TEST_F(BSONColumnTest, StringMultiType) {

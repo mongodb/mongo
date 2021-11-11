@@ -454,9 +454,13 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
     if (!compressed) {
         if (_storeWith128) {
             auto appendEncoded = [&](int128_t encoded) {
-                compressed = _simple8bBuilder128.append(
-                    Simple8bTypeUtil::encodeInt128(calcDelta(encoded, _prevEncoded128)));
-                _prevEncoded128 = encoded;
+                // If previous wasn't encodable we cannot store 0 in Simple8b as that would create
+                // an ambiguity between 0 and repeat of previous
+                if (_prevEncoded128 || encoded != 0) {
+                    compressed = _simple8bBuilder128.append(Simple8bTypeUtil::encodeInt128(
+                        calcDelta(encoded, _prevEncoded128.value_or(0))));
+                    _prevEncoded128 = encoded;
+                }
             };
 
             switch (type) {
@@ -468,9 +472,10 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
                 case BinData: {
                     int size;
                     const char* binary = elem.binData(size);
-                    // We only do delta encoding of binary if the binary size is exactly the same.
-                    // To support size difference we'd need to add a count to be able to reconstruct
-                    // binaries starting with zero bytes. We don't want to waste bits for this.
+                    // We only do delta encoding of binary if the binary size is exactly the
+                    // same. To support size difference we'd need to add a count to be able to
+                    // reconstruct binaries starting with zero bytes. We don't want to waste
+                    // bits for this.
                     if (size != previous.valuestrsize())
                         break;
 
@@ -771,13 +776,12 @@ void BSONColumnBuilder::EncodingState::_initializeFromPrevious() {
             std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
             break;
         case String:
-            _prevEncoded128 =
-                Simple8bTypeUtil::encodeString(prevElem.valueStringData()).value_or(0);
+            _prevEncoded128 = Simple8bTypeUtil::encodeString(prevElem.valueStringData());
             break;
         case BinData: {
             int size;
             const char* binary = prevElem.binData(size);
-            _prevEncoded128 = Simple8bTypeUtil::encodeBinary(binary, size).value_or(0);
+            _prevEncoded128 = Simple8bTypeUtil::encodeBinary(binary, size);
         } break;
         case NumberDecimal:
             _prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(prevElem._numberDecimal());

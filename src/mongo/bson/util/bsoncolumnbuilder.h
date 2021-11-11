@@ -138,7 +138,7 @@ private:
 
         // Additional variables needed for previous state
         int64_t _prevEncoded64 = 0;
-        int128_t _prevEncoded128 = 0;
+        boost::optional<int128_t> _prevEncoded128;
         double _lastValueInPrevBlock = 0;
         uint8_t _scaleIndex;
 
