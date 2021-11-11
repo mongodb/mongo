@@ -54,6 +54,7 @@
 namespace mongo::transport {
 
 extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
+extern FailPoint transportLayerASIOSessionPauseBeforeSetSocketOption;
 
 template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
