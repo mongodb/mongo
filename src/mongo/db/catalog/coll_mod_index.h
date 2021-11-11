@@ -42,7 +42,7 @@ namespace mongo {
  *
  * Refer to CollModRequest in coll_mod.cpp for non-index collMod options.
  */
-struct CollModIndexRequest {
+struct ParsedCollModIndexRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
     BSONElement indexHidden = {};
@@ -60,7 +60,7 @@ struct CollModIndexRequest {
  */
 void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
-                                const CollModIndexRequest& collModIndexRequest,
+                                const ParsedCollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result,
                                 boost::optional<repl::OplogApplication::Mode> mode);

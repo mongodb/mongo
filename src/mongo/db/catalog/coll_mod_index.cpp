@@ -169,7 +169,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
 
 void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
-                                const CollModIndexRequest& collModIndexRequest,
+                                const ParsedCollModIndexRequest& collModIndexRequest,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result,
                                 boost::optional<repl::OplogApplication::Mode> mode) {

@@ -100,11 +100,11 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
     }
 }
 
-struct CollModRequest {
+struct ParsedCollModRequest {
     // Internal fields of this 'cmdObj' are referenced by BSONElement fields here
-    // and CollModIndexRequest.
+    // and ParsedCollModIndexRequest.
     BSONObj cmdObj;  // owned
-    CollModIndexRequest indexRequest;
+    ParsedCollModIndexRequest indexRequest;
     BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement viewPipeLine = {};
     BSONElement timeseries = {};
@@ -116,16 +116,16 @@ struct CollModRequest {
     boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
 };
 
-StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               const CollectionPtr& coll,
-                                               const CollMod& cmd,
-                                               BSONObjBuilder* oplogEntryBuilder) {
+StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const CollectionPtr& coll,
+                                                     const CollMod& cmd,
+                                                     BSONObjBuilder* oplogEntryBuilder) {
 
     bool isView = !coll;
     bool isTimeseries = coll && coll->getTimeseriesOptions() != boost::none;
 
-    CollModRequest cmr;
+    ParsedCollModRequest cmr;
 
     cmr.cmdObj = cmd.toBSON(BSONObj());
     for (const auto& e : cmr.cmdObj) {
@@ -290,8 +290,8 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                     if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
                         oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
                     }
-                    // Un-set "indexHidden" in CollModRequest, and skip the automatic write to the
-                    // oplogEntryBuilder that occurs at the end of the parsing loop.
+                    // Un-set "indexHidden" in ParsedCollModRequest, and skip the automatic write to
+                    // the oplogEntryBuilder that occurs at the end of the parsing loop.
                     cmrIndex->indexHidden = {};
                     continue;
                 }
@@ -541,8 +541,8 @@ Status _collModInternal(OperationContext* opCtx,
     }
     auto oplogEntryObj = oplogEntryBuilder.obj();
 
-    // Save both states of the CollModRequest to allow writeConflictRetries.
-    CollModRequest cmrNew = std::move(statusW.getValue());
+    // Save both states of the ParsedCollModRequest to allow writeConflictRetries.
+    ParsedCollModRequest cmrNew = std::move(statusW.getValue());
     auto viewPipeline = cmrNew.viewPipeLine;
     auto viewOn = cmrNew.viewOn;
     auto clusteredIndexExpireAfterSeconds = cmrNew.clusteredIndexExpireAfterSeconds;
