@@ -244,7 +244,7 @@ template <typename Params, typename MakeRequest>
 void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
     uassert(ErrorCodes::BadValue,
             str::stream() << Params::kCommandName << " needs 4 args",
-            args.length() <= 4);
+            args.length() >= 4);
     uassert(ErrorCodes::BadValue,
             str::stream() << "The database parameter to " << Params::kCommandName
                           << " must be a string",
@@ -256,16 +256,18 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
 
     // Arg2 is specialization defined, see makeRequest().
 
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "The token parameter to " << Params::kCommandName
-                          << " must be an object",
-            args.get(3).isObject());
-
     auto database = ValueWriter(cx, args.get(0)).toString();
     auto arg = ValueWriter(cx, args.get(1)).toBSON();
 
     auto request = makeRequest(database, arg);
-    request.securityToken = ValueWriter(cx, args.get(3)).toBSON();
+    if (auto token = args.get(3); token.isObject()) {
+        request.securityToken = ValueWriter(cx, token).toBSON();
+    } else {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "The token parameter to " << Params::kCommandName
+                              << " must be an object",
+                token.isUndefined());
+    }
 
     const auto& conn = getConnectionRef(args);
     if (isUnacknowledged(request.body)) {
@@ -318,13 +320,13 @@ void MongoBase::Functions::_runCommandImpl::call(JSContext* cx, JS::CallArgs arg
 struct RunCommandWithMetadataParams {
     static constexpr bool kHoistReply = true;
     static constexpr auto kCommandName = "runCommandWithMetadata"_sd;
-    static constexpr auto kArg1Name = "commandArgs"_sd;
+    static constexpr auto kArg1Name = "metadata"_sd;
 };
 
 void MongoBase::Functions::_runCommandWithMetadataImpl::call(JSContext* cx, JS::CallArgs args) {
     doRunCommand<RunCommandWithMetadataParams>(cx, args, [&](StringData db, BSONObj metadata) {
         uassert(ErrorCodes::BadValue,
-                str::stream() << "The metadata parameter to runCommand must be an object",
+                str::stream() << "The commandArgs parameter to runCommand must be an object",
                 args.get(2).isObject());
         return OpMsgRequest::fromDBAndBody(db, ValueWriter(cx, args.get(2)).toBSON(), metadata);
     });
