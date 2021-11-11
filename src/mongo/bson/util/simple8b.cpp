@@ -235,15 +235,18 @@ uint8_t _countBitsWithoutLeadingZeros(uint64_t value) {
 }
 
 uint8_t _countTrailingZerosWithZero(uint64_t value) {
-    // countTrailingZeros64 returns 64 if the value is 0 and we only need to identify a single 0
-    // instead of 64.
-    return value == 0 ? 1 : countTrailingZerosNonZero64(value);
+    // countTrailingZeros64 returns 64 if the value is 0 but we consider this to be 0 trailing
+    // zeros.
+    return value == 0 ? 0 : countTrailingZerosNonZero64(value);
 }
 
 uint8_t _countTrailingZerosWithZero(uint128_t value) {
-    uint64_t low = static_cast<uint64_t>(value);
-    if (low == 0) {
-        return _countTrailingZerosWithZero(static_cast<uint64_t>(value >> 64)) + 64;
+    uint64_t low = absl::Uint128Low64(value);
+    uint64_t high = absl::Uint128High64(value);
+
+    // If value == 0 then we cannot add 64
+    if (low == 0 && high != 0) {
+        return countTrailingZerosNonZero64(high) + 64;
     } else {
         return _countTrailingZerosWithZero(low);
     }
@@ -252,7 +255,7 @@ uint8_t _countTrailingZerosWithZero(uint128_t value) {
 // Calculates number of bits needed to store value. Must be less than
 // numeric_limits<uint128_t>::max().
 uint8_t _countBitsWithoutLeadingZeros(uint128_t value) {
-    uint64_t high = static_cast<uint64_t>(value >> 64);
+    uint64_t high = absl::Uint128High64(value);
     if (high == 0) {
         return _countBitsWithoutLeadingZeros(static_cast<uint64_t>(value));
     } else {

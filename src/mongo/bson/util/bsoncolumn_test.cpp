@@ -3742,38 +3742,39 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
         cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
 }
 
+// TODO SERVER-61410: Re-enable when binary has been regenerated with latest fixes included
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length
-#if !defined(_MSC_VER) || _MSC_VER >= 1929
-TEST_F(BSONColumnTest, FTDCRoundTrip) {
-    StringData compressedBase64Encoded = {
-#include "mongo/bson/util/bson_column_compressed_data.inl"
-    };
-
-    std::string compressed = base64::decode(compressedBase64Encoded);
-
-    auto roundtrip = [](const auto& compressed) {
-        BSONObjBuilder builder;
-        builder.appendBinData("data"_sd, compressed.size(), BinDataType::Column, compressed.data());
-        BSONElement compressedFTDCElement = builder.done().firstElement();
-
-        BSONColumnBuilder columnBuilder("");
-        BSONColumn column(compressedFTDCElement);
-        for (auto&& decompressed : column) {
-            if (!decompressed.eoo()) {
-                columnBuilder.append(decompressed);
-            } else {
-                columnBuilder.skip();
-            }
-        }
-
-        auto binData = columnBuilder.finalize();
-        return std::string((const char*)binData.data, binData.length);
-    };
-
-    ASSERT_EQ(roundtrip(compressed), compressed);
-}
-#endif
+//#if !defined(_MSC_VER) || _MSC_VER >= 1929
+// TEST_F(BSONColumnTest, FTDCRoundTrip) {
+//    StringData compressedBase64Encoded = {
+//#include "mongo/bson/util/bson_column_compressed_data.inl"
+//    };
+//
+//    std::string compressed = base64::decode(compressedBase64Encoded);
+//
+//    auto roundtrip = [](const auto& compressed) {
+//        BSONObjBuilder builder;
+//        builder.appendBinData("data"_sd, compressed.size(), BinDataType::Column,
+//        compressed.data()); BSONElement compressedFTDCElement = builder.done().firstElement();
+//
+//        BSONColumnBuilder columnBuilder("");
+//        BSONColumn column(compressedFTDCElement);
+//        for (auto&& decompressed : column) {
+//            if (!decompressed.eoo()) {
+//                columnBuilder.append(decompressed);
+//            } else {
+//                columnBuilder.skip();
+//            }
+//        }
+//
+//        auto binData = columnBuilder.finalize();
+//        return std::string((const char*)binData.data, binData.length);
+//    };
+//
+//    ASSERT_EQ(roundtrip(compressed), compressed);
+//}
+//#endif
 
 }  // namespace
 }  // namespace mongo

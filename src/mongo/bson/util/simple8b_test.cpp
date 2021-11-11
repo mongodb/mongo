@@ -1013,13 +1013,26 @@ TEST(Simple8b, RleFront) {
 }
 
 TEST(Simple8b, EightSelectorLargeBase) {
-    // 8462480737302404222943232 = 111 + 80 zeros. This should be stored as (0111 10100) where the
+    // 8462480737302404222943232 = 111 + 80 zeros. This should be stored as (111 10100) where the
     // second value of 20 is the nibble shift of 4*20. The first value is 0111 because we store at
-    // least 4 values. This should be encoded as [(0111) (10100)] x6 [1000] [1000] = //
+    // least 4 values. This should be encoded as [(111) (10100)] x6 [1000] [1000] = //
     // 81E8F47A3D1E8F48
     uint128_t val = absl::MakeUint128(0x70000, 0x0);
     std::vector<boost::optional<uint128_t>> expectedInts = {val, val, val, val, val, val};
     std::vector<uint8_t> expectedBinary = {0x88, 0xF4, 0xE8, 0xD1, 0xA3, 0x47, 0x8F, 0x1E};
+    testSimple8b(expectedInts, expectedBinary);
+}
+
+TEST(Simple8b, UInt128Zero) {
+    // Have a large value that forces the extended selectors to be used. Then we check that zeros
+    // are handled correctly for them.
+    uint128_t val =
+        absl::MakeUint128(0x70000, 0x0);  // Stored as 0xF4, [value=(111) nibble count=(10100)]
+    uint128_t zero = absl::MakeUint128(0x0, 0x0);
+
+    // 5 values with Selector8Large = 0x98
+    std::vector<boost::optional<uint128_t>> expectedInts = {val, zero, zero, zero, zero};
+    std::vector<uint8_t> expectedBinary = {0x98, 0xF4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     testSimple8b(expectedInts, expectedBinary);
 }
 
