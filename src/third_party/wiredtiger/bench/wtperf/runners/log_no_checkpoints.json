@@ -1,6 +1,0 @@
-[
-  {
-    "arguments": ["-C checkpoint=(wait=0)"],
-    "operations": ["update"]
-  }
-]

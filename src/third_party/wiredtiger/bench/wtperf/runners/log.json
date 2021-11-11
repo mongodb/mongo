@@ -1,6 +1,0 @@
-[
-  {
-    "arguments": [],
-    "operations": ["update", "max_update_throughput", "min_update_throughput"]
-  }
-]

@@ -27,8 +27,9 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-import glob, re, os
+import glob
 import json
+import re
 
 
 class PerfStat:
@@ -117,23 +118,18 @@ class PerfStatCount(PerfStat):
 
 
 class PerfStatLatency(PerfStat):
-    def __init__(self,
-                 short_label: str,
-                 stat_file:str,
-                 output_label: str,
-                 num_max: int):
-                 super().__init__(short_label=short_label,
-                                  stat_file=stat_file,
-                                  output_label=output_label)
-                 self.num_max = num_max
+    def __init__(self, short_label: str, stat_file: str, output_label: str, num_max: int):
+        super().__init__(short_label=short_label,
+                         stat_file=stat_file,
+                         output_label=output_label)
+        self.num_max = num_max
 
     def find_stat(self, test_stat_path: str):
         values = []
-        if os.path.isfile(test_stat_path):
-            for line in open(test_stat_path):
-                as_dict = json.loads(line)
-                values.append(as_dict["wtperf"]["read"]["max latency"])
-                values.append(as_dict["wtperf"]["update"]["max latency"])
+        for line in open(test_stat_path):
+            as_dict = json.loads(line)
+            values.append(as_dict["wtperf"]["read"]["max latency"])
+            values.append(as_dict["wtperf"]["update"]["max latency"])
         return values
 
     def get_value(self, nth_max: int):

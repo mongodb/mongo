@@ -140,7 +140,8 @@ def run_test(config: WTPerfConfig, test_run: int, operations: List[str] = None, 
         test=config.test,
         home=test_home)
     try:
-        subprocess.run(command_line, check=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE, universal_newlines=True)
+        subprocess.run(command_line, check=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
+                       universal_newlines=True)
     except subprocess.CalledProcessError as cpe:
         print("Error: {}".format(cpe.output))
         exit(1)
@@ -219,7 +220,9 @@ def main():
                         help='reuse and reanalyse results from previous tests rather than running tests again')
     parser.add_argument('-g', '--git_root', help='path of the Git working directory')
     parser.add_argument('-i', '--json_info', help='additional test information in a json format string')
-    parser.add_argument('-a', '--arg_file', help='additional wtperf arguments in a json format file')
+    parser.add_argument('-bf', '--batch_file', help='Run all specified configurations for a single test')
+    parser.add_argument('-args', '--arguments', help='Additional arguments to pass into wtperf')
+    parser.add_argument('-ops', '--operations', help='List of operations to report metrics for')
     parser.add_argument('-v', '--verbose', action="store_true", help='be verbose')
     args = parser.parse_args()
 
@@ -227,17 +230,19 @@ def main():
         print('WTPerfPy')
         print('========')
         print("Configuration:")
-        print("  WtPerf path:              {}".format(args.wtperf))
-        print("  Environment:              {}".format(args.env))
-        print("  Test path:                {}".format(args.test))
-        print("  Home base:                {}".format(args.home))
-        print("  Addition arguments(file): {}".format(args.arg_file))
-        print("  Git root:                 {}".format(args.git_root))
-        print("  Outfile:                  {}".format(args.outfile))
-        print("  Runmax:                   {}".format(args.runmax))
-        print("  JSON info                 {}".format(args.json_info))
-        print("  Reuse results:            {}".format(args.reuse))
-        print("  Brief output:             {}".format(args.brief_output))
+        print("  WtPerf path:       {}".format(args.wtperf))
+        print("  Environment:       {}".format(args.env))
+        print("  Test path:         {}".format(args.test))
+        print("  Home base:         {}".format(args.home))
+        print("  Batch file:        {}".format(args.batch_file))
+        print("  Arguments:         {}".format(args.arguments))
+        print("  Operations:        {}".format(args.operations))
+        print("  Git root:          {}".format(args.git_root))
+        print("  Outfile:           {}".format(args.outfile))
+        print("  Runmax:            {}".format(args.runmax))
+        print("  JSON info          {}".format(args.json_info))
+        print("  Reuse results:     {}".format(args.reuse))
+        print("  Brief output:      {}".format(args.brief_output))
 
     if args.wtperf is None:
         sys.exit('The path to the wtperf executable is required')
@@ -245,15 +250,21 @@ def main():
         sys.exit('The path to the test file is required')
     if args.home is None:
         sys.exit('The path to the "home" directory is required')
-    if args.arg_file and not os.path.isfile(args.arg_file):
-        sys.exit("arg_file: {} not found!".format(args.arg_file))
+    if args.batch_file and not os.path.isfile(args.batch_file):
+        sys.exit("batch_file: {} not found!".format(args.batch_file))
+    if args.batch_file and (args.arguments or args.operations):
+        sys.exit("A batch file (-bf) should not be defined at the same time as -ops or -args")
 
     json_info = json.loads(args.json_info) if args.json_info else {}
+    arguments = json.loads(args.arguments) if args.arguments else None
+    operations = json.loads(args.operations) if args.operations else None
 
     config = WTPerfConfig(wtperf_path=args.wtperf,
                           home_dir=args.home,
                           test=args.test,
-                          arg_file=args.arg_file,
+                          batch_file=args.batch_file,
+                          arguments=arguments,
+                          operations=operations,
                           environment=args.env,
                           run_max=args.runmax,
                           verbose=args.verbose,
@@ -262,32 +273,32 @@ def main():
 
     perf_stats: PerfStatCollection = setup_perf_stats()
 
-    if config.arg_file:
+    if config.batch_file:
         if args.verbose:
-            print("Reading arguments file {}".format(config.arg_file))
-        with open(config.arg_file, "r") as file:
-            arg_file_contents = json.load(file)
+            print("Reading batch file {}".format(config.batch_file))
+        with open(config.batch_file, "r") as file:
+            batch_file_contents = json.load(file)
 
     # Run test
     if not args.reuse:
-        if config.arg_file:
-            for content in arg_file_contents:
+        if config.batch_file:
+            for content in batch_file_contents:
                 if args.verbose:
                     print("Argument: {},  Operation: {}".format(content["arguments"], content["operations"]))
                 run_test_wrapper(config=config, operations=content["operations"], arguments=content["arguments"])
         else:
-            run_test_wrapper(config=config)
+            run_test_wrapper(config=config, arguments=arguments, operations=operations)
 
     if not args.verbose and not args.outfile:
         sys.exit("Enable verbosity (or provide a file path) to dump the stats. "
                  "Try 'python3 wtperf_run.py --help' for more information.")
 
     # Process result
-    if config.arg_file:
-        for content in arg_file_contents:
+    if config.batch_file:
+        for content in batch_file_contents:
             process_results(config, perf_stats, operations=content["operations"])
     else:
-        process_results(config, perf_stats)
+        process_results(config, perf_stats, operations=operations)
 
     # Output result
     if args.brief_output:
