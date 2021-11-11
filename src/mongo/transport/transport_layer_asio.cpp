@@ -620,6 +620,8 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
 #endif
         return std::make_shared<ASIOSession>(
             this, std::move(sock), false, *endpoint, transientSSLContext);
+    } catch (const asio::system_error& e) {
+        return errorCodeToStatus(e.code());
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -736,11 +738,17 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
         })
         .then([this, connector, sslMode, transientSSLContext]() -> Future<void> {
             stdx::unique_lock<Latch> lk(connector->mutex);
-            connector->session = std::make_shared<ASIOSession>(this,
-                                                               std::move(connector->socket),
-                                                               false,
-                                                               *connector->resolvedEndpoint,
-                                                               transientSSLContext);
+            connector->session = [&] {
+                try {
+                    return std::make_shared<ASIOSession>(this,
+                                                         std::move(connector->socket),
+                                                         false,
+                                                         *connector->resolvedEndpoint,
+                                                         transientSSLContext);
+                } catch (const asio::system_error& e) {
+                    iasserted(errorCodeToStatus(e.code()));
+                }
+            }();
             connector->session->ensureAsync();
 
 #ifndef MONGO_CONFIG_SSL

@@ -36,28 +36,44 @@
 #include <vector>
 
 #include <asio.hpp>
+#include <fmt/format.h>
 
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session_asio.h"
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 #ifdef _WIN32
 using SetsockoptPtr = char*;
 #else
 using SetsockoptPtr = void*;
 #endif
+
+class JoinThread : public stdx::thread {
+public:
+    using stdx::thread::thread;
+    ~JoinThread() {
+        if (joinable())
+            join();
+    }
+};
 
 template <typename T>
 class BlockingQueue {
@@ -87,12 +103,12 @@ class ConnectionThread {
 public:
     explicit ConnectionThread(int port) : ConnectionThread(port, nullptr) {}
     ConnectionThread(int port, std::function<void(ConnectionThread&)> onConnect)
-        : _port{port}, _onConnect{std::move(onConnect)}, _thr{[this] { _run(); }} {}
+        : _port{port}, _onConnect{std::move(onConnect)}, _thread{[this] { _run(); }} {}
 
     ~ConnectionThread() {
         LOGV2(6109500, "connection: Tx stop request");
         _stopRequest.set(true);
-        _thr.join();
+        _thread.join();
         LOGV2(6109501, "connection: joined");
     }
 
@@ -116,9 +132,9 @@ private:
 
     int _port;
     std::function<void(ConnectionThread&)> _onConnect;
-    stdx::thread _thr;
-    Socket _s;
     Notification<bool> _stopRequest;
+    Socket _s;
+    JoinThread _thread;  // Appears after the members _run uses.
 };
 
 class SyncClient {
@@ -155,17 +171,24 @@ struct SessionThread {
     struct StopException {};
 
     explicit SessionThread(std::shared_ptr<transport::Session> s)
-        : _session{std::move(s)}, _thread{[this] { run(); }} {}
+        : _session{std::move(s)}, _thread{[this] { _run(); }} {}
 
     ~SessionThread() {
-        _join();
+        if (!_thread.joinable())
+            return;
+        schedule([](auto&&) { throw StopException{}; });
     }
 
     void schedule(std::function<void(transport::Session&)> task) {
         _tasks.push(std::move(task));
     }
 
-    void run() {
+    transport::Session& session() const {
+        return *_session;
+    }
+
+private:
+    void _run() {
         while (true) {
             try {
                 LOGV2(6109508, "SessionThread: pop and execute a task");
@@ -177,21 +200,9 @@ struct SessionThread {
         }
     }
 
-    transport::Session& session() const {
-        return *_session;
-    }
-
-private:
-    void _join() {
-        if (!_thread.joinable())
-            return;
-        schedule([](auto&&) { throw StopException{}; });
-        _thread.join();
-    }
-
     std::shared_ptr<transport::Session> _session;
-    stdx::thread _thread;
     BlockingQueue<std::function<void(transport::Session&)>> _tasks;
+    JoinThread _thread;  // Appears after the members _run uses.
 };
 
 class MockSEP : public ServiceEntryPoint {
@@ -310,7 +321,6 @@ TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
 }
 
 TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
-
     TestFixture tf;
 
     AtomicWord<int> sessionsCreated{0};
@@ -403,6 +413,129 @@ TEST(TransportLayerASIO, SwitchTimeoutModes) {
         ping(conn);
         ASSERT_OK(done.get().getStatus());
     }
+}
+
+class Acceptor {
+public:
+    struct Connection {
+        explicit Connection(asio::io_context& ioCtx) : socket(ioCtx) {}
+        asio::ip::tcp::socket socket;
+    };
+
+    explicit Acceptor(asio::io_context& ioCtx) : _ioCtx(ioCtx) {
+        asio::ip::tcp::endpoint endpoint(asio::ip::address_v4::loopback(), 0);
+        _acceptor.open(endpoint.protocol());
+        _acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+        _acceptor.bind(endpoint);
+        _acceptor.listen();
+        LOGV2(6101600, "Acceptor: listening", "port"_attr = _acceptor.local_endpoint().port());
+
+        _acceptLoop();
+    }
+
+    int port() const {
+        return _acceptor.local_endpoint().port();
+    }
+
+    void setOnAccept(std::function<void(std::shared_ptr<Connection>)> cb) {
+        _onAccept = std::move(cb);
+    }
+
+private:
+    void _acceptLoop() {
+        auto conn = std::make_shared<Connection>(_acceptor.get_executor().context());
+        LOGV2(6101603, "Acceptor: await connection");
+        _acceptor.async_accept(conn->socket, [this, conn](const asio::error_code& ec) {
+            if (ec != asio::error_code{}) {
+                LOGV2(6101605, "Accept", "error"_attr = transport::errorCodeToStatus(ec));
+            } else {
+                if (_onAccept)
+                    _onAccept(conn);
+            }
+            _acceptLoop();
+        });
+    }
+
+    asio::io_context& _ioCtx;
+    asio::ip::tcp::acceptor _acceptor{_ioCtx};
+    std::function<void(std::shared_ptr<Connection>)> _onAccept;
+};
+
+/**
+ * Have `TransportLayerASIO` make a egress connection and observe behavior when
+ * that connection is immediately reset by the peer. Test that if this happens
+ * during the `ASIOSession` constructor, that the thrown `asio::system_error`
+ * is handled safely (translated to a Status holding a SocketException).
+ */
+TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
+    // The `server` accepts connections, only to immediately reset them.
+    TestFixture tf;
+    asio::io_context ioContext;
+
+    // `fp` pauses the `ASIOSession` constructor immediately prior to its
+    // `setsockopt` sequence, to allow time for the peer reset to propagate.
+    FailPoint& fp = transport::transportLayerASIOSessionPauseBeforeSetSocketOption;
+
+    Acceptor server(ioContext);
+    server.setOnAccept([&](std::shared_ptr<Acceptor::Connection> conn) {
+        LOGV2(6101604, "handling a connection by resetting it");
+        conn->socket.set_option(asio::socket_base::linger(true, 0));
+        conn->socket.close();
+        sleepFor(Seconds{1});
+        fp.setMode(FailPoint::off);
+    });
+    JoinThread ioThread{[&] { ioContext.run(); }};
+    ScopeGuard ioContextStop = [&] { ioContext.stop(); };
+
+    fp.setMode(FailPoint::alwaysOn);
+    LOGV2(6101602, "Connecting", "port"_attr = server.port());
+    using namespace unittest::match;
+    // On MacOS, calling `setsockopt` on a peer-reset connection yields an
+    // `EINVAL`. On Linux and Windows, the `setsockopt` completes successfully.
+    // Either is okay, but the `ASIOSession` ctor caller is expected to handle
+    // `asio::system_error` and convert it to `SocketException`.
+    ASSERT_THAT(tf.tla()
+                    .connect({"localhost", server.port()},
+                             transport::ConnectSSLMode::kDisableSSL,
+                             Seconds{10},
+                             {})
+                    .getStatus(),
+                StatusIs(AnyOf(Eq(ErrorCodes::SocketException), Eq(ErrorCodes::OK)), Any()));
+}
+
+/**
+ * With no regard to mongo code, just check what the ASIO socket
+ * implementation does in the reset connection scenario.
+ */
+TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
+    asio::io_context ioContext;
+    Acceptor server{ioContext};
+    Notification<bool> accepted;
+    Notification<boost::optional<std::error_code>> caught;
+    server.setOnAccept([&](auto conn) {
+        conn->socket.set_option(asio::socket_base::linger(true, 0));
+        conn->socket.close();
+        sleepFor(Seconds{1});
+        accepted.set(true);
+    });
+    JoinThread ioThread{[&] { ioContext.run(); }};
+    ScopeGuard ioContextStop = [&] { ioContext.stop(); };
+    JoinThread client{[&] {
+        asio::ip::tcp::socket client{ioContext};
+        client.connect(asio::ip::tcp::endpoint(asio::ip::address_v4::loopback(), server.port()));
+        accepted.get();
+        // Just set any option and see what happens.
+        try {
+            client.set_option(asio::ip::tcp::no_delay(true));
+            caught.set({});
+        } catch (const std::system_error& e) {
+            caught.set(e.code());
+        }
+    }};
+    auto thrown = caught.get();
+    LOGV2(6101610,
+          "ASIO set_option response on peer-reset connection",
+          "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
 }
 
 }  // namespace

@@ -39,6 +39,7 @@
 namespace mongo::transport {
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOSessionPauseBeforeSetSocketOption);
 
 namespace {
 
@@ -99,6 +100,7 @@ TransportLayerASIO::ASIOSession::ASIOSession(
     auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
     auto sev = logv2::LogSeverity::Debug(3);
     if (family == AF_INET || family == AF_INET6) {
+        transportLayerASIOSessionPauseBeforeSetSocketOption.pauseWhileSet();
         setSocketOption(_socket, asio::ip::tcp::no_delay(true), "session no delay", sev);
         setSocketOption(_socket, asio::socket_base::keep_alive(true), "session keep alive", sev);
         setSocketKeepAliveParams(_socket.native_handle(), sev);
