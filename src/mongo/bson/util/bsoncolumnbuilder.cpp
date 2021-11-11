@@ -306,27 +306,28 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         return *this;
     }
 
+    auto obj = elem.Obj();
+    // First validate that we don't store MinKey or MaxKey anywhere in the Object. If this is the
+    // case, throw exception before we modify any state.
+    _traverse(obj, [](const BSONElement& elem, const BSONElement&) {
+        uassert(ErrorCodes::InvalidBSONType,
+                "MinKey or MaxKey is not valid for storage",
+                elem.type() != MinKey && elem.type() != MaxKey);
+    });
 
     if (_mode == Mode::kRegular) {
-        _startDetermineSubObjReference(elem.Obj());
+        _startDetermineSubObjReference(obj);
         return *this;
     }
 
     if (_mode == Mode::kSubObjDeterminingReference) {
-        auto obj = elem.Obj();
-
         // We are in DeterminingReference mode, check if this current object is compatible and merge
         // in any new fields that are discovered.
         uint32_t numElements = 0;
-        if (!traverseLockStep(
-                _referenceSubObj,
-                obj,
-                [this, &numElements](const BSONElement& ref, const BSONElement& elem) {
-                    ++numElements;
-                    uassert(ErrorCodes::InvalidBSONType,
-                            "MinKey or MaxKey is not valid for storage",
-                            elem.type() != MinKey && elem.type() != MaxKey);
-                })) {
+        if (!traverseLockStep(_referenceSubObj,
+                              obj,
+                              [this, &numElements](const BSONElement& ref,
+                                                   const BSONElement& elem) { ++numElements; })) {
             BSONObj merged = mergeObj(_referenceSubObj, obj);
             if (merged.isEmptyPrototype()) {
                 // If merge failed, flush current sub-object compression and start over.
@@ -351,7 +352,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     }
 
     // Reference already determined for sub-object compression, try to add this new object.
-    _appendSubElements(elem.Obj());
+    _appendSubElements(obj);
     return *this;
 }
 
@@ -880,9 +881,6 @@ void BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
     _flattenedAppendedObj.clear();
     if (!traverseLockStep(
             _referenceSubObj, obj, [this](const BSONElement& ref, const BSONElement& elem) {
-                uassert(ErrorCodes::InvalidBSONType,
-                        "MinKey or MaxKey is not valid for storage",
-                        elem.type() != MinKey && elem.type() != MaxKey);
                 _flattenedAppendedObj.push_back(elem);
             })) {
         _flushSubObjMode();
@@ -913,12 +911,6 @@ void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj) {
     // as the first reference
     _state.flush();
     _state = {&_bufBuilder, nullptr};
-
-    _traverse(obj, [](const BSONElement& elem, const BSONElement&) {
-        uassert(ErrorCodes::InvalidBSONType,
-                "MinKey or MaxKey is not valid for storage",
-                elem.type() != MinKey && elem.type() != MaxKey);
-    });
 
     _referenceSubObj = obj.getOwned();
     _bufferedObjElements.push_back(_referenceSubObj);

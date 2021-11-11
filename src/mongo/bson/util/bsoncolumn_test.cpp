@@ -3787,6 +3787,23 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterInterleaveStartInAppendMode) {
         cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
 }
 
+TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
+    BSONColumnBuilder cb("test");
+
+    BSONObjBuilder obj;
+    {
+        BSONObjBuilder builder = obj.subobjStart("root");
+        builder.append("a", "asd");
+        builder.append(createElementMinKey());
+    }
+
+    cb.append(createElementObj(BSON("root" << BSON("0" << 1))));
+    // Make sure we throw InvalidBSONType even if we would detect that "a" needs to be merged before
+    // observing the MinKey.
+    ASSERT_THROWS_CODE(
+        cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
+}
+
 // TODO SERVER-61410: Re-enable when binary has been regenerated with latest fixes included
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length
