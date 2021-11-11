@@ -118,13 +118,16 @@ FaultManager::FaultManager(ServiceContext* svcCtx,
     invariant(_svcCtx);
     invariant(_svcCtx->getFastClockSource());
     invariant(_svcCtx->getPreciseClockSource());
+    _lastTransitionTime = _svcCtx->getFastClockSource()->now();
 }
 
 FaultManager::FaultManager(ServiceContext* svcCtx,
                            std::shared_ptr<executor::TaskExecutor> taskExecutor,
                            std::unique_ptr<FaultManagerConfig> config,
                            std::function<void(std::string cause)> crashCb)
-    : _config(std::move(config)), _svcCtx(svcCtx), _taskExecutor(taskExecutor), _crashCb(crashCb) {}
+    : _config(std::move(config)), _svcCtx(svcCtx), _taskExecutor(taskExecutor), _crashCb(crashCb) {
+    _lastTransitionTime = _svcCtx->getFastClockSource()->now();
+}
 
 void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
@@ -200,6 +203,11 @@ FaultState FaultManager::getFaultState() const {
     return _currentState;
 }
 
+Date_t FaultManager::getLastTransitionTime() const {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    return _lastTransitionTime;
+}
+
 FaultConstPtr FaultManager::currentFault() const {
     auto lk = stdx::lock_guard(_mutex);
     return std::static_pointer_cast<const Fault>(_fault);
@@ -234,7 +242,8 @@ void FaultManager::healthCheck() {
     // Start checks outside of lock.
     auto token = _managerShuttingDownCancellationSource.token();
     for (auto observer : observers) {
-        // TODO: fix bug where health observer is turned off which in transient fault state
+        // TODO: SERVER-59368, fix bug where health observer is turned off when in transient fault
+        // state
         if (_config->getHealthObserverIntensity(observer->getType()) !=
             HealthObserverIntensityEnum::kOff)
             observer->periodicCheck(*this, _taskExecutor, token);
@@ -378,6 +387,8 @@ void FaultManager::transitionToState(FaultState newState) {
           "Transitioned fault manager state",
           "newState"_attr = str::stream() << newState,
           "oldState"_attr = str::stream() << _currentState);
+
+    _lastTransitionTime = _svcCtx->getFastClockSource()->now();
     _currentState = newState;
 }
 

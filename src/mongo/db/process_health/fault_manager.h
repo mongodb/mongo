@@ -97,6 +97,9 @@ public:
     // Gets the aggregate configuration for all process health environment.
     FaultManagerConfig getConfig() const;
 
+    // Gets the timestamp of the last transition
+    Date_t getLastTransitionTime() const;
+
 protected:
     // Starts the health check sequence and updates the internal state on completion.
     // This is invoked by the internal timer.
@@ -158,6 +161,8 @@ private:
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
     FaultState _currentState = FaultState::kStartupCheck;
+
+    Date_t _lastTransitionTime;
 
     // Responsible for transitioning the state of FaultManager to ActiveFault after a
     // timeout while in the TransientFault state. The timer is canceled when the instance is
