@@ -54,6 +54,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
@@ -3134,6 +3135,67 @@ TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
     auto newCachedDefaults = rwcDefaults.getDefault(opCtx.get());
     ASSERT_EQ(Timestamp(50, 20), *newCachedDefaults.getUpdateOpTime());
     ASSERT_EQ(Date_t::fromMillisSinceEpoch(5678), *newCachedDefaults.getUpdateWallClockTime());
+}
+
+TEST_F(OpObserverTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
+    auto opCtx = cc().makeOperationContext();
+    const std::string kTenantId = "tenantId";
+    const NamespaceString nss("tenantId_db", "testColl");
+    const auto uuid = CollectionUUID::gen();
+
+    // Add a tenant migration access blocker on donor for blocking writes.
+    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
+        getServiceContext(), kTenantId, "fakeConnString");
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
+    donorMtab->startBlockingWrites();
+
+    std::vector<InsertStatement> insert;
+    insert.emplace_back(BSON("_id" << 0 << "data"
+                                   << "x"));
+
+    {
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+        OpObserverImpl opObserver;
+        ASSERT_THROWS_CODE(
+            opObserver.onInserts(opCtx.get(), nss, uuid, insert.begin(), insert.end(), false),
+            DBException,
+            ErrorCodes::TenantMigrationConflict);
+    }
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
+}
+
+TEST_F(OpObserverTransactionTest,
+       OnUnpreparedTransactionCommitChecksIfTenantMigrationIsBlockingWrites) {
+    const std::string kTenantId = "tenantId";
+
+    // Add a tenant migration access blocker on donor for blocking writes.
+    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
+        getServiceContext(), kTenantId, "fakeConnString");
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
+
+    const NamespaceString nss("tenantId_db", "testColl");
+    const auto uuid = CollectionUUID::gen();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    std::vector<InsertStatement> insert;
+    insert.emplace_back(0,
+                        BSON("_id" << 0 << "data"
+                                   << "x"));
+
+    {
+        AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
+        opObserver().onInserts(opCtx(), nss, uuid, insert.begin(), insert.end(), false);
+    }
+
+    donorMtab->startBlockingWrites();
+
+    auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
+    ASSERT_THROWS_CODE(opObserver().onUnpreparedTransactionCommit(opCtx(), &txnOps, 0),
+                       DBException,
+                       ErrorCodes::TenantMigrationConflict);
+
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext()).shutDown();
 }
 
 }  // namespace
