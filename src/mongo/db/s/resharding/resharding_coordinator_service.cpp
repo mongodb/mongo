@@ -907,9 +907,7 @@ ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
-    OperationContext* opCtx,
-    BSONObj initialState,
-    const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
+    BSONObj initialState) {
     return std::make_shared<ReshardingCoordinator>(
         this,
         ReshardingCoordinatorDocument::parse(IDLParserErrorContext("ReshardingCoordinatorStateDoc"),

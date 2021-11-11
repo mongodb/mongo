@@ -298,11 +298,15 @@ ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
         .on(**executor, CancellationToken::uncancelable());
 }
 
-std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
+void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
     OperationContext* opCtx,
     BSONObj initialStateDoc,
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
     // TODO (SERVER-59786): check for conflicts here, not RecipientSyncDataCmd::typedRun.
+}
+
+std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
+    BSONObj initialStateDoc) {
     return std::make_shared<TenantMigrationRecipientService::Instance>(
         _serviceContext, this, initialStateDoc);
 }

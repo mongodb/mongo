@@ -532,10 +532,10 @@ PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initial
         existingInstances.emplace_back(instance.getInstance().get());
     }
 
+    checkIfConflictsWithOtherInstances(opCtx, initialState, existingInstances);
+
     auto newInstance =
-        _insertNewInstance(lk,
-                           constructInstance(opCtx, std::move(initialState), existingInstances),
-                           std::move(instanceID));
+        _insertNewInstance(lk, constructInstance(std::move(initialState)), std::move(instanceID));
     return {newInstance, true};
 }
 
@@ -735,9 +735,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         auto idElem = doc["_id"];
         fassert(4923602, !idElem.eoo());
         auto instanceID = idElem.wrap().getOwned();
-        // Pass existingInstances={} to constructInstance. No need to check for conflicts since
-        // these instances didn't conflict before we rebuilt.
-        auto instance = constructInstance(opCtx.get(), std::move(doc), {});
+        auto instance = constructInstance(std::move(doc));
         [[maybe_unused]] auto newInstance =
             _insertNewInstance(lk, std::move(instance), std::move(instanceID));
     }

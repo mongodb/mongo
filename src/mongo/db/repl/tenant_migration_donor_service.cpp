@@ -148,7 +148,7 @@ void setPromiseOkIfNotReady(WithLock lk, Promise& promise) {
 
 }  // namespace
 
-std::shared_ptr<repl::PrimaryOnlyService::Instance> TenantMigrationDonorService::constructInstance(
+void TenantMigrationDonorService::checkIfConflictsWithOtherInstances(
     OperationContext* opCtx,
     BSONObj initialState,
     const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
@@ -163,6 +163,10 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> TenantMigrationDonorService:
                     (durableState.state == TenantMigrationDonorStateEnum::kAborted &&
                      durableState.expireAt));
     }
+}
+
+std::shared_ptr<repl::PrimaryOnlyService::Instance> TenantMigrationDonorService::constructInstance(
+    BSONObj initialState) {
 
     return std::make_shared<TenantMigrationDonorService::Instance>(
         _serviceContext, this, initialState);

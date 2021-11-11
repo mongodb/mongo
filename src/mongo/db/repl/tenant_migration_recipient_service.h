@@ -73,10 +73,12 @@ public:
 
     ThreadPool::Limits getThreadPoolLimits() const final;
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+    void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialStateDoc,
         const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) final;
+
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialStateDoc) final;
 
     /**
      * Sends an abort to all tenant migration instances on this recipient.
