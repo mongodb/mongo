@@ -158,10 +158,10 @@ private:
     bool _hasNext = false;
 
     // A flag used to mark that the timestamp value should be materialized in measurements.
-    bool _includeTimeField;
+    bool _includeTimeField{false};
 
     // A flag used to mark that a bucket's metadata value should be materialized in measurements.
-    bool _includeMetaField;
+    bool _includeMetaField{false};
 
     // The bucket being unpacked.
     BSONObj _bucket;
