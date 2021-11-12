@@ -45,24 +45,13 @@
 namespace mongo {
 namespace {
 
-template <typename T>
-struct Traits {};
+const std::string& getName(const UserName& obj) {
+    return obj.getUser();
+}
 
-template <>
-struct Traits<UserName> {
-    static constexpr auto kFieldName = "user"_sd;
-    static const std::string& getName(const UserName& obj) {
-        return obj.getUser();
-    }
-};
-
-template <>
-struct Traits<RoleName> {
-    static constexpr auto kFieldName = "role"_sd;
-    static const std::string& getName(const RoleName& obj) {
-        return obj.getRole();
-    }
-};
+const std::string& getName(const RoleName& obj) {
+    return obj.getRole();
+}
 
 template <typename Stream, typename T>
 std::string stream(const T& obj) {
@@ -77,7 +66,8 @@ void checkValueAssertions(const T& obj, Name name, Db db) {
     ASSERT_EQ(obj.empty(), expectEmpty);
 
     ASSERT_EQ(obj.getDB(), db);
-    ASSERT_EQ(Traits<T>::getName(obj), name);
+    ASSERT_EQ(obj.getName(), name);
+    ASSERT_EQ(getName(obj), name);
 
     std::string expectDisplay, expectUnique;
     if (!expectEmpty) {
@@ -111,24 +101,18 @@ TEST(AuthName, ConstructorTest) {
 
 template <typename T, typename Name, typename Db>
 void doBSONParseTest(Name name, Db db) {
-    auto obj = BSON(Traits<T>::kFieldName << name << "db" << db);
+    auto obj = BSON(T::kFieldName << name << "db" << db);
     checkValueAssertions(T::parseFromBSON(BSON("" << obj).firstElement()), name, db);
 
-    // RoleName doesn't support parseFromBSONObj()
-    if constexpr (std::is_same_v<T, UserName>) {
-        checkValueAssertions(T::parseFromBSONObj(obj), name, db);
-    }
+    checkValueAssertions(T::parseFromBSONObj(obj), name, db);
 }
 
 template <typename T, typename Name, typename Db>
 void doBSONParseFailure(Name name, Db db) {
-    auto obj = BSON(Traits<T>::kFieldName << name << "db" << db);
+    auto obj = BSON(T::kFieldName << name << "db" << db);
     ASSERT_THROWS(T::parseFromBSON(BSON("" << obj).firstElement()), AssertionException);
 
-    // RoleName doesn't support parseFromBSONObj()
-    if constexpr (std::is_same_v<T, UserName>) {
-        ASSERT_THROWS(T::parseFromBSONObj(obj), AssertionException);
-    }
+    ASSERT_THROWS(T::parseFromBSONObj(obj), AssertionException);
 }
 
 template <typename T>
@@ -161,7 +145,89 @@ void doStringParseTests() {
 
 TEST(AuthName, StringParseTests) {
     doStringParseTests<UserName>();
-    // RoleName doesn't support parse(StringData)
+    doStringParseTests<RoleName>();
+}
+
+// Tests explicitly using UserName/RoleName specializations directly with iteration.
+
+TEST(AuthName, UserName) {
+    const std::vector<UserName> userNames = {
+        UserName(std::string("alice"), "db1"_sd),
+        UserName("bob"_sd, std::string("db2")),
+        uassertStatusOK(UserName::parse("db3.claire")),
+    };
+
+    auto it = makeUserNameIteratorForContainer(userNames);
+
+    ASSERT_EQ(it.more(), true);
+    auto first = it.next();
+    ASSERT_EQ(first.getDisplayName(), "alice@db1");
+    ASSERT_EQ(first.getUnambiguousName(), "db1.alice");
+    ASSERT_EQ(first.getUser(), "alice");
+    ASSERT_EQ(first.getDB(), "db1");
+    ASSERT(first == userNames[0]);
+
+    ASSERT_EQ(it.more(), true);
+    auto second = it.next();
+    ASSERT_EQ(second.getDisplayName(), "bob@db2");
+    ASSERT_EQ(second.getUnambiguousName(), "db2.bob");
+    ASSERT_EQ(second.getUser(), "bob");
+    ASSERT_EQ(second.getDB(), "db2");
+    ASSERT(second == userNames[1]);
+
+    ASSERT_EQ(it.more(), true);
+    auto third = it.next();
+    ASSERT_EQ(third.getDisplayName(), "claire@db3");
+    ASSERT_EQ(third.getUnambiguousName(), "db3.claire");
+    ASSERT_EQ(third.getUser(), "claire");
+    ASSERT_EQ(third.getDB(), "db3");
+    ASSERT(third == userNames[2]);
+
+    ASSERT(first != second);
+    ASSERT(second != third);
+    ASSERT(third != first);
+
+    ASSERT_EQ(it.more(), false);
+}
+
+TEST(AuthName, RoleName) {
+    const std::vector<RoleName> roleNames = {
+        RoleName(std::string("alice"), "db1"_sd),
+        RoleName("bob"_sd, std::string("db2")),
+        uassertStatusOK(RoleName::parse("db3.claire")),
+    };
+
+    auto it = makeRoleNameIteratorForContainer(roleNames);
+
+    ASSERT_EQ(it.more(), true);
+    auto first = it.next();
+    ASSERT_EQ(first.getDisplayName(), "alice@db1");
+    ASSERT_EQ(first.getUnambiguousName(), "db1.alice");
+    ASSERT_EQ(first.getRole(), "alice");
+    ASSERT_EQ(first.getDB(), "db1");
+    ASSERT(first == roleNames[0]);
+
+    ASSERT_EQ(it.more(), true);
+    auto second = it.next();
+    ASSERT_EQ(second.getDisplayName(), "bob@db2");
+    ASSERT_EQ(second.getUnambiguousName(), "db2.bob");
+    ASSERT_EQ(second.getRole(), "bob");
+    ASSERT_EQ(second.getDB(), "db2");
+    ASSERT(second == roleNames[1]);
+
+    ASSERT_EQ(it.more(), true);
+    auto third = it.next();
+    ASSERT_EQ(third.getDisplayName(), "claire@db3");
+    ASSERT_EQ(third.getUnambiguousName(), "db3.claire");
+    ASSERT_EQ(third.getRole(), "claire");
+    ASSERT_EQ(third.getDB(), "db3");
+    ASSERT(third == roleNames[2]);
+
+    ASSERT(first != second);
+    ASSERT(second != third);
+    ASSERT(third != first);
+
+    ASSERT_EQ(it.more(), false);
 }
 
 }  // namespace

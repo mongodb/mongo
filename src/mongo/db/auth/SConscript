@@ -39,11 +39,10 @@ env.Library(
 env.Library(
     target='auth',
     source=[
+        'auth_name.cpp',
         'authorization_manager.cpp',
         'authorization_session.cpp',
         'auth_decorations.cpp',
-        'user_name.cpp',
-        'role_name.cpp',
         'role_name_or_string.cpp',
     ],
     LIBDEPS=[

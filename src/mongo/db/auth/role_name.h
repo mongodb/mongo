@@ -29,16 +29,7 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <vector>
-
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/auth/auth_name.h"
 
 namespace mongo {
 
@@ -47,203 +38,27 @@ namespace mongo {
  *
  * Consists of a "role name"  part and a "datbase name" part.
  */
-class RoleName {
+class RoleName : public AuthName<RoleName> {
 public:
-    RoleName() = default;
+    static constexpr auto kName = "RoleName"_sd;
+    static constexpr auto kFieldName = "role"_sd;
 
-    template <typename Role, typename DB>
-    RoleName(Role role, DB db) {
-        if constexpr (std::is_same_v<Role, std::string>) {
-            _role = std::move(role);
-        } else {
-            _role = StringData(role).toString();
-        }
+    using AuthName::AuthName;
 
-        if constexpr (std::is_same_v<DB, std::string>) {
-            _db = std::move(db);
-        } else {
-            _db = StringData(db).toString();
-        }
-    }
-
-    // Added for IDL support
-    static RoleName parseFromBSON(const BSONElement& elem);
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
-    void serializeToBSON(BSONArrayBuilder* bob) const;
-    void appendToBSON(BSONObjBuilder* sub) const;
-    BSONObj toBSON() const;
-
-    /**
-     * Gets the name of the role excluding the "@dbname" component.
-     */
     const std::string& getRole() const {
-        return _role;
+        return getName();
     }
-
-    /**
-     * Gets the database name part of a role name.
-     */
-    const std::string& getDB() const {
-        return _db;
-    }
-
-    bool empty() const {
-        return _role.empty() && _db.empty();
-    }
-
-    /**
-     * Gets the full name of a role as a string, formatted as "role@db".
-     *
-     * Allowed for keys in non-persistent data structures, such as std::map.
-     */
-    std::string getDisplayName() const {
-        if (empty()) {
-            return "";
-        }
-        return str::stream() << _role << '@' << _db;
-    }
-
-    /**
-     * Gets the full unambiguous unique name of a user as a string, formatted as "db.role"
-     */
-    std::string getUnambiguousName() const {
-        if (empty()) {
-            return "";
-        }
-        return str::stream() << _db << '.' << _role;
-    }
-
-    template <typename H>
-    friend H AbslHashValue(H h, const RoleName& rname) {
-        auto state = H::combine(std::move(h), rname._db);
-        state = H::combine(std::move(state), '.');
-        return H::combine(std::move(state), rname._role);
-    }
-
-private:
-    std::string _role;
-    std::string _db;
 };
 
-static inline bool operator==(const RoleName& lhs, const RoleName& rhs) {
-    return (lhs.getRole() == rhs.getRole()) && (lhs.getDB() == rhs.getDB());
-}
-
-static inline bool operator!=(const RoleName& lhs, const RoleName& rhs) {
-    return (lhs.getRole() != rhs.getRole()) || (lhs.getDB() != rhs.getDB());
-}
-
-static inline bool operator<(const RoleName& lhs, const RoleName& rhs) {
-    if (lhs.getDB() == rhs.getDB()) {
-        return lhs.getRole() < rhs.getRole();
-    }
-    return lhs.getDB() < rhs.getDB();
-}
-
-static inline std::ostream& operator<<(std::ostream& os, const RoleName& role) {
-    if (!role.empty()) {
-        os << role.getRole() << '@' << role.getDB();
-    }
-    return os;
-}
-
-static inline StringBuilder& operator<<(StringBuilder& os, const RoleName& role) {
-    if (!role.empty()) {
-        os << role.getRole() << '@' << role.getDB();
-    }
-    return os;
-}
-
-/**
- * Iterator over an unspecified container of RoleName objects.
- */
-class RoleNameIterator {
-public:
-    class Impl {
-        Impl(const Impl&) = delete;
-        Impl& operator=(const Impl&) = delete;
-
-    public:
-        Impl(){};
-        virtual ~Impl(){};
-        static Impl* clone(Impl* orig) {
-            return orig ? orig->doClone() : nullptr;
-        }
-        virtual bool more() const = 0;
-        virtual const RoleName& get() const = 0;
-
-        virtual const RoleName& next() = 0;
-
-    private:
-        virtual Impl* doClone() const = 0;
-    };
-
-    RoleNameIterator() : _impl(nullptr) {}
-    RoleNameIterator(const RoleNameIterator& other) : _impl(Impl::clone(other._impl.get())) {}
-    explicit RoleNameIterator(Impl* impl) : _impl(impl) {}
-
-    RoleNameIterator& operator=(const RoleNameIterator& other) {
-        _impl.reset(Impl::clone(other._impl.get()));
-        return *this;
-    }
-
-    bool more() const {
-        return _impl.get() && _impl->more();
-    }
-    const RoleName& get() const {
-        return _impl->get();
-    }
-
-    const RoleName& next() {
-        return _impl->next();
-    }
-
-    const RoleName& operator*() const {
-        return get();
-    }
-    const RoleName* operator->() const {
-        return &get();
-    }
-
-private:
-    std::unique_ptr<Impl> _impl;
-};
-
-}  // namespace mongo
-
-namespace mongo {
-
-template <typename ContainerIterator>
-class RoleNameContainerIteratorImpl : public RoleNameIterator::Impl {
-    RoleNameContainerIteratorImpl(const RoleNameContainerIteratorImpl&) = delete;
-    RoleNameContainerIteratorImpl& operator=(const RoleNameContainerIteratorImpl&) = delete;
-
-public:
-    RoleNameContainerIteratorImpl(const ContainerIterator& begin, const ContainerIterator& end)
-        : _curr(begin), _end(end) {}
-    virtual ~RoleNameContainerIteratorImpl() {}
-    virtual bool more() const {
-        return _curr != _end;
-    }
-    virtual const RoleName& next() {
-        return *(_curr++);
-    }
-    virtual const RoleName& get() const {
-        return *_curr;
-    }
-    virtual RoleNameIterator::Impl* doClone() const {
-        return new RoleNameContainerIteratorImpl(_curr, _end);
-    }
-
-private:
-    ContainerIterator _curr;
-    ContainerIterator _end;
-};
+using RoleNameIterator = AuthNameIterator<RoleName>;
+template <typename Container>
+using RoleNameContainerIteratorImpl = AuthNameContainerIteratorImpl<Container, RoleName>;
 
 template <typename ContainerIterator>
 RoleNameIterator makeRoleNameIterator(const ContainerIterator& begin,
                                       const ContainerIterator& end) {
-    return RoleNameIterator(new RoleNameContainerIteratorImpl<ContainerIterator>(begin, end));
+    return RoleNameIterator(
+        std::make_unique<RoleNameContainerIteratorImpl<ContainerIterator>>(begin, end));
 }
 
 template <typename Container>
