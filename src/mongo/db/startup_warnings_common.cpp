@@ -90,17 +90,6 @@ bool CheckPrivilegeEnabled(const wchar_t* name) {
 void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     // each message adds a leading and a trailing newline
 
-    {
-        auto&& vii = VersionInfoInterface::instance();
-        if ((vii.minorVersion() % 2) != 0) {
-            LOGV2_WARNING_OPTIONS(
-                22117,
-                {logv2::LogTag::kStartupWarnings},
-                "This is a development version of MongoDB. Not recommended for production",
-                "version"_attr = vii.version());
-        }
-    }
-
     if (serverParams.authState == ServerGlobalParams::AuthState::kUndefined) {
         LOGV2_WARNING_OPTIONS(22120,
                               {logv2::LogTag::kStartupWarnings},
