@@ -46,6 +46,7 @@ class IndexBoundsBuilder {
 public:
     static const Interval kUndefinedPointInterval;
     static const Interval kNullPointInterval;
+    static const Interval kEmptyArrayPointInterval;
 
     /**
      * Describes various degrees of precision with which predicates can be evaluated based
@@ -216,6 +217,12 @@ public:
      * Returns 'false' otherwise.
      */
     static bool isNullInterval(const OrderedIntervalList& oil);
+
+    /**
+     * Returns 'true' if the ordered intervals 'oil' represent a strict equality predicate matching
+     * null and the empty list. Returns 'false' otherwise.
+     */
+    static bool isNullAndEmptyArrayInterval(const OrderedIntervalList& oil);
 
     /**
      * Appends the startKey and endKey of the given "all values" 'interval' (which is either

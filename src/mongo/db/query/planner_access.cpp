@@ -42,6 +42,7 @@
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query_noop.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -985,20 +986,32 @@ bool isCoveredNullQuery(const CanonicalQuery& query,
                         IndexTag* tag,
                         const vector<IndexEntry>& indices,
                         const QueryPlannerParams& params) {
-    // We are only interested in queries checking for an indexed field equalling null.
-    // This optimization can only be done when the index is not multikey, otherwise empty arrays
-    // in the collection will be treated as null/undefined by the index. Additionally,
-    // sparse indexes and hashed indexes should not use this optimization as they will require a
+    // Sparse indexes and hashed indexes should not use this optimization as they will require a
     // FETCH stage with a filter.
-    if (indices[tag->index].multikey || indices[tag->index].sparse ||
-        indices[tag->index].type == IndexType::INDEX_HASHED ||
-        !ComparisonMatchExpressionBase::isEquality(root->matchType())) {
+    if (indices[tag->index].sparse || indices[tag->index].type == IndexType::INDEX_HASHED) {
         return false;
     }
 
-    // Check if the query is looking for null values.
-    const auto node = static_cast<const ComparisonMatchExpressionBase*>(root);
-    if (node->getData().type() != BSONType::jstNULL) {
+    // When the index is not multikey, we can support a query on an indexed field searching for null
+    // values. This optimization can only be done when the index is not multikey, otherwise empty
+    // arrays in the collection will be treated as null/undefined by the index. When the index is
+    // multikey, we can support a query searching for both null and empty array values.
+    const auto multikeyIndex = indices[tag->index].multikey;
+    if (root->matchType() == MatchExpression::MatchType::MATCH_IN) {
+        // Check that the query matches null values, if the index is not multikey, or null and empty
+        // array values, if the index is multikey. Note that the query may match values other than
+        // null (and empty array).
+        const auto node = static_cast<const InMatchExpression*>(root);
+        if (!node->hasNull() || (multikeyIndex && !node->hasEmptyArray())) {
+            return false;
+        }
+    } else if (ComparisonMatchExpressionBase::isEquality(root->matchType()) && !multikeyIndex) {
+        // Check that the query matches null values.
+        const auto node = static_cast<const ComparisonMatchExpressionBase*>(root);
+        if (node->getData().type() != BSONType::jstNULL) {
+            return false;
+        }
+    } else {
         return false;
     }
 
@@ -1010,8 +1023,8 @@ bool isCoveredNullQuery(const CanonicalQuery& query,
 
     // This optimization can only be used for find when the index covers the projection completely.
     // However, if the indexed field is in the projection, the index may return an incorrect value
-    // for the field, since it does not distinguish between null and undefined. Hence, only find
-    // queries projecting _id are covered.
+    // for the field, since it does not distinguish between null and undefined (and the empty list,
+    // in the multikey case). Hence, only find queries projecting _id are covered.
     auto proj = query.getProj();
     if (!proj) {
         return false;

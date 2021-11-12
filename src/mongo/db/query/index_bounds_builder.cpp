@@ -123,6 +123,7 @@ bool stringMayHaveUnescapedPipe(StringData str) {
 
 const BSONObj kUndefinedElementObj = BSON("" << BSONUndefined);
 const BSONObj kNullElementObj = BSON("" << BSONNULL);
+const BSONObj kEmptyArrayElementObj = BSON("" << BSONArray());
 
 const Interval kHashedUndefinedInterval = IndexBoundsBuilder::makePointInterval(
     ExpressionMapping::hash(kUndefinedElementObj.firstElement()));
@@ -505,6 +506,8 @@ const Interval IndexBoundsBuilder::kUndefinedPointInterval =
     IndexBoundsBuilder::makePointInterval(kUndefinedElementObj);
 const Interval IndexBoundsBuilder::kNullPointInterval =
     IndexBoundsBuilder::makePointInterval(kNullElementObj);
+const Interval IndexBoundsBuilder::kEmptyArrayPointInterval =
+    IndexBoundsBuilder::makePointInterval(kEmptyArrayElementObj);
 
 void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                              const BSONElement& elt,
@@ -1484,6 +1487,15 @@ bool IndexBoundsBuilder::isNullInterval(const OrderedIntervalList& oil) {
     // Note: the order is always the same (see makeNullEqualityBounds()).
     return 2 == oil.intervals.size() && oil.intervals[0].equals(kUndefinedPointInterval) &&
         oil.intervals[1].equals(kNullPointInterval);
+}
+
+// static
+bool IndexBoundsBuilder::isNullAndEmptyArrayInterval(const OrderedIntervalList& oil) {
+    // Checks if the the intervals are [undefined, undefined], [null, null], and [[], []]. These
+    // will always be sorted in the above order during IndexBoundsBuilder::_translatePredicate().
+    return 3 == oil.intervals.size() && oil.intervals[0].equals(kUndefinedPointInterval) &&
+        oil.intervals[1].equals(kNullPointInterval) &&
+        oil.intervals[2].equals(kEmptyArrayPointInterval);
 }
 
 }  // namespace mongo
