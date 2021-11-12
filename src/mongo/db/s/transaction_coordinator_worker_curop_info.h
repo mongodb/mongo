@@ -39,7 +39,7 @@ class TransactionCoordinatorWorkerCurOpInfo {
 
 public:
     TransactionCoordinatorWorkerCurOpInfo(LogicalSessionId lsid,
-                                          TxnNumber txnNumber,
+                                          TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                                           Date_t startTime,
                                           CoordinatorAction action);
 
@@ -49,7 +49,7 @@ private:
     static const std::string toString(CoordinatorAction action);
 
     LogicalSessionId _lsid;
-    TxnNumber _txnNumber;
+    TxnNumberAndRetryCounter _txnNumberAndRetryCounter;
     Date_t _startTime;
     CoordinatorAction _action;
 };

@@ -43,12 +43,13 @@ public:
 
     void set(OperationContext* opCtx,
              const LogicalSessionId& lsid,
-             const TxnNumber txnNumber,
+             const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
              const CoordinatorAction action) override {
         auto startTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         getTransactionCoordinatorWorkerCurOpInfo(opCtx).emplace(
-            TransactionCoordinatorWorkerCurOpInfo(lsid, txnNumber, startTime, action));
+            TransactionCoordinatorWorkerCurOpInfo(
+                lsid, txnNumberAndRetryCounter, startTime, action));
     }
 
     /**
@@ -76,8 +77,14 @@ auto getTransactionCoordinatorWorkerCurOpRepositoryRegistration =
 }  // namespace
 
 TransactionCoordinatorWorkerCurOpInfo::TransactionCoordinatorWorkerCurOpInfo(
-    LogicalSessionId lsid, TxnNumber txnNumber, Date_t startTime, CoordinatorAction action)
-    : _lsid(lsid), _txnNumber(txnNumber), _startTime(startTime), _action(action) {}
+    LogicalSessionId lsid,
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+    Date_t startTime,
+    CoordinatorAction action)
+    : _lsid(lsid),
+      _txnNumberAndRetryCounter(txnNumberAndRetryCounter),
+      _startTime(startTime),
+      _action(action) {}
 
 
 const std::string TransactionCoordinatorWorkerCurOpInfo::toString(CoordinatorAction action) {
@@ -105,7 +112,9 @@ void TransactionCoordinatorWorkerCurOpInfo::reportState(BSONObjBuilder* parent) 
     BSONObjBuilder lsidBuilder(twoPhaseCoordinatorBuilder.subobjStart("lsid"));
     _lsid.serialize(&lsidBuilder);
     lsidBuilder.doneFast();
-    twoPhaseCoordinatorBuilder.append("txnNumber", _txnNumber);
+    twoPhaseCoordinatorBuilder.append("txnNumber", _txnNumberAndRetryCounter.getTxnNumber());
+    twoPhaseCoordinatorBuilder.append("txnRetryCounter",
+                                      *_txnNumberAndRetryCounter.getTxnRetryCounter());
     twoPhaseCoordinatorBuilder.append("action", toString(_action));
     twoPhaseCoordinatorBuilder.append("startTime", dateToISOStringUTC(_startTime));
     parent->append("twoPhaseCommitCoordinator", twoPhaseCoordinatorBuilder.obj());

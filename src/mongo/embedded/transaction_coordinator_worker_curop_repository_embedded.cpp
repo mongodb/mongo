@@ -40,7 +40,7 @@ public:
 
     void set(OperationContext* opCtx,
              const LogicalSessionId& lsid,
-             const TxnNumber txnNumber,
+             const TxnNumberAndRetryCounter TxnNumberAndRetryCounter,
              const CoordinatorAction action) override {}
 
     void reportState(OperationContext* opCtx, BSONObjBuilder* parent) const override {}

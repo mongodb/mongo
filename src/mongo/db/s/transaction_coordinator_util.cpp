@@ -206,7 +206,7 @@ Future<repl::OpTime> persistParticipantsList(
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx,
                         lsid,
-                        txnNumberAndRetryCounter.getTxnNumber(),
+                        txnNumberAndRetryCounter,
                         CoordinatorAction::kWritingParticipantList);
                     return persistParticipantListBlocking(
                         opCtx, lsid, txnNumberAndRetryCounter, participants);
@@ -271,10 +271,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                              txnNumberAndRetryCounter](OperationContext* opCtx) {
         invariant(opCtx);
         getTransactionCoordinatorWorkerCurOpRepository()->set(
-            opCtx,
-            lsid,
-            txnNumberAndRetryCounter.getTxnNumber(),
-            CoordinatorAction::kSendingPrepare);
+            opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kSendingPrepare);
 
         if (MONGO_unlikely(hangBeforeSendingPrepare.shouldFail())) {
             LOGV2(22466, "Hit hangBeforeSendingPrepare failpoint");
@@ -438,10 +435,7 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                 [lsid, txnNumberAndRetryCounter, participants, decision](OperationContext* opCtx) {
                     FlowControl::Bypass flowControlBypass(opCtx);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
-                        opCtx,
-                        lsid,
-                        txnNumberAndRetryCounter.getTxnNumber(),
-                        CoordinatorAction::kWritingDecision);
+                        opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);
                     return persistDecisionBlocking(
                         opCtx, lsid, txnNumberAndRetryCounter, participants, decision);
                 });
@@ -474,10 +468,7 @@ Future<void> sendCommit(ServiceContext* service,
                                              txnNumberAndRetryCounter](OperationContext* opCtx) {
         invariant(opCtx);
         getTransactionCoordinatorWorkerCurOpRepository()->set(
-            opCtx,
-            lsid,
-            txnNumberAndRetryCounter.getTxnNumber(),
-            CoordinatorAction::kSendingCommit);
+            opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kSendingCommit);
 
         if (MONGO_unlikely(hangBeforeSendingCommit.shouldFail())) {
             LOGV2(22470, "Hit hangBeforeSendingCommit failpoint");
@@ -522,7 +513,7 @@ Future<void> sendAbort(ServiceContext* service,
                                              txnNumberAndRetryCounter](OperationContext* opCtx) {
         invariant(opCtx);
         getTransactionCoordinatorWorkerCurOpRepository()->set(
-            opCtx, lsid, txnNumberAndRetryCounter.getTxnNumber(), CoordinatorAction::kSendingAbort);
+            opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kSendingAbort);
 
         if (MONGO_unlikely(hangBeforeSendingAbort.shouldFail())) {
             LOGV2(22471, "Hit hangBeforeSendingAbort failpoint");
@@ -643,7 +634,7 @@ Future<void> deleteCoordinatorDoc(txn::AsyncWorkScheduler& scheduler,
                                 getTransactionCoordinatorWorkerCurOpRepository()->set(
                                     opCtx,
                                     lsid,
-                                    txnNumberAndRetryCounter.getTxnNumber(),
+                                    txnNumberAndRetryCounter,
                                     CoordinatorAction::kDeletingCoordinatorDoc);
                                 deleteCoordinatorDocBlocking(opCtx, lsid, txnNumberAndRetryCounter);
                             });

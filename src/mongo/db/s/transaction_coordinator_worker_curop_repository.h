@@ -54,7 +54,7 @@ public:
      */
     virtual void set(OperationContext* opCtx,
                      const LogicalSessionId& lsid,
-                     TxnNumber txnNumber,
+                     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                      CoordinatorAction action) = 0;
 
     /**

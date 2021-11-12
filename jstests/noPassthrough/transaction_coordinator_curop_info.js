@@ -12,19 +12,25 @@
 load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');  // for waitForFailpoint
 
-function commitTxn(st, lsid, txnNumber, expectedError = null) {
+function commitTxn(
+    st, lsid, txnNumber, txnRetryCounter, areInternalTransactionsEnabled, expectedError = null) {
+    const txnRetryCounterField = areInternalTransactionsEnabled
+        ? ("txnRetryCounter: NumberInt(" + txnRetryCounter + "),")
+        : "";
+
     let cmd = "db.adminCommand({" +
         "commitTransaction: 1," +
         "lsid: " + tojson(lsid) + "," +
         "txnNumber: NumberLong(" + txnNumber + ")," +
         "stmtId: NumberInt(0)," +
-        "autocommit: false," +
-        "})";
+        "autocommit: false," + txnRetryCounterField + "})";
+
     if (expectedError) {
         cmd = "assert.commandFailedWithCode(" + cmd + "," + String(expectedError) + ");";
     } else {
         cmd = "assert.commandWorked(" + cmd + ");";
     }
+
     return startParallelShell(cmd, st.s.port);
 }
 
@@ -51,13 +57,21 @@ function curOpAfterFailpoint(failPoint, filter, timesEntered = 1) {
     return result;
 }
 
-function makeWorkerFilterWithAction(session, action, txnNumber) {
-    return {
+function makeWorkerFilterWithAction(
+    session, action, txnNumber, txnRetryCounter, areInternalTransactionsEnabled) {
+    var filter = {
         'twoPhaseCommitCoordinator.lsid.id': session.getSessionId().id,
         'twoPhaseCommitCoordinator.txnNumber': NumberLong(txnNumber),
         'twoPhaseCommitCoordinator.action': action,
         'twoPhaseCommitCoordinator.startTime': {$exists: true}
     };
+
+    if (areInternalTransactionsEnabled) {
+        Object.assign(filter,
+                      {'twoPhaseCommitCoordinator.txnRetryCounter': NumberInt(txnRetryCounter)});
+    }
+
+    return filter;
 }
 
 function enableFailPoints(shard, failPointNames) {
@@ -71,13 +85,23 @@ function enableFailPoints(shard, failPointNames) {
     return failPoints;
 }
 
-function startTransaction(session, collectionName, insertValue) {
+function startTransaction(session, collectionName, insertValue, areInternalTransactionsEnabled) {
     const dbName = session.getDatabase('test');
     jsTest.log(`Starting a new transaction on ${dbName}.${collectionName}`);
-    session.startTransaction();
-    // insert into both shards
-    assert.commandWorked(dbName[collectionName].insert({_id: -1 * insertValue}));
-    assert.commandWorked(dbName[collectionName].insert({_id: insertValue}));
+    var insertCmdObj = {
+        insert: collectionName,
+        documents: [{_id: -1 * insertValue}, {_id: insertValue}],
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(1),
+        startTransaction: true,
+        autocommit: false,
+    };
+
+    if (areInternalTransactionsEnabled) {
+        Object.assign(insertCmdObj, {txnRetryCounter: NumberInt(1)});
+    }
+
+    assert.commandWorked(dbName.runCommand(insertCmdObj));
 }
 
 // Setup test
@@ -98,6 +122,9 @@ const failPointNames = [
     'hangBeforeDeletingCoordinatorDoc',
     'hangBeforeSendingAbort'
 ];
+const areInternalTransactionsEnabled =
+    assert.commandWorked(st.s.adminCommand({getParameter: 1, featureFlagInternalTransactions: 1}))
+        .featureFlagInternalTransactions.value;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: coordinator.shardName}));
@@ -113,46 +140,56 @@ let failPoints = enableFailPoints(coordinator, failPointNames);
 jsTest.log("Testing that coordinator threads show up in currentOp for a commit decision");
 {
     let session = adminDB.getMongo().startSession();
-    startTransaction(session, collectionName, 1);
-    let txnNumber = session.getTxnNumber_forTesting();
+    startTransaction(session, collectionName, 1, areInternalTransactionsEnabled);
+    let txnNumber = NumberLong(1);
+    let txnRetryCounter = NumberInt(1);
     let lsid = session.getSessionId();
-    let commitJoin = commitTxn(st, lsid, txnNumber);
+    let commitJoin =
+        commitTxn(st, lsid, txnNumber, txnRetryCounter, areInternalTransactionsEnabled);
 
-    const coordinateCommitFilter = {
+    var coordinateCommitFilter = {
         active: true,
         'command.coordinateCommitTransaction': 1,
         'command.lsid.id': session.getSessionId().id,
-        'command.txnNumber': NumberLong(txnNumber),
+        'command.txnNumber': txnNumber,
         'command.coordinator': true,
         'command.autocommit': false
     };
+
+    if (areInternalTransactionsEnabled) {
+        Object.assign(coordinateCommitFilter, {'command.txnRetryCounter': txnRetryCounter});
+    }
+
     let createCoordinateCommitTxnOp = curOpAfterFailpoint(
         failPoints["hangAfterStartingCoordinateCommit"], coordinateCommitFilter);
     assert.eq(1, createCoordinateCommitTxnOp.length);
 
     const writeParticipantFilter =
-        makeWorkerFilterWithAction(session, "writingParticipantList", txnNumber);
+        makeWorkerFilterWithAction(session, "writingParticipantList", txnNumber, txnRetryCounter);
     let writeParticipantOp =
         curOpAfterFailpoint(failPoints['hangBeforeWritingParticipantList'], writeParticipantFilter);
     assert.eq(1, writeParticipantOp.length);
 
-    const sendPrepareFilter = makeWorkerFilterWithAction(session, "sendingPrepare", txnNumber);
+    const sendPrepareFilter =
+        makeWorkerFilterWithAction(session, "sendingPrepare", txnNumber, txnRetryCounter);
     let sendPrepareOp =
         curOpAfterFailpoint(failPoints['hangBeforeSendingPrepare'], sendPrepareFilter, numShards);
     assert.eq(numShards, sendPrepareOp.length);
 
-    const writingDecisionFilter = makeWorkerFilterWithAction(session, "writingDecision", txnNumber);
+    const writingDecisionFilter =
+        makeWorkerFilterWithAction(session, "writingDecision", txnNumber, txnRetryCounter);
     let writeDecisionOp =
         curOpAfterFailpoint(failPoints['hangBeforeWritingDecision'], writingDecisionFilter);
     assert.eq(1, writeDecisionOp.length);
 
-    const sendCommitFilter = makeWorkerFilterWithAction(session, "sendingCommit", txnNumber);
+    const sendCommitFilter =
+        makeWorkerFilterWithAction(session, "sendingCommit", txnNumber, txnRetryCounter);
     let sendCommitOp =
         curOpAfterFailpoint(failPoints['hangBeforeSendingCommit'], sendCommitFilter, numShards);
     assert.eq(numShards, sendCommitOp.length);
 
     const deletingCoordinatorFilter =
-        makeWorkerFilterWithAction(session, "deletingCoordinatorDoc", txnNumber);
+        makeWorkerFilterWithAction(session, "deletingCoordinatorDoc", txnNumber, txnRetryCounter);
     let deletingCoordinatorDocOp = curOpAfterFailpoint(
         failPoints['hangBeforeDeletingCoordinatorDoc'], deletingCoordinatorFilter);
     assert.eq(1, deletingCoordinatorDocOp.length);
@@ -163,21 +200,35 @@ jsTest.log("Testing that coordinator threads show up in currentOp for a commit d
 jsTest.log("Testing that coordinator threads show up in currentOp for an abort decision.");
 {
     let session = adminDB.getMongo().startSession();
-    startTransaction(session, collectionName, 2);
-    let txnNumber = session.getTxnNumber_forTesting();
+    startTransaction(session, collectionName, 2, areInternalTransactionsEnabled);
+    let txnNumber = NumberLong(1);
     let lsid = session.getSessionId();
+    let txnRetryCounter = NumberInt(1);
     // Manually abort the transaction on one of the participants, so that the participant fails to
     // prepare and failpoint is triggered on the coordinator.
-    assert.commandWorked(participant.adminCommand({
+    var abortTransactionCmd = {
         abortTransaction: 1,
         lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
+        txnNumber: txnNumber,
         stmtId: NumberInt(0),
         autocommit: false,
-    }));
-    let commitJoin = commitTxn(st, lsid, txnNumber, ErrorCodes.NoSuchTransaction);
+    };
 
-    const sendAbortFilter = makeWorkerFilterWithAction(session, "sendingAbort", txnNumber);
+    if (areInternalTransactionsEnabled) {
+        Object.assign(abortTransactionCmd, {txnRetryCounter: txnRetryCounter});
+    }
+
+    assert.commandWorked(participant.adminCommand(abortTransactionCmd));
+
+    let commitJoin = commitTxn(st,
+                               lsid,
+                               txnNumber,
+                               txnRetryCounter,
+                               areInternalTransactionsEnabled,
+                               ErrorCodes.NoSuchTransaction);
+
+    const sendAbortFilter = makeWorkerFilterWithAction(
+        session, "sendingAbort", txnNumber, txnRetryCounter, areInternalTransactionsEnabled);
     let sendingAbortOp =
         curOpAfterFailpoint(failPoints['hangBeforeSendingAbort'], sendAbortFilter, numShards);
     assert.eq(numShards, sendingAbortOp.length);
