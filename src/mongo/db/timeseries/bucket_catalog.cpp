@@ -156,6 +156,45 @@ BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
     return builder.obj();
 }
 
+std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOptions& options) {
+    OID bucketId = OID::gen();
+
+    // We round the measurement timestamp down to the nearest minute, hour, or day depending on the
+    // granularity. We do this for two reasons. The first is so that if measurements come in
+    // slightly out of order, we don't have to close the current bucket due to going backwards in
+    // time. The second, and more important reason, is so that we reliably group measurements
+    // together into predictable chunks for sharding. This way we know from a measurement timestamp
+    // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
+    auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
+    uint64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
+    bucketId.setTimestamp(roundedSeconds);
+
+    // Now, if we stopped here we could end up with bucket OID collisions. Consider the case where
+    // we have the granularity set to 'Hours'. This means we will round down to the nearest day, so
+    // any bucket generated on the same machine on the same day will have the same timestamp portion
+    // and unique instance portion of the OID. Only the increment will differ. Since we only use 3
+    // bytes for the increment portion, we run a serious risk of overflow if we are generating lots
+    // of buckets.
+    //
+    // To address this, we'll take the difference between the actual timestamp and the rounded
+    // timestamp and add it to the instance portion of the OID to ensure we can't have a collision.
+    // for timestamps generated on the same machine.
+    //
+    // This leaves open the possibility that in the case of step-down/step-up, we could get a
+    // collision if the old primary and the new primary have unique instance bits that differ by
+    // less than the maximum rounding difference. This is quite unlikely though, and can be resolved
+    // by restarting the new primary. It remains an open question whether we can fix this in a
+    // better way.
+    // TODO (SERVER-61412): Avoid time-series bucket OID collisions after election
+    auto instance = bucketId.getInstanceUnique();
+    uint32_t sum = DataView(reinterpret_cast<char*>(instance.bytes)).read<uint32_t>(1) +
+        (durationCount<Seconds>(time.toDurationSinceEpoch()) - roundedSeconds);
+    DataView(reinterpret_cast<char*>(instance.bytes)).write<uint32_t>(sum, 1);
+    bucketId.setInstanceUnique(instance);
+
+    return {bucketId, roundedTime};
+}
+
 }  // namespace
 
 const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::kEmptyStats{
@@ -650,11 +689,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
                                                       bool openedDuetoMetadata) {
     _expireIdleBuckets(stats, closedBuckets);
 
-    OID bucketId = OID::gen();
-
-    auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
-    auto const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
-    bucketId.setTimestamp(roundedSeconds);
+    auto [bucketId, roundedTime] = generateBucketId(time, options);
 
     auto [it, inserted] = _allBuckets.try_emplace(bucketId, std::make_unique<Bucket>(bucketId));
     tassert(6130900, "Expected bucket to be inserted", inserted);
