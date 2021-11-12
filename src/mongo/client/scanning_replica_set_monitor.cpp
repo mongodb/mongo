@@ -335,7 +335,7 @@ Future<std::vector<HostAndPort>> ScanningReplicaSetMonitor::_getHostsOrRefresh(
 
     stdx::lock_guard<Latch> lk(_state->mutex);
     if (_state->isDropped) {
-        return Status(ErrorCodes::ReplicaSetMonitorRemoved,
+        return Status(ErrorCodes::ShutdownInProgress,
                       str::stream()
                           << "ScanningReplicaSetMonitor for set " << getName() << " is removed");
     }
