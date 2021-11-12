@@ -202,7 +202,8 @@ env.Library(
 env.Library(
     target='collection',
     source=[
-        "collection.cpp",
+        'collection.cpp',
+        'collection_operation_source.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

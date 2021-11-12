@@ -53,6 +53,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
@@ -260,7 +261,10 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     return result;
 }
 
-void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequest) {
+void updateSessionEntry(OperationContext* opCtx,
+                        const UpdateRequest& updateRequest,
+                        const LogicalSessionId& sessionId,
+                        TxnNumber txnNum) {
     // Current code only supports replacement update.
     dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdateModification()));
 
@@ -300,7 +304,9 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
         auto status = collection->insertDocument(opCtx, InsertStatement(updateMod), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
-            throw WriteConflictException();
+            throw WriteConflictException(
+                str::stream() << "Updating session entry failed with duplicate key, session "_sd
+                              << sessionId << ", transaction "_sd << txnNum);
         }
 
         uassertStatusOK(status);
@@ -326,7 +332,9 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
         fassert(40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));
     if (!matcher->matchesBSON(originalDoc)) {
         // Document no longer match what we expect so throw WCE to make the caller re-examine.
-        throw WriteConflictException();
+        throw WriteConflictException(
+            str::stream() << "Updating session entry failed as document no longer matches, "_sd
+                          << "session "_sd << sessionId << ", transaction "_sd << txnNum);
     }
 
     CollectionUpdateArgs args;
@@ -2485,7 +2493,7 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
-    updateSessionEntry(opCtx, updateRequest);
+    updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
@@ -2502,7 +2510,7 @@ void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
 
     repl::UnreplicatedWritesBlock doNotReplicateWrites(opCtx);
 
-    updateSessionEntry(opCtx, updateRequest);
+    updateSessionEntry(opCtx, updateRequest, _sessionId(), sessionTxnRecord.getTxnNum());
     _registerUpdateCacheOnCommit(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }

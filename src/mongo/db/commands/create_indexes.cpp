@@ -337,7 +337,9 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
             createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
 
         if (createStatus == ErrorCodes::NamespaceExists) {
-            throw WriteConflictException();
+            throw WriteConflictException(
+                str::stream() << "Failed to create indexes on new collection: namespace "_sd
+                              << ns.ns() << " exists. Status: "_sd << createStatus.toString());
         }
 
         uassertStatusOK(createStatus);
