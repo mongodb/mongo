@@ -477,11 +477,12 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
                 case BinData: {
                     int size;
                     const char* binary = elem.binData(size);
-                    // We only do delta encoding of binary if the binary size is exactly the
-                    // same. To support size difference we'd need to add a count to be able to
-                    // reconstruct binaries starting with zero bytes. We don't want to waste
-                    // bits for this.
-                    if (size != previous.valuestrsize())
+                    // We only do delta encoding of binary if the binary type and size are
+                    // exactly the same. To support size difference we'd need to add a count to
+                    // be able to reconstruct binaries starting with zero bytes. We don't want
+                    // to waste bits for this.
+                    if (size != previous.valuestrsize() ||
+                        elem.binDataType() != previous.binDataType())
                         break;
 
                     if (auto encoded = Simple8bTypeUtil::encodeBinary(binary, size)) {

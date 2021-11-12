@@ -146,9 +146,9 @@ public:
         return _elementMemory.front().firstElement();
     }
 
-    BSONElement createElementBinData(const std::vector<uint8_t>& val) {
+    BSONElement createElementBinData(BinDataType binDataType, const std::vector<uint8_t>& val) {
         BSONObjBuilder ob;
-        ob.appendBinData("f", val.size(), BinDataGeneral, val.data());
+        ob.appendBinData("f", val.size(), binDataType, val.data());
         _elementMemory.emplace_front(ob.obj());
         return _elementMemory.front().firstElement();
     }
@@ -1906,7 +1906,7 @@ TEST_F(BSONColumnTest, SymbolAfterChangeBack) {
 TEST_F(BSONColumnTest, BinDataBase) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{'1', '2', '3', '4'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
 
@@ -1922,7 +1922,7 @@ TEST_F(BSONColumnTest, BinDataBase) {
 TEST_F(BSONColumnTest, BinDataOdd) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{'\n', '2', '\n', '4'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
 
@@ -1938,7 +1938,7 @@ TEST_F(BSONColumnTest, BinDataOdd) {
 TEST_F(BSONColumnTest, BinDataDelta) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{'1', '2', '3', '4'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
     cb.append(elemBinData);
@@ -1954,15 +1954,15 @@ TEST_F(BSONColumnTest, BinDataDelta) {
     verifyDecompression(binData, {elemBinData, elemBinData});
 }
 
-TEST_F(BSONColumnTest, BinDataDeltaShouldFail) {
+TEST_F(BSONColumnTest, BinDataDeltaCountDifferenceShouldFail) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{'1', '2', '3', '4'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
 
     std::vector<uint8_t> inputLong{'1', '2', '3', '4', '5'};
-    auto elemBinDataLong = createElementBinData(inputLong);
+    auto elemBinDataLong = createElementBinData(BinDataGeneral, inputLong);
     cb.append(elemBinDataLong);
 
     BufBuilder expected;
@@ -1975,15 +1975,35 @@ TEST_F(BSONColumnTest, BinDataDeltaShouldFail) {
     verifyDecompression(binData, {elemBinData, elemBinDataLong});
 }
 
+TEST_F(BSONColumnTest, BinDataDeltaTypeDifferenceShouldFail) {
+    BSONColumnBuilder cb("test"_sd);
+    std::vector<uint8_t> input{'1', '2', '3', '4'};
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
+
+    cb.append(elemBinData);
+
+    auto elemBinDataDifferentType = createElementBinData(Function, input);
+    cb.append(elemBinDataDifferentType);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemBinData);
+    appendLiteral(expected, elemBinDataDifferentType);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemBinData, elemBinDataDifferentType});
+}
+
 TEST_F(BSONColumnTest, BinDataDeltaCheckSkips) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{'1', '2', '3', '4'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
 
     std::vector<uint8_t> inputLong{'1', '2', '3', '3'};
-    auto elemBinDataLong = createElementBinData(inputLong);
+    auto elemBinDataLong = createElementBinData(BinDataGeneral, inputLong);
     cb.append(elemBinDataLong);
     cb.skip();
     cb.append(elemBinData);
@@ -2007,13 +2027,13 @@ TEST_F(BSONColumnTest, BinDataLargerThan16) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
 
     std::vector<uint8_t> inputLong{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '9'};
-    auto elemBinDataLong = createElementBinData(inputLong);
+    auto elemBinDataLong = createElementBinData(BinDataGeneral, inputLong);
     cb.append(elemBinDataLong);
 
     BufBuilder expected;
@@ -2030,13 +2050,13 @@ TEST_F(BSONColumnTest, BinDataEqualTo16) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
 
     std::vector<uint8_t> inputLong{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '8'};
-    auto elemBinDataLong = createElementBinData(inputLong);
+    auto elemBinDataLong = createElementBinData(BinDataGeneral, inputLong);
     cb.append(elemBinDataLong);
 
     BufBuilder expected;
@@ -2054,7 +2074,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16SameValue) {
     BSONColumnBuilder cb("test"_sd);
     std::vector<uint8_t> input{
         '1', '2', '3', '4', '5', '6', '7', '8', '9', '1', '2', '3', '4', '5', '6', '7', '8'};
-    auto elemBinData = createElementBinData(input);
+    auto elemBinData = createElementBinData(BinDataGeneral, input);
 
     cb.append(elemBinData);
     cb.append(elemBinData);
