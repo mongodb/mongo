@@ -564,5 +564,120 @@ TEST_F(CMKeyBoundsTest, NonPointIntervalExpasion) {
     checkBoundList(list, expectedList);
 }
 
+/**
+ * Tests the index bounds generation in the presence of a GEO_NEAR predicate.
+ */
+TEST_F(CMCollapseTreeTest, GeoNearDoesNotAffectOtherBounds) {
+    // {a: 2, b: {$near: ...}} -> a: [2, 2]
+    {
+        OrderedIntervalList expected;
+        expected.intervals.push_back(Interval(BSON("" << 2 << "" << 2), true, true));
+        checkIndexBounds(
+            "{a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, $minDistance: "
+            "0, "
+            "$maxDistance: 2}}}",
+            expected);
+    }
+    // With compound index {a: 1, c: 1}
+    // {a: 2, b: {$near: ...}, c: {$gt: 2}} -> a: [2, 2], c: (2, inf.0]
+    {
+        IndexBounds expectedBounds;
+        expectedBounds.fields.push_back(OrderedIntervalList());
+        expectedBounds.fields.push_back(OrderedIntervalList());
+
+        expectedBounds.fields[0].intervals.push_back(
+            Interval(BSON("" << 2 << "" << 2), true, true));
+
+        BSONObjBuilder builder;
+        builder.appendNumber("", 2);
+        builder.append("", std::numeric_limits<double>::infinity());
+        expectedBounds.fields[1].intervals.push_back(Interval(builder.obj(), false, true));
+
+        checkIndexBoundsWithKey("{a: 1, c: 1}",  // shard key
+                                "{a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, "
+                                "0]}, $minDistance: 0, "
+                                "$maxDistance: 2}}, c: {$gt: 2}}",
+                                expectedBounds);
+    }
+    // With compound index {a: 1, b: 1, c: 1}
+    // {a: 2, b: {$near: ...}, c: {$gt: 2}} -> a: [2, 2], b: [MinKey, MaxKey], c: (2, inf.0]
+    {
+        IndexBounds expectedBounds;
+        expectedBounds.fields.push_back(OrderedIntervalList());
+        expectedBounds.fields.push_back(OrderedIntervalList());
+        expectedBounds.fields.push_back(OrderedIntervalList());
+
+        expectedBounds.fields[0].intervals.push_back(
+            Interval(BSON("" << 2 << "" << 2), true, true));
+
+        BSONObjBuilder bBuilder;
+        bBuilder.appendMinKey("");
+        bBuilder.appendMaxKey("");
+        expectedBounds.fields[1].intervals.push_back(Interval(bBuilder.obj(), true, true));
+
+        BSONObjBuilder cBuilder;
+        cBuilder.appendNumber("", 2);
+        cBuilder.append("", std::numeric_limits<double>::infinity());
+        expectedBounds.fields[2].intervals.push_back(Interval(cBuilder.obj(), false, true));
+
+        checkIndexBoundsWithKey("{a: 1, b: 1, c: 1}",  // shard key
+                                "{a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, "
+                                "0]}, $minDistance: 0, "
+                                "$maxDistance: 2}}, c: {$gt: 2}}",
+                                expectedBounds);
+    }
+}
+
+/**
+ * The implementation of the above optimization assumes that there are some limitations on GEO_NEAR
+ * predicates. If these limitations are removed in the future, we should refactor the optimization.
+ */
+TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
+    // There can be at most one GEO_NEAR predicate.
+    {
+        BSONObj queryObj = fromjson(
+            "{a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, $minDistance: "
+            "0, $maxDistance: 2}}, c: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, "
+            "$minDistance: 0, $maxDistance: 2}}}");
+        const NamespaceString nss("test.foo");
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(queryObj);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(operationContext()));
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(operationContext(),
+                                         std::move(findCommand),
+                                         false,
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "Too many geoNear expressions"),
+                  statusWithCQ.getStatus());
+    }
+
+    // GEO_NEAR must be a top-level expression in the CanonicalQuery.
+    {
+        BSONObj queryObj = fromjson(
+            "{$or: {a: 2, b: {$near: {$geometry: {type: \"Point\", coordinates: [0, 0]}, "
+            "$minDistance: 0, $maxDistance: 2}}}}");
+        const NamespaceString nss("test.foo");
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(queryObj);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(operationContext()));
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(operationContext(),
+                                         std::move(findCommand),
+                                         false,
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "$near must be top-level expr"),
+                  statusWithCQ.getStatus());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

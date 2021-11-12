@@ -567,9 +567,28 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
 
     // Similarly, ignore GEO_NEAR queries in planning, since we do not have geo indexes on mongos.
     if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::GEO_NEAR)) {
-        IndexBounds bounds;
-        IndexBoundsBuilder::allValuesBounds(key, &bounds);
-        return bounds;
+        // If the GEO_NEAR predicate is a child of AND, remove the GEO_NEAR and continue building
+        // bounds. Currently a CanonicalQuery can have at most one GEO_NEAR expression, and only at
+        // the top-level, so this check is sufficient.
+        auto geoIdx = [](auto root) -> boost::optional<size_t> {
+            if (root->matchType() == MatchExpression::AND) {
+                for (size_t i = 0; i < root->numChildren(); ++i) {
+                    if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
+                        return boost::make_optional(i);
+                    }
+                }
+            }
+            return boost::none;
+        }(canonicalQuery.root());
+
+        if (!geoIdx) {
+            IndexBounds bounds;
+            IndexBoundsBuilder::allValuesBounds(key, &bounds);
+            return bounds;
+        }
+
+        canonicalQuery.root()->getChildVector()->erase(
+            canonicalQuery.root()->getChildVector()->begin() + geoIdx.get());
     }
 
     // Consider shard key as an index

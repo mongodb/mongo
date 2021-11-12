@@ -453,7 +453,7 @@ StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(const MatchExpression* r
 
 Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
     if (auto numGeoNear = countNodes(root, MatchExpression::GEO_NEAR); numGeoNear > 0) {
-        tassert(5705300, "Only one $getNear expression is expected", numGeoNear == 1);
+        tassert(5705300, "Only one geo $near expression is expected", numGeoNear == 1);
 
         auto topLevel = false;
         if (MatchExpression::GEO_NEAR == root->matchType()) {
@@ -468,7 +468,7 @@ Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
         }
 
         if (!topLevel) {
-            return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
+            return Status(ErrorCodes::BadValue, "geo $near must be top-level expr");
         }
     }
 
