@@ -132,6 +132,13 @@ public:
         return _elementMemory.front().firstElement();
     }
 
+    BSONElement createElementCode(StringData code) {
+        BSONObjBuilder ob;
+        ob.appendCode("0"_sd, code);
+        _elementMemory.emplace_front(ob.obj());
+        return _elementMemory.front().firstElement();
+    }
+
     BSONElement createCodeWScope(StringData code, const BSONObj& scope) {
         BSONObjBuilder ob;
         ob.appendCodeWScope("0"_sd, code, scope);
@@ -2293,6 +2300,55 @@ TEST_F(BSONColumnTest, StringMultiType) {
                          elemDec128One,
                          elemString,
                          elemString2});
+}
+
+TEST_F(BSONColumnTest, CodeBase) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elem = createElementCode("test");
+    cb.append(elem);
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elem});
+}
+
+TEST_F(BSONColumnTest, CodeDeltaSame) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elemCode = createElementCode("test");
+    cb.append(elemCode);
+    cb.append(elemCode);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemCode);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elemCode, elemCode));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemCode, elemCode});
+}
+
+TEST_F(BSONColumnTest, CodeDeltaDiff) {
+    BSONColumnBuilder cb("test"_sd);
+    auto elemCode = createElementCode("mongo");
+    cb.append(elemCode);
+    auto elemCode2 = createElementCode("tests");
+    cb.append(elemCode2);
+
+    BufBuilder expected;
+    appendLiteral(expected, elemCode);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock128(expected, deltaString(elemCode2, elemCode));
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {elemCode, elemCode2});
 }
 
 TEST_F(BSONColumnTest, ObjectUncompressed) {

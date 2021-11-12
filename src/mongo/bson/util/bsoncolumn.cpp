@@ -527,6 +527,7 @@ BSONColumn::Iterator BSONColumn::Iterator::moveTo(BSONColumn& column) {
 void BSONColumn::Iterator::DecodingState::_loadLiteral(const BSONElement& elem) {
     switch (elem.type()) {
         case String:
+        case Code:
             _lastEncodedValue128 =
                 Simple8bTypeUtil::encodeString(elem.valueStringData()).value_or(0);
             break;
@@ -716,7 +717,8 @@ BSONElement BSONColumn::Iterator::DecodingState::_loadDelta(BSONColumn& column,
     // Write value depending on type
     auto elem = [&]() -> ElementStorage::Element {
         switch (type) {
-            case String: {
+            case String:
+            case Code: {
                 Simple8bTypeUtil::SmallString ss =
                     Simple8bTypeUtil::decodeString(_lastEncodedValue128);
                 // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null

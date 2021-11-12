@@ -470,6 +470,7 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
 
             switch (type) {
                 case String:
+                case Code:
                     if (auto encoded = Simple8bTypeUtil::encodeString(elem.valueStringData())) {
                         appendEncoded(*encoded);
                     }
@@ -782,6 +783,7 @@ void BSONColumnBuilder::EncodingState::_initializeFromPrevious() {
             std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
             break;
         case String:
+        case Code:
             _prevEncoded128 = Simple8bTypeUtil::encodeString(prevElem.valueStringData());
             break;
         case BinData: {

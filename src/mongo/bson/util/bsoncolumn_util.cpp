@@ -35,7 +35,7 @@ bool usesDeltaOfDelta(BSONType type) {
 }
 
 bool uses128bit(BSONType type) {
-    return type == NumberDecimal || type == BinData || type == String;
+    return type == NumberDecimal || type == BinData || type == String || type == Code;
 }
 
 int64_t calcDelta(int64_t val, int64_t prev) {
