@@ -4,7 +4,7 @@ from bisect import bisect_left, bisect_right
 import os
 import re
 import shutil
-from subprocess import call, CalledProcessError, check_output, STDOUT
+from subprocess import call, CalledProcessError, check_output, STDOUT, DEVNULL
 import structlog
 import yaml
 
@@ -47,7 +47,7 @@ def generate_releases_file():
 
 def in_git_root_dir():
     """Return True if we are in the root of a git directory."""
-    if call(["git", "branch"], stderr=STDOUT, stdout=open(os.devnull, 'w')) != 0:
+    if call(["git", "branch"], stderr=STDOUT, stdout=DEVNULL) != 0:
         # We are not in a git directory.
         return False
 

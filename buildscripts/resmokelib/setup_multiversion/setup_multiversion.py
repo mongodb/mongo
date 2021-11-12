@@ -146,15 +146,43 @@ class SetupMultiversion(Subcommand):
             # Use the Evergreen project ID as fallback.
             return re.search(r"(\d+\.\d+$)", evg_project_id).group(0)
 
+    @staticmethod
+    def _get_release_versions(install_last_lts: Optional[bool],
+                              install_last_continuous: Optional[bool]) -> List[str]:
+        """Return last-LTS and/or last-continuous versions."""
+        out = []
+        if not os.path.isfile(
+                os.path.join(os.getcwd(), "buildscripts", "resmokelib",
+                             "multiversionconstants.py")):
+            LOGGER.error("This command should be run from the root of the mongo repo.")
+            LOGGER.error("If you're running it from the root of the mongo repo and still seeing"
+                         " this error, please reach out in #server-testing slack channel.")
+            exit(1)
+        try:
+            import buildscripts.resmokelib.multiversionconstants as multiversionconstants
+        except ImportError:
+            LOGGER.error("Could not import `buildscripts.resmokelib.multiversionconstants`.")
+            LOGGER.error("If you're passing `--installLastLTS` and/or `--installLastContinuous`"
+                         " flags, this module is required to automatically calculate last-LTS"
+                         " and/or last-continuous versions.")
+            LOGGER.error("Try omitting these flags if you don't need the automatic calculation."
+                         " Otherwise please reach out in #server-testing slack channel.")
+            exit(1)
+        else:
+            releases = {
+                multiversionconstants.LAST_LTS_FCV: install_last_lts,
+                multiversionconstants.LAST_CONTINUOUS_FCV: install_last_continuous,
+            }
+            out = {version for version, requested in releases.items() if requested}
+
+        return list(out)
+
     def execute(self):
         """Execute setup multiversion mongodb."""
-        from buildscripts.resmokelib import multiversionconstants
-
-        if self.install_last_lts:
-            self.versions.append(multiversionconstants.LAST_LTS_FCV)
-        if self.install_last_continuous:
-            self.versions.append(multiversionconstants.LAST_CONTINUOUS_FCV)
-        self.versions = list(set(self.versions))
+        if self.install_last_lts or self.install_last_continuous:
+            self.versions.extend(
+                self._get_release_versions(self.install_last_lts, self.install_last_continuous))
+            self.versions = list(set(self.versions))
 
         downloaded_versions = []
 
