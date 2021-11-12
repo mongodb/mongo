@@ -871,26 +871,50 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
     return ExecutorFuture(**executor)
         .then([this, self = shared_from_this(), executor, token] {
+            LOGV2(6104900,
+                  "Entering 'aborting index builds' state.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             // Note we do not use the abort migration token here because the donorAbortMigration
             // command waits for a decision to be persisted which will not happen if inserting the
             // initial state document fails.
             return _enterAbortingIndexBuildsState(executor, token);
         })
         .then([this, self = shared_from_this(), executor, abortToken] {
+            LOGV2(6104901,
+                  "Aborting index builds.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             _abortIndexBuilds(abortToken);
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
+            LOGV2(6104902,
+                  "Fetching cluster time key documents from recipient.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _fetchAndStoreRecipientClusterTimeKeyDocs(
                 executor, recipientTargeterRS, abortToken);
         })
         .then([this, self = shared_from_this(), executor, abortToken] {
+            LOGV2(6104903,
+                  "Entering 'data sync' state.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _enterDataSyncState(executor, abortToken);
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
+            LOGV2(6104904,
+                  "Waiting for recipient to finish data sync and become consistent.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _waitForRecipientToBecomeConsistentAndEnterBlockingState(
                 executor, recipientTargeterRS, abortToken);
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
+            LOGV2(6104905,
+                  "Waiting for receipient to reach the block timestamp.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
                 executor, recipientTargeterRS, abortToken);
         })
@@ -900,12 +924,6 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             return _handleErrorOrEnterAbortedState(executor, token, abortToken, status);
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
-            LOGV2(5006601,
-                  "Tenant migration completed",
-                  "migrationId"_attr = _migrationUuid,
-                  "tenantId"_attr = _tenantId,
-                  "status"_attr = status,
-                  "abortReason"_attr = _abortReason);
             if (!_stateDoc.getExpireAt()) {
                 // Avoid double counting tenant migration statistics after failover.
                 // Double counting may still happen if the failover to the same primary
@@ -940,6 +958,12 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "status"_attr = status);
 
             setPromiseFromStatusIfNotReady(lg, _completionPromise, status);
+            LOGV2(5006601,
+                  "Tenant migration completed",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId,
+                  "status"_attr = status,
+                  "abortReason"_attr = _abortReason);
         })
         .semi();
 }
@@ -1157,6 +1181,10 @@ TenantMigrationDonorService::Instance::_waitForRecipientToBecomeConsistentAndEnt
         })
         .then([this, self = shared_from_this(), executor, token] {
             // Enter "blocking" state.
+            LOGV2(6104907,
+                  "Updating its state doc to enter 'blocking' state.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kBlocking, token)
                 .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
@@ -1235,6 +1263,10 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
         })
         .then([this, self = shared_from_this(), executor, token] {
             // Enter "commit" state.
+            LOGV2(6104908,
+                  "Entering 'committed' state.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kCommitted, token)
                 .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
@@ -1293,6 +1325,10 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
 
         return ExecutorFuture(**executor);
     } else {
+        LOGV2(6104912,
+              "Entering 'aborted' state.",
+              "migrationId"_attr = _migrationUuid,
+              "tenantId"_attr = _tenantId);
         // Enter "abort" state.
         _abortReason.emplace(status);
         return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kAborted, token)
@@ -1313,6 +1349,10 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
+    LOGV2(6104909,
+          "Waiting to receive 'donorForgetMigration' command.",
+          "migrationId"_attr = _migrationUuid,
+          "tenantId"_attr = _tenantId);
     auto expiredAt = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         return _stateDoc.getExpireAt();
@@ -1334,9 +1374,17 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     return std::move(_receiveDonorForgetMigrationPromise.getFuture())
         .thenRunOn(**executor)
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
+            LOGV2(6104910,
+                  "Waiting for recipientForgetMigration response.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS, token);
         })
         .then([this, self = shared_from_this(), executor, token] {
+            LOGV2(6104911,
+                  "Marking migration as garbage-collectable.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             // Note marking the keys as garbage collectable is not atomic with marking the
             // state document garbage collectable, so an interleaved failover can lead the
             // keys to be deleted before the state document has an expiration date. This is
