@@ -127,7 +127,7 @@ Status makeUnsatisfiedReadPrefError(const std::string& name,
 }
 
 Status makeReplicaSetMonitorRemovedError(const std::string& name) {
-    return Status(ErrorCodes::ReplicaSetMonitorRemoved,
+    return Status(ErrorCodes::ShutdownInProgress,
                   str::stream() << "ReplicaSetMonitor for set " << name << " is removed");
 }
 
