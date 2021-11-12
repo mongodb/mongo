@@ -547,10 +547,15 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
                        ex.code() != ErrorCodes::ShardInvalidatedForTargeting &&
                        ex.code() != ErrorCodes::ShardNotFound) {
-                // Errors other than stale metadata or from trying to reach a non existent shard are
-                // fatal to the operation. Network errors and replication retries happen at the
-                // level of the AsyncResultsMerger.
-                ex.addContext("Encountered non-retryable error during query");
+
+                if (ErrorCodes::isRetriableError(ex.code())) {
+                    ex.addContext("Encountered retryable error during query");
+                } else {
+                    // Errors other than stale metadata or from trying to reach a non existent shard
+                    // are fatal to the operation. Network errors and replication retries happen at
+                    // the level of the AsyncResultsMerger.
+                    ex.addContext("Encountered non-retryable error during query");
+                }
                 throw;
             }
 
