@@ -225,9 +225,9 @@ TEST_F(FaultManagerTest, Stats) {
     waitForTransitionIntoState(FaultState::kTransientFault);
 
     auto observer = manager().getHealthObserversTest()[0];
+    assertSoon([&observer] { return !observer->getStats().currentlyRunningHealthCheck; });
     auto stats = observer->getStats();
     ASSERT_TRUE(manager().getConfig().isHealthObserverEnabled(observer->getType()));
-    ASSERT_FALSE(stats.currentlyRunningHealthCheck);
     ASSERT_TRUE(stats.lastTimeCheckStarted >= clockSource().now());
     ASSERT_TRUE(stats.lastTimeCheckCompleted >= stats.lastTimeCheckStarted);
     ASSERT_TRUE(stats.completedChecksCount >= 1);
