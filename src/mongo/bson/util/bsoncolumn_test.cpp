@@ -1188,6 +1188,30 @@ TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
     verifyDecompression(binData, {e1, e2});
 }
 
+TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
+    BSONColumnBuilder cb("test"_sd);
+
+    // 0.0 compares equal to -0.0 when compared as double. Make sure we can handle this case without
+    // data loss.
+    auto d1 = createElementDouble(0.0);
+    auto d2 = createElementDouble(-0.0);
+    cb.append(d1);
+    cb.append(d2);
+
+    // These numbers are encoded as a large integer that does not fit in Simple8b so the result is
+    // two uncompressed literals.
+    ASSERT_EQ(deltaDoubleMemory(d2, d1), 0xFFFFFFFFFFFFFFFF);
+
+    BufBuilder expected;
+    appendLiteral(expected, d1);
+    appendLiteral(expected, d2);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, {d1, d2});
+}
+
 TEST_F(BSONColumnTest, Decimal128Base) {
     BSONColumnBuilder cb("test"_sd);
 

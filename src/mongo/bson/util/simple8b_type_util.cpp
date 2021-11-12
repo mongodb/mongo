@@ -144,10 +144,14 @@ boost::optional<uint8_t> Simple8bTypeUtil::calculateDecimalShiftMultiplier(doubl
 }
 
 boost::optional<int64_t> Simple8bTypeUtil::encodeDouble(double val, uint8_t scaleIndex) {
-    if (scaleIndex == kMemoryAsInteger) {
+    auto bitCastToInt64 = [](double value) {
         int64_t ret;
-        memcpy(&ret, &val, sizeof(ret));
+        memcpy(&ret, &value, sizeof(ret));
         return ret;
+    };
+
+    if (scaleIndex == kMemoryAsInteger) {
+        return bitCastToInt64(val);
     }
 
     // Checks for both overflow and handles NaNs
@@ -166,7 +170,10 @@ boost::optional<int64_t> Simple8bTypeUtil::encodeDouble(double val, uint8_t scal
     // We use encodeInt64 to handle negative floats by taking the signed bit and placing it at the
     // lsb position
     int64_t valueToBeEncoded = std::llround(valTimesMultiplier);
-    if (valueToBeEncoded / scaleMultiplier != val) {
+
+    // We need to check that we can get the exact bit pattern back. 0.0 and -0.0 compares as equal
+    // when comparing as doubles but they have different bit patterns.
+    if (bitCastToInt64(valueToBeEncoded / scaleMultiplier) != bitCastToInt64(val)) {
         return boost::none;
     }
     // Delta encoding. Gap should never induce overflow
