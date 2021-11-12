@@ -513,6 +513,26 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
                 "dry run mode is not applicable to oplog application or applyOps"};
     }
 
+    // We do not need write access in dry run mode.
+    AutoGetCollection coll(opCtx, nsOrUUID, MODE_IS);
+    auto nss = coll.getNss();
+
+    // Validate collMod request and look up index descriptor for checking duplicates.
+    BSONObjBuilder oplogEntryBuilderWeDontCareAbout;
+    auto statusW = parseCollModRequest(
+        opCtx, nss, coll.getCollection(), cmd, &oplogEntryBuilderWeDontCareAbout);
+    if (!statusW.isOK()) {
+        return statusW.getStatus();
+    }
+    const auto& cmr = statusW.getValue();
+
+    // The unique option should be set according to the checks at the top of this function.
+    // Any other modification requested should lead to us refusing to run collMod in dry run mode.
+    if (cmr.numModifications > 1) {
+        return {ErrorCodes::InvalidOptions,
+                "unique: true cannot be combined with any other modification in dry run mode."};
+    }
+
     return Status::OK();
 }
 

@@ -81,6 +81,21 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
+// Unique may not be combined with any other modification in dry run mode.
+assert.commandFailedWithCode(db.runCommand({
+    collMod: collName,
+    index: {keyPattern: {a: 1}, hidden: true, unique: true},
+    dryRun: true,
+}),
+                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({
+    collMod: collName,
+    index: {keyPattern: {a: 1}, unique: true},
+    validationLevel: 'off',
+    dryRun: true,
+}),
+                             ErrorCodes.InvalidOptions);
+
 // Successfully converts to a unique index.
 const result = assert.commandWorked(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
