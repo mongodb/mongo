@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/db/timeseries/minmax.h"
+#include "mongo/db/timeseries/flat_bson.h"
 #include "mongo/unittest/unittest.h"
 
 #include <numeric>
@@ -39,12 +39,10 @@ namespace mongo::timeseries {
 namespace {
 
 std::string concatFieldNames(const MinMaxStore::Obj& obj) {
-    return std::accumulate(obj.begin(),
-                           obj.end(),
-                           std::string(),
-                           [](std::string accum, const MinMaxStore::Element& elem) {
-                               return std::move(accum) + elem.fieldName();
-                           });
+    return std::accumulate(
+        obj.begin(), obj.end(), std::string(), [](std::string accum, const MinMaxElement& elem) {
+            return std::move(accum) + elem.fieldName();
+        });
 }
 
 TEST(MinMax, Insert) {

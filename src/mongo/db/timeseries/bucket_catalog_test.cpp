@@ -38,6 +38,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -217,18 +218,17 @@ void BucketCatalogTest::_testMeasurementSchema(
             if (firstMember) {
                 if (firstGroup) {
                     // We don't expect to close a bucket if we are on the first group.
-                    ASSERT_EQ(pre, post);
+                    ASSERT_EQ(pre, post) << "expected " << doc << " to be compatible";
                     firstGroup = false;
                 } else {
                     // Otherwise we expect that we are in fact closing a bucket because we have
                     // an incompatible schema change.
-                    invariant(pre + 1 == post);
-                    ASSERT_EQ(pre + 1, post);
+                    ASSERT_EQ(pre + 1, post) << "expected " << doc << " to be incompatible";
                 }
                 firstMember = false;
             } else {
                 // Should have compatible schema, no expected bucket closure.
-                ASSERT_EQ(pre, post);
+                ASSERT_EQ(pre, post) << "expected " << doc << " to be compatible";
             }
         }
     }
