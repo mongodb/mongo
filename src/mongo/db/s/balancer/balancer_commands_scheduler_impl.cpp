@@ -32,6 +32,7 @@
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
@@ -42,8 +43,26 @@
 
 namespace mongo {
 
+namespace {
+
 MONGO_FAIL_POINT_DEFINE(pauseSubmissionsFailPoint);
 MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
+
+Status processRemoteResponse(OperationContext* opCtx,
+                             const executor::RemoteCommandResponse& remoteResponse) {
+    // TODO(SERVER-61113): retrieve the last operation time and apply it to the opCtx
+    if (!remoteResponse.status.isOK()) {
+        return remoteResponse.status;
+    }
+    auto remoteStatus = getStatusFromCommandResult(remoteResponse.data);
+    return Shard::shouldErrorBePropagated(remoteStatus.code())
+        ? remoteStatus
+        : Status(ErrorCodes::OperationFailed,
+                 str::stream() << "Command request failed on source shard. "
+                               << causedBy(remoteStatus));
+}
+
+}  // namespace
 
 const std::string MergeChunksCommandInfo::kCommandName = "mergeChunks";
 const std::string MergeChunksCommandInfo::kBounds = "bounds";
@@ -83,6 +102,9 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
     LOGV2(5847200, "Balancer command scheduler start requested");
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_workerThreadHandle.joinable());
+    if (!_executor) {
+        _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    }
     auto requestsToRecover = _loadRequestsToRecover(opCtx);
     _numRequestsToRecover = requestsToRecover.size();
     _state = _numRequestsToRecover == 0 ? SchedulerState::Running : SchedulerState::Recovering;
@@ -109,7 +131,7 @@ void BalancerCommandsSchedulerImpl::stop() {
     _workerThreadHandle.join();
 }
 
-std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChunk(
+SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
@@ -132,25 +154,30 @@ std::unique_ptr<MoveChunkResponse> BalancerCommandsSchedulerImpl::requestMoveChu
                                                               chunk.getVersion(),
                                                               std::move(externalClientInfo));
 
-    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
-    return std::make_unique<MoveChunkResponseImpl>(std::move(requestCollectionInfo));
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(opCtx, remoteResponse);
+        })
+        .semi();
 }
 
-std::unique_ptr<MergeChunksResponse> BalancerCommandsSchedulerImpl::requestMergeChunks(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardId& shardId,
-    const ChunkRange& chunkRange,
-    const ChunkVersion& version) {
+SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   const ShardId& shardId,
+                                                                   const ChunkRange& chunkRange,
+                                                                   const ChunkVersion& version) {
 
     auto commandInfo = std::make_shared<MergeChunksCommandInfo>(
         nss, shardId, chunkRange.getMin(), chunkRange.getMax(), version);
 
-    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
-    return std::make_unique<MergeChunksResponseImpl>(std::move(requestCollectionInfo));
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(opCtx, remoteResponse);
+        })
+        .semi();
 }
 
-std::unique_ptr<SplitVectorResponse> BalancerCommandsSchedulerImpl::requestSplitVector(
+SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestSplitVector(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
@@ -167,11 +194,24 @@ std::unique_ptr<SplitVectorResponse> BalancerCommandsSchedulerImpl::requestSplit
                                                                 commandSettings.maxChunkSizeBytes,
                                                                 commandSettings.force);
 
-    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
-    return std::make_unique<SplitVectorResponseImpl>(std::move(requestCollectionInfo));
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse)
+                  -> StatusWith<std::vector<BSONObj>> {
+            auto responseStatus = processRemoteResponse(opCtx, remoteResponse);
+            if (!responseStatus.isOK()) {
+                return responseStatus;
+            }
+            std::vector<BSONObj> splitKeys;
+            BSONObjIterator it(remoteResponse.data.getObjectField("splitKeys"));
+            while (it.more()) {
+                splitKeys.emplace_back(it.next().Obj().getOwned());
+            }
+            return splitKeys;
+        })
+        .semi();
 }
 
-std::unique_ptr<SplitChunkResponse> BalancerCommandsSchedulerImpl::requestSplitChunk(
+SemiFuture<void> BalancerCommandsSchedulerImpl::requestSplitChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& chunk,
@@ -186,11 +226,14 @@ std::unique_ptr<SplitChunkResponse> BalancerCommandsSchedulerImpl::requestSplitC
                                                                chunk.getVersion(),
                                                                splitPoints);
 
-    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
-    return std::make_unique<SplitChunkResponseImpl>(std::move(requestCollectionInfo));
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(opCtx, remoteResponse);
+        })
+        .semi();
 }
 
-std::unique_ptr<ChunkDataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
+SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardId& shardId,
@@ -206,11 +249,21 @@ std::unique_ptr<ChunkDataSizeResponse> BalancerCommandsSchedulerImpl::requestDat
                                                              estimatedValue,
                                                              version);
 
-    auto requestCollectionInfo = _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo));
-    return std::make_unique<ChunkDataSizeResponseImpl>(std::move(requestCollectionInfo));
+    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
+        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse)
+                  -> StatusWith<DataSizeResponse> {
+            auto responseStatus = processRemoteResponse(opCtx, remoteResponse);
+            if (!responseStatus.isOK()) {
+                return responseStatus;
+            }
+            long long sizeBytes = remoteResponse.data["size"].number();
+            long long numObjects = remoteResponse.data["numObjects"].number();
+            return DataSizeResponse(sizeBytes, numObjects);
+        })
+        .semi();
 }
 
-ResponseHandle BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
+Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
     OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo) {
     const auto newRequestId = UUID::gen();
     LOGV2(5847202,
@@ -239,7 +292,7 @@ ResponseHandle BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
                   "Failed to persist request command document",
                   "reqId"_attr = newRequestId,
                   "status"_attr = writeStatus);
-            return ResponseHandle(newRequestId, writeStatus);
+            return Future<executor::RemoteCommandResponse>::makeReady(writeStatus);
         }
     }
 
@@ -247,23 +300,21 @@ ResponseHandle BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
 
     stdx::unique_lock<Latch> ul(_mutex);
     _stateUpdatedCV.wait(ul, [this] { return _state != SchedulerState::Recovering; });
-
-    return _enqueueRequest(ul, std::move(pendingRequest));
+    auto outcomeFuture = pendingRequest.getOutcomeFuture();
+    _enqueueRequest(ul, std::move(pendingRequest));
+    return outcomeFuture;
 }
 
-ResponseHandle BalancerCommandsSchedulerImpl::_enqueueRequest(WithLock, RequestData&& request) {
+void BalancerCommandsSchedulerImpl::_enqueueRequest(WithLock, RequestData&& request) {
     auto requestId = request.getId();
-    auto deferredResponseHandle = request.getResponseHandle();
     if (_state == SchedulerState::Recovering || _state == SchedulerState::Running) {
         _requests.emplace(std::make_pair(requestId, std::move(request)));
         _unsubmittedRequestIds.push_back(requestId);
         _stateUpdatedCV.notify_all();
     } else {
-        deferredResponseHandle.handle->set(Status(
-            ErrorCodes::BalancerInterrupted, "Request rejected - balancer scheduler is stopped"));
+        request.setOutcome(Status(ErrorCodes::BalancerInterrupted,
+                                  "Request rejected - balancer scheduler is stopped"));
     }
-
-    return deferredResponseHandle;
 }
 
 CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
@@ -271,7 +322,6 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     LOGV2(5847203, "Balancer command request submitted for execution", "reqId"_attr = params.id);
     bool distLockTaken = false;
 
-    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     const auto shardWithStatus =
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, params.commandInfo->getTarget());
     if (!shardWithStatus.isOK()) {
@@ -305,7 +355,7 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     }
 
     auto swRemoteCommandHandle =
-        executor->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
+        _executor->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
     return (
         swRemoteCommandHandle.isOK()
             ? CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getValue())
@@ -329,7 +379,7 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
 }
 
 void BalancerCommandsSchedulerImpl::_applyCommandResponse(
-    UUID requestId, const executor::TaskExecutor::ResponseStatus& response) {
+    UUID requestId, const executor::RemoteCommandResponse& response) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_state == SchedulerState::Stopping || _state == SchedulerState::Stopped) {
@@ -494,13 +544,12 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     // In case of clean exit, cancel all the pending/running command requests
     // (but keep the related descriptor documents to ensure they will be reissued on recovery).
     auto opCtxHolder = cc().makeOperationContext();
-    auto executor = Grid::get(opCtxHolder.get())->getExecutorPool()->getFixedExecutor();
     for (auto& idAndRequest : requestsToCleanUpOnExit) {
         idAndRequest.second.setOutcome(Status(
             ErrorCodes::BalancerInterrupted, "Request cancelled - balancer scheduler is stopping"));
         const auto& cancelHandle = idAndRequest.second.getExecutionContext();
         if (cancelHandle) {
-            executor->cancel(*cancelHandle);
+            _executor->cancel(*cancelHandle);
         }
         _distributedLocks.releaseFor(opCtxHolder.get(), idAndRequest.second.getNamespace());
     }

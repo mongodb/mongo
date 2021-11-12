@@ -321,10 +321,12 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
                                balancerConfig->getSecondaryThrottle(),
                                balancerConfig->waitForDelete(),
                                migrateInfo->forceJumbo);
-    auto response = _commandScheduler->requestMoveChunk(
-        opCtx, nss, chunk, migrateInfo->to, settings, true /* issuedByRemoteUser */);
-    return processManualMigrationOutcome(
-        opCtx, chunk.getMin(), nss, migrateInfo->to, response->getOutcome());
+    auto response =
+        _commandScheduler
+            ->requestMoveChunk(
+                opCtx, nss, chunk, migrateInfo->to, settings, true /* issuedByRemoteUser */)
+            .getNoThrow();
+    return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, migrateInfo->to, response);
 }
 
 Status Balancer::moveSingleChunk(OperationContext* opCtx,
@@ -345,10 +347,11 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
                                waitForDelete,
                                forceJumbo ? MoveChunkRequest::ForceJumbo::kForceManual
                                           : MoveChunkRequest::ForceJumbo::kDoNotForce);
-    auto response = _commandScheduler->requestMoveChunk(
-        opCtx, nss, chunk, newShardId, settings, true /* issuedByRemoteUser */);
-    return processManualMigrationOutcome(
-        opCtx, chunk.getMin(), nss, newShardId, response->getOutcome());
+    auto response = _commandScheduler
+                        ->requestMoveChunk(
+                            opCtx, nss, chunk, newShardId, settings, true /* issuedByRemoteUser */)
+                        .getNoThrow();
+    return processManualMigrationOutcome(opCtx, chunk.getMin(), nss, newShardId, response);
 }
 
 void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
@@ -704,8 +707,8 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         return 0;
     }
 
-    std::vector<std::pair<size_t, std::unique_ptr<MoveChunkResponse>>> migrateInfosAndResponses;
-    migrateInfosAndResponses.reserve(candidateChunks.size());
+    std::vector<std::pair<size_t, SemiFuture<void>>> migrateInfoIdxsAndResponses;
+    migrateInfoIdxsAndResponses.reserve(candidateChunks.size());
     for (size_t migrateInfoIndex = 0; migrateInfoIndex < candidateChunks.size();
          ++migrateInfoIndex) {
         const auto& migrateInfo = candidateChunks[migrateInfoIndex];
@@ -722,18 +725,18 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                                    migrateInfo.forceJumbo);
         auto response = _commandScheduler->requestMoveChunk(
             opCtx, migrateInfo.nss, chunk, migrateInfo.to, settings);
-        migrateInfosAndResponses.emplace_back(
+        migrateInfoIdxsAndResponses.emplace_back(
             std::make_pair(migrateInfoIndex, std::move(response)));
     }
 
     int numChunksProcessed = 0;
-    for (const auto& migrateInfoAndResponse : migrateInfosAndResponses) {
-        const Status status = migrateInfoAndResponse.second->getOutcome();
+    for (const auto& migrateInfoIdxAndResponse : migrateInfoIdxsAndResponses) {
+        const Status status = migrateInfoIdxAndResponse.second.getNoThrow();
         if (status.isOK()) {
             numChunksProcessed++;
             continue;
         }
-        const auto& migrateInfo = candidateChunks[migrateInfoAndResponse.first];
+        const auto& migrateInfo = candidateChunks[migrateInfoIdxAndResponse.first];
 
         // ChunkTooBig is returned by the source shard during the cloning phase if the migration
         // manager finds that the chunk is larger than some calculated size, the source shard is

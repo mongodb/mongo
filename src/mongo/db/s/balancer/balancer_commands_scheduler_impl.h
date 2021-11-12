@@ -39,214 +39,8 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
-
-/*
- * Data structure generated from RequestData to support the creation of SchedulerResponse objects.
- */
-struct ResponseHandle {
-    ResponseHandle(UUID requestId,
-                   const std::shared_ptr<Notification<executor::RemoteCommandResponse>>& handle)
-        : requestId(requestId), handle(handle) {}
-
-    ResponseHandle(UUID requestId, Status outcome)
-        : requestId(requestId),
-          handle(std::make_shared<Notification<executor::RemoteCommandResponse>>()) {
-        handle->set(outcome);
-    }
-
-    ResponseHandle(ResponseHandle&& rhs)
-        : requestId(rhs.requestId), handle(std::move(rhs.handle)) {}
-
-    const UUID requestId;
-    const std::shared_ptr<Notification<executor::RemoteCommandResponse>> handle;
-};
-
-/*
- * Base class exposing common methods to access and expose the outcome of requests received by
- * BalancerCommandSchedulerImpl.
- */
-class SchedulerResponse {
-public:
-    SchedulerResponse(ResponseHandle&& responseHandle)
-        : _requestId(responseHandle.requestId), _deferredValue(std::move(responseHandle.handle)) {}
-
-    SchedulerResponse(const SchedulerResponse& other) = delete;
-
-    ~SchedulerResponse() = default;
-
-    UUID getRequestId() const {
-        return _requestId;
-    }
-
-    bool hasFinalised() const {
-        return !!(*_deferredValue);
-    }
-
-    Status getOutcome() {
-        auto response = getRemoteResponse();
-        if (!response.status.isOK()) {
-            return response.status;
-        }
-        auto remoteStatus = getStatusFromCommandResult(response.data);
-        return Shard::shouldErrorBePropagated(remoteStatus.code())
-            ? remoteStatus
-            : Status(ErrorCodes::OperationFailed,
-                     str::stream() << "Command request" << getRequestId().toString()
-                                   << "failed on source shard." << causedBy(remoteStatus));
-    }
-
-    executor::RemoteCommandResponse getRemoteResponse() {
-        return _deferredValue->get();
-    }
-
-    void setRemoteResponse(const executor::TaskExecutor::ResponseStatus& response) {
-        _deferredValue->set(response);
-    }
-
-private:
-    UUID _requestId;
-    std::shared_ptr<Notification<executor::RemoteCommandResponse>> _deferredValue;
-};
-
-
-/*
- * Set of command-specific classes exposing and deserialising the outcome of
- * of requests received by BalancerCommandSchedulerImpl.
- */
-class MoveChunkResponseImpl : public SchedulerResponse, public MoveChunkResponse {
-public:
-    MoveChunkResponseImpl(ResponseHandle&& responseHandle)
-        : SchedulerResponse(std::move(responseHandle)) {}
-
-    UUID getRequestId() const override {
-        return SchedulerResponse::getRequestId();
-    }
-
-    bool hasFinalised() const override {
-        return SchedulerResponse::hasFinalised();
-    }
-
-    Status getOutcome() override {
-        return SchedulerResponse::getOutcome();
-    }
-};
-
-class MergeChunksResponseImpl : public SchedulerResponse, public MergeChunksResponse {
-public:
-    MergeChunksResponseImpl(ResponseHandle&& responseHandle)
-        : SchedulerResponse(std::move(responseHandle)) {}
-
-    UUID getRequestId() const override {
-        return SchedulerResponse::getRequestId();
-    }
-
-    bool hasFinalised() const override {
-        return SchedulerResponse::hasFinalised();
-    }
-
-    Status getOutcome() override {
-        return SchedulerResponse::getOutcome();
-    }
-};
-
-class SplitVectorResponseImpl : public SchedulerResponse, public SplitVectorResponse {
-public:
-    SplitVectorResponseImpl(ResponseHandle&& responseHandle)
-        : SchedulerResponse(std::move(responseHandle)) {}
-
-    UUID getRequestId() const override {
-        return SchedulerResponse::getRequestId();
-    }
-
-    bool hasFinalised() const override {
-        return SchedulerResponse::hasFinalised();
-    }
-
-    Status getOutcome() override {
-        return SchedulerResponse::getOutcome();
-    }
-
-    StatusWith<std::vector<BSONObj>> getSplitKeys() override {
-        auto response = getRemoteResponse();
-        if (!response.status.isOK()) {
-            return response.status;
-        }
-        auto commandStatus = getStatusFromCommandResult(response.data);
-        if (!commandStatus.isOK()) {
-            return commandStatus;
-        }
-
-        std::vector<BSONObj> splitKeys;
-        BSONObjIterator it(response.data.getObjectField("splitKeys"));
-        while (it.more()) {
-            splitKeys.emplace_back(it.next().Obj().getOwned());
-        }
-        return splitKeys;
-    }
-};
-
-class SplitChunkResponseImpl : public SchedulerResponse, public SplitChunkResponse {
-public:
-    SplitChunkResponseImpl(ResponseHandle&& responseHandle)
-        : SchedulerResponse(std::move(responseHandle)) {}
-
-    UUID getRequestId() const override {
-        return SchedulerResponse::getRequestId();
-    }
-
-    bool hasFinalised() const override {
-        return SchedulerResponse::hasFinalised();
-    }
-
-    Status getOutcome() override {
-        return SchedulerResponse::getOutcome();
-    }
-};
-
-class ChunkDataSizeResponseImpl : public SchedulerResponse, public ChunkDataSizeResponse {
-public:
-    ChunkDataSizeResponseImpl(ResponseHandle&& responseHandle)
-        : SchedulerResponse(std::move(responseHandle)) {}
-
-    UUID getRequestId() const override {
-        return SchedulerResponse::getRequestId();
-    }
-
-    bool hasFinalised() const override {
-        return SchedulerResponse::hasFinalised();
-    }
-
-    Status getOutcome() override {
-        return SchedulerResponse::getOutcome();
-    }
-
-    StatusWith<long long> getSize() override {
-        auto response = getRemoteResponse();
-        if (!response.status.isOK()) {
-            return response.status;
-        }
-        auto commandStatus = getStatusFromCommandResult(response.data);
-        if (!commandStatus.isOK()) {
-            return commandStatus;
-        }
-        return response.data["size"].number();
-    }
-
-    StatusWith<long long> getNumObjects() override {
-        auto response = getRemoteResponse();
-        if (!response.status.isOK()) {
-            return response.status;
-        }
-        auto commandStatus = getStatusFromCommandResult(response.data);
-        if (!commandStatus.isOK()) {
-            return commandStatus;
-        }
-        return response.data["numObjects"].number();
-    }
-};
 
 /**
  * Utility class to extract and hold information describing the remote client that submitted a
@@ -619,18 +413,20 @@ class RequestData {
 public:
     RequestData(UUID id, std::shared_ptr<CommandInfo>&& commandInfo)
         : _id(id),
+          _completedOrAborted(false),
           _holdingDistLock(false),
           _commandInfo(std::move(commandInfo)),
-          _deferredResponse(std::make_shared<Notification<executor::RemoteCommandResponse>>()),
+          _responsePromise{NonNullPromiseTag{}},
           _executionContext(boost::none) {
         invariant(_commandInfo);
     }
 
     RequestData(RequestData&& rhs)
         : _id(rhs._id),
+          _completedOrAborted(rhs._completedOrAborted),
           _holdingDistLock(rhs._holdingDistLock),
           _commandInfo(std::move(rhs._commandInfo)),
-          _deferredResponse(std::move(rhs._deferredResponse)),
+          _responsePromise(std::move(rhs._responsePromise)),
           _executionContext(std::move(rhs._executionContext)) {}
 
     ~RequestData() = default;
@@ -646,8 +442,8 @@ public:
     Status applySubmissionResult(CommandSubmissionResult&& submissionResult) {
         invariant(_id == submissionResult.id);
         _holdingDistLock = submissionResult.acquiredDistLock;
-        if (!!(*_deferredResponse)) {
-            // The request has been already completed by the time the submission gets processed.
+        if (_completedOrAborted) {
+            // A remote response was already received by the time the submission gets processed.
             // Keep the original outcome and continue the workflow.
             return Status::OK();
         }
@@ -666,10 +462,6 @@ public:
         return _executionContext;
     }
 
-    ResponseHandle getResponseHandle() {
-        return ResponseHandle(_id, _deferredResponse);
-    }
-
     const NamespaceString& getNamespace() const {
         return _commandInfo->getNameSpace();
     }
@@ -682,8 +474,13 @@ public:
         return _commandInfo->requiresRecoveryOnCrash();
     }
 
-    void setOutcome(const executor::TaskExecutor::ResponseStatus& response) {
-        _deferredResponse->set(response);
+    Future<executor::RemoteCommandResponse> getOutcomeFuture() {
+        return _responsePromise.getFuture();
+    }
+
+    void setOutcome(const StatusWith<executor::RemoteCommandResponse>& response) {
+        _responsePromise.setFrom(response);
+        _completedOrAborted = true;
     }
 
 private:
@@ -693,11 +490,13 @@ private:
 
     const UUID _id;
 
+    bool _completedOrAborted;
+
     bool _holdingDistLock;
 
     std::shared_ptr<CommandInfo> _commandInfo;
 
-    std::shared_ptr<Notification<executor::RemoteCommandResponse>> _deferredResponse;
+    Promise<executor::RemoteCommandResponse> _responsePromise;
 
     boost::optional<ExecutionContext> _executionContext;
 };
@@ -716,43 +515,44 @@ public:
 
     void stop() override;
 
-    std::unique_ptr<MoveChunkResponse> requestMoveChunk(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        const ChunkType& chunk,
-                                                        const ShardId& destination,
-                                                        const MoveChunkSettings& commandSettings,
-                                                        bool issuedByRemoteUser) override;
+    SemiFuture<void> requestMoveChunk(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const ChunkType& chunk,
+                                      const ShardId& destination,
+                                      const MoveChunkSettings& commandSettings,
+                                      bool issuedByRemoteUser) override;
 
-    std::unique_ptr<MergeChunksResponse> requestMergeChunks(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const ShardId& shardId,
-                                                            const ChunkRange& chunkRange,
-                                                            const ChunkVersion& version) override;
+    SemiFuture<void> requestMergeChunks(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        const ShardId& shardId,
+                                        const ChunkRange& chunkRange,
+                                        const ChunkVersion& version) override;
 
-    std::unique_ptr<SplitVectorResponse> requestSplitVector(
+    SemiFuture<std::vector<BSONObj>> requestSplitVector(
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkType& chunk,
         const KeyPattern& keyPattern,
         const SplitVectorSettings& commandSettings) override;
 
-    std::unique_ptr<SplitChunkResponse> requestSplitChunk(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& chunk,
-        const KeyPattern& keyPattern,
-        const std::vector<BSONObj>& splitPoints) override;
+    SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const ChunkType& chunk,
+                                       const KeyPattern& keyPattern,
+                                       const std::vector<BSONObj>& splitPoints) override;
 
-    std::unique_ptr<ChunkDataSizeResponse> requestDataSize(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           const ShardId& shardId,
-                                                           const ChunkRange& chunkRange,
-                                                           const ChunkVersion& version,
-                                                           const KeyPattern& keyPattern,
-                                                           bool estimatedValue) override;
+    SemiFuture<DataSizeResponse> requestDataSize(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const ShardId& shardId,
+                                                 const ChunkRange& chunkRange,
+                                                 const ChunkVersion& version,
+                                                 const KeyPattern& keyPattern,
+                                                 bool estimatedValue) override;
 
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };
+
+    std::shared_ptr<executor::TaskExecutor> _executor{nullptr};
 
     // Protects the in-memory state of the Scheduler
     // (_state, _requests, _unsubmittedRequestIds, _recentlyCompletedRequests).
@@ -793,10 +593,10 @@ private:
      */
     size_t _numRequestsToRecover{0};
 
-    ResponseHandle _buildAndEnqueueNewRequest(OperationContext* opCtx,
-                                              std::shared_ptr<CommandInfo>&& commandInfo);
+    Future<executor::RemoteCommandResponse> _buildAndEnqueueNewRequest(
+        OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo);
 
-    ResponseHandle _enqueueRequest(WithLock, RequestData&& request);
+    void _enqueueRequest(WithLock, RequestData&& request);
 
     void _performDeferredCleanup(OperationContext* opCtx,
                                  std::vector<RequestData>&& requestsHoldingResources);
@@ -806,8 +606,7 @@ private:
 
     void _applySubmissionResult(WithLock, CommandSubmissionResult&& submissionResult);
 
-    void _applyCommandResponse(UUID requestId,
-                               const executor::TaskExecutor::ResponseStatus& response);
+    void _applyCommandResponse(UUID requestId, const executor::RemoteCommandResponse& response);
 
     std::vector<RequestData> _loadRequestsToRecover(OperationContext* opCtx);
 
