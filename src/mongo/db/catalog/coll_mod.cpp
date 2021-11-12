@@ -114,6 +114,7 @@ struct ParsedCollModRequest {
     boost::optional<ValidationLevelEnum> collValidationLevel;
     bool recordPreImages = false;
     boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
+    int numModifications = 0;
     bool dryRun = false;
 };
 
@@ -266,6 +267,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
+                cmr.numModifications++;
                 BSONElement oldExpireSecs = cmrIndex->idx->infoObj().getField("expireAfterSeconds");
                 if (oldExpireSecs.eoo()) {
                     if (cmrIndex->idx->isIdIndex()) {
@@ -284,6 +286,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (cmrIndex->indexHidden) {
+                cmr.numModifications++;
                 // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
                 if (cmrIndex->idx->hidden() == cmrIndex->indexHidden.booleanSafe()) {
                     // If the collMod includes "expireAfterSeconds", remove the no-op "hidden"
@@ -312,11 +315,13 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (cmrIndex->indexUnique) {
+                cmr.numModifications++;
                 if (!cmrIndex->indexUnique.trueValue()) {
                     return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
                 }
             }
         } else if (fieldName == "validator" && !isView && !isTimeseries) {
+            cmr.numModifications++;
             // If the feature compatibility version is not kLatest, and we are validating features
             // as primary, ban the use of new agg features introduced in kLatest to prevent them
             // from being persisted in the catalog.
@@ -337,18 +342,21 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return cmr.collValidator->getStatus();
             }
         } else if (fieldName == "validationLevel" && !isView && !isTimeseries) {
+            cmr.numModifications++;
             try {
                 cmr.collValidationLevel = ValidationLevel_parse({"validationLevel"}, e.String());
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
         } else if (fieldName == "validationAction" && !isView && !isTimeseries) {
+            cmr.numModifications++;
             try {
                 cmr.collValidationAction = ValidationAction_parse({"validationAction"}, e.String());
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
         } else if (fieldName == "pipeline") {
+            cmr.numModifications++;
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
                               "'pipeline' option only supported on a view");
@@ -358,6 +366,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
             cmr.viewPipeLine = e;
         } else if (fieldName == "viewOn") {
+            cmr.numModifications++;
             if (!isView) {
                 return Status(ErrorCodes::InvalidOptions,
                               "'viewOn' option only supported on a view");
@@ -367,9 +376,11 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
             cmr.viewOn = e.str();
         } else if (fieldName == "recordPreImages" && !isView && !isTimeseries) {
+            cmr.numModifications++;
             cmr.recordPreImages = e.trueValue();
         } else if (fieldName == CollMod::kChangeStreamPreAndPostImagesFieldName && !isView &&
                    !isTimeseries) {
+            cmr.numModifications++;
             if (e.type() != mongo::Object) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "'" << CollMod::kChangeStreamPreAndPostImagesFieldName
@@ -384,6 +395,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return ex.toStatus();
             }
         } else if (fieldName == "expireAfterSeconds") {
+            cmr.numModifications++;
             if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
                 return Status(ErrorCodes::InvalidOptions,
                               "'expireAfterSeconds' option is only supported on collections "
@@ -407,6 +419,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
 
             cmr.clusteredIndexExpireAfterSeconds = e;
         } else if (fieldName == "timeseries") {
+            cmr.numModifications++;
             if (!isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
                               str::stream() << "option only supported on a time-series collection: "
