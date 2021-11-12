@@ -166,4 +166,11 @@ commands:
                               time-series buckets namespace before being sent to shards."
                 optional: true
                 type: bool
+            dryRun:
+                description: "Runs the requested modification without modifying any database state.
+                              This can be used to determine in advance if a particular collMod
+                              request can be completed without errors."
+                optional: true
+                type: safeBool
+                unstable: true
         reply_type: CollModReply

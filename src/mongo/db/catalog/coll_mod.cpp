@@ -114,6 +114,7 @@ struct ParsedCollModRequest {
     boost::optional<ValidationLevelEnum> collValidationLevel;
     bool recordPreImages = false;
     boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
+    bool dryRun = false;
 };
 
 StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -413,6 +414,10 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.timeseries = e;
+        } else if (fieldName == CollMod::kDryRunFieldName) {
+            cmr.dryRun = e.trueValue();
+            // The dry run option should never be included in a collMod oplog entry.
+            continue;
         } else {
             if (isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -474,11 +479,33 @@ void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
     coll->updateClusteredIndexTTLSetting(opCtx, newExpireAfterSeconds);
 }
 
+Status _processCollModDryRunMode(OperationContext* opCtx,
+                                 const NamespaceStringOrUUID& nsOrUUID,
+                                 const CollMod& cmd,
+                                 BSONObjBuilder* result,
+                                 boost::optional<repl::OplogApplication::Mode> mode) {
+    // Ensure that the unique option is specified before validation the rest of the request
+    // and resolving the index descriptor.
+    if (!cmd.getIndex()) {
+        return {ErrorCodes::InvalidOptions, "dry run mode requires an valid index modification."};
+    }
+    if (!cmd.getIndex()->getUnique().value_or(false)) {
+        return {ErrorCodes::InvalidOptions,
+                "dry run mode requires an index modification with unique: true."};
+    }
+
+    return Status::OK();
+}
+
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceStringOrUUID& nsOrUUID,
                         const CollMod& cmd,
                         BSONObjBuilder* result,
                         boost::optional<repl::OplogApplication::Mode> mode) {
+    if (cmd.getDryRun().value_or(false)) {
+        return _processCollModDryRunMode(opCtx, nsOrUUID, cmd, result, mode);
+    }
+
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
     auto nss = coll.getNss();
     StringData dbName = nss.db();

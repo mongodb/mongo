@@ -63,6 +63,24 @@ const duplicateKeyError = assert.commandFailedWithCode(
 jsTestLog('Duplicate key error from failed conversion: ' + tojson(duplicateKeyError));
 assert.commandWorked(coll.remove({_id: 2}));
 
+//
+// Dry-run mode tests.
+//
+
+// Currently, support for dry run mode should be limited to unique conversion.
+assert.commandFailedWithCode(db.runCommand({
+    collMod: collName,
+    index: {keyPattern: {a: 1}, hidden: true},
+    dryRun: true,
+}),
+                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({
+    collMod: collName,
+    validationLevel: 'off',
+    dryRun: true,
+}),
+                             ErrorCodes.InvalidOptions);
+
 // Successfully converts to a unique index.
 const result = assert.commandWorked(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
