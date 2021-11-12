@@ -494,6 +494,12 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
                 "dry run mode requires an index modification with unique: true."};
     }
 
+    // A collMod operation with dry run mode requested is not meant for replicated oplog entries.
+    if (mode) {
+        return {ErrorCodes::InvalidOptions,
+                "dry run mode is not applicable to oplog application or applyOps"};
+    }
+
     return Status::OK();
 }
 
