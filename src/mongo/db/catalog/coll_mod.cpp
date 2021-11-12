@@ -533,6 +533,9 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
                 "unique: true cannot be combined with any other modification in dry run mode."};
     }
 
+    // Throws exception if index contains duplicates.
+    scanIndexForDuplicates(opCtx, coll.getCollection(), cmr.indexRequest.idx);
+
     return Status::OK();
 }
 
