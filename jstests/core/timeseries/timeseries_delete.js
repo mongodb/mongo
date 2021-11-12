@@ -50,7 +50,7 @@ TimeseriesTest.run((insert) => {
                   {delete: coll.getName(), deletes: deleteQuery, ordered, let : letDoc}));
         const docs = coll.find({}, {_id: 0}).toArray();
         assert.eq(res["n"], expectedNRemoved);
-        assert.docEq(docs, expectedRemainingDocs);
+        assert.sameMembers(docs, expectedRemainingDocs);
         assert(coll.drop());
     };
 
