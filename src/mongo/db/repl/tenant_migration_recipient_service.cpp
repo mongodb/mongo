@@ -64,6 +64,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_coordinator.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
+#include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_statistics.h"
 #include "mongo/db/repl/vote_commit_migration_progress_gen.h"
@@ -1905,26 +1906,30 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
         .semi();
 }
 
-SemiFuture<void> TenantMigrationRecipientService::Instance::_rollbackToStable() {
+SemiFuture<void> TenantMigrationRecipientService::Instance::_importCopiedFiles() {
+    if (getProtocol() != MigrationProtocolEnum::kShardMerge) {
+        return SemiFuture<void>::makeReady();
+    }
+
     stdx::lock_guard lk(_mutex);
 
     return ExecutorFuture(**_scopedExecutor)
         .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
-            if (stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
-                return SemiFuture<void>::makeReady();
-            }
-
-            auto tempDirectory = fileClonerTempDir(stateDoc.getId());
-            if (!boost::filesystem::exists(tempDirectory)) {
+            auto tempWTDirectory = fileClonerTempDir(stateDoc.getId());
+            if (!boost::filesystem::exists(tempWTDirectory)) {
                 // TODO (SERVER-61133): Abort the merge if no files.
-                LOGV2_WARNING(61137,
+                LOGV2_WARNING(6113701,
                               "No temp directory of donor files to import",
-                              "tempDirectory"_attr = tempDirectory.string());
+                              "tempDirectory"_attr = tempWTDirectory.string());
                 return SemiFuture<void>::makeReady();
             }
 
             auto opCtx = cc().makeOperationContext();
-            wiredTigerImportFromBackupCursor(opCtx.get(), tempDirectory.string());
+            // TODO (SERVER-62054): do this after file-copy, on primary and secondaries.
+            auto metadatas =
+                wiredTigerRollbackToStableAndGetMetadata(opCtx.get(), tempWTDirectory.string());
+
+            wiredTigerImportFromBackupCursor(opCtx.get(), metadatas, tempWTDirectory.string());
             return SemiFuture<void>::makeReady();
         })
         .semi();
@@ -2624,10 +2629,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        return clonerFuture;
                    })
                    .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
-                   .then([this, self = shared_from_this()] { return _rollbackToStable(); })
                    .then([this, self = shared_from_this()] {
                        return _advanceStableTimestampToStartApplyingDonorOpTime();
                    })
+                   .then([this, self = shared_from_this()] { return _importCopiedFiles(); })
                    .then([this, self = shared_from_this()] {
                        {
                            auto opCtx = cc().makeOperationContext();

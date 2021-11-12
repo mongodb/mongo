@@ -66,6 +66,10 @@ Status wtRCToStatus(int retCode, ContextExpr&& contextExpr) {
     return wtRCToStatus_slow(retCode, std::forward<ContextExpr>(contextExpr)());
 }
 
+inline void uassertWTOK(int ret) {
+    uassertStatusOK(wtRCToStatus(ret));
+}
+
 #define MONGO_invariantWTOK_1(expression)                                               \
     do {                                                                                \
         int _invariantWTOK_retCode = expression;                                        \

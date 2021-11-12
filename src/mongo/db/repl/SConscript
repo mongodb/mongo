@@ -1347,6 +1347,7 @@ env.Library(
     source=[
         'tenant_migration_recipient_coordinator.cpp',
         'tenant_migration_recipient_service.cpp',
+        'tenant_migration_shard_merge_util.cpp',
         'vote_commit_migration_progress.cpp',
         'vote_commit_migration_progress.idl',
     ],

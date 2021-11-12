@@ -27,48 +27,17 @@
  *    it in the license file.
  */
 
-#pragma once
-
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 
-namespace mongo {
-struct WTimportArgs {
-    // Just the base name, no "table:" nor "file:" prefix. No ".wt" suffix.
-    std::string ident;
-    // When querying WT metadata for "table:<ident>"
-    std::string tableMetadata;
-    // When querying WT metadata for "file:<ident>.wt"
-    std::string fileMetadata;
-};
-
-struct CollectionImportMetadata {
-    WTimportArgs importArgs;
-    mongo::NamespaceString ns;
-    // An _mdb_catalog document.
-    mongo::BSONObj catalogObject;
-    long long numRecords;
-    long long dataSize;
-    std::vector<WTimportArgs> indexes;
-};
-
+namespace mongo::repl {
 /**
- * After opening a backup cursor on a donor replica set and copying the donor's files to a local
- * temp directory, use this function to roll back to the backup cursor's checkpoint timestamp and
- * retrieve collection metadata.
+ * After calling wiredTigerRollbackToStableAndGetMetadata, use this function to import files.
  */
-std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
-    OperationContext* opCtx, const std::string& importPath);
-
-/**
- * When preparing to import a collection within a WUOW, use RecoveryUnit::registerChange to
- * update number/size of records when the import commits.
- */
-std::unique_ptr<RecoveryUnit::Change> makeCountsChange(
-    RecordStore* recordStore, const CollectionImportMetadata& collectionMetadata);
-}  // namespace mongo
+void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
+                                      const std::vector<CollectionImportMetadata>& metadatas,
+                                      const std::string& importPath);
+}  // namespace mongo::repl

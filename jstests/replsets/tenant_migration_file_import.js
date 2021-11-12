@@ -20,11 +20,16 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-61144): Recipient secondaries don't import donor files yet, so dbhash will mismatch.
+TestData.skipCheckDBHashes = true;
+
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 const migrationId = UUID();
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+// TODO (SERVER-61773): Don't set minSnapshotHistoryWindowInSeconds.
+const tenantMigrationTest = new TenantMigrationTest(
+    {name: jsTestName(), sharedOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 0}}});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const kDataDir =
@@ -82,13 +87,24 @@ donorPrimary.adminCommand({killCursors: "$cmd.aggregate", cursors: [cursor.id]})
 })();
 
 jsTestLog("Run migration");
+// The old multitenant migrations won't copy myDatabase since it doesn't start with testTenantId,
+// but shard merge copies everything so we still expect myDatabase on the recipient, below.
 const kTenantId = "testTenantId";
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,
 };
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
-// Expect an "Opened donor WiredTiger database" message. Requires featureFlagShardMerge.
-checkLog.containsJson(tenantMigrationTest.getRecipientPrimary(), 6113700);
+for (let collectionName of ["myCollection", "myCappedCollection"]) {
+    jsTestLog(`Checking ${collectionName}`);
+    // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
+    assert.eq(donorPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
+              recipientPrimary.getDB("myDatabase")[collectionName].countDocuments({}),
+              "countDocuments");
+    assert.eq(donorPrimary.getDB("myDatabase")[collectionName].count(),
+              recipientPrimary.getDB("myDatabase")[collectionName].count(),
+              "count");
+}
+
 tenantMigrationTest.stop();
 })();
