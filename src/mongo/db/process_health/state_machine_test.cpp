@@ -38,7 +38,7 @@ namespace process_health {
 class StateMachineTestFixture : public unittest::Test {
 public:
     enum class MachineState { A, B, C, NoHandlerDefined };
-    static const MachineState kInitialState = MachineState::A;
+    static constexpr MachineState kInitialState = MachineState::A;
     struct Message {
         boost::optional<MachineState> nextState;
     };
