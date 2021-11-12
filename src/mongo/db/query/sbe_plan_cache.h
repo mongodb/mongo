@@ -145,9 +145,11 @@ PlanCache& getPlanCache(ServiceContext* serviceCtx);
 PlanCache& getPlanCache(OperationContext* opCtx);
 
 /**
- * Remove cached plan entries with the given collection UUID and collection version number.
+ * Removes cached plan entries with the given collection UUID and collection version number.
  */
-void clearPlanCache(ServiceContext* serviceCtx, UUID collectionUuid, size_t collectionVersion);
+void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
+                               UUID collectionUuid,
+                               size_t collectionVersion);
 
 }  // namespace sbe
 }  // namespace mongo

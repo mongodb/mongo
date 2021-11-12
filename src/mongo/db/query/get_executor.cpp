@@ -86,6 +86,7 @@
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_sub_planner.h"
+#include "mongo/db/query/sbe_utils.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
@@ -1148,37 +1149,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(nss),
                                        std::move(yieldPolicy));
 }
-
-// Checks if the given query can be executed with the SBE engine.
-inline bool isQuerySbeCompatible(OperationContext* opCtx,
-                                 const CollectionPtr* collection,
-                                 const CanonicalQuery* const cq,
-                                 size_t plannerOptions) {
-    invariant(cq);
-    auto expCtx = cq->getExpCtxRaw();
-    const auto& sortPattern = cq->getSortPattern();
-    const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
-    const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
-    const bool isNotOplog = !cq->nss().isOplog();
-    const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
-    const bool doesNotSortOnMetaOrPathWithNumericComponents =
-        !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
-            return part.fieldPath &&
-                !FieldRef(part.fieldPath->fullPath()).hasNumericPathComponents();
-        });
-
-    // Queries against a time-series collection are not currently supported by SBE.
-    const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
-
-    // Queries against a clustered collection are not currently supported by SBE.
-    tassert(6038600, "Expected CollectionPtr to not be nullptr", collection);
-    const bool isQueryNotAgainstClusteredCollection =
-        !(collection->get() && collection->get()->isClustered());
-
-    return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
-        isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
-        doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog;
-}
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
@@ -1189,7 +1159,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
     canonicalQuery->setSbeCompatible(
-        isQuerySbeCompatible(opCtx, collection, canonicalQuery.get(), plannerOptions));
+        sbe::isQuerySbeCompatible(collection, canonicalQuery.get(), plannerOptions));
     return !canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()
         ? getSlotBasedExecutor(opCtx,
                                collection,
@@ -2455,5 +2425,4 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
         return {nullptr};
     }
 }
-
 }  // namespace mongo

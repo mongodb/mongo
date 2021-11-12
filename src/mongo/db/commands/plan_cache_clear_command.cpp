@@ -44,6 +44,8 @@
 #include "mongo/db/query/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/query/sbe_utils.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -79,7 +81,22 @@ Status clear(OperationContext* opCtx,
 
         auto cq = std::move(statusWithCQ.getValue());
 
+        // Based on a query shape only, we cannot be sure whether a query with the given query shape
+        // can be executed with the SBE engine or not. Therefore, we try to clean the plan caches in
+        // the both cases.
         planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
+
+        // Default value of planner options (0) is SBE compatible, so it does not affect result of
+        // sbe::isQuerySbeCompatible here.
+        const size_t plannerOptions = 0;
+        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
+            !cq->getForceClassicEngine() &&
+            sbe::isQuerySbeCompatible(&collection, cq.get(), plannerOptions)) {
+            cq->setSbeCompatible(true);
+            sbe::getPlanCache(opCtx).remove(
+                plan_cache_key_factory::make<sbe::PlanCacheKey>(*cq, collection));
+        }
+
         return Status::OK();
     }
 
@@ -92,6 +109,11 @@ Status clear(OperationContext* opCtx,
     }
 
     planCache->clear();
+
+    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        auto version = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
+        sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(), collection->uuid(), version);
+    }
 
     LOGV2_DEBUG(
         23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", "namespace"_attr = ns);

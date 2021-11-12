@@ -48,7 +48,7 @@ public:
     SbePlanCacheInvalidatorCallback(ServiceContext* serviceCtx) : _serviceCtx{serviceCtx} {}
 
     void invalidateCacheEntriesWith(UUID collectionUuid, size_t oldVersion) override {
-        clearPlanCache(_serviceCtx, collectionUuid, oldVersion);
+        clearPlanCacheEntriesWith(_serviceCtx, collectionUuid, oldVersion);
     }
 
 private:
@@ -158,7 +158,9 @@ sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
     return getPlanCache(opCtx->getServiceContext());
 }
 
-void clearPlanCache(ServiceContext* serviceCtx, UUID collectionUuid, size_t collectionVersion) {
+void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
+                               UUID collectionUuid,
+                               size_t collectionVersion) {
     if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
         auto removed = sbe::getPlanCache(serviceCtx)
                            .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key) {
