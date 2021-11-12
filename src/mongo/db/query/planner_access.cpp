@@ -212,6 +212,59 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
 }
 
 /**
+ * Helper function that checks to see if min() or max() were provided along with the query. If so,
+ * adjusts the collection scan bounds to fit the constraints.
+ */
+void handleRIDRangeMinMax(const CanonicalQuery& query, CollectionScanNode* collScan) {
+    BSONObj minObj = query.getFindCommandRequest().getMin();
+    BSONObj maxObj = query.getFindCommandRequest().getMax();
+    if (minObj.isEmpty() && maxObj.isEmpty()) {
+        return;
+    }
+
+    // If either min() or max() were provided, we can assume they are on the cluster key due to the
+    // following.
+    // (1) min() / max() are only legal when they match the pattern in hint()
+    // (2) Only hint() on a cluster key will generate collection scan rather than an index scan
+    uassert(
+        6137402,
+        "min() / max() are only supported for forward collection scans on clustered collections",
+        collScan->direction == 1);
+
+    boost::optional<RecordId> newMinRecord, newMaxRecord;
+    if (!maxObj.isEmpty()) {
+        // max() is exclusive.
+        // Assumes clustered collection scans are only supported with the forward direction.
+        collScan->boundInclusion =
+            CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+        newMaxRecord = record_id_helpers::keyForElem(maxObj.firstElement());
+    }
+
+    if (!minObj.isEmpty()) {
+        // The min() is inclusive as are bounded collection scans by default.
+        newMinRecord = record_id_helpers::keyForElem(minObj.firstElement());
+    }
+
+    if (!collScan->minRecord) {
+        collScan->minRecord = newMinRecord;
+    } else if (newMinRecord) {
+        if (*newMinRecord > *collScan->minRecord) {
+            // The newMinRecord is more restrictive than the existing minRecord.
+            collScan->minRecord = newMinRecord;
+        }
+    }
+
+    if (!collScan->maxRecord) {
+        collScan->maxRecord = newMaxRecord;
+    } else if (newMaxRecord) {
+        if (*newMaxRecord < *collScan->maxRecord) {
+            // The newMaxRecord is more restrictive than the existing maxRecord.
+            collScan->maxRecord = newMaxRecord;
+        }
+    }
+}
+
+/**
  * Helper function to add an RID range to collection scans.
  * If the query solution tree contains a collection scan node with a suitable comparison
  * predicate on '_id', we add a minRecord and maxRecord on the collection node.
@@ -275,11 +328,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
 
-    // If the hint is {$natural: +-1} this changes the direction of the collection scan.
     const BSONObj& hint = query.getFindCommandRequest().getHint();
     if (!hint.isEmpty()) {
         BSONElement natural = hint[query_request_helper::kNaturalSortField];
         if (natural) {
+            // If the hint is {$natural: +-1} this changes the direction of the collection scan.
             csn->direction = natural.safeNumberInt() >= 0 ? 1 : -1;
         }
     }
@@ -344,6 +397,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
 
     if (params.allowRIDRange && !csn->resumeAfterRecordId) {
         handleRIDRangeScan(csn->filter.get(), csn.get());
+        handleRIDRangeMinMax(query, csn.get());
     }
 
     return csn;

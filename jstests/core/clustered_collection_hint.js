@@ -163,6 +163,37 @@ validateHint({
     },
     expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: arbitraryDocId}
 });
+validateHint({
+    expectedNReturned: 1,
+    cmd: {
+        find: collName,
+        min: {_id: 3},
+        max: {_id: 4},
+        hint: {_id: 1},
+    },
+    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 3, maxRecord: 4}
+});
+validateHint({
+    // min() is inclusive, only {_id: 0}, {_id: 1}, and {_id: 2} should be filtered out.
+    expectedNReturned: batchSize - 3,
+    cmd: {
+        find: collName,
+        min: {_id: 3},
+        hint: {_id: 1},
+    },
+    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 3}
+});
+validateHint({
+    expectedNReturned: 1,
+    cmd: {
+        find: collName,
+        filter: {_id: {$gte: 3}},
+        min: {_id: 2},
+        max: {_id: 4},
+        hint: {_id: 1},
+    },
+    expectedWinningPlanStats: {stage: "COLLSCAN", direction: "forward", minRecord: 3, maxRecord: 4}
+});
 
 // Find with $natural hints.
 validateHint({
@@ -204,6 +235,14 @@ validateHint({
 validateHint({
     expectedNReturned: batchSize,
     cmd: {find: collName, hint: idxA},
+    expectedWinningPlanStats: {
+        stage: "IXSCAN",
+        keyPattern: idxA,
+    }
+});
+validateHint({
+    expectedNReturned: 1,
+    cmd: {find: collName, hint: idxA, min: {a: -3}, max: {a: -4}},
     expectedWinningPlanStats: {
         stage: "IXSCAN",
         keyPattern: idxA,
@@ -273,4 +312,20 @@ validateHint({
 // Reverse 'hint' on the cluster key is illegal.
 assert.commandFailedWithCode(testDB.runCommand({find: collName, hint: {_id: -1}}),
                              ErrorCodes.BadValue);
+
+// 'min' and 'max' must come with 'hint'.
+assert.commandFailedWithCode(testDB.runCommand({find: collName, min: {_id: -1}, max: {_id: 20}}),
+                             51173);
+
+// 'min' cannot be greater than 'max'.
+assert.commandFailedWithCode(
+    testDB.runCommand({find: collName, hint: {_id: 1}, min: {_id: 20}, max: {_id: 2}}), 6137401);
+
+// 'max' cannot be equal to 'min'.
+assert.commandFailedWithCode(
+    testDB.runCommand({find: collName, hint: {_id: 1}, min: {_id: 2}, max: {_id: 2}}), 6137401);
+
+// 'min' and 'max' must match the 'hint' pattern.
+assert.commandFailedWithCode(
+    testDB.runCommand({find: collName, hint: {_id: 1}, min: {a: -2}, max: {a: 2}}), 6137400);
 })();

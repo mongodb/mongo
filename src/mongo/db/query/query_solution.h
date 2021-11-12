@@ -469,6 +469,10 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     int direction{1};
 
+    // By default, includes the minRecord and maxRecord when present.
+    CollectionScanParams::ScanBoundInclusion boundInclusion =
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
+
     // Whether or not to wait for oplog visibility on oplog collection scans.
     bool shouldWaitForOplogVisibility = false;
 
