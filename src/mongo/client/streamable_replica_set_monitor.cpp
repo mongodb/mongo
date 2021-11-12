@@ -773,7 +773,7 @@ Status StreamableReplicaSetMonitor::_makeUnsatisfiedReadPrefError(
 }
 
 Status StreamableReplicaSetMonitor::_makeReplicaSetMonitorRemovedError() const {
-    return Status(ErrorCodes::ReplicaSetMonitorRemoved,
+    return Status(ErrorCodes::ShutdownInProgress,
                   str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
 }
 
