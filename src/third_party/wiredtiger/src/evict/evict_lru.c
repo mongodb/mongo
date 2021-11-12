@@ -2340,8 +2340,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     WT_TRACK_OP_DECL;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *txn_shared;
+    uint64_t cache_max_wait_us, initial_progress, max_progress;
     uint64_t elapsed, time_start, time_stop;
-    uint64_t initial_progress, max_progress;
     bool app_thread;
 
     WT_TRACK_OP_INIT(session);
@@ -2352,6 +2352,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     time_start = time_stop = 0;
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
+
+    if (session->cache_max_wait_us != 0)
+        cache_max_wait_us = session->cache_max_wait_us;
+    else
+        cache_max_wait_us = cache->cache_max_wait_us;
 
     /*
      * Before we enter the eviction generation, make sure this session has a cached history store
@@ -2438,10 +2443,9 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
             goto err;
         }
         /* Stop if we've exceeded the time out. */
-        if (app_thread && cache->cache_max_wait_us != 0) {
+        if (app_thread && cache_max_wait_us != 0) {
             time_stop = __wt_clock(session);
-            if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) >
-              cache->cache_max_wait_us)
+            if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) > cache_max_wait_us)
                 goto err;
         }
     }
@@ -2453,7 +2457,7 @@ err:
         WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
         WT_STAT_SESSION_INCRV(session, cache_time, elapsed);
         session->cache_wait_us += elapsed;
-        if (cache->cache_max_wait_us != 0 && session->cache_wait_us > cache->cache_max_wait_us) {
+        if (cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
             WT_TRET(WT_CACHE_FULL);
             WT_STAT_CONN_INCR(session, cache_timed_out_ops);
         }
