@@ -120,7 +120,7 @@ bool BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candi
     auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data);
     if (!status.isOK()) {
         candidate->status = status.getStatus();
-        return candidate;
+        return false;
     }
 
     auto [resultAccessor, recordIdAccessor, exitedEarly] = status.getValue();
