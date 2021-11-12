@@ -94,8 +94,7 @@ modules:
   - name: py-tpcc
     repo: git@github.com:mongodb-labs/py-tpcc.git
     prefix: ${workdir}/src
-    branch: master
-    ref: 46f8f42a71626fc2057d2604ab9359ccf0395ba0
+    branch: production
 
   ###
 #  - name: mongo
