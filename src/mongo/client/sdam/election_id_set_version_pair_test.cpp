@@ -49,8 +49,6 @@ public:
         kNotComparable
     };
 
-    enum class Consistency { kConsistent, kInconsistent };
-
     struct TestCase {
         // Curent topology max fields.
         const boost::optional<OID> kTerm1;
@@ -59,7 +57,6 @@ public:
         const boost::optional<OID> kTerm2;
         const boost::optional<int> kSet2;
         const Compare compare;
-        const Consistency consistent;
     };
 
     std::string log(const TestCase& t, int testNum) {
@@ -89,54 +86,51 @@ public:
                 ASSERT_FALSE(p1 == p2) << log(t, testNum);
                 break;
         }
-
-        const bool isConsistent = isIncomingPrimaryConsistent(p1, p2);
-        ASSERT_EQ(t.consistent == Consistency::kConsistent, isConsistent) << log(t, testNum);
     }
 };
 
 TEST_F(ElectionIdSetVersionPairTest, ExpectedOutcome) {
     std::vector<TestCase> tests = {
         // At startup, both current fields are not set. Field set > unset.
-        {kNullOid, kNullSet, kOidOne, 1, Compare::kLess, Consistency::kConsistent},
+        {kNullOid, kNullSet, kOidOne, 1, Compare::kLess},
 
-        {kOidOne, 1, kOidOne, 1, Compare::kEquals, Consistency::kConsistent},
+        {kOidOne, 1, kOidOne, 1, Compare::kEquals},
 
         // One field is not set. This should never happen however added for better
         // coverage for malformed protocol.
-        {kNullOid, 1, kOidOne, 1, Compare::kLess, Consistency::kConsistent},
-        {kOidOne, kNullSet, kOidOne, 1, Compare::kLess, Consistency::kConsistent},
-        {kOidOne, 1, kNullOid, 1, Compare::kGreater, Consistency::kConsistent},
-        {kOidOne, 1, kOidOne, kNullSet, Compare::kGreater, Consistency::kConsistent},
+        {kNullOid, 1, kOidOne, 1, Compare::kLess},
+        {kOidOne, kNullSet, kOidOne, 1, Compare::kLess},
+        {kOidOne, 1, kNullOid, 1, Compare::kGreater},
+        {kOidOne, 1, kOidOne, kNullSet, Compare::kGreater},
 
         // Primary advanced one way or another. "Less" means current < incoming.
-        {kOidOne, 1, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
-        {kOidOne, 1, kOidOne, 2, Compare::kLess, Consistency::kConsistent},
+        {kOidOne, 1, kOidTwo, 1, Compare::kLess},
+        {kOidOne, 1, kOidOne, 2, Compare::kLess},
 
         // Primary advanced but current state is incomplete.
-        {kNullOid, 1, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
-        {kNullOid, 1, kOidOne, 2, Compare::kLess, Consistency::kConsistent},
-        {kOidOne, kNullSet, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
-        {kOidOne, kNullSet, kOidOne, 2, Compare::kLess, Consistency::kConsistent},
+        {kNullOid, 1, kOidTwo, 1, Compare::kLess},
+        {kNullOid, 1, kOidOne, 2, Compare::kLess},
+        {kOidOne, kNullSet, kOidTwo, 1, Compare::kLess},
+        {kOidOne, kNullSet, kOidOne, 2, Compare::kLess},
 
         // Primary went backwards one way or another.
         // Inconsistent because Set version went backwards without Term being changed (same
         // primary).
-        {kOidTwo, 2, kOidTwo, 1, Compare::kGreater, Consistency::kInconsistent},
-        {kOidTwo, 2, kOidOne, 2, Compare::kGreater, Consistency::kConsistent},
+        {kOidTwo, 2, kOidTwo, 1, Compare::kGreater},
+        {kOidTwo, 2, kOidOne, 2, Compare::kGreater},
 
         // Primary went backwards with current state incomplete.
-        {kNullOid, 2, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
-        {kOidTwo, kNullSet, kOidOne, 1, Compare::kGreater, Consistency::kConsistent},
+        {kNullOid, 2, kOidTwo, 1, Compare::kLess},
+        {kOidTwo, kNullSet, kOidOne, 1, Compare::kGreater},
 
         // Stale primary case when Term went backwards but Set version advanced.
         // This case is 'consistent' because it's normal for stale primary. The
         // important part is that 'current' > 'incoming', which makes the node 'Unknown'.
-        {kOidTwo, 1, kOidOne, 2, Compare::kGreater, Consistency::kConsistent},
+        {kOidTwo, 1, kOidOne, 2, Compare::kGreater},
 
         // Previous primary was unable to replicate the Set version before failover,
         // new primary forces it to be rolled back.
-        {kOidOne, 2, kOidTwo, 1, Compare::kLess, Consistency::kConsistent},
+        {kOidOne, 2, kOidTwo, 1, Compare::kLess},
     };
 
     int testNum = 0;

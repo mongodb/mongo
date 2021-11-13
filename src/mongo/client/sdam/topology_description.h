@@ -67,11 +67,7 @@ public:
     const UUID& getId() const;
     TopologyType getType() const;
     const boost::optional<std::string>& getSetName() const;
-
-    // TODO(SERVER-59409): remove next 2 methods and keep only pair getter.
-    const boost::optional<int>& getMaxSetVersion() const;
-    const boost::optional<OID>& getMaxElectionId() const;
-    const ElectionIdSetVersionPair getMaxElectionIdSetVersionPair() const;
+    ElectionIdSetVersionPair getMaxElectionIdSetVersionPair() const;
 
     const std::vector<ServerDescriptionPtr>& getServers() const;
 
@@ -105,15 +101,13 @@ private:
     friend bool operator==(const TopologyDescription& lhs, const TopologyDescription& rhs) {
         return std::tie(lhs._setName,
                         lhs._type,
-                        lhs._maxSetVersion,
-                        lhs._maxElectionId,
+                        lhs._maxElectionIdSetVersionPair,
                         lhs._servers,
                         lhs._compatible,
                         lhs._logicalSessionTimeoutMinutes) ==
             std::tie(rhs._setName,
                      rhs._type,
-                     rhs._maxSetVersion,
-                     rhs._maxElectionId,
+                     rhs._maxElectionIdSetVersionPair,
                      rhs._servers,
                      rhs._compatible,
                      rhs._logicalSessionTimeoutMinutes);
@@ -147,6 +141,8 @@ private:
      */
     void calculateLogicalSessionTimeout();
 
+    void updateMaxElectionIdSetVersionPair(const ElectionIdSetVersionPair& pair);
+
     // unique id for this topology
     UUID _id = UUID::gen();
 
@@ -156,13 +152,12 @@ private:
     // setName: the replica set name. Default null.
     boost::optional<std::string> _setName;
 
-    // maxSetVersion: an integer or null. The largest setVersion ever reported by a primary.
-    // Default null.
-    boost::optional<int> _maxSetVersion;
-
-    // maxElectionId: an ObjectId or null. The largest electionId ever reported by a primary.
-    // Default null.
-    boost::optional<OID> _maxElectionId;
+    // The tuple consisting of:
+    // maxSetVersion: an integer or none. The largest setVersion ever reported by a primary.
+    // Note: maxSetVersion can go backwards.
+    // maxElectionId: an ObjectId or none. The largest electionId ever reported by a primary.
+    // Default {none, none}.
+    ElectionIdSetVersionPair _maxElectionIdSetVersionPair;
 
     // servers: a set of ServerDescription instances. Default contains one server:
     // "localhost:27017", ServerType Unknown.

@@ -43,8 +43,8 @@ struct ElectionIdSetVersionPair {
         return electionId && setVersion;
     }
 
-    bool allUndefined() const {
-        return !electionId && !setVersion;
+    bool anyDefined() const {
+        return electionId || setVersion;
     }
 
     bool anyUndefined() const {
@@ -53,11 +53,6 @@ struct ElectionIdSetVersionPair {
 
     BSONObj toBSON() const;
 };
-
-inline bool electionIdEqual(const ElectionIdSetVersionPair& p1,
-                            const ElectionIdSetVersionPair& p2) {
-    return p1.electionId && p2.electionId && (*p1.electionId).compare(*p2.electionId) == 0;
-}
 
 inline bool operator<(const ElectionIdSetVersionPair& p1, const ElectionIdSetVersionPair& p2) {
     if (p1.anyUndefined() && p2.allDefined()) {
@@ -80,22 +75,6 @@ inline bool operator==(const ElectionIdSetVersionPair& p1, const ElectionIdSetVe
 inline bool setVersionWentBackwards(const ElectionIdSetVersionPair& current,
                                     const ElectionIdSetVersionPair& incoming) {
     return current.setVersion && incoming.setVersion && *current.setVersion > *incoming.setVersion;
-}
-
-/**
- * @return true if 'incoming' is RS primary and fields have consistent values.
- */
-inline bool isIncomingPrimaryConsistent(const ElectionIdSetVersionPair& current,
-                                        const ElectionIdSetVersionPair& incoming) {
-    // If Set version goes backwards the term should advance, because it means
-    // failover happened. This is possible if the previous primary failed to replicate
-    // new Set version before failover. When it happens, we will rollback the Set version.
-    if (setVersionWentBackwards(current, incoming)) {
-        return !current.electionId || !incoming.electionId ||
-            (*current.electionId).compare(*incoming.electionId) < 0;
-    }
-
-    return true;
 }
 
 inline BSONObj ElectionIdSetVersionPair::toBSON() const {

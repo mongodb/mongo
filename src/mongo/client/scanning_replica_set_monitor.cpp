@@ -56,6 +56,8 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 
+extern ::mongo::FailPoint maxElectionIdSetVersionPairUpdated;
+
 namespace mongo {
 
 using std::numeric_limits;
@@ -853,7 +855,16 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
                               << _set->maxElectionId};
         }
 
+        const auto existingMaxElectionId = _set->maxElectionId;
         _set->maxElectionId = reply.electionId;
+
+        if (MONGO_unlikely(maxElectionIdSetVersionPairUpdated.shouldFail())) {
+            // name inherited from streaming monitor.
+            LOGV2(6146601,
+                  "Fail point maxElectionIdSetVersionPairUpdated",
+                  "incomingElectionId"_attr = reply.electionId,
+                  "currentMaxElectionId"_attr = existingMaxElectionId);
+        }
     }
 
     _set->configVersion = reply.configVersion;
