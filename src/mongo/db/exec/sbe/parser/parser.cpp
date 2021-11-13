@@ -1894,13 +1894,23 @@ CollectionUUID Parser::getCollectionUuid(const std::string& collName) {
         return uuid.getValue();
     }
 
+    auto catalog = CollectionCatalog::get(_opCtx);
+
     // Try to parse the collection name as a UUID directly, otherwise fallback to lookup by
     // NamespaceString.
     auto parsedUuid = UUID::parse(collName);
     if (parsedUuid.isOK()) {
-        return parsedUuid.getValue();
+        auto uuid = parsedUuid.getValue();
+
+        // Verify that the UUID corresponds to an existing collection.
+        auto collPtr = catalog->lookupCollectionByUUID(_opCtx, uuid);
+        uassert(6056700,
+                str::stream() << "SBE command parser could not find collection: " << collName,
+                collPtr);
+        return uuid;
     }
-    auto uuid = CollectionCatalog::get(_opCtx)->lookupUUIDByNSS(_opCtx, NamespaceString{collName});
+
+    auto uuid = catalog->lookupUUIDByNSS(_opCtx, NamespaceString{collName});
     uassert(5162900,
             str::stream() << "SBE command parser could not find collection: " << collName,
             uuid);
