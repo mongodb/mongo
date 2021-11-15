@@ -195,6 +195,20 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
         invariant(args.updateArgs->preImageDoc);
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(*args.updateArgs->preImageDoc);
+        if (args.updateArgs->preImageRecordingEnabledForCollection &&
+            args.retryableFindAndModifyLocation ==
+                RetryableFindAndModifyLocation::kSideCollection) {
+            // We are writing a no-op pre-image oplog entry and storing a post-image into a side
+            // collection. In this case, we expect to have already reserved 3 oplog slots:
+            // TS - 2: Oplog slot for the current no-op preimage oplog entry
+            // TS - 1: Oplog slot for the forged no-op oplog entry that may eventually get used by
+            //         tenant migrations or resharding.
+            // TS:     Oplog slot for the actual update oplog entry.
+            const auto reservedOplogSlots = args.updateArgs->oplogSlots;
+            invariant(reservedOplogSlots.size() == 3);
+            noopEntry.setOpTime(repl::OpTime(reservedOplogSlots.front().getTimestamp(),
+                                             reservedOplogSlots.front().getTerm()));
+        }
         oplogLink.preImageOpTime = logOperation(opCtx, &noopEntry);
         if (storePreImageInOplogForRetryableWrite) {
             opTimes.prePostImageOpTime = oplogLink.preImageOpTime;
@@ -218,8 +232,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry->setFromMigrateIfTrue(args.updateArgs->source == OperationSource::kFromMigrate);
     // oplogLink could have been changed to include pre/postImageOpTime by the previous no-op write.
     repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, args.updateArgs->stmtIds);
-    if (args.updateArgs->oplogSlot) {
-        oplogEntry->setOpTime(*args.updateArgs->oplogSlot);
+    if (!args.updateArgs->oplogSlots.empty()) {
+        oplogEntry->setOpTime(args.updateArgs->oplogSlots.back());
     }
     opTimes.writeOpTime = logOperation(opCtx, oplogEntry);
     opTimes.wallClockTime = oplogEntry->getWallClockTime();
@@ -843,8 +857,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             invariant(opCtx->getTxnNumber());
 
             oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
-            if (args.oplogSlot) {
-                oplogEntry.setOpTime(*args.oplogSlot);
+            if (!args.oplogSlots.empty()) {
+                oplogEntry.setOpTime(args.oplogSlots.back());
             }
         }
         opTime = replLogDelete(

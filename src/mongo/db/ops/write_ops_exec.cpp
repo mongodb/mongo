@@ -1357,8 +1357,9 @@ Status performAtomicTimeseriesWrites(
         args.criteria = update.getQ();
         args.source = OperationSource::kTimeseriesInsert;
         if (slot) {
-            args.oplogSlot = **slot;
-            fassert(5481600, opCtx->recoveryUnit()->setTimestamp(args.oplogSlot->getTimestamp()));
+            args.oplogSlots = {**slot};
+            fassert(5481600,
+                    opCtx->recoveryUnit()->setTimestamp(args.oplogSlots[0].getTimestamp()));
         }
 
         coll->updateDocument(

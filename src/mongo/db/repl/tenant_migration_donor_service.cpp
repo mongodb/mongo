@@ -589,7 +589,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 
                        CollectionUpdateArgs args;
                        args.criteria = BSON("_id" << _migrationUuid);
-                       args.oplogSlot = oplogSlot;
+                       args.oplogSlots = {oplogSlot};
                        args.update = updatedStateDocBson;
 
                        collection->updateDocument(opCtx,
