@@ -157,6 +157,12 @@ void TopologyVersionObserver::_cacheHelloResponse(
     // We could be a PeriodicRunner::Job someday. For now, OperationContext::sleepFor() will serve
     // the same purpose.
     opCtx->sleepFor(kDelayMS);
+} catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
+    LOGV2_DEBUG(5929701,
+                1,
+                "Caught an InterruptedDueToStorageChange exception, "
+                "but this thread can safely continue",
+                "error"_attr = e.toStatus());
 } catch (const DBException& e) {
     if (ErrorCodes::isShutdownError(e)) {
         // Rethrow if we've experienced shutdown.

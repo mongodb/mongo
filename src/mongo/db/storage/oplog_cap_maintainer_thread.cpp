@@ -79,6 +79,12 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
             return false;  // Oplog went away.
         }
         rs->reclaimOplog(opCtx.get());
+    } catch (const ExceptionFor<ErrorCodes::InterruptedDueToStorageChange>& e) {
+        LOGV2_DEBUG(5929700,
+                    1,
+                    "Caught an InterruptedDueToStorageChange exception, "
+                    "but this thread can safely continue",
+                    "error"_attr = e.toStatus());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         return false;
     } catch (const std::exception& e) {
