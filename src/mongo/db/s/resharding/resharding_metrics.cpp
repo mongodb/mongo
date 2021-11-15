@@ -365,6 +365,10 @@ void ReshardingMetrics::onCompletion(Role role,
         _cumulativeOp->maxRemainingOperationTime = Milliseconds(0);
     }
 
+    if (!_currentOp) {
+        return;
+    }
+
     if (_currentOp->donorState && _currentOp->recipientState) {
         switch (role) {
             case Role::kDonor:

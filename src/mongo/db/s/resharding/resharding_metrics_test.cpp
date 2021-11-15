@@ -173,6 +173,14 @@ DEATH_TEST_F(ReshardingMetricsTest,
 }
 */
 
+TEST_F(ReshardingMetricsTest, RunOnCompletionTwiceIsSafe) {
+    startOperation(ReshardingMetrics::Role::kCoordinator);
+    completeOperation(ReshardingMetrics::Role::kCoordinator,
+                      ReshardingOperationStatusEnum::kSuccess);
+    completeOperation(ReshardingMetrics::Role::kCoordinator,
+                      ReshardingOperationStatusEnum::kSuccess);
+}
+
 TEST_F(ReshardingMetricsTest, RunOnStepDownAfterOnCompletionIsSafe) {
     startOperation(ReshardingMetrics::Role::kRecipient);
     completeOperation(ReshardingMetrics::Role::kRecipient, ReshardingOperationStatusEnum::kSuccess);
