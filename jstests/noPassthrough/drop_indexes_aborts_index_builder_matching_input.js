@@ -39,29 +39,35 @@ const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
     testDB.getMongo(), coll.getFullName(), {c: 1}, {}, [ErrorCodes.IndexBuildAborted]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "c_1");
 
-IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/4, /*readyIndexes=*/["_id_", "a_1"], /*notReadyIndexes=*/["b_1", "c_1"]);
+let awaitDropIndex = startParallelShell(() => {
+    const testDB = db.getSiblingDB(TestData.dbName);
+    assert.commandFailedWithCode(
+        testDB.runCommand({dropIndexes: TestData.collName, index: ["a_1", "b_1"]}),
+        [ErrorCodes.BackgroundOperationInProgressForNamespace]);
+}, conn.port);
+awaitDropIndex();
 
-// 'dropIndexes' will only abort in-progress index builds if the 'index' parameter specifies all of
-// the indexes that a single builder is building together.
-assert.commandFailedWithCode(
-    testDB.runCommand({dropIndexes: TestData.collName, index: ["a_1", "b_1"]}),
-    ErrorCodes.IndexNotFound);
+awaitDropIndex = startParallelShell(() => {
+    const testDB = db.getSiblingDB(TestData.dbName);
+    assert.commandFailedWithCode(
+        testDB.runCommand({dropIndexes: TestData.collName, index: ["a_1", "c_1"]}),
+        [ErrorCodes.BackgroundOperationInProgressForNamespace]);
+}, conn.port);
+awaitDropIndex();
 
-assert.commandFailedWithCode(
-    testDB.runCommand({dropIndexes: TestData.collName, index: ["a_1", "c_1"]}),
-    ErrorCodes.IndexNotFound);
-
-assert.commandFailedWithCode(
-    testDB.runCommand({dropIndexes: TestData.collName, index: ["b_1", "c_1"]}),
-    ErrorCodes.IndexNotFound);
+awaitDropIndex = startParallelShell(() => {
+    const testDB = db.getSiblingDB(TestData.dbName);
+    assert.commandFailedWithCode(
+        testDB.runCommand({dropIndexes: TestData.collName, index: ["b_1", "c_1"]}),
+        [ErrorCodes.BackgroundOperationInProgressForNamespace]);
+}, conn.port);
+awaitDropIndex();
 
 IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 awaitFirstIndexBuild();
 awaitSecondIndexBuild();
 
-IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/4, /*readyIndexes=*/["_id_", "a_1", "b_1", "c_1"], /*notReadyIndexes=*/[]);
+assert.eq(4, testDB.getCollection(collName).getIndexes().length);
 
 MongoRunner.stopMongod(conn);
 }());
