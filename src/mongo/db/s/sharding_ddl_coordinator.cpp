@@ -218,7 +218,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     //  If the token is not cancelled we retry because it could have been generated
                     //  by a remote node.
                     if (!status.isOK() && !_completeOnError &&
-                        (status.isA<ErrorCategory::CursorInvalidatedError>() ||
+                        (_mustAlwaysMakeProgress() ||
+                         status.isA<ErrorCategory::CursorInvalidatedError>() ||
                          status.isA<ErrorCategory::ShutdownError>() ||
                          status.isA<ErrorCategory::RetriableError>() ||
                          status.isA<ErrorCategory::CancellationError>() ||
@@ -228,11 +229,10 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                          status == ErrorCodes::Interrupted || status == ErrorCodes::LockBusy ||
                          status == ErrorCodes::CommandNotFound) &&
                         !token.isCanceled()) {
-                        LOGV2_DEBUG(5656000,
-                                    1,
-                                    "Re-executing sharding DDL coordinator",
-                                    "coordinatorId"_attr = _coordId,
-                                    "reason"_attr = redact(status));
+                        LOGV2_INFO(5656000,
+                                   "Re-executing sharding DDL coordinator",
+                                   "coordinatorId"_attr = _coordId,
+                                   "reason"_attr = redact(status));
                         _firstExecution = false;
                         return false;
                     }

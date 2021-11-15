@@ -159,7 +159,15 @@ protected:
         return osi;
     }
 
-protected:
+    /*
+     * Specify if the coordinator must indefinitely be retried in case of exceptions. It is always
+     * expected for a coordinator to make progress after performing intermediate operations that
+     * can't be rollbacked.
+     */
+    virtual bool _mustAlwaysMakeProgress() {
+        return false;
+    };
+
     ShardingDDLCoordinatorService* _service;
     const ShardingDDLCoordinatorId _coordId;
 
