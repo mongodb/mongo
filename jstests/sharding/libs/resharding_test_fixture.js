@@ -540,11 +540,16 @@ var ReshardingTest = class {
             });
         } else {
             this._callFunctionSafely(() => {
-                this._pauseCoordinatorBeforeBlockingWrites.off();
+                this.retryOnceOnNetworkError(  //
+                    () => this._pauseCoordinatorBeforeBlockingWrites.off());
+
                 postCheckConsistencyFn();
-                this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
+                this.retryOnceOnNetworkError(
+                    () => this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off());
+
                 postDecisionPersistedFn();
-                this._pauseCoordinatorBeforeCompletionFailpoint.off();
+                this.retryOnceOnNetworkError(
+                    () => this._pauseCoordinatorBeforeCompletionFailpoint.off());
             });
         }
 
@@ -885,5 +890,28 @@ var ReshardingTest = class {
         });
 
         return cloneTimestamp;
+    }
+
+    /**
+     * Calls and returns the value from the supplied function.
+     *
+     * If a network error is thrown during its execution, then this function will invoke the
+     * supplied function a second time. This pattern is useful for tolerating network errors which
+     * result from elections triggered by any of the stepUpNewPrimaryOnShard(),
+     * killAndRestartPrimaryOnShard(), and shutdownAndRestartPrimaryOnShard() methods.
+     *
+     * @param fn - the function to be called.
+     * @returns the return value from fn.
+     */
+    retryOnceOnNetworkError(fn) {
+        try {
+            return fn();
+        } catch (e) {
+            if (!isNetworkError(e)) {
+                throw e;
+            }
+
+            return fn();
+        }
     }
 };

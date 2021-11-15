@@ -1463,6 +1463,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
                 ->onStepUp(ReshardingMetrics::Role::kCoordinator);
         }
 
+        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
+            _ctHolder->abort();
+        }
+
         return;
     }
 
@@ -1682,6 +1686,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsInStrict
 Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kBlockingWrites) {
+        invariant(_coordinatorDoc.getState() != CoordinatorStateEnum::kAborting);
         return Status::OK();
     }
 
