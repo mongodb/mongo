@@ -467,6 +467,7 @@ private:
  * during the `ASIOSession` constructor, that the thrown `asio::system_error`
  * is handled safely (translated to a Status holding a SocketException).
  */
+#if 0
 TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
     // The `server` accepts connections, only to immediately reset them.
     TestFixture tf;
@@ -502,6 +503,7 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
                     .getStatus(),
                 StatusIs(AnyOf(Eq(ErrorCodes::SocketException), Eq(ErrorCodes::OK)), Any()));
 }
+#endif  // 0
 
 /**
  * With no regard to mongo code, just check what the ASIO socket
