@@ -457,6 +457,8 @@ error_codes:
 
     - {code: 358, name: InternalTransactionNotSupported}
 
+    - {code: 359, name: CannotEnableIndexConstraint, extra: CannotEnableIndexConstraintInfo}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

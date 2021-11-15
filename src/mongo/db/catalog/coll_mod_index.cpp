@@ -31,7 +31,10 @@
 
 #include "mongo/db/catalog/coll_mod_index.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/catalog/cannot_enable_index_constraint_info.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -276,6 +279,13 @@ void scanIndexForDuplicates(OperationContext* opCtx,
 
         prevIndexEntry = indexEntry;
     }
+}
+
+Status buildEnableConstraintErrorStatus(const std::string& indexType, const BSONArray& violations) {
+    return Status(CannotEnableIndexConstraintInfo(violations),
+                  fmt::format("Cannot enable {} constraint. Please resolve conflicting documents "
+                              "before running collMod again.",
+                              indexType));
 }
 
 }  // namespace mongo

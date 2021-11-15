@@ -72,4 +72,9 @@ void scanIndexForDuplicates(OperationContext* opCtx,
                             const CollectionPtr& collection,
                             const IndexDescriptor* idx);
 
+/**
+ * Returns the formatted error status for not being able to enable the index constraint.
+ */
+Status buildEnableConstraintErrorStatus(const std::string& indexType, const BSONArray& violations);
+
 }  // namespace mongo
