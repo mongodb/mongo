@@ -54,15 +54,13 @@ multiversion::FeatureCompatibilityVersion FeatureCompatibilityVersionParser::par
         return GenericFCV::kLatest;
     }
 
-    uasserted(
-        4926900,
-        str::stream() << "Invalid value for " << multiversion::kParameterName << "document in "
-                      << NamespaceString::kServerConfigurationNamespace.toString() << ", found "
-                      << versionString << ", expected '"
-                      << multiversion::toString(GenericFCV::kLastLTS) << "' or '"
-                      << multiversion::toString(GenericFCV::kLastContinuous) << "' or '"
-                      << multiversion::toString(GenericFCV::kLatest) << ". See "
-                      << feature_compatibility_version_documentation::kCompatibilityLink << ".");
+    uasserted(4926900,
+              str::stream() << "Invalid feature compatibility version value, expected '"
+                            << multiversion::toString(GenericFCV::kLastLTS) << "' or '"
+                            << multiversion::toString(GenericFCV::kLastContinuous) << "' or '"
+                            << multiversion::toString(GenericFCV::kLatest) << ". See "
+                            << feature_compatibility_version_documentation::kCompatibilityLink
+                            << ".");
 }
 
 multiversion::FeatureCompatibilityVersion
@@ -74,7 +72,7 @@ StringData FeatureCompatibilityVersionParser::serializeVersion(
     multiversion::FeatureCompatibilityVersion version) {
     invariant(version == GenericFCV::kLastLTS || version == GenericFCV::kLastContinuous ||
                   version == GenericFCV::kLatest,
-              "Invalid version value for featureCompatibilityVersion documents");
+              "Invalid feature compatibility version value");
 
     return multiversion::toString(version);
 }

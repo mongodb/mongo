@@ -35,11 +35,17 @@ namespace mongo {
 /**
  * Helpers to parse featureCompatibilityVersion document BSON objects into
  * multiversion::FeatureCompatibilityVersion enums.
+ *
+ * Also, act as helpers to serialize and deserialize "fcv_string" idl type.
  */
 class FeatureCompatibilityVersionParser {
 public:
-    // Used to verify that FCV values in 'admin.system.version' are valid and equal to one of
-    // { lastLTS, lastContinuous, latest }.
+    /**
+     * Used to verify that the FCV value provided is valid and equal to one of
+     * { lastLTS, lastContinuous, latest }.
+     *
+     * Note: Deserializer for "fcv_string" idl type.
+     */
     static multiversion::FeatureCompatibilityVersion parseVersion(StringData versionString);
 
     // Used to parse FCV values for feature flags. It is acceptable to have feature flag versions
@@ -49,6 +55,9 @@ public:
     static multiversion::FeatureCompatibilityVersion parseVersionForFeatureFlags(
         StringData versionString);
 
+    /**
+     * Note: Serializer for "fcv_string" idl type.
+     */
     static StringData serializeVersion(multiversion::FeatureCompatibilityVersion version);
 
     static StringData serializeVersionForFeatureFlags(
