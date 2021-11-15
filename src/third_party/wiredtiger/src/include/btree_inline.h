@@ -574,7 +574,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
      * Track if eviction makes progress. This is used in various places to determine whether
      * eviction is stuck.
      */
-    if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_NO_PROGRESS))
+    if (!F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_NO_PROGRESS))
         (void)__wt_atomic_addv64(&cache->eviction_progress, 1);
 }
 
@@ -1230,9 +1230,9 @@ __wt_row_leaf_key_instantiate(WT_SESSION_IMPL *session, WT_PAGE *page)
      * doing a cursor previous call, and this page has never been checked for excessively long
      * stretches of prefix-compressed keys, do it now.
      */
-    if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_BUILD_KEYS))
         return (0);
-    F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
+    F_SET_ATOMIC_16(page, WT_PAGE_BUILD_KEYS);
 
     /* Walk the keys, making sure there's something easy to work with periodically. */
     skip = 0;
@@ -1528,7 +1528,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
      * Only split a page once, otherwise workloads that update in the middle of the page could
      * continually split without benefit.
      */
-    if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_SPLIT_INSERT))
         return (false);
 
     /*
@@ -1681,7 +1681,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * matter the size of the key.)
      */
     if (!__wt_btree_can_evict_dirty(session) &&
-      F_ISSET_ATOMIC(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS))
+      F_ISSET_ATOMIC_16(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS))
         return (false);
 
     /*

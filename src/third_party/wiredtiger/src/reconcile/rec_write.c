@@ -97,7 +97,7 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     ret = __reconcile(session, ref, salvage, flags, &page_locked);
 
     /* If writing a page in service of compaction, we're done, clear the flag. */
-    F_CLR_ATOMIC(ref->page, WT_PAGE_COMPACTION_WRITE);
+    F_CLR_ATOMIC_16(ref->page, WT_PAGE_COMPACTION_WRITE);
 
 err:
     if (page_locked)
@@ -423,7 +423,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
      * discard these pages.
      */
     WT_RET(__wt_page_alloc(session, page->type, mod->mod_multi_entries, false, &next));
-    F_SET_ATOMIC(next, WT_PAGE_EVICT_NO_PROGRESS);
+    F_SET_ATOMIC_16(next, WT_PAGE_EVICT_NO_PROGRESS);
 
     WT_INTL_INDEX_GET(session, next, pindex);
     for (i = 0; i < mod->mod_multi_entries; ++i) {
@@ -1654,7 +1654,7 @@ __rec_split_write_reuse(
      * those blocks. Check after calculating the checksum, there's a possibility the calculated
      * checksum will be useful in the future.
      */
-    if (F_ISSET_ATOMIC(r->page, WT_PAGE_COMPACTION_WRITE))
+    if (F_ISSET_ATOMIC_16(r->page, WT_PAGE_COMPACTION_WRITE))
         return (false);
 
     /*

@@ -160,7 +160,7 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
     uint32_t cell_offset;
 
     /* There's a per-page flag if there are any overflow keys at all. */
-    if (!F_ISSET_ATOMIC(page, WT_PAGE_INTL_OVERFLOW_KEYS))
+    if (!F_ISSET_ATOMIC_16(page, WT_PAGE_INTL_OVERFLOW_KEYS))
         return (0);
 
     /*
@@ -1613,7 +1613,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *mult
      */
     if (ref != NULL) {
         if (ref->page != NULL)
-            F_SET_ATOMIC(ref->page, WT_PAGE_UPDATE_IGNORE);
+            F_SET_ATOMIC_16(ref->page, WT_PAGE_UPDATE_IGNORE);
         __wt_free_ref(session, ref, orig->type, true);
     }
 }
@@ -1747,7 +1747,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_ASSERT(session, __wt_page_is_modified(page));
     WT_ASSERT(session, ref->ft_info.del == NULL);
 
-    F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT); /* Only split in-memory once. */
+    F_SET_ATOMIC_16(page, WT_PAGE_SPLIT_INSERT); /* Only split in-memory once. */
 
     /* Find the last item on the page. */
     if (type == WT_PAGE_ROW_LEAF)
@@ -2238,7 +2238,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
      */
     __wt_page_modify_clear(session, page);
     if (!F_ISSET(S2C(session)->cache, WT_CACHE_EVICT_SCRUB) || multi->supd_restore)
-        F_SET_ATOMIC(page, WT_PAGE_EVICT_NO_PROGRESS);
+        F_SET_ATOMIC_16(page, WT_PAGE_EVICT_NO_PROGRESS);
     __wt_ref_out(session, ref);
 
     /* Swap the new page into place. */

@@ -18,10 +18,22 @@ def flag_declare(name):
         tfile = open(tmp_file, 'w')
 
         lcnt = 0
+        max_flags = 0
         parsing = False
         start = 0
+        stopped = ''
         for line in f:
             lcnt = lcnt + 1
+            if stopped != '':
+                stopped = ''
+                m = re.search("\d+", line)
+                if m != None:
+                    fld_size = int(m.group(0))
+                    if max_flags > fld_size:
+                        print("file: " + name + " line: " + str(lcnt))
+                        print("Flag stop value of " + str(max_flags) \
+                                + " is larger than field size " + str(fld_size))
+                        sys.exit(1)
             if line.find('AUTOMATIC FLAG VALUE GENERATION START') != -1:
                 m = re.search("\d+", line)
                 if m == None:
@@ -41,15 +53,22 @@ def flag_declare(name):
                         " GENERATION STOP 32", file=sys.stderr)
                     sys.exit(1)
                 end = int(m.group(0))
+
+                poweroftwo = (end != 0) and ((end & (end-1)) == 0)
+                if not poweroftwo and end != 12:
+                    print(name + ": line " + str(lcnt) + ", the stop value " + str(end) +
+                    " is not a power of 2", file=sys.stderr)
+                    sys.exit(1)
                 # Compare the number of flags defined and against the number
                 # of flags allowed
-                if len(defines) > end - start:
+                max_flags = len(defines)
+                if max_flags > end - start:
                     print(name + ": line " + str(lcnt) +\
                           ": exceeds maximum {0} limit bit flags".format(end), file=sys.stderr)
                     sys.exit(1)
 
                 # Calculate number of hex bytes, create format string
-                fmt = "0x%%0%dxu" % ((start + len(defines) + 3) / 4)
+                fmt = "0x%%0%dxu" % ((start + max_flags + 3) / 4)
 
                 # Generate the flags starting from an offset set from the start value.
                 tfile.write(header)
@@ -61,6 +80,8 @@ def flag_declare(name):
 
                 parsing = False
                 start = 0
+                stopped = line
+                continue
             elif parsing and line.find('#define') == -1:
                 print(name + ": line " + str(lcnt) +\
                       ": unexpected flag line, no #define", file=sys.stderr)
@@ -69,6 +90,7 @@ def flag_declare(name):
                 defines.append(line)
             else:
                 tfile.write(line)
+            stopped = ''
 
         tfile.close()
         compare_srcfile(tmp_file, name)
