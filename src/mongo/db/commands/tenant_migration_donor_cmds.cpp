@@ -117,11 +117,16 @@ public:
             // with the same migrationId but different options (e.g. tenantId or
             // recipientConnectionString or readPreference).
             uassertStatusOK(donor->checkIfOptionsConflict(stateDoc));
-            auto durableState = donor->getDurableState(opCtx);
-            auto response = Response(durableState.state);
-            if (durableState.abortReason) {
+
+
+            // always ensure we wait for the initial state document to be inserted.
+            donor->getInitialStateDocumentDurableFuture().get(opCtx);
+            auto durableState = donor->getDurableState();
+
+            auto response = Response(durableState->state);
+            if (durableState->abortReason) {
                 BSONObjBuilder bob;
-                durableState.abortReason.get().serializeErrorToBSON(&bob);
+                durableState->abortReason->serializeErrorToBSON(&bob);
                 response.setAbortReason(bob.obj());
             }
 
@@ -180,22 +185,28 @@ public:
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
-            auto donor = TenantMigrationDonorService::Instance::lookup(
+            auto optionalDonor = TenantMigrationDonorService::Instance::lookup(
                 opCtx, donorService, BSON("_id" << cmd.getMigrationId()));
             uassert(ErrorCodes::NoSuchTenantMigration,
                     str::stream() << "Could not find tenant migration with id "
                                   << cmd.getMigrationId(),
-                    donor);
+                    optionalDonor);
 
-            auto durableState = donor.get()->getDurableState(opCtx);
+            // Retrieve the shared_ptr from boost::optional to improve readability
+            auto donorPtr = optionalDonor.get();
+
+            // always ensure we wait for the initial state document to be inserted.
+            donorPtr->getInitialStateDocumentDurableFuture().get(opCtx);
+
+            auto durableState = donorPtr->getDurableState();
             uassert(ErrorCodes::TenantMigrationInProgress,
                     str::stream() << "Could not forget migration with id " << cmd.getMigrationId()
                                   << " since no decision has been made yet",
-                    durableState.state == TenantMigrationDonorStateEnum::kCommitted ||
-                        durableState.state == TenantMigrationDonorStateEnum::kAborted);
+                    durableState->state == TenantMigrationDonorStateEnum::kCommitted ||
+                        durableState->state == TenantMigrationDonorStateEnum::kAborted);
 
-            donor.get().get()->onReceiveDonorForgetMigration();
-            donor.get().get()->getCompletionFuture().get(opCtx);
+            donorPtr->onReceiveDonorForgetMigration();
+            donorPtr->getCompletionFuture().get(opCtx);
         }
 
     private:
@@ -248,13 +259,13 @@ public:
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
-            auto donorPtr = TenantMigrationDonorService::Instance::lookup(
+            auto optionalDonor = TenantMigrationDonorService::Instance::lookup(
                 opCtx, donorService, BSON("_id" << cmd.getMigrationId()));
 
             // If there is NoSuchTenantMigration, perform a noop write and wait for it to be
             // majority committed to verify that any durable data read up to this point is majority
             // committed.
-            if (!donorPtr) {
+            if (!optionalDonor) {
                 tenant_migration_access_blocker::performNoopWrite(opCtx,
                                                                   "NoSuchTenantMigration error");
 
@@ -271,16 +282,16 @@ public:
                                         << cmd.getMigrationId());
             }
 
-            const auto& donor = donorPtr.get().get();
+            // Retrieve the shared_ptr from boost::optional to improve readability
+            auto donorPtr = optionalDonor.get();
 
-            donor->onReceiveDonorAbortMigration();
-            donor->getDecisionFuture().get(opCtx);
-
-            auto durableState = donor->getDurableState(opCtx);
+            donorPtr->onReceiveDonorAbortMigration();
+            donorPtr->getDecisionFuture().get(opCtx);
+            auto durableState = donorPtr->getDurableState();
 
             uassert(ErrorCodes::TenantMigrationCommitted,
                     "Tenant migration already committed",
-                    durableState.state == TenantMigrationDonorStateEnum::kAborted);
+                    durableState->state == TenantMigrationDonorStateEnum::kAborted);
         }
 
     private:

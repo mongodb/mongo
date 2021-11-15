@@ -156,12 +156,17 @@ void TenantMigrationDonorService::checkIfConflictsWithOtherInstances(
     // Any existing migration for this tenant must be aborted and garbage-collectable.
     for (auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const TenantMigrationDonorService::Instance*>(instance);
-        auto durableState = typedInstance->getDurableState(opCtx);
-        uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "tenant " << tenantId << " is already migrating",
-                typedInstance->getTenantId() != tenantId ||
-                    (durableState.state == TenantMigrationDonorStateEnum::kAborted &&
-                     durableState.expireAt));
+        auto durableState = typedInstance->getDurableState();
+
+        if (typedInstance->getTenantId() == tenantId) {
+            // If a migration with the same tenantId exists, it needs to be already in kAborted
+            // state
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream() << "tenant " << tenantId << " is already migrating",
+                    durableState &&
+                        durableState->state == TenantMigrationDonorStateEnum::kAborted &&
+                        durableState->expireAt);
+        }
     }
 }
 
@@ -170,7 +175,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> TenantMigrationDonorService:
 
     return std::make_shared<TenantMigrationDonorService::Instance>(
         _serviceContext, this, initialState);
-}
+}  // namespace mongo
 
 void TenantMigrationDonorService::abortAllMigrations(OperationContext* opCtx) {
     LOGV2(5356301, "Aborting all tenant migrations on donor");
@@ -272,15 +277,13 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
     if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
         // The migration was resumed on stepup.
 
-        _durableState.state = _stateDoc.getState();
-        _durableState.expireAt = _stateDoc.getExpireAt();
         if (_stateDoc.getAbortReason()) {
             auto abortReasonBson = _stateDoc.getAbortReason().get();
             auto code = abortReasonBson["code"].Int();
             auto errmsg = abortReasonBson["errmsg"].String();
-            _durableState.abortReason = Status(ErrorCodes::Error(code), errmsg);
-            _abortReason = _durableState.abortReason;
+            _abortReason = Status(ErrorCodes::Error(code), errmsg);
         }
+        _durableState = DurableState{_stateDoc.getState(), _abortReason, _stateDoc.getExpireAt()};
 
         _initialDonorStateDurablePromise.emplaceValue();
 
@@ -377,7 +380,11 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("recipientConnectionString", _recipientConnectionString);
     bob.append("readPreference", _readPreference.toInnerBSON());
     bob.append("receivedCancellation", _abortRequested);
-    bob.append("lastDurableState", _durableState.state);
+    if (_durableState) {
+        bob.append("lastDurableState", _durableState.get().state);
+    } else {
+        bob.appendUndefined("lastDurableState");
+    }
     if (_stateDoc.getMigrationStart()) {
         bob.appendDate("migrationStart", *_stateDoc.getMigrationStart());
     }
@@ -419,11 +426,8 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(
                                 << tenant_migration_util::redactStateDoc(_stateDoc.toBSON()));
 }
 
-TenantMigrationDonorService::Instance::DurableState
-TenantMigrationDonorService::Instance::getDurableState(OperationContext* opCtx) const {
-    // Wait for the insert of the state doc to become majority-committed.
-    _initialDonorStateDurablePromise.getFuture().get(opCtx);
-
+boost::optional<TenantMigrationDonorService::Instance::DurableState>
+TenantMigrationDonorService::Instance::getDurableState() const {
     stdx::lock_guard<Latch> lg(_mutex);
     return _durableState;
 }
@@ -657,9 +661,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
         .thenRunOn(**executor)
         .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
-            _durableState.state = _stateDoc.getState();
-            _durableState.expireAt = _stateDoc.getExpireAt();
-            switch (_durableState.state) {
+            boost::optional<Status> abortReason;
+            switch (_stateDoc.getState()) {
                 case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
                     setPromiseOkIfNotReady(lg, _initialDonorStateDurablePromise);
                     break;
@@ -669,11 +672,14 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
                     break;
                 case TenantMigrationDonorStateEnum::kAborted:
                     invariant(_abortReason);
-                    _durableState.abortReason = _abortReason;
+                    abortReason = _abortReason;
                     break;
                 default:
                     MONGO_UNREACHABLE;
             }
+
+            _durableState =
+                DurableState{_stateDoc.getState(), std::move(abortReason), _stateDoc.getExpireAt()};
         });
 }
 

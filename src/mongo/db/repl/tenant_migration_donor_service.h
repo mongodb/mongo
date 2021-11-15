@@ -108,9 +108,18 @@ public:
         Status checkIfOptionsConflict(const TenantMigrationDonorDocument& stateDoc);
 
         /**
-         * Returns the latest durable migration state.
+         * Returns the latest durable migration state, or boost::none if no state document has been
+         * inserted yet. The state document exists once getInitialStateDocumentDurableFuture() is
+         * resolved.
          */
-        DurableState getDurableState(OperationContext* opCtx) const;
+        boost::optional<DurableState> getDurableState() const;
+
+        /**
+         * Returns a Future that will be resolved once the initial state document has been inserted.
+         */
+        SharedSemiFuture<void> getInitialStateDocumentDurableFuture() const {
+            return _initialDonorStateDurablePromise.getFuture();
+        }
 
         /**
          * Returns a Future that will be resolved when all work associated with this Instance has
@@ -309,7 +318,7 @@ public:
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
 
         // The latest majority-committed migration state.
-        DurableState _durableState;
+        boost::optional<DurableState> _durableState;
 
         // Promise that is resolved when the donor has majority-committed the write to insert the
         // donor state doc for the migration.
