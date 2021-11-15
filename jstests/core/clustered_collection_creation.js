@@ -22,6 +22,22 @@ if (!ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo())) {
     return;
 }
 
+const validateCompoundSecondaryIndexes = function(db, coll, clusterKey) {
+    const clusterKeyField = Object.keys(clusterKey)[0];
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}));
+    // Expect it's possible to create a compound secondary index that does not include the cluster
+    // key.
+    assert.commandWorked(coll.createIndex({secondaryKey0: 1, secondaryKey1: 1}));
+    // Expect it's possible to create a compound secondary index that prefixes the cluster key.
+    assert.commandWorked(coll.createIndex({[clusterKeyField]: 1, secondaryKey1: 1}));
+    // Expect it's possible to create a compound secondary index that includes the cluster key but
+    // not as a prefix.
+    assert.commandWorked(coll.createIndex({secondaryKey0: 1, [clusterKeyField]: 1}));
+    coll.drop();
+};
+
 // Cannot create an index with the same key as the cluster key.
 const validateClusteredIndexAlreadyExists = function(db, collName, fullCreateOptions) {
     const clusterKey = fullCreateOptions.clusteredIndex.key;
@@ -275,4 +291,9 @@ assert.commandFailedWithCode(
         nonReplicatedColl.getName(),
         {clusteredIndex: {key: {ts: 1}, unique: true}, expireAfterSeconds: -10}),
     ErrorCodes.InvalidOptions);
+
+// Validate that it's possible to create secondary indexes, regardless of whether they
+// include the cluster key as one of the fields.
+validateCompoundSecondaryIndexes(replicatedDB, replicatedColl, {_id: 1});
+validateCompoundSecondaryIndexes(nonReplicatedDB, nonReplicatedColl, {ts: 1});
 })();

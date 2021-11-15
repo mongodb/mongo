@@ -99,6 +99,12 @@ BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo) 
 
 bool matchesClusterKey(const BSONObj& obj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo) {
+    const auto nFields = obj.nFields();
+    invariant(nFields > 0);
+    if (nFields > 1) {
+        // Clustered key cannot be compound.
+        return false;
+    }
     return obj.firstElement().fieldNameStringData() ==
         collInfo->getIndexSpec().getKey().firstElement().fieldNameStringData();
 }
