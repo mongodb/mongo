@@ -50,7 +50,12 @@ MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
 
 Status processRemoteResponse(OperationContext* opCtx,
                              const executor::RemoteCommandResponse& remoteResponse) {
-    // TODO(SERVER-61113): retrieve the last operation time and apply it to the opCtx
+    // Since requests are executed by a separate thread, the related operationTime needs to be
+    // explicitly retrieved and set on the original context of the requestor to ensure
+    // it will be propagated back to the router.
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    replClient.setLastOpToSystemLastOpTime(opCtx);
+
     if (!remoteResponse.status.isOK()) {
         return remoteResponse.status;
     }
