@@ -86,7 +86,7 @@ fpBeforeApplierFutureCalled.off();
 
 jsTestLog("Stepping another node up.");
 // Make a new recipient primary step up. This will ask the applier to shutdown.
-assert.commandWorked(recipientRst.getSecondaries()[0].adminCommand({replSetStepUp: 1}));
+recipientRst.stepUp(recipientRst.getSecondaries()[0]);
 
 jsTestLog("Release the tenant oplog applier failpoint.");
 fpPauseOplogApplier.off();
