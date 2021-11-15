@@ -8,7 +8,6 @@
  * namespace.
  *
  * @tags: [
- *   # TODO SERVER-57128: remove the following tag once mongos retries will be resilient
  *   assumes_unsharded_collection,
  * ]
  */
