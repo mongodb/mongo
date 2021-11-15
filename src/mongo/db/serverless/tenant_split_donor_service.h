@@ -58,6 +58,7 @@ public:
     ThreadPool::Limits getThreadPoolLimits() const override;
 
 protected:
+    // Instance conflict check not yet implemented.
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,

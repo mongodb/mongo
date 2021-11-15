@@ -58,6 +58,7 @@ public:
         return ThreadPool::Limits();
     }
 
+    // The service implemented its own conflict check before this method was added.
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
