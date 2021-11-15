@@ -1,52 +1,49 @@
-var res;
+/**
+ * Tests array append/removal operations using $push.
+ *
+ * The $push operator also supports modifiers such as $each, $slice, $sort, and $position
+ * that are described in the documentation:
+ *     https://docs.mongodb.com/manual/reference/operator/update/push/#modifiers
+ *
+ * Tests for these modifiers may be found in:
+ * - jstests/core/push_sort.js
+ * - src/mongod/db/update/push_node_test.cpp
+ */
+(function() {
+'use strict';
 
-t = db.push;
+const t = db.push;
 t.drop();
 
-t.save({_id: 2, a: [1]});
-t.update({_id: 2}, {$push: {a: 2}});
-assert.eq("1,2", t.findOne().a.toString(), "A");
-t.update({_id: 2}, {$push: {a: 3}});
-assert.eq("1,2,3", t.findOne().a.toString(), "B");
+assert.commandWorked(t.insert({_id: 2, a: [1]}));
+assert.commandWorked(t.update({_id: 2}, {$push: {a: 2}}));
+assert.sameMembers([1, 2], t.findOne().a, "Array should contain 2 elements after appending 2.");
+assert.commandWorked(t.update({_id: 2}, {$push: {a: 3}}));
+assert.sameMembers([1, 2, 3], t.findOne().a, "Array should contain 3 elements after appending 3.");
 
-t.update({_id: 2}, {$pop: {a: 1}});
-assert.eq("1,2", t.findOne().a.toString(), "C");
-t.update({_id: 2}, {$pop: {a: -1}});
-assert.eq("2", t.findOne().a.toString(), "D");
+assert.commandWorked(t.update({_id: 2}, {$pop: {a: 1}}));
+assert.sameMembers(
+    [1, 2], t.findOne().a, "Array should contain 2 elements after removing the last element.");
+assert.commandWorked(t.update({_id: 2}, {$pop: {a: -1}}));
+assert.sameMembers(
+    [2], t.findOne().a, "Array should contain 1 element after removing the first element.");
 
-t.update({_id: 2}, {$push: {a: 3}});
-t.update({_id: 2}, {$push: {a: 4}});
-t.update({_id: 2}, {$push: {a: 5}});
-assert.eq("2,3,4,5", t.findOne().a.toString(), "E1");
+assert.commandWorked(t.update({_id: 2}, {$pop: {a: -1}}));
+assert.sameMembers([], t.findOne().a, "Array should be empty after removing the first element");
 
-t.update({_id: 2}, {$pop: {a: -1}});
-assert.eq("3,4,5", t.findOne().a.toString(), "E2");
+assert.commandWorked(t.update({_id: 2}, {$pop: {a: 1}}));
+assert.sameMembers(
+    [], t.findOne().a, "Empty array should remain empty after trying to remove the last element.");
 
-t.update({_id: 2}, {$pop: {a: -1}});
-assert.eq("4,5", t.findOne().a.toString(), "E3");
+assert.commandWorked(t.update({_id: 2}, {$pop: {b: -1}}));
+assert.sameMembers(
+    [],
+    t.findOne().a,
+    "Popping (first element of) non-existent field should not affect array in field 'a'.");
 
-res = t.update({_id: 2}, {$pop: {a: -1}});
-assert.commandWorked(res);
-assert.eq("5", t.findOne().a.toString(), "E4");
-
-res = t.update({_id: 2}, {$pop: {a: -1}});
-assert.commandWorked(res);
-assert.eq("", t.findOne().a.toString(), "E5");
-
-res = t.update({_id: 2}, {$pop: {a: -1}});
-assert.commandWorked(res);
-assert.eq("", t.findOne().a.toString(), "E6");
-
-res = t.update({_id: 2}, {$pop: {a: -1}});
-assert.commandWorked(res);
-assert.eq("", t.findOne().a.toString(), "E7");
-
-res = t.update({_id: 2}, {$pop: {a: 1}});
-assert.commandWorked(res);
-assert.eq("", t.findOne().a.toString(), "E8");
-
-res = t.update({_id: 2}, {$pop: {b: -1}});
-assert.commandWorked(res);
-
-res = t.update({_id: 2}, {$pop: {b: 1}});
-assert.commandWorked(res);
+assert.commandWorked(t.update({_id: 2}, {$pop: {b: 1}}));
+assert.sameMembers(
+    [],
+    t.findOne().a,
+    "Popping (last element of) non-existent field should not affect array in field 'a'.");
+})();
