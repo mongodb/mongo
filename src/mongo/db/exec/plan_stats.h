@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -57,7 +58,8 @@ struct SpecificStats {
 
     virtual uint64_t estimateObjectSizeInBytes() const = 0;
 
-    virtual void accumulate(PlanSummaryStats& summary) const {}
+    virtual void acceptVisitor(PlanStatsConstVisitor* visitor) const = 0;
+    virtual void acceptVisitor(PlanStatsMutableVisitor* visitor) = 0;
 };
 
 // Every stage has CommonStats.
@@ -149,6 +151,22 @@ struct BasePlanStageStats {
             sizeof(*this);
     }
 
+    auto begin() {
+        return children.begin();
+    }
+
+    auto begin() const {
+        return children.begin();
+    }
+
+    auto end() {
+        return children.end();
+    }
+
+    auto end() const {
+        return children.end();
+    }
+
     T stageType;
 
     // Stats exported by implementing the PlanStage interface.
@@ -182,6 +200,14 @@ struct AndHashStats : public SpecificStats {
         return container_size_helper::estimateObjectSizeInBytes(mapAfterChild) + sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     // How many entries are in the map after each child?
     // child 'i' produced children[i].common.advanced RecordIds, of which mapAfterChild[i] were
     // intersections.
@@ -208,6 +234,14 @@ struct AndSortedStats : public SpecificStats {
         return container_size_helper::estimateObjectSizeInBytes(failedAnd) + sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     // How many results from each child did not pass the AND?
     std::vector<size_t> failedAnd;
 };
@@ -221,6 +255,14 @@ struct CachedPlanStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     boost::optional<std::string> replanReason;
@@ -237,6 +279,13 @@ struct CollectionScanStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
 
     // How many documents did we check against our filter?
     size_t docsTested;
@@ -263,6 +312,14 @@ struct CountStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // The result of the count.
@@ -301,6 +358,14 @@ struct CountScanStats : public SpecificStats {
                    true) +
             keyPattern.objsize() + collation.objsize() + startKey.objsize() + endKey.objsize() +
             indexName.capacity() + sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     std::string indexName;
@@ -344,6 +409,14 @@ struct DeleteStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     size_t docsDeleted = 0u;
 };
 
@@ -367,6 +440,14 @@ struct DistinctScanStats : public SpecificStats {
                    true) +
             keyPattern.objsize() + collation.objsize() + indexBounds.objsize() +
             indexName.capacity() + sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // How many keys did we look at while distinct-ing?
@@ -408,6 +489,14 @@ struct FetchStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     // Have we seen anything that already had an object?
     size_t alreadyHasObj = 0u;
 
@@ -426,6 +515,14 @@ struct IDHackStats : public SpecificStats {
         return indexName.capacity() + sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     std::string indexName;
 
     // Number of entries retrieved from the index while executing the idhack.
@@ -442,6 +539,14 @@ struct ReturnKeyStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 };
 
@@ -477,6 +582,14 @@ struct IndexScanStats : public SpecificStats {
                    true) +
             keyPattern.objsize() + collation.objsize() + indexBounds.objsize() +
             indexName.capacity() + indexType.capacity() + sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // Index type being used.
@@ -531,6 +644,14 @@ struct LimitStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     size_t limit;
 };
 
@@ -544,6 +665,14 @@ struct MockStats : public SpecificStats {
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
     }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
 };
 
 struct MultiPlanStats : public SpecificStats {
@@ -556,6 +685,14 @@ struct MultiPlanStats : public SpecificStats {
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
     }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
 };
 
 struct OrStats : public SpecificStats {
@@ -567,6 +704,14 @@ struct OrStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     size_t dupsTested = 0u;
@@ -582,6 +727,14 @@ struct ProjectionStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return projObj.objsize() + sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // Object specifying the projection transformation to apply.
@@ -601,9 +754,12 @@ struct SortStats : public SpecificStats {
         return sortPattern.objsize() + sizeof(*this);
     }
 
-    void accumulate(PlanSummaryStats& summary) const final {
-        summary.hasSortStage = true;
-        summary.usedDisk = summary.usedDisk || spills > 0;
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // The pattern according to which we are sorting.
@@ -640,6 +796,14 @@ struct MergeSortStats : public SpecificStats {
         return sortPattern.objsize() + sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     size_t dupsTested = 0u;
     size_t dupsDropped = 0u;
 
@@ -658,6 +822,14 @@ struct ShardingFilterStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     size_t chunkSkips;
 };
 
@@ -670,6 +842,14 @@ struct SkipStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     size_t skip;
@@ -701,6 +881,14 @@ struct NearStats : public SpecificStats {
             keyPattern.objsize() + indexName.capacity() + sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     std::vector<IntervalStats> intervalStats;
     std::string indexName;
     // btree index version, not geo index version
@@ -717,6 +905,14 @@ struct UpdateStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return objInserted.objsize() + sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // The number of documents which match the query part of the update.
@@ -745,6 +941,14 @@ struct TextMatchStats : public SpecificStats {
             sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     std::string indexName;
 
     // Human-readable form of the FTSQuery associated with the text stage.
@@ -769,6 +973,14 @@ struct TextOrStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     size_t fetches;
 };
 
@@ -779,6 +991,14 @@ struct TrialStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     size_t trialPeriodMaxWorks = 0;
@@ -800,8 +1020,12 @@ struct GroupStats : public SpecificStats {
         return sizeof(*this);
     }
 
-    void accumulate(PlanSummaryStats& summary) const final {
-        summary.usedDisk = summary.usedDisk || spills > 0;
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // Tracks an estimate of the total size of all documents output by the group stage in bytes.
@@ -821,8 +1045,12 @@ struct DocumentSourceCursorStats : public SpecificStats {
             (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
     }
 
-    void accumulate(PlanSummaryStats& summary) const final {
-        summary.accumulate(planSummaryStats);
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     PlanSummaryStats planSummaryStats;
@@ -838,8 +1066,12 @@ struct DocumentSourceLookupStats : public SpecificStats {
             (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
     }
 
-    void accumulate(PlanSummaryStats& summary) const final {
-        summary.accumulate(planSummaryStats);
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // Tracks the summary stats in aggregate across all executions of the subpipeline.
@@ -856,8 +1088,12 @@ struct UnionWithStats final : public SpecificStats {
             (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
     }
 
-    void accumulate(PlanSummaryStats& summary) const final {
-        summary.accumulate(planSummaryStats);
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // Tracks the summary stats of the subpipeline.
@@ -874,8 +1110,12 @@ struct DocumentSourceFacetStats : public SpecificStats {
             (planSummaryStats.estimateObjectSizeInBytes() - sizeof(planSummaryStats));
     }
 
-    void accumulate(PlanSummaryStats& summary) const final {
-        summary.accumulate(planSummaryStats);
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     // Tracks the cumulative summary stats across all facets.
@@ -891,6 +1131,14 @@ struct UnpackTimeseriesBucketStats final : public SpecificStats {
         return sizeof(*this);
     }
 
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
     size_t nBucketsUnpacked = 0u;
 };
 
@@ -901,6 +1149,14 @@ struct SampleFromTimeseriesBucketStats final : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
     }
 
     size_t nBucketsDiscarded = 0u;

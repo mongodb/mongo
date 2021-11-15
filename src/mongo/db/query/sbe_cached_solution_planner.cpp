@@ -32,6 +32,7 @@
 
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
@@ -72,8 +73,9 @@ CandidatePlans CachedSolutionPlanner::plan(
         return replan(false, str::stream() << "cached plan returned: " << candidate.status);
     }
 
-    auto stats{candidate.root->getStats(false /* includeDebugInfo  */)};
-    auto numReads{calculateNumberOfReads(stats.get())};
+    auto visitor = PlanStatsNumReadsVisitor{};
+    candidate.root->accumulate(kEmptyPlanNodeId, &visitor);
+    auto numReads = visitor.numReads;
 
     // If the trial run executed in 'collectExecutionStats()' did not determine that a replan is
     // necessary, then return that plan as is. The executor can continue using it. All results
@@ -121,9 +123,9 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 
     auto needsReplanningCheck = [maxTrialPeriodNumReads](PlanStage* candidateRoot) {
-        auto stats{candidateRoot->getStats(false /* includeDebugInfo  */)};
-        auto numReads{calculateNumberOfReads(stats.get())};
-        return numReads > maxTrialPeriodNumReads;
+        auto visitor = PlanStatsNumReadsVisitor{};
+        candidateRoot->accumulate(kEmptyPlanNodeId, &visitor);
+        return visitor.numReads > maxTrialPeriodNumReads;
     };
     auto trackerRequirementCheck = [&needsReplanningCheck, &candidate]() {
         bool shouldExitEarly = needsReplanningCheck(candidate.root.get());

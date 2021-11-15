@@ -33,11 +33,14 @@
 
 #include <queue>
 
+#include "mongo/db/exec/plan_stats_walker.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/tree_walker.h"
 #include "mongo/db/record_id_helpers.h"
 
 namespace mongo {
@@ -292,23 +295,9 @@ PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) 
         summary.executionTimeMillisEstimate = *stats->common.executionTimeMillis;
     }
 
-    // Collect cumulative execution stats for the plan.
-    std::queue<const sbe::PlanStageStats*> queue;
-    queue.push(stats);
-    while (!queue.empty()) {
-        stats = queue.front();
-        invariant(stats);
-        queue.pop();
-
-        if (stats->specific) {
-            stats->specific->accumulate(summary);
-        }
-
-        for (auto&& child : stats->children) {
-            queue.push(child.get());
-        }
-    }
-
+    auto visitor = PlanSummaryStatsVisitor(summary);
+    auto walker = PlanStageStatsWalker<true, sbe::CommonStats>(nullptr, nullptr, &visitor);
+    tree_walker::walk<true, sbe::PlanStageStats>(stats, &walker);
     return summary;
 }
 
@@ -436,7 +425,8 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->replanReason = _rootData->replanReason;
 
     // Collect cumulative execution stats for the plan.
-    _root->accumulate(kEmptyPlanNodeId, *statsOut);
+    auto visitor = PlanSummaryStatsVisitor(*statsOut);
+    _root->accumulate(kEmptyPlanNodeId, &visitor);
 
     std::queue<const QuerySolutionNode*> queue;
     queue.push(_solution->root());

@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
@@ -76,9 +77,10 @@ static StringMap<ParserRegistration> parserMap;
 
 void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
                                         PlanSummaryStats& planSummaryStats) {
+    auto visitor = PlanSummaryStatsVisitor(planSummaryStats);
     for (auto&& source : pipeline.getSources()) {
         if (auto specificStats = source->getSpecificStats()) {
-            specificStats->accumulate(planSummaryStats);
+            specificStats->acceptVisitor(&visitor);
         }
     }
 }

@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
 
 namespace mongo {
 /**
@@ -47,8 +48,8 @@ template <typename DocSourceType, typename DocSourceStatType>
 void collectPlanSummaryStats(const DocSourceType& source, PlanSummaryStats* statsOut) {
     auto specificStats = source.getSpecificStats();
     invariant(specificStats);
-    auto& docSpecificStats = static_cast<const DocSourceStatType&>(*specificStats);
-    statsOut->accumulate(docSpecificStats.planSummaryStats);
+    auto visitor = PlanSummaryStatsVisitor(*statsOut);
+    specificStats->acceptVisitor(&visitor);
 }
 
 const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {

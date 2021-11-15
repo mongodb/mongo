@@ -237,18 +237,19 @@ public:
     /**
      * Populates plan 'summary' object by walking through the entire PlanStage tree and for each
      * node whose plan node ID equals to the given 'nodeId', or if 'nodeId' is 'kEmptyPlanNodeId',
-     * invoking 'accumulate(summary)' on the SpecificStats instance obtained by calling
+     * invoking 'acceptVisitor(visitor)' on the SpecificStats instance obtained by calling
      * 'getSpecificStats()'.
      */
-    void accumulate(PlanNodeId nodeId, PlanSummaryStats& summary) const {
+    template <bool IsConst>
+    void accumulate(PlanNodeId nodeId, PlanStatsVisitor<IsConst>* visitor) const {
         if (auto stats = getSpecificStats();
             stats && (nodeId == kEmptyPlanNodeId || _commonStats.nodeId == nodeId)) {
-            stats->accumulate(summary);
+            stats->acceptVisitor(visitor);
         }
 
         auto stage = static_cast<const T*>(this);
         for (auto&& child : stage->_children) {
-            child->accumulate(nodeId, summary);
+            child->accumulate(nodeId, visitor);
         }
     }
 
