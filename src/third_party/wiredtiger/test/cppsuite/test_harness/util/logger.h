@@ -60,6 +60,8 @@ namespace test_harness {
  */
 #define LOG_TRACE 3
 
+void get_time(char *time_buf, size_t buf_size);
+
 class logger {
     public:
     /* Current log level. Default is LOG_WARN. */

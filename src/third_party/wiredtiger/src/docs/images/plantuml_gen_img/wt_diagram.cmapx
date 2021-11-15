@@ -1,20 +1,20 @@
 <map id="wt_diagram_map" name="wt_diagram_map">
 <area shape="rect" id="id1" href="modules.html" title="modules.html" alt="" coords="248,128,283,144"/>
-<area shape="rect" id="id2" href="arch-cache.html" title="arch-cache.html" alt="" coords="196,546,240,562"/>
-<area shape="rect" id="id3" href="arch-cursor.html" title="arch-cursor.html" alt="" coords="206,224,252,240"/>
-<area shape="rect" id="id4" href="arch-eviction.html" title="arch-eviction.html" alt="" coords="295,546,348,562"/>
+<area shape="rect" id="id2" href="arch-cache.html" title="arch-cache.html" alt="" coords="204,546,248,562"/>
+<area shape="rect" id="id3" href="arch-cursor.html" title="arch-cursor.html" alt="" coords="234,224,280,240"/>
+<area shape="rect" id="id4" href="arch-eviction.html" title="arch-eviction.html" alt="" coords="303,546,356,562"/>
 <area shape="rect" id="id5" href="arch-logging.html" title="arch-logging.html" alt="" coords="388,650,443,666"/>
-<area shape="rect" id="id6" href="arch-schema.html" title="arch-schema.html" alt="" coords="95,224,151,240"/>
+<area shape="rect" id="id6" href="arch-schema.html" title="arch-schema.html" alt="" coords="123,224,179,240"/>
 <area shape="rect" id="id7" href="command_line.html" title="command_line.html" alt="" coords="374,23,430,39"/>
 <area shape="rect" id="id8" href="arch-log-file.html" title="arch-log-file.html" alt="" coords="308,865,339,897"/>
 <area shape="rect" id="id9" href="arch-metadata.html" title="arch-metadata.html" alt="" coords="25,328,89,344"/>
 <area shape="rect" id="id10" href="arch-python.html" title="arch-python.html" alt="" coords="84,23,157,39"/>
-<area shape="rect" id="id11" href="arch-snapshot.html" title="arch-snapshot.html" alt="" coords="381,441,455,457"/>
-<area shape="rect" id="id12" href="arch-transaction.html" title="arch-transaction.html" alt="" coords="339,328,428,344"/>
+<area shape="rect" id="id11" href="arch-snapshot.html" title="arch-snapshot.html" alt="" coords="297,441,371,457"/>
+<area shape="rect" id="id12" href="arch-transaction.html" title="arch-transaction.html" alt="" coords="298,328,387,344"/>
 <area shape="rect" id="id13" href="arch-hs.html" title="arch-hs.html" alt="" coords="93,642,140,674"/>
-<area shape="rect" id="id14" href="arch-row-column.html" title="arch-row-column.html" alt="" coords="163,433,217,465"/>
-<area shape="rect" id="id16" href="arch-block.html" title="arch-block.html" alt="" coords="196,642,256,674"/>
-<area shape="rect" id="id17" href="arch-dhandle.html" title="arch-dhandle.html" alt="" coords="181,320,242,352"/>
-<area shape="rect" id="id18" href="arch-data-file.html" title="arch-data-file.html" alt="" coords="179,865,245,897"/>
-<area shape="rect" id="id19" href="arch-fs-os.html" title="arch-fs-os.html" alt="" coords="175,755,357,771"/>
+<area shape="rect" id="id14" href="arch-block.html" title="arch-block.html" alt="" coords="196,642,256,674"/>
+<area shape="rect" id="id15" href="arch-dhandle.html" title="arch-dhandle.html" alt="" coords="144,320,205,352"/>
+<area shape="rect" id="id16" href="arch-data-file.html" title="arch-data-file.html" alt="" coords="179,865,245,897"/>
+<area shape="rect" id="id17" href="arch-row-column.html" title="arch-row-column.html" alt="" coords="117,433,205,465"/>
+<area shape="rect" id="id18" href="arch-fs-os.html" title="arch-fs-os.html" alt="" coords="175,755,357,771"/>
 </map>

@@ -107,7 +107,7 @@ test::run()
     statistics_config = _config->get_subconfig(STATISTICS_CONFIG);
     statistics_type = statistics_config->get_string(TYPE);
     statistics_logging = statistics_config->get_bool(ENABLE_LOGGING);
-    db_create_config += statistics_logging ? "," + std::string(STATISTICS_LOG) : "";
+    db_create_config += statistics_logging ? "," + STATISTICS_LOG : "";
     db_create_config += ",statistics=(" + statistics_type + ")";
     /* Don't forget to delete. */
     delete statistics_config;
@@ -163,29 +163,5 @@ test::run()
     }
 
     logger::log_msg(LOG_INFO, "SUCCESS");
-}
-
-workload_generator *
-test::get_workload_generator()
-{
-    return (_workload_generator);
-}
-
-runtime_monitor *
-test::get_runtime_monitor()
-{
-    return (_runtime_monitor);
-}
-
-timestamp_manager *
-test::get_timestamp_manager()
-{
-    return (_timestamp_manager);
-}
-
-thread_manager *
-test::get_thread_manager()
-{
-    return (_thread_manager);
 }
 } // namespace test_harness

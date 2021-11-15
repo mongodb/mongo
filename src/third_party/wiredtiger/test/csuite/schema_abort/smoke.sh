@@ -27,8 +27,7 @@ $TEST_WRAPPER $test_bin -c -m -t 10 -T 5
 $TEST_WRAPPER $test_bin -c -C -t 10 -T 5
 $TEST_WRAPPER $test_bin -c -C -m -t 10 -T 5
 
-# FIXME: In WT-6116 the test is failing if timestamps are turned off.
-#$TEST_WRAPPER $test_bin -m -t 10 -T 5 -z
-#$TEST_WRAPPER $test_bin -c -m -t 10 -T 5 -z
+$TEST_WRAPPER $test_bin -m -t 10 -T 5 -z
+$TEST_WRAPPER $test_bin -c -m -t 10 -T 5 -z
 $TEST_WRAPPER $test_bin -m -t 10 -T 5 -x
 $TEST_WRAPPER $test_bin -c -m -t 10 -T 5 -x

@@ -303,6 +303,25 @@ __wt_stats_clear(void *stats_arg, int slot)
             WT_STAT_CONN_INCR(session, stat##_gt10000);                                           \
     }
 
+#define WT_STAT_COMPR_RATIO_HIST_INCR_FUNC(ratio)                                                \
+    static inline void __wt_stat_compr_ratio_hist_incr(WT_SESSION_IMPL *session, uint64_t ratio) \
+    {                                                                                            \
+        if (ratio < 2)                                                                           \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_2);                                   \
+        else if (ratio < 4)                                                                      \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_4);                                   \
+        else if (ratio < 8)                                                                      \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_8);                                   \
+        else if (ratio < 16)                                                                     \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_16);                                  \
+        else if (ratio < 32)                                                                     \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_32);                                  \
+        else if (ratio < 64)                                                                     \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_64);                                  \
+        else                                                                                     \
+            WT_STAT_DATA_INCR(session, compress_hist_ratio_max);                                 \
+    }
+
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
@@ -323,6 +342,27 @@ struct __wt_connection_stats {
     int64_t lsm_work_units_done;
     int64_t lsm_work_units_created;
     int64_t lsm_work_queue_max;
+    int64_t block_cache_blocks_update;
+    int64_t block_cache_bytes_update;
+    int64_t block_cache_blocks_evicted;
+    int64_t block_cache_bypass_filesize;
+    int64_t block_cache_data_refs;
+    int64_t block_cache_not_evicted_overhead;
+    int64_t block_cache_bypass_writealloc;
+    int64_t block_cache_bypass_overhead_put;
+    int64_t block_cache_bypass_get;
+    int64_t block_cache_bypass_put;
+    int64_t block_cache_eviction_passes;
+    int64_t block_cache_hits;
+    int64_t block_cache_misses;
+    int64_t block_cache_bypass_chkpt;
+    int64_t block_cache_blocks_removed;
+    int64_t block_cache_blocks;
+    int64_t block_cache_blocks_insert_read;
+    int64_t block_cache_blocks_insert_write;
+    int64_t block_cache_bytes;
+    int64_t block_cache_bytes_insert_read;
+    int64_t block_cache_bytes_insert_write;
     int64_t block_preload;
     int64_t block_read;
     int64_t block_write;
@@ -458,7 +498,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_pages_seen;
     int64_t cache_eviction_pages_already_queued;
     int64_t cache_eviction_fail;
-    int64_t cache_eviction_fail_parent_has_overflow_items;
     int64_t cache_eviction_fail_active_children_on_an_internal_page;
     int64_t cache_eviction_fail_in_reconciliation;
     int64_t cache_eviction_fail_checkpoint_out_of_order_ts;
@@ -656,7 +695,6 @@ struct __wt_connection_stats {
     int64_t rec_time_window_bytes_ts;
     int64_t rec_time_window_bytes_txn;
     int64_t rec_page_delete_fast;
-    int64_t rec_overflow_key_internal;
     int64_t rec_overflow_key_leaf;
     int64_t rec_maximum_seconds;
     int64_t rec_pages;
@@ -842,7 +880,7 @@ struct __wt_dsrc_stats {
     int64_t btree_checkpoint_generation;
     int64_t btree_clean_checkpoint_timer;
     int64_t btree_compact_pages_reviewed;
-    int64_t btree_compact_pages_write_selected;
+    int64_t btree_compact_pages_rewritten;
     int64_t btree_compact_pages_skipped;
     int64_t btree_compact_skipped;
     int64_t btree_column_fix;
@@ -851,7 +889,6 @@ struct __wt_dsrc_stats {
     int64_t btree_column_deleted;
     int64_t btree_column_variable;
     int64_t btree_fixed_len;
-    int64_t btree_maxintlkey;
     int64_t btree_maxintlpage;
     int64_t btree_maxleafkey;
     int64_t btree_maxleafpage;
@@ -859,7 +896,6 @@ struct __wt_dsrc_stats {
     int64_t btree_maximum_depth;
     int64_t btree_entries;
     int64_t btree_overflow;
-    int64_t btree_compact_pages_rewritten;
     int64_t btree_row_empty_values;
     int64_t btree_row_internal;
     int64_t btree_row_leaf;
@@ -952,6 +988,13 @@ struct __wt_dsrc_stats {
     int64_t compress_precomp_leaf_max_page_size;
     int64_t compress_read;
     int64_t compress_write;
+    int64_t compress_hist_ratio_max;
+    int64_t compress_hist_ratio_16;
+    int64_t compress_hist_ratio_2;
+    int64_t compress_hist_ratio_32;
+    int64_t compress_hist_ratio_4;
+    int64_t compress_hist_ratio_64;
+    int64_t compress_hist_ratio_8;
     int64_t compress_write_fail;
     int64_t compress_write_too_small;
     int64_t cursor_next_skip_total;
@@ -994,7 +1037,6 @@ struct __wt_dsrc_stats {
     int64_t rec_page_delete_fast;
     int64_t rec_suffix_compression;
     int64_t rec_multiblock_internal;
-    int64_t rec_overflow_key_internal;
     int64_t rec_prefix_compression;
     int64_t rec_multiblock_leaf;
     int64_t rec_overflow_key_leaf;

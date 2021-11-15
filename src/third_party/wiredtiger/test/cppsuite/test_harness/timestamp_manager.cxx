@@ -84,7 +84,7 @@ timestamp_manager::do_work()
     if ((latest_ts_s - _stable_ts) > _stable_lag) {
         log_msg = "Timestamp_manager: Stable timestamp expired.";
         _stable_ts = latest_ts_s;
-        config += std::string(STABLE_TS) + "=" + decimal_to_hex(_stable_ts);
+        config += STABLE_TS + "=" + decimal_to_hex(_stable_ts);
     }
 
     /*
@@ -101,7 +101,7 @@ timestamp_manager::do_work()
         new_oldest_ts = _stable_ts - _oldest_lag;
         if (!config.empty())
             config += ",";
-        config += std::string(OLDEST_TS) + "=" + decimal_to_hex(new_oldest_ts);
+        config += OLDEST_TS + "=" + decimal_to_hex(new_oldest_ts);
     }
 
     if (!log_msg.empty())

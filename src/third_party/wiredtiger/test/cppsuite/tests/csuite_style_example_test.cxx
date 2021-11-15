@@ -46,6 +46,10 @@ extern "C" {
 
 using namespace test_harness;
 
+/* Declarations to avoid the error raised by -Werror=missing-prototypes. */
+void insert_op(WT_CURSOR *cursor, int key_size, int value_size);
+void read_op(WT_CURSOR *cursor, int key_size);
+
 bool do_inserts = false;
 bool do_reads = false;
 
@@ -93,7 +97,7 @@ main(int argc, char *argv[])
     logger::log_msg(LOG_ERROR, "This could be an error.");
 
     /* Create a connection, set the cache size and specify the home directory. */
-    const std::string conn_config = std::string(CONNECTION_CREATE) + ",cache_size=500MB";
+    const std::string conn_config = CONNECTION_CREATE + ",cache_size=500MB";
     const std::string home_dir = std::string(DEFAULT_DIR) + '_' + progname;
     /*
      * A smart pointer is used here so that the connection can automatically be closed by the
@@ -109,8 +113,8 @@ main(int argc, char *argv[])
 
     /* Create a collection. */
     const std::string collection_name = "table:my_collection";
-    testutil_check(
-      insert_session->create(insert_session, collection_name.c_str(), DEFAULT_FRAMEWORK_SCHEMA));
+    testutil_check(insert_session->create(
+      insert_session, collection_name.c_str(), DEFAULT_FRAMEWORK_SCHEMA.c_str()));
 
     /* Open different cursors. */
     WT_CURSOR *insert_cursor, *read_cursor;

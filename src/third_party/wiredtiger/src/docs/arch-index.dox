@@ -1,9 +1,15 @@
 /*! @page arch-index WiredTiger Architecture Guide
 
-WiredTiger is built as a library that is linked into the application.  Applications
-use the API interface to direct WiredTiger's operations (see @ref basic_api).
-Here is an overview of the software components in WiredTiger and how they are organized.
-An arrow indicates the "from" component uses "to" component.
+The WiredTiger Architecture Guide provides a comprehensive overview
+of WiredTiger internals and code that should be useful for any database
+engineer wanting to understand how the storage engine works. The goal
+of this guide is to help both MongoDB engineers and external users
+quickly understand the workings of WiredTiger.
+
+The relationships between the software components in WiredTiger are
+illustrated in the diagram below. An arrow originating at Component A
+and pointing to Component B indicates that Component B is used by
+Component A.
 
 <div class="arch_diagram">
 @plantuml_start{wt_diagram.png }
@@ -86,14 +92,12 @@ schema -down-> meta
 schema -down-> btree
 cursor -down-> btree
 btree -down-> row
-btree -down-> column
 meta -up-> cursor
 ' The hidden arrow helps our boxes to line up in a better way.
 meta -[hidden]right-> btree
 cursor -[hidden]right-> txn
 txn -down-> snapshot
 row -down-> cache
-column -down-> cache
 cache -down-> history
 evict -down-> history
 history -up-> cursor
@@ -120,104 +124,190 @@ wt_file -[hidden]right-> log_file
 @plantuml_end
 </div>
 
-We go into some detail for some of the internal components.
+For those unfamiliar with storage engine architecture and/or seeking an introduction
+to WiredTiger, we recommend reading the guide in the order presented. You can find
+much of the architecture-specific terminology explained in the @ref arch-glossary.
+For an application level view of WiredTiger, head over to the @ref basic_api section
+of the documentation.
 
-@subpage arch-backup "Backup"
+<div class="arch_toc">
+<h1>Table of Contents</h1>
 
-Hot backup uses a type of cursor to backup the database.
+- @subpage arch-toc-fundamentals
+    - @ref arch-connection
+    - @ref arch-session
+    - @ref arch-cursor
+    - @ref arch-transaction
+    - @ref arch-snapshot
+    - @ref arch-rts
 
-@subpage arch-block "Block Manager"
+- @subpage arch-toc-data-org
+    - @ref arch-schema
+    - @ref arch-metadata
 
-The Block Manager manages the reading and writing of disk blocks.
+- @subpage arch-toc-data-src
+    - @ref arch-dhandle
+    - @ref arch-btree
+    - @ref arch-row-column
+
+- @subpage arch-toc-in-mem
+    - @ref arch-cache
+    - @ref arch-eviction
+
+- @subpage arch-toc-mem-disk
+    - @ref arch-block
+    - @ref arch-data-file
+
+- @subpage arch-toc-on-disk
+    - @ref arch-checkpoint
+    - @ref arch-hs
+    - @ref arch-backup
+
+- @subpage arch-toc-recovery
+    - @ref arch-logging
+    - @ref arch-log-file
+
+- @subpage arch-toc-tools
+    - @ref arch-python
+    - @ref command_line
+
+- @subpage arch-toc-platform
+    - @ref arch-fs-os
+
+- @subpage arch-glossary
+
+</div>
+
+*/
+
+/*! @page arch-toc-fundamentals Fundamentals
+
+@subpage arch-connection
+- A connection is a handle to a WiredTiger database instance.
+
+@subpage arch-session
+- A session defines the context for most operations performed in WiredTiger.
+
+@subpage arch-cursor
+- Cursors are used to get and modify data.
+
+@subpage arch-transaction
+- Transactions provide a powerful abstraction for multiple threads to
+operate on data concurrently.
+
+@subpage arch-snapshot
+- Snapshots are implemented by storing transaction ids committed before
+the transaction started.
+
+@subpage arch-rts
+- Rollback the database to a stable state by removing data that is beyond the
+stable timestamp.
+
+*/
+
+/*! @page arch-toc-data-org Data Organization
+
+@subpage arch-schema
+
+A schema defines the format of the application data in WiredTiger.
+
+@subpage arch-metadata
+
+Metadata is stored as <code>uri, config</code> key/value pairs in a designated table.
+
+*/
+
+/*! @page arch-toc-data-src Data Sources
 
 @subpage arch-btree
+
 A B-Tree is one type of underlying data source in a dhandle and is organized into pages.
+
+@subpage arch-dhandle
+
+An internal structure called a Data Handle (dhandle) is used to represent and
+access Btrees and other data sources in WiredTiger.
+
+@subpage arch-row-column
+
+Row stores and column store are B-Trees. Row stores have a variable size key
+and data while column stores have as their key a record id.
+
+*/
+
+/*! @page arch-toc-in-mem In Memory Concepts
 
 @subpage arch-cache
 
 Cache is represented by the various shared data structures that
 make up in-memory Btrees and subordinate data structures.
 
-@subpage arch-checkpoint "Checkpoint"
-
-A checkpoint is created by WiredTiger to serve as a point from which it can recover.
-
-@subpage arch-connection "Connection"
-
-A connection is a handle to a WiredTiger database instance.
-
-@subpage arch-cursor "Cursor"
-
-Cursors are used to get and modify data.
-
-@subpage arch-data-file "Data File Format"
-
-The format of the data file is given by structures in \c block.h .
-
-@subpage arch-dhandle "Data Handles"
-
-An internal structure called a Data Handle (dhandle) is used to represent and
-access Btrees and other data sources in WiredTiger.
-
-@subpage arch-eviction "Eviction"
+@subpage arch-eviction
 
 Eviction represents the process or removing old data from the cache,
 writing it to disk if it is dirty.
 
-@subpage arch-fs-os "File System and Operating System Interface"
+*/
+
+/*! @page arch-toc-mem-disk Moving Data Between Memory and Disk
+
+@subpage arch-block
+
+The block manager manages the reading and writing of disk blocks.
+
+@subpage arch-data-file
+
+The format of the data file is given by structures in \c block.h .
+
+*/
+
+/*! @page arch-toc-on-disk On Disk Concepts
+
+@subpage arch-checkpoint
+
+A checkpoint is created by WiredTiger to serve as a point from which it can recover.
+
+@subpage arch-hs
+
+The History Store tracks old versions of records.
+
+@subpage arch-backup
+
+Hot backup uses a type of cursor to backup the database.
+
+*/
+
+/*! @page arch-toc-recovery Recovery
+
+@subpage arch-logging
+
+WiredTiger writes all changes into a write-ahead log when configured.
+
+@subpage arch-log-file
+
+The format of a log file is defined in \c log.h .
+
+*/
+
+/*! @page arch-toc-tools Tools
+
+@subpage arch-python
+
+WiredTiger has a Python API that is useful for scripting and experimentation.
+
+@subpage command_line
+
+The \c wt tool is a command-line utility that provides access to various pieces
+of the WiredTiger functionality.
+
+*/
+
+/*! @page arch-toc-platform Cross-Platform Support
+
+@subpage arch-fs-os
 
 A layer of abstraction is above all operating system calls and
 a set of functions can be registered to be called for each file system
 operation.
-
-@subpage arch-hs "History Store"
-
-The History Store tracks old versions of records.
-
-@subpage arch-logging "Logging"
-
-WiredTiger writes all changes into a write-ahead log when configured.
-
-@subpage arch-log-file "Log File Format"
-
-The format of a log file is defined in \c log.h .
-
-@subpage arch-metadata "Metadata"
-
-Metadata is stored as <code>uri, config</code> K/V pairs in a designated table.
-
-@subpage arch-python "Python API"
-
-WiredTiger has a Python API that is useful for scripting and experimentation.
-
-@subpage arch-row-column "Row Store and Column Store"
-
-Row stores and column store are B-Trees. Row stores have a variable size key and data while column
-stores have as their key a record id.
-
-@subpage arch-rts "Rollback to Stable"
-
-Rollback to stable to remove the unstable updates from the database.
-
-@subpage arch-schema "Schema"
-
-A schema defines the format of the application data in WiredTiger.
-
-@subpage arch-session "Session"
-
-A session defines the context for most operations performed in WiredTiger.
-
-@subpage arch-snapshot "Snapshot"
-
-Snapshots are implemented by storing transaction ids committed before
-the transaction started.
-
-@subpage arch-transaction "Transactions"
-
-Transactions provide a powerful abstraction for multiple threads to operate on data concurrently.
-
-@subpage arch-glossary
-
-WiredTiger assigns specific meanings to certain words. Here we decode them.
 
 */

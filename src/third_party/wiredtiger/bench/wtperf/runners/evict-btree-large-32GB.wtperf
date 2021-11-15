@@ -1,0 +1,11 @@
+# wtperf options file: evict btree configuration
+conn_config="cache_size=32G,eviction=(threads_max=8)"
+table_config="type=file"
+icount=1000000000
+report_interval=5
+run_time=120
+populate_threads=1
+threads=((count=16,reads=1))
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5

@@ -147,6 +147,138 @@ random_sleep(WT_RAND_STATE *rnd, u_int max_seconds)
     }
 }
 
+/*
+ * tables_apply -
+ *	Call an underlying function on all tables.
+ */
+static inline void
+tables_apply(void (*func)(TABLE *, void *), void *arg)
+{
+    u_int i;
+
+    if (ntables == 0)
+        func(tables[0], arg);
+    else
+        for (i = 1; i <= ntables; ++i)
+            func(tables[i], arg);
+}
+
+/*
+ * table_maxv --
+ *     Return the maximum value for a table configuration variable.
+ */
+static inline uint32_t
+table_maxv(u_int off)
+{
+    uint32_t v;
+    u_int i;
+
+    if (ntables == 0)
+        return (tables[0]->v[off].v);
+
+    for (v = 0, i = 1; i <= ntables; ++i)
+        v = WT_MAX(v, tables[i]->v[off].v);
+    return (v);
+}
+
+/*
+ * table_sumv --
+ *     Return the summed value for a table configuration variable.
+ */
+static inline uint32_t
+table_sumv(u_int off)
+{
+    uint32_t v;
+    u_int i;
+
+    if (ntables == 0)
+        return (tables[0]->v[off].v);
+
+    for (v = 0, i = 1; i <= ntables; ++i)
+        v += tables[i]->v[off].v;
+    return (v);
+}
+
+/*
+ * table_select --
+ *     Randomly select a table.
+ */
+static inline TABLE *
+table_select(TINFO *tinfo)
+{
+    if (ntables == 0)
+        return (tables[0]);
+
+    return (tables[mmrand(tinfo == NULL ? NULL : &tinfo->rnd, 1, ntables)]);
+}
+
+/*
+ * table_select_type --
+ *     Randomly select a table of a specific type.
+ */
+static inline TABLE *
+table_select_type(table_type type)
+{
+    u_int i;
+
+    if (ntables == 0)
+        return (tables[0]->type == type ? tables[0] : NULL);
+
+    for (i = mmrand(NULL, 1, ntables);; ++i) {
+        if (i > ntables)
+            i = 1;
+        if (tables[i]->type == type)
+            break;
+    }
+    return (tables[i]);
+}
+
+/*
+ * wiredtiger_open_cursor --
+ *     Open a WiredTiger cursor.
+ */
+static inline void
+wiredtiger_open_cursor(
+  WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp)
+{
+    WT_DECL_RET;
+
+    *cursorp = NULL;
+
+    /* WT_SESSION.open_cursor can return EBUSY if concurrent with a metadata operation, retry. */
+    while ((ret = session->open_cursor(session, uri, NULL, config, cursorp)) == EBUSY)
+        __wt_yield();
+    testutil_checkfmt(ret, "%s", uri);
+}
+
+/*
+ * table_cursor --
+ *     Return the cursor for a table, opening a new one if necessary.
+ */
+static inline WT_CURSOR *
+table_cursor(TINFO *tinfo, u_int id)
+{
+    TABLE *table;
+    const char *config;
+
+    testutil_assert(id > 0);
+
+    /* The table ID is 1-based, the cursor array is 0-based. */
+    table = tables[ntables == 0 ? 0 : id];
+    --id;
+
+    if (tinfo->cursors[id] == NULL) {
+        /* Configure "append", in the case of column stores, we append when inserting new rows. */
+        config = table->type == ROW ? NULL : "append";
+        wiredtiger_open_cursor(tinfo->session, table->uri, config, &tinfo->cursors[id]);
+    }
+    return (tinfo->cursors[id]);
+}
+
+/*
+ * wiredtiger_begin_transaction --
+ *     Start a WiredTiger transaction.
+ */
 static inline void
 wiredtiger_begin_transaction(WT_SESSION *session, const char *config)
 {
@@ -166,9 +298,9 @@ wiredtiger_begin_transaction(WT_SESSION *session, const char *config)
  *     Generate a key for lookup.
  */
 static inline void
-key_gen(WT_ITEM *key, uint64_t keyno)
+key_gen(TABLE *table, WT_ITEM *key, uint64_t keyno)
 {
-    key_gen_common(key, keyno, "00");
+    key_gen_common(table, key, keyno, "00");
 }
 
 /*
@@ -176,12 +308,12 @@ key_gen(WT_ITEM *key, uint64_t keyno)
  *     Generate a key for insertion.
  */
 static inline void
-key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
+key_gen_insert(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 {
     static const char *const suffix[15] = {
       "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15"};
 
-    key_gen_common(key, keyno, suffix[mmrand(rnd, 0, 14)]);
+    key_gen_common(table, key, keyno, suffix[mmrand(rnd, 0, 14)]);
 }
 
 /*
@@ -193,11 +325,9 @@ lock_try_writelock(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(LOCK_INITIALIZED(lock));
 
-    if (lock->lock_type == LOCK_WT) {
+    if (lock->lock_type == LOCK_WT)
         return (__wt_try_writelock((WT_SESSION_IMPL *)session, &lock->l.wt));
-    } else {
-        return (pthread_rwlock_trywrlock(&lock->l.pthread));
-    }
+    return (pthread_rwlock_trywrlock(&lock->l.pthread));
 }
 
 /*
@@ -209,11 +339,10 @@ lock_writelock(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(LOCK_INITIALIZED(lock));
 
-    if (lock->lock_type == LOCK_WT) {
+    if (lock->lock_type == LOCK_WT)
         __wt_writelock((WT_SESSION_IMPL *)session, &lock->l.wt);
-    } else {
+    else
         testutil_check(pthread_rwlock_wrlock(&lock->l.pthread));
-    }
 }
 
 /*
@@ -225,11 +354,10 @@ lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(LOCK_INITIALIZED(lock));
 
-    if (lock->lock_type == LOCK_WT) {
+    if (lock->lock_type == LOCK_WT)
         __wt_writeunlock((WT_SESSION_IMPL *)session, &lock->l.wt);
-    } else {
+    else
         testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
-    }
 }
 
 /*
@@ -241,11 +369,10 @@ lock_readlock(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(LOCK_INITIALIZED(lock));
 
-    if (lock->lock_type == LOCK_WT) {
+    if (lock->lock_type == LOCK_WT)
         __wt_readlock((WT_SESSION_IMPL *)session, &lock->l.wt);
-    } else {
+    else
         testutil_check(pthread_rwlock_rdlock(&lock->l.pthread));
-    }
 }
 
 /*
@@ -257,11 +384,10 @@ lock_readunlock(WT_SESSION *session, RWLOCK *lock)
 {
     testutil_assert(LOCK_INITIALIZED(lock));
 
-    if (lock->lock_type == LOCK_WT) {
+    if (lock->lock_type == LOCK_WT)
         __wt_readunlock((WT_SESSION_IMPL *)session, &lock->l.wt);
-    } else {
+    else
         testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
-    }
 }
 
 #define trace_msg(fmt, ...)                                                                        \
@@ -275,16 +401,16 @@ lock_readunlock(WT_SESSION *session, RWLOCK *lock)
                 (uintmax_t)__ts.tv_nsec / WT_THOUSAND, g.tidbuf, __VA_ARGS__));                    \
         }                                                                                          \
     } while (0)
-#define trace_op(tinfo, fmt, ...)                                                                  \
-    do {                                                                                           \
-        if (g.trace) {                                                                             \
-            struct timespec __ts;                                                                  \
-            WT_SESSION *__s = (tinfo)->trace;                                                      \
-            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                             \
-            testutil_check(                                                                        \
-              __s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s] " fmt, (uintmax_t)__ts.tv_sec, \
-                (uintmax_t)__ts.tv_nsec / WT_THOUSAND, tinfo->tidbuf, __VA_ARGS__));               \
-        }                                                                                          \
+#define trace_op(tinfo, fmt, ...)                                                             \
+    do {                                                                                      \
+        if (g.trace) {                                                                        \
+            struct timespec __ts;                                                             \
+            WT_SESSION *__s = (tinfo)->trace;                                                 \
+            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                        \
+            testutil_check(__s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s]:%s " fmt,    \
+              (uintmax_t)__ts.tv_sec, (uintmax_t)__ts.tv_nsec / WT_THOUSAND, (tinfo)->tidbuf, \
+              (tinfo)->table->uri, __VA_ARGS__));                                             \
+        }                                                                                     \
     } while (0)
 
 /*

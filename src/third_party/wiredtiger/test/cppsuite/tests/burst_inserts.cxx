@@ -58,8 +58,8 @@ class burst_inserts : public test {
         struct collection_cursor {
             collection_cursor(
               collection &coll, scoped_cursor &&write_cursor, scoped_cursor &&read_cursor)
-                : coll(coll), write_cursor(std::move(write_cursor)),
-                  read_cursor(std::move(read_cursor))
+                : coll(coll), read_cursor(std::move(read_cursor)),
+                  write_cursor(std::move(write_cursor))
             {
             }
             collection &coll;
@@ -81,15 +81,14 @@ class burst_inserts : public test {
              * Create a reading cursor that will read random documents for every next call. This
              * will help generate cache pressure.
              */
-            ccv.push_back({coll, std::move(tc->session.open_scoped_cursor(coll.name.c_str())),
-              std::move(tc->session.open_scoped_cursor(coll.name.c_str(), "next_random=true"))});
+            ccv.push_back({coll, std::move(tc->session.open_scoped_cursor(coll.name)),
+              std::move(tc->session.open_scoped_cursor(coll.name, "next_random=true"))});
         }
 
         uint64_t counter = 0;
         while (tc->running()) {
             uint64_t start_key = ccv[counter].coll.get_key_count();
             uint64_t added_count = 0;
-            bool committed = true;
             auto &cc = ccv[counter];
             auto burst_start = std::chrono::system_clock::now();
             while (tc->running() &&
@@ -139,9 +138,7 @@ class burst_inserts : public test {
                     logger::log_msg(LOG_TRACE,
                       "Committed an insertion of " + std::to_string(added_count) + " keys.");
                     cc.coll.increase_key_count(added_count);
-                    start_key = cc.coll.get_key_count();
                 }
-                added_count = 0;
             }
 
             testutil_check(cc.write_cursor->reset(cc.write_cursor.get()));

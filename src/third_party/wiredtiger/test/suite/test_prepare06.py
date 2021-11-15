@@ -90,18 +90,24 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         s_reader = self.conn.open_session()
         s_reader.begin_transaction('read_timestamp=' + self.timestamp_str(40))
 
-        # It is legal to set the prepare timestamp earlier than an active
-        # read timestamp with roundup_timestamps settings. This is only
+        # It is illegal to set the prepare timestamp as earlier than an active
+        # read timestamp even with roundup_timestamps settings.  This is only
         # checked in diagnostic builds.
         if wiredtiger.diagnostic_build():
             self.session.begin_transaction('roundup_timestamps=(prepared=true)')
-            self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(10)), 0)
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.prepare_transaction(
+                'prepare_timestamp=' + self.timestamp_str(10)),
+                "/must be greater than the latest active read timestamp/")
             self.session.rollback_transaction()
 
-            # It is legal to set the prepare timestamp the same as an active read
-            # timestamp with roundup_timestamps settings.
+            # It is illegal to set the prepare timestamp the same as an active read
+            # timestamp even with roundup_timestamps settings.
             self.session.begin_transaction('roundup_timestamps=(prepared=true)')
-            self.assertEqual(self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(40)), 0)
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.prepare_transaction(
+                'prepare_timestamp=' + self.timestamp_str(40)),
+                "/must be greater than the latest active read timestamp/")
             self.session.rollback_transaction()
 
         '''
@@ -137,8 +143,6 @@ class test_prepare06(wttest.WiredTigerTestCase, suite_subprocess):
         '''
 
         s_reader.commit_transaction()
-
-        self.ignoreStdoutPatternIfExists("Skip checking prepare timestamp")
 
 if __name__ == '__main__':
     wttest.run()

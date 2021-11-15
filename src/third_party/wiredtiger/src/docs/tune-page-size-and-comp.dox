@@ -202,18 +202,13 @@ example of such a configuration string is as follows:
 
 @subsection key_val_max internal/leaf key/value max
  - Overflow items
-\n Overflow items are keys and values too large to easily store on a page. Overflow
-items are stored separately in the file from the page where the item logically
-appears, and so reading or writing an overflow item is more expensive than an
-on-page item, normally requiring additional I/O.  Additionally, overflow values
-are not cached in memory. This means overflow items won't affect the caching
-behavior of the application.  It also means that each time an overflow value is
-read, it is re-read from disk.
- - internal_key_max
-\n The largest key stored in an internal page, in bytes. If set, keys larger than
-the specified size are stored as overflow items.
-   - The default and the maximum allowed value are both one-tenth the size of a
-newly split internal page.
+\n Overflow items are keys and values too large to easily store on a leaf
+page. Overflow items are stored separately in the file from the page where
+the item logically appears, and so reading an overflow item is more expensive
+than an on-page item, normally requiring additional I/O.  Additionally,
+overflow values are not cached in memory. This means overflow items won't
+affect the caching behavior of the application.  It also means that each
+time an overflow value is read, it is re-read from disk.
  - leaf_key_max
 \n The largest key stored in a leaf page, in bytes. If set, keys larger than the
 specified size are stored as overflow items.
@@ -244,24 +239,18 @@ aren't likely to be needed.
      - Applications with large keys and values, doing table scans, might
 increase the page size to avoid creating overflow items, as the overflow items
 must be read into memory in all cases, anyway.
-   - internal_key_max, leaf_key_max and leaf_value_max configuration values
-allow applications to change the size at which a key or value will be treated
-as an overflow item.
+   - leaf_key_max and leaf_value_max configuration values allow applications
+to change the size at which a key or value will be treated as an overflow item.
      - Most applications should not need to tune the maximum key and value
 sizes.
-     - The value of internal_key_max is relative to the maximum internal page
-size. Because the number of keys on an internal page determines the depth of the
-tree, the internal_key_max value can only be adjusted within a certain range,
-and the configured value will be automatically adjusted by WiredTiger, if
-necessary, to ensure a reasonable number of keys fit on an internal page.
      - The values of leaf_key_max and leaf_value_max are not relative to the
 maximum leaf page size. If either is larger than the maximum page size, the page
 size will be ignored when the larger keys and values are being written, and a
 larger page will be created as necessary.
  - Configuration:
-\n Specified as internal_key_max, leaf_key_max and leaf_value_max configuration
-options to WT_SESSION::create. An example of configuration string for a large
-leaf overflow value:
+\n Specified as leaf_key_max and leaf_value_max configuration options to
+WT_SESSION::create. An example of configuration string for a large leaf
+overflow value:
 
 <pre>
      "key_format=S,value_format=S,leaf_page_max=16KB,leaf_value_max=256KB"

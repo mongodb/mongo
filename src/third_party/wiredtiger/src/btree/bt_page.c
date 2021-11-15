@@ -660,10 +660,11 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
     /*
      * We track if an internal page has backing overflow keys, as overflow keys limit the eviction
-     * we can do during a checkpoint.
+     * we can do during a checkpoint. (This is only for historical tables, reconciliation no longer
+     * writes overflow cookies on internal pages, no matter the size of the key.)
      */
     if (overflow_keys)
-        F_SET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS);
+        F_SET_ATOMIC(page, WT_PAGE_INTL_OVERFLOW_KEYS);
 
 err:
     __wt_scr_free(session, &current);

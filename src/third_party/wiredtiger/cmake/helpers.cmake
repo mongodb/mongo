@@ -376,7 +376,7 @@ function(config_include config_name description)
         set(${config_name} OFF CACHE INTERNAL "" FORCE)
         set(${config_name}_DISABLED ON CACHE INTERNAL "" FORCE)
     endif()
-    # Set an internal cahce variable with the CPP include statement. We can use this when building out our config header.
+    # Set an internal cache variable with the CPP include statement. We can use this when building out our config header.
     if (${${config_name}})
         set(${config_name}_DECL "#include <${CONFIG_INCLUDE_FILE}>" CACHE INTERNAL "")
     endif()
@@ -422,13 +422,14 @@ function(config_lib config_name description)
         find_library(has_lib_${config_name} ${CONFIG_LIB_LIB})
         set(CMAKE_REQUIRED_FLAGS)
         set(has_lib "0")
+        set(has_include "")
         if(has_lib_${config_name})
             set(has_lib ${has_lib_${config_name}})
             if (CONFIG_LIB_HEADER)
                 find_path(include_path_${config_name} ${CONFIG_LIB_HEADER})
                 if (include_path_${config_name})
                     message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}, include path ${include_path_${config_name}}")
-                    include_directories(${include_path_${config_name}})
+                    set(has_include ${include_path_${config_name}})
                 else()
                     message("-- Looking for library ${CONFIG_LIB_LIB}: found ${has_lib_${config_name}}")
                 endif()
@@ -444,8 +445,10 @@ function(config_lib config_name description)
         if(${config_name}_DISABLED)
             unset(${config_name}_DISABLED CACHE)
             set(${config_name} ${has_lib} CACHE STRING "${description}" FORCE)
+            set(${config_name}_INCLUDES ${has_include} CACHE STRING "Additional include paths for ${config_name}" FORCE)
         else()
             set(${config_name} ${has_lib} CACHE STRING "${description}")
+            set(${config_name}_INCLUDES ${has_include} CACHE STRING "Additional include paths for ${config_name}")
         endif()
         # 'check_library_exists' sets our given temp variable into the cache. Clear this so it doesn't persist between
         # configuration runs.
@@ -554,7 +557,7 @@ endfunction()
 # assert_type_size(type size)
 # Wrapper function around 'test_type_size' that additionally asserts whether the given types meets an expected size.
 # Throws a fatal error if the type is not found or doesn't equal the expected size.
-#   type - eame of the type to test.
+#   type - name of the type to test.
 #   size - expected size of the type.
 #   EXTRA_INCLUDES - extra/optional include files to access the given type e.g. a custom typedef in an include header.
 function(assert_type_size type size)
@@ -582,7 +585,7 @@ function(assert_type_size type size)
         message(FATAL_ERROR "Type assertion failed: ${type} does not exists")
     endif()
 
-    if((NOT ${size} EQUAL 0) AND  (NOT ${output_type_size} EQUAL ${size}))
+    if((NOT ${size} EQUAL 0) AND (NOT ${output_type_size} EQUAL ${size}))
         # Type does not meet size assertion.
         message(FATAL_ERROR "Type assertion failed: ${type} does not equal size ${size}")
     endif()

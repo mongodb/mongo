@@ -87,7 +87,7 @@ workload_validation::validate(const std::string &operation_table_name,
 
     /* Parse the tracking table. */
     validation_collection current_collection_records;
-    scoped_cursor cursor = session.open_scoped_cursor(operation_table_name.c_str());
+    scoped_cursor cursor = session.open_scoped_cursor(operation_table_name);
     while ((ret = cursor->next(cursor.get())) == 0) {
         testutil_check(
           cursor->get_key(cursor.get(), &tracked_collection_id, &tracked_key, &tracked_timestamp));
@@ -154,7 +154,7 @@ workload_validation::parse_schema_tracking_table(scoped_session &session,
     uint64_t key_collection_id;
     int value_operation_type;
 
-    scoped_cursor cursor = session.open_scoped_cursor(tracking_table_name.c_str());
+    scoped_cursor cursor = session.open_scoped_cursor(tracking_table_name);
 
     while (cursor->next(cursor.get()) == 0) {
         testutil_check(cursor->get_key(cursor.get(), &key_collection_id, &key_timestamp));
@@ -246,7 +246,7 @@ workload_validation::verify_key_value(scoped_session &session, const uint64_t co
     const char *retrieved_value;
 
     scoped_cursor cursor =
-      session.open_scoped_cursor(database::build_collection_name(collection_id).c_str());
+      session.open_scoped_cursor(database::build_collection_name(collection_id));
     cursor->set_key(cursor.get(), key.c_str());
     ret = cursor->search(cursor.get());
     if (ret != 0) {

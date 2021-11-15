@@ -26,9 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, shutil, re
+import re
 from wiredtiger import stat
-import wttest
 from wtdataset import SimpleDataSet
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
@@ -44,8 +43,8 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide
     # to do an update restore evict on a page when the cache pressure requirements are not met.
     # This means setting eviction target low and cache size high.
-    conn_recon = ',eviction_updates_trigger=10,eviction_dirty_trigger=5,cache_size=10MB,' + \
-            'debug_mode=(update_restore_evict=true),log=(recover=on)'
+    conn_recon = ',eviction_updates_trigger=10,eviction_dirty_trigger=5,eviction_dirty_target=1,' \
+            'cache_size=10MB,debug_mode=(update_restore_evict=true),log=(recover=on)'
 
     def parse_write_gen(self, uri):
         meta_cursor = self.session.open_cursor('metadata:')

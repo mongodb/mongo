@@ -119,7 +119,6 @@ struct __wt_btree {
 
     uint32_t allocsize;        /* Allocation size */
     uint32_t maxintlpage;      /* Internal page max size */
-    uint32_t maxintlkey;       /* Internal page max key size */
     uint32_t maxleafpage;      /* Leaf page max size */
     uint32_t maxleafkey;       /* Leaf page max key size */
     uint32_t maxleafvalue;     /* Leaf page max value size */

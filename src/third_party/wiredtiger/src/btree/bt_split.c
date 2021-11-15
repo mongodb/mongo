@@ -160,7 +160,7 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
     uint32_t cell_offset;
 
     /* There's a per-page flag if there are any overflow keys at all. */
-    if (!F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS))
+    if (!F_ISSET_ATOMIC(page, WT_PAGE_INTL_OVERFLOW_KEYS))
         return (0);
 
     /*

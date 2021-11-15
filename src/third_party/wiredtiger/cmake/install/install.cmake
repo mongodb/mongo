@@ -10,21 +10,25 @@ include(GNUInstallDirs)
 
 # Library installs
 
-# Define the public headers for wiredtiger library to be used when installing the target.
-set_property(
-    TARGET wiredtiger
-    PROPERTY PUBLIC_HEADER
-    ${CMAKE_BINARY_DIR}/include/wiredtiger.h
-    ${CMAKE_SOURCE_DIR}/src/include/wiredtiger_ext.h
+# Define the wiredtiger public headers we want to export when running the install target.
+install(
+    FILES ${CMAKE_BINARY_DIR}/include/wiredtiger.h ${CMAKE_SOURCE_DIR}/src/include/wiredtiger_ext.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
-# Set the version property of the wiredtiger library so we can export a versioned install.
-set_target_properties(wiredtiger PROPERTIES VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
-# Install the wiredtiger library target.
-install(TARGETS wiredtiger
+# Define the wiredtiger library targets we will install.
+set(wt_targets)
+if(ENABLE_SHARED)
+    list(APPEND wt_targets wiredtiger_shared)
+endif()
+if(ENABLE_STATIC)
+    list(APPEND wt_targets wiredtiger_static)
+endif()
+
+# Install the wiredtiger library targets.
+install(TARGETS ${wt_targets}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 # Create our wiredtiger pkgconfig (for POSIX builds).

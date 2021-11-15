@@ -19,6 +19,3 @@ else
     test_bin=$top_builddir/test/csuite/test_tiered_abort
 fi
 $TEST_WRAPPER $test_bin -t 10 -T 5
-$TEST_WRAPPER $test_bin -m -t 10 -T 5
-$TEST_WRAPPER $test_bin -C -t 10 -T 5
-$TEST_WRAPPER $test_bin -C -m -t 10 -T 5

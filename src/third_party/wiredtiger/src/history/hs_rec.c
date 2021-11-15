@@ -28,7 +28,7 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
 
     btree_id = btree->id;
 
-    if (!WT_VERBOSE_ISSET(session, WT_VERB_HS | WT_VERB_HS_ACTIVITY))
+    if (!WT_VERBOSE_ISSET(session, WT_VERB_HS) && !WT_VERBOSE_ISSET(session, WT_VERB_HS_ACTIVITY))
         return;
 
     conn = S2C(session);
@@ -46,7 +46,9 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
         WT_IGNORE_RET_BOOL(__wt_eviction_clean_needed(session, &pct_full));
         WT_IGNORE_RET_BOOL(__wt_eviction_dirty_needed(session, &pct_dirty));
 
-        __wt_verbose(session, WT_VERB_HS | WT_VERB_HS_ACTIVITY,
+        __wt_verbose_multi(session,
+          WT_DECL_VERBOSE_MULTI_CATEGORY(
+            ((WT_VERBOSE_CATEGORY[]){WT_VERB_HS, WT_VERB_HS_ACTIVITY})),
           "Page reconciliation triggered history store write: file ID %" PRIu32
           ". Current history store file size: %" PRId64
           ", cache dirty: %2.3f%% , cache use: %2.3f%%",
@@ -66,9 +68,7 @@ static int
 __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree, const WT_ITEM *key,
   const uint8_t type, const WT_ITEM *hs_value, WT_TIME_WINDOW *tw, bool error_on_ooo_ts)
 {
-#ifdef HAVE_DIAGNOSTIC
     WT_CURSOR_BTREE *hs_cbt;
-#endif
     WT_DECL_ITEM(hs_key);
 #ifdef HAVE_DIAGNOSTIC
     WT_DECL_ITEM(existing_val);
@@ -85,7 +85,7 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     uint64_t counter, hs_counter;
     uint32_t hs_btree_id;
 
-    counter = 0;
+    counter = hs_counter = 0;
 
     /*
      * We might be entering this code from application thread's context. We should make sure that we
@@ -112,8 +112,9 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
 #ifdef HAVE_DIAGNOSTIC
     /* Allocate buffer for the existing history store value for the same key. */
     WT_ERR(__wt_scr_alloc(session, 0, &existing_val));
-    hs_cbt = __wt_curhs_get_cbt(cursor);
 #endif
+
+    hs_cbt = __wt_curhs_get_cbt(cursor);
 
     /* Sanity check that the btree is not a history store btree. */
     WT_ASSERT(session, !WT_IS_HS(btree));
@@ -183,9 +184,16 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
      * would have received WT_NOT_FOUND. In that case we need to search again with a higher
      * timestamp.
      */
-    if (ret == 0)
-        WT_ERR_NOTFOUND_OK(cursor->next(cursor), true);
-    else {
+    if (ret == 0) {
+        /*
+         * Check if the current history store update's stop timestamp is out of order with respect
+         * to the update to be inserted before before moving onto the next record.
+         */
+        if (hs_cbt->upd_value->tw.stop_ts <= tw->start_ts)
+            WT_ERR_NOTFOUND_OK(cursor->next(cursor), true);
+        else
+            counter = hs_counter + 1;
+    } else {
         cursor->set_key(cursor, 3, btree->id, key, tw->start_ts + 1);
         WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_after(session, cursor), true);
     }
@@ -867,8 +875,13 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
         WT_ERR(__wt_compare(session, NULL, &hs_key, key, &cmp));
         WT_ASSERT(session, cmp == 0);
 #endif
-        /* We find a key that is larger or equal to the specified timestamp*/
-        if (hs_ts >= ts)
+        /*
+         * We have found a key with a timestamp larger than or equal to the specified timestamp.
+         * Always use the start timestamp retrieved from the key instead of the start timestamp from
+         * the cell. The cell's start timestamp can be cleared during reconciliation if it is
+         * globally visible.
+         */
+        if (hs_ts >= ts || twp->stop_ts >= ts)
             break;
     }
     if (ret == WT_NOTFOUND)
@@ -894,30 +907,44 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
      * see them after they've been moved due to their transaction id.
      *
      * For example, if we're inserting an update at timestamp 3 with value ddd:
-     * btree key ts counter value
-     * 2     foo 5  0       aaa
-     * 2     foo 6  0       bbb
-     * 2     foo 7  0       ccc
+     * btree key ts counter value stop_ts
+     * 2     foo 5  0       aaa     6
+     * 2     foo 6  0       bbb     7
+     * 2     foo 7  0       ccc     8
      *
      * We want to end up with this:
-     * btree key ts counter value
-     * 2     foo 3  0       aaa
-     * 2     foo 3  1       bbb
-     * 2     foo 3  2       ccc
-     * 2     foo 3  3       ddd
+     * btree key ts counter value stop_ts
+     * 2     foo 3  0       aaa    3
+     * 2     foo 3  1       bbb    3
+     * 2     foo 3  2       ccc    3
+     * 2     foo 3  3       ddd    3
      *
      * Another example, if we're inserting an update at timestamp 0 with value ddd:
-     * btree key ts counter value
-     * 2     foo 5  0       aaa
-     * 2     foo 6  0       bbb
-     * 2     foo 7  0       ccc
+     * btree key ts counter value stop_ts
+     * 2     foo 5  0       aaa    6
+     * 2     foo 6  0       bbb    7
+     * 2     foo 7  0       ccc    8
      *
      * We want to end up with this:
-     * btree key ts counter value
-     * 2     foo 0  0       aaa
-     * 2     foo 0  1       bbb
-     * 2     foo 0  2       ccc
-     * 2     foo 0  3       ddd
+     * btree key ts counter value stop_ts
+     * 2     foo 0  0       aaa    0
+     * 2     foo 0  1       bbb    0
+     * 2     foo 0  2       ccc    0
+     * 2     foo 0  3       ddd    0
+     *
+     * Another example, if we're inserting an update at timestamp 3 with value ddd
+     * that is an out of order with a stop timestamp of 6:
+     * btree key ts counter value stop_ts
+     * 2     foo 1  0       aaa     6
+     * 2     foo 6  0       bbb     7
+     * 2     foo 7  0       ccc     8
+     *
+     * We want to end up with this:
+     * btree key ts counter value stop_ts
+     * 2     foo 1  1       aaa    3
+     * 2     foo 3  2       bbb    3
+     * 2     foo 3  3       ccc    3
+     * 2     foo 3  4       ddd    3
      */
     for (; ret == 0; ret = hs_cursor->next(hs_cursor)) {
         /* We shouldn't have crossed the btree and user key search space. */
@@ -933,8 +960,14 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
          * Our strategy to rectify this is to remove all records for the same key with a timestamp
          * higher or equal than the specified timestamp and reinsert them at the smaller timestamp,
          * which is the timestamp of the update we are about to insert to the history store.
+         *
+         * It is possible that the cursor next call can find an update that was reinserted when it
+         * had an out of order tombstone with respect to the new update. Continue the search by
+         * ignoring them.
          */
-        WT_ASSERT(session, hs_ts >= ts);
+        __wt_hs_upd_time_window(hs_cursor, &twp);
+        if (hs_ts < ts && twp->stop_ts < ts)
+            continue;
 
         if (reinsert) {
             /*
@@ -963,7 +996,16 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
               __wt_timestamp_to_string(hs_cbt->upd_value->tw.durable_stop_ts, ts_string[3]),
               __wt_timestamp_to_string(ts, ts_string[4]));
 
-            hs_insert_tw.start_ts = hs_insert_tw.durable_start_ts = ts - 1;
+            /*
+             * Use the original start time window's timestamps if it isn't out of order with respect
+             * to the new update.
+             */
+            if (hs_cbt->upd_value->tw.start_ts >= ts)
+                hs_insert_tw.start_ts = hs_insert_tw.durable_start_ts = ts - 1;
+            else {
+                hs_insert_tw.start_ts = hs_cbt->upd_value->tw.start_ts;
+                hs_insert_tw.durable_start_ts = hs_cbt->upd_value->tw.durable_start_ts;
+            }
             hs_insert_tw.start_txn = hs_cbt->upd_value->tw.start_txn;
 
             /*

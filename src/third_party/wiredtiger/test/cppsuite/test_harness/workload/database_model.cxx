@@ -39,7 +39,7 @@
 namespace test_harness {
 /* collection class implementation */
 collection::collection(const uint64_t id, const uint64_t key_count, const std::string &name)
-    : id(id), _key_count(key_count), name(name)
+    : name(name), id(id), _key_count(key_count)
 {
 }
 
@@ -150,7 +150,7 @@ void
 database::set_create_config(bool use_compression)
 {
     _collection_create_config = use_compression ?
-      std::string(DEFAULT_FRAMEWORK_SCHEMA) + std::string(SNAPPY_BLK) :
+      DEFAULT_FRAMEWORK_SCHEMA + std::string(SNAPPY_BLK) :
       DEFAULT_FRAMEWORK_SCHEMA;
 }
 } // namespace test_harness

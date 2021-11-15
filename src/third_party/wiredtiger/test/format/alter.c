@@ -35,6 +35,7 @@
 WT_THREAD_RET
 alter(void *arg)
 {
+    TABLE *table;
     WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
@@ -60,10 +61,10 @@ alter(void *arg)
         testutil_check(__wt_snprintf(
           buf, sizeof(buf), "access_pattern_hint=%s", access_value ? "random" : "none"));
         access_value = !access_value;
-        /*
-         * Alter can return EBUSY if concurrent with other operations.
-         */
-        while ((ret = session->alter(session, g.uri, buf)) != 0 && ret != EBUSY)
+
+        /* Alter can return EBUSY if concurrent with other operations. */
+        table = table_select(NULL);
+        while ((ret = session->alter(session, table->uri, buf)) != 0 && ret != EBUSY)
             testutil_die(ret, "session.alter");
         while (period > 0 && !g.workers_finished) {
             --period;

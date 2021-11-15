@@ -79,6 +79,17 @@ class test_compact02(wttest.WiredTigerTestCase):
 
     fullsize = nrecords // 2 * len(bigvalue) + nrecords // 2 * len(smallvalue)
 
+    # Return stats that track the progress of compaction.
+    def getCompactProgressStats(self):
+        cstat = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(all)')
+        statDict = {}
+        statDict["pages_reviewed"] = cstat[stat.dsrc.btree_compact_pages_reviewed][2]
+        statDict["pages_skipped"] = cstat[stat.dsrc.btree_compact_pages_skipped][2]
+        statDict["pages_rewritten"] = cstat[stat.dsrc.btree_compact_pages_rewritten][2]
+        cstat.close()
+        return statDict
+
     # Return the size of the file
     def getSize(self):
         # To allow this to work on systems without ftruncate,
@@ -101,7 +112,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         conn_params = 'create,' + \
             cacheSize + ',error_prefix="%s",' % self.shortid() + \
             'statistics=(all),' + \
-            'eviction_dirty_target=99,eviction_dirty_trigger=99'
+            'eviction_dirty_target=80,eviction_dirty_trigger=99'
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:
@@ -110,6 +121,8 @@ class test_compact02(wttest.WiredTigerTestCase):
 
     # Create a table, add keys with both big and small values.
     def test_compact02(self):
+        mb = 1024 * 1024
+
         # FIXME-WT-7187
         # This test is temporarily disabled for OS/X, it fails, but not consistently.
         import platform
@@ -118,8 +131,9 @@ class test_compact02(wttest.WiredTigerTestCase):
 
         self.ConnectionOpen(self.cacheSize)
 
-        mb = 1024 * 1024
-        params = 'key_format=i,value_format=S,' + self.fileConfig
+        # Set the leaf_value_max to ensure we never create overflow items.
+        # FIXME: WT-2298
+        params = 'key_format=i,value_format=S,leaf_value_max=10MB,' + self.fileConfig
 
         # 1. Create a table with the data, alternating record size.
         self.session.create(self.uri, params)
@@ -167,6 +181,13 @@ class test_compact02(wttest.WiredTigerTestCase):
 
         # After compact, the file size should be less than half the full size.
         self.assertLess(sz, self.fullsize // 2)
+
+        # Verify compact progress stats.
+        statDict = self.getCompactProgressStats()
+        self.assertGreater(statDict["pages_reviewed"],0)
+        self.assertGreater(statDict["pages_rewritten"],0)
+        self.assertEqual(statDict["pages_rewritten"] + statDict["pages_skipped"],
+                            statDict["pages_reviewed"])
 
 if __name__ == '__main__':
     wttest.run()

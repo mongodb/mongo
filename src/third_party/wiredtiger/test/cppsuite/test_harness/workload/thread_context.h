@@ -46,20 +46,7 @@ class workload_tracking;
 namespace test_harness {
 enum thread_type { READ, INSERT, UPDATE };
 
-static std::string
-type_string(thread_type type)
-{
-    switch (type) {
-    case thread_type::INSERT:
-        return ("insert");
-    case thread_type::READ:
-        return ("read");
-    case thread_type::UPDATE:
-        return ("update");
-    default:
-        testutil_die(EINVAL, "unexpected thread_type: %d", static_cast<int>(type));
-    }
-}
+const std::string type_string(thread_type type);
 
 class transaction_context {
     public:
@@ -95,25 +82,25 @@ class transaction_context {
     bool can_rollback();
 
     private:
-    /*
-     * op_count is the current number of operations that have been executed in the current
-     * transaction.
-     */
-    int64_t _op_count = 0;
+    bool _in_txn = false;
+    bool _needs_rollback = false;
 
     /*
      * _min_op_count and _max_op_count are the minimum and maximum number of operations within one
      * transaction. is the current maximum number of operations that can be executed in the current
      * transaction.
      */
-    int64_t _min_op_count = 0;
     int64_t _max_op_count = INT64_MAX;
+    int64_t _min_op_count = 0;
+    /*
+     * op_count is the current number of operations that have been executed in the current
+     * transaction.
+     */
+    int64_t _op_count = 0;
     int64_t _target_op_count = 0;
-    bool _in_txn = false;
-    bool _needs_rollback = false;
 
-    WT_SESSION *_session = nullptr;
     timestamp_manager *_timestamp_manager = nullptr;
+    WT_SESSION *_session = nullptr;
 };
 
 /* Container class for a thread and any data types it may need to interact with the database. */
@@ -157,24 +144,24 @@ class thread_context {
     bool running() const;
 
     public:
-    scoped_session session;
-    scoped_cursor op_track_cursor;
-    scoped_cursor stat_cursor;
-    transaction_context transaction;
-    timestamp_manager *tsm;
-    workload_tracking *tracking;
-    database &db;
     const int64_t collection_count;
     const int64_t key_count;
     const int64_t key_size;
     const int64_t value_size;
     const int64_t thread_count;
-    const uint64_t id;
     const thread_type type;
+    const uint64_t id;
+    database &db;
+    scoped_session session;
+    scoped_cursor op_track_cursor;
+    scoped_cursor stat_cursor;
+    timestamp_manager *tsm;
+    transaction_context transaction;
+    workload_tracking *tracking;
 
     private:
-    throttle _throttle;
     bool _running = true;
+    throttle _throttle;
 };
 } // namespace test_harness
 

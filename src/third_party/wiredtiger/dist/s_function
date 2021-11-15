@@ -108,4 +108,13 @@ for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; 
 	}
 done
 
+# __wt_verbose with a bitwise OR category parameter.
+for f in `find src -name '*.c' -o -name '*._inline.h'`; do
+    file_parse $f | python dist/s_function_verbose.py > $t
+    test -s $t && {
+        echo "$f: Invalid use of verbose category parameter (bitwise OR)."
+        sed 's/^/function @ line:/' < $t
+    }
+done
+
 exit 0

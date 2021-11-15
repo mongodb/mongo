@@ -218,8 +218,7 @@ fill_db(void)
     }
     if (fclose(fp) != 0)
         testutil_die(errno, "fclose");
-    exit(0);
-    /* NOTREACHED */
+    _exit(EXIT_SUCCESS);
 }
 
 extern int __wt_optind;
@@ -263,18 +262,16 @@ main(int argc, char *argv[])
     /*
      * Fork a child to do its work. Wait for it to exit.
      */
-    if ((pid = fork()) < 0)
-        testutil_die(errno, "fork");
+    testutil_checksys((pid = fork()) < 0);
 
     if (pid == 0) { /* child */
         fill_db();
-        return (EXIT_SUCCESS);
+        /* NOTREACHED */
     }
 
     /* parent */
     /* Wait for child to kill itself. */
-    if (waitpid(pid, &status, 0) == -1)
-        testutil_die(errno, "waitpid");
+    testutil_checksys(waitpid(pid, &status, 0) == -1);
 
     /*
      * !!! If we wanted to take a copy of the directory before recovery,

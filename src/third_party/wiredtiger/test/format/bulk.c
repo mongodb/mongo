@@ -73,8 +73,12 @@ bulk_rollback_transaction(WT_SESSION *session)
     testutil_check(session->rollback_transaction(session, NULL));
 }
 
+/*
+ * wts_load --
+ *     Bulk load a table.
+ */
 void
-wts_load(void)
+wts_load(TABLE *table, void *arg)
 {
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
@@ -82,41 +86,38 @@ wts_load(void)
     WT_ITEM key, value;
     WT_SESSION *session;
     uint32_t committed_keyno, keyno, v;
+    char track_buf[128];
     bool is_bulk;
+
+    (void)arg; /* unused argument */
 
     conn = g.wts_conn;
 
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    trace_msg("%s", "=============== bulk load start");
+    testutil_check(__wt_snprintf(track_buf, sizeof(track_buf), "table %u bulk load", table->id));
+    trace_msg("=============== %s bulk load start", table->uri);
 
     /*
      * No bulk load with custom collators, the order of insertion will not match the collation
      * order.
      */
     is_bulk = true;
-    if (g.c_reverse)
+    if (TV(BTREE_REVERSE))
         is_bulk = false;
 
-    /*
-     * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
-     */
-    while ((ret = session->open_cursor(
-              session, g.uri, NULL, is_bulk ? "bulk,append" : NULL, &cursor)) == EBUSY)
-        __wt_yield();
-    testutil_check(ret);
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    wiredtiger_open_cursor(session, table->uri, is_bulk ? "bulk,append" : NULL, &cursor);
 
     /* Set up the key/value buffers. */
     key_gen_init(&key);
     val_gen_init(&value);
 
-    if (g.c_txn_timestamps)
+    if (g.transaction_timestamps_config)
         bulk_begin_transaction(session);
 
-    for (committed_keyno = keyno = 0; ++keyno <= g.c_rows;) {
-        val_gen(NULL, &value, keyno);
+    for (committed_keyno = keyno = 0; ++keyno <= table->rows_current;) {
+        val_gen(table, NULL, &value, keyno);
 
-        switch (g.type) {
+        switch (table->type) {
         case FIX:
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
@@ -132,7 +133,7 @@ wts_load(void)
                 trace_msg("bulk %" PRIu32 " {%.*s}", keyno, (int)value.size, (char *)value.data);
             break;
         case ROW:
-            key_gen(&key, keyno);
+            key_gen(table, &key, keyno);
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
             if (g.trace_all)
@@ -150,7 +151,7 @@ wts_load(void)
         if ((ret = cursor->insert(cursor)) != 0) {
             testutil_assert(ret == WT_CACHE_FULL || ret == WT_ROLLBACK);
 
-            if (g.c_txn_timestamps) {
+            if (g.transaction_timestamps_config) {
                 bulk_rollback_transaction(session);
                 bulk_begin_transaction(session);
             }
@@ -161,13 +162,13 @@ wts_load(void)
              * simply modify the values because they have to equal 100 when the database is reopened
              * (we are going to rewrite the CONFIG file, too).
              */
-            if (g.c_insert_pct > 5) {
-                g.c_delete_pct += g.c_insert_pct - 5;
-                g.c_insert_pct = 5;
+            if (TV(OPS_PCT_INSERT) > 5) {
+                TV(OPS_PCT_DELETE) += TV(OPS_PCT_INSERT) - 5;
+                TV(OPS_PCT_INSERT) = 5;
             }
-            v = g.c_write_pct / 2;
-            g.c_delete_pct += v;
-            g.c_write_pct -= v;
+            v = TV(OPS_PCT_WRITE) / 2;
+            TV(OPS_PCT_DELETE) += v;
+            TV(OPS_PCT_WRITE) -= v;
 
             break;
         }
@@ -179,9 +180,9 @@ wts_load(void)
          */
         if ((keyno < 5000 && keyno % 10 == 0) || keyno % 5000 == 0) {
             /* Report on progress. */
-            track("bulk load", keyno, NULL);
+            track(track_buf, keyno);
 
-            if (g.c_txn_timestamps) {
+            if (g.transaction_timestamps_config) {
                 bulk_commit_transaction(session);
                 committed_keyno = keyno;
                 bulk_begin_transaction(session);
@@ -189,27 +190,23 @@ wts_load(void)
         }
     }
 
-    if (g.c_txn_timestamps)
+    if (g.transaction_timestamps_config)
         bulk_commit_transaction(session);
 
     /*
      * Ideally, the insert loop runs until the number of rows plus one, in which case row counts are
-     * correct. If the loop exited early, reset the counters and rewrite the CONFIG file (so reopens
-     * aren't surprised).
+     * correct. If the loop exited early, reset the table's row count and rewrite the CONFIG file
+     * (so reopens aren't surprised).
      */
-    if (keyno != g.c_rows + 1) {
-        g.c_rows = g.c_txn_timestamps ? committed_keyno : (keyno - 1);
-        testutil_assert(g.c_rows > 0);
-        g.rows = g.c_rows;
+    if (keyno != table->rows_current + 1) {
+        table->rows_current = g.transaction_timestamps_config ? committed_keyno : (keyno - 1);
+        testutil_assert(table->rows_current > 0);
 
         config_print(false);
     }
 
-    testutil_check(cursor->close(cursor));
-
-    trace_msg("%s", "=============== bulk load stop");
-
     testutil_check(session->close(session, NULL));
+    trace_msg("=============== %s bulk load stop", table->uri);
 
     key_gen_teardown(&key);
     val_gen_teardown(&value);

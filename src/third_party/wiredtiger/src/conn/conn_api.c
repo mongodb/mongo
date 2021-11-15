@@ -1990,8 +1990,8 @@ int
 __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
     static const WT_NAME_FLAG verbtypes[] = {{"api", WT_VERB_API}, {"backup", WT_VERB_BACKUP},
-      {"block", WT_VERB_BLOCK}, {"checkpoint", WT_VERB_CHECKPOINT},
-      {"checkpoint_cleanup", WT_VERB_CHECKPOINT_CLEANUP},
+      {"block", WT_VERB_BLOCK}, {"block_cache", WT_VERB_BLKCACHE},
+      {"checkpoint", WT_VERB_CHECKPOINT}, {"checkpoint_cleanup", WT_VERB_CHECKPOINT_CLEANUP},
       {"checkpoint_progress", WT_VERB_CHECKPOINT_PROGRESS}, {"compact", WT_VERB_COMPACT},
       {"compact_progress", WT_VERB_COMPACT_PROGRESS}, {"error_returns", WT_VERB_ERROR_RETURNS},
       {"evict", WT_VERB_EVICT}, {"evict_stuck", WT_VERB_EVICT_STUCK},
@@ -2011,20 +2011,42 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint64_t flags;
 
     conn = S2C(session);
 
     WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
 
-    flags = 0;
     for (ft = verbtypes; ft->name != NULL; ft++) {
-        if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
-            LF_SET(ft->flag);
+        ret = __wt_config_subgets(session, &cval, ft->name, &sval);
         WT_RET_NOTFOUND_OK(ret);
+
+        if (ret == WT_NOTFOUND)
+            /*
+             * If the given event isn't specified in configuration string, default it to the
+             * WT_VERBOSE_WARNING verbosity level.
+             */
+            conn->verbose[ft->flag] = WT_VERBOSE_WARNING;
+        else if (sval.type == WT_CONFIG_ITEM_BOOL && sval.len == 0)
+            /*
+             * If no value is associated with the event (i.e passing verbose=[checkpoint]), default
+             * the event to WT_VERBOSE_DEBUG. Correspondingly, all legacy uses of '__wt_verbose',
+             * being messages without an explicit verbosity level, will default to
+             * 'WT_VERBOSE_DEBUG'.
+             */
+            conn->verbose[ft->flag] = WT_VERBOSE_DEBUG;
+        else if (sval.type == WT_CONFIG_ITEM_NUM && sval.val >= WT_VERBOSE_INFO &&
+          sval.val <= WT_VERBOSE_DEBUG)
+            conn->verbose[ft->flag] = (WT_VERBOSE_LEVEL)sval.val;
+        else
+            /*
+             * We only support verbosity values in the form of positive numbers (representing
+             * verbosity levels e.g. [checkpoint:1,rts:0]) and boolean expressions (e.g.
+             * [checkpoint,rts]). Return error for all other unsupported verbosity values e.g
+             * negative numbers and strings.
+             */
+            WT_RET_MSG(session, EINVAL, "Failed to parse verbose option '%s'", ft->name);
     }
 
-    conn->verbose = flags;
     return (0);
 }
 
@@ -2691,12 +2713,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     }
     WT_ERR(__wt_verbose_config(session, cfg));
     WT_ERR(__wt_timing_stress_config(session, cfg));
-
-    /* Set up operation tracking if configured. */
+    WT_ERR(__wt_block_cache_setup(session, cfg, false));
     WT_ERR(__wt_conn_optrack_setup(session, cfg, false));
-
     WT_ERR(__conn_session_size(session, cfg, &conn->session_size));
-
     WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
     conn->session_scratch_max = (size_t)cval.val;
 

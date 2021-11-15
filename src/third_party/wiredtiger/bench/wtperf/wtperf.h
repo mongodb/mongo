@@ -40,19 +40,32 @@ typedef struct __wtperf WTPERF;
 typedef struct __wtperf_thread WTPERF_THREAD;
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
+#ifndef LZ4_PATH
+#define LZ4_PATH "lz4/.libs/libwiredtiger_lz4.so"
+#endif
+#ifndef SNAPPY_PATH
+#define SNAPPY_PATH "snappy/.libs/libwiredtiger_snappy.so"
+#endif
+#ifndef ZLIB_PATH
+#define ZLIB_PATH "zlib/.libs/libwiredtiger_zlib.so"
+#endif
+#ifndef ZSTD_PATH
+#define ZSTD_PATH "zstd/.libs/libwiredtiger_zstd.so"
+#endif
+
 #define EXT_PFX ",extensions=("
 #define EXT_SFX ")"
 #define EXTPATH "../../ext/compressors/" /* Extensions path */
 #define BLKCMP_PFX "block_compressor="
 
 #define LZ4_BLK BLKCMP_PFX "lz4"
-#define LZ4_EXT EXT_PFX EXTPATH "lz4/.libs/libwiredtiger_lz4.so" EXT_SFX
+#define LZ4_EXT EXT_PFX EXTPATH LZ4_PATH EXT_SFX
 #define SNAPPY_BLK BLKCMP_PFX "snappy"
-#define SNAPPY_EXT EXT_PFX EXTPATH "snappy/.libs/libwiredtiger_snappy.so" EXT_SFX
+#define SNAPPY_EXT EXT_PFX EXTPATH SNAPPY_PATH EXT_SFX
 #define ZLIB_BLK BLKCMP_PFX "zlib"
-#define ZLIB_EXT EXT_PFX EXTPATH "zlib/.libs/libwiredtiger_zlib.so" EXT_SFX
+#define ZLIB_EXT EXT_PFX EXTPATH ZLIB_PATH EXT_SFX
 #define ZSTD_BLK BLKCMP_PFX "zstd"
-#define ZSTD_EXT EXT_PFX EXTPATH "zstd/.libs/libwiredtiger_zstd.so" EXT_SFX
+#define ZSTD_EXT EXT_PFX EXTPATH ZSTD_PATH EXT_SFX
 
 #define MAX_MODIFY_PCT 10
 #define MAX_MODIFY_NUM 16

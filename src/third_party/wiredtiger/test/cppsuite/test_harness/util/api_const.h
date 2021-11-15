@@ -29,50 +29,52 @@
 #ifndef API_CONST_H
 #define API_CONST_H
 
+#include <string>
+
 /* Define all constants related to WiredTiger APIs and testing. */
 namespace test_harness {
 
 /* Component names. */
-static const char *CHECKPOINT_MANAGER = "checkpoint_manager";
-static const char *RUNTIME_MONITOR = "runtime_monitor";
-static const char *TIMESTAMP_MANAGER = "timestamp_manager";
-static const char *WORKLOAD_GENERATOR = "workload_generator";
-static const char *WORKLOAD_TRACKING = "workload_tracking";
+extern const std::string CHECKPOINT_MANAGER;
+extern const std::string RUNTIME_MONITOR;
+extern const std::string TIMESTAMP_MANAGER;
+extern const std::string WORKLOAD_GENERATOR;
+extern const std::string WORKLOAD_TRACKING;
 
 /* Configuration API consts. */
-static const char *CACHE_SIZE_MB = "cache_size_mb";
-static const char *COLLECTION_COUNT = "collection_count";
-static const char *COMPRESSION_ENABLED = "compression_enabled";
-static const char *DURATION_SECONDS = "duration_seconds";
-static const char *ENABLED = "enabled";
-static const char *ENABLE_LOGGING = "enable_logging";
-static const char *INSERT_CONFIG = "insert_config";
-static const char *KEY_COUNT_PER_COLLECTION = "key_count_per_collection";
-static const char *KEY_SIZE = "key_size";
-static const char *LIMIT = "limit";
-static const char *MAX = "max";
-static const char *MIN = "min";
-static const char *OLDEST_LAG = "oldest_lag";
-static const char *OP_RATE = "op_rate";
-static const char *OPS_PER_TRANSACTION = "ops_per_transaction";
-static const char *POPULATE_CONFIG = "populate_config";
-static const char *POSTRUN_STATISTICS = "postrun_statistics";
-static const char *READ_CONFIG = "read_config";
-static const char *STABLE_LAG = "stable_lag";
-static const char *STAT_CACHE_SIZE = "stat_cache_size";
-static const char *STAT_DB_SIZE = "stat_db_size";
-static const char *STATISTICS_CONFIG = "statistics_config";
-static const char *THREAD_COUNT = "thread_count";
-static const char *TYPE = "type";
-static const char *UPDATE_CONFIG = "update_config";
-static const char *VALUE_SIZE = "value_size";
+extern const std::string CACHE_SIZE_MB;
+extern const std::string COLLECTION_COUNT;
+extern const std::string COMPRESSION_ENABLED;
+extern const std::string DURATION_SECONDS;
+extern const std::string ENABLED;
+extern const std::string ENABLE_LOGGING;
+extern const std::string INSERT_CONFIG;
+extern const std::string KEY_COUNT_PER_COLLECTION;
+extern const std::string KEY_SIZE;
+extern const std::string LIMIT;
+extern const std::string MAX;
+extern const std::string MIN;
+extern const std::string OLDEST_LAG;
+extern const std::string OP_RATE;
+extern const std::string OPS_PER_TRANSACTION;
+extern const std::string POPULATE_CONFIG;
+extern const std::string POSTRUN_STATISTICS;
+extern const std::string READ_CONFIG;
+extern const std::string STABLE_LAG;
+extern const std::string STAT_CACHE_SIZE;
+extern const std::string STAT_DB_SIZE;
+extern const std::string STATISTICS_CONFIG;
+extern const std::string THREAD_COUNT;
+extern const std::string TYPE;
+extern const std::string UPDATE_CONFIG;
+extern const std::string VALUE_SIZE;
 
 /* WiredTiger API consts. */
-static const char *COMMIT_TS = "commit_timestamp";
-static const char *CONNECTION_CREATE = "create";
-static const char *OLDEST_TS = "oldest_timestamp";
-static const char *STABLE_TS = "stable_timestamp";
-static const char *STATISTICS_LOG = "statistics_log=(json,wait=1)";
+extern const std::string COMMIT_TS;
+extern const std::string CONNECTION_CREATE;
+extern const std::string OLDEST_TS;
+extern const std::string STABLE_TS;
+extern const std::string STATISTICS_LOG;
 
 /*
  * Use the Snappy compressor for stress testing to avoid excessive disk space usage. Our CMake
@@ -88,10 +90,10 @@ static const char *STATISTICS_LOG = "statistics_log=(json,wait=1)";
 #define SNAPPY_EXT ",extensions=(" SNAPPY_PATH ")"
 
 /* Test harness consts. */
-static const char *DEFAULT_FRAMEWORK_SCHEMA = "key_format=S,value_format=S,";
-static const char *TABLE_OPERATION_TRACKING = "table:operation_tracking";
-static const char *TABLE_SCHEMA_TRACKING = "table:schema_tracking";
-static const char *STATISTICS_URI = "statistics:";
+extern const std::string DEFAULT_FRAMEWORK_SCHEMA;
+extern const std::string TABLE_OPERATION_TRACKING;
+extern const std::string TABLE_SCHEMA_TRACKING;
+extern const std::string STATISTICS_URI;
 
 } // namespace test_harness
 

@@ -89,7 +89,7 @@ static void generate_value(uint32_t, uint64_t, char *, int *, int *, int *, char
 static void run_check_subtest(TEST_OPTS *, const char *, uint64_t, bool, uint64_t *);
 static int run_check_subtest_range(TEST_OPTS *, const char *, bool);
 static void run_check_subtest_range_retry(TEST_OPTS *, const char *, bool);
-static int run_process(TEST_OPTS *, const char *, char *[], int *);
+static void run_process(TEST_OPTS *, const char *, char *[], int *);
 static void subtest_main(int, char *[], bool);
 static void subtest_populate(TEST_OPTS *, bool);
 
@@ -332,8 +332,7 @@ run_check_subtest(
     if (opts->verbose)
         printf("running a separate process with %" PRIu64 " operations until fail...\n", nops);
     testutil_clean_work_dir(opts->home);
-    testutil_check(
-      run_process(opts, debugger != NULL ? debugger : opts->argv0, subtest_args, &estatus));
+    run_process(opts, debugger != NULL ? debugger : opts->argv0, subtest_args, &estatus);
     if (opts->verbose)
         printf("process exited %d\n", estatus);
 
@@ -443,8 +442,8 @@ run_check_subtest_range_retry(TEST_OPTS *opts, const char *debugger, bool close_
  * run_process --
  *     Run a program with arguments, wait until it completes.
  */
-static int
-run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
+static void
+run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *statusp)
 {
     int pid;
     char **arg;
@@ -455,14 +454,13 @@ run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
             printf("%s ", *arg);
         printf("\n");
     }
-    if ((pid = fork()) == 0) {
+    testutil_checksys((pid = fork()) < 0);
+    if (pid == 0) {
         (void)execv(prog, argv);
-        testutil_die(errno, "%s", prog);
-    } else if (pid < 0)
-        return (errno);
+        _exit(EXIT_FAILURE);
+    }
 
-    (void)waitpid(pid, status, 0);
-    return (0);
+    testutil_checksys(waitpid(pid, statusp, 0) == -1);
 }
 
 /*

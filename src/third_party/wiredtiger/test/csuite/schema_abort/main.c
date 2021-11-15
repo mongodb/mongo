@@ -837,7 +837,7 @@ run_workload(uint32_t nth)
      */
     free(thr);
     free(td);
-    exit(EXIT_SUCCESS);
+    _exit(EXIT_SUCCESS);
 }
 
 extern int __wt_optind;
@@ -999,7 +999,7 @@ main(int argc, char *argv[])
 
         if (pid == 0) { /* child */
             run_workload(nth);
-            return (EXIT_SUCCESS);
+            /* NOTREACHED */
         }
 
         /* parent */

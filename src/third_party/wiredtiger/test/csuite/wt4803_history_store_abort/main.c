@@ -66,7 +66,7 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const 
          * panic.
          */
         if (expect_panic)
-            exit(EXIT_SUCCESS);
+            _exit(EXIT_SUCCESS);
     }
 
     return (0);
@@ -81,6 +81,12 @@ hs_workload(TEST_OPTS *opts, const char *hs_file_max)
     WT_SESSION *other_session, *session;
     int i;
     char buf[WT_MEGABYTE], open_config[128];
+
+    /*
+     * We're going to run this workload for different configurations of file_max. So clean out the
+     * work directory each time.
+     */
+    testutil_make_work_dir(opts->home);
 
     testutil_check(__wt_snprintf(open_config, sizeof(open_config),
       "create,cache_size=50MB,history_store=(file_max=%s)", hs_file_max));
@@ -125,24 +131,14 @@ hs_workload(TEST_OPTS *opts, const char *hs_file_max)
      * Cleanup. We do not get here when the file_max size is small because we will have already hit
      * the maximum and exited. This code only executes on the successful path.
      */
-    testutil_check(other_session->rollback_transaction(other_session, NULL));
-    testutil_check(other_session->close(other_session, NULL));
-
-    testutil_check(cursor->close(cursor));
-    testutil_check(session->close(session, NULL));
+    testutil_check(opts->conn->close(opts->conn, NULL));
 }
 
-static int
+static void
 test_hs_workload(TEST_OPTS *opts, const char *hs_file_max)
 {
     pid_t pid;
     int status;
-
-    /*
-     * We're going to run this workload for different configurations of file_max. So clean out the
-     * work directory each time.
-     */
-    testutil_make_work_dir(opts->home);
 
     /*
      * Since it's possible that the workload will panic and abort, we will fork the process and
@@ -151,11 +147,9 @@ test_hs_workload(TEST_OPTS *opts, const char *hs_file_max)
      * This way, we can safely check the exit code of the child process and confirm that it is what
      * we expected.
      */
-    pid = fork();
-    if (pid < 0)
-        /* Failed fork. */
-        testutil_die(errno, "fork");
-    else if (pid == 0) {
+    testutil_checksys((pid = fork()) < 0);
+
+    if (pid == 0) {
         /* Child process from here. */
         hs_workload(opts, hs_file_max);
 
@@ -167,16 +161,14 @@ test_hs_workload(TEST_OPTS *opts, const char *hs_file_max)
           expect_panic ? "true" : "false");
 
         if (expect_panic)
-            exit(EXIT_FAILURE);
+            _exit(EXIT_FAILURE);
         else
-            exit(EXIT_SUCCESS);
+            _exit(EXIT_SUCCESS);
     }
 
     /* Parent process from here. */
-    if (waitpid(pid, &status, 0) == -1)
-        testutil_die(errno, "waitpid");
-
-    return (status);
+    testutil_checksys(waitpid(pid, &status, 0) == -1);
+    testutil_assert(status == 0);
 }
 
 int
@@ -192,23 +184,23 @@ main(int argc, char **argv)
      * needed.
      */
     expect_panic = false;
-    testutil_check(test_hs_workload(&opts, "0"));
+    test_hs_workload(&opts, "0");
 
     /*
      * The history store is limited to 5GB. This is more than enough for this workload so we don't
      * expect any failure.
      */
     expect_panic = false;
-    testutil_check(test_hs_workload(&opts, "5GB"));
+    test_hs_workload(&opts, "5GB");
 
     /*
      * The history store is limited to 100MB. This is insufficient for this workload so we're
      * expecting a failure.
      */
     expect_panic = true;
-    testutil_check(test_hs_workload(&opts, "100MB"));
+    test_hs_workload(&opts, "100MB");
 
     testutil_cleanup(&opts);
 
-    return (0);
+    return (EXIT_SUCCESS);
 }

@@ -262,7 +262,7 @@ TAB_SIZE               = 8
 # a double escape (\\{ and \\})
 
 ALIASES                = "arch_page_table{2}=<div class= arch_head><table><tr><th rowspan=2 style=\"width:10%;\">@htmlonly <div><a href=\"arch-index.html\"><img class=\"arch_thumbnail\" src=\"wt_diagram.png\" style=\"background-image: url(wt_diagram.png)\"></a></div>@endhtmlonly</th><th style=\"width:44%\">Data Structures</th><th style=\"width:45%\">Source Location</th></tr><tr><td><code>\1</code></td><td><code>\2</code></td></tr></table></div>" \
-                         "arch_page_top{2}=@page \1 \2 (Architecture Guide)" \
+                         "arch_page_top{2}=@page \1 \2" \
                          "arch_page_caution=<b>Caution: the Architecture Guide is not updated in lockstep with the code base and is not necessarily correct or complete for any specific release.</b>" \
                          "config{3}=  @row{<tt>\1</tt>,\2,\3}" \
                          "configempty{2}=@param config configuration string, see @ref config_strings.  No values currently permitted." \
@@ -1693,7 +1693,7 @@ MATHJAX_CODEFILE       =
 # The default value is: YES.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-SEARCHENGINE           = NO
+SEARCHENGINE           = YES
 
 # When the SERVER_BASED_SEARCH tag is enabled the search engine will be
 # implemented using a web server instead of a web client using JavaScript. There

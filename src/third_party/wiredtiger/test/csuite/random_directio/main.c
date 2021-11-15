@@ -622,7 +622,7 @@ fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
      */
     free(thr);
     free(td);
-    exit(EXIT_SUCCESS);
+    _exit(EXIT_SUCCESS);
 }
 
 /*
@@ -775,12 +775,9 @@ kill_child(pid_t pid)
      * abort, then signal continue so that the child process will process the abort and dump core.
      */
     printf("Send abort to child process ID %d\n", (int)pid);
-    if (kill(pid, SIGABRT) != 0)
-        testutil_die(errno, "kill");
-    if (kill(pid, SIGCONT) != 0)
-        testutil_die(errno, "kill");
-    if (waitpid(pid, &status, 0) == -1)
-        testutil_die(errno, "waitpid");
+    testutil_checksys(kill(pid, SIGABRT) != 0);
+    testutil_checksys(kill(pid, SIGCONT) != 0);
+    testutil_checksys(waitpid(pid, &status, 0) == -1);
 }
 
 /*
@@ -1001,7 +998,7 @@ handler(int sig)
     int status, termsig;
 
     WT_UNUSED(sig);
-    pid = waitpid(-1, &status, WNOHANG | WUNTRACED);
+    testutil_checksys((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) == -1);
     if (pid == 0)
         return; /* Nothing to wait for. */
     if (WIFSTOPPED(status))
@@ -1211,12 +1208,11 @@ main(int argc, char *argv[])
             memset(&sa, 0, sizeof(sa));
             sa.sa_handler = handler;
             testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-            if ((pid = fork()) < 0)
-                testutil_die(errno, "fork");
+            testutil_checksys((pid = fork()) < 0);
         }
         if (pid == 0) { /* child, or populate_only */
             fill_db(nth, datasize, method, flags);
-            return (EXIT_SUCCESS);
+            /* NOTREACHED */
         }
 
         /* parent */
@@ -1247,10 +1243,8 @@ main(int argc, char *argv[])
         printf("Kill child\n");
         sa.sa_handler = SIG_DFL;
         testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-        if (kill(pid, SIGKILL) != 0)
-            testutil_die(errno, "kill");
-        if (waitpid(pid, &status, 0) == -1)
-            testutil_die(errno, "waitpid");
+        testutil_checksys(kill(pid, SIGKILL) != 0);
+        testutil_checksys(waitpid(pid, &status, 0) == -1);
     }
     if (verify_only && !check_db(nth, datasize, 0, false, flags)) {
         printf("FAIL\n");

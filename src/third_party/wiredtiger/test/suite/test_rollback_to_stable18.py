@@ -31,8 +31,6 @@
 # aggregated_time_windows
 # [END_TAGS]
 
-import fnmatch, os, shutil, time
-from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
@@ -56,7 +54,8 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
     scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,in_memory=true,statistics=(all),log=(enabled=false),eviction_dirty_trigger=5,eviction_updates_trigger=5'
+        config = 'cache_size=50MB,in_memory=true,statistics=(all),log=(enabled=false),' \
+                 'eviction_dirty_trigger=10,eviction_updates_trigger=10'
         return config
 
     def test_rollback_to_stable(self):

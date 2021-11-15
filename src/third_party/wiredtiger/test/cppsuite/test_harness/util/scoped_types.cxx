@@ -26,6 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <string>
 #include <utility>
 
 #include "scoped_types.h"
@@ -33,7 +34,7 @@
 namespace test_harness {
 
 /* scoped_cursor implementation */
-scoped_cursor::scoped_cursor(WT_SESSION *session, const char *uri, const char *cfg)
+scoped_cursor::scoped_cursor(WT_SESSION *session, const std::string &uri, const std::string &cfg)
 {
     reinit(session, uri, cfg);
 }
@@ -45,8 +46,10 @@ scoped_cursor::scoped_cursor(scoped_cursor &&other)
 
 scoped_cursor::~scoped_cursor()
 {
-    if (_cursor != nullptr)
+    if (_cursor != nullptr) {
         testutil_check(_cursor->close(_cursor));
+        _cursor = nullptr;
+    }
 }
 
 /*
@@ -63,14 +66,16 @@ scoped_cursor::operator=(scoped_cursor &&other)
 }
 
 void
-scoped_cursor::reinit(WT_SESSION *session, const char *uri, const char *cfg)
+scoped_cursor::reinit(WT_SESSION *session, const std::string &uri, const std::string &cfg)
 {
+    testutil_assert(!uri.empty());
     if (_cursor != nullptr) {
         testutil_check(_cursor->close(_cursor));
         _cursor = nullptr;
     }
     if (session != nullptr)
-        testutil_check(session->open_cursor(session, uri, nullptr, cfg, &_cursor));
+        testutil_check(session->open_cursor(
+          session, uri.c_str(), nullptr, cfg.empty() ? nullptr : cfg.c_str(), &_cursor));
 }
 
 /*
@@ -103,8 +108,10 @@ scoped_session::scoped_session(WT_CONNECTION *conn)
 
 scoped_session::~scoped_session()
 {
-    if (_session != nullptr)
+    if (_session != nullptr) {
         testutil_check(_session->close(_session, nullptr));
+        _session = nullptr;
+    }
 }
 
 scoped_session::scoped_session(scoped_session &&other)
@@ -155,7 +162,7 @@ scoped_session::get()
 }
 
 scoped_cursor
-scoped_session::open_scoped_cursor(const char *uri, const char *cfg)
+scoped_session::open_scoped_cursor(const std::string &uri, const std::string &cfg)
 {
     return (scoped_cursor(_session, uri, cfg));
 }

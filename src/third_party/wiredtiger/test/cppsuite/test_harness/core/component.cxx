@@ -30,7 +30,7 @@
 #include "test_harness/util/api_const.h"
 
 namespace test_harness {
-component::component(const std::string &name, configuration *config) : _name(name), _config(config)
+component::component(const std::string &name, configuration *config) : _config(config), _name(name)
 {
 }
 

@@ -2,6 +2,7 @@
 #	List of source files for WiredTiger library.
 
 src/block/block_addr.c
+src/block/block_cache.c
 src/block/block_ckpt.c
 src/block/block_ckpt_scan.c
 src/block/block_compact.c

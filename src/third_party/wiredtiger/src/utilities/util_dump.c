@@ -590,7 +590,7 @@ get_dump_type(bool pretty, bool hex, bool json)
     else
         result = "print";
 
-    return result;
+    return (result);
 }
 
 /*

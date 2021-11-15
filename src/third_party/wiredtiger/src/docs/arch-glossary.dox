@@ -1,4 +1,4 @@
-/*! @page arch-glossary Architecture Guide Glossary of Terms
+/*! @page arch-glossary Glossary of Terms
 
 WiredTiger has a lot of domain specific nomenclature - this page attempts
 to decode it. This is intended for those navigating the WiredTiger source
@@ -7,7 +7,9 @@ tree - it describes terms internal to the storage engine.
 The definitions list how the terms are used in WiredTiger, which may not match how
 they are used in other settings.
 
-@section arch-glossary-transactions Glossary (click headings to sort)
+@section arch-glossary-transactions Glossary
+
+(click headings to sort)
 
 <!-- Please keep glossary formatted a single entry to a line, and sorted alphabetically (case insensitive). -->
 

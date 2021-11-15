@@ -73,11 +73,9 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
     F_SET(session, WT_SESSION_NO_RECONCILE);
 
     /*
-     * Reconciliation locks the page for three reasons:
+     * Reconciliation locks the page for two reasons:
      *    Reconciliation reads the lists of page updates, obsolete updates
      * cannot be discarded while reconciliation is in progress;
-     *    The compaction process reads page modification information, which
-     * reconciliation modifies;
      *    In-memory splits: reconciliation of an internal page cannot handle
      * a child page splitting during the reconciliation.
      */
@@ -97,6 +95,9 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
      * that information.
      */
     ret = __reconcile(session, ref, salvage, flags, &page_locked);
+
+    /* If writing a page in service of compaction, we're done, clear the flag. */
+    F_CLR_ATOMIC(ref->page, WT_PAGE_COMPACTION_WRITE);
 
 err:
     if (page_locked)
@@ -392,14 +393,18 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
     /*
      * If a single root page was written (either an empty page or there was a 1-for-1 page swap),
-     * we've written root and checkpoint, we're done. If the root page split, write the resulting
-     * WT_REF array. We already have an infrastructure for writing pages, create a fake root page
-     * and write it instead of adding code to write blocks based on the list of blocks resulting
-     * from a multiblock reconciliation.
+     * we've written root and checkpoint, we're done. Clear the result of the reconciliation, a root
+     * page never has the structures that would normally be associated with (at least), the
+     * replaced-object flag. If the root page split, write the resulting WT_REF array. We already
+     * have an infrastructure for writing pages, create a fake root page and write it instead of
+     * adding code to write blocks based on the list of blocks resulting from a multiblock
+     * reconciliation.
+     *
      */
     switch (mod->rec_result) {
     case WT_PM_REC_EMPTY:   /* Page is empty */
     case WT_PM_REC_REPLACE: /* 1-for-1 page swap */
+        mod->rec_result = 0;
         return (0);
     case WT_PM_REC_MULTIBLOCK: /* Multiple blocks */
         break;
@@ -1145,13 +1150,16 @@ __rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
     return (0);
 }
 
+/* The minimum number of entries before we'll split a row-store internal page. */
+#define WT_PAGE_INTL_MINIMUM_ENTRIES 20
+
 /*
  * __wt_rec_split --
  *     Handle the page reconciliation bookkeeping. (Did you know "bookkeeper" has 3 doubled letters
  *     in a row? Sweet-tooth does, too.)
  */
 int
-__wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool forced)
+__wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 {
     WT_BTREE *btree;
     WT_REC_CHUNK *tmp;
@@ -1170,9 +1178,16 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool 
     /*
      * We can get here if the first key/value pair won't fit. Grow the buffer to contain the current
      * item if we haven't already consumed a reasonable portion of a split chunk.
+     *
+     * If we're promoting huge keys into an internal page, we might be about to write an internal
+     * page with too few items, which isn't good for tree depth or search. Grow the buffer to
+     * contain the current item if we don't have enough items to split an internal page.
      */
     inuse = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-    if (!forced && inuse < r->split_size / 2 && !__wt_rec_need_split(r, 0))
+    if (inuse < r->split_size / 2 && !__wt_rec_need_split(r, 0))
+        goto done;
+
+    if (r->page->type == WT_PAGE_ROW_INT && r->entries < WT_PAGE_INTL_MINIMUM_ENTRIES)
         goto done;
 
     /* All page boundaries reset the dictionary. */
@@ -1185,7 +1200,7 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool 
     /*
      * Normally we keep two chunks in memory at a given time, and we write the previous chunk at
      * each boundary, switching the previous and current check references. The exception is when
-     * doing a bulk load or a forced split, where we write out the chunks as we get them.
+     * doing a bulk load.
      */
     if (r->is_bulk_load)
         WT_RET(__rec_split_write(session, r, r->cur_ptr, NULL, false));
@@ -1193,19 +1208,13 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool 
         if (r->prev_ptr != NULL)
             WT_RET(__rec_split_write(session, r, r->prev_ptr, NULL, false));
 
-        if (forced) {
-            WT_RET(__rec_split_write(session, r, r->cur_ptr, NULL, false));
-            r->prev_ptr = NULL;
-            r->cur_ptr = &r->chunk_A;
-        } else {
-            if (r->prev_ptr == NULL) {
-                WT_RET(__rec_split_chunk_init(session, r, &r->chunk_B));
-                r->prev_ptr = &r->chunk_B;
-            }
-            tmp = r->prev_ptr;
-            r->prev_ptr = r->cur_ptr;
-            r->cur_ptr = tmp;
+        if (r->prev_ptr == NULL) {
+            WT_RET(__rec_split_chunk_init(session, r, &r->chunk_B));
+            r->prev_ptr = &r->chunk_B;
         }
+        tmp = r->prev_ptr;
+        r->prev_ptr = r->cur_ptr;
+        r->cur_ptr = tmp;
     }
 
     /* Initialize the next chunk, including the key. */
@@ -1226,13 +1235,19 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool 
 
 done:
     /*
-     * Overflow values can be larger than the maximum page size but still be "on-page". If the next
-     * key/value pair is larger than space available after a split has happened (in other words,
-     * larger than the maximum page size), create a page sized to hold that one key/value pair. This
-     * generally splits the page into key/value pairs before a large object, the object, and
-     * key/value pairs after the object. It's possible other key/value pairs will also be aggregated
-     * onto the bigger page before or after, if the page happens to hold them, but it won't
-     * necessarily happen that way.
+     * We may have declined the split as described above, in which case grow the buffer based on the
+     * next key/value pair's length. In the internal page minimum-key case, we could grow more than
+     * a single key/value pair's length to avoid repeatedly calling this function, but we'd prefer
+     * not to have internal pages that are larger than they need to be, and repeatedly trying to
+     * split means we will split as soon as we can.
+     *
+     * Also, overflow values can be larger than the maximum page size but still be "on-page". If the
+     * next key/value pair is larger than space available after a split has happened (in other
+     * words, larger than the maximum page size), create a page sized to hold that one key/value
+     * pair. This generally splits the page into key/value pairs before a large object, the object,
+     * and key/value pairs after the object. It's possible other key/value pairs will also be
+     * aggregated onto the bigger page before or after, if the page happens to hold them, but it
+     * won't necessarily happen that way.
      */
     if (r->space_avail < next_len)
         WT_RET(__rec_split_grow(session, r, next_len));
@@ -1245,14 +1260,14 @@ done:
  *     Save the details for the minimum split size boundary or call for a split.
  */
 int
-__wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len, bool forced)
+__wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 {
     /*
      * If crossing the minimum split size boundary, store the boundary details at the current
      * location in the buffer. If we are crossing the split boundary at the same time, possible when
      * the next record is large enough, just split at this point.
      */
-    if (!forced && WT_CROSSING_MIN_BND(r, next_len) && !WT_CROSSING_SPLIT_BND(r, next_len) &&
+    if (WT_CROSSING_MIN_BND(r, next_len) && !WT_CROSSING_SPLIT_BND(r, next_len) &&
       !__wt_rec_need_split(r, 0)) {
         /*
          * If the first record doesn't fit into the minimum split size, we end up here. Write the
@@ -1279,7 +1294,7 @@ __wt_rec_split_crossing_bnd(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t ne
     }
 
     /* We are crossing a split boundary */
-    return (__wt_rec_split(session, r, next_len, forced));
+    return (__wt_rec_split(session, r, next_len));
 }
 
 /*
@@ -1635,12 +1650,11 @@ __rec_split_write_reuse(
     multi->checksum = __wt_checksum(image->data, image->size);
 
     /*
-     * Don't check for a block match when writing blocks during compaction, the whole idea is to
-     * move those blocks. Check after calculating the checksum, we don't distinguish between pages
-     * written solely as part of the compaction and pages written at around the same time, and so
-     * there's a possibility the calculated checksum will be useful in the future.
+     * Don't check for a block match when writing a page for compaction, the whole idea is to move
+     * those blocks. Check after calculating the checksum, there's a possibility the calculated
+     * checksum will be useful in the future.
      */
-    if (session->compact_state != WT_COMPACT_NONE)
+    if (F_ISSET_ATOMIC(r->page, WT_PAGE_COMPACTION_WRITE))
         return (false);
 
     /*

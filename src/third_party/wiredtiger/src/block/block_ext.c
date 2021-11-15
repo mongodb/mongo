@@ -588,6 +588,9 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
     ret = __wt_block_off_free(session, block, objectid, offset, (wt_off_t)size);
     __wt_spin_unlock(session, &block->live_lock);
 
+    /* Evict the freed block from the block cache */
+    __wt_blkcache_remove(session, offset, size, checksum);
+
     return (ret);
 }
 

@@ -55,28 +55,15 @@ __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
  *     internal page.
  */
 static int
-__rec_cell_build_int_key(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size, bool *is_ovflp)
+__rec_cell_build_int_key(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size)
 {
-    WT_BTREE *btree;
     WT_REC_KV *key;
 
-    *is_ovflp = false;
-
-    btree = S2BT(session);
     key = &r->k;
 
     /* Copy the bytes into the "current" and key buffers. */
     WT_RET(__wt_buf_set(session, r->cur, data, size));
     WT_RET(__wt_buf_set(session, &key->buf, data, size));
-
-    /* Create an overflow object if the data won't fit. */
-    if (size > btree->maxintlkey) {
-        WT_STAT_CONN_DATA_INCR(session, rec_overflow_key_internal);
-
-        *is_ovflp = true;
-        return (__wt_rec_cell_build_ovfl(session, r, key, WT_CELL_KEY_OVFL, NULL, 0));
-    }
 
     key->cell_len = __wt_cell_pack_int_key(&key->cell, key->buf.size);
     key->len = key->cell_len + key->buf.size;
@@ -222,7 +209,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
             if (!ovfl_key)
                 WT_RET(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
         }
-        WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len, false));
+        WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
     }
 
     /* Copy the key/value pair onto the page. */
@@ -255,7 +242,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_PAGE_MODIFY *mod;
     WT_REC_KV *key, *val;
     uint32_t i;
-    bool ovfl_key;
 
     mod = page->modify;
 
@@ -265,8 +251,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     /* For each entry in the split array... */
     for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
         /* Build the key and value cells. */
-        WT_RET(__rec_cell_build_int_key(session, r, WT_IKEY_DATA(multi->key.ikey),
-          r->cell_zero ? 1 : multi->key.ikey->size, &ovfl_key));
+        WT_RET(__rec_cell_build_int_key(
+          session, r, WT_IKEY_DATA(multi->key.ikey), r->cell_zero ? 1 : multi->key.ikey->size));
         r->cell_zero = false;
 
         addr = &multi->addr;
@@ -274,7 +260,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Boundary: split or write the page. */
         if (__wt_rec_need_split(r, key->len + val->len))
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len, false));
+            WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
 
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
@@ -282,7 +268,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &addr->ta);
 
         /* Update compression state. */
-        __rec_key_state_update(r, ovfl_key);
+        __rec_key_state_update(r, false);
     }
     return (0);
 }
@@ -305,8 +291,8 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_REC_KV *key, *val;
     WT_REF *ref;
     WT_TIME_AGGREGATE ta;
-    size_t key_overflow_size, size;
-    bool force, hazard, key_onpage_ovfl, ovfl_key;
+    size_t size;
+    bool hazard, key_onpage_ovfl;
     const void *p;
 
     btree = S2BT(session);
@@ -338,8 +324,6 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
      * transforming the page from its disk image to its in-memory version, for example).
      */
     r->cell_zero = true;
-
-    key_overflow_size = 0;
 
     /* For each entry in the in-memory page... */
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
@@ -459,52 +443,16 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         }
         WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
-        /*
-         * Build key cell. Truncate any 0th key, internal pages don't need 0th keys.
-         */
-        if (key_onpage_ovfl) {
-            key->buf.data = cell;
-            key->buf.size = __wt_cell_total_len(kpack);
-            key->cell_len = 0;
-            key->len = key->buf.size;
-            ovfl_key = true;
-            key_overflow_size += ikey->size;
-        } else {
-            __wt_ref_key(page, ref, &p, &size);
-            if (r->cell_zero)
-                size = 1;
-            WT_ERR(__rec_cell_build_int_key(session, r, p, size, &ovfl_key));
-            if (ovfl_key)
-                key_overflow_size += size;
-        }
+        /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */
+        __wt_ref_key(page, ref, &p, &size);
+        if (r->cell_zero)
+            size = 1;
+        WT_ERR(__rec_cell_build_int_key(session, r, p, size));
         r->cell_zero = false;
 
-        /*
-         * Boundary: split or write the page.
-         *
-         * We always instantiate row-store internal page keys in order to avoid special casing the
-         * B+tree search code to handle keys that may not exist (and I/O in a search path). Because
-         * root pages are pinned, overflow keys on the root page can cause follow-on cache effects
-         * where huge root pages tie down lots of cache space and eviction frantically attempts to
-         * evict objects that can't be evicted. If the in-memory image is too large, force a split.
-         * Potentially, limiting ourselves to 10 items per page is going to result in deep trees
-         * which will impact search performance, but at some point, the application's configuration
-         * is too stupid to survive.
-         */
-        force = r->entries > 20 && key_overflow_size > btree->maxmempage_image;
-        if (force || __wt_rec_need_split(r, key->len + val->len)) {
-            key_overflow_size = 0;
-
-            /*
-             * In one path above, we copied address blocks from the page rather than building the
-             * actual key. In that case, we have to build the key now because we are about to
-             * promote it.
-             */
-            if (key_onpage_ovfl)
-                WT_ERR(__wt_buf_set(session, r->cur, WT_IKEY_DATA(ikey), ikey->size));
-
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len, force));
-        }
+        /* Boundary: split or write the page. */
+        if (__wt_rec_need_split(r, key->len + val->len))
+            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
 
         /* Copy the key and value onto the page. */
         __wt_rec_image_copy(session, r, key);
@@ -512,7 +460,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
 
         /* Update compression state. */
-        __rec_key_state_update(r, ovfl_key);
+        __rec_key_state_update(r, false);
     }
     WT_INTL_FOREACH_END;
 
@@ -581,7 +529,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 continue;
 
             WT_RET(__wt_buf_set(session, r->cur, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, 0, false));
+            WT_RET(__wt_rec_split_crossing_bnd(session, r, 0));
 
             /*
              * Turn off prefix and suffix compression until a full key is written into the new page.
@@ -644,7 +592,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                     WT_RET(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
             }
 
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len, false));
+            WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
         }
 
         /* Copy the key/value pair onto the page. */
@@ -1046,7 +994,7 @@ build:
                     WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
             }
 
-            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len, false));
+            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
         }
 
         /* Copy the key/value pair onto the page. */

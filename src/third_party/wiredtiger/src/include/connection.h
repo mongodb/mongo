@@ -295,6 +295,8 @@ struct __wt_connection_impl {
     TAILQ_HEAD(__wt_blockhash, __wt_block) * blockhash;
     TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
+    WT_BLKCACHE blkcache; /* Block cache */
+
     /* Locked: handles in each bucket */
     uint64_t *dh_bucket_count;
     uint64_t dhandle_count;     /* Locked: handles in the queue */
@@ -550,47 +552,8 @@ struct __wt_connection_impl {
     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t debug_flags;
 
-/* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_VERB_API 0x0000000001u
-#define WT_VERB_BACKUP 0x0000000002u
-#define WT_VERB_BLOCK 0x0000000004u
-#define WT_VERB_CHECKPOINT 0x0000000008u
-#define WT_VERB_CHECKPOINT_CLEANUP 0x0000000010u
-#define WT_VERB_CHECKPOINT_PROGRESS 0x0000000020u
-#define WT_VERB_COMPACT 0x0000000040u
-#define WT_VERB_COMPACT_PROGRESS 0x0000000080u
-#define WT_VERB_ERROR_RETURNS 0x0000000100u
-#define WT_VERB_EVICT 0x0000000200u
-#define WT_VERB_EVICTSERVER 0x0000000400u
-#define WT_VERB_EVICT_STUCK 0x0000000800u
-#define WT_VERB_FILEOPS 0x0000001000u
-#define WT_VERB_HANDLEOPS 0x0000002000u
-#define WT_VERB_HS 0x0000004000u
-#define WT_VERB_HS_ACTIVITY 0x0000008000u
-#define WT_VERB_LOG 0x0000010000u
-#define WT_VERB_LSM 0x0000020000u
-#define WT_VERB_LSM_MANAGER 0x0000040000u
-#define WT_VERB_METADATA 0x0000080000u
-#define WT_VERB_MUTEX 0x0000100000u
-#define WT_VERB_OVERFLOW 0x0000200000u
-#define WT_VERB_READ 0x0000400000u
-#define WT_VERB_RECONCILE 0x0000800000u
-#define WT_VERB_RECOVERY 0x0001000000u
-#define WT_VERB_RECOVERY_PROGRESS 0x0002000000u
-#define WT_VERB_RTS 0x0004000000u
-#define WT_VERB_SALVAGE 0x0008000000u
-#define WT_VERB_SHARED_CACHE 0x0010000000u
-#define WT_VERB_SPLIT 0x0020000000u
-#define WT_VERB_TEMPORARY 0x0040000000u
-#define WT_VERB_THREAD_GROUP 0x0080000000u
-#define WT_VERB_TIERED 0x0100000000u
-#define WT_VERB_TIMESTAMP 0x0200000000u
-#define WT_VERB_TRANSACTION 0x0400000000u
-#define WT_VERB_VERIFY 0x0800000000u
-#define WT_VERB_VERSION 0x1000000000u
-#define WT_VERB_WRITE 0x2000000000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t verbose;
+    /* Verbose settings for our various categories. */
+    WT_VERBOSE_LEVEL verbose[WT_VERB_NUM_CATEGORIES];
 
 /*
  * Variable with flags for which subsystems the diagnostic stress timing delays have been requested.

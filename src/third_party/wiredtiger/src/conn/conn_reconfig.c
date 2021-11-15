@@ -416,6 +416,7 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
      */
     WT_WITH_CHECKPOINT_LOCK(session, ret = __wt_conn_compat_config(session, cfg, true));
     WT_ERR(ret);
+    WT_ERR(__wt_block_cache_setup(session, cfg, true));
     WT_ERR(__wt_conn_optrack_setup(session, cfg, true));
     WT_ERR(__wt_conn_statistics_config(session, cfg));
     WT_ERR(__wt_cache_config(session, cfg, true));

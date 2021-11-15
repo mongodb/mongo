@@ -893,6 +893,13 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool txn_has_ts;
 
+    /*
+     * Do not check for timestamp usage in recovery as it is possible that timestamps may be out of
+     * order due to WiredTiger log replay in recovery doesn't use any timestamps.
+     */
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+        return (0);
+
     txn = session->txn;
     txn_has_ts = F_ISSET(txn, WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_DURABLE);
 
@@ -2205,6 +2212,7 @@ int
 __wt_txn_rollback_required(WT_SESSION_IMPL *session, const char *reason)
 {
     session->txn->rollback_reason = reason;
+    __wt_verbose_debug(session, WT_VERB_TRANSACTION, "Rollback reason: %s", reason);
     return (WT_ROLLBACK);
 }
 

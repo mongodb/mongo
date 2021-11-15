@@ -49,10 +49,10 @@ common_runtime_config = [
         enable enhanced checking. ''',
         type='category', subconfig= [
         Config('commit_timestamp', 'none', r'''
-            This option is no longer supported, retained for backward compatibility.''',
+            This option is no longer supported, retained for backward compatibility''',
             choices=['always', 'key_consistent', 'never', 'none']),
         Config('durable_timestamp', 'none', r'''
-            This option is no longer supported, retained for backward compatibility.''',
+            This option is no longer supported, retained for backward compatibility''',
             choices=['always', 'key_consistent', 'never', 'none']),
         Config('write_timestamp', 'off', r'''
             verify that commit timestamps are used per the configured
@@ -339,7 +339,7 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         the file format''',
         choices=['btree']),
     Config('huffman_key', 'none', r'''
-        This option is no longer supported, retained for backward compatibility.'''),
+        This option is no longer supported, retained for backward compatibility'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
@@ -363,17 +363,13 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         block compression is done''',
         min='512B', max='512MB'),
     Config('internal_item_max', '0', r'''
-        This option is no longer supported, retained for backward compatibility.''',
+        This option is no longer supported, retained for backward compatibility''',
         min=0),
     Config('internal_key_max', '0', r'''
-        the largest key stored in an internal node, in bytes.  If set, keys
-        larger than the specified size are stored as overflow items (which
-        may require additional I/O to access).  The default and the maximum
-        allowed value are both one-tenth the size of a newly split internal
-        page''',
+        This option is no longer supported, retained for backward compatibility''',
         min='0'),
     Config('key_gap', '10', r'''
-        This option is no longer supported, retained for backward compatibility.''',
+        This option is no longer supported, retained for backward compatibility''',
         min='0'),
     Config('leaf_key_max', '0', r'''
         the largest key stored in a leaf node, in bytes.  If set, keys
@@ -398,7 +394,7 @@ file_config = format_meta + file_runtime_config + tiered_config + [
         a newly split leaf page''',
         min='0'),
     Config('leaf_item_max', '0', r'''
-        This option is no longer supported, retained for backward compatibility.''',
+        This option is no longer supported, retained for backward compatibility''',
         min=0),
     Config('memory_page_image_max', '0', r'''
         the maximum in-memory page image represented by a single storage block.
@@ -466,6 +462,8 @@ lsm_meta = file_config + lsm_config + [
 tiered_meta = file_meta + tiered_config + [
     Config('last', '0', r'''
         the last allocated object ID'''),
+    Config('oldest', '1', r'''
+        the oldest allocated object ID'''),
     Config('tiers', '', r'''
         list of data sources to combine into a tiered storage structure''', type='list'),
 ]
@@ -510,6 +508,49 @@ table_meta = format_meta + table_only_config
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+    Config('block_cache', '', r'''
+        block cache configuration options''',
+        type='category', subconfig=[
+        Config('cache_on_checkpoint', 'true', r'''
+            cache blocks written by a checkpoint''',
+            type='boolean'),
+        Config('cache_on_writes', 'true', r'''
+            cache blocks as they are written (other than checkpoint blocks)''',
+            type='boolean'),
+        Config('enabled', 'false', r'''
+            enable block cache''',
+            type='boolean'),
+        Config('blkcache_eviction_aggression', '1800', r'''
+            seconds an unused block remains in the cache before it is evicted''',
+            min='1', max='7200'),
+        Config('full_target', '95', r'''
+            the fraction of the block cache that must be full before eviction
+            will remove unused blocks''',
+            min='30', max='100'),
+        Config('size', '0', r'''
+            maximum memory to allocate for the block cache''',
+            min='0', max='10TB'),
+        Config('hashsize', '0', r'''
+            number of buckets in the hashtable that keeps track of blocks''',
+            min='512', max='256K'),
+        Config('max_percent_overhead', '10', r'''
+            maximum tolerated overhead expressed as the number of blocks added
+            and removed as percent of blocks looked up; cache population
+            and eviction will be suppressed if the overhead exceeds the
+            supplied threshold''',
+            min='1', max='500'),
+        Config('nvram_path', '', r'''
+            the absolute path to the file system mounted on the NVRAM device'''),
+        Config('percent_file_in_dram', '50', r'''
+            bypass cache for a file if the set percentage of the file fits in system DRAM
+            (as specified by block_cache.system_ram)''',
+            min='0', max='100'),
+        Config('system_ram', '0', r'''
+            the bytes of system DRAM available for caching filesystem blocks''',
+            min='0', max='1024GB'),
+        Config('type', '', r'''
+            cache location: DRAM or NVRAM'''),
+        ]),
     Config('cache_size', '100MB', r'''
         maximum heap memory to allocate for the cache. A database should
         configure either \c cache_size or \c shared_cache but not both''',
@@ -640,41 +681,47 @@ connection_runtime_config = [
         perform eviction in worker threads when the cache contains at least
         this much dirty content. It is a percentage of the cache size if the
         value is within the range of 1 to 100 or an absolute size when greater
-        than 100. The value is not allowed to exceed the \c cache_size.''',
+        than 100. The value is not allowed to exceed the \c cache_size and has
+        to be lower than its counterpart \c eviction_dirty_trigger''',
         min=1, max='10TB'),
     Config('eviction_dirty_trigger', '20', r'''
         trigger application threads to perform eviction when the cache contains
         at least this much dirty content. It is a percentage of the cache size
         if the value is within the range of 1 to 100 or an absolute size when
-        greater than 100. The value is not allowed to exceed the \c cache_size.
+        greater than 100. The value is not allowed to exceed the \c cache_size
+        and has to be greater than its counterpart \c eviction_dirty_target.
         This setting only alters behavior if it is lower than eviction_trigger
         ''', min=1, max='10TB'),
     Config('eviction_target', '80', r'''
         perform eviction in worker threads when the cache contains at least
         this much content. It is a percentage of the cache size if the value is
         within the range of 10 to 100 or an absolute size when greater than 100.
-        The value is not allowed to exceed the \c cache_size''',
+        The value is not allowed to exceed the \c cache_size and has to be lower
+        than its counterpart \c eviction_trigger''',
         min=10, max='10TB'),
     Config('eviction_trigger', '95', r'''
         trigger application threads to perform eviction when the cache contains
         at least this much content. It is a percentage of the cache size if the
         value is within the range of 10 to 100 or an absolute size when greater
-        than 100.  The value is not allowed to exceed the \c cache_size''',
+        than 100. The value is not allowed to exceed the \c cache_size and has
+        to be greater than its counterpart \c eviction_target''',
         min=10, max='10TB'),
     Config('eviction_updates_target', '0', r'''
         perform eviction in worker threads when the cache contains at least
         this many bytes of updates. It is a percentage of the cache size if the
         value is within the range of 0 to 100 or an absolute size when greater
         than 100. Calculated as half of \c eviction_dirty_target by default.
-        The value is not allowed to exceed the \c cache_size''',
+        The value is not allowed to exceed the \c cache_size and has to be lower
+        than its counterpart \c eviction_updates_trigger''',
         min=0, max='10TB'),
     Config('eviction_updates_trigger', '0', r'''
         trigger application threads to perform eviction when the cache contains
         at least this many bytes of updates. It is a percentage of the cache size
         if the value is within the range of 1 to 100 or an absolute size when
         greater than 100\. Calculated as half of \c eviction_dirty_trigger by default.
-        The value is not allowed to exceed the \c cache_size. This setting only
-        alters behavior if it is lower than \c eviction_trigger''',
+        The value is not allowed to exceed the \c cache_size and has to be greater than
+        its counterpart \c eviction_updates_target. This setting only alters behavior
+        if it is lower than \c eviction_trigger''',
         min=0, max='10TB'),
     Config('file_manager', '', r'''
         control how file handles are managed''',
@@ -807,12 +854,15 @@ connection_runtime_config = [
         'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay', 'split_1',
         'split_2', 'split_3', 'split_4', 'split_5', 'split_6', 'split_7']),
     Config('verbose', '[]', r'''
-        enable messages for various events. Options are given as a
-        list, such as <code>"verbose=[evictserver,read]"</code>''',
+        enable messages for various subsystems and operations. Options are given as a list,
+        where each message type can optionally define an associated verbosity level, such as
+        <code>"verbose=[evictserver,read:1,rts:0]"</code>. Verbosity levels that can be provided
+        include <code>0</code> (INFO) and <code>1</code> (DEBUG).''',
         type='list', choices=[
             'api',
             'backup',
             'block',
+            'block_cache',
             'checkpoint',
             'checkpoint_cleanup',
             'checkpoint_progress',
@@ -824,9 +874,9 @@ connection_runtime_config = [
             'evictserver',
             'fileops',
             'handleops',
-            'log',
             'history_store',
             'history_store_activity',
+            'log',
             'lsm',
             'lsm_manager',
             'metadata',
@@ -1040,6 +1090,12 @@ session_config = [
         closed. This value is inherited from ::wiredtiger_open
         \c cache_cursors''',
         type='boolean'),
+    Config('cache_max_wait_ms', '0', r'''
+        the maximum number of milliseconds an application thread will wait
+        for space to be available in cache before giving up.
+        Default value will be the global setting of the 
+        connection config''',
+        min=0),
     Config('ignore_cache_size', 'false', r'''
         when set, operations performed by this session ignore the cache size
         and are not blocked when the cache is full.  Note that use of this
@@ -1674,11 +1730,10 @@ methods = {
             applicable only for prepared transactions. Indicates if the prepare
             timestamp and the commit timestamp of this transaction can be
             rounded up. If the prepare timestamp is less than the oldest
-            timestamp, the prepare timestamp will be rounded to the oldest
+            timestamp, the prepare timestamp  will be rounded to the oldest
             timestamp. If the commit timestamp is less than the prepare
             timestamp, the commit timestamp will be rounded up to the prepare
-            timestamp. Allows setting the prepared timestamp smaller than or equal
-            to the latest active read timestamp''', type='boolean'),
+            timestamp''', type='boolean'),
         Config('read', 'false', r'''
             if the read timestamp is less than the oldest timestamp, the
             read timestamp will be rounded up to the oldest timestamp''',

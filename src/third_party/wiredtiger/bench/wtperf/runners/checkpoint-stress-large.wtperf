@@ -1,0 +1,27 @@
+# A stress configuration to create long running checkpoints while doing a lot
+# of updates.
+conn_config="cache_size=16GB,eviction=(threads_max=8),log=(enabled=false)"
+table_config="leaf_page_max=32k,internal_page_max=16k,allocation_size=4k,split_pct=90,type=file"
+# Enough data to fill the cache. 150 million 1k records results in two ~11GB
+# tables
+close_conn=false
+icount=1500000000
+create=true
+compression="snappy"
+checkpoint_interval=60
+checkpoint_threads=1
+populate_threads=1
+report_interval=10
+# Run for a longer duration to ensure checkpoints are completing.
+run_time=600
+# Sampling isn't being currently used by any automated test. Keeping it to be
+# used in the future
+sample_interval=10
+sample_rate=1
+# MongoDB always has multiple tables, and checkpoints behave differently when
+# there is more than a single table.
+table_count=2
+threads=((count=6,updates=1))
+value_sz=1000
+# Wait for the throughput to stabilize
+warmup=120

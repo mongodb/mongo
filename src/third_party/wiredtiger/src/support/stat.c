@@ -28,7 +28,7 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: btree checkpoint generation",
   "btree: btree clean tree checkpoint expiration time",
   "btree: btree compact pages reviewed",
-  "btree: btree compact pages selected to be rewritten",
+  "btree: btree compact pages rewritten",
   "btree: btree compact pages skipped",
   "btree: btree skipped by compaction as process would not reduce size",
   "btree: column-store fixed-size leaf pages",
@@ -37,7 +37,6 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: column-store variable-size deleted values",
   "btree: column-store variable-size leaf pages",
   "btree: fixed-record size",
-  "btree: maximum internal page key size",
   "btree: maximum internal page size",
   "btree: maximum leaf page key size",
   "btree: maximum leaf page size",
@@ -45,7 +44,6 @@ static const char *const __stats_dsrc_desc[] = {
   "btree: maximum tree depth",
   "btree: number of key/value pairs",
   "btree: overflow pages",
-  "btree: pages rewritten by compaction",
   "btree: row-store empty values",
   "btree: row-store internal pages",
   "btree: row-store leaf pages",
@@ -147,6 +145,13 @@ static const char *const __stats_dsrc_desc[] = {
   "compression: compressed page maximum leaf page size prior to compression ",
   "compression: compressed pages read",
   "compression: compressed pages written",
+  "compression: number of blocks with compress ratio greater than 64",
+  "compression: number of blocks with compress ratio smaller than 16",
+  "compression: number of blocks with compress ratio smaller than 2",
+  "compression: number of blocks with compress ratio smaller than 32",
+  "compression: number of blocks with compress ratio smaller than 4",
+  "compression: number of blocks with compress ratio smaller than 64",
+  "compression: number of blocks with compress ratio smaller than 8",
   "compression: page written failed to compress",
   "compression: page written was too small to compress",
   "cursor: Total number of entries skipped by cursor next calls",
@@ -189,7 +194,6 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: fast-path pages deleted",
   "reconciliation: internal page key bytes discarded using suffix compression",
   "reconciliation: internal page multi-block writes",
-  "reconciliation: internal-page overflow keys",
   "reconciliation: leaf page key bytes discarded using prefix compression",
   "reconciliation: leaf page multi-block writes",
   "reconciliation: leaf-page overflow keys",
@@ -304,16 +308,15 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     /* not clearing btree_checkpoint_generation */
     /* not clearing btree_clean_checkpoint_timer */
     /* not clearing btree_compact_pages_reviewed */
-    /* not clearing btree_compact_pages_write_selected */
+    /* not clearing btree_compact_pages_rewritten */
     /* not clearing btree_compact_pages_skipped */
-    stats->btree_compact_skipped = 0;
+    /* not clearing btree_compact_skipped */
     stats->btree_column_fix = 0;
     stats->btree_column_internal = 0;
     stats->btree_column_rle = 0;
     stats->btree_column_deleted = 0;
     stats->btree_column_variable = 0;
     stats->btree_fixed_len = 0;
-    stats->btree_maxintlkey = 0;
     stats->btree_maxintlpage = 0;
     stats->btree_maxleafkey = 0;
     stats->btree_maxleafpage = 0;
@@ -321,7 +324,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->btree_maximum_depth = 0;
     stats->btree_entries = 0;
     stats->btree_overflow = 0;
-    stats->btree_compact_pages_rewritten = 0;
     stats->btree_row_empty_values = 0;
     stats->btree_row_internal = 0;
     stats->btree_row_leaf = 0;
@@ -414,6 +416,13 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     /* not clearing compress_precomp_leaf_max_page_size */
     stats->compress_read = 0;
     stats->compress_write = 0;
+    stats->compress_hist_ratio_max = 0;
+    stats->compress_hist_ratio_16 = 0;
+    stats->compress_hist_ratio_2 = 0;
+    stats->compress_hist_ratio_32 = 0;
+    stats->compress_hist_ratio_4 = 0;
+    stats->compress_hist_ratio_64 = 0;
+    stats->compress_hist_ratio_8 = 0;
     stats->compress_write_fail = 0;
     stats->compress_write_too_small = 0;
     stats->cursor_next_skip_total = 0;
@@ -456,7 +465,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_page_delete_fast = 0;
     stats->rec_suffix_compression = 0;
     stats->rec_multiblock_internal = 0;
-    stats->rec_overflow_key_internal = 0;
     stats->rec_prefix_compression = 0;
     stats->rec_multiblock_leaf = 0;
     stats->rec_overflow_key_leaf = 0;
@@ -549,7 +557,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->btree_checkpoint_generation += from->btree_checkpoint_generation;
     to->btree_clean_checkpoint_timer += from->btree_clean_checkpoint_timer;
     to->btree_compact_pages_reviewed += from->btree_compact_pages_reviewed;
-    to->btree_compact_pages_write_selected += from->btree_compact_pages_write_selected;
+    to->btree_compact_pages_rewritten += from->btree_compact_pages_rewritten;
     to->btree_compact_pages_skipped += from->btree_compact_pages_skipped;
     to->btree_compact_skipped += from->btree_compact_skipped;
     to->btree_column_fix += from->btree_column_fix;
@@ -559,8 +567,6 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->btree_column_variable += from->btree_column_variable;
     if (from->btree_fixed_len > to->btree_fixed_len)
         to->btree_fixed_len = from->btree_fixed_len;
-    if (from->btree_maxintlkey > to->btree_maxintlkey)
-        to->btree_maxintlkey = from->btree_maxintlkey;
     if (from->btree_maxintlpage > to->btree_maxintlpage)
         to->btree_maxintlpage = from->btree_maxintlpage;
     if (from->btree_maxleafkey > to->btree_maxleafkey)
@@ -573,7 +579,6 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
         to->btree_maximum_depth = from->btree_maximum_depth;
     to->btree_entries += from->btree_entries;
     to->btree_overflow += from->btree_overflow;
-    to->btree_compact_pages_rewritten += from->btree_compact_pages_rewritten;
     to->btree_row_empty_values += from->btree_row_empty_values;
     to->btree_row_internal += from->btree_row_internal;
     to->btree_row_leaf += from->btree_row_leaf;
@@ -670,6 +675,13 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->compress_precomp_leaf_max_page_size += from->compress_precomp_leaf_max_page_size;
     to->compress_read += from->compress_read;
     to->compress_write += from->compress_write;
+    to->compress_hist_ratio_max += from->compress_hist_ratio_max;
+    to->compress_hist_ratio_16 += from->compress_hist_ratio_16;
+    to->compress_hist_ratio_2 += from->compress_hist_ratio_2;
+    to->compress_hist_ratio_32 += from->compress_hist_ratio_32;
+    to->compress_hist_ratio_4 += from->compress_hist_ratio_4;
+    to->compress_hist_ratio_64 += from->compress_hist_ratio_64;
+    to->compress_hist_ratio_8 += from->compress_hist_ratio_8;
     to->compress_write_fail += from->compress_write_fail;
     to->compress_write_too_small += from->compress_write_too_small;
     to->cursor_next_skip_total += from->cursor_next_skip_total;
@@ -712,7 +724,6 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_page_delete_fast += from->rec_page_delete_fast;
     to->rec_suffix_compression += from->rec_suffix_compression;
     to->rec_multiblock_internal += from->rec_multiblock_internal;
-    to->rec_overflow_key_internal += from->rec_overflow_key_internal;
     to->rec_prefix_compression += from->rec_prefix_compression;
     to->rec_multiblock_leaf += from->rec_multiblock_leaf;
     to->rec_overflow_key_leaf += from->rec_overflow_key_leaf;
@@ -799,8 +810,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->btree_checkpoint_generation += WT_STAT_READ(from, btree_checkpoint_generation);
     to->btree_clean_checkpoint_timer += WT_STAT_READ(from, btree_clean_checkpoint_timer);
     to->btree_compact_pages_reviewed += WT_STAT_READ(from, btree_compact_pages_reviewed);
-    to->btree_compact_pages_write_selected +=
-      WT_STAT_READ(from, btree_compact_pages_write_selected);
+    to->btree_compact_pages_rewritten += WT_STAT_READ(from, btree_compact_pages_rewritten);
     to->btree_compact_pages_skipped += WT_STAT_READ(from, btree_compact_pages_skipped);
     to->btree_compact_skipped += WT_STAT_READ(from, btree_compact_skipped);
     to->btree_column_fix += WT_STAT_READ(from, btree_column_fix);
@@ -810,8 +820,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->btree_column_variable += WT_STAT_READ(from, btree_column_variable);
     if ((v = WT_STAT_READ(from, btree_fixed_len)) > to->btree_fixed_len)
         to->btree_fixed_len = v;
-    if ((v = WT_STAT_READ(from, btree_maxintlkey)) > to->btree_maxintlkey)
-        to->btree_maxintlkey = v;
     if ((v = WT_STAT_READ(from, btree_maxintlpage)) > to->btree_maxintlpage)
         to->btree_maxintlpage = v;
     if ((v = WT_STAT_READ(from, btree_maxleafkey)) > to->btree_maxleafkey)
@@ -824,7 +832,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
         to->btree_maximum_depth = v;
     to->btree_entries += WT_STAT_READ(from, btree_entries);
     to->btree_overflow += WT_STAT_READ(from, btree_overflow);
-    to->btree_compact_pages_rewritten += WT_STAT_READ(from, btree_compact_pages_rewritten);
     to->btree_row_empty_values += WT_STAT_READ(from, btree_row_empty_values);
     to->btree_row_internal += WT_STAT_READ(from, btree_row_internal);
     to->btree_row_leaf += WT_STAT_READ(from, btree_row_leaf);
@@ -930,6 +937,13 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_READ(from, compress_precomp_leaf_max_page_size);
     to->compress_read += WT_STAT_READ(from, compress_read);
     to->compress_write += WT_STAT_READ(from, compress_write);
+    to->compress_hist_ratio_max += WT_STAT_READ(from, compress_hist_ratio_max);
+    to->compress_hist_ratio_16 += WT_STAT_READ(from, compress_hist_ratio_16);
+    to->compress_hist_ratio_2 += WT_STAT_READ(from, compress_hist_ratio_2);
+    to->compress_hist_ratio_32 += WT_STAT_READ(from, compress_hist_ratio_32);
+    to->compress_hist_ratio_4 += WT_STAT_READ(from, compress_hist_ratio_4);
+    to->compress_hist_ratio_64 += WT_STAT_READ(from, compress_hist_ratio_64);
+    to->compress_hist_ratio_8 += WT_STAT_READ(from, compress_hist_ratio_8);
     to->compress_write_fail += WT_STAT_READ(from, compress_write_fail);
     to->compress_write_too_small += WT_STAT_READ(from, compress_write_too_small);
     to->cursor_next_skip_total += WT_STAT_READ(from, cursor_next_skip_total);
@@ -973,7 +987,6 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
     to->rec_suffix_compression += WT_STAT_READ(from, rec_suffix_compression);
     to->rec_multiblock_internal += WT_STAT_READ(from, rec_multiblock_internal);
-    to->rec_overflow_key_internal += WT_STAT_READ(from, rec_overflow_key_internal);
     to->rec_prefix_compression += WT_STAT_READ(from, rec_prefix_compression);
     to->rec_multiblock_leaf += WT_STAT_READ(from, rec_multiblock_leaf);
     to->rec_overflow_key_leaf += WT_STAT_READ(from, rec_overflow_key_leaf);
@@ -1041,6 +1054,27 @@ static const char *const __stats_connection_desc[] = {
   "LSM: tree maintenance operations executed",
   "LSM: tree maintenance operations scheduled",
   "LSM: tree queue hit maximum",
+  "block-manager: block cache cached blocks updated",
+  "block-manager: block cache cached bytes updated",
+  "block-manager: block cache evicted blocks",
+  "block-manager: block cache file size causing bypass",
+  "block-manager: block cache lookups",
+  "block-manager: block cache number of blocks not evicted due to overhead",
+  "block-manager: block cache number of bypasses because no-write-allocate setting was on",
+  "block-manager: block cache number of bypasses due to overhead on put",
+  "block-manager: block cache number of bypasses on get",
+  "block-manager: block cache number of bypasses on put because file is too small",
+  "block-manager: block cache number of eviction passes",
+  "block-manager: block cache number of hits including existence checks",
+  "block-manager: block cache number of misses including existence checks",
+  "block-manager: block cache number of put bypasses on checkpoint I/O",
+  "block-manager: block cache removed blocks",
+  "block-manager: block cache total blocks",
+  "block-manager: block cache total blocks inserted on read path",
+  "block-manager: block cache total blocks inserted on write path",
+  "block-manager: block cache total bytes",
+  "block-manager: block cache total bytes inserted on read path",
+  "block-manager: block cache total bytes inserted on write path",
   "block-manager: blocks pre-loaded",
   "block-manager: blocks read",
   "block-manager: blocks written",
@@ -1187,7 +1221,6 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages seen by eviction walk",
   "cache: pages seen by eviction walk that are already queued",
   "cache: pages selected for eviction unable to be evicted",
-  "cache: pages selected for eviction unable to be evicted as the parent page has overflow items",
   "cache: pages selected for eviction unable to be evicted because of active children on an "
   "internal page",
   "cache: pages selected for eviction unable to be evicted because of failure in reconciliation",
@@ -1387,7 +1420,6 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: approximate byte size of timestamps in pages written",
   "reconciliation: approximate byte size of transaction IDs in pages written",
   "reconciliation: fast-path pages deleted",
-  "reconciliation: internal-page overflow keys",
   "reconciliation: leaf-page overflow keys",
   "reconciliation: maximum seconds spent in a reconciliation call",
   "reconciliation: page reconciliation calls",
@@ -1595,6 +1627,27 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lsm_work_units_done = 0;
     stats->lsm_work_units_created = 0;
     stats->lsm_work_queue_max = 0;
+    stats->block_cache_blocks_update = 0;
+    stats->block_cache_bytes_update = 0;
+    stats->block_cache_blocks_evicted = 0;
+    stats->block_cache_bypass_filesize = 0;
+    stats->block_cache_data_refs = 0;
+    stats->block_cache_not_evicted_overhead = 0;
+    stats->block_cache_bypass_writealloc = 0;
+    stats->block_cache_bypass_overhead_put = 0;
+    stats->block_cache_bypass_get = 0;
+    stats->block_cache_bypass_put = 0;
+    stats->block_cache_eviction_passes = 0;
+    stats->block_cache_hits = 0;
+    stats->block_cache_misses = 0;
+    stats->block_cache_bypass_chkpt = 0;
+    stats->block_cache_blocks_removed = 0;
+    stats->block_cache_blocks = 0;
+    stats->block_cache_blocks_insert_read = 0;
+    stats->block_cache_blocks_insert_write = 0;
+    stats->block_cache_bytes = 0;
+    stats->block_cache_bytes_insert_read = 0;
+    stats->block_cache_bytes_insert_write = 0;
     stats->block_preload = 0;
     stats->block_read = 0;
     stats->block_write = 0;
@@ -1730,7 +1783,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_pages_seen = 0;
     stats->cache_eviction_pages_already_queued = 0;
     stats->cache_eviction_fail = 0;
-    stats->cache_eviction_fail_parent_has_overflow_items = 0;
     stats->cache_eviction_fail_active_children_on_an_internal_page = 0;
     stats->cache_eviction_fail_in_reconciliation = 0;
     stats->cache_eviction_fail_checkpoint_out_of_order_ts = 0;
@@ -1928,7 +1980,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->rec_time_window_bytes_ts = 0;
     stats->rec_time_window_bytes_txn = 0;
     stats->rec_page_delete_fast = 0;
-    stats->rec_overflow_key_internal = 0;
     stats->rec_overflow_key_leaf = 0;
     /* not clearing rec_maximum_seconds */
     stats->rec_pages = 0;
@@ -2108,6 +2159,27 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lsm_work_units_done += WT_STAT_READ(from, lsm_work_units_done);
     to->lsm_work_units_created += WT_STAT_READ(from, lsm_work_units_created);
     to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
+    to->block_cache_blocks_update += WT_STAT_READ(from, block_cache_blocks_update);
+    to->block_cache_bytes_update += WT_STAT_READ(from, block_cache_bytes_update);
+    to->block_cache_blocks_evicted += WT_STAT_READ(from, block_cache_blocks_evicted);
+    to->block_cache_bypass_filesize += WT_STAT_READ(from, block_cache_bypass_filesize);
+    to->block_cache_data_refs += WT_STAT_READ(from, block_cache_data_refs);
+    to->block_cache_not_evicted_overhead += WT_STAT_READ(from, block_cache_not_evicted_overhead);
+    to->block_cache_bypass_writealloc += WT_STAT_READ(from, block_cache_bypass_writealloc);
+    to->block_cache_bypass_overhead_put += WT_STAT_READ(from, block_cache_bypass_overhead_put);
+    to->block_cache_bypass_get += WT_STAT_READ(from, block_cache_bypass_get);
+    to->block_cache_bypass_put += WT_STAT_READ(from, block_cache_bypass_put);
+    to->block_cache_eviction_passes += WT_STAT_READ(from, block_cache_eviction_passes);
+    to->block_cache_hits += WT_STAT_READ(from, block_cache_hits);
+    to->block_cache_misses += WT_STAT_READ(from, block_cache_misses);
+    to->block_cache_bypass_chkpt += WT_STAT_READ(from, block_cache_bypass_chkpt);
+    to->block_cache_blocks_removed += WT_STAT_READ(from, block_cache_blocks_removed);
+    to->block_cache_blocks += WT_STAT_READ(from, block_cache_blocks);
+    to->block_cache_blocks_insert_read += WT_STAT_READ(from, block_cache_blocks_insert_read);
+    to->block_cache_blocks_insert_write += WT_STAT_READ(from, block_cache_blocks_insert_write);
+    to->block_cache_bytes += WT_STAT_READ(from, block_cache_bytes);
+    to->block_cache_bytes_insert_read += WT_STAT_READ(from, block_cache_bytes_insert_read);
+    to->block_cache_bytes_insert_write += WT_STAT_READ(from, block_cache_bytes_insert_write);
     to->block_preload += WT_STAT_READ(from, block_preload);
     to->block_read += WT_STAT_READ(from, block_read);
     to->block_write += WT_STAT_READ(from, block_write);
@@ -2269,8 +2341,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_eviction_pages_already_queued +=
       WT_STAT_READ(from, cache_eviction_pages_already_queued);
     to->cache_eviction_fail += WT_STAT_READ(from, cache_eviction_fail);
-    to->cache_eviction_fail_parent_has_overflow_items +=
-      WT_STAT_READ(from, cache_eviction_fail_parent_has_overflow_items);
     to->cache_eviction_fail_active_children_on_an_internal_page +=
       WT_STAT_READ(from, cache_eviction_fail_active_children_on_an_internal_page);
     to->cache_eviction_fail_in_reconciliation +=
@@ -2476,7 +2546,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_time_window_bytes_ts += WT_STAT_READ(from, rec_time_window_bytes_ts);
     to->rec_time_window_bytes_txn += WT_STAT_READ(from, rec_time_window_bytes_txn);
     to->rec_page_delete_fast += WT_STAT_READ(from, rec_page_delete_fast);
-    to->rec_overflow_key_internal += WT_STAT_READ(from, rec_overflow_key_internal);
     to->rec_overflow_key_leaf += WT_STAT_READ(from, rec_overflow_key_leaf);
     to->rec_maximum_seconds += WT_STAT_READ(from, rec_maximum_seconds);
     to->rec_pages += WT_STAT_READ(from, rec_pages);

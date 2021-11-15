@@ -17,12 +17,14 @@ onintr()
 trap 'onintr' 2
 
 usage() {
-	echo "usage: $0 [-aEFRSv] [-b format-binary] [-c config] [-e env-var]"
-	echo "    [-h home] [-j parallel-jobs] [-n total-jobs] [-r live-record-binary] [-t minutes] [format-configuration]"
+	echo "usage: $0 [-aEFRSv] [-b format-binary] [-c config] [-D directory]"
+	echo "    [-e env-var] [-h home] [-j parallel-jobs] [-n total-jobs] [-r live-record-binary]"
+	echo "    [-t minutes] [format-configuration]"
 	echo
 	echo "    -a           add configuration for abort/recovery testing (defaults to off)"
 	echo "    -b binary    format binary (defaults to "./t")"
 	echo "    -c config    format configuration file (defaults to CONFIG.stress)"
+	echo "    -D directory directory of format configuration files (named \"CONFIG.*\")"
 	echo "    -E           skip known errors (defaults to off)"
 	echo "    -e envvar    Environment variable setting (default to none)"
 	echo "    -F           quit on first failure (defaults to off)"
@@ -45,17 +47,16 @@ smoke_base_2="$smoke_base_1 leaf_page_max=9 internal_page_max=9"
 smoke_list=(
 	# Three access methods.
 	"$smoke_base_1 file_type=row"
-    # Temporarily disabled
+    # Temporarily disabled: FIXME FLCS
 	# "$smoke_base_1 file_type=fix"
-	# "$smoke_base_1 file_type=var"
+	"$smoke_base_1 file_type=var"
 
 	# Huffman value encoding.
 	"$smoke_base_1 file_type=row huffman_value=1"
-    # Temporarily disabled
-	# "$smoke_base_1 file_type=var huffman_value=1"
+	"$smoke_base_1 file_type=var huffman_value=1"
 
 	# LSM
-    # Temporarily disabled
+    # Temporarily disabled: FIXME LSM
 	# "$smoke_base_1 file_type=row runs.source=lsm"
 
 	# Force the statistics server.
@@ -64,10 +65,14 @@ smoke_list=(
 	# Overflow testing.
 	"$smoke_base_2 file_type=row key_min=256"
 	"$smoke_base_2 file_type=row key_min=256 value_min=256"
-    # Temporarily disabled
-	# "$smoke_base_2 file_type=var value_min=256"
+	"$smoke_base_2 file_type=var value_min=256"
 )
+
 smoke_next=0
+smoke_test=0
+
+directory_next=0
+directory_total=0
 
 abort_test=0
 build=""
@@ -80,7 +85,6 @@ live_record_binary=""
 minutes=0
 parallel_jobs=8
 skip_errors=0
-smoke_test=0
 stress_split_test=0
 total_jobs=0
 verbose=0
@@ -95,6 +99,17 @@ while :; do
 		shift ; shift ;;
 	-c)
 		config="$2"
+		shift ; shift ;;
+	-D)
+		# Format changes directories, get absolute paths to the CONFIG files.
+		dir="$2"
+		[[ "$dir" == /* ]] || dir="$PWD/$dir"
+		directory_list=($dir/CONFIG.*)
+		directory_total=${#directory_list[@]}
+		[[ -f "${directory_list[0]}" ]] || {
+		    echo "$name: no CONFIG files found in $2"
+		    exit 1
+		}
 		shift ; shift ;;
 	-E)
 		skip_errors=1
@@ -171,10 +186,36 @@ verbose "$name: run starting at $(date)"
 }
 home=$(cd $home > /dev/null || exit 1 && echo $PWD)
 
+# From the Bash FAQ, shuffle an array.
+shuffle() {
+    local i tmp size max rand
+
+    size=${#directory_list[*]}
+    for ((i=size-1; i>0; i--)); do
+       # RANDOM % (i+1) is biased because of the limited range of $RANDOM
+       # Compensate by using a range which is a multiple of the rand modulus.
+
+       max=$(( 32768 / (i+1) * (i+1) ))
+       while (( (rand=RANDOM) >= max )); do :; done
+       rand=$(( rand % (i+1) ))
+       tmp=${directory_list[i]} directory_list[i]=${directory_list[rand]} directory_list[rand]=$tmp
+    done
+}
+
+# If we have a directory of CONFIGs, shuffle it. The directory has to be an absolute path so there
+# is no additional path checking to do.
+config_found=0
+[[ $directory_total -ne 0 ]] && {
+    shuffle
+    config_found=1
+}
+
 # Config is possibly relative to our current directory and we're about to change directories.
 # Get an absolute path for config if it's local.
-config_found=0
-[[ -f "$config" ]] && config_found=1 && config="$PWD/$config"
+[[ $config_found -eq 0 ]] && [[ -f "$config" ]] && {
+    [[ "$config" == /* ]] || config="$PWD/$config"
+    config_found=1
+}
 
 # Move to the format.sh directory (assumed to be in a WiredTiger build tree).
 cd $(dirname $0) || exit 1
@@ -183,14 +224,16 @@ cd $(dirname $0) || exit 1
 # lives in the same directory of the WiredTiger build tree as format.sh. We're about to change
 # directories if we don't find the format binary here, get an absolute path for config if it's
 # local.
-[[ $config_found -eq 0 ]] && [[ -f "$config" ]] && config="$PWD/$config"
+[[ $config_found -eq 0 ]] && [[ -f "$config" ]] && {
+    config="$PWD/$config"
+    config_found=1
+}
 
 # Find the last part of format_binary, which is format binary file. Builds are normally in the
 # WiredTiger source tree, in which case it's in the same directory as format.sh, else it's in
 # the build_posix tree. If the build is in the build_posix tree, move there, we have to run in
 # the directory where the format binary lives because the format binary "knows" the wt utility
 # is two directory levels above it.
-
 [[ -x ${format_binary##* } ]] || {
 	build_posix_directory="../../build_posix/test/format"
 	[[ ! -d $build_posix_directory ]] || cd $build_posix_directory || exit 1
@@ -209,9 +252,11 @@ wt_binary="../../wt"
 
 # We tested for the CONFIG file in the original directory, then in the WiredTiger source directory,
 # the last place to check is in the WiredTiger build directory. Fail if we don't find it.
-[[ -f "$config" ]] || {
-    echo "$name: configuration file \"$config\" not found"
-    exit 1
+[[ $config_found -eq 0 ]] && {
+    [[ -f "$config" ]] || {
+	echo "$name: configuration file \"$config\" not found"
+	exit 1
+    }
 }
 
 verbose "$name configuration: $format_binary [-c $config]\
@@ -392,18 +437,36 @@ resolve()
 			 echo "$name: original directory copied into $dir.RECOVER"
 			 echo) >> $log
 
-			# Everything is a table unless explicitly a file.
-			uri="table:wt"
-			grep 'runs.source=file' $dir/CONFIG > /dev/null && uri="file:wt"
+			# Verify the objects. In current format, it's a list of files named with a
+			# leading F or tables named with a leading T. Historically, it was a file
+			# or table named "wt".
+			verify_failed=0
+			for i in $(ls $dir | sed -e 's/.*\///'); do
+			    case $i in
+			    F*) uri="file:$i";;
+			    T*) uri="table:${i%.wt}";;
+			    wt) uri="file:wt";;
+			    wt.wt) uri="table:wt";;
+			    *) continue;;
+			    esac
 
-			# Use the wt utility to recover & verify the object.
-			if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
-				rm -rf $dir $dir.RECOVER $log
-				success=$(($success + 1))
-				verbose "$name: job in $dir successfully completed"
+			    # Use the wt utility to recover & verify the object.
+			    echo "verify: $wt_binary -m -R -h $dir verify $uri" >> $log
+			    if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
+				continue
+			    fi
+
+			    verify_failed=1
+			    break
+			done
+
+			if [[ $verify_failed -eq 0 ]]; then
+			    rm -rf $dir $dir.RECOVER $log
+			    success=$(($success + 1))
+			    verbose "$name: job in $dir successfully completed"
 			else
-				echo "$name: job in $dir failed abort/recovery testing"
-				report_failure $dir
+			    echo "$name: job in $dir failed abort/recovery testing"
+			    report_failure $dir
 			fi
 			continue
 		}
@@ -479,6 +542,10 @@ format()
 		args=${smoke_list[$smoke_next]}
 		smoke_next=$(($smoke_next + 1))
 	fi
+	if [[ $directory_total -ne 0 ]]; then
+		config="${directory_list[$directory_next]}"
+		directory_next=$(($directory_next + 1))
+	fi
 	if [[ $abort_test -ne 0 ]]; then
 		args+=" format.abort=1"
 	fi
@@ -498,7 +565,7 @@ format()
 		live_record_binary="$live_record_binary --save-on=error"
 	fi
 
-	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" -1 $args quiet=1"
+	cmd="$live_record_binary $format_binary -c "$config" -h "$dir" $args quiet=1"
 	echo "$name: $cmd"
 
 	# Disassociate the command from the shell script so we can exit and let the command
@@ -535,6 +602,9 @@ while :; do
 
 	# Check if we're only running the smoke-tests and we're done.
 	[[ $smoke_test -ne 0 ]] && [[ $smoke_next -ge ${#smoke_list[@]} ]] && quit=1
+
+	# Check if we're running CONFIGs from a directory and we're done.
+	[[ $directory_total -ne 0 ]] && [[ $directory_next -ge $directory_total ]] && quit=1
 
 	# Check if the total number of jobs has been reached.
 	[[ $total_jobs -ne 0 ]] && [[ $count_jobs -ge $total_jobs ]] && quit=1

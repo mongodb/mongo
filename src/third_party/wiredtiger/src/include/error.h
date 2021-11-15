@@ -168,20 +168,3 @@
             WT_RET_PANIC(session, v, __VA_ARGS__); \
     } while (0)
 #endif
-
-/* Verbose messages. */
-#define WT_VERBOSE_ISSET(session, flag) (FLD_ISSET(S2C(session)->verbose, flag))
-
-/*
- * __wt_verbose --
- *     Display a verbose message. Not an inlined function because you can't inline functions taking
- *     variadic arguments and we don't want to make a function call in production systems just to
- *     find out a verbose flag isn't set. The macro must take a format string and at least one
- *     additional argument, there's no portable way to remove the comma before an empty __VA_ARGS__
- *     value.
- */
-#define __wt_verbose(session, flag, fmt, ...)                              \
-    do {                                                                   \
-        if (WT_VERBOSE_ISSET(session, flag))                               \
-            __wt_verbose_worker(session, "[" #flag "] " fmt, __VA_ARGS__); \
-    } while (0)
