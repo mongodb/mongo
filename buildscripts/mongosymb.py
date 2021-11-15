@@ -208,31 +208,42 @@ class PathResolver(object):
         :param url: download URL
         :return: full name for local file
         """
-        return url.split('/')[-1].replace('.tgz', '.tar', 1)
+        return url.split('/')[-1]
 
-    def unpack(self, path: str) -> str:
+    @staticmethod
+    def unpack(path: str) -> str:
         """
         Use to utar/unzip files.
 
         :param path: full path of file
         :return: full path of 'bin' directory of unpacked file
         """
-        args = ["tar", "xopf", path, "-C", self.cache_dir]
-        process = subprocess.Popen(args=args, close_fds=True, stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE, stderr=open("/dev/null"))
-        process.wait()
-        return path.replace('.tar', '', 1)
+        out_dir = path.replace('.tgz', '', 1)
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
 
-    def download(self, url: str) -> str:
+        args = ["tar", "xopf", path, "-C", out_dir, "--strip-components 1"]
+        cmd = " ".join(args)
+        subprocess.check_call(cmd, shell=True)
+
+        return out_dir
+
+    def download(self, url: str) -> (str, bool):
         """
         Use to download file from URL.
 
         :param url: URL string
-        :return: full path of downloaded file in local filesystem
+        :return: full path of downloaded file in local filesystem, bool indicating if file is already downloaded or not
         """
+        exists_locally = False
         filename = self.url_to_filename(url)
-        subprocess.check_call(['wget', url], cwd=self.cache_dir)
-        return os.path.join(self.cache_dir, filename)
+        path = os.path.join(self.cache_dir, filename)
+        if not os.path.exists(path):
+            subprocess.check_call(['wget', url], cwd=self.cache_dir)
+        else:
+            print('File aready exists in cache')
+            exists_locally = True
+        return path, exists_locally
 
     def get_dbg_file(self, soinfo: dict) -> str or None:
         """
@@ -241,7 +252,8 @@ class PathResolver(object):
         :param soinfo: soinfo as dict
         :return: path as string or None (if path not found)
         """
-        build_id = soinfo.get("buildId", "")
+        build_id = soinfo.get("buildId", "").lower()
+        binary_name = 'mongo'
         # search from cached results
         path = self.get_from_cache(build_id)
         if not path:
@@ -251,13 +263,14 @@ class PathResolver(object):
                 if response.status_code != 200:
                     sys.stderr.write(
                         f"Server returned unsuccessful status: {response.status_code}, "
-                        f"response body: {response.text}")
+                        f"response body: {response.text}\n")
                     return None
                 else:
-                    path = response.json().get('data', {}).get('debug_symbols_url')
+                    data = response.json().get('data', {})
+                    path, binary_name = data.get('debug_symbols_url'), data.get('binary_name')
             except Exception as err:  # noqa pylint: disable=broad-except
                 sys.stderr.write(f"Error occurred while trying to get response from server "
-                                 f"for buildId({build_id}): {err}")
+                                 f"for buildId({build_id}): {err}\n")
                 return None
 
             # update cached results
@@ -269,12 +282,15 @@ class PathResolver(object):
 
         # download & unpack debug symbols file and assign `path` to unpacked file's local path
         try:
-            dl_path = self.download(path)
-            path = self.unpack(dl_path)
+            dl_path, exists_locally = self.download(path)
+            if exists_locally:
+                path = dl_path.replace('.tgz', '', 1)
+            else:
+                print("Downloaded, now unpacking...")
+                path = self.unpack(dl_path)
         except Exception as err:  # noqa pylint: disable=broad-except
-            sys.stderr.write(f"Failed to download & unpack file: {err}")
-
-        return path
+            sys.stderr.write(f"Failed to download & unpack file: {err}\n")
+        return os.path.join(path, f'{binary_name}.debug')
 
 
 def parse_input(trace_doc, dbg_path_resolver):
@@ -367,6 +383,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, i
 
     for frame in frames:
         if frame["path"] is None:
+            print("Path not found in frame:", frame)
             continue
         symbol_line = "CODE {path:} {addr:}\n".format(**frame)
         symbolizer_process.stdin.write(symbol_line.encode())
@@ -393,12 +410,12 @@ def preprocess_frames(dbg_path_resolver, trace_doc, input_format):
 def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argument
     """Provide classic output."""
     for frame in frames:
-        symbinfo = frame["symbinfo"]
+        symbinfo = frame.get("symbinfo")
         if symbinfo:
             for sframe in symbinfo:
                 outfile.write(" {file:s}:{line:d}:{column:d}: {fn:s}\n".format(**sframe))
         else:
-            outfile.write(" {path:s}!!!\n".format(**symbinfo))
+            outfile.write(" Couldn't extract symbols: {path:s}!!!\n".format(**frame))
 
 
 def make_argument_parser(parser=None, **kwargs):
@@ -411,7 +428,7 @@ def make_argument_parser(parser=None, **kwargs):
     parser.add_argument('--input-format', choices=['classic', 'thin'], default='classic')
     parser.add_argument('--output-format', choices=['classic', 'json'], default='classic',
                         help='"json" shows some extra information')
-    parser.add_argument('--debug-file-resolver', choices=['path', 's3', 'pr'], default='path')
+    parser.add_argument('--debug-file-resolver', choices=['path', 's3', 'pr'], default='pr')
     parser.add_argument('--src-dir-to-move', action="store", type=str, default=None,
                         help="Specify a src dir to move to /data/mci/{original_buildid}/src")
 
