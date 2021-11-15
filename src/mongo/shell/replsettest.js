@@ -3344,7 +3344,7 @@ var ReplSetTest = function(opts) {
             // and too slowly processing heartbeats. When it steps down, it closes all of
             // its connections.
             _constructFromExistingSeedNode(opts);
-        }, 120);
+        }, ReplSetTest.kDefaultRetries);
     } else if (typeof opts.rstArgs === "object") {
         _constructFromExistingNodes(opts.rstArgs);
     } else {
@@ -3376,6 +3376,7 @@ var ReplSetTest = function(opts) {
  *  Global default timeout (10 minutes).
  */
 ReplSetTest.kDefaultTimeoutMS = 10 * 60 * 1000;
+ReplSetTest.kDefaultRetries = 240;
 
 /**
  *  Global default number that's effectively infinite.
