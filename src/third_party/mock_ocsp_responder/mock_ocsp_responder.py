@@ -360,9 +360,6 @@ class OCSPResponseBuilder(object):
             if self._this_update is None:
                 self._this_update = produced_at
 
-            if self._next_update is None:
-                self._next_update = (self._this_update + timedelta(days=7)).replace(microsecond=0)
-
             response = {
                     'cert_id': {
                         'hash_algorithm': {
@@ -567,8 +564,9 @@ class OCSPResponder:
         builder.certificate_issuer = self._issuer_cert
 
         # Set next update date
-        now = datetime.now(timezone.utc)
-        builder.next_update = (now + timedelta(seconds=self._next_update_seconds)).replace(microsecond=0)
+        if self._next_update_seconds > 0:
+            now = datetime.now(timezone.utc)
+            builder.next_update = (now + timedelta(seconds=self._next_update_seconds)).replace(microsecond=0)
 
         return builder.build(self._responder_key, self._responder_cert)
 

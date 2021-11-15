@@ -80,7 +80,7 @@ class MockOCSPServer {
             args.push("--fault=" + this.fault_type);
         }
 
-        if (this.next_update_secs) {
+        if (this.next_update_secs || this.next_update_secs === 0) {
             args.push("--next_update_seconds=" + this.next_update_secs);
         }
 
