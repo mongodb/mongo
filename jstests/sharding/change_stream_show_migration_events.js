@@ -3,7 +3,6 @@
 // @tags: [
 //   requires_majority_read_concern,
 //   uses_change_streams,
-//   disabled_due_to_server_60490,
 // ]
 (function() {
 'use strict';
