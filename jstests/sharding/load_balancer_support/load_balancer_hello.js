@@ -1,5 +1,5 @@
 /**
- * @tags: [featureFlagLoadBalancer]
+ * @tags: [requires_fcv_51, featureFlagLoadBalancer]
  *
  * Test the extension to the mongos `hello` command by which clients
  * that have arrived through a load balancer affirm that they are
