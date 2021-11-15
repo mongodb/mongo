@@ -40,21 +40,23 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('integer-row', dict(key_format='i')),
-        ('column', dict(key_format='r')),
+    format_values = [
+        ('integer-row', dict(key_format='i', value_format='i')),
+        ('column', dict(key_format='r', value_format='i')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_all_durable_old(self):
         # This test was originally for testing the all_committed timestamp.
         # In the absence of prepared transactions, all_durable is identical to
         # all_committed so let's enforce the all_durable values instead.
         all_durable_uri = self.uri + '_all_durable'
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         session1 = self.setUpSessionOpen(self.conn)
         session2 = self.setUpSessionOpen(self.conn)
-        session1.create(all_durable_uri, 'key_format={},value_format=i'.format(self.key_format))
-        session2.create(all_durable_uri, 'key_format={},value_format=i'.format(self.key_format))
+        session1.create(all_durable_uri, format)
+        session2.create(all_durable_uri, format)
 
         # Scenario 0: No commit timestamp has ever been specified therefore
         # There is no all_durable timestamp and we will get an error
@@ -138,8 +140,9 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         oldest_reader_uri = self.uri + '_oldest_reader_pinned'
         session1 = self.setUpSessionOpen(self.conn)
         session2 = self.setUpSessionOpen(self.conn)
-        session1.create(oldest_reader_uri, 'key_format={},value_format=i'.format(self.key_format))
-        session2.create(oldest_reader_uri, 'key_format={},value_format=i'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        session1.create(oldest_reader_uri, format)
+        session2.create(oldest_reader_uri, format)
 
         # Nothing is reading so there is no oldest reader.
         self.assertRaisesException(wiredtiger.WiredTigerError,
@@ -196,7 +199,8 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
     def test_pinned_oldest(self):
         pinned_oldest_uri = self.uri + 'pinned_oldest'
         session1 = self.setUpSessionOpen(self.conn)
-        session1.create(pinned_oldest_uri, 'key_format={},value_format=i'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        session1.create(pinned_oldest_uri, format)
         # Confirm no oldest timestamp exists.
         self.assertRaisesException(wiredtiger.WiredTigerError,
             lambda: self.conn.query_timestamp('get=oldest'))
@@ -247,7 +251,8 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
     def test_all_durable(self):
         all_durable_uri = self.uri + '_all_durable'
         session1 = self.setUpSessionOpen(self.conn)
-        session1.create(all_durable_uri, 'key_format={},value_format=i'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        session1.create(all_durable_uri, format)
 
         # Since this is a non-prepared transaction, we'll be using the commit
         # timestamp when calculating all_durable since it's implied that they're
@@ -335,8 +340,9 @@ class test_timestamp14(wttest.WiredTigerTestCase, suite_subprocess):
         all_uri = self.uri + 'pinned_oldest'
         session1 = self.setUpSessionOpen(self.conn)
         session2 = self.setUpSessionOpen(self.conn)
-        session1.create(all_uri, 'key_format={},value_format=i'.format(self.key_format))
-        session2.create(all_uri, 'key_format={},value_format=i'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        session1.create(all_uri, format)
+        session2.create(all_uri, format)
         cur1 = session1.open_cursor(all_uri)
         cur2 = session2.open_cursor(all_uri)
         # Set up oldest timestamp.

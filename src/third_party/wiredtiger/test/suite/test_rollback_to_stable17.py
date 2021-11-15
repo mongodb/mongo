@@ -34,14 +34,14 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_rollback_to_stable17.py
-# Test that rollback to stable handles updates present on history store and data store for variable
-# length column store.
+# Test that rollback to stable handles updates present on history store and data store.
 class test_rollback_to_stable17(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -49,7 +49,7 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         ('inmem', dict(in_memory=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values)
+    scenarios = make_scenarios(format_values, in_memory_values)
 
     def conn_config(self):
         config = 'cache_size=200MB,statistics=(all)'
@@ -87,10 +87,13 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         nrows = 200
         start_row = 1
         ts = [2,5,7,9]
-        values = ["aaaa", "bbbb", "cccc", "dddd"]
+        if self.value_format == '8t':
+            values = [97, 98, 99, 100]
+        else:
+            values = ["aaaa", "bbbb", "cccc", "dddd"]
 
-        create_params = 'log=(enabled=false),key_format=r,value_format=S'
-        self.session.create(uri, create_params)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format + ',log=(enabled=false)')
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +

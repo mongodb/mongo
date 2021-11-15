@@ -42,9 +42,10 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         ('inmem', dict(in_memory=True))
     ]
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     restart_options = [
@@ -52,7 +53,7 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         ('crash', dict(crash=True)),
     ]
 
-    scenarios = make_scenarios(in_memory_values, key_format_values, restart_options)
+    scenarios = make_scenarios(in_memory_values, format_values, restart_options)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all),log=(enabled=false),eviction_dirty_trigger=10,' \
@@ -69,14 +70,18 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable19"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+        else:
+            valuea = "aaaaa" * 100
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        valuea = "aaaaa" * 100
 
         # Perform several updates and removes.
         s = self.conn.open_session()
@@ -95,16 +100,25 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+        if self.value_format == '8t':
+            # In FLCS deleted values read back as 0.
+            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEquals(evict_cursor.get_value(), 0)
+        else:
+            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
 
-        # Search to make sure the data is not visible
+        # Search to make sure the data is not visible (or, in FLCS, that it's zero)
         self.session.begin_transaction("ignore_prepare = true")
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
-        self.assertEquals(cursor2.search(), WT_NOTFOUND)
+        if self.value_format == '8t':
+            self.assertEquals(cursor2.search(), 0)
+            self.assertEquals(cursor2.get_value(), 0)
+        else:
+            self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
         cursor2.close()
 
@@ -124,8 +138,8 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             s.rollback_transaction()
 
         # Verify data is not visible.
-        self.check(valuea, uri, 0, 20)
-        self.check(valuea, uri, 0, 30)
+        self.check(valuea, uri, 0, nrows, 20)
+        self.check(valuea, uri, 0, nrows, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
@@ -149,15 +163,20 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable19"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+        else:
+            valuea = "aaaaa" * 100
+            valueb = "bbbbb" * 100
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        valuea = "aaaaa" * 100
-        valueb = "bbbbb" * 100
 
         # Perform several updates.
         self.large_updates(uri, valuea, ds, nrows, 0, 20)
@@ -182,16 +201,25 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+        if self.value_format == '8t':
+            # In FLCS deleted values read back as 0.
+            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEquals(evict_cursor.get_value(), 0)
+        else:
+            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
 
-        # Search to make sure the data is not visible
+        # Search to make sure the data is not visible (or, in FLCS, that it's zero)
         self.session.begin_transaction("ignore_prepare = true")
         cursor2 = self.session.open_cursor(uri)
         cursor2.set_key(1)
-        self.assertEquals(cursor2.search(), WT_NOTFOUND)
+        if self.value_format == '8t':
+            self.assertEquals(cursor2.search(), 0)
+            self.assertEquals(cursor2.get_value(), 0)
+        else:
+            self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
         cursor2.close()
 
@@ -211,9 +239,9 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
             s.rollback_transaction()
 
         # Verify data.
-        self.check(valuea, uri, nrows, 20)
-        self.check(valuea, uri, 0, 30)
-        self.check(valuea, uri, 0, 40)
+        self.check(valuea, uri, nrows, None, 20)
+        self.check(valuea, uri, 0, nrows, 30)
+        self.check(valuea, uri, 0, nrows, 40)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]

@@ -39,12 +39,13 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable20(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -53,17 +54,21 @@ class test_rollback_to_stable20(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10000
         ntables = 100
-        create_params = 'key_format=i,value_format=S'
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         uri = "table:rollback_to_stable20"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+        else:
+            valuea = "aaaaa" * 100
 
         # Pin oldest and stable timestamp to 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
-
-        valuea = "aaaaa" * 100
 
         for i in range(0, ntables):
             uri = 'table:rollback_to_stable20_' + str(i)

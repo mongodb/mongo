@@ -208,11 +208,10 @@ __rec_need_save_upd(
 
     /*
      * Don't save updates for any reconciliation that doesn't involve history store (in-memory
-     * database, fixed length column store, metadata, and history store reconciliation itself),
-     * except when the selected stop time point or the selected start time point is not globally
-     * visible for in memory database and fixed length column store.
+     * database, metadata, and history store reconciliation itself), except when the selected stop
+     * time point or the selected start time point is not globally visible for in memory database.
      */
-    if (!F_ISSET(r, WT_REC_HS) && !F_ISSET(r, WT_REC_IN_MEMORY) && r->page->type != WT_PAGE_COL_FIX)
+    if (!F_ISSET(r, WT_REC_HS) && !F_ISSET(r, WT_REC_IN_MEMORY))
         return (false);
 
     /* When in checkpoint, no need to save update if no onpage value is selected. */
@@ -293,8 +292,7 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *s
 
     /*
      * No need to check out of order timestamps for any reconciliation that doesn't involve history
-     * store (in-memory database, fixed length column store, metadata, and history store
-     * reconciliation itself).
+     * store (in-memory database, metadata, and history store reconciliation itself).
      */
     if (!F_ISSET(r, WT_REC_HS))
         return (0);
@@ -643,7 +641,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
              *
              * In this case, we should leave the selected update unset to indicate that we want to
              * keep the same on-disk value but set the stop time point to indicate that the validity
-             * window ends when this tombstone started.
+             * window ends when this tombstone started. (Note: this may have been true at one point,
+             * but currently we either append the onpage value and return that, or return the
+             * tombstone itself; there is no case that returns no update but sets the time window.)
              *
              * FIXME-WT-6557: no need to check this after WT-6557 is done as the tombstone will be
              * freed when it is written to the disk image in the previous eviction.
@@ -735,12 +735,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
     if (__rec_need_save_upd(session, r, upd_select, has_newer_updates)) {
         /*
          * We should restore the update chains to the new disk image if there are newer updates in
-         * eviction, or for cases that don't support history store, such as in-memory database and
-         * fixed length column store.
+         * eviction, or for cases that don't support history store, such as an in-memory database.
          */
         supd_restore = F_ISSET(r, WT_REC_EVICT) &&
-          (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ||
-            page->type == WT_PAGE_COL_FIX);
+          (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
         WT_ERR(__rec_update_save(session, r, ins, rip, onpage_upd, supd_restore, upd_memsize));
 

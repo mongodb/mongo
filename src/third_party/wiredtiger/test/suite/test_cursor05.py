@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_cursor05.py
 #    Test cursors at the point where a cursor is first initialized, and when it
@@ -35,22 +36,56 @@ class test_cursor05(wttest.WiredTigerTestCase):
     """
     Test basic operations
     """
-    nentries = 2
+
+    type_values = [
+        ('row', dict(usecolumns=False, usefixed=False)),
+        ('col', dict(usecolumns=True, usefixed=False)),
+        ('fix', dict(usecolumns=True, usefixed=True)),
+    ]
+
+    nentries_values = [
+        ('empty', dict(nentries=0)),
+        ('nonempty', dict(nentries=3))
+    ]
+
+    colgroups_values = [
+        ('no_colgroups', dict(colgroups=None)),
+        ('two_colgroups', dict(colgroups=["(S1,i2)","(S3,i4)"])),
+        ('four_colgroups', dict(colgroups=["(S1)","(i2)","(S3)","(i4)"])),
+    ]
+
+    # For fix, skip cases that won't use it. (The 8t column has to be standing alone.)
+    def checkfix(name, d):
+        if d['usefixed'] and (d['colgroups'] is None or len(d['colgroups']) < 4):
+            return False
+        return True
+
+    scenarios = make_scenarios(type_values, nentries_values, colgroups_values, include=checkfix)
+
+    def makekey(self, i):
+        if self.usecolumns:
+            return i + 1
+        else:
+            return (i, 'key' + str(i))
 
     def populate(self, count):
         """ Populate the given number of entries. """
         cursor = self.session.open_cursor('table:main', None, None)
         for i in range(0, count):
-            cursor[(i, 'key' + str(i))] = ('val' + str(i), i, 'val' + str(i), i)
+            cursor[self.makekey(i)] = ('val' + str(i), i, 'val' + str(i), i)
         cursor.close()
 
     def check_iterate_forward(self, cursor, expectcount):
         """ Use the cursor to iterate and check for the expected entries. """
         i = 0
-        for ikey, skey, s1, i2, s3, i4 in cursor:
-            #print 'forward: ' + str([ikey, skey, s1, i2, s3, i4])
-            self.assertEqual(ikey, i)
-            self.assertEqual(skey, 'key' + str(i))
+        for row in cursor:
+            if self.usecolumns:
+                key, s1, i2, s3, i4 = row
+            else:
+                ikey, skey, s1, i2, s3, i4 = row
+                key = (ikey, skey)
+            #print 'forward: ' + str([key, s1, i2, s3, i4])
+            self.assertEqual(key, self.makekey(i))
             self.assertEqual(s1, 'val' + str(i))
             self.assertEqual(i2, i)
             self.assertEqual(s3, 'val' + str(i))
@@ -63,11 +98,14 @@ class test_cursor05(wttest.WiredTigerTestCase):
         i = expectcount
         while cursor.prev() == 0:
             i -= 1
-            (ikey, skey) = cursor.get_keys()
+            if self.usecolumns:
+                key = cursor.get_key()
+            else:
+                [ikey, skey] = cursor.get_keys()
+                key = (ikey, skey)
             (s1, i2, s3, i4) = cursor.get_values()
-            #print 'backward: ' + str([ikey, skey, s1, i2, s3, i4])
-            self.assertEqual(ikey, i)
-            self.assertEqual(skey, 'key' + str(i))
+            #print 'backward: ' + str([key, s1, i2, s3, i4])
+            self.assertEqual(key, self.makekey(i))
             self.assertEqual(s1, 'val' + str(i))
             self.assertEqual(i2, i)
             self.assertEqual(s3, 'val' + str(i))
@@ -108,7 +146,7 @@ class test_cursor05(wttest.WiredTigerTestCase):
         # Do something that leaves the cursor in an uninitialized spot
         if expectcount > 0:
             n = expectcount - 1
-            s1, i2, s3, i4 = cursor[(n, 'key' + str(n))]
+            s1, i2, s3, i4 = cursor[self.makekey(n)]
             self.assertEqual(s1, 'val' + str(n))
             self.assertEqual(i2, n)
             self.assertEqual(s3, 'val' + str(n))
@@ -146,13 +184,34 @@ class test_cursor05(wttest.WiredTigerTestCase):
 
         cursor.close()
 
-    def common_test(self, nentries, hascolgroups):
-        cgstr = ',colgroups=(c1,c2)' if hascolgroups else ''
-        self.session.create('table:main', 'key_format=iS,value_format=SiSi,'
-                            'columns=(ikey,Skey,S1,i2,S3,i4)' + cgstr)
-        if hascolgroups:
-            self.session.create("colgroup:main:c1", "columns=(S1,i2)")
-            self.session.create("colgroup:main:c2", "columns=(S3,i4)")
+    def test_cursor(self):
+        usecolumns = self.usecolumns
+        usefixed = self.usefixed
+        nentries = self.nentries
+        colgroups = self.colgroups
+
+        key_format = 'key_format={}'.format('r' if usecolumns else 'iS')
+        value_format = ',value_format={}'.format('S8tS8t' if usefixed else 'SiSi')
+        columns = ',columns=({},S1,i2,S3,i4)'.format('rkey' if usecolumns else 'ikey,Skey')
+
+        if colgroups is None:
+            cgstr = ''
+        else:
+            cgstr = ',colgroups=('
+            for i in range(1, len(colgroups) + 1):
+                if i > 1:
+                    cgstr += ','
+                cgstr += 'c{}'.format(i)
+            cgstr += ')'
+
+        config = key_format + value_format + columns + cgstr
+        self.session.create('table:main', config)
+
+        if colgroups is not None:
+            i = 1
+            for cg in colgroups:
+                self.session.create("colgroup:main:c{}".format(i), "columns={}".format(cg))
+                i += 1
         self.populate(nentries)
         self.check_entries(0, nentries, True)
         self.check_entries(1, nentries, True)
@@ -160,18 +219,6 @@ class test_cursor05(wttest.WiredTigerTestCase):
         self.check_entries(0, nentries, False)
         self.check_entries(1, nentries, False)
         self.check_entries(2, nentries, False)
-
-    def test_without_colgroups(self):
-        self.common_test(3, False)
-
-    def test_with_colgroups(self):
-        self.common_test(3, True)
-
-    def test_empty_without_colgroups(self):
-        self.common_test(0, False)
-
-    def test_empty_with_colgroups(self):
-        self.common_test(0, True)
 
 if __name__ == '__main__':
     wttest.run()

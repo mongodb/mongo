@@ -37,7 +37,9 @@ def mod_val(value, char, location, nbytes=1):
 
 # test_rollback_to_stable23.py
 # Test to verify that search operation uses proper base update while returning modifies from
-# the history store after the on-disk update is removed by the rollback to stable.
+# the history store after the on-disk update is removed by the rollback to stable. Since FLCS
+# inherently doesn't support modify, there's no need to run this on FLCS. (Note that
+# self.value_format needs to exist anyway for the base class to use.)
 class test_rollback_to_stable23(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
@@ -45,6 +47,7 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         ('column', dict(key_format='r')),
         ('integer_row', dict(key_format='i')),
     ]
+    value_format='S'
 
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
@@ -73,7 +76,8 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable23"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -95,11 +99,11 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modR, uri, nrows, 40)
-        self.check(value_modS, uri, nrows, 50)
-        self.check(value_modT, uri, nrows, 60)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modR, uri, nrows, None, 40)
+        self.check(value_modS, uri, nrows, None, 50)
+        self.check(value_modT, uri, nrows, None, 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:

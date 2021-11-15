@@ -37,10 +37,11 @@ from wtscenario import make_scenarios
 # Test WT_CURSOR.reserve.
 class test_reserve(wttest.WiredTigerTestCase):
 
-    keyfmt = [
-        ('integer', dict(keyfmt='i')),
-        ('recno', dict(keyfmt='r')),
-        ('string', dict(keyfmt='S')),
+    format_values = [
+        ('integer', dict(keyfmt='i', valfmt='S')),
+        ('recno', dict(keyfmt='r', valfmt='S')),
+        ('fix', dict(keyfmt='r', valfmt='8t')),
+        ('string', dict(keyfmt='S', valfmt='S')),
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
@@ -51,19 +52,21 @@ class test_reserve(wttest.WiredTigerTestCase):
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
         ('table-simple-lsm', dict(uri='table', ds=SimpleLSMDataSet)),
     ]
-    scenarios = make_scenarios(types, keyfmt)
 
-    def skip(self):
-        return self.keyfmt == 'r' and \
-            (self.ds.is_lsm() or self.uri == 'lsm')
+    def keep(name, d):
+        if d['keyfmt'] == 'r' and (d['uri'] == 'lsm' or d['ds'].is_lsm()):
+            return False
+        # The complex data sets have their own built-in value schemas that are not FLCS.
+        if d['valfmt'] == '8t' and d['ds'] == ComplexDataSet:
+            return False
+        return True
+
+    scenarios = make_scenarios(types, format_values, include=keep)
 
     def test_reserve(self):
-        if self.skip():
-            return
-
         uri = self.uri + ':test_reserve'
 
-        ds = self.ds(self, uri, 500, key_format=self.keyfmt)
+        ds = self.ds(self, uri, 500, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
         c = s.open_cursor(uri, None)
@@ -137,12 +140,10 @@ class test_reserve(wttest.WiredTigerTestCase):
 
     # Test cursor.reserve will fail if a key has not yet been set.
     def test_reserve_without_key(self):
-        if self.skip():
-            return
 
         uri = self.uri + ':test_reserve_without_key'
 
-        ds = self.ds(self, uri, 10, key_format=self.keyfmt)
+        ds = self.ds(self, uri, 10, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
         c = s.open_cursor(uri, None)
@@ -153,12 +154,10 @@ class test_reserve(wttest.WiredTigerTestCase):
 
     # Test cursor.reserve will fail if there's no running transaction.
     def test_reserve_without_txn(self):
-        if self.skip():
-            return
 
         uri = self.uri + ':test_reserve_without_txn'
 
-        ds = self.ds(self, uri, 10, key_format=self.keyfmt)
+        ds = self.ds(self, uri, 10, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
         c = s.open_cursor(uri, None)
@@ -169,12 +168,10 @@ class test_reserve(wttest.WiredTigerTestCase):
 
     # Test cursor.reserve returns a value on success.
     def test_reserve_returns_value(self):
-        if self.skip():
-            return
 
         uri = self.uri + ':test_reserve_returns_value'
 
-        ds = self.ds(self, uri, 10, key_format=self.keyfmt)
+        ds = self.ds(self, uri, 10, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         s = self.conn.open_session()
         c = s.open_cursor(uri, None)
@@ -185,12 +182,10 @@ class test_reserve(wttest.WiredTigerTestCase):
 
     # Test cursor.reserve fails on non-standard cursors.
     def test_reserve_not_supported(self):
-        if self.skip():
-            return
 
         uri = self.uri + ':test_reserve_not_supported'
         s = self.conn.open_session()
-        s.create(uri, 'key_format=' + self.keyfmt + ",value_format=S")
+        s.create(uri, 'key_format=' + self.keyfmt + ",value_format=" + self.valfmt)
 
         list = [ "bulk", "dump=json" ]
         for l in list:

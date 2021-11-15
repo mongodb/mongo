@@ -34,16 +34,18 @@ from wtscenario import make_scenarios
 #    JIRA WT-2217: insert resets key/value "set".
 class test_cursor09(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
-        ('file-r', dict(type='file:', keyfmt='r', dataset=SimpleDataSet)),
-        ('file-S', dict(type='file:', keyfmt='S', dataset=SimpleDataSet)),
-        ('lsm-S', dict(type='lsm:', keyfmt='S', dataset=SimpleDataSet)),
-        ('table-r', dict(type='table:', keyfmt='r', dataset=SimpleDataSet)),
-        ('table-S', dict(type='table:', keyfmt='S', dataset=SimpleDataSet)),
-        ('table-r-complex', dict(type='table:', keyfmt='r',
+        ('file-f', dict(type='file:', keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
+        ('file-r', dict(type='file:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
+        ('file-S', dict(type='file:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
+        ('lsm-S', dict(type='lsm:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
+        ('table-f', dict(type='table:', keyfmt='r', valfmt='8t', dataset=SimpleDataSet)),
+        ('table-r', dict(type='table:', keyfmt='r', valfmt='S', dataset=SimpleDataSet)),
+        ('table-S', dict(type='table:', keyfmt='S', valfmt='S', dataset=SimpleDataSet)),
+        ('table-r-complex', dict(type='table:', keyfmt='r', valfmt=None,
             dataset=ComplexDataSet)),
-        ('table-S-complex', dict(type='table:', keyfmt='S',
+        ('table-S-complex', dict(type='table:', keyfmt='S', valfmt=None,
             dataset=ComplexDataSet)),
-        ('table-S-complex-lsm', dict(type='table:', keyfmt='S',
+        ('table-S-complex-lsm', dict(type='table:', keyfmt='S', valfmt=None,
             dataset=ComplexLSMDataSet)),
     ])
 
@@ -52,7 +54,7 @@ class test_cursor09(wttest.WiredTigerTestCase):
     def test_cursor09(self):
         uri = self.type + 'cursor09'
 
-        ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        ds = self.dataset(self, uri, 100, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 
         cursor = self.session.open_cursor(uri, None, None)

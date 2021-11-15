@@ -41,7 +41,9 @@ def append_val(value, char):
     return value + char
 
 # test_rollback_to_stable14.py
-# Test the rollback to stable operation uses proper base update while restoring modifies from history store.
+# Test the rollback to stable operation uses proper base update while restoring modifies from
+# history store. Since FLCS inherently doesn't support modify, there's no need to run this on
+# FLCS. (Note that self.value_format needs to exist anyway for the base class to use.)
 class test_rollback_to_stable14(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
@@ -49,6 +51,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         ('column', dict(key_format='r')),
         ('integer_row', dict(key_format='i')),
     ]
+    value_format='S'
 
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
@@ -68,7 +71,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -95,11 +99,11 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modR, uri, nrows, 40)
-        self.check(value_modS, uri, nrows, 50)
-        self.check(value_modT, uri, nrows, 60)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modR, uri, nrows, None, 40)
+        self.check(value_modS, uri, nrows, None, 50)
+        self.check(value_modT, uri, nrows, None, 60)
 
         # Pin stable to timestamp 60 if prepare otherwise 50.
         if self.prepare:
@@ -164,10 +168,10 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_sweep, 0)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modR, uri, nrows, 40)
-        self.check(value_modS, uri, nrows, 50)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modR, uri, nrows, None, 40)
+        self.check(value_modS, uri, nrows, None, 50)
 
         # The test may output the following message in eviction under cache pressure. Ignore that.
         self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
@@ -179,7 +183,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -212,9 +217,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modT, uri, nrows, 60)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modT, uri, nrows, None, 60)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
@@ -275,8 +280,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_sweep, 0)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
 
         # The test may output the following message in eviction under cache pressure. Ignore that.
         self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
@@ -288,7 +293,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.pr("create/populate table")
         uri = "table:rollback_to_stable14"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -321,9 +327,9 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
             self.large_modifies(uri, 'T', ds, len(value_modS), 1, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modT, uri, nrows, 60)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modT, uri, nrows, None, 60)
 
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
 
@@ -382,8 +388,8 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_sweep, 0)
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
 
         # The test may output the following message in eviction under cache pressure. Ignore that.
         self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")

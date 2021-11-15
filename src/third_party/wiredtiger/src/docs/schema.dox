@@ -105,19 +105,21 @@ table.  The default is a size of 1 bit: that is, a boolean.
 C applications must always use a \c uint8_t type (or equivalently,
 <code>unsigned char</code>) for calls to WT_CURSOR::set_value, and a
 pointer to the same for calls to WT_CURSOR::get_value.
-If a bit field
-value is combined with other types in a packing format, it is equivalent to
-\c 'B', and a full byte is used to store it.
 
-When referenced by a record number (that is, a key format of
+If a bit field value is combined with other types in a packing format,
+it is equivalent to \c 'B', and a full byte is used to store it.
+However, when standing alone in a table or column group, and
+referenced by a record number (that is, a key format of
 <code>'r'</code>), the \c 't' type will be stored in a fixed-length
-column-store, and will not have an out-of-band value to indicate the record
-does not exist.  In this case, a 0 byte value is used to indicate the
-record does not exist.  This means removing a record with WT_CURSOR::remove
-is equivalent to storing a value of 0 in the record with WT_CURSOR::update
-(and storing a value of 0 in the record will cause cursor scans to skip the
-record).  Additionally, creating a record past the end of an object implies
-the creation of any missing intermediate records, with byte values of 0.
+column store.  This is an optimized on-disk format for efficient
+storage of small items. (See @subpage_single file_formats_formats for
+further information.) It has an important operational restriction:
+there is no separate out-of-band value to indicate that deleted
+records do not exist. Instead, deleted values read back as zero. This
+means removing a record with WT_CURSOR::remove is equivalent to
+storing a value of 0 in the record with WT_CURSOR::update.
+Additionally, creating a record past the end of an object implicitly
+also creates any missing intermediate records, all with values of 0.
 
 The \c 'u' type is for raw byte arrays: if it appears at the end of a
 format string (including in the default \c "u" format for untyped tables),

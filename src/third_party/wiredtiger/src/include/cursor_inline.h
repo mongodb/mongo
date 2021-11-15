@@ -402,7 +402,7 @@ static inline int
 __cursor_kv_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
 {
     WT_RET(__wt_key_return(cbt));
-    WT_RET(__wt_value_return(cbt, upd_value));
+    __wt_value_return(cbt, upd_value);
 
     return (0);
 }

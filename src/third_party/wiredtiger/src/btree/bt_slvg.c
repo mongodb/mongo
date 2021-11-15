@@ -571,12 +571,16 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
   size_t addr_size, WT_STUFF *ss)
 {
     WT_CELL_UNPACK_KV unpack;
+    WT_COL_FIX_AUXILIARY_HEADER auxhdr;
     WT_DECL_RET;
     WT_PAGE *page;
+    WT_TIME_WINDOW stable_tw;
     WT_TRACK *trk;
     uint64_t stop_recno;
+    uint32_t cell_num;
 
     page = NULL;
+    WT_TIME_WINDOW_INIT(&stable_tw);
     trk = NULL;
 
     /* Re-allocate the array of pages, as necessary. */
@@ -591,13 +595,59 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
          * Column-store fixed-sized format: start and stop keys can be taken from the block's
          * header, and doesn't contain overflow items.
          */
-        WT_TIME_AGGREGATE_INIT(&trk->trk_ta);
+        WT_TIME_AGGREGATE_INIT_MERGE(&trk->trk_ta);
         trk->col_start = dsk->recno;
         trk->col_stop = dsk->recno + (dsk->u.entries - 1);
 
-        __wt_verbose(session, WT_VERB_SALVAGE, "%s records %" PRIu64 "-%" PRIu64,
-          __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1), trk->col_start,
-          trk->col_stop);
+        /*
+         * Read the auxiliary header. Because pages that fail verify are tossed before salvage, we
+         * shouldn't fail.
+         */
+        WT_RET(__wt_col_fix_read_auxheader(session, dsk, &auxhdr));
+
+        switch (auxhdr.version) {
+        case WT_COL_FIX_VERSION_NIL:
+            /*
+             * Nothing to do besides update the time aggregate with a stable timestamp. This is
+             * necessary mechanically because a time aggregate initialized for merging will fail
+             * validation if not touched, and necessary conceptually because we have notionally
+             * iterated through all these values (which are all stable) and aggregated in their
+             * timestamps.
+             */
+            WT_TIME_AGGREGATE_UPDATE(session, &trk->trk_ta, &stable_tw);
+            __wt_verbose(session, WT_VERB_SALVAGE, "%s records %" PRIu64 "-%" PRIu64,
+              __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
+              trk->col_start, trk->col_stop);
+            break;
+        case WT_COL_FIX_VERSION_TS:
+            /*
+             * Visit the time windows. Note: we're going to visit them all and produce the
+             * corresponding time aggregate, even though we might end up discarding some of the
+             * values later. The time aggregate will get updated to reflect that change when the
+             * page is reconciled after salvage, and in the meantime having the time aggregate be
+             * possibly wider than strictly necessary should not cause anything horribly wrong to
+             * happen.
+             */
+            cell_num = 0;
+            WT_CELL_FOREACH_FIX_TIMESTAMPS (session, dsk, &auxhdr, unpack) {
+                if (cell_num % 2 == 1) {
+                    if (WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
+                        continue;
+                    WT_TIME_AGGREGATE_UPDATE(session, &trk->trk_ta, &unpack.tw);
+                }
+                cell_num++;
+            }
+            WT_CELL_FOREACH_END;
+            if (cell_num / 2 < dsk->u.entries || cell_num == 0) {
+                /* If we have keys with no time windows, or none, aggregate in a stable one. */
+                WT_TIME_AGGREGATE_UPDATE(session, &trk->trk_ta, &stable_tw);
+            }
+            __wt_verbose(session, WT_VERB_SALVAGE,
+              "%s records %" PRIu64 "-%" PRIu64 " and %" PRIu32 " time windows",
+              __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1),
+              trk->col_start, trk->col_stop, cell_num / 2);
+            break;
+        }
         break;
     case WT_PAGE_COL_VAR:
         /*

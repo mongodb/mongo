@@ -33,7 +33,7 @@ from wtscenario import make_scenarios
 #     Cursors with projections.
 class test_cursor10(wttest.WiredTigerTestCase):
     """
-    Test cursor search and search_near
+    Test cursor search
     """
     table_name1 = 'test_cursor10'
     nentries = 20

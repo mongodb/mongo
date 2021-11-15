@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static void __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static int __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *, bool *, size_t *);
 static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, bool *, size_t *);
 static int __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
@@ -189,12 +189,33 @@ err:
 }
 
 /*
+ * __page_inmem_prepare_update_col --
+ *     Shared code for calling __page_inmem_prepare_update on columns.
+ */
+static int
+__page_inmem_prepare_update_col(WT_SESSION_IMPL *session, WT_REF *ref, WT_CURSOR_BTREE *cbt,
+  uint64_t recno, WT_ITEM *value, WT_CELL_UNPACK_KV *unpack, WT_UPDATE **updp, size_t *sizep)
+{
+    WT_RET(__page_inmem_prepare_update(session, value, unpack, updp, sizep));
+
+    /* Search the page and apply the modification. */
+    WT_RET(__wt_col_search(cbt, recno, ref, true, NULL));
+#ifdef HAVE_DIAGNOSTIC
+    WT_RET(__wt_col_modify(cbt, recno, NULL, *updp, WT_UPDATE_INVALID, true, true));
+#else
+    WT_RET(__wt_col_modify(cbt, recno, NULL, *updp, WT_UPDATE_INVALID, true));
+#endif
+    return (0);
+}
+
+/*
  * __wt_page_inmem_prepare --
  *     Instantiate prepared updates.
  */
 int
 __wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
@@ -207,18 +228,16 @@ __wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_UPDATE *upd;
     size_t size, total_size;
     uint64_t recno, rle;
-    uint32_t i;
+    uint32_t i, numtws, tw;
+    uint8_t v;
 
+    btree = S2BT(session);
     page = ref->page;
     upd = NULL;
     total_size = 0;
 
-    /*
-     * We don't handle in-memory prepare resolution here, and prepare only applies to row-store and
-     * variable-length column store leaf pages.
-     */
+    /* We don't handle in-memory prepare resolution here. */
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
-    WT_ASSERT(session, page->type == WT_PAGE_COL_VAR || page->type == WT_PAGE_ROW_LEAF);
 
     __wt_btcur_init(session, &cbt);
     __wt_btcur_open(&cbt);
@@ -242,20 +261,36 @@ __wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
             /* For each record, create an update to resolve the prepare. */
             for (; rle > 0; --rle, ++recno) {
                 /* Create an update to resolve the prepare. */
-                WT_ERR(__page_inmem_prepare_update(session, value, &unpack, &upd, &size));
+                WT_ERR(__page_inmem_prepare_update_col(
+                  session, ref, &cbt, recno, value, &unpack, &upd, &size));
                 total_size += size;
-
-                /* Search the page and apply the modification. */
-                WT_ERR(__wt_col_search(&cbt, recno, ref, true, NULL));
-#ifdef HAVE_DIAGNOSTIC
-                WT_ERR(__wt_col_modify(&cbt, recno, NULL, upd, WT_UPDATE_INVALID, true, true));
-#else
-                WT_ERR(__wt_col_modify(&cbt, recno, NULL, upd, WT_UPDATE_INVALID, true));
-#endif
                 upd = NULL;
             }
         }
+    } else if (page->type == WT_PAGE_COL_FIX) {
+        WT_ASSERT(session, WT_COL_FIX_TWS_SET(page));
+        /* Search for prepare records. */
+        numtws = page->pg_fix_numtws;
+        for (tw = 0; tw < numtws; tw++) {
+            cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
+            __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+            if (!unpack.tw.prepare)
+                continue;
+            recno = ref->ref_recno + page->pg_fix_tws[tw].recno_offset;
+
+            /* Get the value. The update will copy it, so we don't need to allocate here. */
+            v = __bit_getv_recno(ref, recno, btree->bitcnt);
+            value->data = &v;
+            value->size = 1;
+
+            /* Create an update to resolve the prepare. */
+            WT_ERR(__page_inmem_prepare_update_col(
+              session, ref, &cbt, recno, value, &unpack, &upd, &size));
+            total_size += size;
+            upd = NULL;
+        }
     } else {
+        WT_ASSERT(session, page->type == WT_PAGE_ROW_LEAF);
         WT_ERR(__wt_scr_alloc(session, 0, &key));
         WT_ROW_FOREACH (page, rip, i) {
             /* Search for prepare records. */
@@ -375,7 +410,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
 
     switch (page->type) {
     case WT_PAGE_COL_FIX:
-        __inmem_col_fix(session, page);
+        WT_ERR(__inmem_col_fix(session, page, preparedp, &size));
         break;
     case WT_PAGE_COL_INT:
         __inmem_col_int(session, page);
@@ -419,19 +454,160 @@ err:
 }
 
 /*
+ * __wt_col_fix_read_auxheader --
+ *     Read the auxiliary header following the bitmap data, if any. This code is used by verify and
+ *     needs to be accordingly careful. It is also used by mainline reads so it must also not crash
+ *     or print on behalf of verify, and it should not waste time on checks that inmem doesn't need.
+ *     Currently this means it does do bounds checks on the header itself (they are embedded in the
+ *     integer unpacking) but not on the returned offset, and we don't check the version number.
+ *     Careful callers (verify, perhaps debug) should check this. Fast callers (inmem) probably
+ *     needn't bother. Salvage is protected by verify and doesn't need to check any of it.
+ */
+int
+__wt_col_fix_read_auxheader(
+  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_COL_FIX_AUXILIARY_HEADER *auxhdr)
+{
+    WT_BTREE *btree;
+    uint64_t dataoffset, entries;
+    uint32_t auxheaderoffset, bitmapsize;
+    const uint8_t *end, *raw;
+
+    btree = S2BT(session);
+
+    /*
+     * Figure where the auxiliary header is. It is always immediately after the bitmap data,
+     * regardless of whether the page is full.
+     */
+    bitmapsize = __bitstr_size(dsk->u.entries * btree->bitcnt);
+    auxheaderoffset = WT_PAGE_HEADER_BYTE_SIZE(btree) + bitmapsize;
+
+    /*
+     * If the auxiliary header is past the in-memory page size, there's no auxiliary data. If
+     * there's at least one byte past the bitmap data, check whether it's zero. If that's zero,
+     * there's no auxiliary data. (We are guaranteed that any allocation slop that we might be
+     * looking at is all zeros.) Set everything to zero and return.
+     */
+    if (auxheaderoffset >= dsk->mem_size || *(raw = (uint8_t *)dsk + auxheaderoffset) == 0) {
+        auxhdr->version = WT_COL_FIX_VERSION_NIL;
+        auxhdr->entries = 0;
+        auxhdr->offset = 0;
+        return (0);
+    }
+
+    /* Remember the end of the page for easy computation of maximum lengths. */
+    end = (uint8_t *)dsk + dsk->mem_size;
+
+    /*
+     * The on-disk header is a 1-byte version, a packed integer with the number of entries, and a
+     * second packed integer that gives the offset from the header start to the data.
+     */
+
+    auxhdr->version = *(raw++);
+    WT_RET(__wt_vunpack_uint(&raw, WT_PTRDIFF32(end, raw), &entries));
+    WT_RET(__wt_vunpack_uint(&raw, WT_PTRDIFF32(end, raw), &dataoffset));
+
+    /* The returned offset is from the start of the page. */
+    auxhdr->entries = (uint32_t)entries;
+    auxhdr->offset = auxheaderoffset + (uint32_t)dataoffset;
+
+    return (0);
+}
+
+/*
  * __inmem_col_fix --
  *     Build in-memory index for fixed-length column-store leaf pages.
  */
-static void
-__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
+static int
+__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp, size_t *sizep)
 {
     WT_BTREE *btree;
+    WT_CELL_UNPACK_KV unpack;
+    WT_COL_FIX_AUXILIARY_HEADER auxhdr;
     const WT_PAGE_HEADER *dsk;
+    size_t size;
+    uint64_t tmp;
+    uint32_t entry_num, recno_offset, skipped;
+    const uint8_t *p8;
+    bool prepare;
+    void *pv;
 
     btree = S2BT(session);
     dsk = page->dsk;
+    prepare = false;
 
     page->pg_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
+
+    WT_RET(__wt_col_fix_read_auxheader(session, dsk, &auxhdr));
+    WT_ASSERT(session, auxhdr.offset <= dsk->mem_size);
+
+    switch (auxhdr.version) {
+    case WT_COL_FIX_VERSION_NIL:
+        /* There is no time window data. */
+        page->u.col_fix.fix_tw = NULL;
+        break;
+    case WT_COL_FIX_VERSION_TS:
+        /* The page should be VERSION_NIL if there are no timestamp entries. */
+        WT_ASSERT(session, auxhdr.entries > 0);
+
+        recno_offset = 0;
+        skipped = 0;
+
+        /* Walk the entries to build the index. */
+        entry_num = 0;
+        WT_CELL_FOREACH_FIX_TIMESTAMPS (session, dsk, &auxhdr, unpack) {
+            if (unpack.type == WT_CELL_KEY) {
+                p8 = unpack.data;
+                /* The array is attached to the page, so we don't need to free it on error here. */
+                WT_RET(__wt_vunpack_uint(&p8, unpack.size, &tmp));
+                /* For now at least, check that the entries are in ascending order. */
+                WT_ASSERT(session, tmp < UINT32_MAX);
+                WT_ASSERT(session, (recno_offset == 0 && tmp == 0) || tmp > recno_offset);
+                recno_offset = (uint32_t)tmp;
+            } else if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw)) {
+                /* Only index entries that are not already obsolete. */
+
+                if (entry_num == 0) {
+                    size = sizeof(WT_COL_FIX_TW) +
+                      (auxhdr.entries - skipped) * sizeof(WT_COL_FIX_TW_ENTRY);
+                    WT_RET(__wt_calloc(session, 1, size, &pv));
+                    *sizep += size;
+                    page->u.col_fix.fix_tw = pv;
+                }
+                page->pg_fix_tws[entry_num].recno_offset = recno_offset;
+                page->pg_fix_tws[entry_num].cell_offset = WT_PAGE_DISK_OFFSET(page, unpack.cell);
+                if (unpack.tw.prepare)
+                    prepare = true;
+                entry_num++;
+            } else
+                skipped++;
+        }
+        WT_CELL_FOREACH_END;
+
+        /*
+         * Set the number of time windows. If there weren't any, the variable doesn't exist. Also,
+         * while we could now reallocate the array to the exact count, assume it's not worthwhile.
+         */
+        if (entry_num > 0)
+            page->pg_fix_numtws = entry_num;
+
+        /*
+         * If we skipped "quite a few" entries (threshold is arbitrary), mark the page dirty so it
+         * gets rewritten without them.
+         */
+        if (!F_ISSET(btree, WT_BTREE_READONLY) && skipped >= auxhdr.entries / 4 &&
+          skipped >= dsk->u.entries / 100 && skipped > 4) {
+            WT_RET(__wt_page_modify_init(session, page));
+            __wt_page_modify_set(session, page);
+        }
+
+        break;
+    }
+
+    /* Report back whether we found a prepared value. */
+    if (preparedp != NULL && prepare)
+        *preparedp = true;
+
+    return (0);
 }
 
 /*

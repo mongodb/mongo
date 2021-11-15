@@ -49,6 +49,7 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
 
     types = [
         ('col', dict(extra_config=',log=(enabled=false),key_format=r')),
+        ('col-fix', dict(extra_config=',log=(enabled=false),key_format=r,value_format=8t')),
         ('lsm', dict(extra_config=',log=(enabled=false),type=lsm')),
         ('row', dict(extra_config=',log=(enabled=false)')),
     ]

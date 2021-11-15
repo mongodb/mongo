@@ -44,6 +44,10 @@
  *	Data cells (a WT_CELL_{VALUE,VALUE_COPY,VALUE_OVFL} cell), or deleted
  * cells (a WT_CELL_DEL cell).
  *
+ * WT_PAGE_COL_FIX (Column-store leaf page storing fixed-length data):
+ *      Pairs of WT_CELL_KEY and WT_CELL_VALUE, where the key is always a recno,
+ * and the value is empty but contains a non-empty time window.
+ *
  * Each cell starts with a descriptor byte:
  *
  * Bits 1 and 2 are reserved for "short" key and value cells (that is, a cell

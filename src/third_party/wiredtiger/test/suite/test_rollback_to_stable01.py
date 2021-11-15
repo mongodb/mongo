@@ -36,6 +36,9 @@ from time import sleep
 
 # test_rollback_to_stable01.py
 # Shared base class used by rollback to stable tests.
+#
+# Note: this class now expects self.value_format to have been set for some of the
+# operations (those that need to specialize themselves for FLCS).
 class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
     def retry_rollback(self, name, txn_session, code):
         retry_limit = 100
@@ -95,8 +98,14 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
             session.begin_transaction()
             for i in range(1, nrows + 1):
                 cursor.set_key(i)
-                mods = [wiredtiger.Modify(value, location, nbytes)]
-                self.assertEqual(cursor.modify(mods), 0)
+                # FLCS doesn't support modify (for obvious reasons) so just update.
+                # Use the first character of the passed-in value.
+                if self.value_format == '8t':
+                    cursor.set_value(bytes(value, encoding='utf-8')[0])
+                    self.assertEqual(cursor.update(), 0)
+                else:
+                    mods = [wiredtiger.Modify(value, location, nbytes)]
+                    self.assertEqual(cursor.modify(mods), 0)
 
             if commit_ts == 0:
                 session.commit_transaction()
@@ -139,7 +148,12 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
                 session.rollback_transaction()
             raise(e)
 
-    def check(self, check_value, uri, nrows, read_ts):
+    def check(self, check_value, uri, nrows, flcs_extrarows, read_ts):
+        # In FLCS, deleted values read back as 0, and (at least for now) uncommitted appends
+        # cause zeros to appear under them. If flcs_extrarows isn't None, expect that many
+        # rows of zeros following the regular data.
+        flcs_tolerance = self.value_format == '8t' and flcs_extrarows is not None
+
         session = self.session
         if read_ts == 0:
             session.begin_transaction()
@@ -148,10 +162,13 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
-            self.assertEqual(v, check_value)
+            if flcs_tolerance and count >= nrows:
+                self.assertEqual(v, 0)
+            else:
+                self.assertEqual(v, check_value)
             count += 1
         session.commit_transaction()
-        self.assertEqual(count, nrows)
+        self.assertEqual(count, nrows + flcs_extrarows if flcs_tolerance else nrows)
         cursor.close()
 
     def evict_cursor(self, uri, nrows, check_value):
@@ -170,9 +187,10 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -185,7 +203,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -201,22 +219,27 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable01"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+        else:
+            valuea = "aaaaa" * 100
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
 
-        valuea = "aaaaa" * 100
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
-        self.check(valuea, uri, nrows, 10)
+        self.check(valuea, uri, nrows, None, 10)
 
         # Remove all keys with newer timestamp.
         self.large_removes(uri, ds, nrows, self.prepare, 20)
         # Check that the no keys should be visible.
-        self.check(valuea, uri, 0, 20)
+        self.check(valuea, uri, 0, nrows, 20)
 
         # Pin stable to timestamp 20 if prepare otherwise 10.
         if self.prepare:
@@ -229,7 +252,8 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
 
         self.conn.rollback_to_stable()
         # Check that the new updates are only seen after the update timestamp.
-        self.check(valuea, uri, nrows, 20)
+        self.session.breakpoint()
+        self.check(valuea, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

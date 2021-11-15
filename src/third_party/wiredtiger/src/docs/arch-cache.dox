@@ -58,7 +58,8 @@ column-store leaf page will have an array of \c WT_COL structures along with a p
 of \c WT_COL_RLE structures indicating run lengths for items that are repeated more then once
 on the page.  Both of these leaf page formats support binary search to quickly find an entry.
 In a fixed-length column-store leaf page, values will be packed into a simple byte array, allowing
-WiredTiger to access entries using bit operations based on the value length.
+WiredTiger to access entries using bit operations based on the value length; the time window
+information is indexed in a separate array.
 
 The first time an entry on a leaf page is inserted or modified, WiredTiger adds a
 \c WT_PAGE_MODIFY structure to the corresponding \c WT_PAGE in the cache. For a row-store leaf

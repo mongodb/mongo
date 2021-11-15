@@ -39,16 +39,25 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(fast)'
 
     uri = [
-        ('file',  dict(uri='file:' + pfx, dataset=SimpleDataSet, cfg='')),
-        ('table', dict(uri='table:' + pfx, dataset=SimpleDataSet, cfg='')),
-        ('inmem', dict(uri='table:' + pfx, dataset=SimpleDataSet, cfg='',
+        ('file-row',  dict(uri='file:' + pfx, dataset=SimpleDataSet, type='row', cfg='')),
+        ('file-var',  dict(uri='file:' + pfx, dataset=SimpleDataSet, type='var', cfg='')),
+        ('file-fix',  dict(uri='file:' + pfx, dataset=SimpleDataSet, type='fix', cfg='')),
+        ('table-row', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='row', cfg='')),
+        ('table-var', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='var', cfg='')),
+        ('table-fix', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='fix', cfg='')),
+        ('inmem-row', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='row', cfg='',
             conn_config = 'in_memory,statistics=(fast)')),
-        ('table-lsm', dict(uri='table:' + pfx, dataset=SimpleDataSet,
+        ('inmem-var', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='var', cfg='',
+            conn_config = 'in_memory,statistics=(fast)')),
+        ('inmem-fix', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='fix', cfg='',
+            conn_config = 'in_memory,statistics=(fast)')),
+        ('table-lsm', dict(uri='table:' + pfx, dataset=SimpleDataSet, type='lsm',
             cfg='lsm=(chunk_size=1MB,merge_min=2)',
             conn_config = 'statistics=(fast)')),
-        ('complex', dict(uri='table:' + pfx, dataset=ComplexDataSet, cfg='')),
+        ('complex-row', dict(uri='table:' + pfx, dataset=ComplexDataSet, type='row', cfg='')),
+        ('complex-var', dict(uri='table:' + pfx, dataset=ComplexDataSet, type='fix', cfg='')),
         ('complex-lsm',
-            dict(uri='table:' + pfx, dataset=ComplexLSMDataSet,
+            dict(uri='table:' + pfx, dataset=ComplexLSMDataSet, type='lsm',
             cfg='lsm=(chunk_size=1MB,merge_min=2)',
             conn_config = 'statistics=(fast)')),
     ]
@@ -67,7 +76,22 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     # the cursor open succeeds. Insert enough data that LSM tables to need to
     # switch and merge.
     def test_stat_cursor_size(self):
-        ds = self.dataset(self, self.uri, 100, config=self.cfg)
+        if self.type == 'row':
+            key_format = 'S'
+            value_format = 'S'
+        elif self.type == 'var':
+            key_format = 'r'
+            value_format = 'S'
+        elif self.type == 'fix':
+            key_format = 'r'
+            value_format = '8t'
+        else:
+            self.assertEqual(self.type, 'lsm')
+            key_format = 'S'
+            value_format = 'S'
+
+        ds = self.dataset(
+           self, self.uri, 100, key_format=key_format, value_format=value_format, config=self.cfg)
         ds.populate()
         self.openAndWalkStatCursor()
         cursor = self.session.open_cursor(self.uri, None)

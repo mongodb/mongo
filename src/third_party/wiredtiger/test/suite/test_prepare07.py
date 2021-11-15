@@ -41,20 +41,20 @@ class test_prepare07(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=50MB'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('string-row', dict(key_format='S')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='u')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('string-row', dict(key_format='S', value_format='u')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
-    def older_prepare_updates(self, uri, ds, nrows, value_a):
+    def older_prepare_updates(self, uri, ds, nrows, value_a, value_b):
         # Commit some updates along with a prepared update, which is not resolved.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(100))
 
         # Commit some updates.
-        value_b = b"bbbbb" * 100
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction('isolation=snapshot')
         cursor.set_key(ds.key(nrows + 1))
@@ -148,9 +148,16 @@ class test_prepare07(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format='u')
+        ds = SimpleDataSet(
+            self, uri, nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
-        value_a = b"aaaaa" * 100
+
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+        else:
+            value_a = b"aaaaa" * 100
+            value_b = b"bbbbb" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(uri)
@@ -164,7 +171,7 @@ class test_prepare07(wttest.WiredTigerTestCase):
         # Check if txn_visible_all is working properly, when an active oldest
         # transaction is a prepared transaction and the oldest timestamp
         # advances beyond the prepared timestamp.
-        self.older_prepare_updates(uri, ds, nrows, value_a)
+        self.older_prepare_updates(uri, ds, nrows, value_a, value_b)
 
 if __name__ == '__main__':
     wttest.run()

@@ -23,7 +23,6 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
 #endif
 )
 {
-    static const WT_ITEM col_fix_remove = {"", 1, NULL, 0, 0};
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_INSERT *ins;
@@ -67,12 +66,6 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     mod = page->modify;
 
     if (upd_arg == NULL) {
-        /* Fixed-size column-store doesn't have on-page deleted values, it's a nul byte. */
-        if (modify_type == WT_UPDATE_TOMBSTONE && btree->type == BTREE_COL_FIX) {
-            modify_type = WT_UPDATE_STANDARD;
-            value = &col_fix_remove;
-        }
-
         /*
          * There's a chance the application specified a record past the last record on the page. If
          * that's the case and we're inserting a new WT_INSERT/WT_UPDATE pair, it goes on the append
@@ -88,6 +81,13 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
             cbt->ins = NULL;
             cbt->ins_head = NULL;
         }
+    } else {
+        /* Since on this path we never set append, make sure we aren't appending. */
+        WT_ASSERT(session, recno != WT_RECNO_OOB);
+        WT_ASSERT(session,
+          cbt->compare == 0 ||
+            recno <= (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
+                                                     __col_fix_last_recno(cbt->ref)));
     }
 
     /*

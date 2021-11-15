@@ -39,15 +39,17 @@ class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='i')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='i')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_timestamp_api(self):
-        self.session.create(self.uri, 'key_format={},value_format=i'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(self.uri, format)
         c = self.session.open_cursor(self.uri)
 
         # It is illegal to set a prepare timestamp older than oldest timestamp.

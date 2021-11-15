@@ -96,12 +96,12 @@ memory along with the old disk image.
 
 @section exceptions Exceptions
 
-Eviction works differently for in-memory database and fixed-length
-column store. Since they don't support the history store, eviction
-only discards the update chains when all the values on the update
-chains are globally visible. For the same reason, we cannot free the
-updates older than the update written to the disk image. Because
-there is no disk storage for in-memory database, eviction has to keep
-all the reconciled disk images in memory.
+Eviction works differently for in-memory databases. Since they don't
+support the history store, eviction only discards the update chains
+when all the values on the update chains are globally visible. For the
+same reason, we cannot free the updates older than the update written
+to the disk image. Because there is no disk storage for in-memory
+database, eviction has to keep all the reconciled disk images in
+memory.
 
  */

@@ -29,6 +29,7 @@
 import re
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
 
@@ -42,9 +43,22 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
     conn_config = 'log=(enabled=true),statistics=(all)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide
     # to do an update restore evict on a page when the cache pressure requirements are not met.
-    # This means setting eviction target low and cache size high.
+    # This means setting eviction target low and cache size low.
     conn_recon = ',eviction_updates_trigger=10,eviction_dirty_trigger=5,eviction_dirty_target=1,' \
-            'cache_size=10MB,debug_mode=(update_restore_evict=true),log=(recover=on)'
+            'cache_size=1MB,debug_mode=(update_restore_evict=true),log=(recover=on)'
+
+    format_values = [
+        ('column', dict(key_format='r', value_format='S', extraconfig='')),
+        # Does not run reliably; does not always trigger update restore eviction and fails that
+        # assertion, even with small pages and more rows. Probably needs a lot more rows. For
+        # the moment we've concluded that the marginal benefit of running it on FLCS is small so
+        # just disabling the scenario seems to be the best way forward.
+        #('column_fix', dict(key_format='r', value_format='8t', 
+        #    extraconfig=',allocation_size=512,leaf_page_max=512')),
+        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+    ]
+
+    scenarios = make_scenarios(format_values)
 
     def parse_write_gen(self, uri):
         meta_cursor = self.session.open_cursor('metadata:')
@@ -75,22 +89,30 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
         nrows = 10000
 
         # Create our table.
-        ds = SimpleDataSet(self, uri, 0, key_format='i', value_format='S',config='log=(enabled=false)')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)' + self.extraconfig)
         ds.populate()
 
-        value_a = 'a' * 500
-        value_b = 'b' * 500
-        value_c = 'c' * 500
-        value_d = 'd' * 500
+        if self.value_format == '8t':
+            nrows *= 2
+            value_a = 97
+            value_b = 98
+            value_c = 99
+            value_d = 100
+        else:
+            value_a = 'a' * 500
+            value_b = 'b' * 500
+            value_c = 'c' * 500
+            value_d = 'd' * 500
 
         # Perform several updates.
         self.large_updates(uri, value_a, ds, nrows, False, 20)
         self.large_updates(uri, value_b, ds, nrows, False, 30)
         self.large_updates(uri, value_c, ds, nrows, False, 40)
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_c, uri, nrows, 40)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_c, uri, nrows, None, 40)
 
         # Pin the stable timestamp to 40. We will be validating the state of the data post-stable timestamp
         # after we perform a recovery.
@@ -102,9 +124,9 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
         self.large_updates(uri, value_b, ds, nrows, False, 70)
 
         # Verify additional updated data is visible and correct.
-        self.check(value_d, uri, nrows, 50)
-        self.check(value_a, uri, nrows, 60)
-        self.check(value_b, uri, nrows, 70)
+        self.check(value_d, uri, nrows, None, 50)
+        self.check(value_a, uri, nrows, None, 60)
+        self.check(value_b, uri, nrows, None, 70)
 
         # Checkpoint to ensure the data is flushed to disk.
         self.session.checkpoint()
@@ -138,11 +160,11 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
         self.assertGreater(pages_update_restored, 0)
 
         # Check that after recovery, we see the correct data with respect to our previous stable timestamp (40).
-        self.check(value_c, uri, nrows, 40)
-        self.check(value_c, uri, nrows, 50)
-        self.check(value_c, uri, nrows, 60)
-        self.check(value_c, uri, nrows, 70)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_a, uri, nrows, 20)
+        self.check(value_c, uri, nrows, None, 40)
+        self.check(value_c, uri, nrows, None, 50)
+        self.check(value_c, uri, nrows, None, 60)
+        self.check(value_c, uri, nrows, None, 70)
+        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_a, uri, nrows, None, 20)
         # Passing 0 results in opening a transaction with no read timestamp.
-        self.check(value_c, uri, nrows, 0)
+        self.check(value_c, uri, nrows, None, 0)

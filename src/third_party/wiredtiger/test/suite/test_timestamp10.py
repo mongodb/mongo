@@ -45,9 +45,10 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
     nentries = 10
     table_cnt = 3
 
-    key_format_values = [
-        ('integer-row', dict(key_format='i')),
-        ('column', dict(key_format='r')),
+    format_values = [
+        ('integer-row', dict(key_format='i', value_format='i')),
+        ('column', dict(key_format='r', value_format='i')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
     types = [
         ('all', dict(use_stable='false', run_wt=0)),
@@ -60,7 +61,7 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
         ('stable+wt', dict(use_stable='true', run_wt=1)),
         ('stable+wt2', dict(use_stable='true', run_wt=2)),
     ]
-    scenarios = make_scenarios(key_format_values, types)
+    scenarios = make_scenarios(format_values, types)
 
     def data_and_checkpoint(self):
         #
@@ -68,7 +69,7 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
         # Add data to each of them separately and checkpoint so that each one
         # has a different stable timestamp.
         #
-        basecfg = 'key_format={},value_format=i'.format(self.key_format)
+        basecfg = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.oplog_uri, basecfg)
         self.session.create(self.coll1_uri, basecfg + ',log=(enabled=false)')
         self.session.create(self.coll2_uri, basecfg + ',log=(enabled=false)')
@@ -159,6 +160,11 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
                 # be missing some.
                 if self.use_stable == 'false' or i <= ts or table != self.table_cnt:
                     self.assertEquals(curs[i], i)
+                elif self.value_format == '8t':
+                    # For FLCS, expect the table to have extended under the lost values.
+                    # We should see 0 and not the data that was written.
+                    self.assertEqual(curs.search(), 0)
+                    self.assertEqual(curs.get_value(), 0)
                 else:
                     self.assertEqual(curs.search(), wiredtiger.WT_NOTFOUND)
 

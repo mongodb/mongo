@@ -42,14 +42,28 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
     table_nots_log   = 'ts03_nots_logged'
     table_nots_nolog = 'ts03_nots_nologged'
 
+    # XXX neither the use_cg nor the use_index values are actually used.
+    # I've commented out the entries that are therefore duplicates; if/when that's fixed, put
+    # them back I guess.
     types = [
-        ('file-row', dict(uri='file:', key_format='i', use_cg=False, use_index=False)),
-        ('file-col', dict(uri='file:', key_format='r', use_cg=False, use_index=False)),
-        ('lsm', dict(uri='lsm:', key_format='i', use_cg=False, use_index=False)),
-        ('table-row', dict(uri='table:', key_format='i', use_cg=False, use_index=False)),
-        ('table-row-index', dict(uri='table:', key_format='i', use_cg=False, use_index=True)),
-        ('table-col', dict(uri='table:', key_format='r', use_cg=False, use_index=False)),
-        ('table-col-cg', dict(uri='table:', key_format='r', use_cg=True, use_index=False)),
+        ('file-row', dict(uri='file:', key_format='i', value_format='S',
+                use_cg=False, use_index=False)),
+        ('file-col', dict(uri='file:', key_format='r', value_format='S',
+                use_cg=False, use_index=False)),
+        ('file-col-fix', dict(uri='file:', key_format='r', value_format='8t',
+                use_cg=False, use_index=False)),
+        ('lsm', dict(uri='lsm:', key_format='i', value_format='S',
+                use_cg=False, use_index=False)),
+        ('table-row', dict(uri='table:', key_format='i', value_format='S',
+                use_cg=False, use_index=False)),
+        #('table-row-index', dict(uri='table:', key_format='i', value_format='S',
+        #       use_cg=False, use_index=True)),
+        ('table-col', dict(uri='table:', key_format='r', value_format='S',
+                use_cg=False, use_index=False)),
+        ('table-col-fix', dict(uri='table:', key_format='r', value_format='8t',
+                use_cg=False, use_index=False)),
+        #('table-col-cg', dict(uri='table:', key_format='r', value_format='S',
+        #       use_cg=True, use_index=False)),
     ]
 
     ckpt = [
@@ -67,10 +81,16 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
 
     scenarios = make_scenarios(types, ckpt, conncfg)
 
-    # Binary values.
-    value  = u'\u0001\u0002abcd\u0003\u0004'
-    value2 = u'\u0001\u0002dcba\u0003\u0004'
-    value3 = u'\u0001\u0002cdef\u0003\u0004'
+    def moresetup(self):
+        # Binary values.
+        if self.value_format == '8t':
+            self.value = 4
+            self.value2 = 5
+            self.value3 = 6
+        else:
+            self.value  = u'\u0001\u0002abcd\u0003\u0004'
+            self.value2 = u'\u0001\u0002dcba\u0003\u0004'
+            self.value3 = u'\u0001\u0002cdef\u0003\u0004'
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -105,6 +125,13 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         cur_ts_nolog    = session.open_cursor(self.uri + self.table_ts_nolog, None)
         cur_nots_log    = session.open_cursor(self.uri + self.table_nots_log, None)
         cur_nots_nolog  = session.open_cursor(self.uri + self.table_nots_nolog, None)
+
+        # In FLCS the values are bytes, which are numbers, but the tests below are via
+        # string inclusion rather than just equality of values. Not sure why that is, but
+        # I'm going to assume there's a reason for it and not change things. Compensate.
+        if self.value_format == '8t':
+            check_value = str(check_value)
+
         # Count how many times the check_value is present in the
         # logged timestamp table.
         actual_ts_log = 0
@@ -154,6 +181,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
             valcnt_nots_log, valcnt_nots_nolog)
 
     def test_timestamp03(self):
+        self.moresetup()
         uri_ts_log      = self.uri + self.table_ts_log
         uri_ts_nolog    = self.uri + self.table_ts_nolog
         uri_nots_log    = self.uri + self.table_nots_log
@@ -165,7 +193,7 @@ class test_timestamp03(wttest.WiredTigerTestCase, suite_subprocess):
         # 3. Table is logged and does not use timestamps.
         # 4. Table is not logged and does not use timestamps.
         #
-        format = 'key_format={},value_format=S'.format(self.key_format)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri_ts_log, format)
         cur_ts_log = self.session.open_cursor(uri_ts_log)
         self.session.create(uri_ts_nolog, format + ',log=(enabled=false)')

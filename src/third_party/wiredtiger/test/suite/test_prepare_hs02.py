@@ -42,9 +42,10 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
     txn_config = 'isolation=snapshot'
 
     types = [
-        ('col', dict(s_config='value_format=i,log=(enabled=false),key_format=r')),
+        ('col', dict(s_config='key_format=r,value_format=i,log=(enabled=false)')),
+        ('col-fix', dict(s_config='key_format=r,value_format=8t,log=(enabled=false)')),
         ('row', dict(s_config='key_format=i,value_format=i,log=(enabled=false)')),
-        ('lsm', dict(s_config='key_format=i, value_format=i,log=(enabled=false),type=lsm')),
+        ('lsm', dict(s_config='key_format=i,value_format=i,log=(enabled=false),type=lsm')),
     ]
 
     # Transaction end types

@@ -39,9 +39,10 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -54,7 +55,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=4GB,statistics=(all)'
@@ -70,27 +71,34 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable03"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+            valuec = 99
+        else:
+            valuea = "aaaaa" * 100
+            valueb = "bbbbb" * 100
+            valuec = "ccccc" * 100
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
 
-        valuea = "aaaaa" * 100
-        valueb = "bbbbb" * 100
-        valuec = "ccccc" * 100
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
-        self.check(valuea, uri, nrows, 10)
+        self.check(valuea, uri, nrows, None, 10)
 
         self.large_updates(uri, valueb, ds, nrows, self.prepare, 20)
         # Check that all updates are seen.
-        self.check(valueb, uri, nrows, 20)
+        self.check(valueb, uri, nrows, None, 20)
 
         self.large_updates(uri, valuec, ds, nrows, self.prepare, 30)
         # Check that all updates are seen.
-        self.check(valuec, uri, nrows, 30)
+        self.check(valuec, uri, nrows, None, 30)
 
         # Pin stable to timestamp 30 if prepare otherwise 20.
         if self.prepare:
@@ -103,8 +111,8 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
 
         self.conn.rollback_to_stable()
         # Check that the old updates are only seen even with the update timestamp.
-        self.check(valueb, uri, nrows, 20)
-        self.check(valuea, uri, nrows, 10)
+        self.check(valueb, uri, nrows, None, 20)
+        self.check(valuea, uri, nrows, None, 10)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

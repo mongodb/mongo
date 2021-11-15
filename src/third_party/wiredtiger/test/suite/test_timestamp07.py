@@ -41,9 +41,10 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
     tablename2 = 'ts07_nots_logged'
     tablename3 = 'ts07_ts_logged'
 
-    key_format_values = [
-        ('integer-row', dict(key_format='i')),
-        ('column', dict(key_format='r')),
+    format_values = [
+        ('string-row', dict(key_format='i', value_format='S')),
+        ('column', dict(key_format='r', value_format='S')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
 
     types = [
@@ -63,20 +64,30 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         ('1000keys', dict(nkeys=1000)),
     ]
 
-    scenarios = make_scenarios(key_format_values, types, conncfg, nkeys)
+    scenarios = make_scenarios(format_values, types, conncfg, nkeys)
 
     # Binary values.
-    value = u'\u0001\u0002abcd\u0007\u0004'
-    value2 = u'\u0001\u0002dcba\u0007\u0004'
-    value3 = u'\u0001\u0002cdef\u0007\u0004'
+    def moreinit(self):
+        if self.value_format == '8t':
+            self.value = 2
+            self.value2 = 4
+            self.value3 = 6
+        else:
+            self.value = u'\u0001\u0002abcd\u0007\u0004'
+            self.value2 = u'\u0001\u0002dcba\u0007\u0004'
+            self.value3 = u'\u0001\u0002cdef\u0007\u0004'
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected value for a key
-    def check(self, session, txn_config, k, expected):
+    def check(self, session, txn_config, k, expected, flcs_expected):
+        # In FLCS the table extends under uncommitted writes and we expect to
+        # see zero rather than NOTFOUND.
+        if self.value_format == '8t' and flcs_expected is not None:
+            expected = flcs_expected
         if txn_config:
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri + self.tablename, None)
-        if not expected:
+        if expected is None:
             c.set_key(k)
             self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
         else:
@@ -92,6 +103,13 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         c = session.open_cursor(self.uri + self.tablename, None)
         c2 = session.open_cursor(self.uri + self.tablename2, None)
         c3 = session.open_cursor(self.uri + self.tablename3, None)
+
+        # In FLCS the values are bytes, which are numbers, but the tests below are via
+        # string inclusion rather than just equality of values. Not sure why that is, but
+        # I'm going to assume there's a reason for it and not change things. Compensate.
+        if self.value_format == '8t':
+            check_value = str(check_value)
+
         count = 0
         for k, v in c:
             if check_value in str(v):
@@ -126,6 +144,13 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         c = session.open_cursor(self.uri + self.tablename, None)
         c2 = session.open_cursor(self.uri + self.tablename2, None)
         c3 = session.open_cursor(self.uri + self.tablename3, None)
+
+        # In FLCS the values are bytes, which are numbers, but the tests below are via
+        # string inclusion rather than just equality of values. Not sure why that is, but
+        # I'm going to assume there's a reason for it and not change things. Compensate.
+        if self.value_format == '8t':
+            check_value = str(check_value)
+
         # Count how many times the second value is present
         count = 0
         for k, v in c:
@@ -179,17 +204,19 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         uri = self.uri + self.tablename
         uri2 = self.uri + self.tablename2
         uri3 = self.uri + self.tablename3
+        self.moreinit()
         #
         # Open three tables:
         # 1. Table is not logged and uses timestamps.
         # 2. Table is logged and does not use timestamps.
         # 3. Table is logged and uses timestamps.
         #
-        self.session.create(uri, 'key_format={},value_format=S,log=(enabled=false)'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format + ',log=(enabled=false)')
         c = self.session.open_cursor(uri)
-        self.session.create(uri2, 'key_format={},value_format=S'.format(self.key_format))
+        self.session.create(uri2, format)
         c2 = self.session.open_cursor(uri2)
-        self.session.create(uri3, 'key_format={},value_format=S'.format(self.key_format))
+        self.session.create(uri3, format)
         c3 = self.session.open_cursor(uri3)
         # print "tables created"
 
@@ -211,9 +238,9 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
         # timestamp.
         for k in orig_keys:
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(k),
-                k, self.value)
+                k, self.value, None)
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(k),
-                k + 1, None)
+                k + 1, None, None if k == self.nkeys else 0)
 
         # print "all values read, updating timestamps"
 

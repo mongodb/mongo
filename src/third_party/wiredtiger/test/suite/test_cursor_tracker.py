@@ -79,6 +79,7 @@ import wiredtiger, wttest
 class TestCursorTracker(wttest.WiredTigerTestCase):
     table_name1 = 'test_cursor'
     DELETED = 0xffffffffffffffff
+    DELETED_VERSION = 0xffff
     TRACE_API = False    # a print output for each WT API call
 
     def config_string(self):
@@ -142,6 +143,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             raise Exception('cur_initial_conditions: npairs too big')
         self.tablekind = tablekind
         self.isrow = (tablekind == 'row')
+        self.isfix = (tablekind == 'fix')
         self.setup_encoders_decoders()
         self.bitlist = [(x << 32) for x in range(npairs)]
         self.vers = dict((x << 32, 0) for x in range(npairs))
@@ -245,10 +247,11 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         return ((maj << 32) | (min << 16))
 
     def encode_value_fix(self, bits):
+        [maj, min, ver] = self.bits_to_triple(bits)
+        if ver == self.DELETED_VERSION:
+            return 0
         # can only encode only 8 bits
-        maj = ((bits >> 32) & 0xff)
-        min = (bits >> 16) & 0xff
-        return (maj ^ min)
+        return (maj ^ min) % 256
 
     def decode_value_fix(self, s):
         return int(s)
@@ -256,7 +259,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def setpos(self, newpos, isforward):
         length = len(self.bitlist)
         while newpos >= 0 and newpos < length:
-            if not self.isrow and self.bitlist[newpos] == self.DELETED:
+            if not self.isrow and not self.isfix and self.bitlist[newpos] == self.DELETED:
                 if isforward:
                     newpos = newpos + 1
                 else:
@@ -326,6 +329,9 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
                 self.bitlist.pop(self.curpos)
                 self.setpos(self.curpos - 1, True)
                 self.nopos = True
+            elif self.isfix:
+                [major, minor, version] = self.bits_to_triple(self.bitlist[self.curpos])
+                self.bitlist[self.curpos] = self.triple_to_bits(major, minor, self.DELETED_VERSION)
             else:
                 self.bitlist[self.curpos] = self.DELETED
             self.curremoved = True
@@ -442,7 +448,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             return str(self.bits_to_triple(self.decode_key(k))) + ' = ' + str(k)
 
     def _cursor_value_to_string(self, v):
-            return str(self.bits_to_triple(self.decode_value(v))) + ' = ' + v
+            return str(self.bits_to_triple(self.decode_value(v))) + ' = ' + str(v)
 
     def _dumpcursor(self, cursor):
         print('cursor')

@@ -39,9 +39,20 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable02(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    # For FLCS, set the page size down. Otherwise for the in-memory scenarios we get enough
+    # updates on the page that the in-memory page footprint exceeds the default maximum
+    # in-memory size, and that in turn leads to pathological behavior where the page gets
+    # force-evicted over and over again trying to resolve/condense the updates. But they
+    # don't (for in-memory, they can't be moved to the history store) so this leads to a
+    # semi-livelock state that makes the test some 20x slower than it needs to be.
+    #
+    # FUTURE: it would be better if the system adjusted on its own, but it's not critical
+    # and this workload (with every entry on the page modified repeatedly) isn't much like
+    # anything that happens in production.
+    format_values = [
+        ('column', dict(key_format='r', value_format='S', extraconfig='')),
+        ('column_fix', dict(key_format='r', value_format='8t', extraconfig=',leaf_page_max=4096')),
+        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
     ]
 
     in_memory_values = [
@@ -54,7 +65,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=100MB,statistics=(all)'
@@ -70,32 +81,40 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable02"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)' + self.extraconfig)
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+            valuec = 99
+            valued = 100
+        else:
+            valuea = "aaaaa" * 100
+            valueb = "bbbbb" * 100
+            valuec = "ccccc" * 100
+            valued = "ddddd" * 100
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
 
-        valuea = "aaaaa" * 100
-        valueb = "bbbbb" * 100
-        valuec = "ccccc" * 100
-        valued = "ddddd" * 100
         self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
-        self.check(valuea, uri, nrows, 10)
+        self.check(valuea, uri, nrows, None, 10)
 
         self.large_updates(uri, valueb, ds, nrows, self.prepare, 20)
         # Check that the new updates are only seen after the update timestamp.
-        self.check(valueb, uri, nrows, 20)
+        self.check(valueb, uri, nrows, None, 20)
 
         self.large_updates(uri, valuec, ds, nrows, self.prepare, 30)
         # Check that the new updates are only seen after the update timestamp.
-        self.check(valuec, uri, nrows, 30)
+        self.check(valuec, uri, nrows, None, 30)
 
         self.large_updates(uri, valued, ds, nrows, self.prepare, 40)
         # Check that the new updates are only seen after the update timestamp.
-        self.check(valued, uri, nrows, 40)
+        self.check(valued, uri, nrows, None, 40)
 
         # Pin stable to timestamp 30 if prepare otherwise 20.
         if self.prepare:
@@ -103,14 +122,16 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         else:
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
         # Checkpoint to ensure that all the data is flushed.
+        self.session.breakpoint()
         if not self.in_memory:
             self.session.checkpoint()
 
         self.conn.rollback_to_stable()
         # Check that the new updates are only seen after the update timestamp.
-        self.check(valueb, uri, nrows, 40)
-        self.check(valueb, uri, nrows, 20)
-        self.check(valuea, uri, nrows, 10)
+        self.session.breakpoint()
+        self.check(valueb, uri, nrows, None, 40)
+        self.check(valueb, uri, nrows, None, 20)
+        self.check(valuea, uri, nrows, None, 10)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

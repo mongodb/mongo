@@ -57,6 +57,8 @@ from wtscenario import make_scenarios
 #
 # Run this test on rows as well as columns to help make sure the test itself is valid (and
 # stays so over time...)
+#
+# Don't run it on FLCS because FLCS doesn't do RLE encoding so there's no point.
 class test_rollback_to_stable24(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     conn_config = 'in_memory=false'

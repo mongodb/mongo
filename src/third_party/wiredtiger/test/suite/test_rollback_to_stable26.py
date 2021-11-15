@@ -40,9 +40,10 @@ from wtthread import checkpoint_thread
 class test_rollback_to_stable26(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     hs_remove_values = [
@@ -55,7 +56,7 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         ('prepare_remove', dict(prepare_remove=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, hs_remove_values, prepare_remove_values)
+    scenarios = make_scenarios(format_values, hs_remove_values, prepare_remove_values)
 
     def conn_config(self):
         config = 'cache_size=10MB,statistics=(all),timing_stress_for_test=[history_store_checkpoint_delay]'
@@ -78,18 +79,26 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable26"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+             value_a = 97
+             value_b = 98
+             value_c = 99
+             value_d = 100
+             value_e = 101
+        else:
+             value_a = "aaaaa" * 100
+             value_b = "bbbbb" * 100
+             value_c = "ccccc" * 100
+             value_d = "ddddd" * 100
+             value_e = "eeeee" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        value_a = "aaaaa" * 100
-        value_b = "bbbbb" * 100
-        value_c = "ccccc" * 100
-        value_d = "ddddd" * 100
-        value_e = "eeeee" * 100
 
         self.large_updates(uri, value_a, ds, nrows, False, 20)
         self.large_updates(uri, value_b, ds, nrows, False, 30)
@@ -109,8 +118,8 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         prepare_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50))
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_b, uri, nrows, None, 30)
 
         self.evict_cursor(uri, nrows)
 
@@ -132,9 +141,9 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         self.large_updates(uri, value_d, ds, nrows, False, 60)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_d, uri, nrows, 60)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_d, uri, nrows, None, 60)
 
         # Simulate a server crash and restart.
         simulate_crash_restart(self, ".", "RESTART")
@@ -150,17 +159,17 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         self.assertEqual(hs_removed, nrows)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_b, uri, nrows, None, 30)
 
         self.large_updates(uri, value_e, ds, nrows, False, 60)
 
         self.evict_cursor(uri, nrows)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_e, uri, nrows, 60)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_e, uri, nrows, None, 60)
 
 if __name__ == '__main__':
     wttest.run()

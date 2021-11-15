@@ -652,6 +652,7 @@ dsrc_stats = [
     BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,tree_walk'),
     BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,tree_walk'),
     BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale,tree_walk'),
+    BtreeStat('btree_column_tws', 'column-store fixed-size time windows', 'no_scale,tree_walk'),
     BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale,tree_walk'),
     BtreeStat('btree_compact_pages_reviewed', 'btree compact pages reviewed', 'no_clear,no_scale'),
     BtreeStat('btree_compact_pages_skipped', 'btree compact pages skipped', 'no_clear,no_scale'),

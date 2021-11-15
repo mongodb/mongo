@@ -40,25 +40,33 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable29(test_rollback_to_stable_base):
     conn_config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true)'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_rollback_to_stable(self):
         uri = 'table:test_rollback_to_stable29'
         nrows = 100
 
-        # Create our table.
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format='S',config='log=(enabled=false)')
-        ds.populate()
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+            value_c = 99
+            value_d = 100
+        else:
+            value_a = 'a' * 100
+            value_b = 'b' * 100
+            value_c = 'c' * 100
+            value_d = 'd' * 100
 
-        value_a = 'a' * 100
-        value_b = 'b' * 100
-        value_c = 'c' * 100
-        value_d = 'd' * 100
+        # Create our table.
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
+        ds.populate()
 
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
@@ -67,19 +75,19 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
         self.large_updates(uri, value_a, ds, nrows, False, 10)
         self.large_removes(uri, ds, nrows, False, 30)
         self.large_updates(uri, value_b, ds, nrows, False, 40)
-        self.check(value_b, uri, nrows, 40)
+        self.check(value_b, uri, nrows, None, 40)
         self.large_updates(uri, value_c, ds, nrows, False, 50)
-        self.check(value_c, uri, nrows, 50)
+        self.check(value_c, uri, nrows, None, 50)
         self.evict_cursor(uri, nrows, value_c)
 
         # Insert an out of order update.
         self.session.breakpoint()
         self.large_updates(uri, value_d, ds, nrows, False, 20)
 
-        self.check(value_a, uri, nrows, 10)
-        self.check(value_d, uri, nrows, 40)
-        self.check(value_d, uri, nrows, 50)
-        self.check(value_d, uri, nrows, 20)
+        self.check(value_a, uri, nrows, None, 10)
+        self.check(value_d, uri, nrows, None, 40)
+        self.check(value_d, uri, nrows, None, 50)
+        self.check(value_d, uri, nrows, None, 20)
 
         # Pin stable to timestamp 10.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
@@ -88,7 +96,7 @@ class test_rollback_to_stable29(test_rollback_to_stable_base):
         # Simulate a crash by copying to a new directory(RESTART).
         simulate_crash_restart(self, ".", "RESTART")
 
-        self.check(value_a, uri, nrows, 10)
+        self.check(value_a, uri, nrows, None, 10)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]

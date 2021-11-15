@@ -35,19 +35,25 @@ from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 class test_prepare_conflict(wttest.WiredTigerTestCase):
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_prepare(self):
         # Create a large table with lots of pages.
         uri = "table:test_prepare_conflict"
-        key_format = 'key_format=' + self.key_format
-        config = 'allocation_size=512,leaf_page_max=512,{},value_format=S'.format(key_format)
-        self.session.create(uri, config)
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, 'allocation_size=512,leaf_page_max=512,' + format)
+
+        if self.value_format == '8t':
+            replacement_value = 199
+        else:
+            replacement_value = "replacement_value"
+
         cursor = self.session.open_cursor(uri)
         for i in range(1, 80000):
             cursor[simple_key(cursor, i)] = simple_value(cursor, i)
@@ -70,7 +76,7 @@ class test_prepare_conflict(wttest.WiredTigerTestCase):
 
         # Modify a record on a fast-truncate page.
         cursor = self.session.open_cursor(uri)
-        cursor[simple_key(cursor, 40000)] = "replacement_value"
+        cursor[simple_key(cursor, 40000)] = replacement_value
         cursor.close()
 
         # Prepare and commit the transaction.

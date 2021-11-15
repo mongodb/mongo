@@ -36,27 +36,36 @@ class test_hs23(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r', key=1)),
-        ('string-row', dict(key_format='S', key=str(0))),
+    format_values = [
+        ('column', dict(key_format='r', key=1, value_format='S')),
+        ('column-fix', dict(key_format='r', key=1, value_format='8t')),
+        ('string-row', dict(key_format='S', key=str(0), value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test(self):
         uri = 'table:test_hs23'
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
             'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
 
         key = self.key
 
-        value1 = 'a'
-        value2 = 'b'
-        value3 = 'c'
-        value4 = 'd'
-        value5 = 'e'
+        if self.value_format == '8t':
+            value1 = 97 # 'a'
+            value2 = 98 # 'b'
+            value3 = 99 # 'c'
+            value4 = 100 # 'd'
+            value5 = 101 # 'e'
+        else:
+            value1 = 'a'
+            value2 = 'b'
+            value3 = 'c'
+            value4 = 'd'
+            value5 = 'e'
 
         # Insert a key.
         self.session.begin_transaction()

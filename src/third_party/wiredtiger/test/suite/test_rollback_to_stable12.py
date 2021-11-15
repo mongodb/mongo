@@ -38,9 +38,16 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable12(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    # This test is slow, and the value of running it on every access method maybe somewhat
+    # questionable, since the code for skipping over subtrees during RTS is not dependent on
+    # access method. However, that relies on the aggregated timestamps in internal nodes
+    # being correct, which _is_ dependent on access method, so running all three versions is
+    # probably still worthwhile. However, if cutting back on test time becomes desirable it
+    # is probably reasonable to run only one of these unless -l is given.
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     prepare_values = [
@@ -48,7 +55,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, prepare_values)
+    scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all),log=(enabled=true)'
@@ -60,21 +67,26 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable12"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='split_pct=50,log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='split_pct=50,log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+        else:
+            value_a = "aaaaa" * 100
+            value_b = "bbbbb" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
 
-        value_a = "aaaaa" * 100
-        value_b = "bbbbb" * 100
-
         # Perform several updates.
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
+        self.check(value_a, uri, nrows, None, 20)
 
         # Pin stable to timestamp 30 if prepare otherwise 20.
         if self.prepare:
@@ -102,7 +114,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_a, uri, nrows, 30)
+        self.check(value_a, uri, nrows, None, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

@@ -2,13 +2,18 @@
 
 @section file_formats_formats File formats
 
-WiredTiger supports two underlying file formats: row-store and
-column-store, where both are B+tree implementations of key/value stores.
-WiredTiger also supports @ref lsm, implemented as a tree of B+trees.
+WiredTiger supports three underlying file formats: row-store and
+column-store, with an underlying special case of column-store for
+bit-field values. All three formats are B+tree implementations of
+key/value stores. WiredTiger also supports @ref lsm, implemented as a
+tree of B+trees.
 
 In a row-store, both keys and data are variable-length byte strings.  In
 a column-store, keys are 64-bit record numbers (key_format type 'r'),
-and values are either variable- or fixed-length byte strings.
+and values are variable-length byte strings, except for the special
+case format for bit-field values, where the values are a fixed number
+of bits between 1 and 8. The two flavors of column-store are accordingly
+called "variable-length" and "fixed-length".
 
 Generally, row-stores are faster for queries where all of the columns
 are required by every lookup (because there's only a single set of
@@ -22,11 +27,10 @@ be up to (4GB - 512B) in length.  Keys and values too large to fit on a
 normal page are stored as overflow items in the file, and are likely to
 require additional file I/O to access.
 
-Fixed-length column-store values (value_format type 't'), are limited
-to 8-bits, and only values between 0 and 255 may be stored.
-Additionally, there is no out-of-band fixed-length "deleted" value, and
-deleting a value is the same as storing a value of 0.  For the same
-reason, storing a value of 0 will cause cursor scans to skip the record.
+Fixed-length column-store values (value_format type 't') are limited
+to 8 bits. Thus, at most values between 0 and 255 may be stored.
+Additionally, there is no out-of-band fixed-length "deleted" value,
+and deleting a value is the same as storing a value of 0.
 
 WiredTiger does not support duplicate data items: there can be only a
 single value associated with any given key, and applications are
@@ -112,9 +116,9 @@ considered.   (See @ref compression_considerations for details.)
 
   Block compression is disabled by default.
 
-Column-stores with variable-length byte string values support four
-types of compression: run-length encoding, dictionary compression,
-Huffman encoding and block compression.
+Variable-length column stores support four types of compression:
+run-length encoding, dictionary compression, Huffman encoding and
+block compression.
 
 - Run-length encoding reduces the size requirement of both the in-memory
 and on-disk objects by storing sequential, duplicate values in the store
@@ -148,8 +152,8 @@ considered.   (See @ref compression_considerations for details.)
 
   Block compression is disabled by default.
 
-Column-stores with fixed-length byte values support a single type of
-compression: block compression.
+Fixed-length column stores support a single type of compression: block
+compression.
 
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional

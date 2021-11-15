@@ -43,7 +43,7 @@ class test_cursor02(TestCursorTracker):
         ('row', dict(tablekind='row', uri='table')),
         ('lsm-row', dict(tablekind='row', uri='lsm')),
         ('col', dict(tablekind='col', uri='table')),
-        #('fix', dict(tablekind='fix'))
+        ('fix', dict(tablekind='fix', uri='table'))
     ])
 
     def create_session_and_cursor(self, ninitialentries):

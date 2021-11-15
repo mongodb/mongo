@@ -230,14 +230,17 @@ leaf_only:
     if (page->type == WT_PAGE_COL_FIX) {
         if (recno < current->ref_recno) {
             cbt->recno = current->ref_recno;
+            cbt->slot = 0;
             cbt->compare = 1;
             return (0);
         }
         if (recno >= current->ref_recno + page->entries) {
             cbt->recno = current->ref_recno + page->entries;
+            cbt->slot = 0;
             goto past_end;
         } else {
             cbt->recno = recno;
+            cbt->slot = 0;
             cbt->compare = 0;
             ins_head = WT_COL_UPDATE_SINGLE(page);
         }

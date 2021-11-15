@@ -1356,7 +1356,7 @@ __wt_txn_modify_check(
      * uncommitted update or determined that it would be safe to write if we saw a committed update.
      */
     if (!rollback && upd == NULL) {
-        __wt_read_cell_time_window(cbt, &tw, &tw_found);
+        tw_found = __wt_read_cell_time_window(cbt, &tw);
         if (tw_found) {
             if (WT_TIME_WINDOW_HAS_STOP(&tw)) {
                 rollback = !__wt_txn_tw_stop_visible(session, &tw);

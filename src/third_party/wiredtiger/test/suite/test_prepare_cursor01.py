@@ -39,9 +39,10 @@ from wtscenario import make_scenarios
 #    WT_CURSOR navigation (next/prev) tests with prepared transactions
 class test_prepare_cursor01(wttest.WiredTigerTestCase):
 
-    keyfmt = [
-        ('row-store', dict(keyfmt='i')),
-        ('column-store', dict(keyfmt='r')),
+    fmt = [
+        ('row-store', dict(keyfmt='i', valfmt='S')),
+        ('column-store', dict(keyfmt='r', valfmt='S')),
+        ('fixed-length-column-store', dict(keyfmt='r', valfmt='8t')),
     ]
     types = [
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
@@ -51,11 +52,11 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
         ('isolation_read_committed', dict(isolation='read-committed')),
         ('isolation_snapshot', dict(isolation='snapshot'))
     ]
-    scenarios = make_scenarios(types, keyfmt, iso_types)
 
-    def skip(self):
-        return self.keyfmt == 'r' and \
-            (self.ds.is_lsm() or self.uri == 'lsm')
+    def keep(name, d):
+        return d['keyfmt'] != 'r' or (d['uri'] != 'lsm' and not d['ds'].is_lsm())
+
+    scenarios = make_scenarios(types, fmt, iso_types, include=keep)
 
     # Test cursor navigate (next/prev) with prepared transactions.
     # Cursor navigate with timestamp reads and non-timestamped reads.
@@ -64,8 +65,6 @@ class test_prepare_cursor01(wttest.WiredTigerTestCase):
     #   after cursor   : with timestamp after commit timestamp.
     # Cursor with out read timestamp behaviour should be same after cursor behavior.
     def test_cursor_navigate_prepare_transaction(self):
-        if self.skip():
-            return
 
         # Build an object.
         uri = self.uri + ':test_prepare_cursor01'

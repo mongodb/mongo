@@ -51,6 +51,12 @@ key that precedes them. Multiple values may be present, which can represent
 multiple versions. Extremely large values may be represented as a reference
 to another page (see overflow pages).
 
+Fixed-length column store pages contain a block of bitmap data after
+the page header; after this there may be an auxiliary header followed
+by zero or more cells that are used to hold any auxiliary data
+(currently, time validity windows) associated with the values in the
+bitmap.
+
 The exact encoding of cells is rather complex, and beyond what can be
 described here. The encoding strikes a balance between data that can be
 compacted efficiently in time and space, extensibility, and compatibility
@@ -74,11 +80,20 @@ values or addresses (these reference overflow pages).
 - The row-store leaf page \c WT_PAGE_ROW_LEAF is made up of a key cell
 (\c WT_CELL_KEY or \c WT_CELL_KEY_OVFL) followed by a value
 (\c WT_CELL_VALUE/VALUE_COPY/VALUE_OVFL).
-- The column-store leaf page (for variable-length data) \c WT_PAGE_COL_VAR
+- The variable-length column-store leaf page \c WT_PAGE_COL_VAR
 is made up of data cells (\c WT_CELL_VALUE/VALUE_COPY/VALUE_OVFL) or
 deleted cells (\c WT_CELL_DEL). The page header has a starting record
 number, so the associated keys for all column store values is deduced by
 their position in the page.
+- The fixed-length column store leaf page \c WT_PAGE_COL_FIX is made
+up of, first, a block of bitmap data, and then an auxiliary header
+followed by key cells (\c WT_CELL_KEY) alternating with value cells
+(\c WT_CELL_VALUE). The keys hold record number offsets from the page
+start; the value cells are always empty values, but include validity
+window information for values in the bitmap data. Cells for items with
+no validity window information are not written. Pages needing no
+validity window information at all do not contain the auxiliary header
+either.
 
 (3) Overflow Pages - overflow pages are needed when keys/values that are
 too large must be stored separately in the file, apart from where the item

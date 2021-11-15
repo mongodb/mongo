@@ -41,23 +41,25 @@ class test_txn26(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('string-row', dict(key_format='S', key=str(0))),
-        ('column', dict(key_format='r', key=16)),
+    format_values = [
+        ('string-row', dict(key_format='S', value_format='S', key=str(0))),
+        ('column', dict(key_format='r', value_format='S', key=16)),
+        ('column-fix', dict(key_format='r', value_format='8t', key=16)),
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_commit_larger_than_active_timestamp(self):
         if not wiredtiger.diagnostic_build():
             self.skipTest('requires a diagnostic build')
 
         uri = 'table:test_txn26'
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, config)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
             'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
 
-        value = 'a'
+        value = 97 if self.value_format == '8t' else 'a'
 
         # Start a session with timestamp 10
         session2 = self.conn.open_session(self.session_config)

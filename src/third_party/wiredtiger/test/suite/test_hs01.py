@@ -38,12 +38,13 @@ from wtscenario import make_scenarios
 class test_hs01(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=200MB,statistics=(all)'
     session_config = 'isolation=snapshot'
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('row_integer', dict(key_format='i')),
-        ('row_string', dict(key_format='S'))
+    format_values = [
+        ('column', dict(key_format='r', value_format='u')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('row_integer', dict(key_format='i', value_format='u')),
+        ('row_string', dict(key_format='S', value_format='u'))
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -70,10 +71,16 @@ class test_hs01(wttest.WiredTigerTestCase):
             # Hence, we begin/commit transaction manually.
             session.begin_transaction()
             cursor.set_key(ds.key(i))
-            mods = []
-            mod = wiredtiger.Modify('A', offset, 1)
-            mods.append(mod)
-            self.assertEqual(cursor.modify(mods), 0)
+
+            # FLCS doesn't allow modify (it doesn't make sense) so just update to 'j' then 'k'.
+            if self.value_format == '8t':
+                cursor.set_value(106 + offset)
+                self.assertEqual(cursor.update(), 0)
+            else:
+                mods = []
+                mod = wiredtiger.Modify('A', offset, 1)
+                mods.append(mod)
+                self.assertEqual(cursor.modify(mods), 0)
 
             if timestamp == True:
                 session.commit_transaction('commit_timestamp=' + self.timestamp_str(i + 1))
@@ -100,12 +107,23 @@ class test_hs01(wttest.WiredTigerTestCase):
     def test_hs(self):
         # Create a small table.
         uri = "table:test_hs01"
-        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format='u')
+        ds = SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
+
+        if self.value_format == '8t':
+            bigvalue = 97
+            bigvalue2 = 98
+            bigvalue3 = 107
+            bigvalue4 = 100
+        else:
+            bigvalue = b"aaaaa" * 100
+            bigvalue2 = b"ccccc" * 100
+            bigvalue3 = b"ccccc" * 100
+            bigvalue3 = b'AA' + bigvalue3[2:]
+            bigvalue4 = b"ddddd" * 100
 
         # Initially insert a lot of data.
         nrows = 10000
-        bigvalue = b"aaaaa" * 100
         cursor = self.session.open_cursor(uri)
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
@@ -116,7 +134,6 @@ class test_hs01(wttest.WiredTigerTestCase):
 
         # Scenario: 1
         # Check to see if the history store is working with the old reader.
-        bigvalue2 = b"ccccc" * 100
         # Open session 2.
         session2 = self.conn.open_session()
         session2.begin_transaction('isolation=snapshot')
@@ -135,12 +152,10 @@ class test_hs01(wttest.WiredTigerTestCase):
 
         # Scenario: 2
         # Check to see the history store working with modify operations.
-        bigvalue3 = b"ccccc" * 100
-        bigvalue3 = b'AA' + bigvalue3[2:]
         # Open session 2.
         session2 = self.conn.open_session()
         session2.begin_transaction('isolation=snapshot')
-        # Apply two modify operations (session1)- replacing the first two items with 'A'.
+        # Apply two modify operations (session1)- replacing the first two letters with 'A'.
         self.large_modifies(self.session, uri, 0, ds, nrows)
         self.large_modifies(self.session, uri, 1, ds, nrows)
 
@@ -160,7 +175,6 @@ class test_hs01(wttest.WiredTigerTestCase):
 
         # Scenario: 3
         # Check to see if the history store is working with the old timestamp.
-        bigvalue4 = b"ddddd" * 100
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
         self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
 

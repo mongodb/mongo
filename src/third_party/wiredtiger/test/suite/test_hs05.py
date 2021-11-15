@@ -42,12 +42,13 @@ class test_hs05(wttest.WiredTigerTestCase):
     conn_config += 'eviction_updates_target=95,eviction_updates_trigger=100'
     session_config = 'isolation=snapshot'
     stable = 1
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer-row', dict(key_format='i')),
-        ('string-row', dict(key_format='S'))
+    format_values = [
+        ('column', dict(key_format='r', value_format='u')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('integer-row', dict(key_format='i', value_format='u')),
+        ('string-row', dict(key_format='S', value_format='u'))
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -75,9 +76,13 @@ class test_hs05(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_hs05"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format='u')
+        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
-        bigvalue = b"aaaaa" * 100
+
+        if self.value_format == '8t':
+            bigvalue = 97
+        else:
+            bigvalue = b"aaaaa" * 100
 
         # Initially load huge data.
         # Add 10000 items that have a 500b value that is about 50Mb that
@@ -99,7 +104,10 @@ class test_hs05(wttest.WiredTigerTestCase):
         valstr='abcdefghijklmnopqrstuvwxyz'
         loop_start = self.get_stat(stat.conn.cache_hs_score)
         for i in range(1, 9):
-            bigvalue2 = valstr[i].encode() * 50
+            if self.value_format == '8t':
+                bigvalue2 = 105 + i
+            else:
+                bigvalue2 = valstr[i].encode() * 50
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.stable))
             entries_start = self.get_stat(stat.conn.cache_hs_insert)
             score_start = self.get_stat(stat.conn.cache_hs_score)
@@ -127,7 +135,10 @@ class test_hs05(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.stable))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.stable))
         for i in range(9, 11):
-            bigvalue2 = valstr[i].encode() * 50
+            if self.value_format == '8t':
+                bigvalue2 = 105 + i
+            else:
+                bigvalue2 = valstr[i].encode() * 50
             self.pr("Update iteration with oldest: " + str(i) + " Value: " + str(bigvalue2))
             self.large_updates(self.session, uri, bigvalue2, ds, nrows, nrows)
             self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.stable))

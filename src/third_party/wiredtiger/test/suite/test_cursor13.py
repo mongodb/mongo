@@ -36,6 +36,10 @@ from helper import confirm_does_not_exist
 from suite_random import suite_random
 
 # Cursor caching tests
+#
+# This test uses only row-store (key_format='S') but the cursor-caching code has been reviewed
+# for dependence on the access method and found to be access-method independent, so rearranging
+# it to also test column-store is not necessary.
 class test_cursor13_base(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(fast)'
     stat_cursor_cache = 0

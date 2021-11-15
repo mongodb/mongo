@@ -38,15 +38,16 @@ class test_cursor_pin(wttest.WiredTigerTestCase):
     nentries = 10000
     config = 'allocation_size=512,leaf_page_max=512'
     scenarios = make_scenarios([
-        ('recno', dict(keyfmt='r')),
-        ('string', dict(keyfmt='S')),
+        ('recno-fix', dict(keyfmt='r', valfmt='8t')),
+        ('recno', dict(keyfmt='r', valfmt='S')),
+        ('string', dict(keyfmt='S', valfmt='S')),
     ])
 
     # Create a multi-page file, confirm that a simple search to the local
     # page works, followed by a search to a different page.
     def test_smoke(self):
         ds = SimpleDataSet(self, self.uri, self.nentries,
-            config=self.config, key_format=self.keyfmt)
+            config=self.config, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
         self.reopen_conn()
         c = self.session.open_cursor(self.uri, None)

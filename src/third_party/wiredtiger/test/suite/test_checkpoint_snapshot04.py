@@ -42,12 +42,18 @@ class test_checkpoint_snapshot04(backup_base):
     uri = "table:test_checkpoint_snapshot04"
     nrows = 5000
 
+    format_values = [
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('column', dict(key_format='r', value_format='S')),
+        ('string_row', dict(key_format='S', value_format='S')),
+    ]
+
     target_backup = [
         ('full', dict(target=False)),
         ('target', dict(target=True))
     ]
 
-    scenarios = make_scenarios(target_backup)
+    scenarios = make_scenarios(format_values, target_backup)
 
     def conn_config(self):
         config = 'cache_size=200MB'
@@ -57,33 +63,49 @@ class test_checkpoint_snapshot04(backup_base):
         # Update a large number of records.
         session = self.session
         cursor = session.open_cursor(uri)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[ds.key(i)] = value
             session.commit_transaction()
         cursor.close()
 
     def check(self, check_value, uri, nrows):
+        # In FLCS the existence of the invisible extra row causes the table to extend
+        # under it. Until that's fixed, expect (not just allow) this row to exist and
+        # and demand it reads back as zero and not as check_value. When this behavior
+        # is fixed (so the end of the table updates transactionally) the special-case
+        # logic can just be removed.
+        flcs_tolerance = self.value_format == '8t'
+
         session = self.session
         session.begin_transaction()
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
-            self.assertEqual(v, check_value)
+            if flcs_tolerance and count >= nrows:
+                self.assertEqual(v, 0)
+            else:
+                self.assertEqual(v, check_value)
             count += 1
         session.commit_transaction()
-        self.assertEqual(count, nrows)
+        self.assertEqual(count, nrows + 1 if flcs_tolerance else nrows)
 
     def test_checkpoint_snapshot(self):
-        ds = SimpleDataSet(self, self.uri, 0, key_format="S", value_format="S")
+        ds = SimpleDataSet(self, self.uri, 0, \
+                key_format=self.key_format, value_format=self.value_format)
         ds.populate()
-        valuea = "aaaaa" * 100
-        valueb = "bbbbb" * 100
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+        else:
+            valuea = "aaaaa" * 100
+            valueb = "bbbbb" * 100
 
         session1 = self.conn.open_session()
         session1.begin_transaction()
         cursor1 = session1.open_cursor(self.uri)
-        for i in range(self.nrows, self.nrows + 1):
+        for i in range(self.nrows + 1, self.nrows + 2):
             cursor1.set_key(ds.key(i))
             cursor1.set_value(valueb)
             self.assertEqual(cursor1.insert(), 0)

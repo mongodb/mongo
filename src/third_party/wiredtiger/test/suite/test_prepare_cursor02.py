@@ -37,8 +37,9 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
     keyfmt = [
-        ('row-store', dict(keyfmt='i')),
-        ('column-store', dict(keyfmt='r')),
+        ('row-store', dict(keyfmt='i', valfmt='S')),
+        ('column-store', dict(keyfmt='r', valfmt='S')),
+        ('fixed-length-column-store', dict(keyfmt='r', valfmt='8t')),
     ]
     types = [
         ('table-simple', dict(uri='table', ds=SimpleDataSet)),
@@ -46,18 +47,12 @@ class test_prepare_cursor02(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(types, keyfmt)
 
-    def skip(self):
-        return self.keyfmt == 'r' and \
-            (self.ds.is_lsm() or self.uri == 'lsm')
-
     # Test cursor navigate (next/prev) with prepared transactions.
     def test_cursor_navigate_prepare_transaction(self):
-        if self.skip():
-            return
 
         # Build an object.
         uri = self.uri + ':test_prepare_cursor02'
-        ds = self.ds(self, uri, 0, key_format=self.keyfmt)
+        ds = self.ds(self, uri, 0, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 
         session = self.session

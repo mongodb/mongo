@@ -32,6 +32,8 @@
 
 import os, run, string, codecs
 import wiredtiger, wttest
+
+# If removing this, update test_salvage to not reference here.
 import test_salvage
 
 # Run the regular salvage test, but with encryption on
@@ -56,12 +58,17 @@ class test_encrypt07(test_salvage.test_salvage):
     def rot13(self, s):
         return codecs.encode(s, 'rot_13')
 
-    # overrides test_salvage.damage.
+    # Supplement test_salvage.moreinit.
     # When we're looking in the file for our 'unique' set of bytes,
     # (to find a physical spot to damage) we'll need to search for
     # the rot13 encrypted string.
-    def damage(self, tablename):
-        self.damage_inner(tablename, self.rot13(self.unique).encode())
+    def moreinit(self):
+        super().moreinit()
+        self.uniquebytes = self.rot13(self.uniquebytes.decode()).encode()
+
+    # overrides test_salvage.damage.
+    #def damage(self, tablename):
+    #    self.damage_inner(tablename, self.rot13(self.unique).encode())
 
 if __name__ == '__main__':
     wttest.run()

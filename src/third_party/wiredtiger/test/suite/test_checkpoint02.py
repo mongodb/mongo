@@ -39,9 +39,10 @@ from wtscenario import make_scenarios
 #   Run background checkpoints repeatedly while doing inserts and other
 #   operations in another thread
 class test_checkpoint02(wttest.WiredTigerTestCase):
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('u32_row', dict(key_format='L')),
+    format_values = [
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('column', dict(key_format='r', value_format='S')),
+        ('u32_row', dict(key_format='L', value_format='S')),
     ]
 
     size_values = [
@@ -49,12 +50,19 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
         ('table-10', dict(uri='table:test',dsize=10,nops=50000,nthreads=30))
     ]
 
-    scenarios = make_scenarios(key_format_values, size_values)
+    scenarios = make_scenarios(format_values, size_values)
 
     def test_checkpoint02(self):
         done = threading.Event()
         self.session.create(self.uri,
-            "key_format=" + self.key_format + ",value_format=S")
+            "key_format={},value_format={}".format(self.key_format, self.value_format))
+
+        if self.value_format == '8t':
+            self.nops *= 2
+            my_data = 97
+        else:
+            my_data = 'a' * self.dsize
+
         ckpt = checkpoint_thread(self.conn, done)
         work_queue = queue.Queue()
         opthreads = []
@@ -63,7 +71,6 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
 
             uris = list()
             uris.append(self.uri)
-            my_data = 'a' * self.dsize
             for i in range(self.nops):
                 if i % 191 == 0 and i != 0:
                     work_queue.put_nowait(('b', i + 1, my_data))

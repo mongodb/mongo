@@ -309,7 +309,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     ikey = NULL; /* -Wuninitialized */
     cell = NULL;
 
-    WT_RET(__wt_rec_split_init(session, r, page, 0, btree->maxintlpage_precomp));
+    WT_RET(__wt_rec_split_init(session, r, page, 0, btree->maxintlpage_precomp, 0));
 
     /*
      * Ideally, we'd never store the 0th key on row-store internal pages because it's never used
@@ -559,7 +559,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
              */
             cbt->slot = UINT32_MAX;
             WT_RET(__wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
-            WT_RET(__wt_value_return(cbt, cbt->upd_value));
+            __wt_value_return(cbt, cbt->upd_value);
             WT_RET(__wt_rec_cell_build_val(
               session, r, cbt->iface.value.data, cbt->iface.value.size, &tw, 0));
             break;
@@ -708,7 +708,7 @@ __wt_rec_row_leaf(
       !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
       !WT_IS_METADATA(btree->dhandle);
 
-    WT_RET(__wt_rec_split_init(session, r, page, 0, btree->maxleafpage_precomp));
+    WT_RET(__wt_rec_split_init(session, r, page, 0, btree->maxleafpage_precomp, 0));
 
     /*
      * Write any K/V pairs inserted into the page before the first from-disk key on the page.
@@ -833,7 +833,7 @@ __wt_rec_row_leaf(
             case WT_UPDATE_MODIFY:
                 cbt->slot = WT_ROW_SLOT(page, rip);
                 WT_ERR(__wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
-                WT_ERR(__wt_value_return(cbt, cbt->upd_value));
+                __wt_value_return(cbt, cbt->upd_value);
                 WT_ERR(__wt_rec_cell_build_val(
                   session, r, cbt->iface.value.data, cbt->iface.value.size, twp, 0));
                 dictionary = true;

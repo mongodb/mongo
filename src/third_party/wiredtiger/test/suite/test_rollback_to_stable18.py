@@ -41,9 +41,10 @@ from wtscenario import make_scenarios
 class test_rollback_to_stable18(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     prepare_values = [
@@ -51,7 +52,7 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, prepare_values)
+    scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,in_memory=true,statistics=(all),log=(enabled=false),' \
@@ -64,14 +65,18 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable18"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            value_a = 97
+        else:
+            value_a = "aaaaa" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        value_a = "aaaaa" * 100
 
         # Perform several updates.
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
@@ -80,8 +85,8 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         self.large_removes(uri, ds, nrows, self.prepare, 30)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(None, uri, 0, 30)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(None, uri, 0, nrows, 30)
 
         # Configure debug behavior on a cursor to evict the page positioned on when the reset API is used.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
@@ -104,7 +109,7 @@ class test_rollback_to_stable18(test_rollback_to_stable_base):
         self.conn.rollback_to_stable()
 
         # Verify data is not visible.
-        self.check(value_a, uri, nrows, 30)
+        self.check(value_a, uri, nrows, None, 30)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

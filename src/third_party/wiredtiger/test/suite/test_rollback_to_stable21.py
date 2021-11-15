@@ -40,12 +40,13 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # test_rollback_to_stable21.py
 # Test rollback to stable when an out of order prepared transaction is written to disk
 class test_rollback_to_stable21(test_rollback_to_stable_base):
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def conn_config(self):
         config = 'cache_size=250MB,statistics=(all),statistics_log=(json,on_close,wait=1)'
@@ -57,15 +58,20 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+        else:
+            valuea = 'a' * 400
+            valueb = 'b' * 400
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        valuea = 'a' * 400
-        valueb = 'b' * 400
 
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -105,7 +111,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
         self.pr("restart complete")
 
-        self.check(valuea, uri, nrows, 40)
+        self.check(valuea, uri, nrows, None, 40)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
@@ -119,15 +125,20 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+        else:
+            valuea = 'a' * 400
+            valueb = 'b' * 400
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        valuea = 'a' * 400
-        valueb = 'b' * 400
 
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -172,8 +183,8 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
         self.pr("restart complete")
 
-        self.check(valuea, uri, nrows, 30)
-        self.check(valuea, uri, 0, 40)
+        self.check(valuea, uri, nrows, None, 30)
+        self.check(valuea, uri, 0, nrows, 40)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
@@ -189,15 +200,20 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable21"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+        else:
+            valuea = 'a' * 400
+            valueb = 'b' * 400
 
         # Pin oldest and stable timestamps to 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        valuea = 'a' * 400
-        valueb = 'b' * 400
 
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
@@ -223,7 +239,11 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
 
         for i in range(1, nrows + 1):
             evict_cursor.set_key(i)
-            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+            if self.value_format == '8t':
+                self.assertEquals(evict_cursor.search(), 0)
+                self.assertEquals(evict_cursor.get_value(), 0)
+            else:
+                self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
             evict_cursor.reset()
 
         s.rollback_transaction()
@@ -238,7 +258,7 @@ class test_rollback_to_stable21(test_rollback_to_stable_base):
         simulate_crash_restart(self, ".", "RESTART")
         self.pr("restart complete")
 
-        self.check(valuea, uri, 0, 40)
+        self.check(valuea, uri, 0, nrows, 40)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]

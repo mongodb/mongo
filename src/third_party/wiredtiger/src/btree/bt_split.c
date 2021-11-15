@@ -1363,13 +1363,6 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
     bool prepare;
 
     /*
-     * In 04/2016, we removed column-store record numbers from the WT_PAGE structure, leading to
-     * hard-to-debug problems because we corrupt the page if we search it using the wrong initial
-     * record number. For now, assert the record number is set.
-     */
-    WT_ASSERT(session, orig->type != WT_PAGE_COL_VAR || ref->ref_recno != 0);
-
-    /*
      * This code re-creates an in-memory page from a disk image, and adds references to any
      * unresolved update chains to the new page. We get here either because an update could not be
      * written when evicting a page, or eviction chose to keep a page in memory.
@@ -1432,13 +1425,12 @@ __split_multi_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *multi, WT
 
         /*
          * Truncate the onpage value and the older versions moved to the history store. We can't
-         * truncate the updates for in memory database and fixed length column store as they don't
-         * support the history sore. We can't free the truncated updates here as we may still fail.
-         * If we fail, we will append them back to their original update chains. Truncate before we
-         * restore them to ensure the size of the page is correct.
+         * truncate the updates for an in memory database as it doesn't support the history store.
+         * We can't free the truncated updates here as we may still fail. If we fail, we will append
+         * them back to their original update chains. Truncate before we restore them to ensure the
+         * size of the page is correct.
          */
-        if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
-          orig->type != WT_PAGE_COL_FIX) {
+        if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
             /*
              * We have decided to restore this update chain so it must have newer updates than the
              * onpage value on it.
@@ -1559,8 +1551,7 @@ __split_multi_inmem_final(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *mul
             supd->ins->upd = NULL;
 
         /* Free the updates written to the data store and the history store. */
-        if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) &&
-          orig->type != WT_PAGE_COL_FIX)
+        if (supd->onpage_upd != NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
             __wt_free_update_list(session, &supd->onpage_upd);
     }
 }
@@ -1577,7 +1568,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_MULTI *mult
     WT_UPDATE *upd;
     uint32_t i, slot;
 
-    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && orig->type != WT_PAGE_COL_FIX)
+    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         /* Append the onpage values back to the original update chains. */
         for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd) {
             /*

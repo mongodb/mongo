@@ -42,11 +42,17 @@ class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
     conn_recerror = conn_config + ',log=(recover=error)'
     conn_recon = conn_config + ',log=(recover=on)'
 
-    key_format_values = [
-        ('integer-row', dict(key_format='i')),
-        ('column', dict(key_format='r')),
+    format_values = [
+        ('integer-row', dict(key_format='i', value_format='i')),
+        ('column', dict(key_format='r', value_format='i')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
+
+    def mkvalue(self, i):
+        if self.value_format == '8t':
+            return i % 256
+        return i
 
     def simulate_crash(self, olddir, newdir):
         ''' Simulate a crash from olddir and restart in newdir. '''
@@ -77,7 +83,7 @@ class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
         #
         # If we aren't tracking file IDs properly, it's possible that
         # we'd end up apply the log records for t2 to table t1.
-        create_params = 'key_format={},value_format=i'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.t1, create_params)
         #
         # Since we're logging, we need to flush out the meta-data file
@@ -85,7 +91,7 @@ class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.checkpoint()
         c = self.session.open_cursor(self.t1, None, None)
         for i in range(1, 10001):
-            c[i] = i + 1
+            c[i] = self.mkvalue(i + 1)
         c.close()
         olddir = "."
         newdir = "RESTART"
@@ -113,7 +119,7 @@ class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
         i = 1
         for key, value in c:
             self.assertEqual(i, key)
-            self.assertEqual(i+1, value)
+            self.assertEqual(self.mkvalue(i+1), value)
             i += 1
         self.assertEqual(i, 10001)
         c.close()

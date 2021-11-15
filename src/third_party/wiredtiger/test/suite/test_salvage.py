@@ -29,27 +29,88 @@
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_salvage.py
 #    Utilities: wt salvage
+
+# Note that this class is reused by test_encrypt07; be sure to test any changes with
+# that version as well.
+
 class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_salvage.a'
     nentries = 1000
-    session_params = 'key_format=S,value_format=S'
-    unique = 'SomeUniqueString'
+
+    format_values = [
+        ('string-row', dict(key_format='S', value_format='S')),
+        ('column', dict(key_format='r', value_format='S')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+    ]
+    scenarios = make_scenarios(format_values)
+
+    def moreinit(self):
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        if self.key_format == 'r':
+            # VLCS requires smaller pages or the workload fits on one page, which then gets
+            # zapped by the damage operation and the table comes out empty, which isn't what
+            # we want.
+            format += ',leaf_page_max=4096'
+        self.session_params = format
+
+        if self.value_format == '8t':
+            # If the test starts failing weirdly, try picking a different byte. Don't forget to
+            # set value_modulus to some smaller value. It had better be < 127 so the mandatory
+            # Python trip through UTF-8 doesn't blow up. Currently it is set to 125, which at
+            # least gets to the salvage code; 126 apparently corrupts the root page and then
+            # nothing works.
+            self.unique = 125
+            self.value_modulus = 113
+            self.uniquebytes = bytes([self.unique])
+
+        else:
+            self.unique = 'SomeUniqueString'
+            self.uniquebytes = self.unique.encode()
+
+    def firstkey(self):
+        if self.key_format == 'r':
+            return 1
+        return ''
+
+    def nextkey(self, key, i):
+        if self.key_format == 'r':
+            # Use key + i to create gaps. This makes the actual number of rows larger in FLCS,
+            # but since the rows are small that doesn't make the table excessively large.
+            return key + i
+        else:
+            return key + str(i)
+
+    def uniqueval(self):
+        if self.value_format == '8t':
+            return self.unique
+        else:
+            return self.unique + '0'
+
+    def ordinaryval(self, key):
+        if self.value_format == '8t':
+            # Pick something that won't overlap self.unique.
+            return key % self.value_modulus
+        elif self.key_format == 'r':
+            return str(key) + str(key)
+        else:
+            return key + key
 
     def populate(self, tablename):
         """
         Insert some simple entries into the table
         """
         cursor = self.session.open_cursor('table:' + tablename, None, None)
-        key = ''
+        key = self.firstkey()
         for i in range(0, self.nentries):
-            key += str(i)
+            key = self.nextkey(key, i)
             if i == self.nentries // 2:
-                val = self.unique + '0'
+                val = self.uniqueval()
             else:
-                val = key + key
+                val = self.ordinaryval(key)
             cursor[key] = val
         cursor.close()
 
@@ -58,18 +119,30 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         Verify that items added by populate are still there
         """
         cursor = self.session.open_cursor('table:' + tablename, None, None)
-        wantkey = ''
+        wantkey = self.firstkey()
         i = 0
+        zeros = 0
         for gotkey, gotval in cursor:
-            wantkey += str(i)
+            nextkey = self.nextkey(wantkey, i)
+
+            # In FLCS the values between the keys we wrote will read as zero. Count them.
+            if gotkey < nextkey and self.value_format == '8t':
+                self.assertEqual(gotval, 0)
+                zeros += 1
+                continue
+            wantkey = nextkey
+
             if i == self.nentries // 2:
-                wantval = self.unique + '0'
+                wantval = self.uniqueval()
             else:
-                wantval = wantkey + wantkey
+                wantval = self.ordinaryval(wantkey)
             self.assertEqual(gotkey, wantkey)
-            self.assertTrue(gotval, wantval)
+            self.assertEqual(gotval, wantval)
             i += 1
         self.assertEqual(i, self.nentries)
+        if self.value_format == '8t':
+            # We should have visited every key, so the total number of should match the last key.
+            self.assertEqual(self.nentries + zeros, wantkey)
         cursor.close()
 
     def check_damaged(self, tablename):
@@ -79,18 +152,20 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         just that the ones that are here are correct.
         """
         cursor = self.session.open_cursor('table:' + tablename, None, None)
-        wantkey = ''
+        wantkey = self.firstkey()
         i = -1
         correct = 0
         for gotkey, gotval in cursor:
             i += 1
-            wantkey += str(i)
+            wantkey = self.nextkey(wantkey, i)
             if gotkey != wantkey:
+                # Note that if a chunk in the middle of the table got lost,
+                # this will never sync up again.
                 continue
             if i == self.nentries // 2:
-                wantval = self.unique + '0'
+                wantval = self.uniqueval()
             else:
-                wantval = wantkey + wantkey
+                wantval = self.ordinaryval(wantkey)
             self.assertEqual(gotkey, wantkey)
             self.assertTrue(gotval, wantval)
             correct += 1
@@ -106,7 +181,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         cursor.close()
 
     def damage(self, tablename):
-        self.damage_inner(tablename, self.unique.encode())
+        self.damage_inner(tablename, self.uniquebytes)
 
     def read_byte(self, fp):
         """
@@ -151,6 +226,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage in a 'wt' process, using an empty table
         """
+        self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         errfile = "salvageerr.out"
         self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
@@ -161,6 +237,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage in a 'wt' process, using a populated table.
         """
+        self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         self.populate(self.tablename)
         errfile = "salvageerr.out"
@@ -172,6 +249,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage via API, using an empty table
         """
+        self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         self.session.salvage('table:' + self.tablename, None)
         self.check_empty_table(self.tablename)
@@ -180,6 +258,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage via API, using a populated table.
         """
+        self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         self.populate(self.tablename)
         self.session.salvage('file:' + self.tablename + ".wt", None)
@@ -189,6 +268,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage via API, on a damaged table.
         """
+        self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         self.populate(self.tablename)
         self.damage(self.tablename)
@@ -206,6 +286,7 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage in a 'wt' process on a table that is purposely damaged.
         """
+        self.moreinit()
         self.session.create('table:' + self.tablename, self.session_params)
         self.populate(self.tablename)
         self.damage(self.tablename)

@@ -39,6 +39,7 @@ from wtscenario import make_scenarios
 
 # test_rollback_to_stable16.py
 # Test that rollback to stable removes updates present on disk for column store.
+# (This test is now probably redundant with others, and could maybe be removed?)
 class test_rollback_to_stable16(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 
@@ -49,8 +50,7 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
 
     value_format_values = [
         # Fixed length
-        #FIXME: WT-7304 Fixed length column store failing on rollback on disk values
-        # ('fixed', dict(value_format='8t')),
+        ('fixed', dict(value_format='8t')),
         # Variable length
         ('variable', dict(value_format='S')),
     ]
@@ -60,7 +60,14 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
         ('inmem', dict(in_memory=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, value_format_values, in_memory_values)
+    def keep(name, d):
+        if d['key_format'] == 'i' and d['value_format'] == '8t':
+            # Fixed-length format is only special for column-stores.
+            return False
+        return True
+
+    scenarios = make_scenarios(key_format_values, value_format_values, in_memory_values,
+        include=keep)
 
     def conn_config(self):
         config = 'cache_size=200MB,statistics=(all)'
@@ -145,8 +152,8 @@ class test_rollback_to_stable16(wttest.WiredTigerTestCase):
 
         self.check(values[0], uri, nrows, 1, 2)
         self.check(values[1], uri, nrows, 201, 5)
-        self.check(None, uri, nrows, 401, 7)
-        self.check(None, uri, nrows, 601, 9)
+        self.check(0 if self.value_format == '8t' else None, uri, nrows, 401, 7)
+        self.check(0 if self.value_format == '8t' else None, uri, nrows, 601, 9)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]

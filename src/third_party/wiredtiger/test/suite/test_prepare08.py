@@ -39,12 +39,13 @@ class test_prepare08(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=10MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('string-row', dict(key_format='S')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='u')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('string-row', dict(key_format='S', value_format='u')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
@@ -87,18 +88,27 @@ class test_prepare08(wttest.WiredTigerTestCase):
 
         # Create a small table.
         uri_1 = "table:test_prepare08_1"
-        ds_1 = SimpleDataSet(self, uri_1, 0, key_format=self.key_format, value_format='u')
+        ds_1 = SimpleDataSet(
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
         uri_2 = "table:test_prepare08_2"
-        ds_2 = SimpleDataSet(self, uri_2, 0, key_format=self.key_format, value_format='u')
+        ds_2 = SimpleDataSet(
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
-        value_a = b"aaaaa" * 100
-        value_b = b"bbbbb" * 100
-        value_c = b"ccccc" * 100
-        value_d = b"ddddd" * 100
-        value_e = b"eeeee" * 100
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+            value_c = 99
+            value_d = 100
+            value_e = 101
+        else:
+            value_a = b"aaaaa" * 100
+            value_b = b"bbbbb" * 100
+            value_c = b"ccccc" * 100
+            value_d = b"ddddd" * 100
+            value_e = b"eeeee" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -155,19 +165,28 @@ class test_prepare08(wttest.WiredTigerTestCase):
 
         # Create a small table.
         uri_1 = "table:test_prepare10_1"
-        ds_1 = SimpleDataSet(self, uri_1, 0, key_format=self.key_format, value_format='u')
+        ds_1 = SimpleDataSet(
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
         # Create another small table.
         uri_2 = "table:test_prepare10_2"
-        ds_2 = SimpleDataSet(self, uri_2, 0, key_format=self.key_format, value_format='u')
+        ds_2 = SimpleDataSet(
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
-        value_a = b"aaaaa" * 100
-        value_b = b"bbbbb" * 100
-        value_c = b"ccccc" * 100
-        value_d = b"ddddd" * 100
-        value_e = b"eeeee" * 100
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+            value_c = 99
+            value_d = 100
+            value_e = 101
+        else:
+            value_a = b"aaaaa" * 100
+            value_b = b"bbbbb" * 100
+            value_c = b"ccccc" * 100
+            value_d = b"ddddd" * 100
+            value_e = b"eeeee" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
@@ -229,19 +248,28 @@ class test_prepare08(wttest.WiredTigerTestCase):
 
         # Create a small table.
         uri_1 = "table:test_prepare10_1"
-        ds_1 = SimpleDataSet(self, uri_1, 0, key_format=self.key_format, value_format='u')
+        ds_1 = SimpleDataSet(
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format)
         ds_1.populate()
 
         # Create another small table.
         uri_2 = "table:test_prepare10_2"
-        ds_2 = SimpleDataSet(self, uri_2, 0, key_format=self.key_format, value_format='u')
+        ds_2 = SimpleDataSet(
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format)
         ds_2.populate()
 
-        value_a = b"aaaaa" * 100
-        value_b = b"bbbbb" * 100
-        value_c = b"ccccc" * 100
-        value_d = b"ddddd" * 100
-        value_e = b"eeeee" * 100
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+            value_c = 99
+            value_d = 100
+            value_e = 101
+        else:
+            value_a = b"aaaaa" * 100
+            value_b = b"bbbbb" * 100
+            value_c = b"ccccc" * 100
+            value_d = b"ddddd" * 100
+            value_e = b"eeeee" * 100
 
         # Commit some updates along with a prepared update, which is not resolved.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))

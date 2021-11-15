@@ -35,11 +35,12 @@ from wtscenario import make_scenarios
 class test_hs14(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('string-row', dict(key_format='S'))
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('string-row', dict(key_format='S', value_format='S'))
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def create_key(self, i):
         if self.key_format == 'S':
@@ -48,17 +49,25 @@ class test_hs14(wttest.WiredTigerTestCase):
 
     def test_hs14(self):
         uri = 'table:test_hs14'
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, config)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
 
         nrows = 10000
 
-        value1 = 'a' * 500
-        value2 = 'b' * 500
-        value3 = 'c' * 500
-        value4 = 'd' * 500
-        value5 = 'e' * 500
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+            value3 = 99
+            value4 = 100
+            value5 = 101
+        else:
+            value1 = 'a' * 500
+            value2 = 'b' * 500
+            value3 = 'c' * 500
+            value4 = 'd' * 500
+            value5 = 'e' * 500
 
         for i in range(1, nrows):
             self.session.begin_transaction()
@@ -103,7 +112,11 @@ class test_hs14(wttest.WiredTigerTestCase):
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(9))
         for i in range(1, nrows):
             cursor.set_key(self.create_key(i))
-            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+            if self.value_format == '8t':
+                self.assertEqual(cursor.search(), 0)
+                self.assertEqual(cursor.get_value(), 0)
+            else:
+                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
         end = time.time()
 

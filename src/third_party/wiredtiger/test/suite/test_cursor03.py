@@ -44,7 +44,7 @@ class test_cursor03(TestCursorTracker):
             ('row', dict(tablekind='row', keysize=None, valsize=None, uri='table')),
             ('lsm-row', dict(tablekind='row', keysize=None, valsize=None, uri='lsm')),
             ('col', dict(tablekind='col', keysize=None, valsize=None, uri='table')),
-            #('fix', dict(tablekind='fix', keysize=None, valsize=None))
+            ('fix', dict(tablekind='fix', keysize=None, valsize=None, uri='table')),
             ('row.val10k', dict(tablekind='row', keysize=None, valsize=[10, 10000], uri='table')),
             ('col.val10k', dict(tablekind='col', keysize=None, valsize=[10, 10000], uri='table')),
             ('row.keyval10k', dict(tablekind='row', keysize=[10,10000], valsize=[10, 10000], uri='table')),

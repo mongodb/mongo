@@ -40,9 +40,10 @@ def mod_val(value, char, location, nbytes=1):
 class test_rollback_to_stable04(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -55,7 +56,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all)'
@@ -71,26 +72,43 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable04"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            value_a = 97 # 'a'
+            value_b = 98 # 'b'
+            value_c = 99 # 'c'
+            value_d = 100 # 'd'
+
+            # No modifies in FLCS; do ordinary updates instead.
+            value_modQ = 81 # 'Q'
+            value_modR = 82 # 'R'
+            value_modS = 83 # 'S'
+            value_modT = 84 # 'T'
+            value_modW = 87 # 'W'
+            value_modX = 88 # 'X'
+            value_modY = 89 # 'Y'
+            value_modZ = 90 # 'Z'
+        else:
+            value_a = "aaaaa" * 100
+            value_b = "bbbbb" * 100
+            value_c = "ccccc" * 100
+            value_d = "ddddd" * 100
+
+            value_modQ = mod_val(value_a, 'Q', 0)
+            value_modR = mod_val(value_modQ, 'R', 1)
+            value_modS = mod_val(value_modR, 'S', 2)
+            value_modT = mod_val(value_c, 'T', 3)
+            value_modW = mod_val(value_d, 'W', 4)
+            value_modX = mod_val(value_a, 'X', 5)
+            value_modY = mod_val(value_modX, 'Y', 6)
+            value_modZ = mod_val(value_modY, 'Z', 7)
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        value_a = "aaaaa" * 100
-        value_b = "bbbbb" * 100
-        value_c = "ccccc" * 100
-        value_d = "ddddd" * 100
-
-        value_modQ = mod_val(value_a, 'Q', 0)
-        value_modR = mod_val(value_modQ, 'R', 1)
-        value_modS = mod_val(value_modR, 'S', 2)
-        value_modT = mod_val(value_c, 'T', 3)
-        value_modW = mod_val(value_d, 'W', 4)
-        value_modX = mod_val(value_a, 'X', 5)
-        value_modY = mod_val(value_modX, 'Y', 6)
-        value_modZ = mod_val(value_modY, 'Z', 7)
 
         # Perform a combination of modifies and updates.
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
@@ -108,19 +126,19 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.large_modifies(uri, 'Z', ds, 7, 1, nrows, self.prepare, 140)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modR, uri, nrows, 40)
-        self.check(value_modS, uri, nrows, 50)
-        self.check(value_b, uri, nrows, 60)
-        self.check(value_c, uri, nrows, 70)
-        self.check(value_modT, uri, nrows, 80)
-        self.check(value_d, uri, nrows, 90)
-        self.check(value_modW, uri, nrows, 100)
-        self.check(value_a, uri, nrows, 110)
-        self.check(value_modX, uri, nrows, 120)
-        self.check(value_modY, uri, nrows, 130)
-        self.check(value_modZ, uri, nrows, 140)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modR, uri, nrows, None, 40)
+        self.check(value_modS, uri, nrows, None, 50)
+        self.check(value_b, uri, nrows, None, 60)
+        self.check(value_c, uri, nrows, None, 70)
+        self.check(value_modT, uri, nrows, None, 80)
+        self.check(value_d, uri, nrows, None, 90)
+        self.check(value_modW, uri, nrows, None, 100)
+        self.check(value_a, uri, nrows, None, 110)
+        self.check(value_modX, uri, nrows, None, 120)
+        self.check(value_modY, uri, nrows, None, 130)
+        self.check(value_modZ, uri, nrows, None, 140)
 
         # Pin stable to timestamp 40 if prepare otherwise 30.
         if self.prepare:
@@ -134,9 +152,9 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.conn.rollback_to_stable()
 
         # Check that the correct data is seen at and after the stable timestamp.
-        self.check(value_modQ, uri, nrows, 30)
-        self.check(value_modQ, uri, nrows, 150)
-        self.check(value_a, uri, nrows, 20)
+        self.check(value_modQ, uri, nrows, None, 30)
+        self.check(value_modQ, uri, nrows, None, 150)
+        self.check(value_a, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

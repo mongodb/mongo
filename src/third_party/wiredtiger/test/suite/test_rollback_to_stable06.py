@@ -37,9 +37,10 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable06(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -52,7 +53,7 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -68,17 +69,24 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         # Create a table without logging.
         uri = "table:rollback_to_stable06"
         ds = SimpleDataSet(
-            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds.populate()
+
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+            value_c = 99
+            value_d = 100
+        else:
+            value_a = "aaaaa" * 100
+            value_b = "bbbbb" * 100
+            value_c = "ccccc" * 100
+            value_d = "ddddd" * 100
 
         # Pin oldest and stable to timestamp 10.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10) +
             ',stable_timestamp=' + self.timestamp_str(10))
-
-        value_a = "aaaaa" * 100
-        value_b = "bbbbb" * 100
-        value_c = "ccccc" * 100
-        value_d = "ddddd" * 100
 
         # Perform several updates.
         self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
@@ -87,10 +95,10 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         self.large_updates(uri, value_d, ds, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_c, uri, nrows, 40)
-        self.check(value_d, uri, nrows, 50)
+        self.check(value_a, uri, nrows, None, 20)
+        self.check(value_b, uri, nrows, None, 30)
+        self.check(value_c, uri, nrows, None, 40)
+        self.check(value_d, uri, nrows, None, 50)
 
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
@@ -98,10 +106,12 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         self.conn.rollback_to_stable()
 
         # Check that all keys are removed.
-        self.check(value_a, uri, 0, 20)
-        self.check(value_b, uri, 0, 30)
-        self.check(value_c, uri, 0, 40)
-        self.check(value_d, uri, 0, 50)
+        # (For FLCS, at least for now, they will read back as 0, meaning deleted, rather
+        # than disappear.)
+        self.check(value_a, uri, 0, nrows, 20)
+        self.check(value_b, uri, 0, nrows, 30)
+        self.check(value_c, uri, 0, nrows, 40)
+        self.check(value_d, uri, 0, nrows, 50)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

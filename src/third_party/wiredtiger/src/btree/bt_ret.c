@@ -105,40 +105,92 @@ __wt_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, 
 }
 
 /*
+ * __wt_col_fix_get_time_window --
+ *     Look for a time window on a fixed-length column page.
+ */
+static bool
+__wt_col_fix_get_time_window(
+  WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno, WT_TIME_WINDOW *tw)
+{
+    WT_CELL *cell;
+    WT_CELL_UNPACK_KV unpack;
+    WT_PAGE *page;
+    uint64_t start_recno, this_recno;
+    u_int hi, lo, mid;
+
+    page = ref->page;
+    start_recno = ref->ref_recno;
+
+    if (!WT_COL_FIX_TWS_SET(page))
+        return (false);
+
+    lo = 0;
+    hi = page->pg_fix_numtws;
+    /* There should always be at least one entry. */
+    WT_ASSERT(session, lo < hi);
+
+    /* Loop invariant: lo < hi. */
+    for (;;) {
+        /* If hi is lo+1, set mid to lo. Otherwise, hi is at least lo+2 and mid is between. */
+        mid = (lo + hi) / 2;
+
+        /* Check mid. */
+        this_recno = start_recno + page->pg_fix_tws[mid].recno_offset;
+        if (this_recno == recno) {
+            cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[mid]);
+            __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+            WT_TIME_WINDOW_COPY(tw, &unpack.tw);
+            return (true);
+        }
+
+        /* If we set mid to lo, we are done. */
+        if (lo == mid)
+            /* This was the last possible entry and we did not find it. */
+            break;
+
+        /* Otherwise, we either move lo up or hi down, but they cannot meet. */
+        if (this_recno > recno)
+            hi = mid;
+        else
+            lo = mid;
+
+        WT_ASSERT(session, lo < hi);
+    }
+    return (false);
+}
+
+/*
  * __wt_read_cell_time_window --
  *     Read the time window from the cell.
  */
-void
-__wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw, bool *tw_foundp)
+bool
+__wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
 {
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
-
-    *tw_foundp = false;
 
     session = CUR2S(cbt);
     page = cbt->ref->page;
 
     if (cbt->slot == UINT32_MAX)
-        return;
+        return (false);
 
     /* Take the value from the original page cell. */
     switch (page->type) {
     case WT_PAGE_ROW_LEAF:
         if (page->pg_row == NULL)
-            return;
+            return (false);
         __wt_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
         break;
     case WT_PAGE_COL_VAR:
         if (page->pg_var == NULL)
-            return;
+            return (false);
         __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
         break;
-    default: /* WT_PAGE_COL_FIX */
-        /* no time windows yet */
-        return;
+    case WT_PAGE_COL_FIX:
+        return (__wt_col_fix_get_time_window(session, cbt->ref, cbt->recno, tw));
     }
-    *tw_foundp = true;
+    return (true);
 }
 
 /*
@@ -156,6 +208,7 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
     WT_ROW *rip;
     WT_SESSION_IMPL *session;
     uint8_t v;
+    bool found;
 
     session = CUR2S(cbt);
     btree = S2BT(session);
@@ -194,23 +247,14 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
 
     /*
      * WT_PAGE_COL_FIX: Take the value from the original page.
-     *
-     * FIXME-WT-6126: Should also check visibility here
      */
-    if (tw != NULL)
-        WT_TIME_WINDOW_INIT(tw);
+    if (tw != NULL) {
+        found = __wt_col_fix_get_time_window(session, ref, cbt->recno, tw);
+        if (!found)
+            WT_TIME_WINDOW_INIT(tw);
+    }
     v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
     return (__wt_buf_set(session, buf, &v, 1));
-}
-
-/*
- * __value_return --
- *     Change the cursor to reference an internal original-page return value.
- */
-static inline int
-__value_return(WT_CURSOR_BTREE *cbt)
-{
-    return (__wt_value_return_buf(cbt, cbt->ref, &cbt->iface.value, NULL));
 }
 
 /*
@@ -244,37 +288,24 @@ __wt_key_return(WT_CURSOR_BTREE *cbt)
  * __wt_value_return --
  *     Change the cursor to reference an update return value.
  */
-int
+void
 __wt_value_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
 {
     WT_CURSOR *cursor;
-    WT_SESSION_IMPL *session;
 
     cursor = &cbt->iface;
-    session = CUR2S(cbt);
 
     F_CLR(cursor, WT_CURSTD_VALUE_EXT);
-    if (upd_value->type == WT_UPDATE_INVALID) {
-        /*
-         * FIXME-WT-6127: This is a holdover from the pre-durable history read logic where we used
-         * to fallback to the on-page value if we didn't find a visible update elsewhere. This is
-         * still required for fixed length column store as we have issues with this table type in
-         * durable history which we're planning to address in PM-1814.
-         */
-        WT_ASSERT(session, CUR2BT(cbt)->type == BTREE_COL_FIX);
-        WT_RET(__value_return(cbt));
-    } else {
-        /*
-         * We're passed a "standard" update that's visible to us. Our caller should have already
-         * checked for deleted items (we're too far down the call stack to return not-found) and any
-         * modify updates should be have been reconstructed into a full standard update.
-         *
-         * We are here to return a value to the caller. Make sure we don't skip the buf.
-         */
-        WT_ASSERT(session, upd_value->type == WT_UPDATE_STANDARD && !upd_value->skip_buf);
-        cursor->value.data = upd_value->buf.data;
-        cursor->value.size = upd_value->buf.size;
-    }
+    /*
+     * We're passed a "standard" update that's visible to us. Our caller should have already checked
+     * for deleted items (we're too far down the call stack to return not-found) and any modify
+     * updates should have been reconstructed into a full standard update.
+     *
+     * We are here to return a value to the caller. Make sure we don't skip the buf.
+     */
+    WT_ASSERT(CUR2S(cbt), upd_value->type == WT_UPDATE_STANDARD && !upd_value->skip_buf);
+    cursor->value.data = upd_value->buf.data;
+    cursor->value.size = upd_value->buf.size;
+
     F_SET(cursor, WT_CURSTD_VALUE_INT);
-    return (0);
 }

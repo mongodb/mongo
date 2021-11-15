@@ -52,13 +52,14 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         ('rollback_transaction', dict(commit=False))
     ]
 
-    key_format_values = [
+    format_values = [
         # Note: commit_key must exceed nrows to give behavior comparable to the row case.
-        ('column', dict(key_format='r', commit_key=1000)),
-        ('string-row', dict(key_format='S', commit_key='C')),
+        ('column', dict(key_format='r', commit_key=1000, value_format='u')),
+        ('column-fix', dict(key_format='r', commit_key=1000, value_format='8t')),
+        ('string-row', dict(key_format='S', commit_key='C', value_format='u')),
     ]
 
-    scenarios = make_scenarios(commit_values, key_format_values)
+    scenarios = make_scenarios(commit_values, format_values)
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')
@@ -77,7 +78,12 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             if conflict == True:
                 self.assertRaisesException(wiredtiger.WiredTigerError, lambda:cursor.search(), expected_value)
             elif expected_value == None:
-                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+                if self.value_format == '8t':
+                    # In FLCS, deleted values read back as 0.
+                    self.assertEqual(cursor.search(), 0)
+                    self.assertEqual(cursor.get_value(), 0)
+                else:
+                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
                 self.assertEqual(cursor.search(), 0)
                 self.assertEqual(cursor.get_value(), expected_value)
@@ -86,14 +92,20 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
     def prepare_updates(self, ds):
 
+        commit_key = self.commit_key
+        if self.value_format == '8t':
+            commit_value = 98
+            prepare_value = 99
+        else:
+            commit_value = b"bbbbb" * 100
+            prepare_value = b"ccccc" * 100
+
         # Set oldest and stable timestamp for the database.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
 
         # Commit some updates to get eviction and history store fired up.
         # Insert a key at timestamp 1.
-        commit_key = self.commit_key
-        commit_value = b"bbbbb" * 100
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nsessions * self.nkeys):
             self.session.begin_transaction('isolation=snapshot')
@@ -124,7 +136,6 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         # the data store. Insert the same key at timestamp 20, but with prepare updates.
         sessions = [0] * self.nsessions
         cursors = [0] * self.nsessions
-        prepare_value = b"ccccc" * 100
         for j in range (0, self.nsessions):
             sessions[j] = self.conn.open_session()
             sessions[j].begin_transaction('isolation=snapshot')
@@ -216,9 +227,14 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
     def test_prepare_hs(self):
 
-        ds = SimpleDataSet(self, self.uri, self.nrows, key_format=self.key_format, value_format='u')
+        ds = SimpleDataSet(
+            self, self.uri, self.nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
-        bigvalue = b"aaaaa" * 100
+
+        if self.value_format == '8t':
+            bigvalue = 97
+        else:
+            bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(self.uri)

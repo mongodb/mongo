@@ -10,6 +10,7 @@
 
 static int __stat_tree_walk(WT_SESSION_IMPL *);
 static int __stat_page(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
+static void __stat_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
 static void __stat_page_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
 static void __stat_page_row_int(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
 static void __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_DSRC_STATS **);
@@ -104,8 +105,7 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
      */
     switch (page->type) {
     case WT_PAGE_COL_FIX:
-        WT_STAT_INCR(session, stats, btree_column_fix);
-        WT_STAT_INCRV(session, stats, btree_entries, page->entries);
+        __stat_page_col_fix(session, page, stats);
         break;
     case WT_PAGE_COL_INT:
         WT_STAT_INCR(session, stats, btree_column_internal);
@@ -123,6 +123,46 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
         return (__wt_illegal_value(session, page->type));
     }
     return (0);
+}
+
+/*
+ * __stat_page_col_fix --
+ *     Stat a WT_PAGE_COL_FIX page.
+ */
+static void
+__stat_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, WT_DSRC_STATS **stats)
+{
+    WT_CELL *cell;
+    WT_CELL_UNPACK_KV unpack;
+    WT_INSERT *ins;
+    uint32_t numtws, stat_entries, stat_tws, tw;
+
+    WT_STAT_INCR(session, stats, btree_column_fix);
+
+    /*
+     * Iterate the page to count time windows. For now at least, don't try to reason about whether
+     * any particular update chain will result in an on-page timestamp after the next
+     * reconciliation; this is complicated at best and also subject to change as the system runs.
+     * There's accordingly no need to look at the update list.
+     */
+    stat_tws = 0;
+    numtws = WT_COL_FIX_TWS_SET(page) ? page->pg_fix_numtws : 0;
+    for (tw = 0; tw < numtws; tw++) {
+        /* Unpack in case the time window becomes empty. */
+        cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
+        __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+
+        if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
+            stat_tws++;
+    }
+
+    /* Visit the append list to count the full number of entries on the page. */
+    stat_entries = page->entries;
+    WT_SKIP_FOREACH (ins, WT_COL_APPEND(page))
+        stat_entries++;
+
+    WT_STAT_INCRV(session, stats, btree_column_tws, stat_tws);
+    WT_STAT_INCRV(session, stats, btree_entries, stat_entries);
 }
 
 /*

@@ -39,9 +39,10 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable05(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     in_memory_values = [
@@ -54,7 +55,7 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -70,46 +71,55 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         # Create two tables without logging.
         uri_1 = "table:rollback_to_stable05_1"
         ds_1 = SimpleDataSet(
-            self, uri_1, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
+            self, uri_1, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds_1.populate()
 
         uri_2 = "table:rollback_to_stable05_2"
         ds_2 = SimpleDataSet(
-            self, uri_2, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri_2, 0, key_format=self.key_format, value_format=self.value_format,
+            config='log=(enabled=false)')
         ds_2.populate()
 
-        valuea = "aaaaa" * 100
-        valueb = "bbbbb" * 100
-        valuec = "ccccc" * 100
-        valued = "ddddd" * 100
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+            valuec = 99
+            valued = 100
+        else:
+            valuea = "aaaaa" * 100
+            valueb = "bbbbb" * 100
+            valuec = "ccccc" * 100
+            valued = "ddddd" * 100
+
         self.large_updates(uri_1, valuea, ds_1, nrows, self.prepare, 0)
-        self.check(valuea, uri_1, nrows, 0)
+        self.check(valuea, uri_1, nrows, None, 0)
 
         self.large_updates(uri_2, valuea, ds_2, nrows, self.prepare, 0)
-        self.check(valuea, uri_2, nrows, 0)
+        self.check(valuea, uri_2, nrows, None, 0)
 
         # Start a long running transaction and keep it open.
         session_2 = self.conn.open_session()
         session_2.begin_transaction('isolation=snapshot')
 
         self.large_updates(uri_1, valueb, ds_1, nrows, self.prepare, 0)
-        self.check(valueb, uri_1, nrows, 0)
+        self.check(valueb, uri_1, nrows, None, 0)
 
         self.large_updates(uri_1, valuec, ds_1, nrows, self.prepare, 0)
-        self.check(valuec, uri_1, nrows, 0)
+        self.check(valuec, uri_1, nrows, None, 0)
 
         self.large_updates(uri_1, valued, ds_1, nrows, self.prepare, 0)
-        self.check(valued, uri_1, nrows, 0)
+        self.check(valued, uri_1, nrows, None, 0)
 
         # Add updates to the another table.
         self.large_updates(uri_2, valueb, ds_2, nrows, self.prepare, 0)
-        self.check(valueb, uri_2, nrows, 0)
+        self.check(valueb, uri_2, nrows, None, 0)
 
         self.large_updates(uri_2, valuec, ds_2, nrows, self.prepare, 0)
-        self.check(valuec, uri_2, nrows, 0)
+        self.check(valuec, uri_2, nrows, None, 0)
 
         self.large_updates(uri_2, valued, ds_2, nrows, self.prepare, 0)
-        self.check(valued, uri_2, nrows, 0)
+        self.check(valued, uri_2, nrows, None, 0)
 
         # Checkpoint to ensure that all the data is flushed.
         if not self.in_memory:
@@ -120,8 +130,8 @@ class test_rollback_to_stable05(test_rollback_to_stable_base):
         session_2.close()
 
         self.conn.rollback_to_stable()
-        self.check(valued, uri_1, nrows, 0)
-        self.check(valued, uri_2, nrows, 0)
+        self.check(valued, uri_1, nrows, None, 0)
+        self.check(valued, uri_2, nrows, None, 0)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]

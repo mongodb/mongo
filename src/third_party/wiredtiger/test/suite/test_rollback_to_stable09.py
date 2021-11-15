@@ -38,6 +38,8 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 class test_rollback_to_stable09(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    # Don't bother testing FLCS tables as well as they're highly unlikely to
+    # behave differently at this level.
     colstore_values = [
         ('column', dict(use_columns=True)),
         ('row', dict(use_columns=False)),

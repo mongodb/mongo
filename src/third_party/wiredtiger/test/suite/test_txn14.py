@@ -46,11 +46,18 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         ('write', dict(sync='off')),
         ('sync', dict(sync='on')),
     ]
-    key_format_values = [
-        ('integer-row', dict(key_format='i')),
-        ('column', dict(key_format='r')),
+    format_values = [
+        ('integer-row', dict(key_format='i', value_format='i')),
+        ('column', dict(key_format='r', value_format='i')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
     ]
-    scenarios = make_scenarios(sync_list, key_format_values)
+    scenarios = make_scenarios(sync_list, format_values)
+
+    def mkvalue(self, i):
+        if self.value_format == '8t':
+            # Use 255 instead of 256 just for variety.
+            return i % 255
+        return i
 
     def test_log_flush(self):
         # Here's the strategy:
@@ -61,16 +68,16 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         #    - Make recovery run.
         #    - Confirm flushed data is in the table.
         #
-        create_params = 'key_format={},value_format=i'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.t1, create_params)
         c = self.session.open_cursor(self.t1, None, None)
         for i in range(1, self.entries + 1):
-            c[i] = i + 1
+            c[i] = self.mkvalue(i + 1)
         cfgarg='sync=%s' % self.sync
         self.pr('cfgarg ' + cfgarg)
         self.session.log_flush(cfgarg)
         for i in range(1, self.extra_entries + 1):
-            c[i+self.entries] = i + self.entries + 1
+            c[i+self.entries] = self.mkvalue(i + self.entries + 1)
         c.close()
         self.session.log_flush(cfgarg)
         simulate_crash_restart(self, ".", "RESTART")
@@ -78,7 +85,7 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         i = 1
         for key, value in c:
             self.assertEqual(i, key)
-            self.assertEqual(i+1, value)
+            self.assertEqual(self.mkvalue(i+1), value)
             i += 1
         all = self.entries + self.extra_entries
         self.assertEqual(i, all + 1)

@@ -37,11 +37,12 @@ class test_txn25(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled)'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('string-row', dict(key_format='S', usestrings=True)),
-        ('column', dict(key_format='r', usestrings=False)),
+    format_values = [
+        ('string-row', dict(key_format='S', usestrings=True, value_format='S')),
+        ('column', dict(key_format='r', usestrings=False, value_format='S')),
+        ('column-fix', dict(key_format='r', usestrings=False, value_format='8t')),
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def getkey(self, i):
         if self.usestrings:
@@ -51,14 +52,22 @@ class test_txn25(wttest.WiredTigerTestCase):
 
     def test_txn25(self):
         uri = 'file:test_txn25'
-        create_config = 'allocation_size=512,key_format={},value_format=S'.format(self.key_format)
-        self.session.create(uri, create_config)
+        create_config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, 'allocation_size=512,' + create_config)
 
         # Populate the file and ensure that we start seeing some high transaction IDs in the system.
         nrows = 1000
-        value1 = 'aaaaa' * 100
-        value2 = 'bbbbb' * 100
-        value3 = 'ccccc' * 100
+        if self.value_format == '8t':
+            # Values are 1/500 the size, but for this we don't need to generate a lot of data,
+            # just a lot of transactions, so we can keep the same nrows. This will generate only
+            # one page, but that shouldn't affect the test criteria.
+            value1 = 97
+            value2 = 98
+            value3 = 99
+        else:
+            value1 = 'aaaaa' * 100
+            value2 = 'bbbbb' * 100
+            value3 = 'ccccc' * 100
 
         # Keep transaction ids around.
         session2 = self.conn.open_session()

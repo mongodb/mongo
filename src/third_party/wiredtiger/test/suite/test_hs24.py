@@ -33,9 +33,10 @@ from wtscenario import make_scenarios
 # test_hs24.py
 # Test that out of order timestamp fix racing with checkpointing the history store doesn't create inconsistent checkpoint.
 class test_hs24(wttest.WiredTigerTestCase):
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
     checkpoint_stress_scenarios = [
@@ -43,7 +44,7 @@ class test_hs24(wttest.WiredTigerTestCase):
         ('history_store_checkpoint_delay_stress', dict(checkpoint_stress='history_store_checkpoint_delay')),
     ]
 
-    scenarios = make_scenarios(key_format_values, checkpoint_stress_scenarios)
+    scenarios = make_scenarios(format_values, checkpoint_stress_scenarios)
 
     def conn_config(self):
         return 'timing_stress_for_test=({})'.format(self.checkpoint_stress)
@@ -52,12 +53,22 @@ class test_hs24(wttest.WiredTigerTestCase):
     uri = 'table:test_hs24'
     numrows = 2000
 
-    value1 = 'a' * 500
-    value2 = 'b' * 500
-    value3 = 'c' * 500
-    value4 = 'd' * 500
+    def moresetup(self):
+        self.format = 'key_format={},value_format={}'. format(self.key_format, self.value_format)
+        if self.value_format == '8t':
+            self.value1 = 97
+            self.value2 = 98
+            self.value3 = 99
+            self.value4 = 100
+        else:
+            self.value1 = 'a' * 500
+            self.value2 = 'b' * 500
+            self.value3 = 'c' * 500
+            self.value4 = 'd' * 500
+
     def test_zero_ts(self):
-        self.session.create(self.uri, 'key_format={},value_format=S'. format(self.key_format))
+        self.moresetup()
+        self.session.create(self.uri, self.format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.numrows + 1):
@@ -110,7 +121,8 @@ class test_hs24(wttest.WiredTigerTestCase):
         session.close()
 
     def test_zero_commit(self):
-        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
+        self.moresetup()
+        self.session.create(self.uri, self.format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.numrows + 1):
@@ -153,7 +165,8 @@ class test_hs24(wttest.WiredTigerTestCase):
         session.close()
 
     def test_out_of_order_ts(self):
-        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
+        self.moresetup()
+        self.session.create(self.uri, self.format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.numrows + 1):

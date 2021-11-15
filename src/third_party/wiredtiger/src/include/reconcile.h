@@ -58,6 +58,9 @@ struct __wt_rec_chunk {
     size_t min_offset; /* byte offset */
 
     WT_ITEM image; /* disk-image */
+
+    /* For fixed-length column store, track how many time windows we have. */
+    uint32_t auxentries;
 };
 
 /*
@@ -142,7 +145,8 @@ struct __wt_reconcile {
      * Reconciliation gets tricky if we have to split a page, which happens when the disk image we
      * create exceeds the page type's maximum disk image size.
      *
-     * First, the target size of the page we're building.
+     * First, the target size of the page we're building. In FLCS, this is the size of both the
+     * primary and auxiliary portions.
      */
     uint32_t page_size; /* Page size */
 
@@ -182,6 +186,15 @@ struct __wt_reconcile {
     uint8_t *first_free;    /* Current first free byte */
     size_t space_avail;     /* Remaining space in this chunk */
     size_t min_space_avail; /* Remaining space in this chunk to put a minimum size boundary */
+
+    /*
+     * Fixed-length column store divides the disk image into two sections, primary and auxiliary,
+     * and we need to track both of them.
+     */
+    uint32_t aux_start_offset; /* First auxiliary byte */
+    uint32_t aux_entries;      /* Current number of auxiliary entries */
+    uint8_t *aux_first_free;   /* Current first free auxiliary byte */
+    size_t aux_space_avail;    /* Current remaining auxiliary space */
 
     /*
      * Counters tracking how much time information is included in reconciliation for each page that
@@ -322,5 +335,6 @@ typedef enum {
 /*
  * Macros from fixed-length entries to/from bytes.
  */
-#define WT_FIX_BYTES_TO_ENTRIES(btree, bytes) ((uint32_t)((((bytes)*8) / (btree)->bitcnt)))
-#define WT_FIX_ENTRIES_TO_BYTES(btree, entries) ((uint32_t)WT_ALIGN((entries) * (btree)->bitcnt, 8))
+#define WT_COL_FIX_BYTES_TO_ENTRIES(btree, bytes) ((uint32_t)((((bytes)*8) / (btree)->bitcnt)))
+#define WT_COL_FIX_ENTRIES_TO_BYTES(btree, entries) \
+    ((uint32_t)WT_ALIGN((entries) * (btree)->bitcnt, 8))

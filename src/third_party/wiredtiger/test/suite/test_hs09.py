@@ -42,12 +42,13 @@ class test_hs09(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=20MB'
     session_config = 'isolation=snapshot'
     uri = "table:test_hs09"
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer-row', dict(key_format='i')),
-        ('string-row', dict(key_format='S')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('integer-row', dict(key_format='i', value_format='S')),
+        ('string-row', dict(key_format='S', value_format='S')),
     ]
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
     nrows = 1000
 
     def create_key(self, i):
@@ -91,12 +92,17 @@ class test_hs09(wttest.WiredTigerTestCase):
 
     def test_uncommitted_updates_not_written_to_hs(self):
         # Create a small table.
-        create_params = 'key_format={},value_format=S'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, create_params)
 
-        value1 = 'a' * 500
-        value2 = 'b' * 500
-        value3 = 'c' * 500
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+            value3 = 99
+        else:
+            value1 = 'a' * 500
+            value2 = 'b' * 500
+            value3 = 'c' * 500
 
         # Load 500KB of data.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -121,12 +127,17 @@ class test_hs09(wttest.WiredTigerTestCase):
 
     def test_prepared_updates_not_written_to_hs(self):
         # Create a small table.
-        create_params = 'key_format={},value_format=S'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, create_params)
 
-        value1 = 'a' * 500
-        value2 = 'b' * 500
-        value3 = 'c' * 500
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+            value3 = 99
+        else:
+            value1 = 'a' * 500
+            value2 = 'b' * 500
+            value3 = 'c' * 500
 
         # Load 1MB of data.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -156,11 +167,15 @@ class test_hs09(wttest.WiredTigerTestCase):
 
     def test_write_newest_version_to_data_store(self):
         # Create a small table.
-        create_params = 'key_format={},value_format=S'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, create_params)
 
-        value1 = 'a' * 500
-        value2 = 'b' * 500
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+        else:
+            value1 = 'a' * 500
+            value2 = 'b' * 500
 
         # Load 500KB of data.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -180,11 +195,15 @@ class test_hs09(wttest.WiredTigerTestCase):
 
     def test_write_deleted_version_to_data_store(self):
         # Create a small table.
-        create_params = 'key_format={},value_format=S'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, create_params)
 
-        value1 = 'a' * 500
-        value2 = 'b' * 500
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+        else:
+            value1 = 'a' * 500
+            value2 = 'b' * 500
 
         # Load 500KB of data.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -208,7 +227,10 @@ class test_hs09(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.remove(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
 
-        self.check_ckpt_hs(value2, value1, 2, 3)
+        # For FLCS, the deleted records should read back as 0. For non-FLCS, no deleted
+        # records should be seen so none should be compared to 0, and if any are the
+        # resulting Python type error means something's wrong.
+        self.check_ckpt_hs(0, value1, 2, 3)
 
 if __name__ == '__main__':
     wttest.run()

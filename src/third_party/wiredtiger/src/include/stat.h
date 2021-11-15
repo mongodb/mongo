@@ -884,6 +884,7 @@ struct __wt_dsrc_stats {
     int64_t btree_compact_pages_skipped;
     int64_t btree_compact_skipped;
     int64_t btree_column_fix;
+    int64_t btree_column_tws;
     int64_t btree_column_internal;
     int64_t btree_column_rle;
     int64_t btree_column_deleted;

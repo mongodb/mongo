@@ -39,35 +39,46 @@ class test_prepare12(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_prepare_update_restore(self):
         uri = "table:test_prepare12"
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
+
+        if self.value_format == '8t':
+            value_a = 97
+            value_b = 98
+            value_aaa = 65
+        else:
+            value_a = 'a'
+            value_b = 'b'
+            value_aaa = 'a' * 500
 
         # Prepare a transaction
         cursor = self.session.open_cursor(uri, None)
         self.session.begin_transaction()
-        cursor[1] = 'a'
+        cursor[1] = value_a
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(1))
 
         # Insert an uncommitted key
         session2 = self.conn.open_session(None)
         cursor2 = session2.open_cursor(uri, None)
         session2.begin_transaction()
-        cursor2[2] = 'b'
+        cursor2[2] = value_b
 
         # Insert a bunch of other content to fill the database to trigger eviction.
         session3 = self.conn.open_session(None)
         cursor3 = session3.open_cursor(uri, None)
         for i in range(3, 101):
             session3.begin_transaction()
-            cursor3[i] = 'a' * 500
+            cursor3[i] = value_aaa
             session3.commit_transaction()
 
         # Commit the prepared update
@@ -75,4 +86,4 @@ class test_prepare12(wttest.WiredTigerTestCase):
 
         # Read the prepared update
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
-        self.assertEqual(cursor[1], 'a')
+        self.assertEqual(cursor[1], value_a)

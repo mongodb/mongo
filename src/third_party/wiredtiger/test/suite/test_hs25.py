@@ -36,43 +36,54 @@ class test_hs25(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
     uri = 'table:test_hs25'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='S')),
+        ('column_fix', dict(key_format='r', value_format='8t')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_insert_updates_hs(self):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(1))
-        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(self.uri, format)
         s = self.conn.open_session()
+
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+            valuec = 99
+        else:
+            valuea = 'a'
+            valueb = 'b'
+            valuec = 'c'
 
         # Update the first key.
         cursor1 = self.session.open_cursor(self.uri)
         self.session.begin_transaction()
-        cursor1[1] = 'a'
+        cursor1[1] = valuea
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Update the second key.
         self.session.begin_transaction()
-        cursor1[2] = 'a'
+        cursor1[2] = valuea
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         self.session.begin_transaction()
-        cursor1[2] = 'b'
+        cursor1[2] = valueb
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
 
         # Prepared update on the first key.
         self.session.begin_transaction()
-        cursor1[1] = 'b'
-        cursor1[1] = 'c'
+        cursor1[1] = valueb
+        cursor1[1] = valuec
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(4))
 
         # Run eviction cursor.
         s.begin_transaction('ignore_prepare=true')
         evict_cursor = s.open_cursor(self.uri, None, 'debug=(release_evict)')
-        self.assertEqual(evict_cursor[1], 'a')
-        self.assertEqual(evict_cursor[2], 'b')
+        self.assertEqual(evict_cursor[1], valuea)
+        self.assertEqual(evict_cursor[2], valueb)
         s.rollback_transaction()
         self.session.rollback_transaction()

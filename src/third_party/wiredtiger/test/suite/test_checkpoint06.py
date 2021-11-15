@@ -37,18 +37,24 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
     conn_config = 'create,cache_size=50MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+    format_values = [
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('column', dict(key_format='r', value_format='S')),
+        ('integer_row', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_rollback_truncation_in_checkpoint(self):
         self.uri = 'table:ckpt06'
-        self.session.create(self.uri, 'key_format={},value_format=S'.format(self.key_format))
+        config = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(self.uri, config)
 
-        value = "abcdefghijklmnopqrstuvwxyz" * 3
+        if self.value_format == '8t':
+            value = 72
+        else:
+            value = "abcdefghijklmnopqrstuvwxyz" * 3
+
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction()

@@ -29,11 +29,40 @@ order and may not match the default sort order used by WiredTiger.  Set
 order that uses native byte values.
 
 When bulk-loading fixed-length column store objects, the \c bulk
-configuration string value \c bitmap allows chunks of a memory resident
-bitmap to be loaded directly into an object by passing a WT_ITEM to
-WT_CURSOR::set_value, where the size field indicates the number of
-records in the bitmap (as specified by the object's \c value_format
-configuration). Bulk-loaded bitmap values must end on a byte boundary
-relative to the bit count (except for the last set of values loaded).
+configuration string value \c bitmap allows chunks of a memory
+resident bitmap to be loaded directly into an object. This is done by
+passing a WT_ITEM to WT_CURSOR::set_value, where the size field
+indicates the number of records in the bitmap (not the number of
+bytes) and the data pointer points to the proper number of bits,
+packed into bytes with no padding, most significant bits first. For
+example, if the value format is \c 3t, the topmost three bits of the
+first byte hold the first value, the next three the second value, and
+to load the values 7, 6, 5, 4, 3, 2, 1, 0 one would use the three
+bytes 250, 195, 136.
+
+The bitmap must be loaded starting at an aligned record number such
+that the data does not need to be shifted before being placed in the
+database; that is, the first record number to load must be a record
+that appears at the beginning of a byte. Since the first record number
+is 1, the first such record is 1, and the next is given by the bit
+packing. For example, if the value format is \c 3t, every 8 records
+pack into 3 bytes, so legal starting record numbers are 1, 9, 17,
+etc. In general, the load record number less 1, multiplied by the bit
+size, should be a multiple of 8.
+
+The number of records in each load should also in general be chosen to
+load a whole number of bytes, so that after loading one chunk the
+cursor is correctly positioned for loading another. This consideration
+can of course be ignored for the last chunk.
+
+<!--
+The example:
+
+7   6   5   4   3   2   1   0
+111 110 101 100 011 010 001 000
+-----_____----- _____-----_____
+f    a    c     3    8    8
+250       195        136
+-->
 
  */

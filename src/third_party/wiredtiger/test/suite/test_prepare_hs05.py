@@ -36,21 +36,27 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r', key=1)),
-        ('string-row', dict(key_format='S', key=str(1))),
+    format_values = [
+        ('column', dict(key_format='r', key=1, value_format='S')),
+        ('column-fix', dict(key_format='r', key=1, value_format='8t')),
+        ('string-row', dict(key_format='S', key=str(1), value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_check_prepare_abort_hs_restore(self):
         uri = 'table:test_prepare_hs05'
-        create_params = 'key_format={},value_format=S'.format(self.key_format)
+        create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, create_params)
 
-        value1 = 'a' * 5
-        value2 = 'b' * 5
-        value3 = 'c' * 5
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+            value3 = 99
+        else:
+            value1 = 'a' * 5
+            value2 = 'b' * 5
+            value3 = 'c' * 5
 
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
         cursor = self.session.open_cursor(uri)
@@ -80,7 +86,12 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         session2.begin_transaction('ignore_prepare=true')
         cursor2 = session2.open_cursor(uri, None, "debug=(release_evict=true)")
         cursor2.set_key(key)
-        self.assertEquals(cursor2.search(), WT_NOTFOUND)
+        if self.value_format == '8t':
+            # In FLCS, deleted values read back as 0.
+            self.assertEquals(cursor2.search(), 0)
+            self.assertEquals(cursor2.get_value(), 0)
+        else:
+            self.assertEquals(cursor2.search(), WT_NOTFOUND)
         cursor2.reset()
 
         # This should abort the prepared transaction.
@@ -98,5 +109,10 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         # The latest version should be marked deleted.
         self.session.begin_transaction()
         cursor.set_key(key)
-        self.assertEqual(cursor.search(), WT_NOTFOUND)
+        if self.value_format == '8t':
+            # In FLCS, deleted values read back as 0.
+            self.assertEquals(cursor.search(), 0)
+            self.assertEquals(cursor.get_value(), 0)
+        else:
+            self.assertEqual(cursor.search(), WT_NOTFOUND)
         self.session.rollback_transaction()

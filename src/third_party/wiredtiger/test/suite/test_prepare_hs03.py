@@ -53,12 +53,13 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         ('dont_corrupt_table', dict(corrupt=False))
     ]
 
-    key_format_values = [
-        ('column', dict(key_format='r')),
-        ('string-row', dict(key_format='S')),
+    format_values = [
+        ('column', dict(key_format='r', value_format='u')),
+        ('column-fix', dict(key_format='r', value_format='8t')),
+        ('string-row', dict(key_format='S', value_format='u')),
     ]
 
-    scenarios = make_scenarios(corrupt_values, key_format_values)
+    scenarios = make_scenarios(corrupt_values, format_values)
 
     def corrupt_table(self):
         tablename="test_prepare_hs03.wt"
@@ -92,8 +93,14 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         return val
 
     def prepare_updates(self, ds, nrows, nsessions, nkeys):
+        if self.value_format == '8t':
+            commit_value = 98
+            prepare_value = 99
+        else:
+            commit_value = b"bbbbb" * 100
+            prepare_value = b"ccccc" * 100
+
         # Commit some updates to get eviction and history store fired up
-        commit_value = b"bbbbb" * 100
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, nsessions * nkeys):
             self.session.begin_transaction('isolation=snapshot')
@@ -116,7 +123,6 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         # prepared updates to the history store
         sessions = [0] * nsessions
         cursors = [0] * nsessions
-        prepare_value = b"ccccc" * 100
         for j in range (0, nsessions):
             sessions[j] = self.conn.open_session()
             sessions[j].begin_transaction('isolation=snapshot')
@@ -199,9 +205,14 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
 
     def test_prepare_hs(self):
         nrows = 100
-        ds = SimpleDataSet(self, self.uri, nrows, key_format=self.key_format, value_format='u')
+        ds = SimpleDataSet(
+            self, self.uri, nrows, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
-        bigvalue = b"aaaaa" * 100
+
+        if self.value_format == '8t':
+            bigvalue = 97
+        else:
+            bigvalue = b"aaaaa" * 100
 
         # Initially load huge data
         cursor = self.session.open_cursor(self.uri)

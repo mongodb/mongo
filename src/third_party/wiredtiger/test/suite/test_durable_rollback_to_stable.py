@@ -38,10 +38,11 @@ from wtscenario import make_scenarios
 class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subprocess):
     session_config = 'isolation=snapshot'
 
-    keyfmt = [
-        ('row-string', dict(keyfmt='S')),
-        ('row-int', dict(keyfmt='i')),
-        ('column-store', dict(keyfmt='r')),
+    format_values = [
+        ('row-string', dict(keyfmt='S', valfmt='S')),
+        ('row-int', dict(keyfmt='i', valfmt='S')),
+        ('column', dict(keyfmt='r', valfmt='S')),
+        ('column-fix', dict(keyfmt='r', valfmt='8t')),
     ]
     types = [
         ('file', dict(uri='file', ds=SimpleDataSet)),
@@ -54,20 +55,18 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         ('isolation_default', dict(isolation='')),
         ('isolation_snapshot', dict(isolation='snapshot'))
     ]
-    scenarios = make_scenarios(types, keyfmt, iso_types)
 
-    def skip(self):
-        return self.keyfmt == 'r' and \
-            (self.ds.is_lsm() or self.uri == 'lsm')
+    def keep(name, d):
+        return d['keyfmt'] != 'r' or (d['uri'] != 'lsm' and not d['ds'].is_lsm())
+
+    scenarios = make_scenarios(types, format_values, iso_types, include=keep)
 
     # Test durable timestamp.
     def test_durable_rollback_to_stable(self):
-        if self.skip():
-            return
 
         # Build an object.
         uri = self.uri + ':test_durable_rollback_to_stable'
-        ds = self.ds(self, uri, 50, key_format=self.keyfmt)
+        ds = self.ds(self, uri, 50, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 
         session = self.conn.open_session(self.session_config)

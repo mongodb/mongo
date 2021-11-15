@@ -36,16 +36,18 @@ class test_hs22(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r', key1=1, key2=2)),
-        ('string-row', dict(key_format='S', key1=str(0), key2=str(1))),
+    format_values = [
+        ('column', dict(key_format='r', key1=1, key2=2, value_format='S')),
+        ('column-fix', dict(key_format='r', key1=1, key2=2, value_format='8t')),
+        ('string-row', dict(key_format='S', key1=str(0), key2=str(1), value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def test_onpage_out_of_order_timestamp_update(self):
         uri = 'table:test_hs22'
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
             'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
@@ -53,8 +55,12 @@ class test_hs22(wttest.WiredTigerTestCase):
         key1 = self.key1
         key2 = self.key2
 
-        value1 = 'a'
-        value2 = 'b'
+        if self.value_format == '8t':
+            value1 = 97 # 'a'
+            value2 = 98 # 'b'
+        else:
+            value1 = 'a'
+            value2 = 'b'
 
         # Insert a key.
         self.session.begin_transaction()
@@ -103,7 +109,8 @@ class test_hs22(wttest.WiredTigerTestCase):
 
     def test_out_of_order_timestamp_update_newer_than_tombstone(self):
         uri = 'table:test_hs22'
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
         cursor = self.session.open_cursor(uri)
         self.conn.set_timestamp(
             'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
@@ -111,8 +118,12 @@ class test_hs22(wttest.WiredTigerTestCase):
         key1 = self.key1
         key2 = self.key2
 
-        value1 = 'a'
-        value2 = 'b'
+        if self.value_format == '8t':
+            value1 = 97 # 'a'
+            value2 = 98 # 'b'
+        else:
+            value1 = 'a'
+            value2 = 'b'
 
         # Insert a key.
         self.session.begin_transaction()

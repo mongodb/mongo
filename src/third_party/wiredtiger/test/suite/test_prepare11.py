@@ -35,9 +35,10 @@ class test_prepare11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
     session_config = 'isolation=snapshot'
 
-    key_format_values = [
-        ('column', dict(key_format='r', key1=17)),
-        ('string-row', dict(key_format='S', key1='key1')),
+    format_values = [
+        ('column', dict(key_format='r', key1=17, value_format='S')),
+        ('column-fix', dict(key_format='r', key1=17, value_format='8t')),
+        ('string-row', dict(key_format='S', key1='key1', value_format='S')),
     ]
 
     commit_values = [
@@ -45,20 +46,29 @@ class test_prepare11(wttest.WiredTigerTestCase):
         ('rollback', dict(commit=False)),
     ]
 
-    scenarios = make_scenarios(key_format_values, commit_values)
+    scenarios = make_scenarios(format_values, commit_values)
 
     def test_prepare_update_rollback(self):
         uri = "table:test_prepare11"
-        self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
+
+        if self.value_format == '8t':
+            value_x = 120
+            value_y = 121
+        else:
+            value_x = 'xxxx'
+            value_y = 'yyyy'
+
         self.session.begin_transaction("isolation=snapshot")
 
         # In the scenario where we have a reserved update in between two updates, the key repeated
         # flag won't get set and we'll call resolve prepared op on both prepared updates.
         c = self.session.open_cursor(uri, None)
-        c[self.key1] = 'xxxx'
+        c[self.key1] = value_x
         c.set_key(self.key1)
         c.reserve()
-        c[self.key1] = 'yyyy'
+        c[self.key1] = value_y
         self.session.prepare_transaction('prepare_timestamp=10')
         if self.commit:
             self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(20))

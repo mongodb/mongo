@@ -166,6 +166,16 @@ reference in the application's access pattern).
 increase leaf_page_max to transfer more data per I/O.
    - Applications focused on read/write amplification might decrease the page
 size to better match the underlying storage block size.
+   - In fixed-length column stores, a relatively large number of
+items fit on a single page; this can occasionally lead to contention
+issues that can be mitigated by making the pages smaller.
+   - For fixed-length column stores, the much-larger size of in-memory
+pending changes relative to on-disk values can lead to adverse
+eviction behavior if a large number of uncommitted changes are present
+on the same page. Applications that expect to update large numbers of
+adjacent values at once, especially in long-running transactions, may
+want to decrease \c leaf_page_max or, alternatively, increase \c
+memory_page_max.
  - Configuration:
 \n Specified as leaf_page_max configuration option to WT_SESSION::create. An
 example of such a configuration string is as follows:

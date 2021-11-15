@@ -12,7 +12,7 @@ static int __err_cell_corrupt(WT_SESSION_IMPL *, int, uint32_t, const char *);
 static int __err_cell_corrupt_or_eof(WT_SESSION_IMPL *, int, uint32_t, const char *);
 static int __err_cell_type(WT_SESSION_IMPL *, uint32_t, const char *, uint8_t, uint8_t);
 static int __verify_dsk_chunk(WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, uint32_t);
-static int __verify_dsk_col_fix(WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
+static int __verify_dsk_col_fix(WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_ADDR *);
 static int __verify_dsk_col_int(WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_ADDR *);
 static int __verify_dsk_col_var(WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_ADDR *);
 static int __verify_dsk_memsize(WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, WT_CELL *);
@@ -54,6 +54,10 @@ static int __verify_dsk_row_leaf(
 #define WT_CELL_FOREACH_VRFY(session, dsk, cell, unpack, i)                                 \
     for ((cell) = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), (i) = (dsk)->u.entries; (i) > 0; \
          (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
+
+#define WT_CELL_FOREACH_FIX_TIMESTAMPS_VRFY(session, dsk, aux, cell, unpack, i)            \
+    for ((cell) = (WT_CELL *)((uint8_t *)(dsk) + (aux)->offset), (i) = (aux)->entries * 2; \
+         (i) > 0; (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
 /*
  * __wt_verify_dsk_image --
@@ -169,7 +173,7 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_H
     case WT_PAGE_COL_INT:
         return (__verify_dsk_col_int(session, tag, dsk, addr));
     case WT_PAGE_COL_FIX:
-        return (__verify_dsk_col_fix(session, tag, dsk));
+        return (__verify_dsk_col_fix(session, tag, dsk, addr));
     case WT_PAGE_COL_VAR:
         return (__verify_dsk_col_var(session, tag, dsk, addr));
     case WT_PAGE_ROW_INT:
@@ -697,15 +701,127 @@ __verify_dsk_col_int(
  *     Walk a WT_PAGE_COL_FIX disk page and verify it.
  */
 static int
-__verify_dsk_col_fix(WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER *dsk)
+__verify_dsk_col_fix(
+  WT_SESSION_IMPL *session, const char *tag, const WT_PAGE_HEADER *dsk, WT_ADDR *addr)
 {
     WT_BTREE *btree;
-    uint32_t datalen;
+    WT_CELL *cell;
+    WT_CELL_UNPACK_KV *unpack, _unpack;
+    WT_COL_FIX_AUXILIARY_HEADER auxhdr;
+    WT_DECL_RET;
+    uint64_t recno_offset;
+    uint32_t cell_num, datalen, i;
+    const uint8_t *p, *end;
 
     btree = S2BT(session);
+    unpack = &_unpack;
+    end = (uint8_t *)dsk + dsk->mem_size;
 
+    /* First, check that the bitmap data isn't off the end of the page. */
     datalen = __bitstr_size(btree->bitcnt * dsk->u.entries);
-    return (__verify_dsk_chunk(session, tag, dsk, datalen));
+    if ((uint8_t *)WT_PAGE_HEADER_BYTE(btree, dsk) + datalen > end)
+        WT_RET_VRFY(session, "data on page at %s extends past the end of the page", tag);
+
+    /* Unpack the auxiliary header. This function is expected to be paranoid enough to use here. */
+    ret = __wt_col_fix_read_auxheader(session, dsk, &auxhdr);
+    if (ret != 0)
+        WT_RET_VRFY_RETVAL(session, ret, "auxiliary header on page %s invalid", tag);
+    if (auxhdr.offset > dsk->mem_size)
+        WT_RET_VRFY_RETVAL(
+          session, EINVAL, "auxiliary header on page %s has offset off end of page", tag);
+
+    switch (auxhdr.version) {
+    case WT_COL_FIX_VERSION_NIL:
+        /* No time window data; nothing more to do. */
+        return (0);
+    case WT_COL_FIX_VERSION_TS:
+        break;
+    default:
+        WT_RET_VRFY(session, "%s page at %s has unknown page version %" PRIu32,
+          __wt_page_type_string(dsk->type), tag, dsk->version);
+    }
+
+    /* Validate the offset in the auxiliary header. */
+    if (auxhdr.offset > dsk->mem_size)
+        WT_RET_VRFY(session, "%s page at %s has cell offset %" PRIu32 " off the end at %" PRIu32,
+          __wt_page_type_string(dsk->type), tag, auxhdr.offset, dsk->mem_size);
+    if (auxhdr.offset == dsk->mem_size && auxhdr.entries > 0)
+        WT_RET_VRFY(session,
+          "%s page at %s has cell offset %" PRIu32 " at the end with %" PRIu32 " entries",
+          __wt_page_type_string(dsk->type), tag, auxhdr.offset, auxhdr.entries);
+
+    /* Check the number of entries in the auxiliary header. (Note dsk->u.entries is uint32_t.) */
+    if (auxhdr.entries > dsk->u.entries)
+        WT_RET_VRFY(session,
+          "%s page at %s has %" PRIu32
+          " auxiliary (time window) entries but there are only %" PRIu32 " keys",
+          __wt_page_type_string(dsk->type), tag, auxhdr.entries, dsk->u.entries);
+
+    cell_num = 0;
+    WT_CELL_FOREACH_FIX_TIMESTAMPS_VRFY (session, dsk, &auxhdr, cell, unpack, i) {
+        ++cell_num;
+
+        /* Carefully unpack the cell. */
+        ret = __wt_cell_unpack_safe(session, dsk, cell, NULL, unpack, end);
+        if (ret != 0)
+            return (__err_cell_corrupt(session, ret, cell_num, tag));
+
+        /* Check the raw cell type. */
+        WT_RET(__err_cell_type(session, cell_num, tag, unpack->raw, dsk->type));
+
+        /* The cells should alternate keys and values. */
+        if ((cell_num - 1) % 2 == 0) {
+            if (unpack->type != WT_CELL_KEY)
+                WT_RET_VRFY(session,
+                  "in %s page at %s, cell %" PRIu32 " should be a WT_CELL_KEY but is %s",
+                  __wt_page_type_string(dsk->type), tag, cell_num - 1,
+                  __wt_cell_type_string(unpack->type));
+            /* Unpack the key and make sure it's in range. It's a recno offset. */
+            p = unpack->data;
+            /* Note that unpack->size does not reach past the end of the page. */
+            ret = __wt_vunpack_uint(&p, unpack->size, &recno_offset);
+            if (ret != 0)
+                WT_RET_VRFY_RETVAL(session, ret,
+                  "in %s page at %s, the key in cell %" PRIu32 " failed to unpack",
+                  __wt_page_type_string(dsk->type), tag, cell_num - 1);
+            if (recno_offset >= dsk->u.entries)
+                WT_RET_VRFY_RETVAL(session, ret,
+                  "in %s page at %s, out of range recno offset %" PRIu64 " in cell %" PRIu32,
+                  __wt_page_type_string(dsk->type), tag, recno_offset, cell_num - 1);
+        } else {
+            if (unpack->type != WT_CELL_VALUE)
+                WT_RET_VRFY(session,
+                  "in %s page at %s, cell %" PRIu32 " should be a WT_CELL_VALUE but is %s",
+                  __wt_page_type_string(dsk->type), tag, cell_num - 1,
+                  __wt_cell_type_string(unpack->type));
+            if (unpack->size != 0)
+                WT_RET_VRFY(session,
+                  "in %s page at %s, cell %" PRIu32 " should be empty but has size %" PRIu32,
+                  __wt_page_type_string(dsk->type), tag, cell_num - 1, unpack->size);
+
+            /*
+             * Empty validity windows should not result in on-disk cells. Note that because we used
+             * the safe unpack, the time window won't have been cleared even if out of date, so we
+             * won't get spurious failures from that situation.
+             */
+            if (WT_TIME_WINDOW_IS_EMPTY(&unpack->tw))
+                WT_RET_VRFY(session, "in %s page at %s, cell %" PRIu32 " has an empty time window",
+                  __wt_page_type_string(dsk->type), tag, cell_num - 1);
+
+            /* Check the validity window. */
+            WT_RET(__verify_dsk_value_validity(session, unpack, cell_num, addr, tag));
+        }
+    }
+
+    if (cell_num != 2 * auxhdr.entries) {
+        WT_RET_VRFY(session,
+          "in %s page at %s, the header said to expect %" PRIu32 " cells but only saw %" PRIu32,
+          __wt_page_type_string(dsk->type), tag, 2 * auxhdr.entries, cell_num);
+    }
+
+    WT_RET(__verify_dsk_memsize(session, tag, dsk, cell));
+
+    return (0);
 }
 
 /*
@@ -901,9 +1017,12 @@ __wt_cell_type_check(uint8_t cell_type, uint8_t dsk_type)
         if (dsk_type == WT_PAGE_COL_VAR)
             return (true);
         break;
+    case WT_CELL_KEY_SHORT:
+        if (dsk_type == WT_PAGE_COL_FIX)
+            return (true);
+        /* FALLTHROUGH */
     case WT_CELL_KEY:
     case WT_CELL_KEY_OVFL:
-    case WT_CELL_KEY_SHORT:
         if (dsk_type == WT_PAGE_ROW_INT || dsk_type == WT_PAGE_ROW_LEAF)
             return (true);
         break;
@@ -919,6 +1038,9 @@ __wt_cell_type_check(uint8_t cell_type, uint8_t dsk_type)
          */
         break;
     case WT_CELL_VALUE:
+        if (dsk_type == WT_PAGE_COL_FIX)
+            return (true);
+        /* FALLTHROUGH */
     case WT_CELL_VALUE_COPY:
     case WT_CELL_VALUE_OVFL:
     case WT_CELL_VALUE_SHORT:

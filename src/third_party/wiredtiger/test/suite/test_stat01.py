@@ -46,8 +46,9 @@ class test_stat01(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:test_stat01.wt'))
     ]
     keyfmt = [
-        ('recno', dict(keyfmt='r')),
-        ('string', dict(keyfmt='S')),
+        ('column', dict(keyfmt='r', valfmt='S')),
+        ('column-fix', dict(keyfmt='r', valfmt='8t')),
+        ('string-row', dict(keyfmt='S', valfmt='S')),
     ]
     scenarios = make_scenarios(types, keyfmt)
 
@@ -89,8 +90,9 @@ class test_stat01(wttest.WiredTigerTestCase):
     # Test simple connection statistics.
     def test_basic_conn_stats(self):
         # Build an object and force some writes.
-        SimpleDataSet(self, self.uri, 1000,
-                      config=self.config, key_format=self.keyfmt).populate()
+        ds = SimpleDataSet(self, self.uri, 1000,
+                      config=self.config, key_format=self.keyfmt, value_format = self.valfmt)
+        ds.populate()
         self.session.checkpoint(None)
 
         # See that we can get a specific stat value by its key and verify its

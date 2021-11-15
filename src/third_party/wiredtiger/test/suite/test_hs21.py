@@ -47,12 +47,13 @@ class test_hs21(wttest.WiredTigerTestCase):
     numfiles = 10
     nrows = 1000
 
-    key_format_values = [
-        ('column', dict(key_format='r', key1=1, key2=2)),
-        ('string-row', dict(key_format='S', key1=str(0), key2=str(1))),
+    format_values = [
+        ('column', dict(key_format='r', key1=1, key2=2, value_format='S')),
+        ('column-fix', dict(key_format='r', key1=1, key2=2, value_format='8t')),
+        ('string-row', dict(key_format='S', key1=str(0), key2=str(1), value_format='S')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(format_values)
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records, we'll hang if the history store table isn't working.
@@ -64,24 +65,24 @@ class test_hs21(wttest.WiredTigerTestCase):
         session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
         cursor.close()
 
-    def check(self, session, check_value, uri, nrows, read_ts=-1):
+    def check(self, session, check_value, uri, nrows, read_ts=-1, flcs_nrows=None):
+        if self.value_format != '8t':
+            flcs_nrows = None
+
         # Validate we read an expected value (optionally at a given read timestamp).
         if read_ts != -1:
             session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         cursor = session.open_cursor(uri)
         count = 0
         for k, v in cursor:
-            self.assertEqual(v, check_value)
+            if flcs_nrows is not None and count >= nrows:
+                self.assertEqual(v, 0)
+            else:
+                self.assertEqual(v, check_value)
             count += 1
         if read_ts != -1:
             session.rollback_transaction()
-        if count != nrows:
-            self.prout("Oops")
-            self.prout("value: " + str(check_value))
-            self.prout("count: " + str(count))
-            self.prout("nrows: " + str(nrows))
-            self.prout("read_ts: " + str(read_ts))
-        self.assertEqual(count, nrows)
+        self.assertEqual(count, flcs_nrows if flcs_nrows is not None else nrows)
         cursor.close()
 
     def parse_run_write_gen(self, uri):
@@ -102,8 +103,13 @@ class test_hs21(wttest.WiredTigerTestCase):
 
     def test_hs(self):
         active_files = []
-        value1 = 'a' * 500
-        value2 = 'd' * 500
+
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 100
+        else:
+            value1 = 'a' * 500
+            value2 = 'd' * 500
 
         # Set up 'numfiles' with 'numrows' entries. We want to create a number of files that
         # contain active history (content newer than the oldest timestamp).
@@ -112,7 +118,8 @@ class test_hs21(wttest.WiredTigerTestCase):
             file_uri = 'file:%s.%d.wt' % (self.file_name, f)
             # Create a small table.
             ds = SimpleDataSet(
-                self, table_uri, 0, key_format=self.key_format, value_format='S', config='log=(enabled=false)')
+                self, table_uri, 0, key_format=self.key_format, value_format=self.value_format,
+                config='log=(enabled=false)')
             ds.populate()
             # Checkpoint to ensure we write the files metadata checkpoint value.
             self.session.checkpoint()
@@ -145,7 +152,7 @@ class test_hs21(wttest.WiredTigerTestCase):
             # Load more data with a later timestamp.
             self.large_updates(ds.uri, value2, ds, self.nrows, 100)
             # Check that the new updates are only seen after the update timestamp.
-            self.check(self.session, value1, ds.uri, self.nrows // 2, 2)
+            self.check(self.session, value1, ds.uri, self.nrows // 2, 2, flcs_nrows=self.nrows)
             self.check(self.session, value2, ds.uri, self.nrows, 100)
 
         # Our sweep scan interval is every 1 second and the amount of idle time needed for a handle to be closed is 2 seconds.
@@ -191,7 +198,7 @@ class test_hs21(wttest.WiredTigerTestCase):
         # handles have been closed.
         for (_, ds) in active_files:
             # Check that all updates at timestamp 2 are seen.
-            self.check(session_read, value1, ds.uri, self.nrows // 2)
+            self.check(session_read, value1, ds.uri, self.nrows // 2, flcs_nrows=self.nrows)
         session_read.rollback_transaction()
 
         # Perform a series of checks over our files to ensure that our transactions have been written

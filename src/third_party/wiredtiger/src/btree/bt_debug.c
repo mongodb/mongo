@@ -610,6 +610,8 @@ __debug_cell_kv(
 
     /* Dump per-disk page type information. */
     switch (page_type) {
+    case WT_PAGE_COL_FIX:
+        break;
     case WT_PAGE_COL_VAR:
         WT_RET(ds->f(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack)));
         break;
@@ -699,16 +701,42 @@ static int
 __debug_dsk_col_fix(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 {
     WT_BTREE *btree;
+    WT_CELL_UNPACK_KV unpack;
+    WT_COL_FIX_AUXILIARY_HEADER auxhdr;
     uint32_t i;
     uint8_t v;
 
     btree = S2BT(ds->session);
 
-    WT_FIX_FOREACH (btree, dsk, v, i) {
+    WT_RET(__wt_col_fix_read_auxheader(ds->session, dsk, &auxhdr));
+
+    switch (auxhdr.version) {
+    case WT_COL_FIX_VERSION_NIL:
+        WT_RET(ds->f(ds, "page version 0, no auxiliary data\n"));
+        break;
+    case WT_COL_FIX_VERSION_TS:
+        WT_RET(ds->f(ds, "page version 1, %" PRIu32 " time windows\n", auxhdr.entries));
+        break;
+    default:
+        WT_RET(ds->f(ds, "unknown page version %" PRIu32 "\n", auxhdr.version));
+        break;
+    }
+
+    WT_COL_FIX_FOREACH_BITS (btree, dsk, v, i) {
         WT_RET(ds->f(ds, "\t{"));
         WT_RET(__debug_hex_byte(ds, v));
         WT_RET(ds->f(ds, "}\n"));
     }
+
+    if (auxhdr.offset > dsk->mem_size)
+        /* Print something useful instead of crashing or failing. */
+        WT_RET(ds->f(ds, "page is corrupt: offset to time windows is past end of page"));
+    else if (auxhdr.version == WT_COL_FIX_VERSION_TS) {
+        WT_CELL_FOREACH_FIX_TIMESTAMPS (ds->session, dsk, &auxhdr, unpack)
+            WT_RET(__debug_cell_kv(ds, NULL, dsk->type, NULL, &unpack));
+        WT_CELL_FOREACH_END;
+    }
+
     return (0);
 }
 
@@ -1167,13 +1195,16 @@ static int
 __debug_page_col_fix(WT_DBG *ds, WT_REF *ref)
 {
     WT_BTREE *btree;
+    WT_CELL *cell;
+    WT_CELL_UNPACK_KV unpack;
     WT_INSERT *ins;
     WT_PAGE *page;
     const WT_PAGE_HEADER *dsk;
     WT_SESSION_IMPL *session;
     uint64_t recno;
-    uint32_t i;
+    uint32_t curtw, i, numtws;
     uint8_t v;
+    char time_string[WT_TIME_STRING_SIZE];
 
     WT_ASSERT(ds->session, S2BT_SAFE(ds->session) != NULL);
 
@@ -1185,10 +1216,21 @@ __debug_page_col_fix(WT_DBG *ds, WT_REF *ref)
 
     if (dsk != NULL) {
         ins = WT_SKIP_FIRST(WT_COL_UPDATE_SINGLE(page));
-        WT_FIX_FOREACH (btree, dsk, v, i) {
+        curtw = 0;
+        numtws = WT_COL_FIX_TWS_SET(page) ? page->pg_fix_numtws : 0;
+
+        WT_COL_FIX_FOREACH_BITS (btree, dsk, v, i) {
             WT_RET(ds->f(ds, "\t%" PRIu64 "\t{", recno));
             WT_RET(__debug_hex_byte(ds, v));
-            WT_RET(ds->f(ds, "}\n"));
+            WT_RET(ds->f(ds, "}"));
+            if (curtw < numtws && recno - ref->ref_recno == page->pg_fix_tws[curtw].recno_offset) {
+                cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[curtw]);
+                __wt_cell_unpack_kv(ds->session, page->dsk, cell, &unpack);
+                if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
+                    WT_RET(ds->f(ds, ", %s", __wt_time_window_to_string(&unpack.tw, time_string)));
+                curtw++;
+            }
+            WT_RET(ds->f(ds, "\n"));
 
             /* Check for a match on the update list. */
             if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {

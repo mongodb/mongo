@@ -40,13 +40,28 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         ('table', dict(type='table:', lsm=False, dataset=ComplexDataSet))
     ]
     keyfmt = [
-        ('integer', dict(keyfmt='i')),
-        ('recno', dict(keyfmt='r')),
-        ('string', dict(keyfmt='S'))
+        ('integer', dict(keyfmt='i', valfmt='S')),
+        ('recno', dict(keyfmt='r', valfmt='S')),
+        ('recno-fix', dict(keyfmt='r', valfmt='8t')),
+        ('string', dict(keyfmt='S', valfmt='S'))
     ]
-    # Skip record number keys with LSM.
-    scenarios = filter_scenarios(make_scenarios(types, keyfmt),
-        lambda name, d: not (d['lsm'] and d['keyfmt'] == 'r'))
+
+    # Discard invalid or unhelpful scenario combinations.
+    def keep(name, d):
+        if d['keyfmt'] == 'r':
+            # Skip record number keys with LSM.
+            if d['lsm']:
+                return False
+            # Skip complex data sets with FLCS.
+            if d['valfmt'] == '8t' and d['dataset'] != SimpleDataSet:
+                return False
+        else:
+            # Skip byte data with row-store.
+            if d['valfmt'] == '8t':
+                return False
+        return True
+
+    scenarios = make_scenarios(types, keyfmt, include=keep)
 
     def test_cursor_comparison(self):
         uri = self.type + 'compare'
