@@ -56,10 +56,12 @@ structs:
             recipientConnectionString:
                 type: string
                 description: "The connection string for the recipient slice."
+                optional: true
                 validator:
                     callback: "tenant_migration_util::validateConnectionString"
             tenantId:
                 type: string
+                optional: true
                 description: "The identifier for the tenant being migrated."
             state:
                 type: TenantSplitDonorState

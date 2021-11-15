@@ -30,15 +30,19 @@
 #pragma once
 
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/serverless/tenant_split_state_machine_gen.h"
+#include "mongo/executor/cancelable_executor.h"
 
 namespace mongo {
+
+using ScopedTaskExecutorPtr = std::shared_ptr<executor::ScopedTaskExecutor>;
 
 class TenantSplitDonorService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "TenantSplitDonorService"_sd;
 
     explicit TenantSplitDonorService(ServiceContext* const serviceContext)
-        : PrimaryOnlyService(serviceContext) {}
+        : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~TenantSplitDonorService() = default;
 
     class DonorStateMachine;
@@ -57,23 +61,46 @@ protected:
     void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,
         BSONObj initialState,
-        const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override{};
+        const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) override{};
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
+
+private:
+    ServiceContext* const _serviceContext;
 };
 
 class TenantSplitDonorService::DonorStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
 public:
-    explicit DonorStateMachine(const TenantSplitDonorService* donorService,
-                               const BSONObj& initialState);
+    struct DurableState {
+        TenantSplitDonorStateEnum state;
+        boost::optional<Status> abortReason;
+    };
+
+    DonorStateMachine(ServiceContext* serviceContext,
+                      TenantSplitDonorService* serviceInstance,
+                      const TenantSplitDonorDocument& initialState);
 
     ~DonorStateMachine() = default;
+
+    /**
+     * Try to abort this split operation. If the split operation is uninitialized, this will
+     * durably record the operation as aborted.
+     */
+    void tryAbort();
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;
 
     void interrupt(Status status) override;
+
+    SharedSemiFuture<DurableState> completionFuture() const {
+        return _completionPromise.getFuture();
+    }
+
+    UUID getId() const {
+        return _migrationId;
+    }
 
     /**
      * Report TenantMigrationDonorService Instances in currentOp().
@@ -83,8 +110,42 @@ public:
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
 private:
-    const TenantSplitDonorService* const _donorService;
+    // Tasks
+    ExecutorFuture<void> _enterDataSyncState(const ScopedTaskExecutorPtr& executor,
+                                             const CancellationToken& token);
+
+    // Helpers
+    ExecutorFuture<void> _writeInitialDocument(const ScopedTaskExecutorPtr& executor,
+                                               const CancellationToken& token);
+
+    ExecutorFuture<repl::OpTime> _updateStateDocument(const ScopedTaskExecutorPtr& executor,
+                                                      const CancellationToken& token);
+
+    ExecutorFuture<void> _waitForMajorityWriteConcern(const ScopedTaskExecutorPtr& executor,
+                                                      repl::OpTime opTime,
+                                                      const CancellationToken& token);
+
+    ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
+        StatusWith<DurableState> durableState,
+        const ScopedTaskExecutorPtr& executor,
+        const CancellationToken& instanceAbortToken,
+        const CancellationToken& abortToken);
+
+private:
+    const NamespaceString _stateDocumentsNS = NamespaceString::kTenantSplitDonorsNamespace;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantSplitDonorService::_mutex");
+
+    const UUID _migrationId;
+    ServiceContext* const _serviceContext;
+    TenantSplitDonorService* const _tenantSplitService;
+    TenantSplitDonorDocument _stateDoc;
+
+    bool _abortRequested = false;
+    boost::optional<CancellationSource> _abortSource;
+    boost::optional<Status> _abortReason;
+
+    // A promise fulfilled when the tenant split operation has fully completed
+    SharedPromise<DurableState> _completionPromise;
 };
 
 }  // namespace mongo

@@ -2296,6 +2296,7 @@ env.Library(
         's/sharding_commands_d',
         's/sharding_runtime_d',
         'serverinit',
+        'serverless/tenant_split_donor_service',
         'service_context_d',
         'service_liaison_mongod',
         'sessions_collection_rs',

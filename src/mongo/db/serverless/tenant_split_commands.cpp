@@ -28,8 +28,11 @@
  */
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/serverless/tenant_split_commands_gen.h"
+#include "mongo/db/serverless/tenant_split_donor_service.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
@@ -71,7 +74,7 @@ public:
     };
 
     std::string help() const {
-        return "Start an opereation to split a tenant into its own slice.";
+        return "Start an opereation to split a shard into its own slice.";
     }
 
     bool adminOnly() const override {
@@ -119,7 +122,7 @@ public:
     };
 
     std::string help() const override {
-        return "Forget a tenant split operation.";
+        return "Forget a shard split operation.";
     }
 
     bool adminOnly() const override {
@@ -145,7 +148,30 @@ public:
                     "feature \"shard split\" not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            return;
+
+            const RequestType& cmd = request();
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+            auto donorService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                                    ->lookupServiceByName(TenantSplitDonorService::kServiceName);
+            auto donorPtr = TenantSplitDonorService::DonorStateMachine::getOrCreate(
+                opCtx, donorService, BSON("_id" << cmd.getMigrationId()));
+
+            invariant(donorPtr != nullptr);
+
+            donorPtr->tryAbort();
+
+            auto state = donorPtr->completionFuture().get(opCtx);
+
+            uassert(ErrorCodes::CommandFailed,
+                    "Failed to abort shard split",
+                    state.abortReason &&
+                        state.abortReason.get() == ErrorCodes::TenantMigrationAborted);
+
+            uassert(ErrorCodes::TenantMigrationCommitted,
+                    "Failed to abort : shard split already committed",
+                    state.state == TenantSplitDonorStateEnum::kAborted);
         }
 
     private:
@@ -167,7 +193,7 @@ public:
     };
 
     std::string help() const override {
-        return "Abort a tenant split operation.";
+        return "Abort a shard split operation.";
     }
 
     bool adminOnly() const override {
