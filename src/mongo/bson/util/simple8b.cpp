@@ -549,7 +549,6 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
         PendingValue lastPendingValue = _pendingValues.back();
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
-            isSelectorPossible = {true, true, true, true};
             _writeFn(simple8bWord);
         } while (!(_doesIntegerFitInCurrentWord(pendingValue)));
 
@@ -577,7 +576,6 @@ void Simple8bBuilder<T>::_appendSkip(bool tryRle) {
             // Form simple8b word if skip can not fit with last selector
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
             _writeFn(simple8bWord);
-            isSelectorPossible = {true, true, true, true};
             _lastValidExtensionType = kBaseSelector;
         }
 
@@ -703,6 +701,8 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
     for (auto val : _pendingValues) {
         _updateSimple8bCurrentState(val);
     }
+    // Reset which selectors are possible to use for next word
+    isSelectorPossible.fill(true);
     return encodedWord;
 }
 

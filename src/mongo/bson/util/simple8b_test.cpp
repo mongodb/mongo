@@ -1169,6 +1169,30 @@ TEST(Simple8b, RleFlushResetsRle) {
     assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(121, 1));
 }
 
+TEST(Simple8b, RleFlushResetsPossibleSelectors) {
+    BufBuilder buffer;
+    Simple8bBuilder<uint64_t> builder([&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+        return true;
+    });
+
+    // Write a large value with many trailing zeros that does not fit in the base selector, we then
+    // flush and make sure that we can write a value that only fits in the base selector. We should
+    // have reset possible selectors as part of the flush.
+    std::vector<boost::optional<uint64_t>> expectedInts = {0x8000000000000000, 0x0FFFFFFFFFFFFFFE};
+
+    ASSERT_TRUE(builder.append(*expectedInts[0]));
+    builder.flush();
+    ASSERT_TRUE(builder.append(*expectedInts[1]));
+    builder.flush();
+
+    auto size = buffer.len();
+    auto sharedBuffer = buffer.release();
+
+    Simple8b<uint64_t> s8b(sharedBuffer.get(), size);
+    assertValuesEqual(s8b, expectedInts);
+}
+
 TEST(Simple8b, EightSelectorLargeMax) {
     // Selector 8 value
     // 1111 + 124 zeros
