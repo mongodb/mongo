@@ -89,8 +89,8 @@ struct OplogDeleteEntryArgs {
     RetryableFindAndModifyLocation retryableFindAndModifyLocation =
         RetryableFindAndModifyLocation::kNone;
 
-    // Set if an OpTime was reserved for the delete ahead of time.
-    boost::optional<OplogSlot> oplogSlot = boost::none;
+    // Set if OpTime were reserved for the delete ahead of time.
+    std::vector<OplogSlot> oplogSlots;
 };
 
 struct IndexCollModInfo {

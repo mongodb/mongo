@@ -1740,6 +1740,13 @@ TEST_F(OpObserverTest, TestFundamentalOnUpdateOutputs) {
                 update.retryableFindAndModifyLocation =
                     RetryableFindAndModifyLocation::kSideCollection;
                 updateArgs.stmtIds = {1};
+                if (testCase.alwaysRecordPreImages &&
+                    testCase.retryableOptions == kRecordInSideCollection) {
+                    // 'getNextOpTimes' requires us to be inside a WUOW when reserving oplog slots.
+                    WriteUnitOfWork wuow(opCtx);
+                    auto reservedSlots = repl::getNextOpTimes(opCtx, 3);
+                    updateArgs.oplogSlots = reservedSlots;
+                }
                 break;
         }
         if (testCase.retryableOptions != kNotRetryable) {

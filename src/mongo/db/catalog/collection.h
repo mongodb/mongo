@@ -97,8 +97,8 @@ struct CollectionUpdateArgs {
     bool preImageRecordingEnabledForCollection = false;
     bool changeStreamPreAndPostImagesEnabledForCollection = false;
 
-    // Set if an OpTime was reserved for the update ahead of time.
-    boost::optional<OplogSlot> oplogSlot = boost::none;
+    // Set if OpTimes were reserved for the update ahead of time.
+    std::vector<OplogSlot> oplogSlots;
 };
 
 /**
