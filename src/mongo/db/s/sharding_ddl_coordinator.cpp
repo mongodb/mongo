@@ -39,6 +39,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -73,6 +74,9 @@ ShardingDDLCoordinator::~ShardingDDLCoordinator() {
 }
 
 bool ShardingDDLCoordinator::_removeDocument(OperationContext* opCtx) {
+    // Checkpoint configTime and topologyTime to guarantee causality with respect to DDL operations
+    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
+
     DBDirectClient dbClient(opCtx);
     auto commandResponse = dbClient.runCommand([&] {
         write_ops::DeleteCommandRequest deleteOp(
