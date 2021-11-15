@@ -254,7 +254,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionsTargetCollectionExists) {
     ASSERT_THROWS_CODE(
         sharding_ddl_util::checkShardedRenamePreconditions(opCtx, kToNss, false /* dropTarget */),
         AssertionException,
-        ErrorCodes::CommandFailed);
+        ErrorCodes::NamespaceExists);
 }
 
 TEST_F(ShardingDDLUtilTest, ShardedRenamePreconditionTargetCollectionHasTags) {
