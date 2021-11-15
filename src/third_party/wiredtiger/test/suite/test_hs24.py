@@ -26,6 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import time
+
 import wttest, threading, wiredtiger
 from helper import simulate_crash_restart
 from wtscenario import make_scenarios
@@ -82,6 +84,10 @@ class test_hs24(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
         thread = threading.Thread(target=self.zero_ts_deletes)
         thread.start()
+        # Give the thread a chance to get going. Otherwise typically none of the deletions
+        # appear in the checkpoint and we lose the ability to test that anything interesting
+        # happened.
+        time.sleep(3)
         self.session.checkpoint()
         thread.join()
         simulate_crash_restart(self, '.', "RESTART")
@@ -99,6 +105,14 @@ class test_hs24(wttest.WiredTigerTestCase):
             cursor2.set_key(i)
             ret = cursor.search()
             ret2 = cursor2.search()
+
+            # In FLCS, deleted values read back as 0. Adjust accordingly.
+            if self.value_format == '8t':
+                if ret == 0 and cursor.get_value() == 0:
+                    ret = wiredtiger.WT_NOTFOUND
+                if ret2 == 0 and cursor2.get_value() == 0:
+                    ret2 = wiredtiger.WT_NOTFOUND
+
             if not newer_data_visible:
                 newer_data_visible = ret != wiredtiger.WT_NOTFOUND
             if newer_data_visible:
