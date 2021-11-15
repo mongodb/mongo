@@ -53,6 +53,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
@@ -116,6 +117,26 @@ void removeTableChecksFile() {
                             "Failed to remove file",
                             "file"_attr = path.generic_string(),
                             "error"_attr = errorCode.message());
+    }
+}
+
+void setTableWriteTimestampAssertion(WT_SESSION* session, const std::string& uri, bool on) {
+    const std::string setting = on ? "assert=(write_timestamp=on)" : "assert=(write_timestamp=off)";
+    LOGV2_DEBUG(6003700,
+                1,
+                "Changing table write timestamp assertion settings",
+                "uri"_attr = uri,
+                "writeTimestampAssertionOn"_attr = on);
+    int ret = session->alter(session, uri.c_str(), setting.c_str());
+    if (ret) {
+        LOGV2_FATAL(6003701,
+                    "Failed to update write timestamp assertion setting",
+                    "uri"_attr = uri,
+                    "writeTimestampAssertionOn"_attr = on,
+                    "error"_attr = ret,
+                    "metadata"_attr =
+                        redact(WiredTigerUtil::getMetadataCreate(session, uri).getValue()),
+                    "message"_attr = session->strerror(session, ret));
     }
 }
 
@@ -856,6 +877,15 @@ Status WiredTigerUtil::_setTableLogging(WT_SESSION* session, const std::string& 
                     "error"_attr = ret,
                     "metadata"_attr = redact(existingMetadata),
                     "message"_attr = session->strerror(session, ret));
+    }
+
+    // The write timestamp assertion setting only needs to be changed at startup. It will be turned
+    // on when logging is disabled, and off when logging is enabled.
+    if (TestingProctor::instance().isEnabled()) {
+        setTableWriteTimestampAssertion(session, uri, !on);
+    } else {
+        // Disables the assertion when the testing proctor is off.
+        setTableWriteTimestampAssertion(session, uri, false /* on */);
     }
 
     return Status::OK();

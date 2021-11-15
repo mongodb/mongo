@@ -171,6 +171,13 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
         ss << "prefix_compression=true,";
     }
 
+    // TODO (SERVER-60716): Remove special handling for unique indexes.
+    if (TestingProctor::instance().isEnabled() && !desc.unique()) {
+        ss << "write_timestamp_usage=ordered,";
+        ss << "assert=(write_timestamp=on),";
+        ss << "verbose=[write_timestamp],";
+    }
+
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(collectionNamespace.ns());
     ss << sysIndexConfig << ",";

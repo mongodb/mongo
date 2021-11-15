@@ -162,6 +162,10 @@ public:
         {
             WriteUnitOfWork wuow(opCtx1.get());
             BSONObj res;
+            auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
+                                   ->getMyLastAppliedOpTime()
+                                   .getTimestamp();
+            ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
             auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx1.get(), collection1, idQuery, res);
             wuow.commit();
             ASSERT_TRUE(foundDoc);
@@ -201,6 +205,10 @@ private:
             auto collection2 =
                 CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
             ASSERT(collection2 != nullptr);
+            auto lastApplied = repl::ReplicationCoordinator::get(opCtx2->getServiceContext())
+                                   ->getMyLastAppliedOpTime()
+                                   .getTimestamp();
+            ASSERT_OK(opCtx2->recoveryUnit()->setTimestamp(lastApplied + 1));
             BSONObj res;
             ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res));
 
@@ -233,6 +241,10 @@ private:
                                                     const BSONObj& idQuery) {
         {
             WriteUnitOfWork wuow1(opCtx1);
+            auto lastApplied = repl::ReplicationCoordinator::get(opCtx1->getServiceContext())
+                                   ->getMyLastAppliedOpTime()
+                                   .getTimestamp();
+            ASSERT_OK(opCtx1->recoveryUnit()->setTimestamp(lastApplied + 1));
             Helpers::emptyCollection(opCtx1, nss);
 
             {

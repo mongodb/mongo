@@ -96,6 +96,7 @@ public:
      */
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         StringData ns,
+                                                        StringData ident,
                                                         const CollectionOptions& options,
                                                         StringData extraStrings);
 
