@@ -64,7 +64,7 @@ let expected = [
     {_id: 6, val: "str"},
     {_id: 7, rand: "rand", val: "str"},
 ];
-assertArrayEq(result, expected);
+assertArrayEq({actual: result, expected: expected});
 
 // Partitions don't mix values
 collection = [
@@ -91,7 +91,7 @@ expected = [
     {_id: 3, val: 0, part: 1},
     {_id: 4, val: 2, part: 2},
 ];
-assertArrayEq(result, expected);
+assertArrayEq({actual: result, expected: expected});
 
 // Values stay missing if all values are missing.
 collection = [
@@ -102,6 +102,7 @@ collection = [
 ];
 coll.drop();
 assert.commandWorked(coll.insert(collection));
+expected = collection;
 
 result = coll.aggregate([{
                  $setWindowFields: {
@@ -111,7 +112,7 @@ result = coll.aggregate([{
              }])
              .toArray();
 
-assertArrayEq(result, collection);
+assertArrayEq({actual: result, expected: expected});
 
 collection = [
     {_id: 1, val: null},
@@ -121,6 +122,7 @@ collection = [
 ];
 coll.drop();
 assert.commandWorked(coll.insert(collection));
+expected = collection;
 
 result = coll.aggregate([{
                  $setWindowFields: {
@@ -130,5 +132,5 @@ result = coll.aggregate([{
              }])
              .toArray();
 
-assertArrayEq(result, collection);
+assertArrayEq({actual: result, expected: expected});
 })();

@@ -60,8 +60,8 @@ const out = testDB.mr_stored_out;
 
 function assertCorrect(results) {
     assert.eq(2, Object.keySet(results).length);
-    assertArrayEq([9, 11, 30], results["1"].stats);
-    assertArrayEq([9, 41, 41], results["2"].stats);
+    assertArrayEq({actual: [9, 11, 30], expected: results["1"].stats});
+    assertArrayEq({actual: [9, 41, 41], expected: results["2"].stats});
 }
 
 // Stored Map.

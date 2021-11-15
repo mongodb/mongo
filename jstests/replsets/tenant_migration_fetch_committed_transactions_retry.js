@@ -56,7 +56,7 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
         delete entry.lastWriteOpTime;
         delete entry.lastWriteDate;
     }
-    assertArrayEq(donorTxnEntries, recipientTxnEntries);
+    assertArrayEq({actual: donorTxnEntries, expected: recipientTxnEntries});
 };
 
 (() => {

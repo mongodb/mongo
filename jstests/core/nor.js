@@ -10,7 +10,7 @@ coll.drop();
 
 function assertIds(query, expectedIds) {
     const resultIds = coll.find(query, {_id: 1}).map(d => d._id);
-    assertArrayEq(expectedIds, resultIds);
+    assertArrayEq({actual: expectedIds, expected: resultIds});
 }
 
 assert.commandWorked(coll.insert([

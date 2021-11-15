@@ -368,9 +368,10 @@ function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
  * the 'actual' array has a matching element in the 'expected' array, without honoring elements
  * order.
  */
-function assertArrayEq({actual = [], expected = [], fieldsToSkip = []} = {}) {
+function assertArrayEq({actual = [], expected = [], fieldsToSkip = [], extraErrorMsg = ""} = {}) {
+    assert.eq(arguments.length, 1, "assertArrayEq arguments must be in an object");
     assert(arrayEq(actual, expected, false, null, fieldsToSkip),
-           `actual=${tojson(actual)}, expected=${tojson(expected)}`);
+           `actual=${tojson(actual)}, expected=${tojson(expected)}${extraErrorMsg}`);
 }
 
 /**
@@ -424,4 +425,48 @@ function generateCollection({
  */
 function collectionExists(coll) {
     return Array.contains(coll.getDB().getCollectionNames(), coll.getName());
+}
+
+/**
+ * Runs and asserts an explain command for an aggregation with the given stage. Returns just the
+ * pipeline from the explain results regardless of cluster topology.
+ */
+function desugarSingleStageAggregation(db, coll, stage) {
+    const result = coll.explain().aggregate([
+        // prevent stages from being absorbed into the .find() layer
+        {$_internalInhibitOptimization: {}},
+        stage,
+    ]);
+
+    assert.commandWorked(result);
+    // We proceed by cases based on topology.
+    if (!FixtureHelpers.isMongos(db)) {
+        assert(Array.isArray(result.stages), result);
+        // The first two stages should be the .find() cursor and the inhibit-optimization stage;
+        // the rest of the stages are what the user's 'stage' expanded to.
+        assert(result.stages[0].$cursor, result);
+        assert(result.stages[1].$_internalInhibitOptimization, result);
+        return result.stages.slice(2);
+    } else {
+        if (result.splitPipeline) {
+            assert(result.splitPipeline.shardsPart[0].$_internalInhibitOptimization, result);
+            const shardsPart = result.splitPipeline.shardsPart.slice(1);
+            const mergerPart = result.splitPipeline.mergerPart;
+            return [].concat(shardsPart).concat(mergerPart);
+        } else if (result.stages) {
+            // Required for aggregation_mongos_passthrough.
+            assert(Array.isArray(result.stages), result);
+            // The first two stages should be the .find() cursor and the inhibit-optimization stage;
+            // the rest of the stages are what the user's 'stage' expanded to.
+            assert(result.stages[0].$cursor, result);
+            assert(result.stages[1].$_internalInhibitOptimization, result);
+            return result.stages.slice(2);
+        } else {
+            // Required for aggregation_one_shard_sharded_collections.
+            assert(Array.isArray(result.shards["shard-rs0"].stages), result);
+            assert(result.shards["shard-rs0"].stages[0].$cursor, result);
+            assert(result.shards["shard-rs0"].stages[1].$_internalInhibitOptimization, result);
+            return result.shards["shard-rs0"].stages.slice(2);
+        }
+    }
 }

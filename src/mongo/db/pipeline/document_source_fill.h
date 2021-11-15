@@ -27,48 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/pipeline/accumulator_for_window_functions.h"
-
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_fill_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
-REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
-    locf,
-    mongo::window_function::ExpressionFromLeftUnboundedWindowFunction<AccumulatorLocf>::parse,
-    multiversion::FeatureCompatibilityVersion::kVersion_5_2,
-    feature_flags::gFlagFill.isEnabledAndIgnoreFCV());
+namespace document_source_fill {
+constexpr StringData kStageName = "$fill"_sd;
+constexpr StringData kLocfMethod = "locf"_sd;
+constexpr StringData kLinearInterpolateMethod = "linear"_sd;
 
-AccumulatorLocf::AccumulatorLocf(ExpressionContext* const expCtx)
-    : AccumulatorForWindowFunctions(expCtx) {
-    _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
-}
+/*
+ * '$fill' is sugar for '$setWindowFields' and $addFields'. This method delegates to the appropriate
+ * parsers for those DocumentSources.
+ */
+std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-void AccumulatorLocf::processInternal(const Value& input, bool merging) {
-    tassert(6050100, "$locf can't be merged", !merging);
-
-    if (!input.nullish()) {
-        _lastNonNull = input;
-        _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
-    }
-}
-
-Value AccumulatorLocf::getValue(bool toBeMerged) {
-    tassert(6050102, "$locf can't be merged", !toBeMerged);
-    return _lastNonNull;
-}
-
-void AccumulatorLocf::reset() {
-    _lastNonNull = Value();
-    _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
-}
-
-boost::intrusive_ptr<AccumulatorState> AccumulatorLocf::create(ExpressionContext* const expCtx) {
-    return new AccumulatorLocf(expCtx);
-}
+}  // namespace document_source_fill
 }  // namespace mongo

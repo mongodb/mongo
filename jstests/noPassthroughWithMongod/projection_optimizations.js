@@ -15,7 +15,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 function runFindWithProjection({filter = {}, projection, expected} = {}) {
     const res = coll.find(filter, projection);
-    assertArrayEq(res.toArray(), expected);
+    assertArrayEq({actual: res.toArray(), expected: expected});
     return res;
 }
 

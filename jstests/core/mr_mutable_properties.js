@@ -65,12 +65,15 @@ const finalize = function(key, values) {
 
 const cmdResult = collection.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}});
 
-assertArrayEq(cmdResult.results[0].value.food, [
-    {"cake": 1, "mod": 1},
-    {"beef": 1, "mod": 1},
-    {"beat": 1, "mod": 1},
-    {"mochi": 1, "mod": 1},
-    {"ice": 1, "mod": 1},
-    {"cream": 1, "mod": 1}
-]);
+assertArrayEq({
+    actual: cmdResult.results[0].value.food,
+    expected: [
+        {"cake": 1, "mod": 1},
+        {"beef": 1, "mod": 1},
+        {"beat": 1, "mod": 1},
+        {"mochi": 1, "mod": 1},
+        {"ice": 1, "mod": 1},
+        {"cream": 1, "mod": 1}
+    ]
+});
 }());

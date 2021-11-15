@@ -26,6 +26,7 @@ assert.commandWorked(coll.createIndex({"a.0.b": 1, c: 1}));
 // array, since we index on a particular element of the array, the index should not be turned into
 // multikey by this operation.
 const doc = {
+    _id: 0,
     a: [{b: 1}],
     c: 1
 };
@@ -56,7 +57,7 @@ assert.eq(ixscan.stage, "IXSCAN", explain);
 assert.eq(ixscan.isMultiKey, false, explain);
 
 // Now execute the query and validate the result.
-assertArrayEq(cursor.toArray(), [doc]);
+assertArrayEq({actual: cursor.toArray(), expected: [doc]});
 
 MongoRunner.stopMongod(conn);
 }());

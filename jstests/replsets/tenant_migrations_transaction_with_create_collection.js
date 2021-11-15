@@ -67,7 +67,10 @@ TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComple
 // Verify that all docs were successfully migrated onto the recipient.
 assert.eq(1, recipientPrimary.getCollection(transactionsNS).find().itcount());
 assert.eq(3, recipientPrimary.getCollection(tenantNS).find().itcount());
-assertArrayEq([doc1, doc2, doc3], recipientPrimary.getCollection(tenantNS).find().toArray());
+assertArrayEq({
+    actual: [doc1, doc2, doc3],
+    expected: recipientPrimary.getCollection(tenantNS).find().toArray()
+});
 
 tenantMigrationTest.stop();
 })();
