@@ -69,8 +69,6 @@ struct ServerGlobalParams {
 
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
 
-    bool cpu = false;  // --cpu show cpu time periodically
-
     bool objcheck = true;  // --objcheck
 
     // Shell parameter, used for testing only, to tell the shell to crash on InvalidBSON errors.

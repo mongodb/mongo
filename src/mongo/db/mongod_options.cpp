@@ -445,10 +445,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.groupCollections = params["storage.groupCollections"].as<bool>();
     }
 
-    if (params.count("cpu")) {
-        serverGlobalParams.cpu = params["cpu"].as<bool>();
-    }
-
     if (params.count("storage.journal.enabled")) {
         storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
     }
