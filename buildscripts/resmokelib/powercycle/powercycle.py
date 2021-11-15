@@ -1201,7 +1201,7 @@ def mongo_reconfig_replication(mongo, host_port, repl_set):
             except pymongo.errors.AutoReconnect:
                 pass
             except pymongo.errors.OperationFailure as err:
-                # src/mongo/base/error_codes.err: error_code("NotYetInitialized", 94)
+                # src/mongo/base/error_codes.yml: error_code("NotYetInitialized", 94)
                 if err.code != 94:
                     LOGGER.error("Replication failed to initialize: %s", ret)
                     return 1
