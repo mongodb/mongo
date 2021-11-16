@@ -150,7 +150,14 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
             }
         });
 
-        WiredTigerBeginTxnBlock txnOpen(session.getSession(), syncToDisk ? "sync=true" : nullptr);
+        // To avoid deadlocks with cache eviction, allow the transaction to time itself out. Once
+        // the time limit has been exceeded on an operation in this transaction, WiredTiger returns
+        // WT_ROLLBACK for that operation.
+        std::string txnConfig = "operation_timeout_ms=10";
+        if (syncToDisk) {
+            txnConfig += ",sync=true";
+        }
+        WiredTigerBeginTxnBlock txnOpen(session.getSession(), txnConfig.c_str());
 
         for (auto it = buffer.begin(); it != buffer.end(); ++it) {
 
@@ -172,7 +179,15 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
             WiredTigerItem value(data.objdata(), data.objsize());
             cursor->set_key(cursor, key.Get());
             cursor->set_value(cursor, value.Get());
-            invariantWTOK(cursor->insert(cursor));
+            int ret = cursor->insert(cursor);
+            if (ret == WT_ROLLBACK) {
+                // One of the code paths calling this function is when a session is checked back
+                // into the session cache. This could involve read-only operations which don't
+                // except write conflicts. If WiredTiger returns WT_ROLLBACK during the flush, we
+                // skip flushing.
+                return;
+            }
+            invariantWTOK(ret);
         }
         txnOpen.done();
         invariantWTOK(session.getSession()->commit_transaction(session.getSession(), nullptr));
