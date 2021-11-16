@@ -740,6 +740,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
         std::vector<NamespaceString> dependencyChain{nss};
 
         int depth = 0;
+        boost::optional<bool> mixedData = boost::none;
         for (; depth < ViewGraph::kMaxViewDepth; depth++) {
             auto view =
                 _lookup(opCtx, *resolvedNss, ViewCatalogLookupBehavior::kValidateDurableViews);
@@ -761,10 +762,25 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
                 return StatusWith<ResolvedView>(
                     {*resolvedNss,
                      std::move(resolvedPipeline),
-                     collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec});
+                     collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec,
+                     mixedData});
             }
 
             resolvedNss = &view->viewOn();
+
+            if (view->timeseries()) {
+                auto tsCollection =
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, *resolvedNss);
+                tassert(6067201,
+                        str::stream() << "expected time-series buckets collection " << *resolvedNss
+                                      << " to exist",
+
+                        tsCollection);
+                mixedData = tsCollection
+                    ? tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData()
+                    : false;
+            }
+
             dependencyChain.push_back(*resolvedNss);
             if (!collation) {
                 if (timeSeriesCollator) {

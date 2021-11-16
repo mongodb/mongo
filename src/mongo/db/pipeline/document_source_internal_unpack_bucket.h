@@ -43,6 +43,7 @@ public:
     static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
     static constexpr StringData kInclude = "include"_sd;
     static constexpr StringData kExclude = "exclude"_sd;
+    static constexpr StringData kAssumeNoMixedSchemaData = "assumeNoMixedSchemaData"_sd;
     static constexpr StringData kBucketMaxSpanSeconds = "bucketMaxSpanSeconds"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
@@ -52,7 +53,8 @@ public:
 
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        BucketUnpacker bucketUnpacker,
-                                       int bucketMaxSpanSeconds);
+                                       int bucketMaxSpanSeconds,
+                                       bool assumeNoMixedSchemaData = false);
 
     const char* getSourceName() const override {
         return kStageNameInternal.rawData();
@@ -201,6 +203,10 @@ public:
 
 private:
     GetNextResult doGetNext() final;
+
+    // If buckets contained a mixed type schema along some path, we have to push down special
+    // predicates in order to ensure correctness.
+    bool _assumeNoMixedSchemaData = false;
 
     BucketUnpacker _bucketUnpacker;
     int _bucketMaxSpanSeconds;

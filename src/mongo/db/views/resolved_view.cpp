@@ -72,15 +72,30 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         collationSpec = collationElt.embeddedObject().getOwned();
     }
 
+
+    boost::optional<bool> mixedSchema = boost::none;
+    if (auto mixedSchemaElem = viewDef[kTimeseriesMayContainMixedData]) {
+        uassert(6067204,
+                str::stream() << "view definition must have " << kTimeseriesMayContainMixedData
+                              << " of type bool or no such field",
+                mixedSchemaElem.type() == BSONType::Bool);
+
+        mixedSchema = boost::optional<bool>(mixedSchemaElem.boolean());
+    }
+
     return {NamespaceString(viewDef["ns"].valueStringData()),
             std::move(pipeline),
-            std::move(collationSpec)};
+            std::move(collationSpec),
+            std::move(mixedSchema)};
 }
 
 void ResolvedView::serialize(BSONObjBuilder* builder) const {
     BSONObjBuilder subObj(builder->subobjStart("resolvedView"));
     subObj.append("ns", _namespace.ns());
     subObj.append("pipeline", _pipeline);
+    // Only serialize if it doesn't contain mixed data.
+    if ((_timeseriesMayContainMixedData && !(*_timeseriesMayContainMixedData)))
+        subObj.append(kTimeseriesMayContainMixedData, *_timeseriesMayContainMixedData);
     if (!_defaultCollation.isEmpty()) {
         subObj.append("collation", _defaultCollation);
     }
@@ -125,6 +140,21 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
         }
         resolvedPipeline[1] =
             BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << builder.obj());
+    } else if (resolvedPipeline.size() >= 1 &&
+               resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal] &&
+               serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                   multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
+        auto unpackStage = resolvedPipeline[0];
+
+        BSONObjBuilder builder;
+        for (const auto& elem :
+             unpackStage[DocumentSourceInternalUnpackBucket::kStageNameInternal].Obj()) {
+            builder.append(elem);
+        }
+        builder.append(DocumentSourceInternalUnpackBucket::kAssumeNoMixedSchemaData,
+                       ((_timeseriesMayContainMixedData && !(*_timeseriesMayContainMixedData))));
+        resolvedPipeline[0] =
+            BSON(DocumentSourceInternalUnpackBucket::kStageNameInternal << builder.obj());
     }
 
     AggregateCommandRequest expandedRequest{_namespace, resolvedPipeline};
