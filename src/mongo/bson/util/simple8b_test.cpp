@@ -1193,6 +1193,103 @@ TEST(Simple8b, RleFlushResetsPossibleSelectors) {
     assertValuesEqual(s8b, expectedInts);
 }
 
+TEST(Simple8b, FlushResetsLastInPreviousWhenFlushingRle) {
+    BufBuilder buffer;
+    Simple8bBuilder<uint64_t> builder([&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+        return true;
+    });
+
+    // Write 150 1s and flush. This should result in a word with 30 1s followed by RLE. We make sure
+    // that last value written is reset when RLE is the last thing we flush.
+    for (int i = 0; i < 150; ++i) {
+        ASSERT_TRUE(builder.append(1));
+    }
+    builder.flush();
+
+    // Last value written is only used for RLE so append 120 values of the same value and make sure
+    // this does _NOT_ start RLE as flush occured in between.
+    for (int i = 0; i < 120; ++i) {
+        ASSERT_TRUE(builder.append(1));
+    }
+    builder.flush();
+
+    auto size = buffer.len();
+    auto sharedBuffer = buffer.release();
+
+    std::vector<uint8_t> simple8bBlockThirty1s = {0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
+    std::vector<uint8_t> simple8bBlockRLE = {0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    std::vector<uint8_t> expectedBinary = simple8bBlockThirty1s;
+    expectedBinary.insert(expectedBinary.end(), simple8bBlockRLE.begin(), simple8bBlockRLE.end());
+    for (int i = 0; i < 4; ++i) {
+        expectedBinary.insert(
+            expectedBinary.end(), simple8bBlockThirty1s.begin(), simple8bBlockThirty1s.end());
+    }
+
+    ASSERT_EQ(size, expectedBinary.size());
+    ASSERT_EQ(memcmp(sharedBuffer.get(), expectedBinary.data(), size), 0);
+
+    Simple8b<uint64_t> s8b(sharedBuffer.get(), size);
+    assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(270, 1));
+}
+
+TEST(Simple8b, FlushResetsLastInPreviousWhenFlushingRleZeroRleAfter) {
+    BufBuilder buffer;
+    Simple8bBuilder<uint64_t> builder([&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+        return true;
+    });
+
+    // Write 150 1s and flush. This should result in a word with 30 1s followed by RLE. We make sure
+    // that last value written is reset when RLE is the last thing we flush.
+    for (int i = 0; i < 150; ++i) {
+        ASSERT_TRUE(builder.append(1));
+    }
+    builder.flush();
+    auto sizeAfterFlush = buffer.len();
+
+    // Write 120 0s. They should be encoded as a single RLE block.
+    for (int i = 0; i < 120; ++i) {
+        ASSERT_TRUE(builder.append(0));
+    }
+    builder.flush();
+
+    auto size = buffer.len();
+    auto sharedBuffer = buffer.release();
+
+    std::vector<uint8_t> simple8bBlockThirty1s = {0x52, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
+    std::vector<uint8_t> simple8bBlockRLE = {0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    std::vector<uint8_t> expectedBinary = simple8bBlockThirty1s;
+    for (int i = 0; i < 2; ++i) {
+        expectedBinary.insert(
+            expectedBinary.end(), simple8bBlockRLE.begin(), simple8bBlockRLE.end());
+    }
+
+    ASSERT_EQ(size, expectedBinary.size());
+    ASSERT_EQ(memcmp(sharedBuffer.get(), expectedBinary.data(), size), 0);
+
+    {
+        // Reading all values as one block would be interpreted as everything is 1s as we wrote a
+        // RLE block immediately after a block containing 1 values.
+        Simple8b<uint64_t> s8b(sharedBuffer.get(), size);
+        assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(270, 1));
+    }
+
+    // In practise the binary is split up in two parts where we can initialize the second part on
+    // how the RLE should be interpreted.
+    {
+        Simple8b<uint64_t> s8b(sharedBuffer.get(), sizeAfterFlush);
+        assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(150, 1));
+    }
+    {
+        Simple8b<uint64_t> s8b(
+            sharedBuffer.get() + sizeAfterFlush, size - sizeAfterFlush, 0 /* previous */);
+        assertValuesEqual(s8b, std::vector<boost::optional<uint64_t>>(120, 0));
+    }
+}
+
 TEST(Simple8b, EightSelectorLargeMax) {
     // Selector 8 value
     // 1111 + 124 zeros

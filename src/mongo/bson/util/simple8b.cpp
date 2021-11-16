@@ -458,8 +458,10 @@ void Simple8bBuilder<T>::flush() {
         // There are no more words in _pendingValues and RLE is possible.
         // However the _rleCount is 0 because we have not read any of the values in the next word.
         _rleCount = 0;
-        _lastValueInPrevWord = {};
     }
+
+    // Always reset _lastValueInPrevWord. We may only start RLE after flush on 0 value.
+    _lastValueInPrevWord = {};
 }
 
 template <typename T>
