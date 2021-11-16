@@ -107,7 +107,6 @@ struct ParsedCollModRequest {
     ParsedCollModIndexRequest indexRequest;
     BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement viewPipeLine = {};
-    BSONElement timeseries = {};
     std::string viewOn = {};
     boost::optional<Collection::Validator> collValidator;
     boost::optional<ValidationActionEnum> collValidationAction;
@@ -418,7 +417,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             cmr.clusteredIndexExpireAfterSeconds = e;
-        } else if (fieldName == "timeseries") {
+        } else if (fieldName == CollMod::kTimeseriesFieldName) {
             cmr.numModifications++;
             if (!isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
@@ -426,7 +425,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                                             << fieldName);
             }
 
-            cmr.timeseries = e;
+            // Access the parsed CollModTimeseries through the generated CollMod IDL type.
         } else if (fieldName == CollMod::kDryRunFieldName) {
             cmr.dryRun = e.trueValue();
             // The dry run option should never be included in a collMod oplog entry.
@@ -615,7 +614,7 @@ Status _collModInternal(OperationContext* opCtx,
     auto viewPipeline = cmrNew.viewPipeLine;
     auto viewOn = cmrNew.viewOn;
     auto clusteredIndexExpireAfterSeconds = cmrNew.clusteredIndexExpireAfterSeconds;
-    auto ts = cmrNew.timeseries;
+    auto ts = cmd.getTimeseries();
 
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON(BSONObj()));
@@ -716,9 +715,9 @@ Status _collModInternal(OperationContext* opCtx,
                 opCtx, *cmrNew.changeStreamPreAndPostImagesOptions);
         }
 
-        if (ts.isABSONObj()) {
+        if (ts) {
             auto res = timeseries::applyTimeseriesOptionsModifications(*oldCollOptions.timeseries,
-                                                                       ts.Obj());
+                                                                       ts->toBSON());
             uassertStatusOK(res);
             auto [newOptions, changed] = res.getValue();
             if (changed) {
