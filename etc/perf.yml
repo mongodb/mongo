@@ -453,14 +453,14 @@ tasks:
       - func: f_run_dsi_workload
         vars:
           test_control: auto_genny_workload
-          auto_workload_path: execution/UserAcquisition.yml
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/execution/UserAcquisition.yml
   - name: genny_scale_InsertRemove
     depends_on: *_compile
     commands:
       - func: f_run_dsi_workload
         vars:
           test_control: auto_genny_workload
-          auto_workload_path: scale/InsertRemove.yml
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/InsertRemove.yml
   - name: query_read_commands
     depends_on: *_compile
     commands:
