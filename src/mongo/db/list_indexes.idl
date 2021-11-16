@@ -49,86 +49,113 @@ structs:
             v:
                 type: safeInt
                 optional: true
+                unstable: false
             key:
                 type: object_owned
                 optional: true
+                unstable: false
             name:
                 type: string
                 optional: true
+                unstable: false
             ns:
                 # MongoDB 4.2 and older generate this field, see SERVER-41696.
                 type: string
                 ignore: true
+                unstable: false
             background:
                 type: safeBool
                 optional: true
+                unstable: false
             unique:
                 type: safeBool
                 optional: true
+                unstable: false
             hidden:
                 type: safeBool
                 optional: true
+                unstable: false
             partialFilterExpression:
                 type: object_owned
                 optional: true
+                unstable: false
             sparse:
                 type: safeBool
                 optional: true
+                unstable: false
             expireAfterSeconds:
                 type: safeInt
                 optional: true
+                unstable: false
             storageEngine:
                 type: object_owned
                 optional: true
+                unstable: false
             weights:
                 type:
                     variant: [string, object_owned]
                 optional: true
+                unstable: false
             default_language:
                 type: string
                 optional: true
+                unstable: false
             language_override:
                 type: string
                 optional: true
+                unstable: false
             textIndexVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             2dsphereIndexVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             bits:
                 type: safeInt
                 optional: true
+                unstable: false
             min:
                 type: safeDouble
                 optional: true
+                unstable: false
             max:
                 type: safeDouble
                 optional: true
+                unstable: false
             bucketSize:
                 type: safeDouble
                 optional: true
+                unstable: false
             collation:
                 type: object_owned
                 optional: true
+                unstable: false
             wildcardProjection:
                 type: object_owned
                 optional: true
+                unstable: false
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true
+                unstable: false
             finestIndexedLevel:
                 type: safeInt
                 optional: true
+                unstable: false
             dropDups:
                 type: safeBool
                 optional: true
+                unstable: false
             originalSpec:
                 type: object_owned
                 optional: true
+                unstable: false
             clustered:
                 type: safeBool
                 optional: true
+                unstable: false
             #
             # An index build in progress appears with these two fields. They're required, but marked
             # optional to permit the built index format using the fields above instead.
@@ -136,26 +163,37 @@ structs:
             buildUUID:
                 type: uuid
                 optional: true
+                unstable: false
             spec:
                 type: NewIndexSpec
                 optional: true
+                unstable: false
 
     ListIndexesReplyCursor:
         description: "Cursor object"
         fields:
-            id: long
-            ns: namespacestring
-            firstBatch: array<ListIndexesReplyItem>
+            id:
+                type: long
+                unstable: false
+            ns:
+                type: namespacestring
+                unstable: false
+            firstBatch:
+                type: array<ListIndexesReplyItem>
+                unstable: false
 
     ListIndexesReply:
         description: "The listIndexes command's reply."
         fields:
-            cursor: ListIndexesReplyCursor
+            cursor: 
+                type: ListIndexesReplyCursor
+                unstable: false
             # Included so mongos can parse shards' listIndexes replies.
             ok:
                 type: safeDouble
                 validator: { gte: 0.0, lte: 1.0 }
                 optional: true
+                unstable: false
 
 commands:
     listIndexes:
@@ -178,6 +216,7 @@ commands:
             cursor:
                 type: SimpleCursorOptions
                 optional: true
+                unstable: false
             includeBuildUUIDs:
                 type: safeBool
                 optional: true
@@ -188,4 +227,5 @@ commands:
                               time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
+                unstable: false
         reply_type: ListIndexesReply

@@ -44,10 +44,12 @@ structs:
                 type: bool
                 description: "If true, the data store is read only."
                 optional: true
+                unstable: false
             uuid:
                 type: uuid
                 description: "Unique, immutable collection ID."
                 optional: true
+                unstable: false
 
     ListCollectionsReplyItem:
         description: "Individual result"
@@ -55,33 +57,46 @@ structs:
             name:
                 type: string
                 description: "Name of the collection."
+                unstable: false
             type:
                 type: string
                 description: "Type of data store."
+                unstable: false
             options:
                 type: object_owned
                 description: "Collection options."
                 optional: true
+                unstable: false
             info:
                 type: ListCollectionsReplyInfo
                 description: "Information about the collection."
                 optional: true
+                unstable: false
             idIndex:
                 type: object_owned
                 description: "Provides information on the _id index for the collection."
                 optional: true
+                unstable: false
 
     ListCollectionsReplyCursor:
         description: "Cursor object"
         fields:
-            id: long
-            ns: namespacestring
-            firstBatch: array<ListCollectionsReplyItem>
+            id: 
+                type: long
+                unstable: false
+            ns: 
+                type: namespacestring
+                unstable: false
+            firstBatch: 
+                type: array<ListCollectionsReplyItem>
+                unstable: false
 
     ListCollectionsReply:
         description: "The listCollection command's reply."
         fields:
-            cursor: ListCollectionsReplyCursor
+            cursor:
+                type: ListCollectionsReplyCursor
+                unstable: false
 
 commands:
     listCollections:
@@ -104,15 +119,19 @@ commands:
             cursor:
                 type: SimpleCursorOptions
                 optional: true
+                unstable: false
             filter:
                 type: object
                 optional: true
+                unstable: false
             nameOnly:
                 type: bool
                 default: false
+                unstable: false
             authorizedCollections:
                 type: bool
                 default: false
+                unstable: false
             includePendingDrops:
                 type: safeBool
                 unstable: true

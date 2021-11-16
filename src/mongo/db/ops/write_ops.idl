@@ -100,9 +100,11 @@ structs:
             index:
                 description: "Index of the document."
                 type: int
+                unstable: false
             _id:
                 description: "ID of the document."
                 type: IDLAnyTypeOwned
+                unstable: false
 
     UpdateCommandReply:
         description: "Contains information related to update command reply."
@@ -112,10 +114,12 @@ structs:
                 description: "An array contains information about upserted documents."
                 type: array<Upserted>
                 optional: true
+                unstable: false
             nModified:
                 description: "Number of updated documents."
                 type: int
                 default: 0
+                unstable: false
 
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
@@ -135,6 +139,7 @@ structs:
                               write documents that do not meet the validation requirements."
                 type: safeBool
                 default: false
+                unstable: false
             ordered:
                 description: "If true, then when an write statement fails, the command returns
                               without executing the remaining statements. If false, then statements
@@ -142,6 +147,7 @@ structs:
                               continue with the remaining statements, if any."
                 type: bool
                 default: true
+                unstable: false
             stmtId:
                 description: "A statement number relative to the transaction. If this field
                               is set, the statement ids of the contained operation will be
@@ -149,6 +155,7 @@ structs:
                               given. This field is mutually exclusive with 'stmtIds'."
                 type: int
                 optional: true
+                unstable: false
 
             stmtIds:
                 description: "An array of statement numbers relative to the transaction. If this
@@ -160,11 +167,13 @@ structs:
                               with 'stmtId'."
                 type: array<int>
                 optional: true
+                unstable: false
             isTimeseriesNamespace:
                 description: "This flag is set to true when the write command was originally sent
                               to the time-series view, but got rewritten to target time-series
                               buckets namespace."
                 type: optionalBool
+                unstable: false
 
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
@@ -174,42 +183,51 @@ structs:
                 description: "The query that matches documents to update. Uses the same query
                               selectors as used in the 'find' operation."
                 type: object
+                unstable: false
             u:
                 description: "Set of modifications to apply."
                 type: update_modification
+                unstable: false
             c:
                 description: "Specifies constant values that can be referred to in the pipeline
                               performing a custom update."
                 type: object
                 optional: true
+                unstable: false
             arrayFilters:
                 description: "Specifies which array elements an update modifier should apply to."
                 type: array<object>
                 optional: true
+                unstable: false
             hint:
                 description: "Specifies the hint to use for the operation."
                 type: indexHint
                 default: mongo::BSONObj()
+                unstable: false
             multi:
                 description: "If true, updates all documents that meet the query criteria. If false,
                               limits the update to one document which meets the query criteria."
                 type: bool
                 default: false
+                unstable: false
             upsert:
                 description: "If true, perform an insert if no documents match the query. If both
                               upsert and multi are true and no documents match the query, the update
                               operation inserts only a single document."
                 type: bool
                 default: false
+                unstable: false
             upsertSupplied:
                 description: "Only applicable when upsert is true. If set, and if no documents match
                               the query, the update subsystem will insert the document supplied as
                               'c.new' rather than generating a new document from the update spec."
                 type: optionalBool
+                unstable: false
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object
                 optional: true
+                unstable: false
 
     DeleteOpEntry:
         description: "Parser for the entries in the 'deletes' array of a delete command."
@@ -219,19 +237,23 @@ structs:
                 description: "The query that matches documents to delete. Uses the same query
                               selectors as used in the 'find' operation."
                 type: object
+                unstable: false
             limit:
                 description: "The number of matching documents to delete. Value of 0 deletes all
                               matching documents and 1 deletes a single document."
                 type: multi_delete_bool
                 cpp_name: multi
+                unstable: false
             hint:
                 description: "Specifies the hint to use for the operation."
                 type: indexHint
                 default: mongo::BSONObj()
+                unstable: false
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object
                 optional: true
+                unstable: false
 
     FindAndModifyLastError:
         description: "Contains execution details for the findAndModify command"
@@ -239,16 +261,19 @@ structs:
             n:
                 type: int
                 cpp_name: numDocs
+                unstable: false
                 description: "The number of documents that were inserted/deleted or matched the
                               update predicate."
             updatedExisting:
                 type: bool
                 description: "Whether an existing document was updated."
                 optional: true
+                unstable: false
             upserted:
                 type: IDLAnyTypeOwned
                 description: "The _id of the inserted document."
                 optional: true
+                unstable: false
 
     FindAndModifyCommandReply:
         description: "Parser for the response from a `findAndModify` command"
@@ -256,12 +281,14 @@ structs:
         fields:
             lastErrorObject:
                 type: FindAndModifyLastError
+                unstable: false
             value:
                 type: object_owned
                 optional: true
                 always_serialize: true
                 description: "The document after the write, if the 'new' field of the request is
                               true. Otherwise, the document before the write."
+                unstable: false
 
 commands:
 
@@ -285,6 +312,7 @@ commands:
                 description: "An array of one or more documents to insert."
                 type: array<object>
                 supports_doc_sequence: true
+                unstable: false
 
     update:
         description: "Parser for the 'update' command."
@@ -306,17 +334,20 @@ commands:
                 description: "An array of one or more update statements to perform."
                 type: array<UpdateOpEntry>
                 supports_doc_sequence: true
+                unstable: false
             let:
                 description: "A set of user-specified constants used by pipeline-style update
                               operations and $expr."
                 type: object
                 optional: true
+                unstable: false
             runtimeConstants:
                 description: "A legacy way to specify constant variables available during execution.
                              'let' is now preferred."
                 cpp_name: legacyRuntimeConstants
                 type: LegacyRuntimeConstants
                 optional: true
+                unstable: false
 
     delete:
         description: "Parser for the 'delete' command."
@@ -338,16 +369,19 @@ commands:
                 description: "An array of one or more delete statements to perform."
                 type: array<DeleteOpEntry>
                 supports_doc_sequence: true
+                unstable: false
             let:
                 description: "A set of user-specified constants used by $expr."
                 type: object
                 optional: true
+                unstable: false
             runtimeConstants:
                 description: "A legacy way to specify constant variables available during execution.
                              'let' is now preferred."
                 cpp_name: legacyRuntimeConstants
                 type: LegacyRuntimeConstants
                 optional: true
+                unstable: false
 
     findAndModify:
         description: "Parser for the 'findAndModify' command."
@@ -369,75 +403,92 @@ commands:
                               selectors as used in the 'find' operation."
                 type: object_owned
                 default: mongo::BSONObj()
+                unstable: false
             fields:
                 description: "A subset of fields to return."
                 type: object_owned
                 optional: true
+                unstable: false
             sort:
                 description: "Determines which document the operation modifies if the query selects
                               multiple documents."
                 type: object_owned
                 optional: true
+                unstable: false
             batchSize:
                 description: "Determines the batch size."
                 type: int
                 optional: true
+                unstable: false
             singleBatch:
                 description: "Determines if the batch is single."
                 type: bool
                 optional: true
+                unstable: false
             hint:
                 description: "Specifies the hint to use for the operation."
                 type: indexHint
                 default: mongo::BSONObj()
+                unstable: false
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object
                 optional: true
+                unstable: false
             arrayFilters:
                 description: "Specifies which array elements an update modifier should apply to."
                 type: array<object>
                 optional: true
+                unstable: false
             remove:
                 description: "Removes the document specified in the query field."
                 # We use 'safeBool' here since the field also allows numeric values.
                 type: safeBool
                 optional: true
+                unstable: false
             update:
                 description: "Modification to apply."
                 type: update_modification
                 optional: true
+                unstable: false
             upsert:
                 description: "If true, perform an insert if no documents match the query. If both
                               upsert and multi are true and no documents match the query, the update
                               operation inserts only a single document."
                 type: safeBool
                 optional: true
+                unstable: false
             new:
                 description: "When true, returns the modified document rather than the original."
                 type: safeBool
                 optional: true
+                unstable: false
             stmtId:
                 description: "The statement number for this findAndModify operation."
                 type: int
                 optional: true
+                unstable: false
             bypassDocumentValidation:
                 description: "Enables the operation to bypass document validation. This lets you
                               write documents that do not meet the validation requirements."
                 type: safeBool
                 optional: true
+                unstable: false
             let:
                 description: "A set of user-specified constants used by pipeline-style update
                               operations and $expr."
                 type: object
                 optional: true
+                unstable: false
             runtimeConstants:
                 description: "A collection of values that do not change once computed. These are
                               used by pipeline-style update operations."
                 cpp_name: legacyRuntimeConstants
                 type: LegacyRuntimeConstants
                 optional: true
+                unstable: false
             writeConcern:
                 description: "Describes the write concern."
                 type: object
                 optional: true
+                unstable: false

@@ -311,12 +311,20 @@ structs:
             ok:
                 type: safeDouble 
                 validator: { gte: 0.0, lte: 0.0 }
-            code: int
-            codeName: string
-            errmsg: string
+                unstable: false
+            code: 
+                type: int
+                unstable: false
+            codeName: 
+                type: string
+                unstable: false
+            errmsg: 
+                type: string
+                unstable: false
             errorLabels:
                 type: array<string>
                 optional: true
+                unstable: false
 
     SimpleCursorOptions:
         description: "Parser for cursor options, for commands with minimal cursor support"
@@ -326,6 +334,7 @@ structs:
                 type: safeInt64
                 optional: true
                 validator: { gte: 0 }
+                unstable: false
     WriteConcernIdl:
         description: "WriteConcern object parser"
         strict: true
@@ -333,31 +342,39 @@ structs:
             w:
                 type: writeConcernW
                 cpp_name: writeConcernW
+                unstable: false
             j:
                 type: safeBool
                 optional: true
+                unstable: false
             wtimeout:
                 type: safeInt64
                 default: 0
+                unstable: false
             fsync:
                 type: safeBool
                 optional: true
+                unstable: false
             # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for
             # backwards-compatibility reasons, but their values are entirely ignored.
             wElectionId:
                 type: any
                 ignore: true
+                unstable: false
             wOpTime:
                 type: any
                 ignore: true
+                unstable: false
             getLastError:
                 type: any
                 ignore: true
+                unstable: false
             provenance:
                 description: "The source for this provenance"
                 cpp_name: source
                 type: ReadWriteConcernProvenanceSource
                 optional: true
+                unstable: false
 
     Collation:
         description: "Specifies the default collation for the collection or the view."
@@ -366,40 +383,49 @@ structs:
         fields:
             locale:
                 type: string
+                unstable: false
             # Turns case sensitivity on at strength 1 or 2.
             caseLevel:
                 type: bool
                 default: false
+                unstable: false
             caseFirst:
                 type: CollationCaseFirst
                 default: kOff
+                unstable: false
             # For backwards-compatibility, we must accept longs, ints, and doubles, so we cannot
             # use the int-typed CollationStrength enum directly.
             strength:
                 type: safeInt
                 default: static_cast<int>(CollationStrength::kTertiary)
                 validator: { gte: 0, lte: 5 }
+                unstable: false
             # Order numbers based on numerical order and not lexicographic order.
             numericOrdering:
                 type: bool
                 default: false
+                unstable: false
             alternate:
                 type: CollationAlternate
                 default: kNonIgnorable
+                unstable: false
             maxVariable:
                 type: CollationMaxVariable
                 default: kPunct
+                unstable: false
             # Any language that uses multiple combining characters such as Arabic, ancient Greek,
             # Hebrew, Hindi, Thai or Vietnamese either requires Normalization Checking to be on, or
             # the text to go through a normalization process before collation.
             normalization:
                 type: bool
                 default: false
+                unstable: false
             # Causes accent differences to be considered in reverse order, as it is done in the
             # French language. Note: the optionalBool parser rejects null/undefined inputs, which
             # preserves an invariant in updateCollationSpecFromICUCollator.
             backwards:
                 type: optionalBool
+                unstable: false
             # Indicates the version of the collator. It is used to ensure that we do not mix
             # versions by, for example, constructing an index with one version of ICU and then
             # attempting to use this index with a server that is built against a newer ICU version.

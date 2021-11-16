@@ -139,6 +139,7 @@ structs:
         fields:
             unstableNewField:
                 type: string
+                unstable: false
 
     OptionalNewFieldReply:
         description: "This reply contains a field that is required in the old command but is
@@ -146,6 +147,7 @@ structs:
         fields:
             optionalNewField:
                 type: string
+                unstable: false
 
     RequiredNewField:
         description: "This struct contains a field that is optional in the old command but is
@@ -154,6 +156,7 @@ structs:
             requiredNewField:
                 type: string
                 optional: true
+                unstable: false
 
     MissingNewFieldReply:
         description: "This reply contains a field that exists in the old command but is
@@ -161,6 +164,7 @@ structs:
         fields:
             missingNewField:
                 type: string
+                unstable: false
 
     EnumNotSubsetReply:
         description: "This reply contains an enum field where the new enum values is not a subset
@@ -168,6 +172,7 @@ structs:
         fields:
             enumNotSubsetReplyField:
                 type: NewReplyFieldEnumNotSubset
+                unstable: false
 
     NotEnumFieldReply:
         description: "This reply contains a field that is an enum type in the old command but
@@ -175,6 +180,7 @@ structs:
         fields:
             notEnumReplyField:
                 type: NewReplyFieldEnumNotSubset
+                unstable: false
 
     NotStructFieldReply:
         description: "This reply contains a field that is a struct type in the old command but
@@ -182,6 +188,7 @@ structs:
         fields:
             notStructReplyField:
                 type: StructReplyFieldType
+                unstable: false
 
     StructReplyFieldType:
         description: "This is a struct reply field type"
@@ -192,6 +199,7 @@ structs:
         fields:
             EnumOrStructReplyField:
                 type: intToIntString
+                unstable: false
 
     BsonNotSubsetReply:
         description: "This reply contains a field type where the new bson_serialization_type
@@ -199,6 +207,7 @@ structs:
         fields:
             bsonNotSubsetReplyField:
                 type: intToIntString
+                unstable: false
 
     BsonNotSubsetReplyTwo:
         description: "This reply contains a field type where the new bson_serialization_type
@@ -206,6 +215,7 @@ structs:
         fields:
             bsonNotSubsetReplyFieldTwo:
                 type: intStringToIntStringBool
+                unstable: false
 
     OldBsonSerializationTypeAnyReply:
         description: "This reply contains a field whose old type has a bson_serialization_type
@@ -213,6 +223,7 @@ structs:
         fields:
             oldBsonSerializationTypeAnyReplyField:
                 type: oldBsonSerializationTypeAny
+                unstable: false
 
     NewBsonSerializationTypeAnyReply:
         description: "This reply contains a field whose new type has a bson_serialization_type
@@ -220,6 +231,7 @@ structs:
         fields:
             newBsonSerializationTypeAnyReplyField:
                 type: newBsonSerializationTypeAny
+                unstable: false
 
     BsonSerializationTypeAnyReply:
         description: "This reply contains a field whose old and new type have a
@@ -227,6 +239,7 @@ structs:
         fields:
             bsonSerializationTypeAnyReplyField:
                 type: bsonSerializationTypeAny
+                unstable: false
 
     NewlyAddedBsonSerializationTypeAnyReply:
         description: "This reply contains a newly added field whose type has a
@@ -373,6 +386,7 @@ structs:
                         bson_serialization_type that contains 'any' that is not compatible"
         fields:
             bsonSerializationTypeAnyStructField:
+                unstable: false
                 type:
                     variant: [oldBsonSerializationTypeAny, newBsonSerializationTypeAny]
 
@@ -381,6 +395,7 @@ structs:
                       bson_serialization_type that contains 'any' that is not compatible"
         fields:
             bsonSerializationTypeAnyStructField:
+                unstable: false
                 type:
                     variant: [array<oldBsonSerializationTypeAny>,
                               array<newBsonSerializationTypeAny>]
@@ -391,6 +406,7 @@ structs:
         fields:
             cppTypeNotEqualReplyField:
                 type: bsonSerializationTypeAnyCppTypeNotEqual
+                unstable: false
 
     SerializerNotEqualReply:
         description: "This reply contains a field whose old and new type have a
@@ -399,6 +415,7 @@ structs:
         fields:
             serializerNotEqualReplyField:
                 type: bsonSerializationTypeAnySerializerNotEqual
+                unstable: false
 
     DeserializerNotEqualReply:
         description: "This reply contains a field whose old and new type have a
@@ -407,6 +424,7 @@ structs:
         fields:
             deserializerNotEqualReplyField:
                 type: bsonSerializationTypeAnyDeserializerNotEqual
+                unstable: false
 
     StructFieldTypeRecursiveReplyOne:
         description: "This reply contains a field whose new type is a struct that is not
@@ -414,6 +432,7 @@ structs:
         fields:
             structReplyField:
                 type: UnstableNewFieldReply
+                unstable: false
 
     StructFieldTypeRecursiveReplyTwo:
         description: "This reply contains a field whose new type is a struct that is not
@@ -421,6 +440,7 @@ structs:
         fields:
             structReplyField:
                 type: StructType
+                unstable: false
 
     StructType:
         description: "This struct contains a field whose new type is incompatible with the
@@ -428,6 +448,7 @@ structs:
         fields:
             fieldOne:
                 type: BsonNotSubsetReply
+                unstable: false
 
     NewVariantTypeReply:
         description: "This reply contains a new field that has a variant type while the old field
@@ -435,6 +456,7 @@ structs:
         fields:
             newVariantTypeReplyField:
                 type: int
+                unstable: false
 
     NewVariantNotSubsetReply:
         description: "This reply contains a field whose new variant types are not a subset
@@ -443,12 +465,14 @@ structs:
             variantNotSubsetReplyField:
                 type:
                     variant: [int, string]
+                unstable: false
 
     NewVariantNotSubsetReplyWithArray:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
         fields:
             variantNotSubsetReplyField:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>]
 
@@ -457,6 +481,7 @@ structs:
                       of the old variant types"
         fields:
             variantNotSubsetReplyFieldTwo:
+                unstable: false
                 type:
                     variant: [int, string]
 
@@ -465,6 +490,7 @@ structs:
                       of the old variant types"
         fields:
             variantNotSubsetReplyFieldTwo:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>]
 
@@ -473,6 +499,7 @@ structs:
                       compatible with the old variant type"
         fields:
             variantRecursiveReplyField:
+                unstable: false
                 type:
                     variant: [int, intStringToIntStringBool]
 
@@ -481,6 +508,7 @@ structs:
                       compatible with the old variant type"
         fields:
             variantRecursiveReplyField:
+                unstable: false
                 type:
                     variant: [array<int>, array<intStringToIntStringBool>]
 
@@ -489,6 +517,7 @@ structs:
                       of the old variant types"
         fields:
             variantStructNotSubsetReplyField:
+                unstable: false
                 type:
                     variant: [int, string]
 
@@ -497,6 +526,7 @@ structs:
                       of the old variant types"
         fields:
             variantStructNotSubsetReplyField:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>]
 
@@ -505,6 +535,7 @@ structs:
                       compatible with the old variant struct type"
         fields:
             variantStructRecursiveReplyField:
+                unstable: false
                 type:
                     variant: [int, StructFieldTypeRecursiveReplyTwo]
 
@@ -513,6 +544,7 @@ structs:
                       compatible with the old variant struct type"
         fields:
             variantStructRecursiveReplyField:
+                unstable: false
                 type:
                     variant: [array<int>, array<StructFieldTypeRecursiveReplyTwo>]
 
@@ -522,6 +554,7 @@ structs:
         fields:
             stableToUnstableField:
                 type: string
+                unstable: false
 
     CommandParamStructRecursiveTwo:
         description: "This command parameter struct type contains a field that
@@ -529,6 +562,7 @@ structs:
         fields:
             notSupersetField:
                 type: intStringToInt
+                unstable: false
 
     NewValidatorStruct:
         description: "This struct contains a field where the new version contains a validator while
@@ -536,6 +570,7 @@ structs:
         fields:
             newValidatorField:
                 type: int
+                unstable: false
 
     ValidatorsNotEqualStruct:
         description: "This struct contains a field where the new and old validators are not exactly equal"
@@ -548,6 +583,7 @@ structs:
                     lte: 2.0
                     gte: -2.97
                     callback: "callback"
+                unstable: false
 
     AddedRequiredTypeFieldStruct:
         description: "This struct contains a field that is added and required in the new version."
@@ -566,12 +602,14 @@ structs:
         fields:
             structCommandParameterTypeRecursiveField:
                 type: intStringToInt
+                unstable: false
 
     VariantNotSupersetStruct:
         description: "This struct contains a field where the new variant types are not a superset
                       of the old variant types"
         fields:
             variantNotSupersetField:
+                unstable: false
                 type:
                     variant: [int, bool, string]
 
@@ -580,6 +618,7 @@ structs:
                       of the old variant types"
         fields:
             variantNotSupersetField:
+                unstable: false
                 type:
                     variant: [array<int>, array<bool>, array<string>]
 
@@ -588,6 +627,7 @@ structs:
                       of the old variant types"
         fields:
             variantNotSupersetFieldTwo:
+                unstable: false
                 type:
                     variant: [int, bool, string, double]
 
@@ -596,6 +636,7 @@ structs:
                       of the old variant types"
         fields:
             variantNotSupersetFieldTwo:
+                unstable: false
                 type:
                     variant: [array<int>, array<bool>, array<string>, array<double>]
 
@@ -604,6 +645,7 @@ structs:
                       old one is"
         fields:
             variantField:
+                unstable: false
                 type:
                     variant: [int, bool]
 
@@ -612,6 +654,7 @@ structs:
                       compatible with the old variant types"
         fields:
             variantRecursiveField:
+                unstable: false
                 type:
                     variant: [int, intStringBoolToIntString]
 
@@ -620,6 +663,7 @@ structs:
                       compatible with the old variant types"
         fields:
             variantRecursiveField:
+                unstable: false
                 type:
                     variant: [array<int>, array<intStringBoolToIntString>]
 
@@ -628,6 +672,7 @@ structs:
                       while the new one does not"
         fields:
             variantStructNotSupersetField:
+                unstable: false
                 type:
                     variant: [int, string, StructCommandParameterType]
 
@@ -636,6 +681,7 @@ structs:
                       while the new one does not"
         fields:
             variantStructNotSupersetField:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>, array<StructCommandParameterType>]
 
@@ -644,6 +690,7 @@ structs:
                       variant struct are not compatible"
         fields:
             variantStructRecursiveField:
+                unstable: false
                 type:
                     variant: [int, string, StructCommandParameterTypeRecursive]
 
@@ -652,6 +699,7 @@ structs:
                       variant struct are not compatible"
         fields:
             variantStructRecursiveField:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>, array<StructCommandParameterTypeRecursive>]
 
@@ -660,6 +708,19 @@ structs:
         fields:
             ArrayCommandParameter:
                 type: array<string>
+                unstable: false
+
+    MissingUnstableFieldNewFieldStruct:
+        description: "This struct contains a field that missing the 'unstable' field in the new
+                      command."
+        fields:
+            missingUnstableFieldNewField:
+                type: string
+                unstable: false
+
+    MissingUnstableFieldAddedNewFieldStruct:
+        description: "This struct contains an added field in the new command that is missing the
+                      'unstable' field."
 
 commands:
     invalidAPIVersionOld:
@@ -712,6 +773,7 @@ commands:
         fields:
             parameterToRemove:
                 type: string
+                unstable: false
 
     addedNewCommandParameterRequired:
         description: "new command parameter fails because it is required when
@@ -735,6 +797,7 @@ commands:
         fields:
             newUnstableParameter:
                 type: string
+                unstable: false
 
     commandParameterStableRequiredNoDefault:
         description: "new required stable command parameter with no default value fails
@@ -763,6 +826,7 @@ commands:
             newRequiredParam:
                 type: string
                 optional: true
+                unstable: false
 
     oldCommandParameterTypeBsonSerializationAny:
         description: "old command fails because it has a parameter type that has a
@@ -776,6 +840,7 @@ commands:
         fields:
             bsonTypeAnyParam:
                 type: oldBsonSerializationTypeAny
+                unstable: false
 
     newCommandParameterTypeBsonSerializationAny:
         description: "new command fails because it has a parameter type that has a
@@ -789,6 +854,7 @@ commands:
         fields:
             bsonTypeAnyParam:
                 type: newBsonSerializationTypeAny
+                unstable: false
 
     oldParamTypeBsonAnyAllowList:
         description: "old command fails because it has a parameter type that has a
@@ -803,6 +869,7 @@ commands:
         fields:
             bsonTypeAnyParam:
                 type: oldBsonSerializationTypeAny
+                unstable: false
 
     newParamTypeBsonAnyAllowList:
         description: "new command fails because it has a parameter type that has a
@@ -817,6 +884,7 @@ commands:
         fields:
             bsonTypeAnyParam:
                 type: newBsonSerializationTypeAny
+                unstable: false
 
     commandParameterTypeBsonSerializationAnyNotAllowed:
         description: "command fails because it has a parameter type that has a
@@ -831,6 +899,7 @@ commands:
         fields:
             bsonTypeAnyParam:
                 type: bsonSerializationTypeAny
+                unstable: false
 
     commandParameterCppTypeNotEqual:
         description: "command fails because it has a parameter type that has a
@@ -845,6 +914,7 @@ commands:
         fields:
             cppTypeNotEqualParam:
                 type: bsonSerializationTypeAnyCppTypeNotEqual
+                unstable: false
 
     commandParameterSerializerNotEqual:
         description: "command fails because it has a parameter type that has a
@@ -859,6 +929,7 @@ commands:
         fields:
             serializerNotEqualParam:
                 type: bsonSerializationTypeAnySerializerNotEqual
+                unstable: false
 
     commandParameterDeserializerNotEqual:
         description: "command fails because it has a parameter type that has a
@@ -873,6 +944,7 @@ commands:
         fields:
             deserializerNotEqualParam:
                 type: bsonSerializationTypeAnyDeserializerNotEqual
+                unstable: false
 
     oldCommandParamTypeBsonAnyUnstable:
         description: "old command fails because it has a parameter type that has a
@@ -998,6 +1070,7 @@ commands:
         fields:
             enumNotSupersetParam:
                 type: EnumNotSuperset
+                unstable: false
 
     newCommandParameterTypeNotEnum:
         description: "new command fails because its parameter type is not an enum when the
@@ -1011,6 +1084,7 @@ commands:
         fields:
             newParamNotEnum:
                 type: EnumNotSuperset
+                unstable: false
 
     newCommandParameterTypeNotStruct:
         description: "new command fails because its parameter type is not a struct when the
@@ -1024,6 +1098,7 @@ commands:
         fields:
             newParamNotStruct:
                 type: StructCommandParameterType
+                unstable: false
 
     newCommandParameterTypeEnumOrStructOne:
         description: "new command fails because its parameter type is an enum while the
@@ -1037,6 +1112,7 @@ commands:
         fields:
             newParamEnum:
                 type: string
+                unstable: false
 
     newCommandParameterTypeEnumOrStructTwo:
         description: "new command fails because its parameter type is a struct while the
@@ -1050,6 +1126,7 @@ commands:
         fields:
             newParamStruct:
                 type: string
+                unstable: false
 
     newCommandParameterTypeBsonNotSuperset:
         description: "new command fails because its parameter type has a bson_serialization_type
@@ -1064,6 +1141,7 @@ commands:
         fields:
             newParamBsonNotSuperset:
                 type: intStringToInt
+                unstable: false
 
     newCommandParameterTypeStructRecursiveOne:
         description: "new command fails because its parameter type is a struct that is
@@ -1077,6 +1155,7 @@ commands:
         fields:
             stableToUnstableStructParameter:
                 type: CommandParamStructRecursiveOne
+                unstable: false
 
     newCommandParameterTypeStructRecursiveTwo:
         description: "new command fails because its parameter type is a struct that is
@@ -1090,6 +1169,7 @@ commands:
         fields:
             notSupersetStructParameter:
                 type: CommandParamStructRecursiveTwo
+                unstable: false
 
     newCommandParameterValidator:
         description: "new command fails because it contains a parameter that contains a validator
@@ -1103,6 +1183,7 @@ commands:
         fields:
             newParam:
                 type: int
+                unstable: false
 
     commandParameterValidatorsNotEqual:
         description: "new command fails because it contains a parameter that contains a validator
@@ -1115,6 +1196,7 @@ commands:
         reply_type: OkReply
         fields:
             newParam:
+                unstable: false
                 type: double
                 validator:
                     lt: 0.0
@@ -1327,6 +1409,7 @@ commands:
         reply_type: OkReply
         fields:
             variantAnyField:
+                unstable: false
                 type: BsonSerializationTypeWithVariantAnyStruct
 
     parameterFieldTypeBsonAnyWithVariantWithArray:
@@ -1340,6 +1423,7 @@ commands:
         reply_type: OkReply
         fields:
             variantAnyField:
+                unstable: false
                 type: BsonSerializationTypeWithVariantAnyStructWithArray
 
     commandTypeBsonAnyWithVariant:
@@ -1960,6 +2044,7 @@ commands:
         reply_type: OkReply
         fields:
             variantNotSupersetParam:
+                unstable: false
                 type:
                     variant: [int, bool, string]
 
@@ -1974,6 +2059,7 @@ commands:
         reply_type: OkReply
         fields:
             variantNotSupersetParam:
+                unstable: false
                 type:
                     variant: [array<int>, array<bool>, array<string>]
 
@@ -1988,6 +2074,7 @@ commands:
         reply_type: OkReply
         fields:
             variantNotSupersetParamTwo:
+                unstable: false
                 type:
                     variant: [int, bool, string, double]
 
@@ -2002,6 +2089,7 @@ commands:
         reply_type: OkReply
         fields:
             variantNotSupersetParamTwo:
+                unstable: false
                 type:
                     variant: [array<int>, array<bool>, array<string>, array<double>]
 
@@ -2016,6 +2104,7 @@ commands:
         reply_type: OkReply
         fields:
             variantParam:
+                unstable: false
                 type:
                     variant: [int, bool]
 
@@ -2030,6 +2119,7 @@ commands:
         reply_type: OkReply
         fields:
             variantRecursiveParam:
+                unstable: false
                 type:
                     variant: [int, intStringBoolToIntString]
 
@@ -2044,6 +2134,7 @@ commands:
         reply_type: OkReply
         fields:
             variantRecursiveParam:
+                unstable: false
                 type:
                     variant: [array<int>, array<intStringBoolToIntString>]
 
@@ -2058,6 +2149,7 @@ commands:
         reply_type: OkReply
         fields:
             variantStructNotSupersetParam:
+                unstable: false
                 type:
                     variant: [int, string, StructCommandParameterType]
 
@@ -2072,6 +2164,7 @@ commands:
         reply_type: OkReply
         fields:
             variantStructNotSupersetParam:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>, array<StructCommandParameterType>]
 
@@ -2087,6 +2180,7 @@ commands:
         reply_type: OkReply
         fields:
             variantStructRecursiveParam:
+                unstable: false
                 type:
                     variant: [int, string, StructCommandParameterTypeRecursive]
 
@@ -2102,6 +2196,7 @@ commands:
         reply_type: OkReply
         fields:
             variantStructRecursiveParam:
+                unstable: false
                 type:
                     variant: [array<int>, array<string>, array<StructCommandParameterTypeRecursive>]
 
@@ -2331,6 +2426,7 @@ commands:
         fields:
             parameterStruct:
                 type: array<ArrayTypeStruct>
+                unstable: false
         reply_type: ArrayTypeStruct
 
     ArrayCommandParameterTypeError:
@@ -2345,6 +2441,7 @@ commands:
         fields:
             parameterStruct:
                 type: array<ArrayTypeStruct>
+                unstable: false
         reply_type: ArrayTypeStruct
 
     accessCheckTypeChange:
@@ -2511,6 +2608,7 @@ commands:
         fields:
             parameterStruct:
                 type: array<ArrayTypeStruct>
+                unstable: false
         reply_type: ArrayTypeStruct
 
     ArrayCommandTypeErrorNoArrayNew:
@@ -2525,6 +2623,7 @@ commands:
         fields:
             parameterStruct:
                 type: array<ArrayTypeStruct>
+                unstable: false
         reply_type: ArrayTypeStruct
 
     ArrayCommandParameterNoArrayOld:
@@ -2539,6 +2638,7 @@ commands:
         fields:
             parameterStruct:
                 type: ArrayTypeStruct
+                unstable: false
         reply_type: ArrayTypeStruct
 
     ArrayCommandParameterNoArrayNew:
@@ -2553,4 +2653,71 @@ commands:
         fields:
             parameterStruct:
                 type: array<ArrayTypeStruct>
+                unstable: false
         reply_type: ArrayTypeStruct
+
+    newReplyFieldMissingUnstableField:
+        description: "new command fails because it contains a reply field that is missing the
+                      'stable' field"
+        command_name: newReplyFieldMissingUnstableField
+        namespace: ignored
+        cpp_name: newReplyFieldMissingUnstableField
+        strict: true
+        api_version: "1"
+        reply_type: MissingUnstableFieldNewFieldStruct
+
+    newCommandTypeFieldMissingUnstableField:
+        description: "new command fails because it contains a command type field that is missing the
+                      'unstable' field"
+        command_name: newCommandTypeFieldMissingUnstableField
+        namespace: type
+        cpp_name: newCommandTypeFieldMissingUnstableField
+        strict: true
+        api_version: "1"
+        type: MissingUnstableFieldNewFieldStruct
+        reply_type: OkReply
+
+    newParameterMissingUnstableField:
+        description: "new command fails because it contains a parameter that is missing the
+                      'unstable' field"
+        command_name: newParameterMissingUnstableField
+        namespace: ignored
+        cpp_name: newParameterMissingUnstableField
+        strict: true
+        api_version: "1"
+        fields:
+            missingUnstableFieldNewParameter:
+                type: int
+                unstable: false
+        reply_type: OkReply
+
+    addedNewParameterMissingUnstableField:
+        description: "new command fails because it contains a new parameter that is missing the
+                      'unstable' field"
+        command_name: addedNewParameterMissingUnstableField
+        namespace: ignored
+        cpp_name: addedNewParameterMissingUnstableField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    addedNewReplyFieldMissingUnstableField:
+        description: "new command fails because it contains a new reply field that is missing the
+                      'unstable' field"
+        command_name: addedNewReplyFieldMissingUnstableField
+        namespace: ignored
+        cpp_name: addedNewReplyFieldMissingUnstableField
+        strict: true
+        api_version: "1"
+        reply_type: MissingUnstableFieldAddedNewFieldStruct
+
+    addedNewCommandTypeFieldMissingUnstableField:
+        description: "new command fails because it contains a new command type field that is missing
+                      the 'unstable' field"
+        command_name: addedNewCommandTypeFieldMissingUnstableField
+        namespace: type
+        type: MissingUnstableFieldAddedNewFieldStruct
+        cpp_name: addedNewCommandTypeFieldMissingUnstableField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply

@@ -50,12 +50,15 @@ structs:
                 # In practice, this field is always populated as 1.
                 description: "Unique identifier for this SASL authentication session"
                 type: int
+                unstable: false
             done:
                 description: "Whether or not the authentication has completed"
                 type: bool
+                unstable: false
             payload:
                 description: "SASL payload"
                 type: SaslPayload
+                unstable: false
 
 commands:
     saslStart:
@@ -72,18 +75,22 @@ commands:
             mechanism:
                 description: "SASL mechanism used for authentication"
                 type: string
+                unstable: false
             autoAuthorize:
                 # This field is ignored and assumed to always be true.
                 description: "Automatically authorized user once authenticated"
                 type: safeBool
                 default: true
+                unstable: false
             options:
                 description: "SASL mechanism specific options"
                 type: object_owned
                 optional: true
+                unstable: false
             payload:
                 description: "Initial client message for SASL exchange"
                 type: SaslPayload
+                unstable: false
 
     saslContinue:
         description: "Continue a SASL based authentication session"
@@ -100,6 +107,8 @@ commands:
                 # This field is expected to be 1, any other value generates an error.
                 description: "Unique identifier for this SASL authentication session"
                 type: int
+                unstable: false
             payload:
                 description: "SASL payload"
                 type: SaslPayload
+                unstable: false

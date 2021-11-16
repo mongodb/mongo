@@ -43,24 +43,29 @@ structs:
                 description: 'Index count before create'
                 type: int
                 optional: true
+                unstable: false
             numIndexesAfter:
                 description: 'Index count after create'
                 type: int
                 optional: true
+                unstable: false
             createdCollectionAutomatically:
                 description: >-
                     Whether or not this createIndexes command resulted
                     in a newly created collection.
                 type: bool
                 optional: true
+                unstable: false
             commitQuorum:
                 description: 'Commit Quorum options used'
                 type: CommitQuorum
                 optional: true
+                unstable: false
             note:
                 description: 'Optional warning/error related to createIndex'
                 type: string
                 optional: true
+                unstable: false
 
     # A built index appears with these fields, which must be the same as ListIndexesReplyItem's
     # fields in list_indexes.idl.
@@ -72,16 +77,20 @@ structs:
                 description: 'Index spec version'
                 type: safeInt
                 optional: true
+                unstable: false
             key:
                 description: 'Key to index on'
                 type: object_owned
+                unstable: false
             name:
                 description: 'Descriptive name for the index'
                 type: string
+                unstable: false
             ns:
                 # MongoDB 4.2 and older generate this field, see SERVER-41696.
                 type: string
                 ignore: true
+                unstable: false
             background:
                 type: safeBool
                 optional: true
@@ -89,12 +98,15 @@ structs:
             unique:
                 type: safeBool
                 optional: true
+                unstable: false
             hidden:
                 type: safeBool
                 optional: true
+                unstable: false
             partialFilterExpression:
                 type: object_owned
                 optional: true
+                unstable: false
             sparse:
                 type: safeBool
                 optional: true
@@ -102,6 +114,7 @@ structs:
             expireAfterSeconds:
                 type: safeInt
                 optional: true
+                unstable: false
             storageEngine:
                 type: object_owned
                 optional: true
@@ -110,27 +123,35 @@ structs:
                 type:
                     variant: [string, object_owned]
                 optional: true
+                unstable: false
             default_language:
                 type: string
                 optional: true
+                unstable: false
             language_override:
                 type: string
                 optional: true
+                unstable: false
             textIndexVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             2dsphereIndexVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             bits:
                 type: safeInt
                 optional: true
+                unstable: false
             min:
                 type: safeDouble
                 optional: true
+                unstable: false
             max:
                 type: safeDouble
                 optional: true
+                unstable: false
             bucketSize:
                 type: safeDouble
                 optional: true
@@ -138,15 +159,19 @@ structs:
             collation:
                 type: object_owned
                 optional: true
+                unstable: false
             wildcardProjection:
                 type: object_owned
                 optional: true
+                unstable: false
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true
+                unstable: false
             finestIndexedLevel:
                 type: safeInt
                 optional: true
+                unstable: false
             dropDups:
                 type: safeBool
                 optional: true
@@ -154,6 +179,7 @@ structs:
             clustered:
                 type: safeBool
                 optional: true
+                unstable: false
 commands:
     createIndexes:
         description: "Command for creating indexes on a collection"
@@ -173,21 +199,26 @@ commands:
                 description: 'Index schema version'
                 type: safeInt
                 default: 2
+                unstable: false
             indexes:
                 description: 'Indexes to be created'
                 # array<NewIndexSpec> but respect ignoreUnknownIndexOptions
                 type: array<object>
+                unstable: false
             ignoreUnknownIndexOptions:
                 description: 'Ignore unknown options in index spec'
                 type: safeBool
                 default: false
+                unstable: false
             commitQuorum:
                 description: 'Commit Quorum options'
                 type: CommitQuorum
                 optional: true
+                unstable: false
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
+                unstable: false

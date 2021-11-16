@@ -89,36 +89,44 @@ commands:
         description: "The query predicate. If unspecified, then all documents in the collection
         will match the predicate."
         type: object_owned_nonempty_serialize
+        unstable: false
       projection:
         description: "The projection specification to determine which fields to include in the
         returned documents."
         type: object_owned_nonempty_serialize
+        unstable: false
       sort:
         description: "The sort specification for the ordering of the results."
         type: object_owned_nonempty_serialize
+        unstable: false
       hint:
         description: "Specify either the index name as a string or the index key pattern. If
         specified, then the query system will only consider plans using the hinted index."
         type: indexHint
         default: mongo::BSONObj()
+        unstable: false
       collation:
         description: "Specifies the collation to use for the operation."
         type: object_owned_nonempty_serialize
+        unstable: false
       skip:
         description: "Number of documents to skip."
         type: safeInt64
         optional: true
         validator: { gte: 0 }
+        unstable: false
       limit:
         description: "The maximum number of documents to return."
         type: safeInt64
         optional: true
         validator: { gte: 0 }
+        unstable: false
       batchSize:
         description: "The number of documents to return in the first batch."
         type: safeInt64
         optional: true
         validator: { gte: 0 }
+        unstable: false
       ntoreturn:
         description: "Deprecated. Should use batchSize."
         type: safeInt64
@@ -128,10 +136,12 @@ commands:
       singleBatch:
         description: "Determines whether to close the cursor after the first batch."
         type: optionalBool
+        unstable: false
       allowDiskUse:
         description: "Use allowDiskUse to allow MongoDB to use temporary files on disk to store
         data exceeding the 100 megabyte memory limit while processing a blocking sort operation."
         type: optionalBool
+        unstable: false
       min:
         description: "The inclusive lower bound for a specific index."
         type: object_owned_nonempty_serialize
@@ -176,10 +186,12 @@ commands:
         getMore commands) to return partial results, rather than an error, if one or more queried
         shards are unavailable."
         type: optionalBool
+        unstable: false
       let:
         description: "Allows user defined variables to be used inside $expr."
         type: object_owned
         optional: true
+        unstable: false
       options:
         description: "Deprecated."
         type: object_owned
@@ -215,10 +227,12 @@ commands:
         type: maxTimeMS
         optional: true
         validator: { gte: 0 }
+        unstable: false
       readConcern:
         description: "Specifies the read concern."
         type: object_owned
         optional: true
+        unstable: false
       runtimeConstants:
         description: "A collection of values that do not change once computed."
         cpp_name: legacyRuntimeConstants

@@ -82,21 +82,25 @@ structs:
                               documents must have this field, and the field must be of the BSON UTC
                               datetime type (0x9)"
                 type: string
+                unstable: false
             metaField:
                 description: "The name of the top-level field describing the series. This field is
                               used to group related data and may be of any BSON type. This may not 
                               be \"_id\" or the same as 'timeField'."
                 type: string
                 optional: true
+                unstable: false
             granularity:
                 description: "Describes the expected interval between subsequent measurements"
                 type: BucketGranularity
                 default: Seconds
+                unstable: false
             bucketMaxSpanSeconds:
                 description: "The maximum range of time values for a bucket, in seconds"
                 type: safeInt
                 optional: true
                 validator: { gte: 1 }
+                unstable: false
 
     CollModTimeseries:
         description: "A type representing the adjustable options on timeseries collections"
@@ -105,3 +109,4 @@ structs:
             granularity:
                 optional: true
                 type: BucketGranularity
+                unstable: false

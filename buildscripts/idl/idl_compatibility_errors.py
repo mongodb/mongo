@@ -118,6 +118,9 @@ ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL = "ID0073"
 ERROR_ID_COMMAND_DESERIALIZER_NOT_EQUAL = "ID0074"
 ERROR_ID_COMMAND_PARAMETER_DESERIALIZER_NOT_EQUAL = "ID0075"
 ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL = "ID0076"
+ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE = "ID0077"
+ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE = "ID0078"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE = "ID0079"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -973,6 +976,27 @@ class IDLCompatibilityContext(object):
             ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD, field_name,
             ("The generic reply field '%s' was removed from the new generic_argument.idl file") %
             (field_name), file)
+
+    def add_new_reply_field_requires_unstable_error(self, command_name: str, field_name: str,
+                                                    file: str) -> None:
+        """Add an error that a new reply field requires the 'unstable' field."""
+        self._add_error(ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE, command_name, (
+            "'%s' has new reply field '%s' that requires specifying a value for the 'unstable' field"
+        ) % (command_name, field_name), file)
+
+    def add_new_param_or_command_type_field_requires_unstable_error(
+            self, command_name: str, field_name: str, file: str,
+            is_command_parameter: bool) -> None:
+        # pylint: disable=invalid-name
+        """Add an error that a new param or command type field requires the 'unstable' field."""
+        if is_command_parameter:
+            self._add_error(ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE, command_name, (
+                "'%s' has new parameter '%s' that requires specifying a value for the 'unstable' field"
+            ) % (command_name, field_name), file)
+        else:
+            self._add_error(ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE, command_name, (
+                "'%s' has new command type field '%s' that requires specifying a value for the 'unstable' field"
+            ) % (command_name, field_name), file)
 
 
 def _assert_unique_error_messages() -> None:

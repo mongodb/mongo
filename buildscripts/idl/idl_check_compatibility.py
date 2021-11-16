@@ -161,7 +161,7 @@ class FieldCompatibility:
     field_type: syntax.Type
     idl_file: syntax.IDLParsedSpec
     idl_file_path: str
-    unstable: bool
+    unstable: Optional[bool]
 
 
 @dataclass
@@ -494,8 +494,14 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
         if not new_field_exists and not old_field.unstable:
             ctxt.add_new_reply_field_missing_error(cmd_name, old_field.name, old_idl_file_path)
 
-    # Check that newly added fields do not have an unallowed use of 'any' as the bson_serialization_type.
     for new_field in new_reply.fields or []:
+        # Check that all fields in the new IDL have specified the 'unstable' field.
+        if new_field.unstable is None:
+            ctxt.add_new_reply_field_requires_unstable_error(cmd_name, new_field.name,
+                                                             new_idl_file_path)
+
+        # Check that newly added fields do not have an unallowed use of 'any' as the
+        # bson_serialization_type.
         newly_added = True
         for old_field in old_reply.fields or []:
             if new_field.name == old_field.name:
@@ -732,6 +738,11 @@ def check_command_params_or_type_struct_fields(
     # Check if a new field has been added to the parameters or type struct.
     # If so, it must be optional.
     for new_field in new_struct.fields or []:
+        # Check that all fields in the new IDL have specified the 'unstable' field.
+        if new_field.unstable is None:
+            ctxt.add_new_param_or_command_type_field_requires_unstable_error(
+                cmd_name, new_field.name, new_idl_file_path, is_command_parameter)
+
         newly_added = True
         for old_field in old_struct.fields or []:
             if new_field.name == old_field.name:

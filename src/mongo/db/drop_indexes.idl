@@ -43,10 +43,12 @@ structs:
                              (mongod only)
                 type: int
                 optional: true
+                unstable: false
             msg:
                 description: Optional message (mongod only)
                 type: string
                 optional: true
+                unstable: false
 
 commands:
     dropIndexes:
@@ -71,10 +73,12 @@ commands:
                         - string
                         - array<string>
                         - object
+                unstable: false
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
+                unstable: false
         reply_type: DropIndexesReply

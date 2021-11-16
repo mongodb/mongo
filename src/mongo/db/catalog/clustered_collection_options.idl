@@ -41,15 +41,19 @@ structs:
                 description: 'Index spec version'
                 type: safeInt
                 default: 2
+                unstable: false
             key:
                 description: 'Key to index on'
                 type: object_owned
+                unstable: false
             name:
                 description: 'Descriptive name for the index'
                 type: string
                 optional: true
+                unstable: false
             unique:
                 type: safeBool
+                unstable: false
 
     ClusteredCollectionInfo:
         description: "Information on how a collection is clustered. For internal use only"

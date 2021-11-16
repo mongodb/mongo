@@ -117,10 +117,13 @@ structs:
     chained_structs:
       InternalSessionFields: InternalSessionFields
     fields:
-      id: uuid
+      id: 
+        type: uuid
+        unstable: false
       uid:
         type: sha256Block
         optional: true
+        unstable: false
 
   OperationSessionInfo:
     description: "Parser for serializing sessionId/txnNumber combination"

@@ -72,6 +72,7 @@ structs:
             firstBatch:
                 description: "The first batch of the cursor."
                 type: array<object>
+                unstable: false
 
     CursorInitialReply:
         description: "A struct representing a initial cursor reply."
@@ -79,10 +80,12 @@ structs:
             cursor:
                 description: "A response cursor object."
                 type: InitialResponseCursor
+                unstable: false
             vars:
                 description: "An optional field containing additional response information for the query."
                 type: object
                 optional: true
+                unstable: false
 
     GetMoreResponseCursor:
         description: "A struct representing a subsequent response cursor."
@@ -93,6 +96,7 @@ structs:
             nextBatch:
                 description: "The subsequent batch of the cursor."
                 type: array<object>
+                unstable: false
 
     CursorGetMoreReply:
         description: "A struct representing a getMore cursor reply."
@@ -100,3 +104,4 @@ structs:
             cursor:
                 description: "A response cursor object."
                 type: GetMoreResponseCursor
+                unstable: false

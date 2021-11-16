@@ -46,8 +46,10 @@ structs:
                 # Currently ignored
                 type: safeInt
                 default: 0
+                unstable: false
             maxWireVersion:
                 type: safeInt
+                unstable: false
 
     HelloLastWrite:
         description: "Most recent op/write times for this node"
@@ -56,15 +58,19 @@ structs:
             opTime:
                 type: optime
                 optional: true
+                unstable: false
             lastWriteDate:
                 type: date
                 optional: true
+                unstable: false
             majorityOpTime:
                 type: optime
                 optional: true
+                unstable: false
             majorityWriteDate:
                 type: date
                 optional: true
+                unstable: false
 
     HelloCommandReply:
         description: "Reply to 'hello' command"
@@ -73,138 +79,180 @@ structs:
             helloOk:
                 type: bool
                 default: true
+                unstable: false
             clientSupportsHello:
                 type: bool
                 optional: true
+                unstable: false
             configsvr:
                 type: safeInt
                 optional: true
+                unstable: false
             maxBsonObjectSize:
                 type: safeInt64
                 optional: true
+                unstable: false
             maxMessageSizeBytes:
                 type: safeInt64
                 optional: true
+                unstable: false
             maxWriteBatchSize:
                 type: safeInt64
                 optional: true
+                unstable: false
             localTime:
                 type: date
                 optional: true
+                unstable: false
             logicalSessionTimeoutMinutes:
                 type: safeInt
                 optional: true
+                unstable: false
             connectionId:
                 type: safeInt64
                 optional: true
+                unstable: false
             minWireVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             maxWireVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             readOnly:
                 type: bool
                 optional: true
+                unstable: false
             compression:
                 type: array<string>
                 optional: true
+                unstable: false
             automationServiceDescriptor:
                 type: string
                 optional: true
+                unstable: false
             saslSupportedMechs:
                 type: array<string>
                 optional: true
+                unstable: false
             speculativeAuthenticate:
                 type: object
                 optional: true
+                unstable: false
             msg:
                 type: string
                 optional: true
+                unstable: false
             serviceId:
                 type: objectid
                 optional: true
+                unstable: false
             ##
             ## ReplicationInfo
             ##
             topologyVersion:
                 type: TopologyVersion
+                unstable: false
             ismaster:
                 # Replies will contain 'ismaster' OR 'isWritablePrimary', not both
                 type: bool
                 optional: true
+                unstable: false
             isWritablePrimary:
                 type: bool
                 optional: true
+                unstable: false
             ##
             ## Using ReplSets
             ##
             hosts:
                 type: array<string>
                 optional: true
+                unstable: false
             passives:
                 type: array<string>
                 optional: true
+                unstable: false
             arbiters:
                 type: array<string>
                 optional: true
+                unstable: false
             setName:
                 type: string
                 optional: true
+                unstable: false
             primary:
                 type: string
                 optional: true
+                unstable: false
             secondary:
                 type: bool
                 optional: true
+                unstable: false
             info:
                 type: string
                 optional: true
+                unstable: false
             isreplicaset:
                 type: bool
                 optional: true
+                unstable: false
             setVersion:
                 type: safeInt
                 optional: true
+                unstable: false
             arbiterOnly:
                 type: bool
                 optional: true
+                unstable: false
             passive:
                 type: bool
                 optional: true
+                unstable: false
             hidden:
                 type: bool
                 optional: true
+                unstable: false
             buildIndexes:
                 type: bool
                 optional: true
+                unstable: false
             slaveDelay:
                 # Reply will contain either slaveDelay or secondaryDelaySecs, but not both.
                 type: safeInt64
                 optional: true
+                unstable: false
             secondaryDelaySecs:
                 type: safeInt64
                 optional: true
+                unstable: false
             tags:
                 type: object
                 optional: true
+                unstable: false
             me:
                 type: string
                 optional: true
+                unstable: false
             electionId:
                 type: objectid
                 optional: true
+                unstable: false
             lastWrite:
                 type: HelloLastWrite
                 optional: true
+                unstable: false
             isImplicitDefaultMajorityWC:
                 # Only populated on shard server.
                 type: bool
                 optional: true
+                unstable: false
             cwwc:
                 # Only populated on shard server.
                 type: WriteConcern
                 optional: true
+                unstable: false
 
 commands:
     hello:
@@ -223,38 +271,50 @@ commands:
             forShell:
                 type: safeBool
                 default: false
+                unstable: false
             hostInfo:
                 type: string
                 default: false
+                unstable: false
             hangUpOnStepDown:
                 type: safeBool
                 default: true
+                unstable: false
             internalClient:
                 type: HelloInternalClientField
                 optional: true
+                unstable: false
             client:
                 type: ClientMetadata
                 optional: true
+                unstable: false
             topologyVersion:
                 type: TopologyVersion
                 optional: true
+                unstable: false
             maxAwaitTimeMS:
                 type: safeInt64
                 optional: true
                 validator: { gte: 0 }
+                unstable: false
             helloOk:
                 type: safeBool
                 optional: true
+                unstable: false
             compression:
                 type: array<string>
                 optional: true
+                unstable: false
             saslSupportedMechs:
                 type: 
                     variant: [string, object_owned]
                 optional: true
+                unstable: false
             speculativeAuthenticate:
                 type: object
                 optional: true
+                unstable: false
             loadBalanced:
                 type: bool
                 optional: true
+                unstable: false

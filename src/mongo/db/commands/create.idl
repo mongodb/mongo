@@ -48,6 +48,7 @@ structs:
                 description: 'Warnings or other additional information'
                 type: string
                 optional: true
+                unstable: false
 
 commands:
     create:
@@ -84,6 +85,7 @@ commands:
                               must also set a maximum size in the 'size' field."
                 type: safeBool
                 default: false
+                unstable: false
             autoIndexId:
                 description: "Specify false to disable the automatic creation of an index on the
                               _id field."
@@ -94,6 +96,7 @@ commands:
                 description: "Specify the default _id index specification."
                 type: object
                 optional: true
+                unstable: false
             size:
                 description: "Specify a maximum size in bytes for the capped collection."
                 type: safeInt64
@@ -120,18 +123,21 @@ commands:
                 description: "Specify validation rules or expressions for the collection."
                 type: object
                 optional: true
+                unstable: false
             validationLevel:
                 description: "Determines how strictly to apply the validation rules to existing
                               documents during an update.
                               Can be one of following values: 'off', 'strict' or 'moderate'."
                 type: ValidationLevel
                 optional: true
+                unstable: false
             validationAction:
                 description: "Determines whether to error on invalid documents or just warn about
                               the violations but allow invalid documents to be inserted.
                               Can be either 'warn' or 'error'."
                 type: ValidationAction
                 optional: true
+                unstable: false
             indexOptionDefaults:
                 description: "Allows users to specify a default configuration for indexes when
                               creating a collection."
@@ -143,6 +149,7 @@ commands:
                               view."
                 type: string
                 optional: true
+                unstable: false
                 validator:
                     callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
@@ -151,10 +158,12 @@ commands:
                               view."
                 type: array<object>
                 optional: true
+                unstable: false
             collation:
                 description: "Specifies the default collation for the collection or the view."
                 type: Collation
                 optional: true
+                unstable: false
             recordPreImages:
                 description: "Sets whether updates/deletes should store the pre-image of the
                               document in the oplog"
@@ -170,6 +179,7 @@ commands:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions
                 optional: true
+                unstable: false
             clusteredIndex:
                 description: "Specifies whether this collection should have a clusteredIndex.
                     Boolean is accepted as the legacy clustered index format for specific internal
@@ -178,10 +188,12 @@ commands:
                 type:
                     variant: [safeBool, ClusteredIndexSpec]
                 optional: true
+                unstable: false
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted."
                 type: safeInt64
                 optional: true
+                unstable: false
             temp:
                 description: "DEPRECATED"
                 type: safeBool

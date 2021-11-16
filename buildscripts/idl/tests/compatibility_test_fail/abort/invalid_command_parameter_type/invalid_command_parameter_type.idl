@@ -44,3 +44,4 @@ commands:
         fields:
             invalidParameter:
                 type: None
+                unstable: false
