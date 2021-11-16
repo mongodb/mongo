@@ -28,8 +28,6 @@ const defaultOptions = {
 
 // This lists all supported releases and needs to be kept up to date as versions are added and
 // dropped.
-// TODO SERVER-26792: In the future, we should have a common place from which both the
-// multiversion setup procedure and this test get information about supported major releases.
 const versions = [
     {binVersion: '4.0', featureCompatibilityVersion: '4.0', testCollection: 'four_zero'},
     {binVersion: '4.2', featureCompatibilityVersion: '4.2', testCollection: 'four_two'},

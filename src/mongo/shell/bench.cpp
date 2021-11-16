@@ -1459,7 +1459,6 @@ BSONObj BenchRunner::finish(BenchRunner* runner) {
     };
 
     appendPerSec("totalOps/s", stats.opCount);
-    // TODO: SERVER-35721 these are all per second results and should be renamed to reflect that.
     appendPerSec("findOne", stats.findOneCounter.getNumEvents());
     appendPerSec("insert", stats.insertCounter.getNumEvents());
     appendPerSec("delete", stats.deleteCounter.getNumEvents());

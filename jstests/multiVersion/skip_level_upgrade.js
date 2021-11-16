@@ -28,8 +28,6 @@ const defaultOptions = {
 };
 
 // This lists all binary versions older than the last-lts version.
-// TODO SERVER-26792: In the future, we should have a common place from which both the
-// multiversion setup procedure and this test get information about supported major releases.
 const versions = [
     {binVersion: '4.0', testCollection: 'four_zero'},
     {binVersion: '4.2', testCollection: 'four_two'}
