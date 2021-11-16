@@ -2030,6 +2030,18 @@ functions:
         files:
           - wiki_page_location.json
 
+  "attach running minimized tests wiki page":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/wiki_page_minimized_agg_query_fuzzer.sh"
+    - command: attach.artifacts
+      params:
+        files:
+          - wiki_page_running_minimized_test_location.json
+
 
 # Pre task steps
 pre:
@@ -2044,6 +2056,7 @@ post:
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
   - func: "attach wiki page"
+  - func: "attach running minimized tests wiki page"
   - func: "kill processes"
   - func: "save local client logs"
   - func: "save code coverage data"
