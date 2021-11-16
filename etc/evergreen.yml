@@ -6979,6 +6979,7 @@ buildvariants:
     tooltags: "ssl"
     build_mongoreplay: true
     virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
+    large_distro_name: linux-64-amzn-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
