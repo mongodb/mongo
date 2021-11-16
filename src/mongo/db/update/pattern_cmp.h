@@ -31,15 +31,10 @@
 
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
-
 namespace pattern_cmp {
 
 /**
@@ -52,35 +47,7 @@ namespace pattern_cmp {
  *   3. The sort field cannot be empty.
  *   4. If the sort field is a dotted field, it does not have any empty parts.
  */
-static Status checkSortClause(const BSONObj& sortObject) {
-    if (sortObject.isEmpty()) {
-        return Status(ErrorCodes::BadValue,
-                      "The sort pattern is empty when it should be a set of fields.");
-    }
-
-    for (auto&& patternElement : sortObject) {
-        double orderVal = patternElement.isNumber() ? patternElement.Number() : 0;
-        if (orderVal != -1 && orderVal != 1) {
-            return Status(ErrorCodes::BadValue, "The sort element value must be either 1 or -1");
-        }
-
-        FieldRef sortField(patternElement.fieldName());
-        if (sortField.numParts() == 0) {
-            return Status(ErrorCodes::BadValue, "The sort field cannot be empty");
-        }
-
-        for (size_t i = 0; i < sortField.numParts(); ++i) {
-            if (sortField.getPart(i).size() == 0) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "The sort field is a dotted field "
-                                               "but has an empty part: "
-                                            << sortField.dottedField());
-            }
-        }
-    }
-
-    return Status::OK();
-}
+Status checkSortClause(const BSONObj& sortObject);
 
 }  // namespace pattern_cmp
 
@@ -88,33 +55,11 @@ static Status checkSortClause(const BSONObj& sortObject) {
 // 'rhs'. We expect that both 'lhs' and 'rhs' be key patterns.
 class PatternElementCmp {
 public:
-    PatternElementCmp() = default;
+    PatternElementCmp();
 
-    PatternElementCmp(const BSONObj& pattern, const CollatorInterface* collator)
-        : sortPattern(pattern.copy()),
-          useWholeValue(sortPattern.hasField("")),
-          collator(collator) {}
+    PatternElementCmp(const BSONObj& pattern, const CollatorInterface* collator);
 
-    bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
-        namespace dps = ::mongo::dotted_path_support;
-        if (useWholeValue) {
-            const int comparedValue = lhs.compareWithElement(rhs, collator, false);
-
-            const bool reversed = (sortPattern.firstElement().number() < 0);
-
-            return (reversed ? comparedValue > 0 : comparedValue < 0);
-        } else {
-            BSONObj lhsObj =
-                lhs.getType() == Object ? lhs.getValueObject() : lhs.getValue().wrap("");
-            BSONObj rhsObj =
-                rhs.getType() == Object ? rhs.getValueObject() : rhs.getValue().wrap("");
-
-            BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
-            BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
-
-            return lhsKey.woCompare(rhsKey, sortPattern, false, collator) < 0;
-        }
-    }
+    bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const;
 
     BSONObj sortPattern;
     bool useWholeValue = true;
@@ -123,39 +68,16 @@ public:
 
 class PatternValueCmp {
 public:
-    PatternValueCmp() = default;
+    PatternValueCmp();
 
     PatternValueCmp(const BSONObj& pattern,
                     const BSONElement& originalElement,
-                    const CollatorInterface* collator)
-        : sortPattern(pattern.copy()),
-          useWholeValue(sortPattern.hasField("")),
-          originalObj(BSONObj().addField(originalElement).copy()),
-          collator(collator) {}
+                    const CollatorInterface* collator);
 
-    bool operator()(const Value& lhs, const Value& rhs) const {
-        namespace dps = ::mongo::dotted_path_support;
-        if (useWholeValue) {
-            const bool ascending = ValueComparator().getLessThan()(lhs, rhs);
-
-            const bool reversed = (sortPattern.firstElement().number() < 0);
-
-            return (reversed ? !ascending : ascending);
-        } else {
-            BSONObj lhsObj = lhs.isObject() ? lhs.getDocument().toBson() : lhs.wrap("");
-            BSONObj rhsObj = rhs.isObject() ? rhs.getDocument().toBson() : rhs.wrap("");
-
-            BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
-            BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
-
-            return lhsKey.woCompare(rhsKey, sortPattern, false, collator) < 0;
-        }
-    }
+    bool operator()(const Value& lhs, const Value& rhs) const;
 
     // Returns the original element passed into the PatternValueCmp constructor.
-    BSONElement getOriginalElement() const {
-        return originalObj.firstElement();
-    }
+    BSONElement getOriginalElement() const;
 
     BSONObj sortPattern;
     bool useWholeValue = true;
