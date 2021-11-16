@@ -100,20 +100,35 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     boost::optional<long long> limit,
     const boost::optional<BSONObj>& hint) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
 
     if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
-        // Set up operation context with majority read snapshot so correct optime can be retrieved.
+        // Resets to the original read source at the end of this operation.
+        auto originalReadSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        boost::optional<Timestamp> originalReadTimestamp;
+        if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
+            originalReadTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+        }
+        readSourceGuard.emplace([opCtx, originalReadSource, originalReadTimestamp] {
+            if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
+                opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource,
+                                                              originalReadTimestamp);
+            } else {
+                opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource);
+            }
+        });
+        // Sets up operation context with majority read snapshot so correct optime can be retrieved.
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
         Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
 
-        // Wait for any writes performed by this ShardLocal instance to be committed and visible.
+        // Waits for any writes performed by this ShardLocal instance to be committed and visible.
         Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
             opCtx, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
         if (!readConcernStatus.isOK()) {
             return readConcernStatus;
         }
 
-        // Inform the storage engine to read from the committed snapshot for the rest of this
+        // Informs the storage engine to read from the committed snapshot for the rest of this
         // operation.
         status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
         if (!status.isOK()) {
