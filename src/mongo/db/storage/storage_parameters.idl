@@ -87,6 +87,13 @@ server_parameters:
             name: StorageDirectoryPerDbParameter
             override_ctor: true
 
+    roundtripBsonColumnOnValidate:
+        description: 'Roundtrips collections content to BSONColumn to verify that we can compress/decompress without data loss.'
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: gRoundtripBsonColumnOnValidate
+        default: false
+
 feature_flags:
     featureFlagClusteredIndexes:
         description: "When enabled, support non time-series collections with clustered indexes"
