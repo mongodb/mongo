@@ -460,11 +460,18 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // Permit writing to the oplog before we step up to primary.
                                AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
                                Lock::GlobalWrite globalWrite(opCtx);
-                               WriteUnitOfWork wuow(opCtx);
-                               Helpers::putSingleton(opCtx, configCollectionName, config);
-                               const auto msgObj = BSON("msg" << kInitiatingSetMsg);
-                               _service->getOpObserver()->onOpMessage(opCtx, msgObj);
-                               wuow.commit();
+                               {
+                                   // Writes to 'local.system.replset' must be untimestamped.
+                                   WriteUnitOfWork wuow(opCtx);
+                                   Helpers::putSingleton(opCtx, configCollectionName, config);
+                                   wuow.commit();
+                               }
+                               {
+                                   WriteUnitOfWork wuow(opCtx);
+                                   const auto msgObj = BSON("msg" << kInitiatingSetMsg);
+                                   _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                                   wuow.commit();
+                               }
                            });
 
         // ReplSetTest assumes that immediately after the replSetInitiate command returns, it can
@@ -607,17 +614,22 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          bool writeOplog) {
     try {
         writeConflictRetry(opCtx, "save replica set config", configCollectionName, [&] {
-            WriteUnitOfWork wuow(opCtx);
-            Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
-            Helpers::putSingleton(opCtx, configCollectionName, config);
+            {
+                // Writes to 'local.system.replset' must be untimestamped.
+                WriteUnitOfWork wuow(opCtx);
+                Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
+                Helpers::putSingleton(opCtx, configCollectionName, config);
+                wuow.commit();
+            }
 
             if (writeOplog) {
+                WriteUnitOfWork wuow(opCtx);
                 auto msgObj = BSON("msg"
                                    << "Reconfig set"
                                    << "version" << config["version"]);
                 _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                wuow.commit();
             }
-            wuow.commit();
         });
         return Status::OK();
     } catch (const DBException& ex) {
