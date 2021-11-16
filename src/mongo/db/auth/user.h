@@ -178,6 +178,20 @@ public:
     }
 
     /**
+     * Checks if the user has been invalidated.
+     */
+    bool isInvalidated() const {
+        return _isInvalidated;
+    }
+
+    /**
+     * Invalidates the user.
+     */
+    void invalidate() {
+        _isInvalidated = true;
+    }
+
+    /**
      * Returns a digest of the user's identity
      */
     const SHA256Block& getDigest() const {
@@ -314,6 +328,9 @@ private:
 
     // The full user name (as specified by the administrator)
     UserName _name;
+
+    // User was explicitly invalidated
+    bool _isInvalidated;
 
     // Digest of the full username
     SHA256Block _digest;

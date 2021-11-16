@@ -66,7 +66,8 @@ SHA256Block computeDigest(const UserName& name) {
 
 }  // namespace
 
-User::User(const UserName& name) : _name(name), _digest(computeDigest(_name)) {}
+User::User(const UserName& name)
+    : _name(name), _isInvalidated(false), _digest(computeDigest(_name)) {}
 
 template <>
 User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() {

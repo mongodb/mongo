@@ -44,7 +44,7 @@ function testIpAllowlistRuntime(description, allowlistString, authResult) {
 
     const conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1"});
 
-    // we must create a user to verify that we don't fallback to localhost exception for auth
+    // Must create a user to verify that we don't fallback to localhost exception for auth.
     assert.commandWorked(
         conn.getDB('admin').runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
 
@@ -53,20 +53,18 @@ function testIpAllowlistRuntime(description, allowlistString, authResult) {
     print("Testing whether __system can login after set to: " + allowlistString);
     assert.commandWorked(conn.adminCommand(
         {setParameter: 1, "clusterIpSourceAllowlist": allowlistString.split(",")}));
-    conn.getDB("local").logout();
+    if (!authResult) {
+        // At this time we have no valid authentication, and existing session should reset.
+        // We should expect admin commands to fail.
+        print("Verifying that there is no longer authenticated session and admin commands fail");
+        assert.commandFailed(conn.adminCommand({fsync: 1}));
+    }
+
     assert.eq(authResult, conn.getDB("local").auth("__system", "foopdedoop"));
     emitWarningAuthErrorIsExpected(authResult);
 
     if (!authResult) {
-        // following line should be unnecessary after SERVER-61038
-        conn.getDB("local").logout();
-        // at this time we have no valid authentication, and existing session should reset.
-        // we should expect admin commands to fail. In order for them to succeed, we should
-        // login using admin user
-        print("Verifying that there is no longer authenticated session and admin commands fail");
-        assert.commandFailed(
-            conn.adminCommand({setParameter: 1, "clusterIpSourceAllowlist": null}));
-        print("Authenticating with admin user");
+        print("Authenticating with admin user since __system is barred");
         conn.getDB('admin').auth('admin', 'admin');
     }
 

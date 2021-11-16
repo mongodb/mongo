@@ -627,7 +627,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                                   "error"_attr = redact(status));
                     break;
             }
-        } else if (!currentUser.isValid()) {
+        } else if (!currentUser.isValid() || currentUser->isInvalidated()) {
             // Our user handle has changed, update the our list of users.
             auto updatedUser = std::move(swUser.getValue());
             try {

@@ -83,7 +83,7 @@ std::shared_ptr<UserHandle> createSystemUserHandle() {
 
 class ClusterNetworkRestrictionManagerImpl : public ClusterNetworkRestrictionManager {
 public:
-    static void configureClusterNetworkRestrictions(std::shared_ptr<UserHandle> user) {
+    static void configureRestrictions(std::shared_ptr<UserHandle> user) {
         const auto allowlistedClusterNetwork =
             std::atomic_load(&mongodGlobalParams.allowlistedClusterNetwork);  // NOLINT
         if (allowlistedClusterNetwork) {
@@ -100,11 +100,9 @@ public:
 
     void updateClusterNetworkRestrictions() override {
         auto user = createSystemUserHandle();
-        configureClusterNetworkRestrictions(user);
+        configureRestrictions(user);
         auto originalUser = internalSecurity.setUser(user);
-
-        // TODO: Invalidate __system sessions falling under restrictions (SERVER-61038)
-        boost::ignore_unused_variable_warning(originalUser);
+        (*originalUser)->invalidate();
     }
 };
 
@@ -113,7 +111,7 @@ MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
                           ("CreateAuthorizationManager"))
 (InitializerContext* const context) try {
     auto user = createSystemUserHandle();
-    ClusterNetworkRestrictionManagerImpl::configureClusterNetworkRestrictions(user);
+    ClusterNetworkRestrictionManagerImpl::configureRestrictions(user);
     internalSecurity.setUser(user);
 } catch (...) {
     uassertStatusOK(exceptionToStatus());
@@ -550,7 +548,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext*
                                                                const UserHandle& user) {
     const UserName& userName = user->getName();
     handleWaitForUserCacheInvalidation(opCtx, user);
-    if (user.isValid()) {
+    if (user.isValid() && !user->isInvalidated()) {
         return user;
     }
 
