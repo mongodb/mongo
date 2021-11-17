@@ -217,14 +217,26 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
     if (args.nss == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto newCoordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserErrorContext("reshardingCoordinatorDoc"), args.updateArgs.updatedDoc);
-        auto reshardingId = BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
-                                 << newCoordinatorDoc.getReshardingUUID());
-        auto observer = getReshardingCoordinatorObserver(opCtx, reshardingId);
-        opCtx->recoveryUnit()->onCommit(
-            [observer = std::move(observer), newCoordinatorDoc = std::move(newCoordinatorDoc)](
-                boost::optional<Timestamp> unusedCommitTime) mutable {
+        opCtx->recoveryUnit()->onCommit([opCtx, newCoordinatorDoc = std::move(newCoordinatorDoc)](
+                                            boost::optional<Timestamp> unusedCommitTime) mutable {
+            try {
+                // It is possible that the ReshardingCoordinatorService is still being rebuilt. We
+                // must defer calling ReshardingCoordinator::lookup() until after our storage
+                // transaction has committed to ensure we aren't holding open an oplog hole and
+                // preventing replication from making progress while we wait.
+                auto reshardingId = BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName
+                                         << newCoordinatorDoc.getReshardingUUID());
+                auto observer = getReshardingCoordinatorObserver(opCtx, reshardingId);
                 observer->onReshardingParticipantTransition(newCoordinatorDoc);
-            });
+            } catch (const DBException& ex) {
+                LOGV2_INFO(6148200,
+                           "Interrupted while waiting for resharding coordinator to be rebuilt;"
+                           " will retry on new primary",
+                           "namespace"_attr = newCoordinatorDoc.getSourceNss(),
+                           "reshardingUUID"_attr = newCoordinatorDoc.getReshardingUUID(),
+                           "error"_attr = redact(ex.toStatus()));
+            }
+        });
     } else if (args.nss.isTemporaryReshardingCollection()) {
         const std::vector<InsertStatement> updateDoc{InsertStatement{args.updateArgs.updatedDoc}};
         assertCanExtractShardKeyFromDocs(opCtx, args.nss, updateDoc.begin(), updateDoc.end());
