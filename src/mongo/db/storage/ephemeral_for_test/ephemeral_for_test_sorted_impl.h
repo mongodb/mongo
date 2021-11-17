@@ -118,9 +118,9 @@ public:
     SortedDataInterfaceUnique(const Ordering& ordering, StringData ident);
     std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
                                                                 bool dupsAllowed) override;
-    Status insert(OperationContext* opCtx,
-                  const KeyString::Value& keyString,
-                  bool dupsAllowed) override;
+    StatusWith<bool> insert(OperationContext* opCtx,
+                            const KeyString::Value& keyString,
+                            bool dupsAllowed) override;
     void unindex(OperationContext* opCtx,
                  const KeyString::Value& keyString,
                  bool dupsAllowed) override;
@@ -147,9 +147,9 @@ public:
     SortedDataInterfaceStandard(const Ordering& ordering, StringData ident);
     std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
                                                                 bool dupsAllowed) override;
-    Status insert(OperationContext* opCtx,
-                  const KeyString::Value& keyString,
-                  bool dupsAllowed) override;
+    StatusWith<bool> insert(OperationContext* opCtx,
+                            const KeyString::Value& keyString,
+                            bool dupsAllowed) override;
     void unindex(OperationContext* opCtx,
                  const KeyString::Value& keyString,
                  bool dupsAllowed) override;
