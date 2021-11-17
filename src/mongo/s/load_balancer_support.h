@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo::load_balancer_support {
@@ -60,5 +61,14 @@ bool isFromLoadBalancer(Client* client);
  * Returns whether the feature flag for load balancer support is enabled.
  */
 bool isEnabled();
+
+/**
+ * Returns the LSID of the session most recently used by the given Client as part of a
+ * multi-statement transaction
+ */
+LogicalSessionId getMruSession(Client* client);
+
+void setMruSession(Client* client, LogicalSessionId id);
+
 
 }  // namespace mongo::load_balancer_support

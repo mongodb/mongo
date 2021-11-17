@@ -5012,5 +5012,30 @@ TEST_F(TransactionRouterMetricsTest, ReportResourcesUnstartedTxn) {
     ASSERT_BSONOBJ_EQ(state, BSONObj());
 }
 
+TEST_F(TransactionRouterMetricsTest, IsTrackingOverTrueIfNoTxnStarted) {
+    ASSERT(txnRouter().isTrackingOver());
+}
+
+TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnCommitted) {
+    beginTxnWithDefaultTxnNumber();
+    ASSERT_FALSE(txnRouter().isTrackingOver());
+    runCommit(kDummyOkRes);
+    ASSERT(txnRouter().isTrackingOver());
+}
+
+TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnExplcitlyAborted) {
+    beginTxnWithDefaultTxnNumber();
+    ASSERT_FALSE(txnRouter().isTrackingOver());
+    explicitAbortInProgress();
+    ASSERT(txnRouter().isTrackingOver());
+}
+
+TEST_F(TransactionRouterMetricsTest, IsTrackingOverIfTxnImplicitlyAborted) {
+    beginTxnWithDefaultTxnNumber();
+    ASSERT_FALSE(txnRouter().isTrackingOver());
+    implicitAbortInProgress();
+    ASSERT(txnRouter().isTrackingOver());
+}
+
 }  // unnamed namespace
 }  // namespace mongo

@@ -75,12 +75,23 @@ public:
         _didHello = true;
     }
 
+    LogicalSessionId mruLogicalSessionId() {
+        return _lsid;
+    }
+
+    void setMruSession(LogicalSessionId lsid) {
+        _lsid = lsid;
+    }
+
 private:
     /** True if the connection was established through a load balancer. */
     bool _isFromLoadBalancer = false;
 
     /** True after we send this client a hello reply. */
     bool _didHello = false;
+
+    /** Most recent LogicalSession used by the Client in a multi-statement txn. */
+    LogicalSessionId _lsid;
 };
 
 const auto getPerServiceState = ServiceContext::declareDecoration<PerService>();
@@ -120,5 +131,13 @@ bool isFromLoadBalancer(Client* client) {
         return false;
     }
     return getPerClientState(client).isFromLoadBalancer();
+}
+
+LogicalSessionId getMruSession(Client* client) {
+    return getPerClientState(client).mruLogicalSessionId();
+}
+
+void setMruSession(Client* client, LogicalSessionId id) {
+    getPerClientState(client).setMruSession(id);
 }
 }  // namespace mongo::load_balancer_support

@@ -528,6 +528,15 @@ public:
             return o().metricsTracker->getTimingStats();
         }
 
+        /**
+         * Returns if the router is not currently tracking an active transaction.
+         */
+        bool isTrackingOver() {
+            if (o().metricsTracker)
+                return o().metricsTracker->isTrackingOver();
+            return true;
+        }
+
     private:
         /**
          * Resets the router's state. Used when the router sees a new transaction for the first
