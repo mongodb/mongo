@@ -72,9 +72,15 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service);
  * Changes the storage engine for the given service by shutting down the old one and starting
  * up a new one.  Kills all opCtxs on the service context which have a storage recovery unit,
  * except the one passed in which has its recovery unit replaced.
+ *
+ * Changes to the configuration (e.g. to storageGlobalParams.dbpath) which need to happen while
+ * no storage engine is active may be made in the changeConfigurationCallback.  At that point the
+ * opCtx will have a no op recovery unit and any access to storage is not allowed.
  */
-StorageEngine::LastShutdownState reinitializeStorageEngine(OperationContext* opCtx,
-                                                           StorageEngineInitFlags initFlags);
+StorageEngine::LastShutdownState reinitializeStorageEngine(
+    OperationContext* opCtx,
+    StorageEngineInitFlags initFlags,
+    std::function<void()> changeConfigurationCallback = [] {});
 
 /**
  * Registers a storage engine onto the given "service".

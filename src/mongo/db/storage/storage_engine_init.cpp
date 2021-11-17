@@ -215,8 +215,10 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
         service, {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."});
 }
 
-StorageEngine::LastShutdownState reinitializeStorageEngine(OperationContext* opCtx,
-                                                           StorageEngineInitFlags initFlags) {
+StorageEngine::LastShutdownState reinitializeStorageEngine(
+    OperationContext* opCtx,
+    StorageEngineInitFlags initFlags,
+    std::function<void()> changeConfigurationCallback) {
     auto service = opCtx->getServiceContext();
     opCtx->recoveryUnit()->abandonSnapshot();
     shutdownGlobalStorageEngineCleanly(
@@ -224,6 +226,7 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(OperationContext* opC
         {ErrorCodes::InterruptedDueToStorageChange, "The storage engine is being reinitialized."});
     opCtx->setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+    changeConfigurationCallback();
     auto lastShutdownState =
         initializeStorageEngine(opCtx, initFlags | StorageEngineInitFlags::kForRestart);
     StorageControl::startStorageControls(service);
