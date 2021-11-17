@@ -98,6 +98,7 @@ env.Library(
         'sharding_task_executor_pool.idl',
         'client/sharding_connection_hook.cpp',
         'client/sharding_network_connection_hook.cpp',
+        'initialize_tenant_to_shard_cache.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/periodic_runner_factory',

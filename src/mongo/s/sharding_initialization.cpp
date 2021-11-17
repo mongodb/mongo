@@ -65,6 +65,7 @@
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/initialize_tenant_to_shard_cache.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/sharding_task_executor.h"
@@ -203,6 +204,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     keyManager->startMonitoring(service);
 
     LogicalTimeValidator::set(service, std::make_unique<LogicalTimeValidator>(keyManager));
+    initializeTenantToShardCache(service);
 
     return Status::OK();
 }
