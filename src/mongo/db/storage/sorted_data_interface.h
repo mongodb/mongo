@@ -95,14 +95,17 @@ public:
      * @param dupsAllowed true if duplicate keys are allowed, and false
      *        otherwise
      *
-     * @return Status::OK() if the insert succeeded,
+     * @return true if the key was inserted
      *
-     *         ErrorCodes::DuplicateKey if 'keyString' already exists in 'this' index
-     *         at a RecordId other than 'loc' and duplicates were not allowed
+     *         false if 'dupsAllowed' is true the exact key (including RecordId) already existed in
+     *         the index
+     *
+     *         ErrorCodes::DuplicateKey if 'dupsAllowed' is false and the prefix key (ignoring
+     *         RecordId) already existed in the index
      */
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed) = 0;
+    virtual StatusWith<bool> insert(OperationContext* opCtx,
+                                    const KeyString::Value& keyString,
+                                    bool dupsAllowed) = 0;
 
     /**
      * Remove the entry from the index with the specified KeyString, which must have a RecordId

@@ -1359,9 +1359,9 @@ SortedDataInterfaceUnique::SortedDataInterfaceUnique(const Ordering& ordering, S
     _KSForIdentEnd = createRadixKeyWithoutLocFromObj(BSONObj(), _identEnd, _ordering);
 }
 
-Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
-                                         const KeyString::Value& keyString,
-                                         bool dupsAllowed) {
+StatusWith<bool> SortedDataInterfaceUnique::insert(OperationContext* opCtx,
+                                                   const KeyString::Value& keyString,
+                                                   bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
@@ -1378,7 +1378,7 @@ Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
         auto added = data.add(loc, keyString.getTypeBits());
         if (!added) {
             // Already indexed
-            return Status::OK();
+            return false;
         }
 
         workingCopy->update({std::move(key), *added});
@@ -1387,7 +1387,7 @@ Status SortedDataInterfaceUnique::insert(OperationContext* opCtx,
         workingCopy->insert({std::move(key), *data.add(loc, keyString.getTypeBits())});
     }
     RecoveryUnit::get(opCtx)->makeDirty();
-    return Status::OK();
+    return true;
 }
 
 void SortedDataInterfaceUnique::unindex(OperationContext* opCtx,
@@ -1557,9 +1557,9 @@ SortedDataInterfaceStandard::SortedDataInterfaceStandard(const Ordering& orderin
     _KSForIdentEnd = createMinRadixKeyFromObj(BSONObj(), _identEnd, _ordering);
 }
 
-Status SortedDataInterfaceStandard::insert(OperationContext* opCtx,
-                                           const KeyString::Value& keyString,
-                                           bool dupsAllowed) {
+StatusWith<bool> SortedDataInterfaceStandard::insert(OperationContext* opCtx,
+                                                     const KeyString::Value& keyString,
+                                                     bool dupsAllowed) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
@@ -1569,7 +1569,7 @@ Status SortedDataInterfaceStandard::insert(OperationContext* opCtx,
             .second;
     if (inserted)
         RecoveryUnit::get(opCtx)->makeDirty();
-    return Status::OK();
+    return inserted;
 }
 
 void SortedDataInterfaceStandard::unindex(OperationContext* opCtx,

@@ -186,10 +186,10 @@ public:
         return {};
     }
 
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed) {
-        return Status::OK();
+    virtual StatusWith<bool> insert(OperationContext* opCtx,
+                                    const KeyString::Value& keyString,
+                                    bool dupsAllowed) {
+        return true;
     }
 
     virtual void unindex(OperationContext* opCtx,

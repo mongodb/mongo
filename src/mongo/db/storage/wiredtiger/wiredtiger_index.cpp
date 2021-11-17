@@ -273,9 +273,9 @@ void dassertRecordIdAtEnd(const KeyString::Value& keyString, KeyFormat keyFormat
 }
 }  // namespace
 
-Status WiredTigerIndex::insert(OperationContext* opCtx,
-                               const KeyString::Value& keyString,
-                               bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndex::insert(OperationContext* opCtx,
+                                         const KeyString::Value& keyString,
+                                         bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
@@ -1487,10 +1487,10 @@ std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIdIndex::newCursor(Operat
     return std::make_unique<WiredTigerIdIndexCursor>(*this, opCtx, forward);
 }
 
-Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
-                                  WT_CURSOR* c,
-                                  const KeyString::Value& keyString,
-                                  bool dupsAllowed) {
+StatusWith<bool> WiredTigerIdIndex::_insert(OperationContext* opCtx,
+                                            WT_CURSOR* c,
+                                            const KeyString::Value& keyString,
+                                            bool dupsAllowed) {
     invariant(!dupsAllowed);
     const RecordId id =
         KeyString::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
@@ -1513,7 +1513,9 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
 
-    if (ret != WT_DUPLICATE_KEY) {
+    if (!ret) {
+        return true;
+    } else if (ret != WT_DUPLICATE_KEY) {
         return wtRCToStatus(ret);
     }
 
@@ -1522,10 +1524,10 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
         key, _desc->getEntry()->getNSSFromCatalog(opCtx), _indexName, _keyPattern, _collation);
 }
 
-Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
-                                      WT_CURSOR* c,
-                                      const KeyString::Value& keyString,
-                                      bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
+                                                WT_CURSOR* c,
+                                                const KeyString::Value& keyString,
+                                                bool dupsAllowed) {
     LOGV2_TRACE_INDEX(
         20097, "Timestamp safe unique idx KeyString: {keyString}", "keyString"_attr = keyString);
 
@@ -1595,10 +1597,13 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
     metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
 
     // It is possible that this key is already present during a concurrent background index build.
-    if (ret != WT_DUPLICATE_KEY)
-        invariantWTOK(ret);
+    if (ret == WT_DUPLICATE_KEY) {
+        return false;
+    }
 
-    return Status::OK();
+    invariantWTOK(ret);
+
+    return true;
 }
 
 void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
@@ -1732,10 +1737,10 @@ std::unique_ptr<SortedDataBuilderInterface> WiredTigerIndexStandard::makeBulkBui
     return std::make_unique<StandardBulkBuilder>(this, opCtx);
 }
 
-Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
-                                        WT_CURSOR* c,
-                                        const KeyString::Value& keyString,
-                                        bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndexStandard::_insert(OperationContext* opCtx,
+                                                  WT_CURSOR* c,
+                                                  const KeyString::Value& keyString,
+                                                  bool dupsAllowed) {
     invariant(dupsAllowed);
 
     WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
@@ -1752,13 +1757,16 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(keyItem.size);
 
-    // If the record was already in the index, we just return OK.
+    // If the record was already in the index, return false.
     // This can happen, for example, when building a background index while documents are being
     // written and reindexed.
-    if (ret != 0 && ret != WT_DUPLICATE_KEY)
+    if (ret == WT_DUPLICATE_KEY) {
+        return false;
+    } else if (ret) {
         return wtRCToStatus(ret);
+    }
 
-    return Status::OK();
+    return true;
 }
 
 void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,

@@ -99,9 +99,9 @@ public:
                     const IndexDescriptor* desc,
                     bool readOnly);
 
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed);
+    virtual StatusWith<bool> insert(OperationContext* opCtx,
+                                    const KeyString::Value& keyString,
+                                    bool dupsAllowed);
 
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
@@ -156,10 +156,10 @@ public:
     virtual bool isTimestampSafeUniqueIdx() const = 0;
 
 protected:
-    virtual Status _insert(OperationContext* opCtx,
-                           WT_CURSOR* c,
-                           const KeyString::Value& keyString,
-                           bool dupsAllowed) = 0;
+    virtual StatusWith<bool> _insert(OperationContext* opCtx,
+                                     WT_CURSOR* c,
+                                     const KeyString::Value& keyString,
+                                     bool dupsAllowed) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           WT_CURSOR* c,
@@ -219,10 +219,10 @@ public:
     bool isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString) override;
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const KeyString::Value& keyString,
-                   bool dupsAllowed) override;
+    StatusWith<bool> _insert(OperationContext* opCtx,
+                             WT_CURSOR* c,
+                             const KeyString::Value& keyString,
+                             bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -270,10 +270,10 @@ public:
     }
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const KeyString::Value& keyString,
-                   bool dupsAllowed) override;
+    StatusWith<bool> _insert(OperationContext* opCtx,
+                             WT_CURSOR* c,
+                             const KeyString::Value& keyString,
+                             bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -310,10 +310,10 @@ public:
     }
 
 protected:
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const KeyString::Value& keyString,
-                   bool dupsAllowed) override;
+    StatusWith<bool> _insert(OperationContext* opCtx,
+                             WT_CURSOR* c,
+                             const KeyString::Value& keyString,
+                             bool dupsAllowed) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
