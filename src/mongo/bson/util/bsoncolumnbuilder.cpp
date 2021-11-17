@@ -388,6 +388,10 @@ BufBuilder BSONColumnBuilder::detach() {
     return std::move(_bufBuilder);
 }
 
+int BSONColumnBuilder::numInterleavedStartWritten() const {
+    return _numInterleavedStartWritten;
+}
+
 BSONColumnBuilder::EncodingState::EncodingState(
     BufBuilder* bufBuilder, std::function<void(const char*, size_t)> controlBlockWriter)
     : _simple8bBuilder64(_createBufferWriter()),
@@ -924,6 +928,7 @@ void BSONColumnBuilder::_finishDetermineSubObjReference() {
     // Done determining reference sub-object. Write this control byte and object to stream.
     _bufBuilder.appendChar(bsoncolumn::kInterleavedStartControlByte);
     _bufBuilder.appendBuf(_referenceSubObj.objdata(), _referenceSubObj.objsize());
+    ++_numInterleavedStartWritten;
 
     // Initialize all encoding states. We do this by traversing in lock-step between the reference
     // object and first buffered element. We can use the fact if sub-element exists in reference to

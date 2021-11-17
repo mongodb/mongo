@@ -44,11 +44,17 @@ class TimeseriesStats {
 public:
     static const TimeseriesStats& get(const Collection* coll);
 
+    struct CompressedBucketInfo {
+        int size = 0;
+        int numInterleaveRestarts = 0;
+    };
+
     /**
-     * Records stats for a closed time-series bucket. 'boost::none' for compressedSize means
+     * Records stats for a closed time-series bucket. 'boost::none' for compressed means
      * compression failed for any reason.
      */
-    void onBucketClosed(int uncompressedSize, boost::optional<int> compressedSize) const;
+    void onBucketClosed(int uncompressedSize,
+                        boost::optional<CompressedBucketInfo> compressed) const;
 
     /**
      * Appends current stats to the given BSONObjBuilder.
@@ -60,6 +66,7 @@ private:
     // non-const Collection (which requires MODE_X collection lock).
     mutable AtomicWord<long long> _uncompressedSize;
     mutable AtomicWord<long long> _compressedSize;
+    mutable AtomicWord<long long> _compressedSubObjRestart;
     mutable AtomicWord<long long> _numCompressedBuckets;
     mutable AtomicWord<long long> _numUncompressedBuckets;
 };

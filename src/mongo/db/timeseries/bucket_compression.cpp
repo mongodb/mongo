@@ -41,12 +41,18 @@ namespace mongo {
 
 namespace timeseries {
 
-boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc, StringData timeFieldName) try {
+boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
+                                        StringData timeFieldName,
+                                        int* numInterleavedRestarts) try {
     // Helper for uncompressed measurements
     struct Measurement {
         BSONElement timeField;
         std::vector<BSONElement> dataFields;
     };
+
+    if (numInterleavedRestarts) {
+        *numInterleavedRestarts = 0;
+    }
 
     BSONObjBuilder builder;                 // builder to build the compressed bucket
     std::vector<Measurement> measurements;  // Extracted measurements from uncompressed bucket
@@ -200,6 +206,12 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc, StringData tim
                 }
             }
             dataBuilder.append(column.fieldName(), column.finalize());
+            // We only record when the interleaved mode has to re-start. i.e. when more than one
+            // interleaved start control byte was written in the binary
+            if (int interleavedStarts = column.numInterleavedStartWritten();
+                numInterleavedRestarts && interleavedStarts > 1) {
+                *numInterleavedRestarts += interleavedStarts - 1;
+            }
             columnBuffer = column.detach();
         }
     }

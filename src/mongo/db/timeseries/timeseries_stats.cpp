@@ -44,10 +44,11 @@ const TimeseriesStats& TimeseriesStats::get(const Collection* coll) {
 }
 
 void TimeseriesStats::onBucketClosed(int uncompressedSize,
-                                     boost::optional<int> compressedSize) const {
+                                     boost::optional<CompressedBucketInfo> compressed) const {
     _uncompressedSize.fetchAndAddRelaxed(uncompressedSize);
-    if (compressedSize) {
-        _compressedSize.fetchAndAddRelaxed(*compressedSize);
+    if (compressed) {
+        _compressedSize.fetchAndAddRelaxed(compressed->size);
+        _compressedSubObjRestart.fetchAndAddRelaxed(compressed->numInterleaveRestarts);
         _numCompressedBuckets.fetchAndAddRelaxed(1);
     } else {
         _compressedSize.fetchAndAddRelaxed(uncompressedSize);
@@ -58,6 +59,7 @@ void TimeseriesStats::onBucketClosed(int uncompressedSize,
 void TimeseriesStats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("numBytesUncompressed", _uncompressedSize.load());
     builder->appendNumber("numBytesCompressed", _compressedSize.load());
+    builder->appendNumber("numSubObjCompressionRestart", _compressedSubObjRestart.load());
     builder->appendNumber("numCompressedBuckets", _numCompressedBuckets.load());
     builder->appendNumber("numUncompressedBuckets", _numUncompressedBuckets.load());
 }

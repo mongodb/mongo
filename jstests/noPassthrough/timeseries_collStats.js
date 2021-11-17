@@ -51,6 +51,7 @@ const clearCollection = function() {
     expectedStats.numMeasurementsCommitted = 0;
     expectedStats.numCompressedBuckets = 0;
     expectedStats.numUncompressedBuckets = 0;
+    expectedStats.numSubObjCompressionRestart = 0;
 };
 clearCollection();
 
@@ -148,6 +149,30 @@ expectedStats.avgNumMeasurementsPerCommit =
 if (isTimeseriesBucketCompressionEnabled) {
     expectedStats.numCompressedBuckets++;
 }
+checkCollStats();
+
+// Assumes each bucket has a limit of 1000 measurements. We change the order twice of fields in the
+// subobj we are storing. Should be 2 'numSubObjCompressionRestart' if bucket compression is
+// enabled.
+docs = Array(500).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {'a': 1, 'b': 1}});
+docs = docs.concat(
+    Array(1).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {'b': 1, 'a': 1}}));
+docs = docs.concat(
+    Array(500).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {'a': 1, 'b': 1}}));
+assert.commandWorked(coll.insert(docs, {ordered: false}));
+expectedStats.bucketCount += 2;
+expectedStats.numBucketInserts += 2;
+expectedStats.numBucketsOpenedDueToMetadata++;
+expectedStats.numBucketsClosedDueToCount++;
+expectedStats.numCommits += 2;
+expectedStats.numMeasurementsCommitted += 1001;
+expectedStats.avgNumMeasurementsPerCommit =
+    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+if (isTimeseriesBucketCompressionEnabled) {
+    expectedStats.numCompressedBuckets++;
+    expectedStats.numSubObjCompressionRestart += 2;
+}
+
 checkCollStats();
 
 // Assumes each bucket has a limit of 125kB on the measurements stored in the 'data' field.

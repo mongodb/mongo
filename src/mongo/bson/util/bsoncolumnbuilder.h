@@ -85,6 +85,11 @@ public:
      */
     BufBuilder detach();
 
+    /**
+     * Returns the number of interleaved start control bytes this BSONColumnBuilder has written.
+     */
+    int numInterleavedStartWritten() const;
+
 private:
     /**
      * State for encoding scalar BSONElement as BSONColumn using delta or delta-of-delta
@@ -186,6 +191,7 @@ private:
     Mode _mode = Mode::kRegular;
 
     std::string _fieldName;
+    int _numInterleavedStartWritten = 0;
 };
 
 }  // namespace mongo

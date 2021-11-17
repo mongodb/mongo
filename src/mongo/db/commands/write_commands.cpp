@@ -710,13 +710,16 @@ public:
             }
 
             boost::optional<int> beforeSize;
-            boost::optional<int> afterSize;
+            boost::optional<TimeseriesStats::CompressedBucketInfo> compressionStats;
+
 
             auto bucketCompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
                 beforeSize = bucketDoc.objsize();
                 // Reset every time we run to ensure we never use a stale value
-                afterSize = boost::none;
-                auto compressed = timeseries::compressBucket(bucketDoc, closedBucket.timeField);
+                compressionStats = boost::none;
+                int numInterleavedRestarts = 0;
+                auto compressed = timeseries::compressBucket(
+                    bucketDoc, closedBucket.timeField, &numInterleavedRestarts);
                 // If compressed object size is larger than uncompressed, skip compression update.
                 if (compressed && compressed->objsize() >= *beforeSize) {
                     LOGV2_DEBUG(5857802,
@@ -727,7 +730,8 @@ public:
                                 "compressedSize"_attr = compressed->objsize());
                     return boost::none;
                 }
-                afterSize = compressed->objsize();
+                compressionStats = TimeseriesStats::CompressedBucketInfo{compressed->objsize(),
+                                                                         numInterleavedRestarts};
                 return compressed;
             };
 
@@ -743,7 +747,7 @@ public:
                     opCtx, compressionOp.getNamespace());
                 if (coll) {
                     const auto& stats = TimeseriesStats::get(coll.get());
-                    stats.onBucketClosed(*beforeSize, afterSize);
+                    stats.onBucketClosed(*beforeSize, compressionStats);
                 }
             }
 
