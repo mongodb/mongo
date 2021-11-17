@@ -50,7 +50,11 @@ struct ValidateResults;
  * is a way to inform the callers to do something when special format exists on disk.
  * TODO SERVER-36385: Remove this enum in 4.4.
  */
-enum SpecialFormatInserted { NoSpecialFormatInserted = 0, LongTypeBitsInserted = 1 };
+enum SpecialFormatInserted {
+    NothingInserted = 0,
+    NoSpecialFormatInserted = 1,
+    LongTypeBitsInserted = 2,
+};
 
 /**
  * This is the uniform interface for storing indexes and supporting point queries as well as range

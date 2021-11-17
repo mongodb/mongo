@@ -264,8 +264,13 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                 ret = _newInterface->insert(opCtx, key, loc, true /* dupsAllowed */);
                 status = ret.getStatus();
 
-                if (status.isOK() && onDuplicateKey)
+                if (status.isOK() && ret.getValue() != SpecialFormatInserted::NothingInserted &&
+                    onDuplicateKey) {
+                    // Only run the duplicate key handler if we inserted the key ourselves. Someone
+                    // else could have already inserted this exact key, but in that case we don't
+                    // count it as a duplicate.
                     status = onDuplicateKey(key);
+                }
             }
 
             if (status.isOK() && ret.getValue() == SpecialFormatInserted::LongTypeBitsInserted)

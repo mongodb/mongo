@@ -1441,16 +1441,13 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
     c->set_value(c, valueItem.Get());
     int ret = WT_OP_CHECK(c->insert(c));
 
-    if (ret != WT_DUPLICATE_KEY) {
-        if (ret == 0) {
-            if (data.getTypeBits().isLongEncoding())
-                return StatusWith<SpecialFormatInserted>(
-                    SpecialFormatInserted::LongTypeBitsInserted);
-            else
-                return StatusWith<SpecialFormatInserted>(
-                    SpecialFormatInserted::NoSpecialFormatInserted);
-        }
-
+    if (!ret) {
+        if (data.getTypeBits().isLongEncoding())
+            return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
+        else
+            return StatusWith<SpecialFormatInserted>(
+                SpecialFormatInserted::NoSpecialFormatInserted);
+    } else if (ret != WT_DUPLICATE_KEY) {
         return wtRCToStatus(ret);
     }
 
@@ -1472,7 +1469,7 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampUnsafe(
         RecordId idInIndex = KeyString::decodeRecordId(&br);
         if (id == idInIndex)
             return StatusWith<SpecialFormatInserted>(
-                SpecialFormatInserted::NoSpecialFormatInserted);  // already in index
+                SpecialFormatInserted::NothingInserted);  // already in index
 
         if (!insertedId && id < idInIndex) {
             value.appendRecordId(id);
@@ -1563,8 +1560,10 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexUnique::_insertTimestampSafe(
     ret = WT_OP_CHECK(c->insert(c));
 
     // It is possible that this key is already present during a concurrent background index build.
-    if (ret != WT_DUPLICATE_KEY)
-        invariantWTOK(ret);
+    if (ret == WT_DUPLICATE_KEY) {
+        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NothingInserted);
+    }
+    invariantWTOK(ret);
 
     if (tableKey.getTypeBits().isLongEncoding())
         return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);
@@ -1768,11 +1767,14 @@ StatusWith<SpecialFormatInserted> WiredTigerIndexStandard::_insert(OperationCont
     c->set_value(c, valueItem.Get());
     int ret = WT_OP_CHECK(c->insert(c));
 
-    // If the record was already in the index, we just return OK.
+    // If the record was already in the index, return NothingInserted.
     // This can happen, for example, when building a background index while documents are being
     // written and reindexed.
-    if (ret != 0 && ret != WT_DUPLICATE_KEY)
+    if (ret == WT_DUPLICATE_KEY) {
+        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NothingInserted);
+    } else if (ret) {
         return wtRCToStatus(ret);
+    }
 
     if (key.getTypeBits().isLongEncoding())
         return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::LongTypeBitsInserted);

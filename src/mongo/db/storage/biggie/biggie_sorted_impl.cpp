@@ -329,8 +329,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
                         key, _collectionNamespace, _indexName, _keyPattern, _collation);
                 }
             } else {
-                return StatusWith<SpecialFormatInserted>(
-                    SpecialFormatInserted::NoSpecialFormatInserted);
+                return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NothingInserted);
             }
         }
     } else {
@@ -338,7 +337,7 @@ StatusWith<SpecialFormatInserted> SortedDataInterface::insert(OperationContext* 
     }
 
     if (workingCopy->find(insertKeyString) != workingCopy->end())
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NothingInserted);
 
     // The value we insert is the RecordId followed by the typebits.
     std::string internalTbString = std::string(workingCopyInternalKs->getTypeBits().getBuffer(),

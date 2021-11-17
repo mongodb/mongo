@@ -189,8 +189,10 @@ public:
         if (_data->insert(entry).second) {
             _currentKeySize += key.objsize();
             opCtx->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
+            return StatusWith<SpecialFormatInserted>(
+                SpecialFormatInserted::NoSpecialFormatInserted);
         }
-        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NoSpecialFormatInserted);
+        return StatusWith<SpecialFormatInserted>(SpecialFormatInserted::NothingInserted);
     }
 
     virtual void unindex(OperationContext* opCtx,
