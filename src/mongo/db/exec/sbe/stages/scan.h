@@ -128,7 +128,8 @@ protected:
     void doDetachFromOperationContext() override;
     void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromTrialRunTracker() override;
-    void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
+    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
     const CollectionUUID _collUuid;

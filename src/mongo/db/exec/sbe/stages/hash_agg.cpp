@@ -223,6 +223,16 @@ void HashAggStage::open(bool reOpen) {
                     makeTemporaryRecordStore();
                 }
             }
+
+            if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
+                // During trial runs, we want to limit the amount of work done by opening a blocking
+                // stage, like this one. The blocking stage tracks the number of documents it has
+                // read from its child, and if the TrialRunTracker ends the trial, a special
+                // exception returns control back to the planner.
+                _tracker = nullptr;
+                _children[0]->close();
+                uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in group");
+            }
         }
 
         if (_optimizedClose) {
@@ -372,6 +382,23 @@ size_t HashAggStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_aggs);
     size += size_estimator::estimate(_seekKeysSlots);
     return size;
+}
+
+void HashAggStage::doDetachFromTrialRunTracker() {
+    _tracker = nullptr;
+}
+
+PlanStage::TrialRunTrackerAttachResultMask HashAggStage::doAttachToTrialRunTracker(
+    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
+    // The HashAggStage only tracks the "numResults" metric when it is the most deeply nested
+    // blocking stage.
+    if (!(childrenAttachResult & TrialRunTrackerAttachResultFlags::AttachedToBlockingStage)) {
+        _tracker = tracker;
+    }
+
+    // Return true to indicate that the tracker is attached to a blocking stage: either this stage
+    // or one of its descendent stages.
+    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToBlockingStage;
 }
 
 }  // namespace sbe

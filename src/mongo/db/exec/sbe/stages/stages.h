@@ -262,13 +262,25 @@ public:
         stage->doDetachFromTrialRunTracker();
     }
 
-    void attachToTrialRunTracker(TrialRunTracker* tracker) {
+    // Bit flags to indicate what kinds of stages a TrialRunTracker was attached to by a call to the
+    // 'attachToTrialRunTracker()' method.
+    enum TrialRunTrackerAttachResultFlags : uint32_t {
+        NoAttachment = 0x0,
+        AttachedToStreamingStage = 1 << 0,
+        AttachedToBlockingStage = 1 << 1,
+    };
+
+    using TrialRunTrackerAttachResultMask = uint32_t;
+
+    TrialRunTrackerAttachResultMask attachToTrialRunTracker(TrialRunTracker* tracker) {
+        TrialRunTrackerAttachResultMask result = TrialRunTrackerAttachResultFlags::NoAttachment;
+
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
-            child->attachToTrialRunTracker(tracker);
+            result |= child->attachToTrialRunTracker(tracker);
         }
 
-        stage->doAttachToTrialRunTracker(tracker);
+        return result | stage->doAttachToTrialRunTracker(tracker, result);
     }
 
     /**
@@ -466,7 +478,10 @@ protected:
     virtual void doDetachFromOperationContext() {}
     virtual void doAttachToOperationContext(OperationContext* opCtx) {}
     virtual void doDetachFromTrialRunTracker() {}
-    virtual void doAttachToTrialRunTracker(TrialRunTracker* tracker) {}
+    virtual TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
+        return TrialRunTrackerAttachResultFlags::NoAttachment;
+    }
 
     Vector _children;
 };

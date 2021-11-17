@@ -89,6 +89,11 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doDetachFromTrialRunTracker() override;
+    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
+
 private:
     void makeTemporaryRecordStore();
 
@@ -138,6 +143,10 @@ private:
 
     // Used when spilling to disk.
     std::unique_ptr<TemporaryRecordStore> _recordStore;
+
+    // If provided, used during a trial run to accumulate certain execution stats. Once the trial
+    // run is complete, this pointer is reset to nullptr.
+    TrialRunTracker* _tracker{nullptr};
 };
 
 }  // namespace sbe

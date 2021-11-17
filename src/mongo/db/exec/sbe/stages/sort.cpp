@@ -154,8 +154,17 @@ void SortStage::doDetachFromTrialRunTracker() {
     _tracker = nullptr;
 }
 
-void SortStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
-    _tracker = tracker;
+PlanStage::TrialRunTrackerAttachResultMask SortStage::doAttachToTrialRunTracker(
+    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
+    // The SortStage only tracks the "numResults" metric when it is the most deeply nested blocking
+    // stage.
+    if (!(childrenAttachResult & TrialRunTrackerAttachResultFlags::AttachedToBlockingStage)) {
+        _tracker = tracker;
+    }
+
+    // Return true to indicate that the tracker is attached to a blocking stage: either this stage
+    // or one of its descendent stages.
+    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToBlockingStage;
 }
 
 void SortStage::open(bool reOpen) {

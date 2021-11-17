@@ -89,7 +89,8 @@ public:
 
 protected:
     void doDetachFromTrialRunTracker() override;
-    void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
+    TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
+        TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
     void makeSorter();

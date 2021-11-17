@@ -237,8 +237,10 @@ void IndexScanStage::doDetachFromTrialRunTracker() {
     _tracker = nullptr;
 }
 
-void IndexScanStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
+PlanStage::TrialRunTrackerAttachResultMask IndexScanStage::doAttachToTrialRunTracker(
+    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
     _tracker = tracker;
+    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
 }
 
 void IndexScanStage::open(bool reOpen) {

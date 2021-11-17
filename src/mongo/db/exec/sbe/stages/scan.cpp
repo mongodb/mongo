@@ -263,8 +263,10 @@ void ScanStage::doDetachFromTrialRunTracker() {
     _tracker = nullptr;
 }
 
-void ScanStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
+PlanStage::TrialRunTrackerAttachResultMask ScanStage::doAttachToTrialRunTracker(
+    TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) {
     _tracker = tracker;
+    return childrenAttachResult | TrialRunTrackerAttachResultFlags::AttachedToStreamingStage;
 }
 
 void ScanStage::open(bool reOpen) {
