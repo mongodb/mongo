@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
@@ -379,6 +380,10 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
             return scheduler.scheduleWork(
                 [lsid, txnNumber, participants, decision](OperationContext* opCtx) {
                     FlowControl::Bypass flowControlBypass(opCtx);
+                    // Do not acquire a storage ticket in order to avoid unnecessary serialization
+                    // with other prepared transactions that are holding a storage ticket
+                    // themselves; see SERVER-60682.
+                    SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumber, CoordinatorAction::kWritingDecision);
                     return persistDecisionBlocking(opCtx, lsid, txnNumber, participants, decision);
