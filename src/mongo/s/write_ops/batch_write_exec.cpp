@@ -300,6 +300,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
                     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
+                    trackedErrors.startTracking(ErrorCodes::TenantMigrationAborted);
 
                     LOGV2_DEBUG(22907,
                                 4,
@@ -338,6 +339,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     const auto& staleShardErrors =
                         trackedErrors.getErrors(ErrorCodes::StaleShardVersion);
                     const auto& staleDbErrors = trackedErrors.getErrors(ErrorCodes::StaleDbVersion);
+                    const auto& tenantMigrationAbortedErrors =
+                        trackedErrors.getErrors(ErrorCodes::TenantMigrationAborted);
 
                     if (!staleShardErrors.empty()) {
                         invariant(staleDbErrors.empty());
@@ -349,6 +352,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                         invariant(staleShardErrors.empty());
                         noteStaleDbResponses(opCtx, staleDbErrors, &targeter);
                         ++stats->numStaleDbBatches;
+                    }
+
+                    if (!tenantMigrationAbortedErrors.empty()) {
+                        ++stats->numTenantMigrationAbortedErrors;
                     }
 
                     if (response.shardHostAndPort) {

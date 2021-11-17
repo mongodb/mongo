@@ -157,6 +157,57 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
 }
 
 /**
+ * Expects to send tenantMigrationAborted error for the numberOfFailedOps given.
+ * If
+ */
+BSONObj expectInsertsReturnTenantMigrationAbortedErrorsBase(
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& expected,
+    const executor::RemoteCommandRequest& request,
+    int numberOfFailedOps) {
+    ASSERT_EQUALS(nss.db(), request.dbname);
+
+    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+    ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+
+    const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
+    ASSERT_EQUALS(expected.size(), inserted.size());
+
+    auto itInserted = inserted.begin();
+    auto itExpected = expected.begin();
+
+    for (; itInserted != inserted.end(); itInserted++, itExpected++) {
+        ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
+    }
+
+    BSONObjBuilder tenantMigrationAbortedResponse;
+    tenantMigrationAbortedResponse.append("ok", 1);
+    tenantMigrationAbortedResponse.append("n", int(inserted.size()));
+
+    int expectedSize = int(expected.size());
+    invariant(numberOfFailedOps >= 0 && numberOfFailedOps <= expectedSize,
+              str::stream() << "Expected numberOfFailedOps value to be between 0 and "
+                            << expectedSize << " but found " << numberOfFailedOps << ".");
+    int i = expectedSize - numberOfFailedOps;
+
+    std::vector<BSONObj> errors;
+    for (; i < expectedSize; i++) {
+        BSONObjBuilder errorBuilder;
+        errorBuilder.append("index", i);
+        errorBuilder.append("code", int(ErrorCodes::TenantMigrationAborted));
+        errorBuilder.append("errmsg", "mock tenantmigrationaborted error");
+        errors.push_back(errorBuilder.obj());
+        // ordered bulk only return one error and stop.
+        if (actualBatchedInsert.getWriteCommandRequestBase().getOrdered())
+            break;
+    }
+    tenantMigrationAbortedResponse.append("writeErrors", errors);
+
+    return tenantMigrationAbortedResponse.obj();
+}
+
+/**
  * Mimics a single shard backend for a particular collection which can be initialized with a
  * set of write command results to return.
  */
@@ -244,6 +295,14 @@ public:
     void expectInsertsReturnStaleDbVersionErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             return expectInsertsReturnStaleDbVersionErrorsBase(nss, expected, request);
+        });
+    }
+
+    void expectInsertsReturnTenantMigrationAbortedErrors(const std::vector<BSONObj>& expected,
+                                                         int numberOfFailedOps) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            return expectInsertsReturnTenantMigrationAbortedErrorsBase(
+                nss, expected, request, numberOfFailedOps);
         });
     }
 
@@ -1621,6 +1680,204 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
     });
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, TenantMigrationAbortedErrorOrderedOp) {
+    const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(expected);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    // Execute request
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+
+        ASSERT_EQUALS(1, stats.numTenantMigrationAbortedErrors);
+    });
+
+    expectInsertsReturnTenantMigrationAbortedErrors(expected, expected.size());
+    expectInsertsReturnSuccess(expected);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, TenantMigrationAbortedErrorUnorderedOp) {
+    const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(expected);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    // Execute request
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+
+        ASSERT_EQUALS(1, stats.numTenantMigrationAbortedErrors);
+    });
+
+    expectInsertsReturnTenantMigrationAbortedErrors(expected, expected.size());
+    expectInsertsReturnSuccess(expected);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, MultipleTenantMigrationAbortedErrorUnorderedOp) {
+    const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(expected);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    const int numTenantMigrationAbortedErrors = 3;
+
+    // Execute request
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+
+        ASSERT_EQUALS(numTenantMigrationAbortedErrors, stats.numTenantMigrationAbortedErrors);
+    });
+
+    for (int i = 0; i < numTenantMigrationAbortedErrors; i++) {
+        expectInsertsReturnTenantMigrationAbortedErrors(expected, expected.size());
+    }
+    expectInsertsReturnSuccess(expected);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, MultipleTenantMigrationAbortedErrorOrderedOp) {
+    const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(expected);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    const int numTenantMigrationAbortedErrors = 3;
+
+    // Execute request
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+
+        ASSERT_EQUALS(numTenantMigrationAbortedErrors, stats.numTenantMigrationAbortedErrors);
+    });
+
+    for (int i = 0; i < numTenantMigrationAbortedErrors; i++) {
+        expectInsertsReturnTenantMigrationAbortedErrors(expected, expected.size());
+    }
+    expectInsertsReturnSuccess(expected);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, PartialTenantMigrationAbortedErrorOrderedOp) {
+    const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(expected);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    // Execute request
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+
+        ASSERT_EQUALS(1, stats.numTenantMigrationAbortedErrors);
+    });
+
+    const std::vector<BSONObj> expected_retries{BSON("x" << 2), BSON("x" << 3)};
+    int numberOfFailedOps = expected_retries.size();
+    expectInsertsReturnTenantMigrationAbortedErrors(expected, numberOfFailedOps);
+    expectInsertsReturnSuccess(expected_retries);
+
+    future.default_timed_get();
+}
+
+TEST_F(BatchWriteExecTest, PartialTenantMigrationErrorUnorderedOp) {
+    const std::vector<BSONObj> expected{BSON("x" << 1), BSON("x" << 2), BSON("x" << 3)};
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(false);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(expected);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    // Execute request
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), singleShardNSTargeter, request, &response, &stats);
+        ASSERT(response.getOk());
+
+        ASSERT_EQUALS(1, stats.numTenantMigrationAbortedErrors);
+    });
+
+    const std::vector<BSONObj> expected_retries{BSON("x" << 2), BSON("x" << 3)};
+    int numberOfFailedOps = expected_retries.size();
+    expectInsertsReturnTenantMigrationAbortedErrors(expected, numberOfFailedOps);
+    expectInsertsReturnSuccess(expected_retries);
 
     future.default_timed_get();
 }
