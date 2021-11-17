@@ -2874,9 +2874,7 @@ public:
 class ExpressionReverseArray final : public ExpressionFixedArity<ExpressionReverseArray, 1> {
 public:
     explicit ExpressionReverseArray(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionFixedArity<ExpressionReverseArray, 1>(expCtx) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
