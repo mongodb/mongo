@@ -256,6 +256,14 @@ public:
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
 
+    // Has a value if this operation is a query. True if the execution tree for the find part of the
+    // query was built using the classic query engine, false if it was built in SBE.
+    boost::optional<bool> classicEngineUsed;
+
+    // Has a value if this operation is an aggregation query. True if `DocumentSources` were
+    // involved in the execution tree for this query, false if they were not.
+    boost::optional<bool> documentSourceUsed;
+
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();
 

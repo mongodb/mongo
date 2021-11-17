@@ -794,7 +794,11 @@ Status runAggregate(OperationContext* opCtx,
             // PlanExecutor by itself. The resulting cursor will look like what the client would
             // have gotten from find command.
             execs.emplace_back(std::move(attachExecutorCallback.second));
+            // Mark that this query does not use DocumentSource.
+            curOp->debug().documentSourceUsed = false;
         } else {
+            // Mark that this query uses DocumentSource.
+            curOp->debug().documentSourceUsed = true;
             // Complete creation of the initial $cursor stage, if needed.
             PipelineD::attachInnerQueryExecutorToPipeline(collection,
                                                           attachExecutorCallback.first,
