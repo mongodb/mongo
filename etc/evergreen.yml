@@ -3585,21 +3585,6 @@ tasks:
       jepsen_test_name: register
 
 - <<: *run_jepsen_template
-  name: jepsen_register_linearizableRead
-  commands:
-  - func: "do setup"
-  - func: "do jepsen setup"
-  - func: "run jepsen test"
-    vars:
-      <<: *jepsen_config_vars
-      jepsen_read_concern: --read-concern linearizable
-      jepsen_storage_engine: --storage-engine mmapv1
-      jepsen_test_name: register
-      # Running Jepsen when using the MMAPv1 storage engine for longer periods of time can lead to
-      # out of memory issues and task timeouts during the analysis phase.
-      jepsen_time_limit: --time-limit 300
-
-- <<: *run_jepsen_template
   name: jepsen_register_linearizableRead_WT
   commands:
   - func: "do setup"
@@ -6596,9 +6581,6 @@ buildvariants:
   - name: jepsen_register_findAndModify_WT
     distros:
     - ubuntu1604-build
-  - name: jepsen_register_linearizableRead
-    distros:
-    - ubuntu1604-build
   - name: jepsen_register_linearizableRead_WT
     distros:
     - ubuntu1604-build
@@ -9560,9 +9542,6 @@ buildvariants:
   - name: audit
   - name: ese
   - name: jepsen_register_findAndModify_WT
-    distros:
-    - ubuntu1604-build
-  - name: jepsen_register_linearizableRead
     distros:
     - ubuntu1604-build
   - name: jepsen_register_linearizableRead_WT
