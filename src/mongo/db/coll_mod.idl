@@ -81,14 +81,6 @@ structs:
                 type: safeBool
                 unstable: true
 
-    CollModTimeseries:
-        description: "A type representing the adjustable options on timeseries collections"
-        strict: true
-        fields:
-            granularity:
-                optional: true
-                type: BucketGranularity
-
 commands:
     collMod:
         description: "Specify collMod Command."

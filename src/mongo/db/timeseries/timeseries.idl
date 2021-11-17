@@ -97,3 +97,11 @@ structs:
                 type: safeInt
                 optional: true
                 validator: { gte: 1 }
+
+    CollModTimeseries:
+        description: "A type representing the adjustable options on timeseries collections"
+        strict: true
+        fields:
+            granularity:
+                optional: true
+                type: BucketGranularity
