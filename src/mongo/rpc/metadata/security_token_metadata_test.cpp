@@ -52,7 +52,7 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = BSON(kTenantFieldName << OID::gen());
 
-    gSupportMultitenancy = false;
+    gMultitenancySupport = false;
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
     ASSERT_THROWS_CODE_AND_WHAT(msgBytes.parse(),
                                 DBException,
@@ -65,7 +65,7 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = BSON(kTenantFieldName << kOid);
 
-    gSupportMultitenancy = true;
+    gMultitenancySupport = true;
     auto msg = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody}.parse();
     ASSERT_BSONOBJ_EQ(msg.body, kPingBody);
     ASSERT_EQ(msg.sequences.size(), 0u);

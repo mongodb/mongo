@@ -194,7 +194,7 @@ OpMsg OpMsg::parse(const Message& message) try {
             case Section::kSecurityToken: {
                 uassert(ErrorCodes::Unauthorized,
                         "Unsupported Security Token provided",
-                        gSupportMultitenancy);
+                        gMultitenancySupport);
                 msg.securityToken = sectionsBuf.read<Validated<BSONObj>>();
                 break;
             }

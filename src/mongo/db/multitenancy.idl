@@ -30,10 +30,10 @@ global:
     cpp_namespace: "mongo"
 
 server_parameters:
-  supportMultitenancy:
+  multitenancySupport:
     description: Configure mongod to act as a serverless data store
     set_at: [ startup ]
     cpp_vartype: bool
-    cpp_varname: gSupportMultitenancy
+    cpp_varname: gMultitenancySupport
     default: false
 

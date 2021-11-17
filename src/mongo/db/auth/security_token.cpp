@@ -46,9 +46,9 @@ namespace {
 const auto securityTokenDecoration = OperationContext::declareDecoration<MaybeSecurityToken>();
 MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
     uassert(ErrorCodes::BadValue,
-            "supportMultitenancy may not be specified if featureFlagMongoStore is not enabled",
-            !gSupportMultitenancy || gFeatureFlagMongoStore.isEnabledAndIgnoreFCV());
-    if (gSupportMultitenancy) {
+            "multitenancySupport may not be specified if featureFlagMongoStore is not enabled",
+            !gMultitenancySupport || gFeatureFlagMongoStore.isEnabledAndIgnoreFCV());
+    if (gMultitenancySupport) {
         logv2::detail::setGetTenantIDCallback([]() -> boost::optional<OID> {
             auto* client = Client::getCurrent();
             auto* opCtx = client ? client->getOperationContext() : nullptr;
@@ -68,7 +68,7 @@ void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) t
         return;
     }
 
-    uassert(ErrorCodes::BadValue, "Multitenancy not enabled", gSupportMultitenancy);
+    uassert(ErrorCodes::BadValue, "Multitenancy not enabled", gMultitenancySupport);
 
     securityTokenDecoration(opCtx) = SecurityToken::parse({"Security Token"}, securityToken);
     LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = securityToken);
