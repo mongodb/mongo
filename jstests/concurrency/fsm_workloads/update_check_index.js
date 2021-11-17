@@ -20,13 +20,17 @@ var $config = (function() {
     var transitions = {multiUpdate: {multiUpdate: 1.0}};
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({a: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({b: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({c: 1}));
+        assertAlways.commandWorked(db[collName].createIndexes([
+            {a: 1},
+            {b: 1},
+            {c: 1},
+        ]));
 
+        let docs = [];
         for (var i = 0; i < 10; i++) {
-            assertAlways.commandWorked(db[collName].insert({a: 1, b: 1, c: 1}));
+            docs.push({a: 1, b: 1, c: 1});
         }
+        assertAlways.commandWorked(db[collName].insert(docs));
     }
 
     // Asserts that the number of index entries for all three entries matches the number of docs
