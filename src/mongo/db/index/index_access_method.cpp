@@ -102,7 +102,7 @@ AbstractIndexAccessMethod::AbstractIndexAccessMethod(IndexCatalogEntry* btreeSta
 }
 
 bool AbstractIndexAccessMethod::isFatalError(OperationContext* opCtx,
-                                             Status status,
+                                             StatusWith<bool> status,
                                              KeyString::Value key) {
     // If the status is Status::OK() return false immediately.
     if (status.isOK()) {
@@ -192,19 +192,30 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
         bool unique = _descriptor->unique();
-        Status status = _newInterface->insert(opCtx, keyString, !unique /* dupsAllowed */);
+        auto result = _newInterface->insert(opCtx, keyString, !unique /* dupsAllowed */);
 
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.
-        if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed) {
+        if (ErrorCodes::DuplicateKey == result.getStatus().code() && options.dupsAllowed) {
             invariant(unique);
-            status = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
 
-            if (status.isOK() && onDuplicateKey)
-                status = onDuplicateKey(keyString);
+            result = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
+            if (!result.isOK()) {
+                return result.getStatus();
+            } else if (result.getValue() && onDuplicateKey) {
+                // Only run the duplicate key handler if we inserted the key ourselves. Someone else
+                // could have already inserted this exact key, but in that case we don't count it as
+                // a duplicate.
+                auto status = onDuplicateKey(keyString);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+        } else if (!result.isOK()) {
+            return result.getStatus();
         }
-        if (isFatalError(opCtx, status, keyString)) {
-            return status;
+        if (isFatalError(opCtx, result, keyString)) {
+            return result.getStatus();
         }
     }
     if (numInserted) {
@@ -441,9 +452,9 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
 
     // Add all new data keys into the index.
     for (const auto keyString : ticket.added) {
-        Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
-        if (isFatalError(opCtx, status, keyString)) {
-            return status;
+        auto result = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
+        if (isFatalError(opCtx, result, keyString)) {
+            return result.getStatus();
         }
     }
 

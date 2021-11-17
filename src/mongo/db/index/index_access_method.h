@@ -584,7 +584,7 @@ private:
      * in the event that a non-fatal 'ErrorCodes::DuplicateKeyValue' is encountered during a
      * background index build.
      */
-    bool isFatalError(OperationContext* opCtx, Status status, KeyString::Value key);
+    bool isFatalError(OperationContext* opCtx, StatusWith<bool> status, KeyString::Value key);
 
     /**
      * Removes a single key from the index.

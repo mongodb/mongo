@@ -82,9 +82,9 @@ public:
     SortedDataInterface(const Ordering& ordering, bool isUnique, StringData ident);
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx,
                                                        bool dupsAllowed) override;
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed) override;
+    virtual StatusWith<bool> insert(OperationContext* opCtx,
+                                    const KeyString::Value& keyString,
+                                    bool dupsAllowed) override;
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
                          bool dupsAllowed) override;

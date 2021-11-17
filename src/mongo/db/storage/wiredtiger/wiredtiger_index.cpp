@@ -253,9 +253,9 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
       _prefix(prefix),
       _isIdIndex(desc->isIdIndex()) {}
 
-Status WiredTigerIndex::insert(OperationContext* opCtx,
-                               const KeyString::Value& keyString,
-                               bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndex::insert(OperationContext* opCtx,
+                                         const KeyString::Value& keyString,
+                                         bool dupsAllowed) {
     dassert(opCtx->lockState()->isWriteLocked());
     dassert(KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize()).isValid());
 
@@ -1509,20 +1509,20 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
-                                      WT_CURSOR* c,
-                                      const KeyString::Value& keyString,
-                                      bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
+                                                WT_CURSOR* c,
+                                                const KeyString::Value& keyString,
+                                                bool dupsAllowed) {
     if (isTimestampSafeUniqueIdx()) {
         return _insertTimestampSafe(opCtx, c, keyString, dupsAllowed);
     }
     return _insertTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
 }
 
-Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
-                                                     WT_CURSOR* c,
-                                                     const KeyString::Value& keyString,
-                                                     bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
+                                                               WT_CURSOR* c,
+                                                               const KeyString::Value& keyString,
+                                                               bool dupsAllowed) {
     const RecordId id = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     invariant(id.isValid());
 
@@ -1540,11 +1540,9 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     c->set_value(c, valueItem.Get());
     int ret = WT_OP_CHECK(c->insert(c));
 
-    if (ret != WT_DUPLICATE_KEY) {
-        if (ret == 0) {
-            return Status::OK();
-        }
-
+    if (!ret) {
+        return true;
+    } else if (ret != WT_DUPLICATE_KEY) {
         return wtRCToStatus(ret);
     }
 
@@ -1565,7 +1563,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     while (br.remaining()) {
         RecordId idInIndex = KeyString::decodeRecordId(&br);
         if (id == idInIndex)
-            return Status::OK();
+            return false;
 
         if (!insertedId && id < idInIndex) {
             value.appendRecordId(id);
@@ -1597,13 +1595,13 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    return Status::OK();
+    return true;
 }
 
-Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
-                                                   WT_CURSOR* c,
-                                                   const KeyString::Value& keyString,
-                                                   bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
+                                                             WT_CURSOR* c,
+                                                             const KeyString::Value& keyString,
+                                                             bool dupsAllowed) {
     LOGV2_TRACE_INDEX(
         20097, "Timestamp safe unique idx KeyString: {keyString}", "keyString"_attr = keyString);
 
@@ -1660,10 +1658,13 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
     ret = WT_OP_CHECK(c->insert(c));
 
     // It is possible that this key is already present during a concurrent background index build.
-    if (ret != WT_DUPLICATE_KEY)
-        invariantWTOK(ret);
+    if (ret == WT_DUPLICATE_KEY) {
+        return false;
+    }
 
-    return Status::OK();
+    invariantWTOK(ret);
+
+    return true;
 }
 
 void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
@@ -1848,10 +1849,10 @@ SortedDataBuilderInterface* WiredTigerIndexStandard::getBulkBuilder(OperationCon
     return new StandardBulkBuilder(this, opCtx, _prefix);
 }
 
-Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
-                                        WT_CURSOR* c,
-                                        const KeyString::Value& keyString,
-                                        bool dupsAllowed) {
+StatusWith<bool> WiredTigerIndexStandard::_insert(OperationContext* opCtx,
+                                                  WT_CURSOR* c,
+                                                  const KeyString::Value& keyString,
+                                                  bool dupsAllowed) {
     invariant(dupsAllowed);
 
     WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
@@ -1865,13 +1866,16 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
     c->set_value(c, valueItem.Get());
     int ret = WT_OP_CHECK(c->insert(c));
 
-    // If the record was already in the index, we just return OK.
+    // If the record was already in the index, return false.
     // This can happen, for example, when building a background index while documents are being
     // written and reindexed.
-    if (ret != 0 && ret != WT_DUPLICATE_KEY)
+    if (ret == WT_DUPLICATE_KEY) {
+        return false;
+    } else if (ret) {
         return wtRCToStatus(ret);
+    }
 
-    return Status::OK();
+    return true;
 }
 
 void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,

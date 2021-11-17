@@ -169,10 +169,10 @@ public:
                                                     _collation);
     }
 
-    virtual Status insert(OperationContext* opCtx,
-                          const BSONObj& key,
-                          const RecordId& loc,
-                          bool dupsAllowed) {
+    virtual StatusWith<bool> insert(OperationContext* opCtx,
+                                    const BSONObj& key,
+                                    const RecordId& loc,
+                                    bool dupsAllowed) {
         invariant(loc.isValid());
         invariant(!key.hasFieldNames());
 
@@ -187,13 +187,14 @@ public:
             _currentKeySize += key.objsize();
             opCtx->recoveryUnit()->registerChange(
                 std::make_unique<IndexChange>(_data, entry, true));
+            return true;
         }
-        return Status::OK();
+        return false;
     }
 
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed) {
+    virtual StatusWith<bool> insert(OperationContext* opCtx,
+                                    const KeyString::Value& keyString,
+                                    bool dupsAllowed) {
         RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
         auto key = KeyString::toBson(keyString, _ordering);

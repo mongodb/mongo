@@ -323,9 +323,9 @@ SortedDataInterface::SortedDataInterface(const Ordering& ordering, bool isUnique
     _KSForIdentEnd = createKeyString(BSONObj(), RecordId::min(), _identEnd, _ordering, _isUnique);
 }
 
-Status SortedDataInterface::insert(OperationContext* opCtx,
-                                   const KeyString::Value& keyString,
-                                   bool dupsAllowed) {
+StatusWith<bool> SortedDataInterface::insert(OperationContext* opCtx,
+                                             const KeyString::Value& keyString,
+                                             bool dupsAllowed) {
     RecordId loc = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
 
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
@@ -363,7 +363,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
                         key, _collectionNamespace, _indexName, _keyPattern, _collation);
                 }
             } else {
-                return Status::OK();
+                return false;
             }
         }
     } else {
@@ -371,7 +371,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
     }
 
     if (workingCopy->find(insertKeyString) != workingCopy->end())
-        return Status::OK();
+        return false;
 
     // The value we insert is the RecordId followed by the typebits.
     std::string internalTbString =
@@ -386,7 +386,7 @@ Status SortedDataInterface::insert(OperationContext* opCtx,
     workingCopy->insert(StringStore::value_type(insertKeyString, data));
     RecoveryUnit::get(opCtx)->makeDirty();
 
-    return Status::OK();
+    return true;
 }
 
 void SortedDataInterface::unindex(OperationContext* opCtx,
