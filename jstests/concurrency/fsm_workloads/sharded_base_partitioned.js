@@ -202,8 +202,6 @@ var $config = (function() {
         }
     };
 
-    var teardown = function teardown(db, collName, cluster) {};
-
     return {
         threadCount: 1,
         iterations: 1,
@@ -212,7 +210,6 @@ var $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
-        teardown: teardown,
         passConnectionCache: true
     };
 })();
