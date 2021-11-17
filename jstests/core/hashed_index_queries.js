@@ -10,13 +10,15 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
 load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
 
-const coll = db.hashed_index_queries;
-coll.drop();
+const collNamePrefix = 'hashed_index_queries_';
+let collCount = 0;
+let coll;
 
+let docs = [];
+let docId = 0;
 for (let i = 0; i < 100; i++) {
-    assert.commandWorked(assert.commandWorked(
-        coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)})));
-    assert.commandWorked(coll.insert({a: i, b: (i % 13), c: NumberInt(i % 10)}));
+    docs.push({_id: docId++, a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)});
+    docs.push({_id: docId++, a: i, b: (i % 13), c: NumberInt(i % 10)});
 }
 
 /**
@@ -52,7 +54,10 @@ function validateCountCmdOutputAndPlan({filter, expectedStages, expectedOutput})
 /**
  * Tests for 'find' operation when hashed field is prefix.
  */
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({b: "hashed", c: -1}));
+assert.commandWorked(coll.insert(docs));
 
 // Verify that index is not used for a range query on a hashed field.
 validateFindCmdOutputAndPlan({filter: {b: {$gt: 10, $lt: 12}}, expectedStages: ["COLLSCAN"]});
@@ -78,8 +83,10 @@ validateFindCmdOutputAndPlan({
 /**
  * Tests for 'find' operation when hashed field is not a prefix.
  */
-assert.commandWorked(coll.dropIndexes());
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: "hashed", c: -1}));
+assert.commandWorked(coll.insert(docs));
 
 // Verify $in query can use point interval bounds on hashed fields and non-hashed fields.
 validateFindCmdOutputAndPlan({
@@ -99,8 +106,10 @@ validateFindCmdOutputAndPlan({
 /**
  * Tests for 'count' operation when hashed field is prefix.
  */
-assert.commandWorked(coll.dropIndexes());
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({b: "hashed", a: 1}));
+assert.commandWorked(coll.insert(docs));
 
 // Verify that index is not used for a range query on a hashed field.
 validateCountCmdOutputAndPlan(
@@ -113,8 +122,10 @@ validateCountCmdOutputAndPlan(
 /**
  * Tests for 'count' operation when hashed field is not a prefix.
  */
-assert.commandWorked(coll.dropIndexes());
+coll = db.getCollection(collNamePrefix + collCount++);
+coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: "hashed", c: -1}));
+assert.commandWorked(coll.insert(docs));
 
 // Verify that range query on a non-hashed prefix field can use index.
 validateCountCmdOutputAndPlan({
