@@ -1,5 +1,6 @@
 // Tests that nodes sync from each other properly and that nodes find new sync sources when they
 // are disconnected from their current sync source.
+// @tags: [multiversion_incompatible]
 
 (function() {
 'use strict';
