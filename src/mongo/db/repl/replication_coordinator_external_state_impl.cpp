@@ -623,6 +623,11 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
             }
 
             if (writeOplog) {
+                // The no-op write doesn't affect the correctness of the safe reconfig protocol and
+                // so it doesn't have to be written in the same WUOW as the config write. In fact,
+                // the no-op write is only needed for some corner cases where the committed snapshot
+                // is dropped after a force reconfig that changes the config content or a safe
+                // reconfig that changes writeConcernMajorityJournalDefault.
                 WriteUnitOfWork wuow(opCtx);
                 auto msgObj = BSON("msg"
                                    << "Reconfig set"
