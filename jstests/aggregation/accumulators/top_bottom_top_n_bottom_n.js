@@ -69,21 +69,25 @@ for (const stateDoc of states) {
 
 assert.commandWorked(coll.insert(docs));
 
+// Helper to construct a valid $topN/$bottomN specification.
+function buildTopNBottomNSpec(op, sortSpec, outputSpec) {
+    return {[op]: {output: outputSpec, n: n, sortBy: sortSpec}};
+}
+
 /**
  * Helper that verifies that 'op' and 'sortSpec' produce 'expectedResults'.
  */
 function assertExpected(op, sortSpec, expectedResults) {
-    const actual =
-        coll.aggregate([
-                {
-                    $group: {
-                        _id: "$state",
-                        associates: {[op]: {output: "$associate", n: n, sortBy: sortSpec}}
-                    }
-                },
-                {$sort: {_id: 1}}
-            ])
-            .toArray();
+    const actual = coll.aggregate([
+                           {
+                               $group: {
+                                   _id: "$state",
+                                   associates: buildTopNBottomNSpec(op, sortSpec, "$associate")
+                               }
+                           },
+                           {$sort: {_id: 1}}
+                       ])
+                       .toArray();
     assert.eq(expectedResults, actual);
 }
 
@@ -93,6 +97,40 @@ assertExpected("$bottomN", {sales: 1}, expectedBottomNAscResults);
 assertExpected("$topN", {sales: 1}, expectedTopNAscResults);
 assertExpected("$bottomN", {sales: -1}, expectedBottomNDescResults);
 assertExpected("$topN", {sales: -1}, expectedTopNDescResults);
+
+// Verify that we can compute multiple topN/bottomN groupings in the same $group.
+const combinedGroup =
+    coll.aggregate([
+            {
+                $group: {
+                    _id: "$state",
+                    bottomAsc: buildTopNBottomNSpec("$bottomN", {sales: 1}, "$associate"),
+                    bottomDesc: buildTopNBottomNSpec("$bottomN", {sales: -1}, "$associate"),
+                    topAsc: buildTopNBottomNSpec("$topN", {sales: 1}, "$associate"),
+                    topDesc: buildTopNBottomNSpec("$topN", {sales: -1}, "$associate")
+                }
+            },
+            {$sort: {_id: 1}}
+        ])
+        .toArray();
+
+let bottomAsc = [];
+let bottomDesc = [];
+let topAsc = [];
+let topDesc = [];
+for (const doc of combinedGroup) {
+    bottomAsc.push({_id: doc["_id"], associates: doc["bottomAsc"]});
+    bottomDesc.push({_id: doc["_id"], associates: doc["bottomDesc"]});
+    topAsc.push({_id: doc["_id"], associates: doc["topAsc"]});
+    topDesc.push({_id: doc["_id"], associates: doc["topDesc"]});
+}
+
+assert.eq([bottomAsc, bottomDesc, topAsc, topDesc], [
+    expectedBottomNAscResults,
+    expectedBottomNDescResults,
+    expectedTopNAscResults,
+    expectedTopNDescResults
+]);
 
 // Verify that we can dynamically compute 'n' based on the group key for $group.
 const groupKeyNExpr = {
@@ -153,6 +191,62 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
     cursor: {}
 }),
                              4544714);
+
+assert(coll.drop());
+
+// Verify that $topN/$bottomN respects the specified sort order.
+function gameScoreGenerator(i) {
+    const players = ["Mihai", "Mickey", "Kyle", "Bob", "Joe", "Rebecca", "Jane", "Jill", "Sarah"];
+    const playerId = i % players.length;
+    const playersPerGame = 10;
+    const gameId = Math.floor(i / playersPerGame);
+    const score = i % 3 === 1 ? i : 3 * i;
+    return {
+        _id: i,
+        game: "G" + gameId,
+        player: players[playerId] + Math.floor(i / players.length),
+        score: score
+    };
+}
+const nGames = 100;
+let games = [];
+for (let i = 0; i < nGames; ++i) {
+    games.push(gameScoreGenerator(i));
+}
+assert.commandWorked(coll.insert(games));
+
+const gameSpec = {
+    player: "$player",
+    score: "$score"
+};
+const gameResults = coll.aggregate([{
+                            $group: {
+                                _id: "$game",
+                                bottomAsc: buildTopNBottomNSpec("$bottomN", {score: 1}, gameSpec),
+                                topAsc: buildTopNBottomNSpec("$topN", {score: 1}, gameSpec),
+                                topDesc: buildTopNBottomNSpec("$topN", {score: -1}, gameSpec),
+                                bottomDesc: buildTopNBottomNSpec("$bottomN", {score: -1}, gameSpec),
+                            }
+                        }])
+                        .toArray();
+
+for (const doc of gameResults) {
+    let assertResultsInOrder = function(index, doc, fieldName, isAsc) {
+        const arr = doc[fieldName];
+        const [first, second] = [arr[index - 1]["score"], arr[index]["score"]];
+        const cmpResult = isAsc ? first < second : first > second;
+        assert(cmpResult,
+               "Incorrect order from accumulator corresponding to field '" + fieldName +
+                   "'; results: " + tojson(arr));
+    };
+
+    for (let i = 1; i < n; ++i) {
+        assertResultsInOrder(i, doc, "bottomAsc", true);
+        assertResultsInOrder(i, doc, "topAsc", true);
+        assertResultsInOrder(i, doc, "bottomDesc", false);
+        assertResultsInOrder(i, doc, "topDesc", false);
+    }
+}
 
 const rejectInvalidSpec = (op, assign, errCode, delProps = []) => {
     let spec = Object.assign({}, {output: "$associate", n: 2, sortBy: {sales: 1}}, assign);

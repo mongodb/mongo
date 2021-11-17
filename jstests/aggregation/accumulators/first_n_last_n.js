@@ -69,6 +69,35 @@ const expectedLastNResults = [
 arrayEq(expectedFirstNResults, actualFirstNResults);
 arrayEq(expectedLastNResults, actualLastNResults);
 
+// Verify that an index on {_id: 1, sales: -1} will produce the expected results.
+const idxSpec = {
+    _id: 1,
+    sales: -1
+};
+assert.commandWorked(coll.createIndex(idxSpec));
+
+const indexedFirstNResults =
+    coll.aggregate(
+            [
+                {$sort: {_id: 1}},
+                {$group: {_id: '$state', sales: {$firstN: {input: "$sales", n: n}}}},
+                {$sort: {_id: 1}},
+            ],
+            {hint: idxSpec})
+        .toArray();
+assert.eq(expectedFirstNResults, indexedFirstNResults);
+
+const indexedLastNResults =
+    coll.aggregate(
+            [
+                {$sort: {_id: 1}},
+                {$group: {_id: '$state', sales: {$lastN: {input: "$sales", n: n}}}},
+                {$sort: {_id: 1}},
+            ],
+            {hint: idxSpec})
+        .toArray();
+assert.eq(expectedLastNResults, indexedLastNResults);
+
 // Reject non-integral values of n.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
     pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {input: '$sales', n: 'string'}}}}],
