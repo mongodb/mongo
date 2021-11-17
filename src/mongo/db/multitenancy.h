@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -40,9 +43,11 @@ namespace mongo {
  * and be guaranteed to never have a collision with a value
  * produced by OID::gen().
  */
-const OID kSystemTenantID(
-    "15650000"   /* timestamp: 1981-05-17 */
-    "0102030405" /* process id */
-    "060708" /* counter */);
+extern const OID kSystemTenantID;
+
+/**
+ * Extract the active TenantID for this operation.
+ */
+boost::optional<OID> getActiveTenant(OperationContext* opCtx);
 
 }  // namespace mongo

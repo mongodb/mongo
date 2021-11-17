@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,24 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/multitenancy.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/security_token.h"
 
 namespace mongo {
 
-class V2UserDocumentParser {
-    V2UserDocumentParser(const V2UserDocumentParser&) = delete;
-    V2UserDocumentParser& operator=(const V2UserDocumentParser&) = delete;
+const OID kSystemTenantID(
+    "15650000"   /* timestamp: 1981-05-17 */
+    "0102030405" /* process id */
+    "060708" /* counter */);
 
-public:
-    V2UserDocumentParser() {}
-
-    /**
-     * Apply a tenant identifier to every tenant aware object during parsing.
-     */
-    void setTenantID(boost::optional<OID> tenant) {
-        _tenant = std::move(tenant);
+boost::optional<OID> getActiveTenant(OperationContext* opCtx) {
+    auto token = auth::getSecurityToken(opCtx);
+    if (!token) {
+        return boost::none;
     }
 
-    Status checkValidUserDocument(const BSONObj& doc) const;
-    Status initializeUserFromUserDocument(const BSONObj& privDoc, User* user) const;
-
-private:
-    Status initializeUserIndirectRolesFromUserDocument(const BSONObj& doc, User* user) const;
-    Status initializeUserPrivilegesFromUserDocument(const BSONObj& doc, User* user) const;
-
-public:
-    // public for unit testing only.
-    Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
-    Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;
-    Status initializeAuthenticationRestrictionsFromUserDocument(const BSONObj& doc,
-                                                                User* user) const;
-
-private:
-    boost::optional<OID> _tenant;
-};
+    return token->getTenant();
+}
 
 }  // namespace mongo

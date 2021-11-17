@@ -33,9 +33,12 @@
 #include "mongo/db/auth/user_name.h"
 
 namespace mongo {
+namespace {
+constexpr auto kTenantFieldName = "tenant"_sd;
+}  // namespace
 
 template <typename T>
-StatusWith<T> AuthName<T>::parse(StringData str) {
+StatusWith<T> AuthName<T>::parse(StringData str, const boost::optional<OID>& tenant) {
     auto split = str.find('.');
 
     if (split == std::string::npos) {
@@ -44,51 +47,62 @@ StatusWith<T> AuthName<T>::parse(StringData str) {
                                     << T::kFieldName << " pair");
     }
 
-    return T(str.substr(split + 1), str.substr(0, split));
+    return T(str.substr(split + 1), str.substr(0, split), tenant);
 }
 
 template <typename T>
-T AuthName<T>::parseFromVariant(const stdx::variant<std::string, BSONObj>& name) {
+T AuthName<T>::parseFromVariant(const stdx::variant<std::string, BSONObj>& name,
+                                const boost::optional<OID>& tenant) {
     if (stdx::holds_alternative<std::string>(name)) {
         return uassertStatusOK(parse(stdx::get<std::string>(name)));
     }
 
-    return parseFromBSONObj(stdx::get<BSONObj>(name));
+    return parseFromBSONObj(stdx::get<BSONObj>(name), tenant);
 }
 
 template <typename T>
-T AuthName<T>::parseFromBSONObj(const BSONObj& obj) {
-    std::bitset<2> usedFields;
+T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<OID>& activeTenant) {
+    std::bitset<3> usedFields;
     constexpr size_t kNameFieldBit = 0;
     constexpr size_t kDbFieldBit = 1;
+    constexpr size_t kTenantFieldBit = 2;
     StringData name, db;
+    boost::optional<OID> tenant = activeTenant;
+
+    const auto validateField = [&](const BSONElement& elem, const size_t bit, BSONType expType) {
+        const auto fieldName = elem.fieldNameStringData();
+        uassert(ErrorCodes::BadValue,
+                str::stream() << T::kName << " must contain a " << typeName(expType)
+                              << " field named: " << fieldName,
+                elem.type() == expType);
+        uassert(ErrorCodes::BadValue,
+                str::stream() << T::kName << " has more than one field named: " << fieldName,
+                !usedFields[bit]);
+        usedFields.set(bit);
+    };
 
     for (const auto& element : obj) {
         const auto fieldName = element.fieldNameStringData();
 
         if (fieldName == T::kFieldName) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << T::kName
-                                  << " must contain a string field named: " << T::kFieldName,
-                    element.type() == String);
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << T::kName
-                                  << " has more than one field named: " << T::kFieldName,
-                    !usedFields[kNameFieldBit]);
-
-            usedFields.set(kNameFieldBit);
+            validateField(element, kNameFieldBit, String);
             name = element.valueStringData();
-        } else if (fieldName == "db"_sd) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << T::kName
-                                  << " must contain a string field named: " << T::kFieldName,
-                    element.type() == String);
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << T::kName << " has more than one field named: db",
-                    !usedFields[kDbFieldBit]);
 
-            usedFields.set(kDbFieldBit);
+        } else if (fieldName == "db"_sd) {
+            validateField(element, kDbFieldBit, String);
             db = element.valueStringData();
+
+        } else if (fieldName == kTenantFieldName) {
+            validateField(element, kTenantFieldBit, jstOID);
+            tenant = element.OID();
+            if (activeTenant) {
+                uassert(ErrorCodes::BadValue,
+                        str::stream()
+                            << T::kName
+                            << " contains a TenantID which does not match the active tenant",
+                        tenant == activeTenant);
+            }
+
         } else if constexpr (std::is_same_v<UserName, T>) {
             // Only UserName is strict, RoleName is non-strict.
             uasserted(ErrorCodes::BadValue,
@@ -105,16 +119,16 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj) {
             str::stream() << T::kName << " must contain a field named: db",
             usedFields[kDbFieldBit]);
 
-    return T(name, db);
+    return T(name, db, tenant);
 }
 
 template <typename T>
-T AuthName<T>::parseFromBSON(const BSONElement& elem) {
+T AuthName<T>::parseFromBSON(const BSONElement& elem, const boost::optional<OID>& activeTenant) {
     if (elem.type() == String) {
-        return uassertStatusOK(parse(elem.valueStringData()));
+        return uassertStatusOK(parse(elem.valueStringData(), activeTenant));
     } else if (elem.type() == Object) {
         const auto obj = elem.embeddedObject();
-        return parseFromBSONObj(obj);
+        return parseFromBSONObj(obj, activeTenant);
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << T::kName << " must be either a string or an object");
@@ -134,14 +148,17 @@ void AuthName<T>::serializeToBSON(BSONArrayBuilder* bob) const {
 }
 
 template <typename T>
-void AuthName<T>::appendToBSON(BSONObjBuilder* bob) const {
+void AuthName<T>::appendToBSON(BSONObjBuilder* bob, bool encodeTenant) const {
     *bob << T::kFieldName << getName() << "db"_sd << getDB();
+    if (encodeTenant && _tenant) {
+        *bob << kTenantFieldName << _tenant.get();
+    }
 }
 
 template <typename T>
-BSONObj AuthName<T>::toBSON() const {
+BSONObj AuthName<T>::toBSON(bool encodeTenant) const {
     BSONObjBuilder bob;
-    appendToBSON(&bob);
+    appendToBSON(&bob, encodeTenant);
     return bob.obj();
 }
 

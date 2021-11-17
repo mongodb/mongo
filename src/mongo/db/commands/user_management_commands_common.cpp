@@ -45,6 +45,7 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 
@@ -345,7 +346,17 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
                                                      ActionType::viewUser));
     } else {
         invariant(arg.isExact());
+        auto activeTenant = getActiveTenant(opCtx);
         for (const auto& userName : arg.getElements(dbname)) {
+            if (userName.getTenant() != boost::none) {
+                // Only connection based cluster administrators may specify tenant in query.
+                uassert(ErrorCodes::Unauthorized,
+                        "May not specify tenant in usersInfo query",
+                        !activeTenant &&
+                            as->isAuthorizedForActionsOnResource(
+                                ResourcePattern::forClusterResource(), ActionType::internal));
+            }
+
             if (as->lookupUser(userName)) {
                 // Can always view users you are logged in as.
                 continue;

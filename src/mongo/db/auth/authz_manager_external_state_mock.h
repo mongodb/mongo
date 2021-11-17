@@ -115,7 +115,7 @@ public:
     std::vector<BSONObj> getCollectionContents(const NamespaceString& collectionName);
 
 protected:
-    RolesLocks _lockRoles(OperationContext* opCtx) override {
+    RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<OID>&) override {
         return RolesLocks();
     }
 

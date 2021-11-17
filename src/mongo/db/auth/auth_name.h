@@ -29,16 +29,17 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <iosfwd>
 #include <memory>
 #include <string>
-
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo {
@@ -54,7 +55,7 @@ public:
     AuthName() = default;
 
     template <typename Name, typename DB>
-    AuthName(Name name, DB db) {
+    AuthName(Name name, DB db, boost::optional<OID> tenant = boost::none) {
         if constexpr (std::is_same_v<Name, std::string>) {
             _name = std::move(name);
         } else {
@@ -66,23 +67,27 @@ public:
         } else {
             _db = StringData(db).toString();
         }
+
+        _tenant = std::move(tenant);
     }
 
     /**
-     * Parses a string of the form "db.name" into an AuthName object.
+     * Parses a string of the form "db.name" into an AuthName object with an optional tenant.
      */
-    static StatusWith<T> parse(StringData str);
+    static StatusWith<T> parse(StringData str, const boost::optional<OID>& tenant = boost::none);
 
     /**
      * These methods support parsing usernames from IDL
      */
-    static T parseFromVariant(const stdx::variant<std::string, mongo::BSONObj>& name);
-    static T parseFromBSONObj(const BSONObj& obj);
-    static T parseFromBSON(const BSONElement& elem);
+    static T parseFromVariant(const stdx::variant<std::string, mongo::BSONObj>& name,
+                              const boost::optional<OID>& tenant = boost::none);
+    static T parseFromBSONObj(const BSONObj& obj, const boost::optional<OID>& tenant = boost::none);
+    static T parseFromBSON(const BSONElement& elem,
+                           const boost::optional<OID>& tenant = boost::none);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
-    void appendToBSON(BSONObjBuilder* bob) const;
-    BSONObj toBSON() const;
+    void appendToBSON(BSONObjBuilder* bob, bool encodeTenant = false) const;
+    BSONObj toBSON(bool encodeTenant = false) const;
 
     /**
      * Gets the name part of a AuthName.
@@ -96,6 +101,13 @@ public:
      */
     const std::string& getDB() const {
         return _db;
+    }
+
+    /**
+     * Gets the TenantID, if any, associated with this AuthName.
+     */
+    const boost::optional<OID>& getTenant() const {
+        return _tenant;
     }
 
     /**
@@ -129,14 +141,14 @@ public:
     }
 
     /**
-     * True if the username and dbname have not been set.
+     * True if the username, dbname, and tenant have not been set.
      */
     bool empty() const {
-        return _db.empty() && _name.empty();
+        return _db.empty() && _name.empty() && !_tenant;
     }
 
     bool operator==(const AuthName& rhs) const {
-        return (_name == rhs._name) && (_db == rhs._db);
+        return (_name == rhs._name) && (_db == rhs._db) && (_tenant == rhs._tenant);
     }
 
     bool operator!=(const AuthName& rhs) const {
@@ -144,17 +156,28 @@ public:
     }
 
     bool operator<(const AuthName& rhs) const {
-        return (_name < rhs._name) || ((_name == rhs._name) && (_db < rhs._db));
+        if (_tenant != rhs._tenant) {
+            return _tenant < rhs._tenant;
+        } else if (_db != rhs._db) {
+            return _db < rhs._db;
+        } else {
+            return _name < rhs._name;
+        }
     }
 
     template <typename H>
     friend H AbslHashValue(H h, const AuthName& name) {
-        return H::combine(std::move(h), name._db, '.', name._name);
+        auto state = std::move(h);
+        if (name._tenant) {
+            state = H::combine(std::move(state), OID::Hasher()(name._tenant.get()), '_');
+        }
+        return H::combine(std::move(state), name._db, '.', name._name);
     }
 
 private:
     std::string _name;
     std::string _db;
+    boost::optional<OID> _tenant;
 };
 
 template <typename Stream, typename T>

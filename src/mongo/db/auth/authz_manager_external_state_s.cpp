@@ -39,7 +39,7 @@
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
@@ -119,7 +119,9 @@ StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(OperationContext
     }
 
     User user(userReq.name);
-    status = V2UserDocumentParser().initializeUserFromUserDocument(userDoc, &user);
+    V2UserDocumentParser dp;
+    dp.setTenantID(getActiveTenant(opCtx));
+    status = dp.initializeUserFromUserDocument(userDoc, &user);
     if (!status.isOK()) {
         return status;
     }
@@ -132,13 +134,10 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* opC
                                                            BSONObj* result) {
     const UserName& userName = user.name;
     if (!user.roles) {
-        BSONObj usersInfoCmd = BSON(
-            "usersInfo" << BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                           << userName.getUser()
-                                           << AuthorizationManager::USER_DB_FIELD_NAME
-                                           << userName.getDB()))
-                        << "showPrivileges" << true << "showCredentials" << true
-                        << "showAuthenticationRestrictions" << true << "showCustomData" << false);
+        BSONObj usersInfoCmd = BSON("usersInfo" << userName.toBSON(true /* serialize tenant */)
+                                                << "showPrivileges" << true << "showCredentials"
+                                                << true << "showAuthenticationRestrictions" << true
+                                                << "showCustomData" << false);
         BSONObjBuilder builder;
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
             opCtx, "admin", usersInfoCmd, &builder);

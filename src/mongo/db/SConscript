@@ -78,6 +78,17 @@ env.Library(
 )
 
 env.Library(
+    target='multitenancy',
+    source=[
+        'multitenancy.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'auth/security_token',
+    ],
+)
+
+env.Library(
     target='shutdown_in_progress_quiesce_info',
     source=[
         'shutdown_in_progress_quiesce_info.cpp',

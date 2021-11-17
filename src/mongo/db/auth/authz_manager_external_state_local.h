@@ -137,7 +137,7 @@ protected:
     class RolesLocks {
     public:
         RolesLocks() = default;
-        RolesLocks(OperationContext*);
+        RolesLocks(OperationContext*, const boost::optional<OID>&);
         ~RolesLocks();
 
     private:
@@ -152,7 +152,7 @@ protected:
      *
      * virtual to allow Mock to not lock anything.
      */
-    virtual RolesLocks _lockRoles(OperationContext* opCtx);
+    virtual RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<OID>&);
 
 private:
     /**
