@@ -11,9 +11,9 @@ libworkgen_la_SOURCES = workgen.cxx workgen_func.c
 noinst_LTLIBRARIES = libworkgen.la
 
 # We keep generated Python sources under bench/workgen.
-$(PYSRC)/workgen_wrap.cxx: $(PYSRC)/workgen.h $(PYSRC)/workgen.swig
+$(PYSRC)/workgen_wrap.cxx: $(PYSRC)/workgen.h $(PYSRC)/workgen.i
 	(cd $(PYSRC) && \
-	    $(SWIG) -c++ -python -threads -O -Wall -I$(abs_top_builddir) -outdir ./workgen workgen.swig)
+	    $(SWIG) -c++ -python -threads -O -Wall -I$(abs_top_builddir) -outdir ./workgen workgen.i)
 
 _workgen.so: $(top_builddir)/libwiredtiger.la $(PYSRC)/workgen_wrap.cxx libworkgen.la $(PYSRC)/workgen.h $(PYSRC)/workgen_time.h
 	(cd $(PYSRC) && \

@@ -34,7 +34,11 @@ import os, sys
 thisdir = os.path.dirname(os.path.abspath(__file__))
 workgen_src = os.path.dirname(os.path.dirname(thisdir))
 wt_dir = os.path.dirname(os.path.dirname(workgen_src))
-wt_builddir = os.path.join(wt_dir, 'build_posix')
+env_builddir = os.getenv('WT_BUILDDIR')
+if env_builddir:
+    wt_builddir = env_builddir
+else:
+    wt_builddir = os.path.join(wt_dir, 'build_posix')
 
 def _prepend_env_path(pathvar, s):
     last = ''

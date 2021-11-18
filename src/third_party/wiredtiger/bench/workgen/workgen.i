@@ -27,7 +27,7 @@
  */
 
 /*
- * workgen.swig
+ * workgen.i
  *	The SWIG interface file defining the workgen python API.
  */
 
