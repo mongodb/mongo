@@ -2007,12 +2007,26 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"thread_group", WT_VERB_THREAD_GROUP}, {"timestamp", WT_VERB_TIMESTAMP},
       {"tiered", WT_VERB_TIERED}, {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
       {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE}, {NULL, 0}};
+    static const WT_NAME_FLAG jsontypes[] = {
+      {"error", WT_JSON_OUTPUT_ERROR}, {"message", WT_JSON_OUTPUT_MESSAGE}, {NULL, 0}};
+
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
+    uint8_t flags;
 
     conn = S2C(session);
+
+    /* Check if JSON-encoded message strings are enabled, per event handler category. */
+    WT_RET(__wt_config_gets(session, cfg, "json_output", &cval));
+    flags = 0;
+    for (ft = jsontypes; ft->name != NULL; ft++) {
+        if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+            LF_SET(ft->flag);
+        WT_RET_NOTFOUND_OK(ret);
+    }
+    conn->json_output = flags;
 
     WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
 

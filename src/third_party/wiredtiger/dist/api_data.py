@@ -748,6 +748,13 @@ connection_runtime_config = [
             is 1MB.''',
             min='0', max='1TB'),
         ]),
+    Config('json_output', '[]', r'''
+        enable JSON formatted messages on the event handler interface. Options are
+        given as a list, where each option specifies an event handler category e.g.
+        'error' represents the messages from the WT_EVENT_HANDLER::handle_error method.''',
+        type='list', choices=[
+            'error',
+            'message']),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.

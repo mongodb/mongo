@@ -2205,6 +2205,10 @@ struct __wt_connection {
 	 * throttled\, and in what proportion\, are made internally.  The minimum non-zero setting
 	 * is 1MB., an integer between 0 and 1TB; default \c 0.}
 	 * @config{ ),,}
+	 * @config{json_output, enable JSON formatted messages on the event handler interface.
+	 * Options are given as a list\, where each option specifies an event handler category e.g.
+	 * 'error' represents the messages from the WT_EVENT_HANDLER::handle_error method., a list\,
+	 * with values chosen from the following options: \c "error"\, \c "message"; default \c [].}
 	 * @config{log = (, enable logging.  Enabling logging uses three sessions from the
 	 * configured session_max., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive unneeded log files., a
@@ -2981,6 +2985,10 @@ struct __wt_connection {
  * made internally.  The minimum non-zero setting is 1MB., an integer between 0 and 1TB; default \c
  * 0.}
  * @config{ ),,}
+ * @config{json_output, enable JSON formatted messages on the event handler interface.  Options are
+ * given as a list\, where each option specifies an event handler category e.g.  'error' represents
+ * the messages from the WT_EVENT_HANDLER::handle_error method., a list\, with values chosen from
+ * the following options: \c "error"\, \c "message"; default \c [].}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from the configured
  * session_max., a set of related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive unneeded log files., a boolean

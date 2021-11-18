@@ -27,13 +27,21 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import wiredtiger, wttest
 from test_verbose01 import test_verbose_base
+from wtscenario import make_scenarios
+import wiredtiger, wttest
 
 # test_verbose02.py
 # Verify basic uses of the verbose configuration API when categories and valid/invalid verbosity
 # levels are specified.
 class test_verbose02(test_verbose_base):
+
+    format = [
+        ('flat', dict(is_json=False)),
+        ('json', dict(is_json=True)),
+    ]
+    scenarios = make_scenarios(format)
+
     collection_cfg = 'key_format=S,value_format=S'
 
     # Test use cases passing single verbose categories, ensuring we only produce verbose output for
@@ -46,7 +54,7 @@ class test_verbose02(test_verbose_base):
         # Test passing a single verbose category, 'api' along with the verbosity level
         # WT_VERBOSE_DEBUG (1). Ensuring the only verbose output generated is related to the 'api'
         # category.
-        with self.expect_verbose(['api:1'], ['WT_VERB_API']) as conn:
+        with self.expect_verbose(['api:1'], ['WT_VERB_API'], self.is_json) as conn:
             # Perform a set of simple API operations to generate verbose API messages.
             uri = 'table:test_verbose01_api'
             session = conn.open_session()
@@ -58,7 +66,7 @@ class test_verbose02(test_verbose_base):
 
         # At this time, there is no verbose messages with the category WT_VERB_API and the verbosity
         # level WT_VERBOSE_INFO (0), hence we don't expect any output.
-        with self.expect_verbose(['api:0'], ['WT_VERB_API'], False) as conn:
+        with self.expect_verbose(['api:0'], ['WT_VERB_API'], self.is_json, False) as conn:
             uri = 'table:test_verbose01_api'
             session = conn.open_session()
             session.create(uri, self.collection_cfg)
@@ -72,7 +80,7 @@ class test_verbose02(test_verbose_base):
         # WT_VERBOSE_INFO (0) and WT_VERBOSE_DEBUG (1), we can test them both.
         cfgs = ['compact:0', 'compact:1']
         for cfg in cfgs:
-            with self.expect_verbose([cfg], ['WT_VERB_COMPACT']) as conn:
+            with self.expect_verbose([cfg], ['WT_VERB_COMPACT'], self.is_json) as conn:
                 # Create a simple table to invoke compaction on. We aren't doing anything
                 # interesting with the table, we want to simply invoke a compaction pass to generate
                 # verbose messages.
@@ -91,7 +99,7 @@ class test_verbose02(test_verbose_base):
         # to those two categories.
         cfgs = ['api:1,version', 'api,version:1', 'api:1,version:1']
         for cfg in cfgs:
-            with self.expect_verbose([cfg], ['WT_VERB_API', 'WT_VERB_VERSION']) as conn:
+            with self.expect_verbose([cfg], ['WT_VERB_API', 'WT_VERB_VERSION'], self.is_json) as conn:
                 # Perform a set of simple API operations (table creations and cursor operations) to
                 # generate verbose API messages. Beyond opening the connection resource, we
                 # shouldn't need to do anything special for the version category.
