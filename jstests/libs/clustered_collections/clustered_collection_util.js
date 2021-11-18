@@ -1,6 +1,10 @@
 /**
  * Utilities for testing clustered collections.
  */
+
+load("jstests/libs/analyze_plan.js");
+load("jstests/libs/collection_drop_recreate.js");
+
 var ClusteredCollectionUtil = class {
     static areClusteredIndexesEnabled(conn) {
         const clusteredIndexesEnabled =
@@ -77,10 +81,9 @@ var ClusteredCollectionUtil = class {
         for (let len of lengths) {
             let id = 'x'.repeat(len);
 
-            // Validate the below for _id-clustered collection only until the following tickets are
+            // Validate the below for _id-clustered collection only until the following ticket is
             // addressed:
             // * TODO SERVER-60734 replacement updates should preserve the cluster key
-            // * TODO SERVER-60702 enable bounded collscans for arbitary cluster keys
             if (clusterKey == "_id") {
                 assert.commandWorked(coll.update({[clusterKey]: id}, {a: len}));
 

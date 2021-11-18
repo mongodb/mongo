@@ -39,6 +39,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query_noop.h"
 #include "mongo/db/fts/fts_spec.h"
@@ -269,7 +270,11 @@ void handleRIDRangeMinMax(const CanonicalQuery& query, CollectionScanNode* collS
  * If the query solution tree contains a collection scan node with a suitable comparison
  * predicate on '_id', we add a minRecord and maxRecord on the collection node.
  */
-void handleRIDRangeScan(const MatchExpression* conjunct, CollectionScanNode* collScan) {
+void handleRIDRangeScan(const MatchExpression* conjunct,
+                        CollectionScanNode* collScan,
+                        const QueryPlannerParams& params) {
+    invariant(params.clusteredInfo);
+
     if (conjunct == nullptr) {
         return;
     }
@@ -277,12 +282,14 @@ void handleRIDRangeScan(const MatchExpression* conjunct, CollectionScanNode* col
     auto* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
     if (andMatchPtr != nullptr) {
         for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
-            handleRIDRangeScan(andMatchPtr->getChild(index), collScan);
+            handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params);
         }
         return;
     }
 
-    if (conjunct->path() != "_id") {
+    if (conjunct->path() !=
+        clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec())) {
+        // No match on the cluster key.
         return;
     }
 
@@ -395,9 +402,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
                 csn->assertTsHasNotFallenOffOplog);
     }
 
-    if (params.allowRIDRange && !csn->resumeAfterRecordId) {
-        handleRIDRangeScan(csn->filter.get(), csn.get());
-        handleRIDRangeMinMax(query, csn.get());
+    if (params.clusteredInfo && !csn->resumeAfterRecordId) {
+        // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
+        // via minRecord and maxRecord if applicable.
+        handleRIDRangeScan(csn->filter.get(), csn.get(), params);
     }
 
     return csn;

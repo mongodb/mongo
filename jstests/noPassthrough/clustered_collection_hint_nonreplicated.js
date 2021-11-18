@@ -12,14 +12,19 @@
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/clustered_collections/clustered_collection_hint_common.js");
 
-if (ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo()) == false) {
+const conn = MongoRunner.runMongod();
+
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    MongoRunner.stopMongod(conn);
     return;
 }
 
-const replicatedDB = db.getSiblingDB(jsTestName());
+const nonReplicatedDB = conn.getDB("local");
 const collName = "coll";
-const replicatedColl = replicatedDB[collName];
+const nonReplicatedColl = nonReplicatedDB[collName];
 
-testClusteredCollectionHint(replicatedColl, {_id: 1}, "_id_");
+testClusteredCollectionHint(nonReplicatedColl, {ts: 1}, "ts_1");
+
+MongoRunner.stopMongod(conn);
 })();

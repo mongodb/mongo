@@ -8,7 +8,7 @@
  */
 (function() {
 "use strict";
-load("jstests/libs/clustered_collection_util.js");
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load('jstests/libs/dateutil.js');
 
 // Run TTL monitor constantly to speed up this test.

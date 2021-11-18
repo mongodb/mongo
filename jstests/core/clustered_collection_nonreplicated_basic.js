@@ -21,7 +21,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/clustered_collection_util.js");
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 if (ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo()) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');

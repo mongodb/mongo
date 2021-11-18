@@ -9,8 +9,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/clustered_collection_util.js");
-load("jstests/libs/collection_drop_recreate.js");
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});

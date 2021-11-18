@@ -42,8 +42,7 @@ struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
           indexFiltersApplied(false),
-          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
-          allowRIDRange(false) {}
+          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()) {}
 
     enum Options {
         // You probably want to set this.
@@ -143,10 +142,6 @@ struct QueryPlannerParams {
     // Specifies the clusteredIndex information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
     boost::optional<ClusteredCollectionInfo> clusteredInfo;
-
-    // Set if we allow optimization which converts "_id" predicates into range collection scan using
-    // minRecord and maxRecord.
-    bool allowRIDRange;
 };
 
 }  // namespace mongo
