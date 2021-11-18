@@ -342,7 +342,8 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     uassertStatusOK(checkForOverlappingZonedKeyRange(
         opCtx, configServer.get(), nss, actualRange, zoneName, keyPattern));
     try {
-        const auto& coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+        const auto& coll = Grid::get(opCtx)->catalogClient()->getCollection(
+            opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
         const auto& timeseriesField = coll.getTimeseriesFields();
         if (timeseriesField) {
             uassertStatusOK(
