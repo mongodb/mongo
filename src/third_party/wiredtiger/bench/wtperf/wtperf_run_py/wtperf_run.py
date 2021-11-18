@@ -276,6 +276,9 @@ def main():
         sys.exit("batch_file: {} not found!".format(args.batch_file))
     if args.batch_file and (args.arguments or args.operations):
         sys.exit("A batch file (-bf) should not be defined at the same time as -ops or -args")
+    if not args.verbose and not args.outfile:
+        sys.exit("Enable verbosity (or provide a file path) to dump the stats. "
+                 "Try 'python3 wtperf_run.py --help' for more information.")
 
     json_info = json.loads(args.json_info) if args.json_info else {}
     arguments = json.loads(args.arguments) if args.arguments else None
@@ -301,26 +304,46 @@ def main():
         with open(config.batch_file, "r") as file:
             batch_file_contents = json.load(file)
 
+    # Check for duplicate operations, and exit if duplicates are found
+    # First, construct a list of all operations, including potential duplicates
+    all_operations = []
+    if config.batch_file:
+        for content in batch_file_contents:
+            all_operations += content["operations"]
+    elif operations:
+        all_operations += operations
+    # Next, construct a new list with duplicates removed.
+    # Converting to a dict and back is a simple way of doing this.
+    all_operations_nodups = list(dict.fromkeys(all_operations))
+    # Now check if any duplicate operations were removed in the deduplication step.
+    if len(all_operations_nodups) != len(all_operations):
+        sys.exit("List of all operations ({}) contains duplicates".format(all_operations))
+
     # Run test
     if not args.reuse:
         if config.batch_file:
+            if args.verbose:
+                print("Batch tests to run: {}".format(len(batch_file_contents)))
             for content in batch_file_contents:
+                index = batch_file_contents.index(content)
                 if args.verbose:
-                    print("Argument: {},  Operation: {}".format(content["arguments"], content["operations"]))
-                run_test_wrapper(config=config, index=batch_file_contents.index(content), arguments=content["arguments"])
+                    print("Batch test {}: Arguments: {}, Operations: {}".
+                          format(index,  content["arguments"], content["operations"]))
+                run_test_wrapper(config=config, index=index, arguments=content["arguments"])
         else:
             run_test_wrapper(config=config, arguments=arguments)
 
-    if not args.verbose and not args.outfile:
-        sys.exit("Enable verbosity (or provide a file path) to dump the stats. "
-                 "Try 'python3 wtperf_run.py --help' for more information.")
-
-    # Process result
+    # Process results
     if config.batch_file:
         for content in batch_file_contents:
-            process_results(config, perf_stats, operations=content["operations"], index=batch_file_contents.index(content))
+            process_results(config,
+                            perf_stats,
+                            operations=content["operations"],
+                            index=batch_file_contents.index(content))
     else:
-        process_results(config, perf_stats, operations=operations)
+        process_results(config,
+                        perf_stats,
+                        operations=operations)
 
     # Output result
     if args.brief_output:
