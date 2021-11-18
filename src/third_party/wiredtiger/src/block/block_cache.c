@@ -132,7 +132,7 @@ __blkcache_high_overhead(WT_SESSION_IMPL *session)
     blkcache = &S2C(session)->blkcache;
 
     ops = blkcache->inserts + blkcache->removals;
-    return (blkcache->lookups > ops && ((ops * 100) / blkcache->lookups) > blkcache->overhead_pct);
+    return (blkcache->lookups == 0 || ((ops * 100) / blkcache->lookups) > blkcache->overhead_pct);
 }
 
 /*
