@@ -90,6 +90,9 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(skipUnindexingDocumentWhenDeleted);
 MONGO_FAIL_POINT_DEFINE(skipIndexNewRecords);
 
+// This failpoint causes the check for TTL indexes on capped collections to be ignored.
+MONGO_FAIL_POINT_DEFINE(ignoreTTLIndexCappedCollectionCheck);
+
 using std::endl;
 using std::string;
 using std::unique_ptr;
@@ -325,6 +328,18 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     }
 
     auto validatedSpec = swValidatedAndFixed.getValue();
+
+    // Check whether this is a TTL index being created on a capped collection.
+    // TODO SERVER-61545 The feature compatibility version check in this if statement can be removed
+    // once 6.0 is LTS.
+    if (collection && collection->isCapped() &&
+        validatedSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
+        ((!serverGlobalParams.featureCompatibility.isVersionInitialized()) ||
+         serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+             multiversion::FeatureCompatibilityVersion::kVersion_5_2)) &&
+        MONGO_likely(!ignoreTTLIndexCappedCollectionCheck.shouldFail())) {
+        return {ErrorCodes::CannotCreateIndex, "Cannot create TTL index on a capped collection"};
+    }
 
     // Check whether this is a non-_id index and there are any settings disallowing this server
     // from building non-_id indexes.

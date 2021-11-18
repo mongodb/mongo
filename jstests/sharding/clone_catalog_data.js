@@ -33,7 +33,7 @@
     // Create indexes on each collection.
     var coll1Indexes =
             [
-                {key: {a: 1}, name: 'index1', expireAfterSeconds: 5000},
+                {key: {a: 1}, name: 'index1', sparse: true},
                 {key: {b: -1}, name: 'index2', unique: true},
             ],
         coll2Indexes = [
