@@ -26,13 +26,17 @@ if (!isExactTopNEnabled) {
     return;
 }
 
+const largestInt =
+    NumberDecimal("9223372036854775807");  // This is max int64 which is supported as N.
+const largestIntPlus1 = NumberDecimal("9223372036854775808");  // Adding 1 puts it over the edge.
+
 // Makes a string for a unique sales associate name that looks like 'Jim the 4 from CA'.
 const associateName = (i, state) => ["Jim", "Pam", "Dwight", "Phyllis"][i % 4] + " the " +
     parseInt(i / 4) + " from " + state;
 
 // Basic correctness tests.
 let docs = [];
-const n = 4;
+const defaultN = 4;
 const states = [{state: "CA", sales: 10}, {state: "NY", sales: 7}, {state: "TX", sales: 4}];
 let expectedBottomNAscResults = [];
 let expectedTopNAscResults = [];
@@ -50,10 +54,10 @@ for (const stateDoc of states) {
         docs.push({state, sales: amount, associate});
 
         // Record the lowest/highest 'n' values.
-        if (i < n + 1) {
+        if (i < defaultN + 1) {
             lowSales.push(associate);
         }
-        if (sales - n < i) {
+        if (sales - defaultN < i) {
             highSales.push(associate);
         }
     }
@@ -70,24 +74,25 @@ for (const stateDoc of states) {
 assert.commandWorked(coll.insert(docs));
 
 // Helper to construct a valid $topN/$bottomN specification.
-function buildTopNBottomNSpec(op, sortSpec, outputSpec) {
-    return {[op]: {output: outputSpec, n: n, sortBy: sortSpec}};
+function buildTopNBottomNSpec(op, sortSpec, outputSpec, nValue) {
+    return {[op]: {output: outputSpec, n: nValue, sortBy: sortSpec}};
 }
 
 /**
  * Helper that verifies that 'op' and 'sortSpec' produce 'expectedResults'.
  */
 function assertExpected(op, sortSpec, expectedResults) {
-    const actual = coll.aggregate([
-                           {
-                               $group: {
-                                   _id: "$state",
-                                   associates: buildTopNBottomNSpec(op, sortSpec, "$associate")
-                               }
-                           },
-                           {$sort: {_id: 1}}
-                       ])
-                       .toArray();
+    const actual =
+        coll.aggregate([
+                {
+                    $group: {
+                        _id: "$state",
+                        associates: buildTopNBottomNSpec(op, sortSpec, "$associate", defaultN)
+                    }
+                },
+                {$sort: {_id: 1}}
+            ])
+            .toArray();
     assert.eq(expectedResults, actual);
 }
 
@@ -104,10 +109,11 @@ const combinedGroup =
             {
                 $group: {
                     _id: "$state",
-                    bottomAsc: buildTopNBottomNSpec("$bottomN", {sales: 1}, "$associate"),
-                    bottomDesc: buildTopNBottomNSpec("$bottomN", {sales: -1}, "$associate"),
-                    topAsc: buildTopNBottomNSpec("$topN", {sales: 1}, "$associate"),
-                    topDesc: buildTopNBottomNSpec("$topN", {sales: -1}, "$associate")
+                    bottomAsc: buildTopNBottomNSpec("$bottomN", {sales: 1}, "$associate", defaultN),
+                    bottomDesc:
+                        buildTopNBottomNSpec("$bottomN", {sales: -1}, "$associate", defaultN),
+                    topAsc: buildTopNBottomNSpec("$topN", {sales: 1}, "$associate", defaultN),
+                    topDesc: buildTopNBottomNSpec("$topN", {sales: -1}, "$associate", defaultN)
                 }
             },
             {$sort: {_id: 1}}
@@ -192,6 +198,18 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
 }),
                              4544714);
 
+// Verify that 'n' cannot be greater than the largest signed 64 bit int.
+assert.commandFailedWithCode(coll.runCommand("aggregate", {
+    pipeline: [{
+        $group: {
+            _id: {'st': '$state'},
+            sales: {$topN: {output: "$associate", n: largestIntPlus1, sortBy: {sales: 1}}}
+        }
+    }],
+    cursor: {}
+}),
+                             5787903);
+
 assert(coll.drop());
 
 // Verify that $topN/$bottomN respects the specified sort order.
@@ -219,32 +237,46 @@ const gameSpec = {
     player: "$player",
     score: "$score"
 };
-const gameResults = coll.aggregate([{
-                            $group: {
-                                _id: "$game",
-                                bottomAsc: buildTopNBottomNSpec("$bottomN", {score: 1}, gameSpec),
-                                topAsc: buildTopNBottomNSpec("$topN", {score: 1}, gameSpec),
-                                topDesc: buildTopNBottomNSpec("$topN", {score: -1}, gameSpec),
-                                bottomDesc: buildTopNBottomNSpec("$bottomN", {score: -1}, gameSpec),
-                            }
-                        }])
-                        .toArray();
+for (const nVal of [defaultN, largestInt]) {
+    const gameResults =
+        coll.aggregate([{
+                $group: {
+                    _id: "$game",
+                    bottomAsc: buildTopNBottomNSpec("$bottomN", {score: 1}, gameSpec, nVal),
+                    topAsc: buildTopNBottomNSpec("$topN", {score: 1}, gameSpec, nVal),
+                    topDesc: buildTopNBottomNSpec("$topN", {score: -1}, gameSpec, nVal),
+                    bottomDesc: buildTopNBottomNSpec("$bottomN", {score: -1}, gameSpec, nVal),
+                }
+            }])
+            .toArray();
 
-for (const doc of gameResults) {
-    let assertResultsInOrder = function(index, doc, fieldName, isAsc) {
-        const arr = doc[fieldName];
-        const [first, second] = [arr[index - 1]["score"], arr[index]["score"]];
-        const cmpResult = isAsc ? first < second : first > second;
-        assert(cmpResult,
-               "Incorrect order from accumulator corresponding to field '" + fieldName +
-                   "'; results: " + tojson(arr));
-    };
+    for (const doc of gameResults) {
+        let assertResultsInOrder = function(index, fieldName, arr, isAsc) {
+            const [first, second] = [arr[index - 1]["score"], arr[index]["score"]];
+            const cmpResult = isAsc ? first < second : first > second;
+            assert(cmpResult,
+                   "Incorrect order from accumulator corresponding to field '" + fieldName +
+                       "'; results: " + tojson(arr));
+        };
 
-    for (let i = 1; i < n; ++i) {
-        assertResultsInOrder(i, doc, "bottomAsc", true);
-        assertResultsInOrder(i, doc, "topAsc", true);
-        assertResultsInOrder(i, doc, "bottomDesc", false);
-        assertResultsInOrder(i, doc, "topDesc", false);
+        let testFieldNames = function(fNames, isAsc) {
+            for (const fieldName of fNames) {
+                const arr = doc[fieldName];
+                // Verify that 'nVal' is greater or equal to the number of results returned.
+                // Note that we upconvert to NumberDecimal to account for 'largestInt' being a
+                // NumberDecimal.
+                assert.gte(NumberDecimal(nVal),
+                           NumberDecimal(arr.length),
+                           nVal + " is not GTE array length of " + tojson(arr) + " for field " +
+                               fieldName);
+                for (let i = 1; i < arr.length; ++i) {
+                    assertResultsInOrder(i, fieldName, arr, isAsc);
+                }
+            }
+        };
+
+        testFieldNames(["bottomAsc", "topAsc"], true);
+        testFieldNames(["bottomDesc", "topDesc"], false);
     }
 }
 

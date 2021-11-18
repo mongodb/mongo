@@ -24,79 +24,99 @@ if (!isExactTopNEnabled) {
     return;
 }
 
+const largestInt =
+    NumberDecimal("9223372036854775807");  // This is max int64 which is supported as N.
+const largestIntPlus1 = NumberDecimal("9223372036854775808");  // Adding 1 puts it over the edge.
+
 // Basic correctness tests.
 let docs = [];
-const n = 3;
+const defaultN = 3;
 const kMaxSales = 20;
-for (let i = 0; i < kMaxSales; i++) {
-    if (i < 2) {
-        docs.push({state: 'CA', sales: i * 10});
+let expectedFirstThree = [];
+let expectedLastThree = [];
+let expectedAllResults = [];
+for (const states
+         of [{state: 'AZ', sales: 3}, {state: 'CA', sales: 2}, {state: 'NY', sales: kMaxSales}]) {
+    let allResults = [];
+    let firstThree = [];
+    let lastThree = [];
+    const state = states['state'];
+    const sales = states['sales'];
+    for (let i = 0; i < kMaxSales; ++i) {
+        const salesAmt = i * 10;
+        if (i < sales) {
+            docs.push({state: state, sales: salesAmt});
+
+            // First N candidate.
+            if (i < defaultN) {
+                firstThree.push(salesAmt);
+            }
+
+            if (i + defaultN >= sales) {
+                lastThree.push(salesAmt);
+            }
+            allResults.push(salesAmt);
+        }
     }
-    if (i < 3) {
-        docs.push({state: 'AZ', sales: i * 10});
-    }
-    docs.push({state: 'NY', sales: i * 10});
+    expectedFirstThree.push({_id: state, sales: firstThree});
+    expectedLastThree.push({_id: state, sales: lastThree});
+    expectedAllResults.push({_id: state, sales: allResults});
 }
 
 assert.commandWorked(coll.insert(docs));
 
-const actualFirstNResults =
-    coll.aggregate([
-            {$sort: {_id: 1}},
-            {$group: {_id: '$state', sales: {$firstN: {input: "$sales", n: n}}}},
-        ])
-        .toArray();
-
-const expectedFirstNResults =
-    [{_id: "AZ", sales: [0, 10, 20]}, {_id: "CA", sales: [0, 10]}, {_id: "NY", sales: [0, 10, 20]}];
-
-const actualLastNResults =
-    coll.aggregate([
-            {$sort: {_id: 1}},
-            {$group: {_id: '$state', sales: {$lastN: {input: "$sales", n: n}}}},
-        ])
-        .toArray();
-
-const expectedLastNResults = [
-    {_id: "AZ", sales: [0, 10, 20]},
-    {_id: "CA", sales: [0, 10]},
-    {_id: "NY", sales: [170, 180, 190]}
-];
-
-// As these are unordered operators, we need to ensure we can deterministically test the values
-// returned by firstN/lastN. As the output is not guaranteed to be in order, arrayEq is used
-// instead.
-arrayEq(expectedFirstNResults, actualFirstNResults);
-arrayEq(expectedLastNResults, actualLastNResults);
-
-// Verify that an index on {_id: 1, sales: -1} will produce the expected results.
-const idxSpec = {
-    _id: 1,
-    sales: -1
-};
-assert.commandWorked(coll.createIndex(idxSpec));
-
-const indexedFirstNResults =
-    coll.aggregate(
-            [
+function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
+    const actualFirstNResults =
+        coll.aggregate([
                 {$sort: {_id: 1}},
                 {$group: {_id: '$state', sales: {$firstN: {input: "$sales", n: n}}}},
-                {$sort: {_id: 1}},
-            ],
-            {hint: idxSpec})
-        .toArray();
-assert.eq(expectedFirstNResults, indexedFirstNResults);
+            ])
+            .toArray();
 
-const indexedLastNResults =
-    coll.aggregate(
-            [
+    const actualLastNResults =
+        coll.aggregate([
                 {$sort: {_id: 1}},
                 {$group: {_id: '$state', sales: {$lastN: {input: "$sales", n: n}}}},
-                {$sort: {_id: 1}},
-            ],
-            {hint: idxSpec})
-        .toArray();
-assert.eq(expectedLastNResults, indexedLastNResults);
+            ])
+            .toArray();
+
+    // As these are unordered operators, we need to ensure we can deterministically test the values
+    // returned by firstN/lastN. As the output is not guaranteed to be in order, arrayEq is used
+    // instead.
+    arrayEq(expectedFirstNResults, actualFirstNResults);
+    arrayEq(expectedLastNResults, actualLastNResults);
+
+    // Verify that an index on {_id: 1, sales: -1} will produce the expected results.
+    const idxSpec = {_id: 1, sales: -1};
+    assert.commandWorked(coll.createIndex(idxSpec));
+
+    const indexedFirstNResults =
+        coll.aggregate(
+                [
+                    {$sort: {_id: 1}},
+                    {$group: {_id: '$state', sales: {$firstN: {input: "$sales", n: n}}}},
+                    {$sort: {_id: 1}},
+                ],
+                {hint: idxSpec})
+            .toArray();
+    assert.eq(expectedFirstNResults, indexedFirstNResults);
+
+    const indexedLastNResults =
+        coll.aggregate(
+                [
+                    {$sort: {_id: 1}},
+                    {$group: {_id: '$state', sales: {$lastN: {input: "$sales", n: n}}}},
+                    {$sort: {_id: 1}},
+                ],
+                {hint: idxSpec})
+            .toArray();
+    assert.eq(expectedLastNResults, indexedLastNResults);
+}
+
+runFirstLastN(defaultN, expectedFirstThree, expectedLastThree);
+
+// Verify that 'n' is allowed to be the max signed 64 bit int and returns all values.
+runFirstLastN(largestInt, expectedAllResults, expectedAllResults);
 
 // Reject non-integral values of n.
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
@@ -112,10 +132,19 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
                              5787903);
 
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$firstN: {input: '$sales', n: -1}}}}],
+    pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {input: '$sales', n: -1}}}}],
     cursor: {}
 }),
                              5787908);
+
+// Verify that 'n' cannot be greater than the largest signed 64 bit int.
+assert.commandFailedWithCode(coll.runCommand("aggregate", {
+    pipeline: [
+        {$group: {_id: {'st': '$state'}, sales: {$firstN: {input: '$sales', n: largestIntPlus1}}}}
+    ],
+    cursor: {}
+}),
+                             5787903);
 
 // Reject invalid specifications.
 
@@ -141,6 +170,6 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
 assert.commandFailedWithCode(
     coll.runCommand(
         "aggregate",
-        {pipeline: [{$group: {_id: {'st': '$state'}, sales: {$minN: {n: 2}}}}], cursor: {}}),
+        {pipeline: [{$group: {_id: {'st': '$state'}, sales: {$firstN: {n: 2}}}}], cursor: {}}),
     5787907);
 })();
