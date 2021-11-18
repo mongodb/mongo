@@ -136,7 +136,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
     def _run_check_repl_db_hash(self, test, test_report):
         """Check the repl DB hash on each cluster."""
-        check_db_hash = dbhash.CheckReplDBHash(self.logger, self._fixture)
+        check_db_hash = dbhash.CheckReplDBHash(self.logger, self._fixture, self._shell_options)
         check_db_hash.before_suite(test_report)
         check_db_hash.before_test(test, test_report)
         check_db_hash.after_test(test, test_report)
