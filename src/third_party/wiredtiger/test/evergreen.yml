@@ -1694,6 +1694,20 @@ tasks:
             set -o verbose
             ${test_env_vars|} $(pwd)/test/csuite/test_wt8057_compact_stress 2>&1
 
+  - name: csuite-wt8246-compact-rts-data-correctness-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt8246_compact_rts_data_correctness 2>&1
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
