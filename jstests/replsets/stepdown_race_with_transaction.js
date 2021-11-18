@@ -2,7 +2,7 @@
  * Tests that multi-documment transactions no longer race with stepdown over
  * "setAlwaysInterruptAtStepDownOrUp".
  *
- * @tags: [incompatible_with_eft]
+ * @tags: [requires_persistence]
  */
 
 (function() {
