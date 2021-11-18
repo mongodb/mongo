@@ -17,13 +17,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_load_extension[] = {
   {"entry", "string", NULL, NULL, NULL, 0}, {"terminate", "string", NULL, NULL, NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
-static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session_debug_subconfigs[] = {
-  {"release_evict_page", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
-
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session[] = {
   {"cache_cursors", "boolean", NULL, NULL, NULL, 0},
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
-  {"debug", "category", NULL, NULL, confchk_WT_CONNECTION_open_session_debug_subconfigs, 1},
   {"ignore_cache_size", "boolean", NULL, NULL, NULL, 0},
   {"isolation", "string", NULL,
     "choices=[\"read-uncommitted\",\"read-committed\","
@@ -413,7 +409,6 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_query_timestamp[] = {
 static const WT_CONFIG_CHECK confchk_WT_SESSION_reconfigure[] = {
   {"cache_cursors", "boolean", NULL, NULL, NULL, 0},
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
-  {"debug", "category", NULL, NULL, confchk_WT_CONNECTION_open_session_debug_subconfigs, 1},
   {"ignore_cache_size", "boolean", NULL, NULL, NULL, 0},
   {"isolation", "string", NULL,
     "choices=[\"read-uncommitted\",\"read-committed\","
@@ -1179,10 +1174,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "terminate=wiredtiger_extension_terminate",
     confchk_WT_CONNECTION_load_extension, 4},
   {"WT_CONNECTION.open_session",
-    "cache_cursors=true,cache_max_wait_ms=0,"
-    "debug=(release_evict_page=false),ignore_cache_size=false,"
+    "cache_cursors=true,cache_max_wait_ms=0,ignore_cache_size=false,"
     "isolation=snapshot",
-    confchk_WT_CONNECTION_open_session, 5},
+    confchk_WT_CONNECTION_open_session, 4},
   {"WT_CONNECTION.query_timestamp", "get=all_durable", confchk_WT_CONNECTION_query_timestamp, 1},
   {"WT_CONNECTION.reconfigure",
     "block_cache=(blkcache_eviction_aggression=1800,"
@@ -1291,10 +1285,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     1},
   {"WT_SESSION.query_timestamp", "get=read", confchk_WT_SESSION_query_timestamp, 1},
   {"WT_SESSION.reconfigure",
-    "cache_cursors=true,cache_max_wait_ms=0,"
-    "debug=(release_evict_page=false),ignore_cache_size=false,"
+    "cache_cursors=true,cache_max_wait_ms=0,ignore_cache_size=false,"
     "isolation=snapshot",
-    confchk_WT_SESSION_reconfigure, 5},
+    confchk_WT_SESSION_reconfigure, 4},
   {"WT_SESSION.rename", "", NULL, 0}, {"WT_SESSION.reset", "", NULL, 0},
   {"WT_SESSION.reset_snapshot", "", NULL, 0},
   {"WT_SESSION.rollback_transaction", "operation_timeout_ms=0",
