@@ -62,6 +62,12 @@ void OpCounters::_checkWrap(CacheAligned<AtomicWord<long long>> OpCounters::*cou
         _deleteDeprecated.store(0);
         _getmoreDeprecated.store(0);
         _killcursorsDeprecated.store(0);
+
+        _insertOnExistingDoc.store(0);
+        _updateOnMissingDoc.store(0);
+        _deleteWasEmpty.store(0);
+        _deleteFromMissingNamespace.store(0);
+        _acceptableErrorInCommand.store(0);
     }
 }
 
@@ -92,6 +98,24 @@ BSONObj OpCounters::getObj() const {
         d.append("delete", deleteDep);
         d.append("getmore", getmoreDep);
         d.append("killcursors", killcursorsDep);
+    }
+
+    // Append counters for constraint relaxations, only if they exist.
+    auto insertOnExistingDoc = _insertOnExistingDoc.loadRelaxed();
+    auto updateOnMissingDoc = _updateOnMissingDoc.loadRelaxed();
+    auto deleteWasEmpty = _deleteWasEmpty.loadRelaxed();
+    auto deleteFromMissingNamespace = _deleteFromMissingNamespace.loadRelaxed();
+    auto acceptableErrorInCommand = _acceptableErrorInCommand.loadRelaxed();
+    auto totalRelaxed = insertOnExistingDoc + updateOnMissingDoc + deleteWasEmpty +
+        deleteFromMissingNamespace + acceptableErrorInCommand;
+
+    if (totalRelaxed > 0) {
+        BSONObjBuilder d(b.subobjStart("constraintsRelaxed"));
+        d.append("insertOnExistingDoc", insertOnExistingDoc);
+        d.append("updateOnMissingDoc", updateOnMissingDoc);
+        d.append("deleteWasEmpty", deleteWasEmpty);
+        d.append("deleteFromMissingNamespace", deleteFromMissingNamespace);
+        d.append("acceptableErrorInCommand", acceptableErrorInCommand);
     }
 
     return b.obj();
