@@ -528,15 +528,15 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
     // Note: tickClusterTimeTo() will not tick the recipient clock backwards in time.
     VectorClockMutable::get(opCtx)->tickClusterTimeTo(LogicalTime(returnAfterReachingTimestamp));
 
-    {
-        stdx::lock_guard lk(_mutex);
-        _stateDoc.setRejectReadsBeforeTimestamp(selectRejectReadsBeforeTimestamp(
-            opCtx, returnAfterReachingTimestamp, donorRecipientOpTimePair.recipientOpTime));
-    }
+    stdx::unique_lock lk(_mutex);
+    _stateDoc.setRejectReadsBeforeTimestamp(selectRejectReadsBeforeTimestamp(
+        opCtx, returnAfterReachingTimestamp, donorRecipientOpTimePair.recipientOpTime));
+    const auto stateDoc = _stateDoc;
+    lk.unlock();
     _stopOrHangOnFailPoint(&fpBeforePersistingRejectReadsBeforeTimestamp, opCtx);
 
     auto lastOpBeforeUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
+    uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, stateDoc));
     auto lastOpAfterUpdate = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
     if (lastOpBeforeUpdate == lastOpAfterUpdate) {
@@ -1151,7 +1151,11 @@ void TenantMigrationRecipientService::Instance::_createOplogBuffer() {
         _donorOplogBuffer = std::move(bufferCollection);
     }
 
-    invariant(_stateDoc.getStartFetchingDonorOpTime());
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_stateDoc.getStartFetchingDonorOpTime());
+    }
+
     {
         // Ensure we are primary when trying to startup and create the oplog buffer collection.
         auto coordinator = repl::ReplicationCoordinator::get(opCtx.get());
@@ -1530,7 +1534,10 @@ bool TenantMigrationRecipientService::Instance::_isCloneCompletedMarkerSet(WithL
 
 OpTime TenantMigrationRecipientService::Instance::_getOplogResumeApplyingDonorOptime(
     const OpTime startApplyingDonorOpTime, const OpTime cloneFinishedRecipientOpTime) const {
-    invariant(_stateDoc.getCloneFinishedRecipientOpTime().has_value());
+    {
+        stdx::lock_guard lk(_mutex);
+        invariant(_stateDoc.getCloneFinishedRecipientOpTime().has_value());
+    }
     auto opCtx = cc().makeOperationContext();
     OplogInterfaceLocal oplog(opCtx.get());
     auto oplogIter = oplog.makeIterator();
@@ -2114,16 +2121,21 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                stateDoc = _stateDoc;
                            }
                            uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(
-                               opCtx.get(), _stateDoc));
+                               opCtx.get(), stateDoc));
                        } else {
                            // Avoid fulfilling the promise twice on restart of the future chain.
                            _stateDocPersistedPromise.emplaceValue();
                        }
-                       uassert(ErrorCodes::TenantMigrationForgotten,
-                               str::stream() << "Migration " << getMigrationUUID()
-                                             << " already marked for garbage collect",
-                               _stateDoc.getState() != TenantMigrationRecipientStateEnum::kDone &&
-                                   !_stateDoc.getExpireAt());
+
+                       {
+                           stdx::lock_guard<Latch> lg(_mutex);
+                           uassert(ErrorCodes::TenantMigrationForgotten,
+                                   str::stream() << "Migration " << getMigrationUUID()
+                                                 << " already marked for garbage collect",
+                                   _stateDoc.getState() !=
+                                           TenantMigrationRecipientStateEnum::kDone &&
+                                       !_stateDoc.getExpireAt());
+                       }
 
                        // Must abort if flagged for cancellation above.
                        uassert(ErrorCodes::TenantMigrationAborted,
@@ -2505,6 +2517,7 @@ void TenantMigrationRecipientService::Instance::_setMigrationStatsOnCompletion(
     bool success = false;
 
     if (completionStatus.code() == ErrorCodes::TenantMigrationForgotten) {
+        stdx::lock_guard lk(_mutex);
         if (_stateDoc.getExpireAt()) {
             // Avoid double counting tenant migration statistics after failover.
             return;
