@@ -754,7 +754,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
     //
 
     if (_needsTargetingRefresh) {
-        // Reset the field
+        _remoteShardVersions.clear();
         _needsTargetingRefresh = false;
 
         // If we couldn't target, we might need to refresh if we haven't remotely refreshed
