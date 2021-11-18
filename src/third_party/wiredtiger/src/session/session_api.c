@@ -191,6 +191,8 @@ __wt_session_release_resources(WT_SESSION_IMPL *session)
 static void
 __session_clear(WT_SESSION_IMPL *session)
 {
+    WT_HAZARD_WEAK_ARRAY *wha;
+
     /*
      * There's no serialization support around the review of the hazard array, which means threads
      * checking for hazard pointers first check the active field (which may be 0) and then use the
@@ -205,6 +207,11 @@ __session_clear(WT_SESSION_IMPL *session)
 
     session->hazard_inuse = 0;
     session->nhazard = 0;
+
+    for (wha = session->hazard_weak; wha != NULL; wha = wha->next) {
+        wha->hazard_inuse = 0;
+        wha->nhazard = 0;
+    }
 }
 
 /*
@@ -2064,6 +2071,13 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         session_ret->hazard_size = WT_SESSION_INITIAL_HAZARD_SLOTS;
         session_ret->hazard_inuse = 0;
         session_ret->nhazard = 0;
+
+        WT_ERR(__wt_calloc(session, 1,
+          sizeof(WT_HAZARD_WEAK_ARRAY) + WT_SESSION_INITIAL_HAZARD_SLOTS * sizeof(WT_HAZARD_WEAK),
+          &session_ret->hazard_weak));
+        session_ret->hazard_weak->hazard_size = WT_SESSION_INITIAL_HAZARD_SLOTS;
+        session_ret->hazard_weak->hazard_inuse = 0;
+        session_ret->hazard_weak->nhazard = 0;
     }
 
     /*

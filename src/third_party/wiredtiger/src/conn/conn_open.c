@@ -178,6 +178,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
                 __wt_free(session, s->dhhash);
                 __wt_stash_discard_all(session, s);
                 __wt_free(session, s->hazard);
+                __wt_hazard_weak_destroy(session, s);
             }
 
     /* Destroy the file-system configuration. */

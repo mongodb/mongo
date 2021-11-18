@@ -7,7 +7,6 @@
  */
 
 #include "wt_internal.h"
-
 #ifdef HAVE_DIAGNOSTIC
 static void __hazard_dump(WT_SESSION_IMPL *);
 #endif
@@ -51,7 +50,8 @@ hazard_grow(WT_SESSION_IMPL *session)
      * leak the memory.
      */
     __wt_gen_next(session, WT_GEN_HAZARD, &hazard_gen);
-    WT_IGNORE_RET(__wt_stash_add(session, WT_GEN_HAZARD, hazard_gen, ohazard, 0));
+    WT_IGNORE_RET(
+      __wt_stash_add(session, WT_GEN_HAZARD, hazard_gen, ohazard, size * sizeof(WT_HAZARD)));
 
     return (0);
 }
@@ -237,7 +237,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
             break;
         }
     if (session->nhazard == 0 && !found)
-        return;
+        goto weak;
 
     __wt_errx(session, "session %p: close hazard pointer table: table not empty", (void *)session);
 
@@ -263,6 +263,10 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
     if (session->nhazard != 0)
         __wt_errx(session, "session %p: close hazard pointer table: count didn't match entries",
           (void *)session);
+
+weak:
+    /* Same for weak hazard pointers. */
+    __wt_hazard_weak_close(session);
 }
 
 /*
@@ -361,7 +365,8 @@ __wt_hazard_count(WT_SESSION_IMPL *session, WT_REF *ref)
     uint32_t i, hazard_inuse;
     u_int count;
 
-    hazard_get_reference(session, &hp, &hazard_inuse);
+    hp = session->hazard;
+    hazard_inuse = session->hazard_inuse;
 
     for (count = 0, i = 0; i < hazard_inuse; ++hp, ++i)
         if (hp->ref == ref)

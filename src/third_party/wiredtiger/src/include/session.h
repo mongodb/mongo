@@ -30,6 +30,28 @@ struct __wt_hazard {
 #endif
 };
 
+/*
+ * WT_HAZARD_WEAK --
+ *	A weak hazard pointer.
+ */
+struct __wt_hazard_weak {
+    WT_REF *ref; /* Page reference */
+    bool valid;  /* Is the weak hazard pointer still valid? */
+};
+
+/*
+ * WT_HAZARD_WEAK_ARRAY --
+ *	A per-session array of weak hazard pointers. These are grown by adding a new array, and are
+ *  only freed when the session is closed.
+ */
+struct __wt_hazard_weak_array {
+    uint32_t hazard_size;  /* Weak hazard pointer array slots */
+    uint32_t hazard_inuse; /* Weak hazard pointer array slots in-use */
+    uint32_t nhazard;      /* Count of active weak hazard pointers */
+    WT_HAZARD_WEAK_ARRAY *next;
+    WT_HAZARD_WEAK hazard[0]; /* Weak hazard pointer array */
+};
+
 /* Get the connection implementation for a session */
 #define S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
@@ -278,6 +300,8 @@ struct __wt_session_impl {
     uint32_t hazard_inuse; /* Hazard pointer array slots in-use */
     uint32_t nhazard;      /* Count of active hazard pointers */
     WT_HAZARD *hazard;     /* Hazard pointer array */
+
+    WT_HAZARD_WEAK_ARRAY *hazard_weak;
 
     /*
      * Operation tracking.
