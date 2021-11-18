@@ -7,6 +7,7 @@
 load("jstests/aggregation/extras/utils.js");       // For arrayEq.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -135,9 +136,7 @@ FixtureHelpers.runCommandOnEachPrimary({
     }
 });
 
-const groupPushdownEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
-        .featureFlagSBEGroupPushdown.value;
+const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
 if (groupPushdownEnabled) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: testDB.getSiblingDB("admin"),

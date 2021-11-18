@@ -9,6 +9,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
 load('jstests/libs/analyze_plan.js');         // For planHasStage().
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 let coll = db.remove_redundant_projects;
 coll.drop();
@@ -16,6 +17,8 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ['elem1']}));
 
 let indexSpec = {a: 1, 'c.d': 1, 'e.0': 1};
+
+const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
 
 /**
  * Helper to test that for a given pipeline, the same results are returned whether or not an
@@ -84,7 +87,8 @@ assertResultsMatch({
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, a: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}],
     expectProjectToCoalesce: true,
-    removedProjectStage: {_id: 0, a: 1}
+    removedProjectStage: {_id: 0, a: 1},
+    pipelineOptimizedAway: groupPushdownEnabled
 });
 assertResultsMatch({
     pipeline: [{$sort: {a: -1}}, {$project: {_id: 0, a: 1}}],
@@ -95,10 +99,11 @@ assertResultsMatch({
     pipeline: [
         {$sort: {a: 1, 'c.d': 1}},
         {$project: {_id: 0, a: 1}},
-        {$group: {_id: "$a", arr: {$push: "$a"}}}
+        {$group: {_id: "$a", a: {$sum: "$a"}}}
     ],
     expectProjectToCoalesce: true,
-    removedProjectStage: {_id: 0, a: 1}
+    removedProjectStage: {_id: 0, a: 1},
+    pipelineOptimizedAway: groupPushdownEnabled
 });
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, c: {d: 1}}}],
@@ -125,8 +130,9 @@ assertResultsMatch({
     pipelineOptimizedAway: true
 });
 assertResultsMatch({
-    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", arr: {$push: "$a"}}}, {$project: {arr: 1}}],
-    expectProjectToCoalesce: true
+    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
+    expectProjectToCoalesce:
+        !groupPushdownEnabled,  // lowering $group into SBE prevents coalesing of projects
 });
 
 // Test that projections with computed fields are removed from the pipeline.
@@ -151,11 +157,11 @@ assertResultsMatch({
 assertResultsMatch({
     pipeline: [
         {$project: {_id: 0, a: 1}},
-        {$group: {_id: "$a", arr: {$push: "$a"}, a: {$sum: "$a"}}},
+        {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
         {$project: {_id: 0}}
     ],
     expectProjectToCoalesce: true,
-    removedProjectStage: {_id: 0, a: 1}
+    removedProjectStage: {_id: 0, a: 1},
 });
 
 // Test that projections on _id with nested fields are removed from pipeline.

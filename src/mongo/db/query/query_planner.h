@@ -90,30 +90,14 @@ public:
         std::map<IndexEntry::Identifier, size_t> indexMap;
     };
 
-    /**
-     * Carries the result of the QueryPlanner which consists of two pieces: an array of
-     * QuerySolutions that represents the portion of the query that will be multi-planned, and a
-     * QuerySolutionNode that represents the part of the query for the post-multi-planned portion.
-     * The post-multi-planned portion contains a 'SentinelNode' that can be used to graft the
-     * post-multi-planned tree on top of the "winning" plan from the multi-planned candidates.
-     */
-    struct QueryPlannerResult {
-        StatusWith<std::vector<std::unique_ptr<QuerySolution>>> multiPlannedCandidates;
-        std::unique_ptr<QuerySolutionNode> postMultiPlan;
-    };
-
-    /**
-     * Returns the list of possible query solutions for the provided 'query' for multi-planning, and
-     * post-multi-planning. Uses the indices and other data in 'params' to determine the set of
-     * available plans.
-     */
-    static QueryPlannerResult plan(const CanonicalQuery& query, const QueryPlannerParams& params);
+    static std::unique_ptr<QuerySolution> extendWithAggPipeline(
+        const CanonicalQuery& query, std::unique_ptr<QuerySolution>&& solution);
 
     /**
      * Returns the list of possible query solutions for the provided 'query' for multi-planning.
      * Uses the indices and other data in 'params' to determine the set of available plans.
      */
-    static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> planForMultiPlanner(
+    static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> plan(
         const CanonicalQuery& query, const QueryPlannerParams& params);
 
     /**
@@ -252,7 +236,7 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             // considering any plan that's a collscan.
             invariant(branchResult->solutions.empty());
             auto statusWithMultiPlanSolns =
-                QueryPlanner::planForMultiPlanner(*branchResult->canonicalQuery, params);
+                QueryPlanner::plan(*branchResult->canonicalQuery, params);
             if (!statusWithMultiPlanSolns.isOK()) {
                 str::stream ss;
                 ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "

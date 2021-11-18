@@ -642,30 +642,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     return {std::move(soln)};
 }
 
-// static
-QueryPlanner::QueryPlannerResult QueryPlanner::plan(const CanonicalQuery& query,
-                                                    const QueryPlannerParams& params) {
-    if (query.pipeline().empty()) {
-        return {planForMultiPlanner(query, params), nullptr};
-    }
-
-    std::unique_ptr<QuerySolutionNode> postMultiPlannedQSN = std::make_unique<SentinelNode>();
-    for (auto& innerStage : query.pipeline()) {
-        auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage->documentSource());
-        tassert(5842400,
-                "Cannot support pushdown of a stage other than $group at the moment",
-                groupStage != nullptr);
-
-        postMultiPlannedQSN = std::make_unique<GroupNode>(std::move(postMultiPlannedQSN),
-                                                          groupStage->getIdFields(),
-                                                          groupStage->getAccumulatedFields(),
-                                                          groupStage->doingMerge());
-    }
-    return {planForMultiPlanner(query, params), std::move(postMultiPlannedQSN)};
-}
-
-// static
-StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::planForMultiPlanner(
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
     // It's a little silly to ask for a count and for owned data. This could indicate a bug earlier
     // on.
@@ -1242,6 +1219,32 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::planForMul
 
     invariant(out.size() > 0);
     return {std::move(out)};
+}
+
+/**
+ * The 'query' might contain parts of aggregation pipeline. For now, we plan those separately
+ * and later attach the agg portion of the plan to the solution(s) for the "find" part of the query.
+ */
+std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
+    const CanonicalQuery& query, std::unique_ptr<QuerySolution>&& solution) {
+    if (query.pipeline().empty()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<QuerySolutionNode> solnForAgg = std::make_unique<SentinelNode>();
+    for (auto& innerStage : query.pipeline()) {
+        auto groupStage = dynamic_cast<DocumentSourceGroup*>(innerStage->documentSource());
+        tassert(5842400,
+                "Cannot support pushdown of a stage other than $group at the moment",
+                groupStage != nullptr);
+
+        solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
+                                                 groupStage->getIdFields(),
+                                                 groupStage->getAccumulatedFields(),
+                                                 groupStage->doingMerge());
+    }
+    solution->extendWith(std::move(solnForAgg));
+    return QueryPlannerAnalysis::removeProjectSimpleBelowGroup(std::move(solution));
 }
 
 StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries(

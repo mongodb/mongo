@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/db/query/query_planner_test_lib.h"
 
 namespace {
 using namespace mongo;
@@ -70,10 +71,22 @@ TEST_F(QueryPlannerGroupPushdownTest, PushdownOfASingleGroup) {
 
     runQueryWithPipeline(fromjson("{x: 1}"), makeInnerPipelineStages(*pipeline.get()));
 
+    // 'runQueryWithPipeline()' only does planning of the find subsystem.
     ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertPostMultiPlanSolutionMatches(
-        "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: {sentinel: "
-        "{}}}}");
+    ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir:1, filter: {x:1}}}", solns[0]->root())
+               .isOK())
+        << solns[0]->root()->toString();
+
+    // Check the plan after lowering $group into the find subsystem.
+    ASSERT(!cq->pipeline().empty());
+    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]));
+    ASSERT(QueryPlannerTestLib::solutionMatches(
+               "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: "
+               "{cscan: {dir:1, filter: {x:1}}}"
+               "}}",
+               solution->root())
+               .isOK())
+        << solution->root()->toString();
 }
 
 TEST_F(QueryPlannerGroupPushdownTest, PushdownOfTwoGroups) {
@@ -85,11 +98,24 @@ TEST_F(QueryPlannerGroupPushdownTest, PushdownOfTwoGroups) {
 
     runQueryWithPipeline(fromjson("{x: 1}"), makeInnerPipelineStages(*pipeline.get()));
 
+    // 'runQueryWithPipeline()' only does planning of the find subsystem.
     ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertPostMultiPlanSolutionMatches(
-        "{group: {key: {_id: '$_id'}, accs: [{count: {$min: '$count'}}], node: {group: "
-        "{key: {_id: "
-        "'$_id'}, accs: [{count: {$sum: '$x'}}], node: {sentinel: {}}}}}}");
+    ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir:1, filter: {x:1}}}", solns[0]->root())
+               .isOK())
+        << solns[0]->root()->toString();
+
+    // Check the plan after lowering $group into the find subsystem.
+    ASSERT(!cq->pipeline().empty());
+    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]));
+    ASSERT(QueryPlannerTestLib::solutionMatches(
+               "{group: {key: {_id: '$_id'}, accs: [{count: {$min: '$count'}}], node: "
+               "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}], node: "
+               "{cscan: {dir:1, filter: {x:1}}}"
+               "}}"
+               "}}",
+               solution->root())
+               .isOK())
+        << solution->root()->toString();
 }
 
 TEST_F(QueryPlannerGroupPushdownTest, PushdownOfOneGroupWithMultipleAccumulators) {
@@ -100,10 +126,22 @@ TEST_F(QueryPlannerGroupPushdownTest, PushdownOfOneGroupWithMultipleAccumulators
 
     runQueryWithPipeline(fromjson("{x: 1}"), makeInnerPipelineStages(*pipeline.get()));
 
+    // 'runQueryWithPipeline()' only does planning of the find subsystem.
     ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertPostMultiPlanSolutionMatches(
-        "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}, {m: {$min: '$y'}}], node: "
-        "{sentinel: "
-        "{}}}}");
+    ASSERT(QueryPlannerTestLib::solutionMatches("{cscan: {dir:1, filter: {x:1}}}", solns[0]->root())
+               .isOK())
+        << solns[0]->root()->toString();
+
+    // Check the plan after lowering $group into the find subsystem.
+    ASSERT(!cq->pipeline().empty());
+    auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]));
+    ASSERT(
+        QueryPlannerTestLib::solutionMatches(
+            "{group: {key: {_id: '$_id'}, accs: [{count: {$sum: '$x'}}, {m: {$min: '$y'}}], node: "
+            "{cscan: {dir:1, filter: {x:1}}}"
+            "}}",
+            solution->root())
+            .isOK())
+        << solution->root()->toString();
 }
 }  //  namespace

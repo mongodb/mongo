@@ -536,6 +536,11 @@ public:
         QueryPlannerParams plannerParams;
         plannerParams.options = _plannerOptions;
         fillOutPlannerParams(_opCtx, _collection, _cq, &plannerParams);
+        tassert(
+            5842901,
+            "Fast count queries aren't supported in SBE, therefore, should never lower parts of "
+            "the aggregation pipeline for these queries either.",
+            (!(plannerParams.options & QueryPlannerParams::IS_COUNT) || _cq->pipeline().empty()));
 
         // If the canonical query does not have a user-specified collation and no one has given the
         // CanonicalQuery a collation already, set it from the collection default.
@@ -544,10 +549,10 @@ public:
             _cq->setCollator(_collection->getDefaultCollator()->clone());
         }
 
-        const IndexDescriptor* idIndexDesc = _collection->getIndexCatalog()->findIdIndex(_opCtx);
-
         // If we have an _id index we can use an idhack plan.
-        if (idIndexDesc && isIdHackEligibleQuery(_collection, *_cq)) {
+        if (const IndexDescriptor* idIndexDesc =
+                _collection->getIndexCatalog()->findIdIndex(_opCtx);
+            idIndexDesc && isIdHackEligibleQuery(_collection, *_cq)) {
             LOGV2_DEBUG(
                 20922, 2, "Using idhack", "canonicalQuery"_attr = redact(_cq->toStringShort()));
             // If an IDHACK plan is not supported, we will use the normal plan generation process
@@ -598,7 +603,6 @@ public:
             }
         }
 
-
         if (internalQueryPlanOrChildrenIndependently.load() &&
             SubplanStage::canUseSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
@@ -608,14 +612,7 @@ public:
             return buildSubPlan(plannerParams);
         }
 
-        // 'postMultiPlan' might be necessary, if the query contains parts of a pipeline, pushed
-        // into the find subsystem. Currently, we only support this for SBE when a single solution
-        // is found.
-        auto&& [statusWithMultiPlanSolns, postMultiPlan] = QueryPlanner::plan(*_cq, plannerParams);
-        tassert(5842803,
-                "Extending multi-planned solutions is only supported in SBE",
-                (std::is_same<ResultType, SlotBasedPrepareExecutionResult>::value ||
-                 postMultiPlan == nullptr));
+        auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, plannerParams);
 
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus().withContext(
@@ -646,18 +643,10 @@ public:
         }
 
         if (1 == solutions.size()) {
+            // Only one possible plan. Build the stages from the solution.
             auto result = makeResult();
-            // Only one possible plan. Run it. Build the stages from the solution.
-            solutions[0]->extendWith(std::move(postMultiPlan));
-
-            // For performance reasons when executing $group plans, we need to eliminate a redundant
-            // PROJECTION_SIMPLE node if its required fields are a super set of the postMultiPlan's
-            // dependency set.
-            auto optimizedSoln =
-                QueryPlannerAnalysis::removeProjectSimpleBelowGroup(std::move(solutions[0]));
-
-            auto root = buildExecutableTree(*optimizedSoln);
-            result->emplace(std::move(root), std::move(optimizedSoln));
+            auto root = buildExecutableTree(*solutions[0]);
+            result->emplace(std::move(root), std::move(solutions[0]));
 
             LOGV2_DEBUG(20926,
                         2,
@@ -887,13 +876,13 @@ class SlotBasedPrepareExecutionHelper final
 public:
     using PrepareExecutionHelper::PrepareExecutionHelper;
 
-protected:
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> buildExecutableTree(
         const QuerySolution& solution) const final {
         return stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collection, *_cq, solution, _yieldPolicy);
     }
 
+protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(
         const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
         invariant(descriptor);
@@ -1128,17 +1117,50 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                   plannerOptions)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = planner->plan(std::move(solutions), std::move(roots));
+
+        bool isOpen = true;
+        if (!cq->pipeline().empty()) {
+            // Extend the winning candidate with the agg pipeline and rebuild the execution tree.
+            auto&& winner = candidates.winner();
+            winner.root->close();
+            auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(winner.solution));
+            auto&& [rootStage, data] = helper.buildExecutableTree(*solution);
+            rootStage->prepare(data.ctx);
+            candidates.plans[candidates.winnerIdx] = sbe::plan_ranker::CandidatePlan{
+                std::move(solution), std::move(rootStage), std::move(data)};
+            isOpen = false;
+
+            // Extending rejecting solutions is only useful if this is an explain query.
+            if (cq->getExplain()) {
+                for (size_t i = 0; i < candidates.plans.size(); ++i) {
+                    if (i == candidates.winnerIdx)
+                        continue;  // have already done the winner
+                    // Rejected plans are already closed and we also don't need to prepare them.
+                    auto solution = QueryPlanner::extendWithAggPipeline(
+                        *cq, std::move(candidates.plans[i].solution));
+                    auto&& [rootStage, data] = helper.buildExecutableTree(*solution);
+                    candidates.plans[i] = sbe::plan_ranker::CandidatePlan{
+                        std::move(solution), std::move(rootStage), std::move(data)};
+                }
+            }
+        }
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
                                            std::move(candidates),
                                            collection,
                                            plannerOptions,
                                            std::move(nss),
+                                           isOpen,
                                            std::move(yieldPolicy));
     }
-    // No need for runtime planning, just use the constructed plan stage tree.
-    invariant(roots.size() == 1);
 
+    invariant(solutions.size() == 1);
+    invariant(roots.size() == 1);
+    if (!cq->pipeline().empty()) {
+        // Need to extend the solution with the agg pipeline and rebuild the execution tree.
+        solutions[0] = QueryPlanner::extendWithAggPipeline(*cq, std::move(solutions[0]));
+        roots[0] = helper.buildExecutableTree(*(solutions[0]));
+    }
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
                                        std::move(solutions[0]),
@@ -2404,8 +2426,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
 
     // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
     // fillOutPlannerParamsForDistinct() (i.e., the indexes that include the distinct field).
-    auto statusWithMultiPlanSolns =
-        QueryPlanner::planForMultiPlanner(*parsedDistinct->getQuery(), plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*parsedDistinct->getQuery(), plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
             return {nullptr};

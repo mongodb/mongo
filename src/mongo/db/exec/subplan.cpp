@@ -103,11 +103,15 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
 }
 
 Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
+    tassert(5842902,
+            "Lowering parts of aggregation pipeline is only supported in SBE",
+            _query->pipeline().empty());
+
     // Clear out the working set. We'll start with a fresh working set.
     _ws->clear();
 
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns = QueryPlanner::planForMultiPlanner(*_query, _plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*_query, _plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << _query->toString()

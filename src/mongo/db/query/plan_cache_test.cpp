@@ -851,7 +851,7 @@ protected:
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
         ASSERT_OK(statusWithCQ.getStatus());
-        auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*statusWithCQ.getValue(), params);
+        auto statusWithMultiPlanSolns = QueryPlanner::plan(*statusWithCQ.getValue(), params);
         ASSERT_OK(statusWithMultiPlanSolns.getStatus());
         solns = std::move(statusWithMultiPlanSolns.getValue());
     }
@@ -876,7 +876,7 @@ protected:
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
         ASSERT_OK(statusWithCQ.getStatus());
-        auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*statusWithCQ.getValue(), params);
+        auto statusWithMultiPlanSolns = QueryPlanner::plan(*statusWithCQ.getValue(), params);
         ASSERT_OK(statusWithMultiPlanSolns.getStatus());
         solns = std::move(statusWithMultiPlanSolns.getValue());
     }

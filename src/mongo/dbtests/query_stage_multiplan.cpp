@@ -401,7 +401,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     fillOutPlannerParams(_opCtx.get(), collection.getCollection(), cq.get(), &plannerParams);
 
     // Plan.
-    auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*cq, plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 

@@ -5,11 +5,9 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const featureEnabled =
-    assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
-        .featureFlagSBEGroupPushdown.value;
-if (!featureEnabled) {
+if (!checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"])) {
     jsTestLog("Skipping test because the sbe group pushdown feature flag is disabled");
     return;
 }
@@ -232,13 +230,40 @@ assert.neq(null, getAggPlanStage(explain, "DISTINCT_SCAN"), explain);
 assert.eq(null, getAggPlanStage(explain, "SORT"), explain);
 assert.commandWorked(coll.dropIndex({item: 1}));
 
-// Time to see if indexes prevent pushdown. Add an index on item, and make sure we don't execute in
-// sbe because we won't support $group pushdown until SERVER-58429.
+// Time to check that indexes don't prevent pushdown.
+// The $match stage should trigger usage of indexed plans if there is an index for it. Indexes on
+// the fields involved in $group stage should make no difference.
+// data schema: {"_id": 1, "item": "a", "price": 10, "quantity": 2, "date": ISODate()}
+// The existing index is irrelevant.
+assert.commandWorked(coll.createIndex({quantity: 1}));
+assertGroupPushdown(coll,
+                    [{$match: {price: {$gt: 0}}}, {$group: {_id: "$item", s: {$sum: "$price"}}}],
+                    [{"_id": "b", "s": 30}, {"_id": "a", "s": 15}, {"_id": "c", "s": 5}],
+                    1 /* expectedGroupCountInExplain */);
+// Index on the group by field but the accumulator prevents distinct scan.
 assert.commandWorked(coll.createIndex({item: 1}));
-assertNoGroupPushdown(coll,
-                      [{$group: {_id: "$item", s: {$sum: "$price"}}}],
-                      [{"_id": "b", "s": 30}, {"_id": "a", "s": 15}, {"_id": "c", "s": 5}]);
+assertGroupPushdown(coll,
+                    [{$group: {_id: "$item", s: {$sum: "$price"}}}],
+                    [{"_id": "b", "s": 30}, {"_id": "a", "s": 15}, {"_id": "c", "s": 5}],
+                    1 /* expectedGroupCountInExplain */);
+// Multiple relevant indexes.
+assert.commandWorked(coll.createIndex({price: 1}));
+assertGroupPushdown(coll,
+                    [{$match: {price: {$gt: 0}}}, {$group: {_id: "$item", s: {$sum: "$price"}}}],
+                    [{"_id": "b", "s": 30}, {"_id": "a", "s": 15}, {"_id": "c", "s": 5}],
+                    1 /* expectedGroupCountInExplain */);
+// Index on the accumulator field only.
 assert.commandWorked(coll.dropIndex({item: 1}));
+assertGroupPushdown(coll,
+                    [{$group: {_id: "$item", s: {$sum: "$price"}}}],
+                    [{"_id": "b", "s": 30}, {"_id": "a", "s": 15}, {"_id": "c", "s": 5}],
+                    1 /* expectedGroupCountInExplain */);
+assertGroupPushdown(coll,
+                    [{$match: {price: {$gt: 0}}}, {$group: {_id: "$item", s: {$sum: "$price"}}}],
+                    [{"_id": "b", "s": 30}, {"_id": "a", "s": 15}, {"_id": "c", "s": 5}],
+                    1 /* expectedGroupCountInExplain */);
+assert.commandWorked(coll.dropIndex({price: 1}));
+assert.commandWorked(coll.dropIndex({quantity: 1}));
 
 // Supported group and then a group with no supported accumulators.
 explain = coll.explain().aggregate([

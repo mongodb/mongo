@@ -618,8 +618,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           nullptr /* projExec */);
     plannerParams.indices.push_back(std::move(indexEntry));
 
-    auto statusWithMultiPlanSolns =
-        QueryPlanner::planForMultiPlanner(canonicalQuery, plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
     if (statusWithMultiPlanSolns.getStatus().code() != ErrorCodes::NoQueryExecutionPlans) {
         auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 

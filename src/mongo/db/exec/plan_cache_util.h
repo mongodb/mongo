@@ -93,6 +93,13 @@ void updatePlanCache(
     invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
     auto& winningPlan = candidates[winnerIdx];
 
+    // TODO SERVER-61507: Integration between lowering parts of aggregation pipeline into the find
+    // subsystem and the new SBE cache isn't implemented yet.
+    if (!query.pipeline().empty() &&
+        feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
     // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
     // write to the plan cache.
     //
@@ -195,6 +202,8 @@ void updatePlanCache(
                 static_assert(std::is_same_v<PlanStageType, PlanStage*>);
                 cacheClassicPlan();
             }
+        } else {
+            log_detail::logNotCachingNoData(winningPlan.solution->toString());
         }
     }
 }

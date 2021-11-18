@@ -120,7 +120,7 @@ public:
         fillOutPlannerParams(&_opCtx, collection.getCollection(), cq, &plannerParams);
 
         // Plan.
-        auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*cq, plannerParams);
+        auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
         ASSERT_OK(statusWithMultiPlanSolns.getStatus());
         auto solutions = std::move(statusWithMultiPlanSolns.getValue());
 

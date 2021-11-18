@@ -364,10 +364,9 @@ void QueryPlannerTest::runQueryFull(
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    auto&& [statusWithMultiPlanSolns, postMultiPlanSln] = QueryPlanner::plan(*cq, params);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
     solns = std::move(statusWithMultiPlanSolns.getValue());
-    postMultiPlanSoln = std::move(postMultiPlanSln);
 }
 
 void QueryPlannerTest::runInvalidQuery(const BSONObj& query) {
@@ -441,7 +440,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*cq, params);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     plannerStatus = statusWithMultiPlanSolns.getStatus();
     ASSERT_NOT_OK(plannerStatus);
 }
@@ -469,7 +468,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    auto statusWithMultiPlanSolns = QueryPlanner::planForMultiPlanner(*cq, params);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     ASSERT_OK(statusWithMultiPlanSolns.getStatus());
     solns = std::move(statusWithMultiPlanSolns.getValue());
 }
@@ -496,7 +495,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    auto&& [statusWithMultiPlanSolns, _] = QueryPlanner::plan(*cq, params);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
     plannerStatus = statusWithMultiPlanSolns.getStatus();
     ASSERT_NOT_OK(plannerStatus);
 }
@@ -515,10 +514,6 @@ void QueryPlannerTest::dumpSolutions(str::stream& ost) const {
     for (auto&& soln : solns) {
         ost << soln->toString() << '\n';
     }
-}
-
-void QueryPlannerTest::dumpPostMultiplanSolutions(str::stream& ost) const {
-    ost << postMultiPlanSoln->toString() << '\n';
 }
 
 void QueryPlannerTest::assertNumSolutions(size_t expectSolutions) const {
@@ -560,21 +555,6 @@ void QueryPlannerTest::assertSolutionExists(const std::string& solnJson, size_t 
        << " instead. Run with --verbose=vv to see reasons for mismatch. All solutions generated: "
        << '\n';
     dumpSolutions(ss);
-    FAIL(ss);
-}
-
-void QueryPlannerTest::assertPostMultiPlanSolutionMatches(
-    const std::string& expectedSolnJson) const {
-    BSONObj expectedSoln = fromjson(expectedSolnJson);
-    auto matchStatus = QueryPlannerTestLib::solutionMatches(
-        expectedSoln, postMultiPlanSoln.get() /* actual soln */, relaxBoundsCheck);
-    if (matchStatus.isOK()) {
-        return;
-    }
-    str::stream ss;
-    ss << "expected post-multi-planned soution to match for solution " << expectedSolnJson
-       << " Run with --verbose=vv to see reasons for mismatch. All solutions generated: " << '\n';
-    dumpPostMultiplanSolutions(ss);
     FAIL(ss);
 }
 

@@ -212,28 +212,35 @@ assert.commandWorked(results[0]);
 
 //
 // .aggregate()
+// $group stage might be lowered into SBE which would remove the pipeline. As the goal here is to
+// test the explain helpers for the case when pipeline is used, we suppress the potential
+// optimizations with '$_internalInhibitOptimization' stage.
 //
 
-explain = t.explain().aggregate([{$match: {a: 3}}, {$group: {_id: null}}]);
+explain = t.explain().aggregate(
+    [{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}]);
 assert.commandWorked(explain);
-assert.eq(2, explain.stages.length);
+assert.eq(4, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 // Legacy varargs format.
-explain = t.explain().aggregate({$group: {_id: null}});
+explain = t.explain().aggregate({$_internalInhibitOptimization: {}}, {$group: {_id: null}});
 assert.commandWorked(explain);
-assert.eq(2, explain.stages.length);
+assert.eq(3, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
-explain = t.explain().aggregate({$project: {a: 3}}, {$group: {_id: null}});
+explain = t.explain().aggregate(
+    {$_internalInhibitOptimization: {}}, {$project: {a: 3}}, {$group: {_id: null}});
 assert.commandWorked(explain);
-assert.eq(2, explain.stages.length);
+assert.eq(4, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 // Options already provided.
-explain = t.explain().aggregate([{$match: {a: 3}}, {$group: {_id: null}}], {allowDiskUse: true});
+explain = t.explain().aggregate(
+    [{$_internalInhibitOptimization: {}}, {$match: {a: 3}}, {$group: {_id: null}}],
+    {allowDiskUse: true});
 assert.commandWorked(explain);
-assert.eq(2, explain.stages.length);
+assert.eq(4, explain.stages.length);
 assert("queryPlanner" in explain.stages[0].$cursor);
 
 //

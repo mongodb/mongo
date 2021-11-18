@@ -213,8 +213,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     }
 
     // Use the query planning module to plan the whole query.
-    auto statusWithMultiPlanSolns =
-        QueryPlanner::planForMultiPlanner(*_canonicalQuery, _plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*_canonicalQuery, _plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
             str::stream() << "error processing query: " << _canonicalQuery->toString()

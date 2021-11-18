@@ -182,8 +182,6 @@ void QuerySolution::extendWith(std::unique_ptr<QuerySolutionNode> extensionRoot)
     parentOfSentinel->children[0] = _root.release();
     delete current;  // The sentinel node itself isn't used anymore.
 
-    // TODO.irinayat: Should any other members of the solution be updated/reset? Is it OK that
-    // nodeIds will be changed by `setRoot()`?
     setRoot(std::move(extensionRoot));
 }
 

@@ -11,13 +11,9 @@
 load("jstests/aggregation/extras/utils.js");  // arrayEq, documentEq
 load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 load("jstests/libs/analyze_plan.js");         // For getAggPlanStage.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
-const sbeGroupPushdownEnabled = function() {
-    const res =
-        assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}));
-    return res.hasOwnProperty("featureFlagSBEGroupPushdown") &&
-        res.featureFlagSBEGroupPushdown.value;
-}();
+const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -110,7 +106,7 @@ function testPipeline(pipeline) {
     // When the SBE $group pushdown feature is enabled, a $group alone is pushed down but it is not
     // when it's in $unionWith sub-pipeline. So, we don't need test such scenarios for now.
     // Eventually such scenarios should be enabled.
-    if (sbeGroupPushdownEnabled && pipeline.some(stage => stage.hasOwnProperty("$group"))) {
+    if (groupPushdownEnabled && pipeline.some(stage => stage.hasOwnProperty("$group"))) {
         return;
     }
 

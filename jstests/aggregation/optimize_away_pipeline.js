@@ -20,6 +20,7 @@
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
 load("jstests/libs/analyze_plan.js");     // For 'aggPlanHasStage' and other explain helpers.
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -136,10 +137,7 @@ function testGetMore({command = null, expectedResult = null} = {}) {
     assert.sameMembers(documents, expectedResult);
 }
 
-const groupPushdownEnabled = function() {
-    return assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagSBEGroupPushdown: 1}))
-        .featureFlagSBEGroupPushdown.value;
-}();
+const groupPushdownEnabled = checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"]);
 
 // Calls 'assertPushdownEnabled' if groupPushdownEnabled is 'true'. Otherwise, it calls
 // 'assertPushdownDisabled'.
@@ -381,13 +379,23 @@ assertPipelineDoesNotUseAggregation({
     expectedResult: [{x: 30}, {x: 20}],
 });
 
-// For $sort, $limit, $group, the $sort and $limit can be pushed down, but $group cannot.
-assertPipelineUsesAggregation({
-    pipeline: [{$sort: {x: 1}}, {$limit: 2}, {$group: {_id: null, s: {$sum: "$x"}}}],
-    expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
-    expectedResult: [{_id: null, s: 30}],
-    optimizedAwayStages: ["$sort", "$limit"],
-});
+let pipeline = [{$sort: {x: 1}}, {$limit: 2}, {$group: {_id: null, s: {$sum: "$x"}}}];
+assertPipelineIfGroupPushdown(
+    function() {
+        return assertPipelineDoesNotUseAggregation({
+            pipeline: pipeline,
+            expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "GROUP"],
+            expectedResult: [{_id: null, s: 30}],
+        });
+    },
+    function() {
+        return assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
+            expectedResult: [{_id: null, s: 30}],
+            optimizedAwayStages: ["$sort", "$limit"],
+        });
+    });
 
 // Test that $limit can be pushed down before a group, but it prohibits the DISTINCT_SCAN
 // optimization.
@@ -397,22 +405,43 @@ assertPipelineUsesAggregation({
     expectedResult: [{_id: 10}, {_id: 20}, {_id: 30}],
 });
 assertPipelineUsesAggregation({
-    pipeline: [{$limit: 2}, {$group: {_id: "$x"}}],
-    expectedStages: ["COLLSCAN", "LIMIT"],
-    optimizedAwayStages: ["$limit"],
-});
-assertPipelineUsesAggregation({
     pipeline: [{$sort: {x: 1}}, {$group: {_id: "$x"}}],
     expectedStages: ["DISTINCT_SCAN", "PROJECTION_COVERED"],
     expectedResult: [{_id: 10}, {_id: 20}, {_id: 30}],
     optimizedAwayStages: ["$sort"],
 });
-assertPipelineUsesAggregation({
-    pipeline: [{$sort: {x: 1}}, {$limit: 2}, {$group: {_id: "$x"}}],
-    expectedResult: [{_id: 10}, {_id: 20}],
-    expectedStages: ["IXSCAN", "LIMIT"],
-    optimizedAwayStages: ["$sort", "$limit"],
-});
+
+pipeline = [{$limit: 2}, {$group: {_id: "$x"}}];
+assertPipelineIfGroupPushdown(
+    function() {
+        return assertPipelineDoesNotUseAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "LIMIT", "GROUP"],
+        });
+    },
+    function() {
+        return assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "LIMIT"],
+            optimizedAwayStages: ["$limit"],
+        });
+    });
+
+pipeline = [{$sort: {x: 1}}, {$limit: 2}, {$group: {_id: "$x"}}];
+assertPipelineIfGroupPushdown(
+    function() {
+        return assertPipelineDoesNotUseAggregation({
+            pipeline: pipeline,
+            expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT", "GROUP"],
+        });
+    },
+    function() {
+        return assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
+            optimizedAwayStages: ["$sort", "$limit"],
+        });
+    });
 
 // $limit after a group has no effect on our ability to produce a DISTINCT_SCAN plan.
 assertPipelineUsesAggregation({
@@ -422,7 +451,7 @@ assertPipelineUsesAggregation({
 });
 
 // For $limit, $project, $limit, we can optimize away both $limit stages.
-let pipeline = [{$match: {x: {$gte: 0}}}, {$limit: 2}, {$project: {_id: 0, x: 1}}, {$limit: 1}];
+pipeline = [{$match: {x: {$gte: 0}}}, {$limit: 2}, {$project: {_id: 0, x: 1}}, {$limit: 1}];
 assertPipelineDoesNotUseAggregation({
     pipeline: pipeline,
     expectedStages: ["IXSCAN", "PROJECTION_COVERED", "LIMIT"],
