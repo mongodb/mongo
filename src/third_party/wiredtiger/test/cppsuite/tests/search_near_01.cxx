@@ -45,6 +45,7 @@ class search_near_01 : public test_harness::test {
     uint64_t srchkey_len = 0;
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
     const uint64_t PREFIX_KEY_LEN = 3;
+    const int64_t MINIMUM_EXPECTED_ENTRIES = 40;
 
     static void
     populate_worker(thread_context *tc, const std::string &ALPHABET, uint64_t PREFIX_KEY_LEN)
@@ -178,7 +179,8 @@ class search_near_01 : public test_harness::test {
         std::map<uint64_t, scoped_cursor> cursors;
         tc->stat_cursor = tc->session.open_scoped_cursor(STATISTICS_URI);
         std::string srch_key;
-        int64_t entries_stat, prefix_stat, prev_entries_stat, prev_prefix_stat, expected_entries;
+        int64_t entries_stat, prefix_stat, prev_entries_stat, prev_prefix_stat, expected_entries,
+          buffer;
         int cmpp;
 
         cmpp = 0;
@@ -237,14 +239,19 @@ class search_near_01 : public test_harness::test {
                     " prefix fash path:  " + std::to_string(prefix_stat - prev_prefix_stat));
 
                 /*
-                 * It is possible that WiredTiger increments the entries skipped stat irrelevant to
-                 * prefix search near. This is dependent on how many read threads are present in the
-                 * test. Account for this by creating a small buffer using thread count. Assert that
-                 * the number of expected entries is the upper limit which the prefix search near
-                 * can traverse and the prefix fast path is incremented.
+                 * Due to the concurrency of multiple threads and how WiredTiger increments the
+                 * entries skipped stat, it is possible that a thread can perform multiple search
+                 * nears before another can finish one. Account for this problem by creating a
+                 * buffer taking the maximum of either calculated 2 * expected entries or the
+                 * minimum expected entries. The minimum expected entries is necessary in the case
+                 * that expected entries is a low number.
+                 *
+                 * Assert that the number of expected entries is the maximum allowed limit that the
+                 * prefix search nears can traverse.
                  */
-                testutil_assert(
-                  (expected_entries + (2 * tc->thread_count)) >= entries_stat - prev_entries_stat);
+                buffer = std::max(2 * expected_entries, MINIMUM_EXPECTED_ENTRIES);
+                testutil_assert((expected_entries + buffer) >= entries_stat - prev_entries_stat);
+
                 /*
                  * There is an edge case where we may not early exit the prefix search near call
                  * because the specified prefix matches the rest of the entries in the tree.

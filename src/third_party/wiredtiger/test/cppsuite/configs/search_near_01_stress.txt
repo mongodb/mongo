@@ -13,6 +13,7 @@ workload_generator=
     (
         collection_count=3,
         key_count_per_collection=100,
+        value_size=30
     ),
     read_config=
     (
