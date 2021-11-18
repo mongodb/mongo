@@ -114,5 +114,67 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
     findAndModifyThread.join();
 })();
 
+(() => {
+    jsTest.log(
+        "Starting test findAndModify transaction during migration blocking state then aborts.");
+
+    const tenantID = ObjectId();
+    const kDbName = tenantID.str + "_test";
+    let db = st.s0.getDB(kDbName);
+    assert.commandWorked(db.foo.insert({'mydata': 1}));
+
+    assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName}));
+    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+
+    let blockingFp = configureFailPoint(adminDB, "pauseTenantMigrationBeforeLeavingBlockingState");
+    let abortFailPoint =
+        configureFailPoint(adminDB, "abortTenantMigrationBeforeLeavingBlockingState");
+
+    let cmdObj = donorStartMigrationCmd(tenantID, st.rs1.getURL());
+    assert.commandWorked(adminDB.runCommand(cmdObj));
+    blockingFp.wait();
+
+    let transactionThread = new Thread((mongosConnString, dbName) => {
+        let mongos = new Mongo(mongosConnString);
+        let session = mongos.startSession();
+        let sessionDB = session.getDatabase(dbName);
+
+        session.startTransaction();
+        sessionDB.foo.findAndModify(
+            {query: {'mydata': 1}, update: {$set: {'mydata': 2}}, new: true});
+
+        let res = session.commitTransaction_forTesting();
+        let assertErrorResponse = (res, expectedError, expectedErrLabel) => {
+            jsTest.log("Going to check the response " + tojson(res));
+            assert.commandFailedWithCode(res, expectedError, tojson(res));
+            assert(res["errorLabels"] != null, "Error labels are absent from " + tojson(res));
+            const expectedErrorLabels = [expectedErrLabel];
+            assert.sameMembers(res["errorLabels"],
+                               expectedErrorLabels,
+                               "Error labels " + tojson(res["errorLabels"]) +
+                                   " are different from expected " + expectedErrorLabels);
+        };
+        assertErrorResponse(res, ErrorCodes.TenantMigrationAborted, 'TransientTransactionError');
+
+        jsTest.log("Going to retry commit transaction after tenant migration aborted.");
+        res = session.commitTransaction_forTesting();
+        assertErrorResponse(res, ErrorCodes.NoSuchTransaction, 'TransientTransactionError');
+    }, st.s0.host, kDbName);
+    transactionThread.start();
+
+    assert.soon(function() {
+        let mtab = st.rs0.getPrimary()
+                       .getDB('admin')
+                       .adminCommand({serverStatus: 1})
+                       .tenantMigrationAccessBlocker[tenantID.str]
+                       .donor;
+        return mtab.numBlockedWrites > 0;
+    }, "no blocked writes found", 1 * 10000, 1 * 1000);
+
+    blockingFp.off();
+    transactionThread.join();
+    abortFailPoint.off();
+})();
+
 st.stop();
 })();
