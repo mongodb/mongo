@@ -4833,7 +4833,7 @@ tasks:
 
 - <<: *gen_task_template
   name: tenant_migration_jscore_passthrough_gen
-  tags: ["tenant_migration"]
+  tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4841,7 +4841,7 @@ tasks:
 
 - <<: *gen_task_template
   name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  tags: ["tenant_migration"]
+  tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4849,7 +4849,7 @@ tasks:
 
 - <<: *gen_task_template
   name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["tenant_migration", "txn"]
+  tags: ["serverless", "txn"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4857,7 +4857,7 @@ tasks:
 
 - <<: *gen_task_template
   name: tenant_migration_stepdown_jscore_passthrough_gen
-  tags: ["tenant_migration"]
+  tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4865,7 +4865,7 @@ tasks:
 
 - <<: *gen_task_template
   name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  tags: ["tenant_migration"]
+  tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -4874,7 +4874,7 @@ tasks:
 
 - <<: *gen_task_template
   name: tenant_migration_kill_primary_jscore_passthrough_gen
-  tags: ["tenant_migration"]
+  tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5318,6 +5318,13 @@ tasks:
 - <<: *task_template
   name: sasl
   tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: serverless
+  tags: ["serverless"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -7818,7 +7825,7 @@ buildvariants:
   - name: .stitch
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
-  - name: .tenant_migration !.multiversion
+  - name: .serverless !.multiversion
     distros:
       - rhel80-xlarge
   - name: server_selection_json_test_TG
@@ -9192,7 +9199,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
-  - name: .tenant_migration
+  - name: .serverless
     distros:
       - rhel80-xlarge
   - name: server_selection_json_test_TG
@@ -9310,7 +9317,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: snmp
   - name: .stitch
-  - name: .tenant_migration
+  - name: .serverless
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
 # Disabling as the following tests are not aware of feature flags.
@@ -9382,7 +9389,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .stitch
-  - name: .tenant_migration
+  - name: .serverless
     distros:
       - rhel80-xlarge
   - name: .updatefuzzer
@@ -11069,7 +11076,7 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .stitch
-  - name: .tenant_migration
+  - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
@@ -11140,7 +11147,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: snmp
-  - name: .tenant_migration
+  - name: .serverless
   - name: .watchdog
   - name: .stitch
 # Disabling the following tests as they are not aware of feature flags.
@@ -11217,7 +11224,7 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .stitch
-  - name: .tenant_migration
+  - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
@@ -11312,7 +11319,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
-  - name: .tenant_migration
+  - name: .serverless
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
@@ -11380,7 +11387,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: snmp
   - name: .stitch
-  - name: .tenant_migration
+  - name: .serverless
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
 # Disabling the following tests as they are not aware of feature flags.
@@ -11451,7 +11458,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
-  - name: .tenant_migration
+  - name: .serverless
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
