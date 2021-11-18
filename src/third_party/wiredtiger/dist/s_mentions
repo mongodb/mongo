@@ -1,0 +1,23 @@
+#! /bin/bash
+
+# Find comments related to the ticket potentially indicated by the branch name. The script never
+# fails, it only warns the caller there are comments that are potentially worth checking.
+
+# Retrieve the current branch name.
+branch_name=$(git rev-parse --abbrev-ref HEAD 2>&1 || echo "BRANCH_NOT_FOUND")
+
+# We expect the following syntax (case insensitive): wt-<digits>[-<alphanum>].
+regex="^(wt|WT|wT|Wt)-[0-9]+(-[a-zA-Z0-9-]+)?"
+if [[ ! $branch_name =~ $regex ]]; then
+    exit 0
+fi
+
+# Get what could be the ticket id.
+ticket_id=$(echo "$branch_name" | cut -d "-" -f-2)
+
+# Check for comments related to the ticket.
+if grep -inr --exclude-dir=.git "$ticket_id" ../. > /dev/null 2>&1; then
+    echo "There are comments mentioning $ticket_id in the code, please check them."
+fi
+
+exit 0
