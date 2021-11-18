@@ -128,7 +128,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, {});
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
-    ASSERT_EQ(1, replOpCounters.getDeleteFromMissingNamespace()->load() - prevDeleteFromMissing);
+    auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
+    ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
+
+    ASSERT_EQ(postDeleteFromMissing,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("deleteFromMissingNamespace")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -159,7 +166,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, kUuid);
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
-    ASSERT_EQ(1, replOpCounters.getDeleteFromMissingNamespace()->load() - prevDeleteFromMissing);
+    auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
+    ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
+
+    ASSERT_EQ(postDeleteFromMissing,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("deleteFromMissingNamespace")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -197,7 +211,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
-    ASSERT_EQ(1, replOpCounters.getDeleteFromMissingNamespace()->load() - prevDeleteFromMissing);
+    auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
+    ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
+
+    ASSERT_EQ(postDeleteFromMissing,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("deleteFromMissingNamespace")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -226,7 +247,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
-    ASSERT_EQ(1, replOpCounters.getDeleteWasEmpty()->load() - prevDeleteWasEmpty);
+    auto postDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
+    ASSERT_EQ(1, postDeleteWasEmpty - prevDeleteWasEmpty);
+
+    ASSERT_EQ(postDeleteWasEmpty,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("deleteWasEmpty")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -255,7 +283,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
     int prevInsertOnExistingDoc = replOpCounters.getInsertOnExistingDoc()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
-    ASSERT_EQ(1, replOpCounters.getInsertOnExistingDoc()->load() - prevInsertOnExistingDoc);
+    auto postInsertOnExistingDoc = replOpCounters.getInsertOnExistingDoc()->load();
+    ASSERT_EQ(1, postInsertOnExistingDoc - prevInsertOnExistingDoc);
+
+    ASSERT_EQ(postInsertOnExistingDoc,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("insertOnExistingDoc")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -275,7 +310,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
         repl::OpTypeEnum::kUpdate, nss, uuid, BSON("$set" << BSON("a" << 1)), BSON("_id" << 0));
     int prevUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
-    ASSERT_EQ(1, replOpCounters.getUpdateOnMissingDoc()->load() - prevUpdateOnMissingDoc);
+    auto postUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
+    ASSERT_EQ(1, postUpdateOnMissingDoc - prevUpdateOnMissingDoc);
+
+    ASSERT_EQ(postUpdateOnMissingDoc,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("updateOnMissingDoc")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -308,7 +350,14 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
-    ASSERT_EQ(1, replOpCounters.getDeleteWasEmpty()->load() - prevDeleteWasEmpty);
+    auto postDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
+    ASSERT_EQ(1, postDeleteWasEmpty - prevDeleteWasEmpty);
+
+    ASSERT_EQ(postDeleteWasEmpty,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("deleteWasEmpty")
+                  .Long());
 }
 
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
@@ -3189,7 +3238,14 @@ TEST_F(IdempotencyTestDisableSteadyStateConstraints, AcceptableErrorsRecordedInS
     int prevAcceptableError = replOpCounters.getAcceptableErrorInCommand()->load();
     ASSERT_OK(runOpSteadyState(emptyCappedOp));
 
-    ASSERT_EQ(1, replOpCounters.getAcceptableErrorInCommand()->load() - prevAcceptableError);
+    auto postAcceptableError = replOpCounters.getAcceptableErrorInCommand()->load();
+    ASSERT_EQ(1, postAcceptableError - prevAcceptableError);
+
+    ASSERT_EQ(postAcceptableError,
+              replOpCounters.getObj()
+                  .getObjectField("constraintsRelaxed")
+                  .getField("acceptableErrorInCommand")
+                  .Long());
 }
 
 TEST_F(IdempotencyTestEnableSteadyStateConstraints,
@@ -3825,7 +3881,6 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionIgnoresNamespaceNotFoundErr
 
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_RECOVERING));
-
     testOpsAreIdempotent({prepareOp, commitOp});
 
     // The op should have thrown a NamespaceNotFound error, which should have been ignored, so the

@@ -42,6 +42,10 @@ function getOpCountersDiff(cmdFn) {
     const primaryOpCountersAfter = getOpCounters(primary);
     const secondaryOpCountersReplAfter = getOpCountersRepl(secondary);
 
+    assert(!primaryOpCountersAfter.hasOwnProperty("constraintsRelaxed"), primaryOpCountersAfter);
+    assert(!secondaryOpCountersReplAfter.hasOwnProperty("constraintsRelaxed"),
+           secondaryOpCountersReplAfter);
+
     // Calculate the diff
     let primaryDiff = {};
     let secondaryDiff = {};
