@@ -77,8 +77,6 @@
     // We now join that thread, and therefore end its connection to the server.
     countdownLatch.countDown();
     cursorOpeningThread.join();
-    assert.commandWorked(
-        admin.adminCommand({configureFailPoint: "clientIsFromLoadBalancer", mode: "off"}));
 
     let cursorId = cursorOpeningThread.returnData();
     assert.eq(idleCursor.cursorId, cursorId);
@@ -95,5 +93,8 @@
                 .itcount();
         return (numCursorsFoundWithId == 0);
     });
+
+    assert.commandWorked(
+        admin.adminCommand({configureFailPoint: "clientIsFromLoadBalancer", mode: "off"}));
     st.stop();
 })();
