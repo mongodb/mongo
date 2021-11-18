@@ -716,8 +716,8 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         if (ts) {
-            auto res = timeseries::applyTimeseriesOptionsModifications(*oldCollOptions.timeseries,
-                                                                       ts->toBSON());
+            auto res =
+                timeseries::applyTimeseriesOptionsModifications(*oldCollOptions.timeseries, *ts);
             uassertStatusOK(res);
             auto [newOptions, changed] = res.getValue();
             if (changed) {

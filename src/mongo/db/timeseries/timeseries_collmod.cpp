@@ -100,8 +100,7 @@ std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCt
 
     auto& tsMod = origCmd.getTimeseries();
     if (tsMod) {
-        auto res =
-            timeseries::applyTimeseriesOptionsModifications(*timeseriesOptions, tsMod->toBSON());
+        auto res = timeseries::applyTimeseriesOptionsModifications(*timeseriesOptions, *tsMod);
         if (res.isOK()) {
             auto& [newOptions, changed] = res.getValue();
             if (changed) {

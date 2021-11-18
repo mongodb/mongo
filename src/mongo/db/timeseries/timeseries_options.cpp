@@ -95,14 +95,12 @@ int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity) {
 }
 
 StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
-    const TimeseriesOptions& currentOptions, const BSONObj& mod) {
+    const TimeseriesOptions& currentOptions, const CollModTimeseries& mod) {
     TimeseriesOptions newOptions = currentOptions;
     bool changed = false;
 
-    if (mod.hasField("granularity")) {
-        BSONElement granularityElem = mod.getField("granularity");
-        BucketGranularityEnum target = BucketGranularity_parse(
-            IDLParserErrorContext("BucketGranularity"), granularityElem.valueStringData());
+    if (auto granularity = mod.getGranularity()) {
+        BucketGranularityEnum target = *granularity;
         if (target != currentOptions.getGranularity()) {
             if (!isValidTimeseriesGranularityTransition(currentOptions.getGranularity(), target)) {
                 return Status{ErrorCodes::InvalidOptions,

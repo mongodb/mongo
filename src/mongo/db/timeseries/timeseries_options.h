@@ -44,7 +44,7 @@ namespace timeseries {
 int getMaxSpanSecondsFromGranularity(BucketGranularityEnum granularity);
 
 StatusWith<std::pair<TimeseriesOptions, bool>> applyTimeseriesOptionsModifications(
-    const TimeseriesOptions& current, const BSONObj& mod);
+    const TimeseriesOptions& current, const CollModTimeseries& mod);
 
 BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray);
 
