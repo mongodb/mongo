@@ -124,7 +124,8 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog("NumBuckets " + numBuckets + ", numDocs on sharded cluster" +
                   db[collName].find().itcount() + "numDocs on unsharded collection " +
                   db[this.nonShardCollName].find({}).itcount());
-        const pipeline = [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1}}];
+        const pipeline =
+            [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1, _id: 1}}];
         const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
                                                     db[this.nonShardCollName].aggregate(pipeline));
         assertAlways.eq(
@@ -177,6 +178,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1}));
         assert.commandWorked(db[collName].createIndex({m: 1, t: 1}));
         assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1, t: 1}));
+        assert.commandWorked(db[this.nonShardCollName].createIndex({m: 1, t: 1, _id: 1}));
 
         const bulk = db[collName].initializeUnorderedBulkOp();
         const bulkUnsharded = db[this.nonShardCollName].initializeUnorderedBulkOp();
