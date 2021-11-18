@@ -363,8 +363,14 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.assertEqual(keys_restored, 0)
         self.assertGreaterEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, 0)
-        self.assertGreater(hs_sweep, 0)
+        # Each row that gets processed by RTS can be counted by either hs_removed or hs_sweep,
+        # but not both. If the data store page for the row appears in the last checkpoint, it
+        # gets counted in hs_removed; if not, it gets counted in hs_sweep, unless the history
+        # store page for the row didn't make it out, in which case nothing gets counted at all.
+        # We expect at least some history store pages to appear, so assert that some rows get
+        # processed, but the balance between the two counts depends on test timing and we
+        # should not depend on it.
+        self.assertGreater(hs_removed + hs_sweep, 0)
 
         # The test may output the following message in eviction under cache pressure. Ignore that.
         self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
