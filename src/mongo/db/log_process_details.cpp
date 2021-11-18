@@ -103,6 +103,14 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
         }
     }
 
+    LOGV2(5853301,
+          "featureCompatibilityVersion on log rotation",
+          "featureCompatibilityVersion"_attr =
+              serverGlobalParams.featureCompatibility.isVersionInitialized()
+              ? multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())
+              : multiversion::toString(
+                    multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior));
+
     logProcessDetails(nullptr);
 }
 

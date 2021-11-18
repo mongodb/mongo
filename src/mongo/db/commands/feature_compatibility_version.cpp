@@ -421,6 +421,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     invariant(opCtx->lockState()->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
     if (!featureCompatibilityVersion) {
+        LOGV2(5853303, "featureCompatibilityVersion document missing at startup");
         return;
     }
 
@@ -437,14 +438,20 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
                              << "UPGRADE PROBLEM: Found an invalid featureCompatibilityVersion "
                                 "document (ERROR: "
                              << swVersion.getStatus()
-                             << "). If the current featureCompatibilityVersion is below 4.4, see "
-                                "the documentation on upgrading at "
+                             << "). If the current featureCompatibilityVersion is below "
+                             << multiversion::toString(multiversion::GenericFCV::kLastLTS)
+                             << ", see the documentation on upgrading at "
                              << feature_compatibility_version_documentation::kUpgradeLink << "."});
     }
 
     auto version = swVersion.getValue();
     serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
     FeatureCompatibilityVersion::updateMinWireVersion();
+
+    LOGV2(5853300,
+          "Intializing featureCompatibilityVersion at startup",
+          "featureCompatibilityVersion"_attr =
+              multiversion::toString(serverGlobalParams.featureCompatibility.getVersion()));
 
     // On startup, if the version is in an upgrading or downgrading state, print a warning.
     if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
