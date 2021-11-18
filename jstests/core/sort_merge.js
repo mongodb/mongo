@@ -11,12 +11,17 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos'.
 
-const coll = db.sort_merge;
+const collNamePrefix = 'sort_merge_';
+let collCount = 0;
+let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 
-assert.commandWorked(coll.createIndex({filterFieldA: 1, sortFieldA: 1, sortFieldB: 1}));
-assert.commandWorked(coll.createIndex({filterFieldA: 1, sortFieldA: -1, sortFieldB: -1}));
-assert.commandWorked(coll.createIndex({sortFieldA: 1, sortFieldB: 1}));
+const indexSpecs = [
+    {filterFieldA: 1, sortFieldA: 1, sortFieldB: 1},
+    {filterFieldA: 1, sortFieldA: -1, sortFieldB: -1},
+    {sortFieldA: 1, sortFieldB: 1},
+];
+assert.commandWorked(coll.createIndexes(indexSpecs));
 
 // Insert some random data and dump the seed to the log.
 const seed = new Date().getTime();
@@ -29,14 +34,17 @@ function randomInt() {
     return Math.floor(Math.random() * kRandomValCeil);
 }
 
+let docs = [];
 for (let i = 0; i < 100; ++i) {
-    assert.commandWorked(coll.insert({
+    docs.push({
+        _id: i,
         filterFieldA: randomInt(),
         filterFieldB: randomInt(),
         sortFieldA: randomInt(),
         sortFieldB: randomInt()
-    }));
+    });
 }
+assert.commandWorked(coll.insert(docs));
 
 function isSorted(array, lessThanFunction) {
     for (let i = 1; i < array.length; ++i) {
@@ -262,8 +270,8 @@ function runTest(sorts, filters, verifyCallback) {
 // Insert documents with arrays into the collection and check that the deduping works correctly.
 (function testDeduplication() {
     assert.commandWorked(coll.insert([
-        {filterFieldA: [1, 2], filterFieldB: "multikeydoc", sortFieldA: 1, sortFieldB: 1},
-        {sortFieldA: [1, 2], filterFieldA: "multikeydoc"}
+        {_id: 100, filterFieldA: [1, 2], filterFieldB: "multikeydoc", sortFieldA: 1, sortFieldB: 1},
+        {_id: 101, sortFieldA: [1, 2], filterFieldA: "multikeydoc"}
     ]));
 
     const kUniqueFilters = [
@@ -290,15 +298,19 @@ function runTest(sorts, filters, verifyCallback) {
 
 // Verify that sort merge works correctly when sorting dotted paths.
 (function testDottedPathSortMerge() {
-    assert(coll.drop());
+    coll = db.getCollection(collNamePrefix + collCount++);
+    coll.drop();
     assert.commandWorked(coll.createIndex({'filterFieldA': 1, 'sortField.a': 1, 'sortField.b': 1}));
+    let docs = [];
     for (let i = 0; i < 100; ++i) {
-        assert.commandWorked(coll.insert({
+        docs.push({
+            _id: (200 + i),
             filterFieldA: randomInt(),
             filterFieldB: randomInt(),
             sortField: {a: randomInt(), b: randomInt()}
-        }));
+        });
     }
+    assert.commandWorked(coll.insert(docs));
 
     const kSortPattern = {
         sortPattern: {'sortField.a': 1, 'sortField.b': 1},
