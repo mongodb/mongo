@@ -1,0 +1,65 @@
+/*! @arch_page arch-compact Compaction
+
+Compaction is a cooperative process between the @ref arch-btree "Btree layer" and
+the @ref arch-block "Block Manager" to reduce the on-disk footprint of WT tables. The compaction
+process is initiated by the user application by calling \c WT_SESSION::compact method. Overall, the
+compaction process involves rewriting disk blocks from the end of the on-disk file to the start of
+the file, hence giving an opportunity to reclaim the space from the end of the file through truncation
+and effectively reducing the file system reported file size. Note that the compaction is a
+"best-effort" process and does not guarantee a reduction in file size.
+
+Before understanding the compaction process, we need to understand how disk blocks are referenced by the
+checkpoints. Each checkpoint references a certain set of disk blocks for a table. When a dirty
+btree page is reconciled, a new disk block is assigned for the page and a new checkpoint starts
+referencing the new block used for the page. Once the checkpoint referencing the old block is deleted,
+the old disk block becomes available for reuse. The compaction process copies over the data from
+the blocks at the end of the file to the reusable blocks at the start of the file.
+
+The compaction process starts with a system-wide checkpoint. There are potentially many dirty blocks
+in the cache, and the intention here is to write them out and then discard previous checkpoints so
+that there are as many blocks as possible on the file's "available for reuse" list when the compaction
+starts.  The compaction logic then starts examining the files that need to be compacted. Compaction
+ignores files smaller than 1MB and computes the available bytes in the initial 80% and 90% of the file.
+Compaction doesn't proceed if at least 1MB worth of space can not be recovered. If at least 20% of
+the space is available in the first 80% of the file, the compaction process will try to rewrite
+the last 20% of the file. Else if at least 10% of the total file is available in the first 90% of
+the file, compaction is tried on the last 10% of the file. Else the file is skipped.
+
+Compacting the object is done 10% at a time, that is, compaction tries to move blocks from the last 10% of the
+file into the beginning of the file (the 10% is hard-coded in the block manager).  The reason for
+this is because compaction walks the file in a logical order, not block offset order, and compaction
+of a file can fail if the block from the end of the file is not written first. Note that the block manager
+uses a first-fit block selection algorithm during compaction to maximize block movement. The process
+is repeated multiple times until the block manager detects that there are no blocks from the last 10% of the file
+that can be moved.
+
+Diving deep into the compaction process, the btree layer walks the internal pages for a given table to
+identify leaf pages that can be rewritten. For each leaf page referenced by the internal page, we use
+a block manager API to assess whether it will be beneficial to rewrite the leaf page. If the block
+manager recognizes that rewriting the page will be beneficial, it rewrites the disk
+block to a new disk location. The new disk address is placed into the parent internal page and
+the page is marked dirty. In this way, the leaf page is rewritten without being brought into the
+cache. If the leaf page is already in the cache, the leaf page is simply marked dirty and the subsequent
+checkpoint or eviction rewrites the page. When a leaf page is rewritten by compaction, the parent
+internal page is marked dirty so that the chain of internal pages from root to the leaf page is
+rewritten by the next checkpoint or eviction.
+
+After each 10% compaction, a checkpoint is performed two more times. The second and third
+checkpoints are because the block manager checkpoints in two steps: blocks made available for reuse
+during a checkpoint are put on a special checkpoint-available list and only moved to the real available
+list after the metadata has been updated with the new checkpoint's information. For this reason,
+blocks allocated to write the checkpoint itself cannot be taken from the blocks made available by
+the checkpoint. To say it another way, the second checkpoint puts the blocks from the end of the file
+that were made available by compaction onto the checkpoint-available list, but then potentially
+writes the checkpoint itself at the end of the file, which would prevent any file truncation.  When
+the metadata is updated for the second checkpoint, the blocks freed by compaction become available for
+the third checkpoint, so the third checkpoint's blocks are written towards the beginning of the file,
+and then the file can be truncated.
+
+Compaction is a time-consuming operation and therefore logs have been added in compaction logic to
+track current progress. Some of the verbose logs for compaction can be activated by setting
+\c "verbose=[compact,compact_progress]" configuration option for \c wiredtiger_open() method. Apart from
+verbose logs, WT also records statistics about compact progress that can be used to debug issues
+with the compaction process.
+
+*/

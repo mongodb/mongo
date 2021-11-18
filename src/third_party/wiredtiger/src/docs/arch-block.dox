@@ -245,4 +245,6 @@ page is marked dirty, forcing the block to be rewritten. WiredTiger then
 performs two checkpoints, as at least two checkpoints are required to delete the
 checkpoint originally containing the block.
 
+For more details about the compaction process, please refer to @ref arch-compact "Compaction".
+
 */

@@ -162,6 +162,7 @@ of the documentation.
     - @ref arch-checkpoint
     - @ref arch-hs
     - @ref arch-backup
+    - @ref arch-compact
 
 - @subpage arch-toc-recovery
     - @ref arch-logging
@@ -274,6 +275,10 @@ The History Store tracks old versions of records.
 @subpage arch-backup
 
 Hot backup uses a type of cursor to backup the database.
+
+@subpage arch-compact
+
+Compaction process can be used to reclaim unused space from on-disk files.
 
 */
 
