@@ -1127,6 +1127,12 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                    str::stream() << "Sync source had unsafe feature compatibility version: "
                                  << multiversion::toString(version)));
         return;
+    } else {
+        // Since we don't guarantee that we always clone the "admin.system.version" collection first
+        // and collection/index creation can depend on FCV, we set the in-memory FCV value to match
+        // the version on the sync source. We won't persist the FCV on disk nor will we update our
+        // minWireVersion until we clone the actual document.
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
     }
 
     if (MONGO_unlikely(initialSyncHangBeforeSplittingControlFlow.shouldFail())) {
