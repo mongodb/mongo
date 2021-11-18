@@ -600,13 +600,16 @@ functions:
         script: |
           set -o errexit
           set -o verbose
+          if [ ${no_create|false} = false ]; then
+            rm -rf WT_TEST*
+          fi
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
           ${pip3_binary} install psutil pygit2
           JSON_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'", "distro_id": "'${distro_id}'" } }'
           echo "JSON_TASK_INFO: $JSON_TASK_INFO"
-          ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out.json ${wtarg}
-          ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out.json ${wtarg}
+          ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -b -o test_stats/evergreen_out_${perf-test-name}.json ${wtarg}
+          ${test_env_vars|} ${python_binary} ../../../bench/wtperf/wtperf_run_py/wtperf_run.py -p ./wtperf -t ../../../bench/wtperf/runners/${perf-test-name}.wtperf -ho WT_TEST -m ${maxruns} -g "../.." -v -i "$JSON_TASK_INFO" -re -o test_stats/atlas_out_${perf-test-name}.json ${wtarg}
 
   "upload-perf-test-stats":
     - command: shell.exec
@@ -619,22 +622,24 @@ functions:
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
           ${pip3_binary} install pymongo[srv]
-          git clone git@github.com:wiredtiger/automation-scripts.git
-          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -f test_stats/atlas_out.json -b ${branch_name}
+          if [[ ! -d "automation-scripts" ]]; then
+            git clone git@github.com:wiredtiger/automation-scripts.git
+          fi
+          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_wt_perf_test_user} -p ${atlas_wt_perf_pass} -f test_stats/atlas_out_${perf-test-name}.json -b ${branch_name}
     - command: perf.send
       params:
-        file: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out.json
+        file: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out_${perf-test-name}.json
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'perf-test-name' variable
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        local_files_include_filter: wiredtiger/cmake_build/bench/wtperf/test_stats/*
+        local_files_include_filter: wiredtiger/cmake_build/bench/wtperf/test_stats/*_${perf-test-name}.json
         bucket: build_external
         permissions: public-read
         content_type: text/html
-        remote_file: wiredtiger/${build_variant}/${revision}/perf-test-${perf-test-name}-${build_id}-${execution}/
+        remote_file: wiredtiger/${build_variant}/${revision}/${task_name}-${build_id}-${execution}/
 
   "validate-expected-stats":
     - command: shell.exec
@@ -3380,15 +3385,15 @@ tasks:
         vars:
           perf-test-name: multi-btree-zipfian-populate
           maxruns: 1
-          wtarg: -ops ['"read"']
       - func: "run-perf-test"
         vars:
           perf-test-name: multi-btree-zipfian-workload
           maxruns: 1
+          no_create: true
           wtarg: -ops ['"read"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: multi-btree-zipfian
+          perf-test-name: multi-btree-zipfian-workload
 
   - name: perf-test-many-table-stress
     tags: ["stress-perf"]
@@ -3426,7 +3431,7 @@ tasks:
       - func: "validate-expected-stats"
         vars:
           expected-stats: '{"Pages seen by eviction": 200}'
-          stat_file: './test_stats/evergreen_out.json'
+          stat_file: './test_stats/evergreen_out_evict-fairness.json'
 
   - name: perf-test-evict-btree-stress-multi
     tags: ["stress-perf"]
@@ -3438,7 +3443,7 @@ tasks:
         vars:
           perf-test-name: evict-btree-stress-multi
           maxruns: 1
-          wtarg: -ops ['"warnings", "max_latencies"']
+          wtarg: -ops ['"warnings", "top5_latencies_read_update"']
       - func: "upload-perf-test-stats"
         vars:
           perf-test-name: evict-btree-stress-multi
@@ -3539,7 +3544,7 @@ tasks:
           wtarg: -args ['"-C log=(enabled,file_max=1M)"'] -ops ['"update"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: log-small-files
+          perf-test-name: log
 
   - name: perf-test-log-no-checkpoints
     tags: ["log-perf"]
@@ -3554,7 +3559,7 @@ tasks:
           wtarg: -args ['"-C checkpoint=(wait=0)"'] -ops ['"update"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: log-no-checkpoints
+          perf-test-name: log
 
   - name: perf-test-log-no-prealloc
     tags: ["log-perf"]
@@ -3569,7 +3574,7 @@ tasks:
           wtarg: -args ['"-C log=(enabled,file_max=1M,prealloc=false)"'] -ops ['"update"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: log-no-prealloc
+          perf-test-name: log
 
   - name: perf-test-log-zero-fill
     tags: ["log-perf"]
@@ -3584,7 +3589,7 @@ tasks:
           wtarg: -args ['"-C log=(enabled,file_max=1M,zero_fill=true)"'] -ops ['"update"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: log-zero-fill
+          perf-test-name: log
 
   - name: perf-test-log-many-threads
     tags: ["log-perf"]
@@ -3599,7 +3604,85 @@ tasks:
           wtarg: -args ['"-C log=(enabled,file_max=1M),session_max=256", "-o threads=((count=128,updates=1))"'] -ops ['"update"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: log-many-threads
+          perf-test-name: log
+
+    ###########################################
+    #        Performance Long Tests           #
+    ###########################################
+
+  - name: perf-test-long-btree
+    tags: ["long-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 86400
+          timeout_secs: 86400
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: 500m-btree-populate
+          maxruns: 1
+          wtarg: -args ['"-C create,statistics=(fast),statistics_log=(json,wait=1,sources=[file:])"'] -ops ['"load", "warnings", "max_latency_insert"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: 500m-btree-populate
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: 500m-btree-50r50u
+          maxruns: 1
+          no_create: true
+          wtarg: -args ['"-C create,statistics=(fast),statistics_log=(json,wait=1,sources=[file:])"'] -ops ['"read", "update", "warnings", "max_latency_read_update"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: 500m-btree-50r50u
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: 500m-btree-50r50u-backup
+          maxruns: 1
+          no_create: true
+          wtarg: -args ['"-C create,statistics=(fast),statistics_log=(json,wait=1,sources=[file:])"'] -ops ['"read", "update", "warnings", "max_latency_read_update"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: 500m-btree-50r50u-backup
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: 500m-btree-80r20u
+          maxruns: 1
+          no_create: true
+          wtarg: -args ['"-C create,statistics=(fast),statistics_log=(json,wait=1,sources=[file:])"'] -ops ['"read", "update", "warnings", "max_latency_read_update"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: 500m-btree-80r20u
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: 500m-btree-rdonly
+          maxruns: 1
+          no_create: true
+          wtarg: -args ['"-C create,statistics=(fast),statistics_log=(json,wait=1,sources=[file:])"'] -ops ['"read", "warnings", "max_latency_read_update", "min_read_throughput", "max_read_throughput"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: 500m-btree-rdonly
+
+  - name: perf-test-long-checkpoint-stress
+    tags: ["long-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 86400
+          timeout_secs: 86400
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: checkpoint-stress
+          maxruns: 1
+          wtarg: -args ['"-C create,statistics=(fast),statistics_log=(json,wait=1,sources=[file:])"'] -ops ['"update", "checkpoint"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: checkpoint-stress
 
 #######################################
 #            Buildvariants            #
@@ -3887,6 +3970,7 @@ buildvariants:
     - name: ".checkpoint-perf"
     - name: ".evict-perf"
     - name: ".log-perf"
+    - name: ".long-perf"
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -3906,6 +3990,9 @@ buildvariants:
     - name: Wiredtiger-perf-log-jobs
       execution_tasks:
       - ".log-perf"
+    - name: Wiredtiger-perf-long-jobs
+      execution_tasks:
+      - ".long-perf"
 
 - name: large-scale-tests
   display_name: "Large scale tests"

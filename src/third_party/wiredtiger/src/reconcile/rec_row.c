@@ -292,7 +292,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_REF *ref;
     WT_TIME_AGGREGATE ta;
     size_t size;
-    bool hazard, key_onpage_ovfl;
+    bool hazard;
     const void *p;
 
     btree = S2BT(session);
@@ -336,13 +336,18 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
          * instantiated, off-page key, we don't bother setting them if that's not possible.
          */
         cell = NULL;
-        key_onpage_ovfl = false;
         ikey = __wt_ref_key_instantiated(ref);
         if (ikey != NULL && ikey->cell_offset != 0) {
             cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
             __wt_cell_unpack_addr(session, page->dsk, cell, kpack);
-            key_onpage_ovfl =
-              F_ISSET(kpack, WT_CELL_UNPACK_OVERFLOW) && kpack->raw != WT_CELL_KEY_OVFL_RM;
+
+            /*
+             * Historically, we stored overflow cookies on internal pages, discard any underlying
+             * blocks. We have a copy to build the key (the key was instantiated when we read the
+             * page into memory), they won't be needed in the future as we're rewriting the page.
+             */
+            if (F_ISSET(kpack, WT_CELL_UNPACK_OVERFLOW) && kpack->raw != WT_CELL_KEY_OVFL_RM)
+                WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
         }
 
         WT_ERR(__wt_rec_child_modify(session, r, ref, &hazard, &state));
@@ -353,14 +358,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         case WT_CHILD_IGNORE:
             /*
              * Ignored child.
-             *
-             * Overflow keys referencing pages we're not writing are no longer useful, schedule them
-             * for discard. Don't worry about instantiation, internal page keys are always
-             * instantiated. Don't worry about reuse, reusing this key in this reconciliation is
-             * unlikely.
              */
-            if (key_onpage_ovfl)
-                WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
             WT_CHILD_RELEASE_ERR(session, hazard, ref);
             continue;
 
@@ -370,26 +368,9 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
-                /*
-                 * Overflow keys referencing empty pages are no longer useful, schedule them for
-                 * discard. Don't worry about instantiation, internal page keys are always
-                 * instantiated. Don't worry about reuse, reusing this key in this reconciliation is
-                 * unlikely.
-                 */
-                if (key_onpage_ovfl)
-                    WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
                 WT_CHILD_RELEASE_ERR(session, hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
-                /*
-                 * Overflow keys referencing split pages are no longer useful (the split page's key
-                 * is the interesting key); schedule them for discard. Don't worry about
-                 * instantiation, internal page keys are always instantiated. Don't worry about
-                 * reuse, reusing this key in this reconciliation is unlikely.
-                 */
-                if (key_onpage_ovfl)
-                    WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
-
                 WT_ERR(__rec_row_merge(session, r, child));
                 WT_CHILD_RELEASE_ERR(session, hazard, ref);
                 continue;

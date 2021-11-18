@@ -30,6 +30,7 @@
 import glob
 import json
 import re
+from typing import List
 
 
 class PerfStat:
@@ -118,18 +119,19 @@ class PerfStatCount(PerfStat):
 
 
 class PerfStatLatency(PerfStat):
-    def __init__(self, short_label: str, stat_file: str, output_label: str, num_max: int):
+    def __init__(self, short_label: str, stat_file: str, output_label: str, ops: List[str], num_max: int):
         super().__init__(short_label=short_label,
                          stat_file=stat_file,
                          output_label=output_label)
         self.num_max = num_max
+        self.ops = ops
 
     def find_stat(self, test_stat_path: str):
         values = []
         for line in open(test_stat_path):
             as_dict = json.loads(line)
-            values.append(as_dict["wtperf"]["read"]["max latency"])
-            values.append(as_dict["wtperf"]["update"]["max latency"])
+            for operation in self.ops:
+                values.append(as_dict["wtperf"][operation]["max latency"])
         return values
 
     def get_value(self, nth_max: int):
