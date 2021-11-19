@@ -21,10 +21,13 @@
 #endif
 
 #define __wt_err(session, error, ...) \
-    __wt_err_func(session, error, __PRETTY_FUNCTION__, __LINE__, __VA_ARGS__)
-#define __wt_errx(session, ...) __wt_errx_func(session, __PRETTY_FUNCTION__, __LINE__, __VA_ARGS__)
+    __wt_err_func(                    \
+      session, error, __PRETTY_FUNCTION__, __LINE__, WT_VERBOSE_CATEGORY_DEFAULT, __VA_ARGS__)
+#define __wt_errx(session, ...) \
+    __wt_errx_func(session, __PRETTY_FUNCTION__, __LINE__, WT_VERBOSE_CATEGORY_DEFAULT, __VA_ARGS__)
 #define __wt_panic(session, error, ...) \
-    __wt_panic_func(session, error, __PRETTY_FUNCTION__, __LINE__, __VA_ARGS__)
+    __wt_panic_func(                    \
+      session, error, __PRETTY_FUNCTION__, __LINE__, WT_VERBOSE_CATEGORY_DEFAULT, __VA_ARGS__)
 #define __wt_set_return(session, error) \
     __wt_set_return_func(session, __PRETTY_FUNCTION__, __LINE__, error)
 
