@@ -84,7 +84,7 @@ const char BalancerSettingsType::kKey[] = "balancer";
 const char* BalancerSettingsType::kBalancerModes[] = {"full", "autoSplitOnly", "off"};
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
-const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{64 * 1024 * 1024};
+const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{128 * 1024 * 1024};
 
 const char AutoSplitSettingsType::kKey[] = "autosplit";
 

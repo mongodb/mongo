@@ -38,6 +38,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -66,7 +67,7 @@ protected:
             ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
             ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
             ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
-            ASSERT_EQUALS(64 * 1024 * 1024ULL,
+            ASSERT_EQUALS(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
                           static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
 
             ASSERT_BSONOBJ_EQ(

@@ -8,7 +8,8 @@
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-var st = new ShardingTest({name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true}});
+var st = new ShardingTest(
+    {name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true, chunkSize: 64}});
 var mongos = st.s;
 var admin = mongos.getDB("admin");
 var db = mongos.getDB("test");

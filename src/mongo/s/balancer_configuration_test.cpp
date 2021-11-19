@@ -117,7 +117,7 @@ TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
     ASSERT(config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
     ASSERT(config.getShouldAutoSplit());
 }
 
@@ -160,7 +160,7 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     ASSERT(!config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
     ASSERT(config.getShouldAutoSplit());
 }
 
@@ -182,7 +182,7 @@ TEST_F(BalancerConfigurationTestFixture, AutoSplitSettingsDocumentOnly) {
     ASSERT(config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
     ASSERT(!config.getShouldAutoSplit());
 }
 
@@ -206,7 +206,7 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentBalanceForAutoS
     ASSERT(config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(64 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
+    ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
 }
 
 TEST(BalancerSettingsType, Defaults) {
