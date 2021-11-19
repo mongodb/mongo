@@ -41,15 +41,29 @@ TimeseriesTest.run((insert) => {
         doc[timeFieldName] = ISODate();
         assert.commandWorked(insert(coll, doc));
 
+        // Find the _id value of the measurement just inserted.
+        const matchingMeasurements = coll.find(doc).toArray();
+        assert.eq(matchingMeasurements.length, 1);
+        const measurementId = matchingMeasurements[0]._id;
+
+        // Find the bucket the measurement belongs to.
         const bucketDocs = bucketsColl
-                               .find({}, {
-                                   'control.min._id': 0,
-                                   'control.max._id': 0,
-                                   ['control.min.' + timeFieldName]: 0,
-                                   ['control.max.' + timeFieldName]: 0
-                               })
+                               .find({
+                                   $and: [
+                                       {"control.min._id": {$lte: measurementId}},
+                                       {"control.max._id": {$gte: measurementId}}
+                                   ]
+                               },
+                                     {
+                                         'control.min._id': 0,
+                                         'control.max._id': 0,
+                                         ['control.min.' + timeFieldName]: 0,
+                                         ['control.max.' + timeFieldName]: 0
+                                     })
                                .toArray();
-        const bucketDoc = bucketDocs[bucketDocs.length - 1];
+        assert.eq(bucketDocs.length, 1);
+
+        const bucketDoc = bucketDocs[0];
         jsTestLog('Bucket collection document: ' + tojson(bucketDoc));
 
         assert.docEq(
