@@ -76,12 +76,6 @@ private:
 template <typename F>
 ScopeGuard(F &&)->ScopeGuard<std::decay_t<F>>;
 
-/** Obsolete: `ScopeGuard<F>` can deduce the `F` type. */
-template <typename F>
-auto makeGuard(F&& fun) {
-    return ScopeGuard<std::decay_t<F>>(std::forward<F>(fun));
-}
-
 }  // namespace mongo
 
 #define MONGO_SCOPEGUARD_CAT2(s1, s2) s1##s2
