@@ -85,6 +85,21 @@ assert.commandWorked(
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$a", s: {$sum: "$b"}}}]);
 assertShardedGroupResultsMatch(coll, [{$group: {_id: null, s: {$sum: "$b"}}}]);
 
+// Test cases for a sharded $stdDevPop and $stdDevSamp
+
+coll = prepareCollection(db.partial_std_dev);
+assert.commandWorked(coll.insert([
+    {"item": "a", "price": 10},
+    {"item": "b", "price": 20},
+    {"item": "a", "price": 5},
+    {"item": "b", "price": 10},
+    {"item": "c", "price": 5},
+]));
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevSamp: "$price"}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevSamp: "$missing"}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevPop: "$price"}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevPop: "$missing"}}}]);
+
 // A test case for a sharded $avg
 
 coll = prepareCollection(db.partial_avg);

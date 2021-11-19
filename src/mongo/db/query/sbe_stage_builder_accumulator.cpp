@@ -335,6 +335,34 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     return {std::move(aggs), std::move(inputStage)};
 }
 
+std::unique_ptr<sbe::EExpression> buildFinalizePartialStdDev(sbe::value::SlotId stdDevSlot) {
+    // To support the sharding behavior, the mongos splits $group into two separate $group
+    // stages one at the mongos-side and the other at the shard-side. This stage builder builds
+    // the shard-side plan. The shard-side $stdDevSamp and $stdDevPop accumulators are responsible
+    // to return the partial stddev in the form of {m2: val1, mean: val2, count: val3}.
+    auto stdDevResult = makeVariable(stdDevSlot);
+
+    return makeNewObjFunction(
+        FieldPair{
+            "m2"_sd,
+            makeFunction("getElement",
+                         stdDevResult->clone(),
+                         makeConstant(sbe::value::TypeTags::NumberInt32,
+                                      static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningM2)))},
+        FieldPair{"mean"_sd,
+                  makeFunction(
+                      "getElement",
+                      stdDevResult->clone(),
+                      makeConstant(sbe::value::TypeTags::NumberInt32,
+                                   static_cast<int>(sbe::vm::AggStdDevValueElems::kRunningMean)))},
+        FieldPair{
+            "count"_sd,
+            makeFunction("getElement",
+                         stdDevResult->clone(),
+                         makeConstant(sbe::value::TypeTags::NumberInt32,
+                                      static_cast<int>(sbe::vm::AggStdDevValueElems::kCount)))});
+}
+
 std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeStdDevPop(
     StageBuilderState& state,
     const AccumulationExpression& expr,
@@ -345,8 +373,13 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeStdDevPop(
             str::stream() << "Expected one input slot for finalization of stdDevPop, got: "
                           << stdDevSlots.size(),
             stdDevSlots.size() == 1);
-    auto stdDevPopFinalize = makeFunction("stdDevPopFinalize", makeVariable(stdDevSlots[0]));
-    return {std::move(stdDevPopFinalize), std::move(inputStage)};
+
+    if (state.needsMerge) {
+        return {buildFinalizePartialStdDev(stdDevSlots[0]), std::move(inputStage)};
+    } else {
+        auto stdDevPopFinalize = makeFunction("stdDevPopFinalize", makeVariable(stdDevSlots[0]));
+        return {std::move(stdDevPopFinalize), std::move(inputStage)};
+    }
 }
 
 std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeStdDevSamp(
@@ -359,8 +392,13 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeStdDevSamp(
             str::stream() << "Expected one input slot for finalization of stdDevSamp, got: "
                           << stdDevSlots.size(),
             stdDevSlots.size() == 1);
-    auto stdDevSampFinalize = makeFunction("stdDevSampFinalize", makeVariable(stdDevSlots[0]));
-    return {std::move(stdDevSampFinalize), std::move(inputStage)};
+
+    if (state.needsMerge) {
+        return {buildFinalizePartialStdDev(stdDevSlots[0]), std::move(inputStage)};
+    } else {
+        auto stdDevSampFinalize = makeFunction("stdDevSampFinalize", makeVariable(stdDevSlots[0]));
+        return {std::move(stdDevSampFinalize), std::move(inputStage)};
+    }
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorMergeObjects(

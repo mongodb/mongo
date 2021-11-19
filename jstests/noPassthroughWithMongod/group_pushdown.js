@@ -88,8 +88,6 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
         cursor: {}
     };
     const explain = coll.runCommand(explainCmd);
-    // When $group is pushed down it will never be present as a stage in the 'winningPlan' of
-    // $cursor.
     assert.eq(expectedGroupCountInExplain, getAggPlanStages(explain, "GROUP").length, explain);
     const sbeRes = coll.runCommand(cmd).cursor.firstBatch;
 
@@ -236,13 +234,6 @@ assertResultsMatchWithAndWithoutPushdown(
 // enable $mergeObject or document id expression. As of now we don't have a way to produce valid
 // subdocuments from a $group stage.
 
-// Run a group with an unsupported accumultor and check that it doesn't get pushed down.
-assertNoGroupPushdown(coll, [{$group: {_id: "$item", s: {$stdDevSamp: "$quantity"}}}], [
-    {"_id": "a", "s": 2.1213203435596424},
-    {"_id": "b", "s": 6.363961030678928},
-    {"_id": "c", "s": null}
-]);
-
 // Run a simple group with $sum and object _id, check if it doesn't get pushed down.
 assertNoGroupPushdown(coll,
                       [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}],
@@ -303,15 +294,6 @@ assertGroupPushdown(coll,
 assert.commandWorked(coll.dropIndex({price: 1}));
 assert.commandWorked(coll.dropIndex({quantity: 1}));
 
-// Supported group and then a group with no supported accumulators.
-explain = coll.explain().aggregate([
-    {$group: {_id: "$item", s: {$sum: "$price"}}},
-    {$group: {_id: "$quantity", c: {$stdDevPop: "$price"}}}
-]);
-
-assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
-assert(explain.stages[1].hasOwnProperty("$group"));
-
 // Another case of supported group and then a group with no supported accumulators. A boolean
 // expression may be translated to an internal expression $coerceToBool which is not supported by
 // SBE.
@@ -321,12 +303,6 @@ explain = coll.explain().aggregate([
 ]);
 
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
-assert(explain.stages[1].hasOwnProperty("$group"));
-
-// A group with one supported and one unsupported accumulators.
-explain = coll.explain().aggregate(
-    [{$group: {_id: "$item", s: {$sum: "$price"}, stdev: {$stdDevPop: "$price"}}}]);
-assert.eq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
 
 // $group cannot be pushed down to SBE when there's $match with $or due to an issue with
@@ -397,6 +373,10 @@ assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$sum: "$quanti
 const tcoll = db.group_pushdown1;
 assert.commandWorked(tcoll.insert([{a: NumberLong("9223372036854775807")}, {a: NumberLong("10")}]));
 assertShardedGroupResultsMatch(tcoll, [{$group: {_id: null, s: {$sum: "$a"}}}]);
+
+// Verifies that the shard-side $stdDevPop and $stdDevSamp work.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$stdDevPop: "$price"}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$stdDevSamp: "$price"}}}]);
 
 // Verifies that a sharded $avg works when there's no numeric data.
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", a: {$avg: "$missing"}}}]);
