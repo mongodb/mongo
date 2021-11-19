@@ -32,8 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/plan_cache_util.h"
-
-#include "mongo/db/query/explain.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::plan_cache_util {

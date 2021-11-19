@@ -32,23 +32,6 @@
 #include "mongo/db/catalog/collection.h"
 
 namespace mongo {
-
-/**
- * Encapsulates a callback function called on the SBE Plan Cache invalidation.
- */
-class PlanCacheInvalidatorCallback {
-public:
-    /**
-     * Stores the callback as a service context decoration.
-     */
-    static void set(ServiceContext* serviceContext,
-                    std::unique_ptr<PlanCacheInvalidatorCallback> callback);
-
-    virtual ~PlanCacheInvalidatorCallback() = default;
-
-    virtual void invalidateCacheEntriesWith(UUID collectionUuid, size_t oldVersion) = 0;
-};
-
 /**
  * Controls life-time of PlanCache entries associated with a particular collection of a particular
  * version. A new copy of the collection is created each time the collection
@@ -81,7 +64,6 @@ private:
     // The collection's UUID.
     const boost::optional<UUID> _uuid{};
 
-    // A callback to be called when we need to clean PlanCache.
-    PlanCacheInvalidatorCallback* const _callback{};
+    ServiceContext* const _serviceContext{};
 };
 }  // namespace mongo

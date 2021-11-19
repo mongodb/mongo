@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/plan_cache_invalidator.h"
 
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -38,21 +39,13 @@ namespace {
 
 const auto getCollectionVersionNumber =
     SharedCollectionDecorations::declareDecoration<AtomicWord<size_t>>();
-
-const auto getCallback =
-    ServiceContext::declareDecoration<std::unique_ptr<PlanCacheInvalidatorCallback>>();
 }  // namespace
-
-void PlanCacheInvalidatorCallback::set(ServiceContext* serviceContext,
-                                       std::unique_ptr<PlanCacheInvalidatorCallback> callback) {
-    getCallback(serviceContext) = std::move(callback);
-}
 
 PlanCacheInvalidator::PlanCacheInvalidator(const CollectionPtr& collection,
                                            ServiceContext* serviceContext)
     : _version{getCollectionVersionNumber(collection->getSharedDecorations()).fetchAndAdd(1u)},
       _uuid{collection->uuid()},
-      _callback{getCallback(serviceContext).get()} {}
+      _serviceContext{serviceContext} {}
 
 PlanCacheInvalidator::~PlanCacheInvalidator() {
     try {
@@ -70,8 +63,8 @@ PlanCacheInvalidator::~PlanCacheInvalidator() {
 void PlanCacheInvalidator::clearPlanCache() const {
     // Some unit tests cannot properly initialize CollectionQueryInfo but rely on it partially
     // initialized to make PlanCacheKeys.
-    if (_callback && _uuid) {
-        _callback->invalidateCacheEntriesWith(*_uuid, _version);
+    if (_serviceContext && _uuid) {
+        sbe::clearPlanCacheEntriesWith(_serviceContext, *_uuid, _version);
     }
 }
 

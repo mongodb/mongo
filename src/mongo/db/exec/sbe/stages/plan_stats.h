@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/plan_stats_visitor.h"
-#include "mongo/db/query/stage_types.h"
 
 namespace mongo::sbe {
 struct CommonStats {
