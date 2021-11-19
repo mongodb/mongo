@@ -722,6 +722,10 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
                                                                : PlanExecutor::YIELD_AUTO);
 
     size_t numAttempts = 0;
+
+    // Upper bound on the number of retries allowed. This prevents the server from getting stuck
+    // in an infinite loop when trying to upsert invalid BSON (see SERVER-60897 for details).
+    constexpr size_t kMaxNumAttempts = 1000;
     while (true) {
         ++numAttempts;
 
@@ -734,6 +738,10 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(OperationContext* 
 
             if (!parsedUpdate.hasParsedQuery()) {
                 uassertStatusOK(parsedUpdate.parseQueryToCQ());
+            }
+
+            if (numAttempts >= kMaxNumAttempts) {
+                throw;
             }
 
             if (!UpdateStage::shouldRetryDuplicateKeyException(
