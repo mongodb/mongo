@@ -21,7 +21,8 @@ const collName = jsTestName();
 
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
-const secondaryColl = secondary.getDB(dbName).getCollection(collName);
+const secondaryDB = secondary.getDB(dbName);
+const secondaryColl = secondaryDB.getCollection(collName);
 
 assert.commandWorked(db.createCollection(collName));
 
@@ -32,9 +33,12 @@ for (let i = 0; i < 5; i++) {
 assert.commandWorked(coll.createIndex({x: 1}, {name: "x_1"}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
+IndexBuildTest.pauseIndexBuilds(secondary);
+
 const awaitIndexBuild =
     IndexBuildTest.startIndexBuild(db.getMongo(), coll.getFullName(), {y: 1}, {name: "y_1"});
 IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, "y_1");
+IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, "y_1");
 
 IndexBuildTest.assertIndexes(
     coll, /*numIndexes=*/3, /*readyIndexes=*/["_id_", "x_1"], /*notReadyIndexes=*/["y_1"]);
@@ -51,7 +55,10 @@ IndexBuildTest.assertIndexes(
     secondaryColl, /*numIndexes=*/2, /*readyIndexes=*/["_id_"], /*notReadyIndexes=*/["y_1"]);
 
 IndexBuildTest.resumeIndexBuilds(primary);
+IndexBuildTest.resumeIndexBuilds(secondary);
+
 awaitIndexBuild();
+rst.awaitReplication();
 
 IndexBuildTest.assertIndexes(
     coll, /*numIndexes=*/2, /*readyIndexes=*/["_id_", "y_1"], /*notReadyIndexes=*/[]);
