@@ -46,6 +46,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_asio.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -468,6 +469,11 @@ private:
  * is handled safely (translated to a Status holding a SocketException).
  */
 TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
+    // Under TFO, no SYN is sent until the client has data to send.  For this
+    // test, we need the server to respond when the client hits the failpoint
+    // in the ASIOSession ctor. So we have to disable TFO.
+    auto savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
+    auto savedTFOClientRestore = makeGuard([&] { transport::gTCPFastOpenClient = savedTFOClient; });
     // The `server` accepts connections, only to immediately reset them.
     TestFixture tf;
     asio::io_context ioContext;
@@ -485,7 +491,7 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
         fp.setMode(FailPoint::off);
     });
     JoinThread ioThread{[&] { ioContext.run(); }};
-    ScopeGuard ioContextStop = [&] { ioContext.stop(); };
+    auto ioContextStop = makeGuard([&] { ioContext.stop(); });
 
     fp.setMode(FailPoint::alwaysOn);
     LOGV2(6101602, "Connecting", "port"_attr = server.port());
@@ -519,7 +525,7 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
         accepted.set(true);
     });
     JoinThread ioThread{[&] { ioContext.run(); }};
-    ScopeGuard ioContextStop = [&] { ioContext.stop(); };
+    auto ioContextStop = makeGuard([&] { ioContext.stop(); });
     JoinThread client{[&] {
         asio::ip::tcp::socket client{ioContext};
         client.connect(asio::ip::tcp::endpoint(asio::ip::address_v4::loopback(), server.port()));
