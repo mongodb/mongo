@@ -212,8 +212,11 @@ var {DataConsistencyChecker} = (function() {
             const diff = this.getCollectionDiffUsingSessions(
                 sourceSession, syncingSession, sourceCollInfos.dbName, collName);
             for (let doc of diff.docsWithDifferentContents) {
-                const sourceDoc = doc["first"];
-                const syncingDoc = doc["second"];
+                const sourceDoc = doc["sourceNode"];
+                const syncingDoc = doc["syncingNode"];
+                if (!sourceDoc || !syncingDoc) {
+                    return false;
+                }
                 const hasInvalidated = sourceDoc.hasOwnProperty("invalidated") &&
                     syncingDoc.hasOwnProperty("invalidated");
                 if (!hasInvalidated || sourceDoc["invalidated"] === syncingDoc["invalidated"]) {
