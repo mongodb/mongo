@@ -83,6 +83,7 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/load_balancer_support.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/s/mongos_topology_coordinator.h"
@@ -652,8 +653,16 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>(serviceContext));
 
-    auto tl =
-        transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
+    const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
+    if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {
+        LOGV2_ERROR(6067901,
+                    "Load balancer port must be different from the normal ingress port.",
+                    "port"_attr = serverGlobalParams.port);
+        quickExit(EXIT_BADOPTIONS);
+    }
+
+    auto tl = transport::TransportLayerManager::createWithConfig(
+        &serverGlobalParams, serviceContext, loadBalancerPort);
     auto res = tl->setup();
     if (!res.isOK()) {
         LOGV2_ERROR(22856,

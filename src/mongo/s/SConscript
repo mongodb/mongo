@@ -150,7 +150,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        "load_balancer_feature_flag",
+        'load_balancer_feature_flag',
+        'mongos_server_parameters',
     ],
 )
 

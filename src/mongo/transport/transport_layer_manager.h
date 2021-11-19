@@ -39,6 +39,8 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 struct ServerGlobalParams;
 class ServiceContext;
@@ -94,8 +96,10 @@ public:
      * serviceContext->setTransportLayer(std::move(tl));
      * serviceContext->getTransportLayer->start();
      */
-    static std::unique_ptr<TransportLayer> createWithConfig(const ServerGlobalParams* config,
-                                                            ServiceContext* ctx);
+    static std::unique_ptr<TransportLayer> createWithConfig(
+        const ServerGlobalParams* config,
+        ServiceContext* ctx,
+        boost::optional<int> loadBalancerPort = {});
 
     static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 

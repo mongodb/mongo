@@ -62,3 +62,13 @@ server_parameters:
     default: 15000
     validator:
         gte: 0
+
+  loadBalancerPort:
+    description: >-
+        The port over which proxied connections using the Proxy Protocol may be made.
+        A value of 0 disables the port entirely.
+    set_at: [ startup ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: "loadBalancerPort"
+    default: 0
+    validator: { gte: 0, lte: 65535 }

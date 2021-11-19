@@ -35,10 +35,9 @@
 namespace mongo::load_balancer_support {
 
 /**
- * When a connection is made, we identify whether it came in through a load
- * balancer. We associate this information with the `client`.
+ * Gets the load balancer port, if we are configured to enable one.
  */
-void setClientIsFromLoadBalancer(Client* client);
+boost::optional<int> getLoadBalancerPort();
 
 /**
  * Helper for handling the `hello` command on mongos.
