@@ -603,10 +603,19 @@ __meta_ckptlist_allocate_new_ckpt(
      * Update time value for most recent checkpoint, not letting it move backwards. It is possible
      * to race here, so use atomic CAS. This code relies on the fact that anyone we race with will
      * only increase (never decrease) the most recent checkpoint time value.
+     *
+     * Update the time for this checkpoint not letting it move backwards. If tiered storage is in
+     * use move it at least up to the most recent flush. Then move it up to at least the most
+     * checkpoint.
+     *
+     * NOTE: reading the most recent flush time is not an ordered read because currently checkpoint
+     * and flush tier are mutually exclusive.
      */
     for (;;) {
         WT_ORDERED_READ(most_recent, conn->ckpt_most_recent);
-        if (ckpt->sec <= most_recent ||
+        ckpt->sec = WT_MAX(ckpt->sec, conn->flush_most_recent);
+        ckpt->sec = WT_MAX(ckpt->sec, most_recent);
+        if (ckpt->sec == most_recent ||
           __wt_atomic_cas64(&conn->ckpt_most_recent, most_recent, ckpt->sec))
             break;
     }

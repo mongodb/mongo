@@ -460,6 +460,8 @@ lsm_meta = file_config + lsm_config + [
 ]
 
 tiered_meta = file_meta + tiered_config + [
+    Config('flush_time', '0', r'''
+        indicates the time this tree was flushed to shared storage or 0 if unflushed'''),
     Config('last', '0', r'''
         the last allocated object ID'''),
     Config('oldest', '1', r'''
@@ -472,7 +474,7 @@ tier_meta = file_meta + tiered_tree_config
 # Objects need to have the readonly setting set and bucket_prefix.
 # The file_meta already contains those pieces.
 object_meta = file_meta + [
-    Config('flush', '0', r'''
+    Config('flush_time', '0', r'''
         indicates the time this object was flushed to shared storage or 0 if unflushed'''),
 ]
 

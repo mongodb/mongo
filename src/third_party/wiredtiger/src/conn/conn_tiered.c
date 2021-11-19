@@ -81,13 +81,18 @@ __flush_tier_wait(WT_SESSION_IMPL *session, const char **cfg)
 static int
 __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
 {
+    WT_CKPT ckpt;
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
+    uint64_t ckpt_time, flush_time;
     const char *key, *value;
 
     WT_UNUSED(flags);
-    __wt_verbose(session, WT_VERB_TIERED, "%s", "FLUSH_TIER_ONCE: Called");
+    __wt_verbose(session, WT_VERB_TIERED, "FLUSH_TIER_ONCE: Called flags %" PRIx32, flags);
 
+    conn = S2C(session);
     cursor = NULL;
     /*
      * For supporting splits and merge:
@@ -96,7 +101,18 @@ __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
      * - Do the work to create said objects.
      * - Move the objects.
      */
-    S2C(session)->flush_state = 0;
+    conn->flush_state = 0;
+
+    /*
+     * We hold the checkpoint lock so we know no other thread can be doing a checkpoint at this time
+     * but our time can move backward with respect to the time set by a different thread that did a
+     * checkpoint. Update time value for most recent flush_tier, taking the more recent of now or
+     * the checkpoint time.
+     */
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT));
+    __wt_seconds(session, &flush_time);
+    /* XXX If/when flush tier no longer requires the checkpoint lock, this needs consideration. */
+    conn->flush_most_recent = WT_MAX(flush_time, conn->ckpt_most_recent);
 
     /*
      * Walk the metadata cursor to find tiered tables to flush. This should be optimized to avoid
@@ -108,14 +124,36 @@ __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
         cursor->get_value(cursor, &value);
         /* For now just switch tiers which just does metadata manipulation. */
         if (WT_PREFIX_MATCH(key, "tiered:")) {
-            __wt_verbose(session, WT_VERB_TIERED, "FLUSH_TIER_ONCE: %s %s", key, value);
-            /* Is this instantiating every handle even if it is not opened or in use? */
+            __wt_verbose(
+              session, WT_VERB_TIERED, "FLUSH_TIER_ONCE: %s %s 0x%" PRIx32, key, value, flags);
+            if (!LF_ISSET(WT_FLUSH_TIER_FORCE)) {
+                /*
+                 * Check the table's last checkpoint time and only flush trees that have a
+                 * checkpoint more recent than the last flush time.
+                 */
+                WT_ERR(__wt_meta_checkpoint(session, key, NULL, &ckpt));
+                /*
+                 * XXX If/when flush tier no longer requires the checkpoint lock, this needs
+                 * consideration.
+                 */
+                ckpt_time = ckpt.sec;
+                __wt_meta_checkpoint_free(session, &ckpt);
+                WT_ERR(__wt_config_getones(session, value, "flush_time", &cval));
+
+                /* If nothing has changed, there's nothing to do. */
+                if (ckpt_time == 0 || (uint64_t)cval.val > ckpt_time) {
+                    WT_STAT_CONN_INCR(session, flush_tier_skipped);
+                    continue;
+                }
+            }
+            /* Only instantiate the handle if we need to flush. */
             WT_ERR(__wt_session_get_dhandle(session, key, NULL, NULL, 0));
             /*
              * When we call wt_tiered_switch the session->dhandle points to the tiered: entry and
              * the arg is the config string that is currently in the metadata.
              */
             WT_ERR(__wt_tiered_switch(session, value));
+            WT_STAT_CONN_INCR(session, flush_tier_switched);
             WT_ERR(__wt_session_release_dhandle(session));
         }
     }
@@ -225,7 +263,7 @@ __tier_flush_meta(
     WT_ERR(__wt_metadata_remove(session, local_uri));
     WT_ERR(__wt_metadata_search(session, obj_uri, &obj_value));
     __wt_seconds(session, &now);
-    WT_ERR(__wt_buf_fmt(session, buf, "flush=%" PRIu64, now));
+    WT_ERR(__wt_buf_fmt(session, buf, "flush_time=%" PRIu64, now));
     cfg[0] = obj_value;
     cfg[1] = buf->mem;
     WT_ERR(__wt_config_collapse(session, cfg, &newconfig));
@@ -592,7 +630,8 @@ __tiered_mgr_server(void *arg)
         /*
          * Here is where we do work. Work we expect to do:
          */
-        WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, 0));
+        WT_WITH_CHECKPOINT_LOCK(
+          session, WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, 0)));
         WT_ERR(ret);
         if (ret == 0)
             WT_ERR(__flush_tier_wait(session, cfg));

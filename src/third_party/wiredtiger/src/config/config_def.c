@@ -633,7 +633,7 @@ static const WT_CONFIG_CHECK confchk_object_meta[] = {
   {"collator", "string", NULL, NULL, NULL, 0}, {"columns", "list", NULL, NULL, NULL, 0},
   {"dictionary", "int", NULL, "min=0", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_WT_SESSION_create_encryption_subconfigs, 2},
-  {"flush", "string", NULL, NULL, NULL, 0},
+  {"flush_time", "string", NULL, NULL, NULL, 0},
   {"format", "string", NULL, "choices=[\"btree\"]", NULL, 0},
   {"huffman_key", "string", NULL, NULL, NULL, 0}, {"huffman_value", "string", NULL, NULL, NULL, 0},
   {"id", "string", NULL, NULL, NULL, 0},
@@ -756,6 +756,7 @@ static const WT_CONFIG_CHECK confchk_tiered_meta[] = {
   {"collator", "string", NULL, NULL, NULL, 0}, {"columns", "list", NULL, NULL, NULL, 0},
   {"dictionary", "int", NULL, "min=0", NULL, 0},
   {"encryption", "category", NULL, NULL, confchk_WT_SESSION_create_encryption_subconfigs, 2},
+  {"flush_time", "string", NULL, NULL, NULL, 0},
   {"format", "string", NULL, "choices=[\"btree\"]", NULL, 0},
   {"huffman_key", "string", NULL, NULL, NULL, 0}, {"huffman_value", "string", NULL, NULL, NULL, 0},
   {"id", "string", NULL, NULL, NULL, 0},
@@ -1388,7 +1389,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "read_timestamp=none,write_timestamp=off),block_allocation=best,"
     "block_compressor=,cache_resident=false,checkpoint=,"
     "checkpoint_backup_info=,checkpoint_lsn=,checksum=on,collator=,"
-    "columns=,dictionary=0,encryption=(keyid=,name=),flush=0,"
+    "columns=,dictionary=0,encryption=(keyid=,name=),flush_time=0,"
     "format=btree,huffman_key=,huffman_value=,id=,"
     "ignore_in_memory_cache_size=false,internal_item_max=0,"
     "internal_key_max=0,internal_key_truncate=true,"
@@ -1436,8 +1437,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "read_timestamp=none,write_timestamp=off),block_allocation=best,"
     "block_compressor=,cache_resident=false,checkpoint=,"
     "checkpoint_backup_info=,checkpoint_lsn=,checksum=on,collator=,"
-    "columns=,dictionary=0,encryption=(keyid=,name=),format=btree,"
-    "huffman_key=,huffman_value=,id=,"
+    "columns=,dictionary=0,encryption=(keyid=,name=),flush_time=0,"
+    "format=btree,huffman_key=,huffman_value=,id=,"
     "ignore_in_memory_cache_size=false,internal_item_max=0,"
     "internal_key_max=0,internal_key_truncate=true,"
     "internal_page_max=4KB,key_format=u,key_gap=10,last=0,"
@@ -1450,7 +1451,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "bucket=,bucket_prefix=,cache_directory=,local_retention=300,"
     "name=,object_target_size=10M),tiers=,value_format=u,verbose=[],"
     "version=(major=0,minor=0),write_timestamp_usage=none",
-    confchk_tiered_meta, 50},
+    confchk_tiered_meta, 51},
   {"wiredtiger_open",
     "block_cache=(blkcache_eviction_aggression=1800,"
     "cache_on_checkpoint=true,cache_on_writes=true,enabled=false,"

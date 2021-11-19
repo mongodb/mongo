@@ -529,6 +529,8 @@ conn_stats = [
     # Tiered storage statistics
     ##########################################
     StorageStat('flush_tier', 'flush_tier operation calls'),
+    StorageStat('flush_tier_skipped', 'flush_tier tables skipped due to no checkpoint'),
+    StorageStat('flush_tier_switched', 'flush_tier tables switched'),
     StorageStat('local_objects_inuse', 'attempts to remove a local object and the object is in use'),
     StorageStat('local_objects_removed', 'local objects removed'),
 

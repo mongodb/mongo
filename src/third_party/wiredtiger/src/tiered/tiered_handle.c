@@ -193,7 +193,7 @@ __tiered_create_object(WT_SESSION_IMPL *session, WT_TIERED *tiered)
       __wt_tiered_name(session, &tiered->iface, tiered->current_id, WT_TIERED_NAME_OBJECT, &name));
     cfg[0] = WT_CONFIG_BASE(session, object_meta);
     cfg[1] = tiered->obj_config;
-    cfg[2] = "flush=0,readonly=true";
+    cfg[2] = "flush_time=0,readonly=true";
     WT_ASSERT(session, tiered->obj_config != NULL);
     WT_ERR(__wt_config_merge(session, cfg, NULL, (const char **)&config));
     __wt_verbose(
@@ -301,8 +301,9 @@ __wt_tiered_set_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_ITEM *b
 {
     uint32_t i;
 
-    WT_RET(__wt_buf_catfmt(session, buf, ",last=%" PRIu32 ",oldest=%" PRIu32 ",tiers=(",
-      tiered->current_id, tiered->oldest_id));
+    WT_RET(__wt_buf_catfmt(session, buf,
+      ",flush_time=%" PRIu64 ",last=%" PRIu32 ",oldest=%" PRIu32 ",tiers=(",
+      S2C(session)->flush_most_recent, tiered->current_id, tiered->oldest_id));
     for (i = 0; i < WT_TIERED_MAX_TIERS; ++i) {
         if (tiered->tiers[i].name == NULL) {
             __wt_verbose(session, WT_VERB_TIERED, "TIER_SET_META: names[%" PRIu32 "] NULL", i);

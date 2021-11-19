@@ -427,6 +427,7 @@ struct __wt_connection_impl {
     WT_CONDVAR *flush_cond;          /* Flush wait mutex */
     WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
     bool tiered_server_running;      /* Internal tiered server operating */
+    uint64_t flush_most_recent;      /* Clock value of most recent flush_tier */
     uint32_t flush_state;            /* State of last flush tier */
 
     WT_TIERED_MANAGER tiered_mgr;        /* Tiered manager thread information */

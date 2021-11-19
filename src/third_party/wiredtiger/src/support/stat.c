@@ -1458,6 +1458,8 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: split objects currently awaiting free",
   "session: attempts to remove a local object and the object is in use",
   "session: flush_tier operation calls",
+  "session: flush_tier tables skipped due to no checkpoint",
+  "session: flush_tier tables switched",
   "session: local objects removed",
   "session: open session count",
   "session: session query timestamp calls",
@@ -2017,6 +2019,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing rec_split_stashed_objects */
     stats->local_objects_inuse = 0;
     stats->flush_tier = 0;
+    stats->flush_tier_skipped = 0;
+    stats->flush_tier_switched = 0;
     stats->local_objects_removed = 0;
     /* not clearing session_open */
     stats->session_query_ts = 0;
@@ -2587,6 +2591,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_split_stashed_objects += WT_STAT_READ(from, rec_split_stashed_objects);
     to->local_objects_inuse += WT_STAT_READ(from, local_objects_inuse);
     to->flush_tier += WT_STAT_READ(from, flush_tier);
+    to->flush_tier_skipped += WT_STAT_READ(from, flush_tier_skipped);
+    to->flush_tier_switched += WT_STAT_READ(from, flush_tier_switched);
     to->local_objects_removed += WT_STAT_READ(from, local_objects_removed);
     to->session_open += WT_STAT_READ(from, session_open);
     to->session_query_ts += WT_STAT_READ(from, session_query_ts);
