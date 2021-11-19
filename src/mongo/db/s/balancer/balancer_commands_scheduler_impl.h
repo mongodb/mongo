@@ -470,7 +470,7 @@ public:
         return _holdingDistLock;
     }
 
-    const bool isRecoverable() const {
+    bool isRecoverable() const {
         return _commandInfo->requiresRecoveryOnCrash();
     }
 
