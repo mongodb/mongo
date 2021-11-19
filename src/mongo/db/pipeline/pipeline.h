@@ -271,6 +271,7 @@ public:
      */
     std::vector<Value> serialize() const;
     std::vector<BSONObj> serializeToBson() const;
+    static std::vector<Value> serializeContainer(const SourceContainer& container);
 
     /**
      * Serializes the pipeline into BSON for explain/debug logging purposes.

@@ -145,8 +145,22 @@ public:
      */
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
+protected:
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
 private:
     explicit DocumentSourceGeoNear(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
+     * If this stage immediately follows an $_internalUnpackBucket, split it up into several stages
+     * including an explicit $sort.
+     *
+     * Does nothing if not immediately following an $_internalUnpackBucket.
+     */
+    Pipeline::SourceContainer::iterator splitForTimeseries(Pipeline::SourceContainer::iterator itr,
+                                                           Pipeline::SourceContainer* container);
+
 
     /**
      * Parses the fields in the object 'options', throwing if an error occurs.

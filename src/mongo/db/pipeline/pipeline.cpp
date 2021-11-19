@@ -411,12 +411,15 @@ stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
     return collectionNames;
 }
 
-vector<Value> Pipeline::serialize() const {
+vector<Value> Pipeline::serializeContainer(const SourceContainer& container) {
     vector<Value> serializedSources;
-    for (auto&& source : _sources) {
+    for (auto&& source : container) {
         source->serializeToArray(serializedSources);
     }
     return serializedSources;
+}
+vector<Value> Pipeline::serialize() const {
+    return serializeContainer(_sources);
 }
 
 vector<BSONObj> Pipeline::serializeToBson() const {

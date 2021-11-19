@@ -31,12 +31,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/document_source_match.h"
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -91,6 +98,209 @@ Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity
 boost::intrusive_ptr<DocumentSource> DocumentSourceGeoNear::optimize() {
     _nearGeometry = _nearGeometry->optimize();
     return this;
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+
+    // Currently this is the only rewrite.
+    itr = splitForTimeseries(itr, container);
+
+    return itr;
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    // Only do this rewrite if we are immediately following an $_internalUnpackBucket stage.
+    if (container->begin() == itr ||
+        !dynamic_cast<DocumentSourceInternalUnpackBucket*>(std::prev(itr)->get()))
+        return std::next(itr);
+
+    // If _nearGeometry is not a constant, do nothing.
+    // It might be constant in a future call to optimizeAt(), once any variables have been filled
+    // in.
+    _nearGeometry = _nearGeometry->optimize();
+    auto nearConst = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
+    if (!nearConst)
+        return std::next(itr);
+
+    // If the user didn't specify a field name to query, do nothing.
+    // Normally when we use a DocumentSourceGeoNearCursor we infer this from the presence of an
+    // index, but when we use an explicit $sort there might not be an index involved.
+    if (!keyFieldPath)
+        return std::next(itr);
+
+    tassert(5860206, "$geoNear distanceField unexpectedly null", distanceField);
+
+    // In this case, we know:
+    // - there are stages before us
+    // - the query point is a known constant
+    // - the field name
+
+    // It's fine for this error message to say "on a time-series collection" because we only get
+    // here when an $_internalUnpackBucket stage precedes us.
+    uassert(5860207,
+            "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
+            query.isEmpty());
+    uassert(
+        5860208, "$geoNear 'includeLocs' is not supported on time-series metrics", !includeLocs);
+
+    // Replace the stage with $geoWithin, $computeGeoDistance, $sort.
+
+    // Use GeoNearExpression to parse the arguments. This makes it easier to handle a variety of
+    // cases: for example, if the query point is GeoJSON, then 'spherical' is implicitly true.
+    GeoNearExpression nearExpr;
+    // asNearQuery() is something like '{fieldName: {$near: ...}}'.
+    // GeoNearExpression seems to want something like '{$near: ...}'.
+    auto nearQuery = asNearQuery(keyFieldPath->fullPath()).firstElement().Obj().getOwned();
+    tassert(nearExpr.parseFrom(nearQuery));
+    tassert(5860204,
+            "Unexpected GeoNearExpression field name after asNearQuery(): "_sd + nearExpr.field,
+            nearExpr.field == ""_sd);
+
+    Pipeline::SourceContainer replacement;
+    // 1. $geoWithin maxDistance
+    //    We always include a $geoWithin predicate, even if maxDistance covers the entire space,
+    //    because it takes care of excluding documents that don't have the geo field we're querying.
+    if (nearExpr.centroid->crs == SPHERE) {
+        // {$match: {field: {$geoWithin: {$centerSphere: [[x, y], radiusRadians]}}}}
+        double x = nearExpr.centroid->oldPoint.x;
+        double y = nearExpr.centroid->oldPoint.y;
+        auto radiusRadians = [&](double radius) -> double {
+            if (nearExpr.unitsAreRadians) {
+                // In this mode, $geoNear interprets the given maxDistance as radians.
+                return radius;
+            } else {
+                // Otherwise it interprets maxDistance as meters.
+                auto maxDistanceMeters = radius;
+                return maxDistanceMeters / kRadiusOfEarthInMeters;
+            }
+        };
+        replacement.push_back(DocumentSourceMatch::create(
+            BSON(keyFieldPath->fullPath()
+                 << BSON("$geoWithin"
+                         << BSON("$centerSphere" << BSON_ARRAY(
+                                     BSON_ARRAY(x << y) << radiusRadians(nearExpr.maxDistance))))),
+            pExpCtx));
+
+        if (minDistance) {
+            // Also include an inside-out $geoWithin. This query is imprecise due to rounding error,
+            // so we will include an additional, precise filter later in the pipeline.
+            double antipodalX = x < 0 ? x + 180 : x - 180;
+            double antipodalY = -y;
+            double insideOutRadiusRadians = M_PI - radiusRadians(nearExpr.minDistance);
+            if (insideOutRadiusRadians > 0) {
+                replacement.push_back(DocumentSourceMatch::create(
+                    BSON(keyFieldPath->fullPath()
+                         << BSON("$geoWithin" << BSON("$centerSphere" << BSON_ARRAY(
+                                                          BSON_ARRAY(antipodalX << antipodalY)
+                                                          << insideOutRadiusRadians)))),
+                    pExpCtx));
+            }
+        }
+    } else if (nearExpr.centroid->crs == FLAT) {
+        // {$match: {field: {$geoWithin: {$center: [[x, y], radius]}}}}
+        tassert(5860205,
+                "'isNearSphere' should have resulted in a SPHERE crs.",
+                !nearExpr.isNearSphere);
+        auto x = nearExpr.centroid->oldPoint.x;
+        auto y = nearExpr.centroid->oldPoint.y;
+        replacement.push_back(DocumentSourceMatch::create(
+            BSON(keyFieldPath->fullPath()
+                 << BSON("$geoWithin" << BSON(
+                             "$center" << BSON_ARRAY(BSON_ARRAY(x << y) << nearExpr.maxDistance)))),
+            pExpCtx));
+
+        if (std::isnormal(nearExpr.minDistance)) {
+            // $geoWithin includes its boundary, so a negated $geoWithin excludes the boundary.
+            // So we need to tweak the radius here to include those points on the boundary.
+            // This means this filter is approximate, so we'll include an additional filter for
+            // minDistance after unpacking.
+
+            // Making the radius 1% smaller seems like a big enough tweak that we won't miss any
+            // boundary points, and a small enough tweak to still be selective. It also preserves
+            // the sign of minDistance (whereas subtracting an epsilon wouldn't, necessarily).
+            // Only do this when isnormal(minDistance), to ensure we have enough bits of precision.
+            auto radius = 0.99 * nearExpr.minDistance;
+            replacement.push_back(DocumentSourceMatch::create(
+                BSON(keyFieldPath->fullPath() << BSON(
+                         "$not" << BSON("$geoWithin" << BSON("$center" << BSON_ARRAY(
+                                                                 BSON_ARRAY(x << y) << radius))))),
+                pExpCtx));
+        }
+    } else {
+        tasserted(5860203, "Expected coordinate system to be either SPHERE or FLAT.");
+    }
+
+    // 2. Compute geo distance.
+    {
+        auto multiplier = (distanceMultiplier ? *distanceMultiplier : 1.0);
+        if (nearExpr.unitsAreRadians) {
+            // In this mode, $geoNear would report distances in radians instead of meters.
+            // To imitate this behavior, we need to scale down here too.
+            multiplier /= kRadiusOfEarthInMeters;
+        }
+
+        auto coords = nearExpr.centroid->crs == SPHERE
+            ? BSON("near" << BSON("type"
+                                  << "Point"
+                                  << "coordinates"
+                                  << BSON_ARRAY(nearExpr.centroid->oldPoint.x
+                                                << nearExpr.centroid->oldPoint.y)))
+            : BSON("near" << BSON_ARRAY(nearExpr.centroid->oldPoint.x
+                                        << nearExpr.centroid->oldPoint.y));
+        tassert(5860220, "", coords.firstElement().isABSONObj());
+
+        auto centroid = std::make_unique<PointWithCRS>();
+        tassert(GeoParser::parseQueryPoint(coords.firstElement(), centroid.get())
+                    .withContext("parsing centroid for $geoNear time-series rewrite"));
+
+        replacement.push_back(make_intrusive<DocumentSourceInternalGeoNearDistance>(
+            pExpCtx,
+            keyFieldPath->fullPath(),
+            std::move(centroid),
+            coords.firstElement().Obj().getOwned(),
+            distanceField->fullPath(),
+            multiplier));
+    }
+
+    // 3. Filter precisely by minDistance / maxDistance.
+    if (minDistance) {
+        // 'minDistance' does not take 'distanceMultiplier' into account.
+        replacement.push_back(DocumentSourceMatch::create(
+            BSON(distanceField->fullPath() << BSON(
+                     "$gte" << *minDistance * (distanceMultiplier ? *distanceMultiplier : 1.0))),
+            pExpCtx));
+    }
+    if (maxDistance) {
+        // 'maxDistance' does not take 'distanceMultiplier' into account.
+        replacement.push_back(DocumentSourceMatch::create(
+            BSON(distanceField->fullPath() << BSON(
+                     "$lte" << *maxDistance * (distanceMultiplier ? *distanceMultiplier : 1.0))),
+            pExpCtx));
+    }
+
+    // 4. $sort by geo distance.
+    {
+        // {$sort: {dist: 1}}
+        replacement.push_back(DocumentSourceSort::create(pExpCtx,
+                                                         SortPattern({
+                                                             {true, *distanceField, nullptr},
+                                                         })));
+    }
+
+    LOGV2_DEBUG(5860209,
+                5,
+                "$geoNear splitForTimeseries",
+                "pipeline"_attr = Pipeline::serializeContainer(*container),
+                "replacement"_attr = Pipeline::serializeContainer(replacement));
+
+    auto prev = std::prev(itr);
+    std::move(replacement.begin(), replacement.end(), std::inserter(*container, itr));
+    container->erase(itr);
+    return std::next(prev);
 }
 
 intrusive_ptr<DocumentSourceGeoNear> DocumentSourceGeoNear::create(

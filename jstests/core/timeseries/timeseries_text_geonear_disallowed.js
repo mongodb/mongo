@@ -34,11 +34,11 @@ for (let i = 0; i < nMeasurements; i++) {
     assert.commandWorked(tsColl.insert(docToInsert));
 }
 
-// Test that $geoNear fails cleanly because it cannot be issued against a time-series collection.
+// Test that unimplemented match exprs on time-series collections fail cleanly.
+// $geoNear (the match expression; not to be confused with the aggregation stage)
 assert.commandFailedWithCode(
     assert.throws(() => tsColl.find({"tags.distance": {$geoNear: [0, 0]}}).itcount()), 5626500);
 
-// Test that unimplemented match exprs on time-series collections fail cleanly.
 // $near
 assert.commandFailedWithCode(
     assert.throws(() => tsColl.find({"tags.distance": {$near: [0, 0]}}).itcount()), 5626500);

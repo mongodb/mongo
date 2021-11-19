@@ -45,17 +45,34 @@ REGISTER_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     auto obj = elem.embeddedObjectUserCheck();
-    tassert(5874500,
+    uassert(5874500,
             str::stream() << DocumentSourceInternalGeoNearDistance::kKeyFieldName
                           << " field is required and must be a string",
             obj.hasField(DocumentSourceInternalGeoNearDistance::kKeyFieldName) &&
                 obj[DocumentSourceInternalGeoNearDistance::kKeyFieldName].type() ==
                     BSONType::String);
-    tassert(5874501,
+    uassert(5874501,
             str::stream() << DocumentSourceInternalGeoNearDistance::kNearFieldName
                           << " field is required and must be an object or array",
             obj.hasField(DocumentSourceInternalGeoNearDistance::kNearFieldName) &&
                 obj[DocumentSourceInternalGeoNearDistance::kNearFieldName].isABSONObj());
+    uassert(5874502,
+            str::stream() << DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName
+                          << " field is required and must be a string",
+            obj.hasField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName) &&
+                obj[DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName].type() ==
+                    BSONType::String);
+    uassert(
+        5874503,
+        str::stream() << DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName
+                      << " field is required and must be a number",
+        obj.hasField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName) &&
+            obj[DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName].isNumber());
+    int expectedNumArgs = 4;
+    uassert(5874510,
+            str::stream() << kStageName << " expected " << expectedNumArgs << " arguments but got "
+                          << obj.nFields(),
+            obj.nFields() == expectedNumArgs);
 
     auto nearElm = obj[DocumentSourceInternalGeoNearDistance::kNearFieldName];
     auto centroid = std::make_unique<PointWithCRS>();
@@ -66,20 +83,27 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::crea
             pExpCtx,
             obj[DocumentSourceInternalGeoNearDistance::kKeyFieldName].String(),
             std::move(centroid),
-            nearElm.embeddedObject().getOwned());
+            nearElm.embeddedObject().getOwned(),
+            obj[DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName].String(),
+            obj[DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName]
+                .numberDouble());
 
     return out;
 }
 
 DocumentSourceInternalGeoNearDistance::DocumentSourceInternalGeoNearDistance(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    const std::string& key,
+    std::string key,
     std::unique_ptr<PointWithCRS> centroid,
-    const BSONObj& coords)
+    const BSONObj& coords,
+    std::string distanceField,
+    double distanceMultiplier)
     : DocumentSource(kStageName, pExpCtx),
-      _key(key),
+      _key(std::move(key)),
       _centroid(std::move(centroid)),
-      _coords(coords) {}
+      _coords(coords),
+      _distanceField(std::move(distanceField)),
+      _distanceMultiplier(distanceMultiplier) {}
 
 DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext() {
     auto next = pSource->getNext();
@@ -104,9 +128,10 @@ DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext()
                 minDistance = nextDistance;
             }
         }
+        minDistance *= _distanceMultiplier;
 
         MutableDocument doc(next.releaseDocument());
-        doc.metadata().setGeoNearDistance(minDistance);
+        doc.setNestedField(_distanceField, Value{minDistance});
 
         return doc.freeze();
     }
@@ -119,6 +144,10 @@ Value DocumentSourceInternalGeoNearDistance::serialize(
     MutableDocument out;
     out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName, Value(_coords));
     out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName, Value(_key));
+    out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,
+                 Value(_distanceField.fullPath()));
+    out.setField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName,
+                 Value(_distanceMultiplier));
 
     return Value(DOC(getSourceName() << out.freeze()));
 }

@@ -135,18 +135,19 @@ TimeseriesTest.run((insert) => {
         timeseriescoll.find({location: {$geoWithin: {$center: [[40, -70], .15]}}}).toArray().length,
         geoWithinPlan2d);
 
-    /* TODO (SERVER-58602): Enable this test once query planner can use 'GEO_2DSPHERE_BUCKET' index
-    with $geoNear by translating to a $geoWithin + $sort assert.eq(2, bucketscoll .aggregate([{
+    assert.eq(4,
+              timeseriescoll
+                  .aggregate([{
                       $geoNear: {
                           near: {type: "Point", coordinates: [40.4, -70.4]},
                           distanceField: "dist",
                           spherical: true,
-                          key: 'data.location'
+                          key: 'location'
                       }
                   }])
                   .toArray()
                   .length,
-              "Failed to use 2dsphere index: " + tojson(twoDSphereBucketsIndexSpec));*/
+              "Failed to use 2dsphere index: " + tojson(twoDSphereTimeseriesIndexSpec));
 
     assert.commandWorked(timeseriescoll.dropIndex(twoDSphereTimeseriesIndexSpec));
 });

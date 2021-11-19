@@ -49,7 +49,9 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
                 type: "Point",
                 coordinates: [1, 1]
             },
-            key: "loc" 
+            key: "loc",
+            distanceMultiplier: 1,
+            distanceField: "dist"
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
@@ -64,7 +66,8 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
     auto next = geoDist->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
-    ASSERT_EQUALS(doc.metadata().getGeoNearDistance(), 0);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_EQUALS(doc["dist"].coerceToDouble(), 0);
 }
 
 TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoints) {
@@ -74,7 +77,9 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
                 type: "Point",
                 coordinates: [0, 1]
             },
-            key: "loc" 
+            key: "loc",
+            distanceMultiplier: 1,
+            distanceField: "dist"
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
@@ -90,14 +95,17 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
     const int meterToLatDegree = 111319;  // Each degree of latitude is approximately 111km.
-    ASSERT_APPROX_EQUAL(doc.metadata().getGeoNearDistance(), meterToLatDegree, 300);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), meterToLatDegree, 300);
 }
 
 TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoLegacyPoints) {
     BSONObj computeGeoSpec = fromjson(R"(
         { $_internalComputeGeoNearDistance: {
             near: [1, 1],
-            key: "loc" 
+            key: "loc",
+            distanceMultiplier: 1,
+            distanceField: "dist"
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
@@ -108,7 +116,8 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoLegacyPoints
     auto next = geoDist->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
-    ASSERT_APPROX_EQUAL(doc.metadata().getGeoNearDistance(), 1.41421, 0.01);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), 1.41421, 0.01);
 }
 
 TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsSphereAndFlat) {
@@ -118,7 +127,9 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsS
                 type: "Point",
                 coordinates: [0, 1]
             },
-            key: "loc" 
+            key: "loc",
+            distanceMultiplier: 1,
+            distanceField: "dist"
         }})");
     auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
         computeGeoSpec.firstElement(), getExpCtx());
@@ -130,7 +141,8 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsS
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
     const int meterToLatDegree = 111319;  // Each degree of latitude is approximately 111km.
-    ASSERT_APPROX_EQUAL(doc.metadata().getGeoNearDistance(), meterToLatDegree, 300);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), meterToLatDegree, 300);
 }
 
 }  // namespace

@@ -43,28 +43,42 @@ public:
     static constexpr StringData kStageName = "$_internalComputeGeoNearDistance"_sd;
     static constexpr StringData kNearFieldName = "near"_sd;
     static constexpr StringData kKeyFieldName = "key"_sd;
+    static constexpr StringData kDistanceFieldFieldName = "distanceField"_sd;
+    static constexpr StringData kDistanceMultiplierFieldName = "distanceMultiplier"_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     DocumentSourceInternalGeoNearDistance(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                                          const std::string& key,
+                                          std::string key,
                                           std::unique_ptr<PointWithCRS> centroid,
-                                          const BSONObj& coords);
+                                          const BSONObj& coords,
+                                          std::string distanceField,
+                                          double distanceMultiplier);
 
     const char* getSourceName() const override {
         return kStageName.rawData();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
-        return StageConstraints(StreamType::kStreaming,
-                                PositionRequirement::kNone,
-                                HostTypeRequirement::kNone,
-                                DiskUseRequirement::kNoDiskUse,
-                                FacetRequirement::kAllowed,
-                                TransactionRequirement::kAllowed,
-                                LookupRequirement::kAllowed,
-                                UnionRequirement::kAllowed);
+        StageConstraints result = {
+            StreamType::kStreaming,
+            PositionRequirement::kNone,
+            HostTypeRequirement::kNone,
+            DiskUseRequirement::kNoDiskUse,
+            FacetRequirement::kAllowed,
+            TransactionRequirement::kAllowed,
+            LookupRequirement::kAllowed,
+            UnionRequirement::kAllowed,
+        };
+        result.canSwapWithMatch = true;
+        return result;
+    }
+
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        return {GetModPathsReturn::Type::kFiniteSet,
+                std::set<std::string>{_distanceField.fullPath()},
+                {}};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
@@ -80,6 +94,8 @@ private:
     std::string _key;
     std::unique_ptr<PointWithCRS> _centroid;
     BSONObj _coords;  // "near" option
+    FieldPath _distanceField;
+    double _distanceMultiplier;
 };
 
 }  // namespace mongo

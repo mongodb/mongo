@@ -1,6 +1,8 @@
 /**
- * Test that $geoNear, $near, $nearSphere, and $text are not allowed against timeseries collections
- * and such queries fail cleanly.
+ * Test the behavior of $geoNear queries on time-series collections.
+ *
+ * Also test that $near, $nearSphere, and $text are not allowed against timeseries collections and
+ * such queries fail cleanly.
  *
  * @tags: [
  *     does_not_support_transactions,
