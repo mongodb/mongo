@@ -542,7 +542,11 @@ private:
     boost::optional<DensifyValue> _globalMin = boost::none;
     boost::optional<DensifyValue> _globalMax = boost::none;
 
-    // Expression to be used to compare partitions.
+    // _partitionExpr has two purposes:
+    // 1. to determine which partition a document belongs in.
+    // 2. to initialize new documents with the right partition key.
+    // For example, if the stage had 'partitionByFields: ["a", "x.y"]' then this expression
+    // would be {a: "$a", {x: {y: "$x.y"}}}.
     boost::intrusive_ptr<ExpressionObject> _partitionExpr;
 
     bool _eof = false;

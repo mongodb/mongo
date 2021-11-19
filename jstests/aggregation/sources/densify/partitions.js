@@ -522,6 +522,94 @@ function singleDocumentTest() {
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
 
+function testDottedField() {
+    coll.drop();
+    const input = [
+        {
+            "_id": 0,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+            "temp": 12
+        },
+        {
+            "_id": 1,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T02:00:00.000Z"),
+            "temp": 14
+        }
+    ];
+    const pipeline = [{
+        $densify: {
+            field: "timestamp",
+            // Dots are interpreted as path separators.
+            partitionByFields: ["metadata.sensorId"],
+            range: {step: 1, unit: "hour", bounds: "full"}
+        }
+    }];
+    const expectedOutput = [
+        {
+            "_id": 0,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T00:00:00Z"),
+            "temp": 12
+        },
+        {
+            // Because dotted fields are interpreted as paths, when we write to 'metadata.sensorId'
+            // it should create a nested document.
+            "metadata": {"sensorId": 5578},
+            "timestamp": ISODate("2021-05-18T01:00:00Z"),
+        },
+        {
+            "_id": 1,
+            "metadata": {"sensorId": 5578, "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T02:00:00Z"),
+            "temp": 14
+        }
+    ];
+
+    assert.commandWorked(coll.insert(input));
+    const actualOutput = coll.aggregate(pipeline).toArray();
+
+    assert(arrayEq(actualOutput, expectedOutput), {actualOutput, expectedOutput});
+}
+
+function testArrayTraversalDisallowed() {
+    const pipeline = [{
+        $densify: {
+            field: "timestamp",
+            partitionByFields: ["metadata.sensorId"],
+        }
+    }];
+
+    let input = [
+        {
+            "_id": 0,
+            // In this case, the dot in 'metadata.sensorId' traverses through an array, because
+            // the whole 'metadata' subdocument is an array.
+            "metadata": [{"sensorId": 5578, "type": "temperature"}],
+            "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+            "temp": 12
+        },
+    ];
+    coll.drop();
+    assert.commandWorked(coll.insert(input));
+    assert.throws(() => coll.aggregate(pipeline));
+
+    input = [
+        {
+            "_id": 0,
+            // In this case, the dot does not traverse an array. But the path evaluates to an array,
+            // so this is also an error.
+            "metadata": {"sensorId": [5578], "type": "temperature"},
+            "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
+            "temp": 12
+        },
+    ];
+    coll.drop();
+    assert.commandWorked(coll.insert(input));
+    assert.throws(() => coll.aggregate(pipeline));
+}
+
 testOne();
 testTwo();
 testThree();
@@ -543,4 +631,7 @@ fullTestTwoDates();
 rangeTestTwoDates();
 
 singleDocumentTest();
+
+testDottedField();
+testArrayTraversalDisallowed();
 })();

@@ -640,14 +640,19 @@ Value DocumentSourceInternalDensify::serialize(
 }
 
 void DocumentSourceInternalDensify::initializePartitionState(Document initialDoc) {
+    // Initialize _partitionExpr from _partitions.
+
     // We check whether there is anything in _partitions during parsing.
-    std::vector<std::pair<std::string, boost::intrusive_ptr<mongo::Expression>>> partitionExp;
-    for (FieldPath p : _partitions) {
-        partitionExp.push_back({p.fullPath(),
-                                ExpressionFieldPath::createPathFromString(
-                                    pExpCtx.get(), p.fullPath(), pExpCtx->variablesParseState)});
+    tassert(
+        6154800, "Expected at least one field when partitioning is enabled.", !_partitions.empty());
+
+    MutableDocument partitionExpr;
+    for (auto&& p : _partitions) {
+        partitionExpr.setNestedField(p.fullPath(), Value{"$"_sd + p.fullPath()});
     }
-    _partitionExpr = ExpressionObject::create(pExpCtx.get(), std::move(partitionExp));
+    _partitionExpr = ExpressionObject::parse(
+        pExpCtx.get(), partitionExpr.freeze().toBson(), pExpCtx->variablesParseState);
+
     setPartitionValue(initialDoc);
 }
 
