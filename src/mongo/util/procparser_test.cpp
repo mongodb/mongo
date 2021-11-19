@@ -669,7 +669,7 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
 boost::filesystem::space_info mockGetSpace(const boost::filesystem::path& p,
                                            boost::system::error_code& ec) {
     ec = boost::system::error_code();
-    boost::filesystem::space_info result;
+    auto result = boost::filesystem::space_info();
     if (p.string() == "/") {
         result.available = 11213234231;
         result.capacity = 23432543255;
