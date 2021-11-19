@@ -352,6 +352,9 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 }
 
 void AccumulatorFirstLastN::_processValue(const Value& val) {
+    // Convert missing values to null.
+    auto valToProcess = val.missing() ? Value(BSONNULL) : val;
+
     // Only insert in the lastN case if we have 'n' elements.
     if (static_cast<long long>(_deque.size()) == *_n) {
         if (_variant == Sense::kLast) {
@@ -362,8 +365,8 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
         }
     }
 
-    updateAndCheckMemUsage(val.getApproximateSize());
-    _deque.push_back(val);
+    updateAndCheckMemUsage(valToProcess.getApproximateSize());
+    _deque.push_back(valToProcess);
 }
 
 const char* AccumulatorFirstLastN::getOpName() const {
@@ -599,6 +602,11 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorTopBottomN<sense, single>::cre
 template <TopBottomSense sense, bool single>
 void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
     Value output = val[AccumulatorN::kFieldNameOutput];
+
+    // Upconvert to 'null' if the output field is missing.
+    if (output.missing())
+        output = Value(BSONNULL);
+
     Value sortKey;
 
     // In the case that _processValue() is getting called in the context of merging, a previous

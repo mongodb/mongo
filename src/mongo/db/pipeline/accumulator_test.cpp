@@ -223,9 +223,9 @@ TEST(Accumulators, FirstN) {
             {{Value(4), Value(5), Value(6), Value(3), Value(2), Value(1)},
              Value(std::vector<Value>{Value(4), Value(5)})},
 
-            // Null and missing values should NOT be ignored.
+            // Null and missing values should NOT be ignored (missing gets upconverted to null).
             {{Value(), Value(BSONNULL), Value(4), Value(), Value(BSONNULL), Value(5), Value(6)},
-             Value(std::vector<Value>{Value(), Value(BSONNULL)})},
+             Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL)})},
 
             // Testing mixed types.
             {{Value(4), Value("str"_sd), Value(3.2), Value(4.0)},
@@ -297,7 +297,7 @@ TEST(Accumulators, LastN) {
             {{Value(4), Value(5), Value(6), Value(3), Value(2), Value(1)},
              Value(std::vector<Value>{Value(2), Value(1)})},
 
-            // Null and missing values should NOT be ignored.
+            // Null and missing values should NOT be ignored (missing gets upconverted to null).
             {{Value(), Value(BSONNULL), Value(4), Value(), Value(BSONNULL), Value(5), Value(6)},
              Value(std::vector<Value>{Value(5), Value(6)})},
 
@@ -317,7 +317,7 @@ TEST(Accumulators, LastN) {
               Value(),
               Value(),
               Value()},
-             Value(std::vector<Value>{Value(), Value()})},
+             Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL)})},
 
             // Testing mixed types.
             {{Value(4), Value("str"_sd), Value(3.2), Value(4.0)},
@@ -698,18 +698,18 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
           mkdoc(Value(10))},
          {Value(std::vector<Value>{Value(1), Value(10), Value(10)})}},
 
-        // Null/missing cases (missing and null both are NOT ignored).
+        // Null/missing cases (missing and null are NOT ignored, but missing is converted to null).
         {{mkdoc(Value(BSONNULL)), mkdoc(Value()), mkdoc(Value(BSONNULL)), mkdoc(Value(3))},
-         {Value(std::vector<Value>{Value(), Value(BSONNULL), Value(3)})}},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(3)})}},
 
         {{mkdoc(Value()), mkdoc(Value(BSONNULL)), mkdoc(Value()), mkdoc(Value(3))},
-         {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(3)})}},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(3)})}},
 
         // Output values different than sortBy.
         {{mkdoc2(5, Value(7)), mkdoc2(4, Value(2)), mkdoc2(3, Value(3)), mkdoc2(1, Value(3))},
          {Value(std::vector<Value>{Value(3), Value(2), Value(7)})}},
         {{mkdoc2(5, Value(BSONNULL)), mkdoc2(4, Value()), mkdoc2(3, Value(3))},
-         {Value(std::vector<Value>{Value(3), Value(), Value(BSONNULL)})}}};
+         {Value(std::vector<Value>{Value(3), Value(BSONNULL), Value(BSONNULL)})}}};
 
     OperationsType bottomSpecificCases = {
         // All 10s encountered once map is full.
@@ -837,25 +837,26 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
           mkdoc(Value(10))},
          {Value(std::vector<Value>{Value(10), Value(1), Value(1)})}},
 
-        // Null/missing cases (missing and null both are NOT ignored).
+        // Null/missing cases (missing and null are NOT ignored, but missing is upconverted to
+        // null).
         {{mkdoc(Value(100)),
           mkdoc(Value(BSONNULL)),
           mkdoc(Value()),
           mkdoc(Value(BSONNULL)),
           mkdoc(Value())},
-         {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(BSONNULL)})}},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(BSONNULL)})}},
         {{mkdoc(Value(100)),
           mkdoc(Value()),
           mkdoc(Value(BSONNULL)),
           mkdoc(Value()),
           mkdoc(Value())},
-         {Value(std::vector<Value>{Value(), Value(BSONNULL), Value()})}},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(BSONNULL)})}},
 
         // Output values different than sortBy.
         {{mkdoc2(5, Value(7)), mkdoc2(6, Value(5)), mkdoc2(4, Value(2)), mkdoc2(3, Value(3))},
          {Value(std::vector<Value>{Value(7), Value(2), Value(3)})}},
         {{mkdoc2(5, Value(BSONNULL)), mkdoc2(4, Value()), mkdoc2(3, Value(3))},
-         {Value(std::vector<Value>{Value(BSONNULL), Value(), Value(3)})}}};
+         {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(3)})}}};
 
     OperationsType bottomSpecificCases = {
         // One 1 encountered once map is full.
@@ -1028,7 +1029,7 @@ TEST(Accumulators, TopBottomSingle) {
         {{mkdoc(Value(4)), mkdoc(Value(3))}, {Value(std::vector<Value>{Value(3)})}},
         {{mkdoc(Value(BSONNULL)), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(BSONNULL)})}},
 
-        {{mkdoc(Value()), mkdoc(Value(4))}, {Value(std::vector<Value>{Value()})}},
+        {{mkdoc(Value()), mkdoc(Value(4))}, {Value(std::vector<Value>{Value(BSONNULL)})}},
         {{mkdoc(Value(BSONUndefined)), mkdoc(Value(4))},
          {Value(std::vector<Value>{Value(BSONUndefined)})}}};
 

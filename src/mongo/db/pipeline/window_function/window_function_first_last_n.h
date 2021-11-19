@@ -63,18 +63,20 @@ public:
     }
 
     void add(Value value) final {
-        _memUsageBytes += value.getApproximateSize();
-        _values.emplace_back(std::move(value));
+        auto valToInsert = value.missing() ? Value(BSONNULL) : value;
+        _memUsageBytes += valToInsert.getApproximateSize();
+        _values.emplace_back(std::move(valToInsert));
     }
 
     void remove(Value value) final {
+        auto valToRemove = value.missing() ? Value(BSONNULL) : value;
         tassert(5788400, "Can't remove from an empty WindowFunctionFirstLastN", !_values.empty());
         auto iter = _values.begin();
         tassert(5788402,
                 str::stream() << "Attempted to remove an element other than the first element from "
                                  "window function "
                               << getName(),
-                _expCtx->getValueComparator().compare(*iter, value) == 0);
+                _expCtx->getValueComparator().compare(*iter, valToRemove) == 0);
         _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
     }
