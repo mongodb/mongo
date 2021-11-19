@@ -1517,6 +1517,13 @@ elif env.TargetOSIs('windows'):
             CCFLAGS_WERROR=["/WX"]
         )
 
+if env.ToolchainIs('clang'):
+    def assembler_with_cpp_gen(target, source, env, for_signature):
+        if source[0].get_suffix() == '.sx':
+            return '-x assembler-with-cpp'
+    env['CLANG_ASSEMBLER_WITH_CPP'] = assembler_with_cpp_gen
+    env.Append(ASFLAGS=['$CLANG_ASSEMBLER_WITH_CPP'])
+
 env['CC_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CC')
 env['CXX_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CXX')
 
