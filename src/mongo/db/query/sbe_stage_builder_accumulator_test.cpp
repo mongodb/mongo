@@ -1424,7 +1424,7 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
         // TODO (SERVER-XXXX): Uncomment the following two test cases when we support pushdown of
         // accumlators to SBE.
         // R"(_id: null, agg: {$addToSet: "$item"})",
-        // R"(_id: null, agg: {$avg: "$quantity"})",
+        R"(_id: null, agg: {$avg: "$quantity"})",
         // R"(_id: null, agg: {$first: "$item"})",
         // R"(_id: null, agg: {$last: "$item"})",
         // TODO (SERVER-51541): Uncomment the following two test cases when $object supported is

@@ -158,7 +158,7 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
                                         makeBinaryOp(sbe::EPrimBinary::logicOr,
                                                      generateNullOrMissing(input),
                                                      generateNonNumericCheck(input)),
-                                        makeConstant(sbe::value::TypeTags::Nothing, 0),
+                                        makeConstant(sbe::value::TypeTags::NumberInt64, 0),
                                         makeConstant(sbe::value::TypeTags::NumberInt64, 1));
                                 },
                                 std::move(arg));
@@ -179,16 +179,65 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeAvg(
             str::stream() << "Expected two slots to finalize avg, got: " << aggSlots.size(),
             aggSlots.size() == 2);
 
-    // If we've encountered any numeric input, the counter would contain a positive integer. Unlike
-    // $sum, when there is no numeric input, $avg should return null.
-    auto finalizingExpression = sbe::makeE<sbe::EIf>(
-        generateNullOrMissing(aggSlots[1]),
-        makeConstant(sbe::value::TypeTags::Null, 0),
-        makeBinaryOp(sbe::EPrimBinary::div,
-                     makeFunction("doubleDoubleSumFinalize", makeVariable(aggSlots[0])),
-                     makeVariable(aggSlots[1])));
+    if (state.needsMerge) {
+        // To support the sharding behavior, the mongos splits $group into two separate $group
+        // stages one at the mongos-side and the other at the shard-side. This stage builder builds
+        // the shard-side plan. The shard-side $avg accumulator is responsible to return the partial
+        // avg in the form of {subTotal: val1, count: val2} when the type of sum is decimal or
+        // {subTotal: val1, count: val2, subTotalError: val3} when the type of sum is non-decimal.
+        auto sumResult = makeVariable(aggSlots[0]);
+        auto countResult = makeVariable(aggSlots[1]);
 
-    return {std::move(finalizingExpression), std::move(inputStage)};
+        // Existence of 'kDecimalTotal' element in the sum result means the type of sum result is
+        // decimal.
+        auto ifCondExpr = makeFunction(
+            "exists",
+            makeFunction("getElement",
+                         sumResult->clone(),
+                         makeConstant(sbe::value::TypeTags::NumberInt32,
+                                      static_cast<int>(sbe::vm::AggSumValueElems::kDecimalTotal))));
+        // Returns {subTotal: val1, count: val2} if the type of the sum result is decimal.
+        auto thenExpr = makeNewObjFunction(
+            FieldPair{"subTotal"_sd,
+                      // 'doubleDoubleSumFinalize' returns the sum, adding decimal
+                      // sum and non-decimal sum.
+                      makeFunction("doubleDoubleSumFinalize", sumResult->clone())},
+            FieldPair{"count"_sd, countResult->clone()});
+        // Returns {subTotal: val1, count: val2: subTotalError: val3} otherwise.
+        auto elseExpr = makeNewObjFunction(
+            FieldPair{
+                "subTotal"_sd,
+                makeFunction("getElement",
+                             sumResult->clone(),
+                             makeConstant(sbe::value::TypeTags::NumberInt32,
+                                          static_cast<int>(
+                                              sbe::vm::AggSumValueElems::kNonDecimalTotalSum)))},
+            FieldPair{"count"_sd, countResult->clone()},
+            FieldPair{"subTotalError"_sd,
+                      makeFunction(
+                          "getElement",
+                          sumResult->clone(),
+                          makeConstant(sbe::value::TypeTags::NumberInt32,
+                                       static_cast<int>(
+                                           sbe::vm::AggSumValueElems::kNonDecimalTotalAddend)))});
+        auto partialAvgFinalize =
+            sbe::makeE<sbe::EIf>(std::move(ifCondExpr), std::move(thenExpr), std::move(elseExpr));
+
+        return {std::move(partialAvgFinalize), std::move(inputStage)};
+    } else {
+        // If we've encountered any numeric input, the counter would contain a positive integer.
+        // Unlike $sum, when there is no numeric input, $avg should return null.
+        auto finalizingExpression = sbe::makeE<sbe::EIf>(
+            makeBinaryOp(sbe::EPrimBinary::eq,
+                         makeVariable(aggSlots[1]),
+                         makeConstant(sbe::value::TypeTags::NumberInt64, 0)),
+            makeConstant(sbe::value::TypeTags::Null, 0),
+            makeBinaryOp(sbe::EPrimBinary::div,
+                         makeFunction("doubleDoubleSumFinalize", makeVariable(aggSlots[0])),
+                         makeVariable(aggSlots[1])));
+
+        return {std::move(finalizingExpression), std::move(inputStage)};
+    }
 }
 
 std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumulatorSum(
@@ -214,8 +263,8 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeSum(
             sumSlots.size() == 1);
 
     if (state.needsMerge) {
-        // When to support the sharding behavior, the mongos splits $group into two separate $group
-        // stages one at the mongo-side side and the other at the shard-side, the shard-side $sum
+        // To support the sharding behavior, the mongos splits $group into two separate $group
+        // stages one at the mongos-side and the other at the shard-side. The shard-side $sum
         // accumulator is responsible to return the partial sum which is mostly same format to the
         // global sum but in the cases of overflowed 'NumberInt32'/'NumberInt64', return a
         // sub-document {subTotal: val1, subTotalError: val2}. The builtin function for $sum
@@ -228,20 +277,21 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildFinalizeSum(
             [](sbe::EVariable input) {
                 return sbe::makeE<sbe::EIf>(
                     makeFunction("isArray", input.clone()),
-                    makeFunction(
-                        "newObj",
-                        makeConstant("subTotal"_sd),
-                        makeFunction(
-                            "getElement",
-                            input.clone(),
-                            makeConstant(sbe::value::TypeTags::NumberInt32,
-                                         static_cast<int>(sbe::vm::AggPartialSumElems::kTotal))),
-                        makeConstant("subTotalError"_sd),
-                        makeFunction(
-                            "getElement",
-                            input.clone(),
-                            makeConstant(sbe::value::TypeTags::NumberInt32,
-                                         static_cast<int>(sbe::vm::AggPartialSumElems::kError)))),
+                    makeNewObjFunction(
+                        FieldPair{
+                            "subTotal"_sd,
+                            makeFunction("getElement",
+                                         input.clone(),
+                                         makeConstant(sbe::value::TypeTags::NumberInt32,
+                                                      static_cast<int>(
+                                                          sbe::vm::AggPartialSumElems::kTotal)))},
+                        FieldPair{
+                            "subTotalError"_sd,
+                            makeFunction("getElement",
+                                         input.clone(),
+                                         makeConstant(sbe::value::TypeTags::NumberInt32,
+                                                      static_cast<int>(
+                                                          sbe::vm::AggPartialSumElems::kError)))}),
                     input.clone());
             },
             std::move(sumFinalize));

@@ -40,13 +40,41 @@ assert(
 assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));
 st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
 
-// A test case for a sharded $sum: Verifies that $group with $sum pushed down to SBE works in a
-// sharded environment.
+let assertShardedGroupResultsMatch = (coll, pipeline) => {
+    // Turns to the classic engine at the shard before figuring out its result.
+    assert.commandWorked(
+        dbAtShard.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
 
-let coll = db.partial_sum;
+    // Collects the classic engine's result as the expected result, executing the pipeline at the
+    // mongos.
+    const classicalRes =
+        coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}})
+            .cursor.firstBatch;
 
-// Makes sure that the collection is sharded.
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+    // Turns to the SBE engine at the shard.
+    assert.commandWorked(
+        dbAtShard.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+
+    // Verifies that the SBE engine's results are same as the expected results, executing the
+    // pipeline at the mongos.
+    const sbeRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}})
+                       .cursor.firstBatch;
+
+    assert.sameMembers(sbeRes, classicalRes);
+};
+
+let prepareCollection = coll => {
+    coll.drop();
+
+    // Makes sure that the collection is sharded.
+    assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+
+    return coll;
+};
+
+// A test case for a sharded $sum
+
+let coll = prepareCollection(db.partial_sum);
 
 // Prepares data for the 'NumberLong' sum result to overflow, when the shard sends back the partial
 // sum as a doc with 'subTotal' and 'subTotalError' fields to the mongos. All data go to the only
@@ -54,35 +82,29 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), ke
 assert.commandWorked(
     coll.insert([{a: 1, b: NumberLong("9223372036854775807")}, {a: 2, b: NumberLong("10")}]));
 
-// Turns to the classic engine at the shard before figuring out its result.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$a", s: {$sum: "$b"}}}]);
+assertShardedGroupResultsMatch(coll, [{$group: {_id: null, s: {$sum: "$b"}}}]);
+
+// A test case for a sharded $avg
+
+coll = prepareCollection(db.partial_avg);
+
+// Prepares dataset so that each group has different numeric data types for price field which
+// will excercise different code paths in generated SBE plan stages.
+// Prices for group "a" are all decimals.
+assert.commandWorked(coll.insert(
+    [{item: "a", price: NumberDecimal("10.7")}, {item: "a", price: NumberDecimal("20.3")}]));
+// Prices for group "b" are one decimal and one non-decimal.
 assert.commandWorked(
-    dbAtShard.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+    coll.insert([{item: "b", price: NumberDecimal("3.7")}, {item: "b", price: 2.3}]));
+// Prices for group "c" are all non-decimals.
+assert.commandWorked(coll.insert([{item: "c", price: 3}, {item: "b", price: 1}]));
 
-// Collects the classic engine's result as the expected result, executing the pipeline at the
-// mongos.
-const pipeline1 = [{$group: {_id: "$a", s: {$sum: "$b"}}}];
-const classicalRes1 =
-    coll.runCommand({aggregate: coll.getName(), pipeline: pipeline1, cursor: {}}).cursor.firstBatch;
+// Verifies that SBE group pushdown with $avg works in a sharded environment.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", a: {$avg: "$price"}}}]);
 
-// Collects the classic engine's result as the expected result, executing the pipeline at the
-// mongos.
-const pipeline2 = [{$group: {_id: null, s: {$sum: "$b"}}}];
-const classicalRes2 =
-    coll.runCommand({aggregate: coll.getName(), pipeline: pipeline2, cursor: {}}).cursor.firstBatch;
-
-// Turns to the SBE engine at the shard.
-assert.commandWorked(
-    dbAtShard.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
-
-// Verifies that the SBE engine's results are same as the expected results, executing the pipeline
-// at the mongos.
-const sbeRes1 =
-    coll.runCommand({aggregate: coll.getName(), pipeline: pipeline1, cursor: {}}).cursor.firstBatch;
-assert.sameMembers(sbeRes1, classicalRes1);
-
-const sbeRes2 =
-    coll.runCommand({aggregate: coll.getName(), pipeline: pipeline2, cursor: {}}).cursor.firstBatch;
-assert.sameMembers(sbeRes2, classicalRes2);
+// Verifies that SBE group pushdown with sharded $avg works for missing data.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", a: {$avg: "$missing"}}}]);
 
 st.stop();
 }());

@@ -245,6 +245,68 @@ std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
     std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise);
 
 /**
+ * Makes "newObj" function from variadic parameter pack of 'FieldPair' which is a pair of a field
+ * name and field expression.
+ */
+template <typename... Ts>
+std::unique_ptr<sbe::EExpression> makeNewObjFunction(Ts... fields);
+
+using FieldPair = std::pair<StringData, std::unique_ptr<sbe::EExpression>>;
+template <size_t N>
+using FieldExprs = std::array<std::unique_ptr<sbe::EExpression>, N>;
+
+// The following two template functions convert 'FieldPair' to two 'EExpression's and add them to
+// 'EExpression' array which will be converted back to variadic parameter pack for 'makeFunction()'.
+template <size_t N, size_t... Is>
+FieldExprs<N + 2> array_append(FieldExprs<N> fieldExprs,
+                               const std::index_sequence<Is...>&,
+                               std::unique_ptr<sbe::EExpression> nameExpr,
+                               std::unique_ptr<sbe::EExpression> valExpr) {
+    return FieldExprs<N + 2>{std::move(fieldExprs[Is])..., std::move(nameExpr), std::move(valExpr)};
+}
+template <size_t N>
+FieldExprs<N + 2> array_append(FieldExprs<N> fieldExprs, FieldPair field) {
+    return array_append(std::move(fieldExprs),
+                        std::make_index_sequence<N>{},
+                        makeConstant(field.first),
+                        std::move(field.second));
+}
+
+// The following two template functions convert the 'EExpression' array back to variadic parameter
+// pack and calls the 'makeFunction("newObj")'.
+template <size_t N, size_t... Is>
+std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldExprs<N> fieldExprs,
+                                                     const std::index_sequence<Is...>&) {
+    return makeFunction("newObj", std::move(fieldExprs[Is])...);
+}
+template <size_t N>
+std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldExprs<N> fieldExprs) {
+    return makeNewObjFunction(std::move(fieldExprs), std::make_index_sequence<N>{});
+}
+
+// Deals with the last 'FieldPair' and adds it to the 'EExpression' array.
+template <size_t N>
+std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldExprs<N> fieldExprs, FieldPair field) {
+    return makeNewObjFunction(array_append(std::move(fieldExprs), std::move(field)));
+}
+
+// Deals with the intermediary 'FieldPair's and adds them to the 'EExpression' array.
+template <size_t N, typename... Ts>
+std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldExprs<N> fieldExprs,
+                                                     FieldPair field,
+                                                     Ts... fields) {
+    return makeNewObjFunction(array_append(std::move(fieldExprs), std::move(field)),
+                              std::forward<Ts>(fields)...);
+}
+
+// Deals with the first 'FieldPair' and adds it to the 'EExpression' array.
+template <typename... Ts>
+std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldPair field, Ts... fields) {
+    return makeNewObjFunction(FieldExprs<2>{makeConstant(field.first), std::move(field.second)},
+                              std::forward<Ts>(fields)...);
+}
+
+/**
  * Creates an expression to extract a shard key part from inputExpr. The generated expression is a
  * let binding that binds a getField expression to extract the shard key part value from the
  * inputExpr. The entire let binding evaluates to a constant expression carrying the Nothing value

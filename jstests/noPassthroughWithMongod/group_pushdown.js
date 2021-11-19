@@ -61,6 +61,44 @@ let assertResultsMatchWithAndWithoutPushdown = function(
     assert.sameMembers(resultNoGroupPushdown, resultWithGroupPushdown);
 };
 
+let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCountInExplain = 1) {
+    const originalClassicEngineStatus =
+        assert
+            .commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}))
+            .was;
+
+    const cmd = {
+        aggregate: coll.getName(),
+        pipeline: pipeline,
+        needsMerge: true,
+        fromMongos: true,
+        cursor: {}
+    };
+
+    const classicalRes = coll.runCommand(cmd).cursor.firstBatch;
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+    const explainCmd = {
+        aggregate: coll.getName(),
+        pipeline: pipeline,
+        needsMerge: true,
+        fromMongos: true,
+        explain: true,
+        cursor: {}
+    };
+    const explain = coll.runCommand(explainCmd);
+    // When $group is pushed down it will never be present as a stage in the 'winningPlan' of
+    // $cursor.
+    assert.eq(expectedGroupCountInExplain, getAggPlanStages(explain, "GROUP").length, explain);
+    const sbeRes = coll.runCommand(cmd).cursor.firstBatch;
+
+    assert.sameMembers(sbeRes, classicalRes);
+
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQueryForceClassicEngine: originalClassicEngineStatus}));
+};
+
 // Try a pipeline with no group stage.
 assert.eq(
     coll.aggregate([{$match: {item: "c"}}]).toArray(),
@@ -351,58 +389,30 @@ explain = coll.runCommand({
 });
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
 
-const originalClassicEngineStatus =
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}))
-        .was;
-
-const pipeline1 = [{$group: {_id: "$item", s: {$sum: "$quantity"}}}];
-const classicalRes1 = coll.runCommand({
-                              aggregate: coll.getName(),
-                              pipeline: pipeline1,
-                              needsMerge: true,
-                              fromMongos: true,
-                              cursor: {}
-                          })
-                          .cursor.firstBatch;
+// Verifies that a basic sharded $sum accumulator works.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", s: {$sum: "$quantity"}}}]);
 
 // When there's overflow for 'NumberLong', the mongod sends back the partial sum as a doc with
 // 'subTotal' and 'subTotalError' fields. So, we need an overflow case to verify such behavior.
 const tcoll = db.group_pushdown1;
 assert.commandWorked(tcoll.insert([{a: NumberLong("9223372036854775807")}, {a: NumberLong("10")}]));
-const pipeline2 = [{$group: {_id: null, s: {$sum: "$a"}}}];
-const classicalRes2 = tcoll
-                          .runCommand({
-                              aggregate: tcoll.getName(),
-                              pipeline: pipeline2,
-                              needsMerge: true,
-                              fromMongos: true,
-                              cursor: {}
-                          })
-                          .cursor.firstBatch;
+assertShardedGroupResultsMatch(tcoll, [{$group: {_id: null, s: {$sum: "$a"}}}]);
 
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+// Verifies that a sharded $avg works when there's no numeric data.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", a: {$avg: "$missing"}}}]);
 
-const sbeRes1 = coll.runCommand({
-                        aggregate: coll.getName(),
-                        pipeline: pipeline1,
-                        needsMerge: true,
-                        fromMongos: true,
-                        cursor: {}
-                    })
-                    .cursor.firstBatch;
-assert.sameMembers(sbeRes1, classicalRes1);
+// When sum of numeric data is a non-decimal, shard(s) should return data in the form of {subTotal:
+// val1, count: val2, subTotalError: val3}.
+assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", a: {$avg: "$quantity"}}}]);
 
-const sbeRes2 = tcoll
-                    .runCommand({
-                        aggregate: tcoll.getName(),
-                        pipeline: pipeline2,
-                        needsMerge: true,
-                        fromMongos: true,
-                        cursor: {}
-                    })
-                    .cursor.firstBatch;
-assert.docEq(sbeRes2, classicalRes2);
-
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQueryForceClassicEngine: originalClassicEngineStatus}));
+// When sum of numeric data is a decimal, shard(s) should return data in the form of {subTotal:
+// val1, count: val2}.
+tcoll.drop();
+// Prices for group "a" are all decimals.
+assert.commandWorked(tcoll.insert(
+    [{item: "a", price: NumberDecimal("10.7")}, {item: "a", price: NumberDecimal("20.3")}]));
+// Prices for group "b" are one decimal and one non-decimal.
+assert.commandWorked(
+    tcoll.insert([{item: "b", price: NumberDecimal("3.7")}, {item: "b", price: 2.3}]));
+assertShardedGroupResultsMatch(tcoll, [{$group: {_id: "$item", a: {$avg: "$price"}}}]);
 })();
