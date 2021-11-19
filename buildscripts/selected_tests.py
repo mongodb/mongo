@@ -408,7 +408,7 @@ class SelectedTestsOrchestrator:
                 require_multiversion_setup=task_def.require_multiversion_setup(),
                 require_multiversion_version_combo=False,
                 repeat_suites=task_config.get("repeat_suites", 1),
-                resmoke_args=task_config.get("resmoke_args", {}),
+                resmoke_args=task_config.get("resmoke_args", ""),
                 resmoke_jobs_max=task_config.get("resmoke_jobs_max"),
                 config_location=self.evg_expansions.get_config_location(),
             )
