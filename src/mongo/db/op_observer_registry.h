@@ -140,10 +140,11 @@ public:
 
     void aboutToDelete(OperationContext* const opCtx,
                        const NamespaceString& nss,
+                       const UUID& uuid,
                        const BSONObj& doc) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->aboutToDelete(opCtx, nss, doc);
+            o->aboutToDelete(opCtx, nss, uuid, doc);
     }
 
     void onDelete(OperationContext* const opCtx,

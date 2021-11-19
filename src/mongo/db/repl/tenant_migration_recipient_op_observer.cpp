@@ -129,6 +129,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
 
 void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                                                        NamespaceString const& nss,
+                                                       const UUID& uuid,
                                                        BSONObj const& doc) {
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {

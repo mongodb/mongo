@@ -78,6 +78,7 @@ public:
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override{};
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
+                       const UUID& uuid,
                        const BSONObj& doc) override {}
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,

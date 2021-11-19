@@ -76,6 +76,7 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
 void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
+                                   const UUID& uuid,
                                    BSONObj const& doc) {
     audit::logRemoveOperation(opCtx->getClient(), nss, doc);
 

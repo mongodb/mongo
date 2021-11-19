@@ -171,6 +171,7 @@ public:
     virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
     virtual void aboutToDelete(OperationContext* opCtx,
                                const NamespaceString& nss,
+                               const UUID& uuid,
                                const BSONObj& doc) = 0;
 
     /**

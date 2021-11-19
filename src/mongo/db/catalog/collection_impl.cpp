@@ -1053,7 +1053,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         BSONObj doc = record->data.toBson();
         if (ns().isReplicated()) {
             OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
-            opObserver->aboutToDelete(opCtx, ns(), doc);
+            opObserver->aboutToDelete(opCtx, ns(), uuid(), doc);
 
             OplogDeleteEntryArgs args;
             // Explicitly setting values despite them being the defaults.
@@ -1184,7 +1184,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     retryableFindAndModifyLocation,
                                     oplogSlots};
 
-    getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
+    getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), uuid(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
     const bool isRecordingPreImageForRetryableWrite =

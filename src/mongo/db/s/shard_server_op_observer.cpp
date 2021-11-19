@@ -449,6 +449,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           NamespaceString const& nss,
+                                          const UUID& uuid,
                                           BSONObj const& doc) {
 
     if (nss == NamespaceString::kCollectionCriticalSectionsNamespace) {

@@ -88,6 +88,7 @@ public:
 
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
+                       const UUID& uuid,
                        const BSONObj& doc) final;
 
     void onDelete(OperationContext* opCtx,

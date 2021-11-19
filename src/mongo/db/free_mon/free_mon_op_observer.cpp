@@ -120,6 +120,7 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntry
 
 void FreeMonOpObserver::aboutToDelete(OperationContext* opCtx,
                                       const NamespaceString& nss,
+                                      const UUID& uuid,
                                       const BSONObj& doc) {
 
     bool isFreeMonDoc = (nss == NamespaceString::kServerConfigurationNamespace) &&

@@ -133,9 +133,9 @@ TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     NamespaceString nss = {"test", "coll"};
     AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
+    opObserver.aboutToDelete(opCtx.get(), nss, uuid, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, uuid, {}, {});
-    opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
+    opObserver.aboutToDelete(opCtx.get(), nss, uuid, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, uuid, {}, {});
 }
 
@@ -148,13 +148,14 @@ DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") 
 }
 
 DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
+    auto uuid = UUID::gen();
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
-    opObserver.aboutToDelete(opCtx.get(), nss, {});
-    opObserver.onDelete(opCtx.get(), nss, UUID::gen(), {}, {});
-    opObserver.onDelete(opCtx.get(), nss, UUID::gen(), {}, {});
+    opObserver.aboutToDelete(opCtx.get(), nss, uuid, {});
+    opObserver.onDelete(opCtx.get(), nss, uuid, {}, {});
+    opObserver.onDelete(opCtx.get(), nss, uuid, {}, {});
 }
 
 }  // namespace

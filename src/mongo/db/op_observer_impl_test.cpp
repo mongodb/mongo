@@ -698,9 +698,9 @@ TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     NamespaceString nss = {"test", "coll"};
     AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
-    opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
+    opObserver.aboutToDelete(opCtx.get(), nss, uuid, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
-    opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
+    opObserver.aboutToDelete(opCtx.get(), nss, uuid, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
 }
 
@@ -718,7 +718,7 @@ DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
     UUID uuid = UUID::gen();
-    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    opObserver.aboutToDelete(opCtx.get(), nss, uuid, {});
     opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
     opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
 }
@@ -913,6 +913,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
 
     opObserver().aboutToDelete(opCtx(),
                                nss1,
+                               uuid1,
                                BSON("_id" << 0 << "data"
                                           << "x"));
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, {});
@@ -1420,11 +1421,13 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().aboutToDelete(opCtx(),
                                nss1,
+                               uuid1,
                                BSON("_id" << 0 << "data"
                                           << "x"));
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, {});
     opObserver().aboutToDelete(opCtx(),
                                nss2,
+                               uuid2,
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
@@ -1572,7 +1575,7 @@ TEST_F(OpObserverRetryableFindAndModifyTest, RetryableFindAndModifyDeleteHasNeed
     AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
     const auto deletedDoc = BSON("_id" << 0 << "data"
                                        << "x");
-    opObserver().aboutToDelete(opCtx(), nss, deletedDoc);
+    opObserver().aboutToDelete(opCtx(), nss, uuid, deletedDoc);
     OplogDeleteEntryArgs args;
     args.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
     args.deletedDoc = &deletedDoc;
@@ -2272,7 +2275,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionPreImageTest) {
     OplogDeleteEntryArgs args;
     args.deletedDoc = &deletedDoc;
     args.preImageRecordingEnabledForCollection = true;
-    opObserver().aboutToDelete(opCtx(), nss1, deletedDoc);
+    opObserver().aboutToDelete(opCtx(), nss1, uuid1, deletedDoc);
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, args);
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
@@ -2349,7 +2352,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPreImageTest) {
     OplogDeleteEntryArgs args;
     args.deletedDoc = &deletedDoc;
     args.preImageRecordingEnabledForCollection = true;
-    opObserver().aboutToDelete(opCtx(), nss1, deletedDoc);
+    opObserver().aboutToDelete(opCtx(), nss1, uuid1, deletedDoc);
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, args);
 
     repl::OpTime prepareOpTime;
@@ -2415,11 +2418,13 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().aboutToDelete(opCtx(),
                                nss1,
+                               uuid1,
                                BSON("_id" << 0 << "data"
                                           << "x"));
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, {});
     opObserver().aboutToDelete(opCtx(),
                                nss2,
+                               uuid2,
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
@@ -2629,11 +2634,13 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().aboutToDelete(opCtx(),
                                nss1,
+                               uuid1,
                                BSON("_id" << 0 << "data"
                                           << "x"));
     opObserver().onDelete(opCtx(), nss1, uuid1, 0, {});
     opObserver().aboutToDelete(opCtx(),
                                nss2,
+                               uuid2,
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});

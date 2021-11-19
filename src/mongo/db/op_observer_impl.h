@@ -104,6 +104,7 @@ public:
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) final;
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
+                       const UUID& uuid,
                        const BSONObj& doc) final;
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,
