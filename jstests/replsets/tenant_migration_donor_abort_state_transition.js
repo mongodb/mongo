@@ -20,7 +20,10 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kTenantIdPrefix = "testTenantId";
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {setParameter: {tenantMigrationGarbageCollectionDelayMS: 0}}
+});
 
 /**
  * Starts a migration and forces the write to insert the donor's state doc to abort on the first few

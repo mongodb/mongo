@@ -72,8 +72,8 @@ public:
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
 
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
+            uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
+                migrationProtocol, cmd.getTenantId().toString()));
 
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
@@ -191,8 +191,8 @@ public:
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
 
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
+            uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
+                migrationProtocol, cmd.getTenantId().toString()));
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
             auto recipientService =

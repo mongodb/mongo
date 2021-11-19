@@ -85,8 +85,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
     hangWhileMigrating.wait();
 
     jsTestLog("Determining whether B or C is the sync source");
-    let res = recipientPrimary.adminCommand(
-        {currentOp: true, desc: "tenant recipient migration", tenantId: tenantId});
+    let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
     assert.eq(res.inprog.length, 1, () => tojson(res));
     let currOp = res.inprog[0];
     assert.eq(bsonWoCompare(currOp.instanceID, migrationId), 0, () => tojson(res));

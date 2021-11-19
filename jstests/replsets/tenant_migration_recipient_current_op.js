@@ -61,12 +61,12 @@ for (const db of dbsToClone) {
 function checkStandardFieldsOK(res) {
     assert.eq(res.inprog.length, 1, res);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID, kMigrationId), 0, res);
-    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0, res);
     assert.eq(res.inprog[0].donorConnectionString, tenantMigrationTest.getDonorRst().getURL(), res);
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0, res);
     // We don't test failovers in this test so we don't expect these counters to be incremented.
     assert.eq(res.inprog[0].numRestartsDueToDonorConnectionFailure, 0, res);
     assert.eq(res.inprog[0].numRestartsDueToRecipientFailure, 0, res);
+    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0, res);
 }
 
 // Check currentOp fields' expected value once the recipient is in state "consistent" or later.

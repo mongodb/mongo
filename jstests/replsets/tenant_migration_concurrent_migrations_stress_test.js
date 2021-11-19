@@ -42,6 +42,14 @@ const tenantMigrationTest =
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
+if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    // This test runs multiple concurrent migrations, which shard merge can't handle.
+    jsTestLog(
+        "Skip: featureFlagShardMerge is enabled and this test runs multiple concurrent migrations, which shard merge can't handle.");
+    tenantMigrationTest.stop();
+    return;
+}
+
 setLogVerbosity([donorPrimary, recipientPrimary], {
     "tenantMigration": {"verbosity": 0},
     "replication": {"verbosity": 0},

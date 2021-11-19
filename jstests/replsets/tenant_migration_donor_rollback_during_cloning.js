@@ -107,10 +107,8 @@ function runTest(tenantId,
 
     jsTestLog("Stopping donor replication.");
     // Figure out which donor node the recipient is syncing from.
-    let res = recipientPrimary.adminCommand(
-        {currentOp: true, desc: "tenant recipient migration", tenantId: tenantId});
-    assert.eq(res.inprog.length, 1, res);
-    let currOp = res.inprog[0];
+    let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
+    let currOp = res.inprog.find(op => bsonWoCompare(op.instanceID, migrationId) === 0);
     assert.eq(bsonWoCompare(currOp.instanceID, migrationId), 0, res);
     assert.eq(currOp.numRestartsDueToDonorConnectionFailure, 0, res);
 
@@ -158,10 +156,8 @@ function runTest(tenantId,
 
     jsTestLog("Make sure that the recipient has had to restart the migration.");
     assert.soon(() => {
-        res = recipientPrimary.adminCommand(
-            {currentOp: true, desc: "tenant recipient migration", tenantId: tenantId});
-        assert.eq(res.inprog.length, 1, res);
-        currOp = res.inprog[0];
+        res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
+        currOp = res.inprog.find(op => bsonWoCompare(op.instanceID, migrationId) === 0);
         assert.eq(bsonWoCompare(currOp.instanceID, migrationId), 0, res);
         return currOp.numRestartsDueToDonorConnectionFailure == 1;
     }, "Expected the recipient to have restarted: " + tojson(res));

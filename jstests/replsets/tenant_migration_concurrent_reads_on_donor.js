@@ -25,7 +25,17 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {
+        setParameter: {
+            // set ttlMonitorSleepSecs and tenantMigrationGarbageCollectionDelayMS to low values
+            // to speed up cleanup between tests for shard merge
+            ttlMonitorSleepSecs: 1,
+            tenantMigrationGarbageCollectionDelayMS: 500,
+        }
+    }
+});
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
@@ -41,7 +51,8 @@ function checkTenantMigrationAccessBlocker(node, tenantId, {
     numTenantMigrationCommittedErrors = 0,
     numTenantMigrationAbortedErrors = 0
 }) {
-    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId).donor;
+    const mtab =
+        TenantMigrationUtil.getTenantMigrationAccessBlocker({donorNode: node, tenantId}).donor;
     if (!mtab) {
         assert.eq(0, numBlockedReads);
         assert.eq(0, numTenantMigrationCommittedErrors);
@@ -103,8 +114,9 @@ function runCommand(db, cmd, expectedError, isTransaction) {
  */
 function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
+    const migrationIdString = extractUUIDFromObject(UUID());
     const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
+        migrationIdString,
         tenantId,
     };
 
@@ -145,7 +157,8 @@ function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
                 node, tenantId, {numTenantMigrationCommittedErrors: 1});
         }
     });
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationIdString);
 }
 
 /**
@@ -154,8 +167,9 @@ function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
  */
 function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
+    const migrationIdString = extractUUIDFromObject(UUID());
     const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
+        migrationIdString,
         tenantId,
     };
 
@@ -194,7 +208,9 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
             checkTenantMigrationAccessBlocker(node, tenantId, {numTenantMigrationAbortedErrors: 0});
         }
     });
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationIdString);
 }
 
 /**
@@ -203,8 +219,9 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
  */
 function testBlockReadsAfterMigrationEnteredBlocking(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
+    const migrationIdString = extractUUIDFromObject(UUID());
     const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
+        migrationIdString,
         tenantId,
     };
 
@@ -245,7 +262,9 @@ function testBlockReadsAfterMigrationEnteredBlocking(testCase, dbName, collName)
     blockingFp.off();
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationIdString);
 }
 
 /**
@@ -259,8 +278,9 @@ function testRejectBlockedReadsAfterMigrationCommitted(testCase, dbName, collNam
     }
 
     const tenantId = dbName.split('_')[0];
+    const migrationIdString = extractUUIDFromObject(UUID());
     const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
+        migrationIdString,
         tenantId,
     };
 
@@ -308,7 +328,9 @@ function testRejectBlockedReadsAfterMigrationCommitted(testCase, dbName, collNam
     resumeMigrationThread.join();
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationIdString);
 }
 
 /**
@@ -322,8 +344,9 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     }
 
     const tenantId = dbName.split('_')[0];
+    const migrationIdString = extractUUIDFromObject(UUID());
     const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
+        migrationIdString,
         tenantId,
     };
 
@@ -375,7 +398,9 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     abortFp.off();
     TenantMigrationTest.assertAborted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationIdString);
 }
 
 const testCases = {
@@ -490,8 +515,8 @@ const testFuncs = {
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
-        jsTest.log("Testing " + testName + " with testCase " + testCaseName);
-        let dbName = testCaseName + "-" + testName + "_" + kTenantDefinedDbName;
+        jsTest.log(`Testing ${testName} with testCase ${testCaseName}`);
+        const dbName = `${testCaseName}-${testName}_${kTenantDefinedDbName}`;
         testFunc(testCase, dbName, kCollName);
     }
 }

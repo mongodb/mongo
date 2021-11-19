@@ -111,12 +111,33 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(S
 boost::optional<MtabPair>
 TenantMigrationAccessBlockerRegistry::_getTenantMigrationAccessBlockersForDbName(StringData dbName,
                                                                                  WithLock) {
-    auto it = std::find_if(_tenantMigrationAccessBlockers.begin(),
-                           _tenantMigrationAccessBlockers.end(),
-                           [dbName](const std::pair<std::string, MtabPair>& blocker) {
-                               StringData tenantId = blocker.first;
-                               return dbName.startsWith(tenantId + "_");
-                           });
+    auto it = _tenantMigrationAccessBlockers.find("");
+    if (it != _tenantMigrationAccessBlockers.end()) {
+        auto donor = it->second.getAccessBlocker(TenantMigrationAccessBlocker::BlockerType::kDonor);
+        tassert(5979300,
+                "Expected blocker to be a donor blocker with protocol Shard Merge",
+                donor && donor->getProtocol() == MigrationProtocolEnum::kShardMerge);
+
+        auto donorCount = std::count_if(_tenantMigrationAccessBlockers.begin(),
+                                        _tenantMigrationAccessBlockers.end(),
+                                        [](const std::pair<std::string, MtabPair>& blocker) {
+                                            return blocker.second.getAccessBlocker(
+                                                TenantMigrationAccessBlocker::BlockerType::kDonor);
+                                        });
+        tassert(5979301,
+                "Expected there to be a single donor tenant migration access blocker present "
+                "during a shard merge",
+                donorCount == 1);
+
+        return it->second;
+    }
+
+    it = std::find_if(_tenantMigrationAccessBlockers.begin(),
+                      _tenantMigrationAccessBlockers.end(),
+                      [dbName](const std::pair<std::string, MtabPair>& blocker) {
+                          StringData tenantId = blocker.first;
+                          return dbName.startsWith(tenantId + "_");
+                      });
 
     if (it == _tenantMigrationAccessBlockers.end()) {
         return boost::none;
@@ -149,14 +170,29 @@ void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(
 
     for (auto& [tenantId, mtabPair] : _tenantMigrationAccessBlockers) {
         BSONObjBuilder mtabInfoBuilder;
-        if (auto recipientMtab = mtabPair.getAccessBlocker(MtabType::kRecipient)) {
-            recipientMtab->appendInfoForServerStatus(&mtabInfoBuilder);
-        }
+
         if (auto donorMtab = mtabPair.getAccessBlocker(MtabType::kDonor)) {
-            donorMtab->appendInfoForServerStatus(&mtabInfoBuilder);
+            BSONObjBuilder donorMtabInfoBuilder;
+            donorMtab->appendInfoForServerStatus(&donorMtabInfoBuilder);
+            switch (donorMtab->getProtocol()) {
+                case MigrationProtocolEnum::kShardMerge:
+                    builder->append("donor", donorMtabInfoBuilder.obj());
+                    break;
+                case MigrationProtocolEnum::kMultitenantMigrations:
+                    mtabInfoBuilder.append("donor", donorMtabInfoBuilder.obj());
+                    break;
+            }
         }
 
-        builder->append(tenantId, mtabInfoBuilder.obj());
+        if (auto recipientMtab = mtabPair.getAccessBlocker(MtabType::kRecipient)) {
+            BSONObjBuilder recipientMtabInfoBuilder;
+            recipientMtab->appendInfoForServerStatus(&recipientMtabInfoBuilder);
+            mtabInfoBuilder.append("recipient", recipientMtabInfoBuilder.obj());
+        }
+
+        if (mtabInfoBuilder.len()) {
+            builder->append(tenantId, mtabInfoBuilder.obj());
+        }
     }
 }
 

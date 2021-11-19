@@ -32,12 +32,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
-#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
@@ -71,11 +73,16 @@ const StringMap<int> commandDenyListAfterMigration = {
 }  // namespace
 
 TenantMigrationDonorAccessBlocker::TenantMigrationDonorAccessBlocker(
-    ServiceContext* serviceContext, std::string tenantId, std::string recipientConnString)
-    : TenantMigrationAccessBlocker(BlockerType::kDonor),
+    ServiceContext* serviceContext,
+    std::string tenantId,
+    MigrationProtocolEnum protocol,
+    std::string recipientConnString)
+    : TenantMigrationAccessBlocker(BlockerType::kDonor, protocol),
       _serviceContext(serviceContext),
       _tenantId(std::move(tenantId)),
+      _protocol(protocol),
       _recipientConnString(std::move(recipientConnString)) {
+    invariant(tenant_migration_util::protocolTenantIdCompatibilityCheck(_protocol, _tenantId));
     _asyncBlockingOperationsExecutor = TenantMigrationAccessBlockerExecutor::get(serviceContext)
                                            .getOrCreateBlockedOperationsExecutor();
 }
@@ -385,21 +392,20 @@ void TenantMigrationDonorAccessBlocker::appendInfoForServerStatus(BSONObjBuilder
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_commitOpTime || !_abortOpTime);
 
-    BSONObjBuilder tenantBuilder;
-    tenantBuilder.append("state", _state.toString());
+    builder->append("state", _state.toString());
     if (_blockTimestamp) {
-        tenantBuilder.append("blockTimestamp", _blockTimestamp.get());
+        builder->append("blockTimestamp", _blockTimestamp.get());
     }
     if (_commitOpTime) {
-        tenantBuilder.append("commitOpTime", _commitOpTime->toBSON());
+        builder->append("commitOpTime", _commitOpTime->toBSON());
     }
     if (_abortOpTime) {
-        tenantBuilder.append("abortOpTime", _abortOpTime->toBSON());
+        builder->append("abortOpTime", _abortOpTime->toBSON());
     }
-    _stats.report(&tenantBuilder);
-    tenantBuilder.append("tenantId", _tenantId);
-
-    builder->append("donor", tenantBuilder.obj());
+    _stats.report(builder);
+    if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+        builder->append("tenantId", _tenantId);
+    }
 }
 
 BSONObj TenantMigrationDonorAccessBlocker::getDebugInfo() const {

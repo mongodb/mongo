@@ -57,9 +57,10 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     // Wait for donorAbortMigration command to start.
     assert.soon(() => {
-        const res = assert.commandWorked(donorPrimary.adminCommand(
-            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancellation;
+        const res = assert.commandWorked(
+            donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+        const op = res.inprog.find(op => extractUUIDFromObject(op.instanceID) === migrationId);
+        return op.receivedCancellation;
     });
 
     fp.off();
@@ -253,9 +254,9 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     });
 
     const tenantId = kTenantId;
-    const migrationId = UUID();
+    const migrationId = extractUUIDFromObject(UUID());
     const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(migrationId),
+        migrationIdString: migrationId,
         tenantId: tenantId,
         recipientConnString: tmt.getRecipientConnString(),
     };
@@ -270,9 +271,10 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     // Wait for donorAbortMigration command to start.
     assert.soon(() => {
-        const res = assert.commandWorked(tmt.getDonorPrimary().adminCommand(
-            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancellation;
+        const res = assert.commandWorked(
+            tmt.getDonorPrimary().adminCommand({currentOp: true, desc: "tenant donor migration"}));
+        const op = res.inprog.find(op => extractUUIDFromObject(op.instanceID) === migrationId);
+        return op.receivedCancellation;
     });
     barrierBeforeFetchingKeys.off();
 
@@ -369,9 +371,10 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     // Wait for donorAbortMigration command to start.
     assert.soon(() => {
-        const res = assert.commandWorked(donorPrimary.adminCommand(
-            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancellation;
+        const res = assert.commandWorked(
+            donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+        const op = res.inprog.find(op => extractUUIDFromObject(op.instanceID) === migrationId);
+        return op.receivedCancellation;
     });
 
     fp.off();
@@ -412,9 +415,10 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     // Wait for donorAbortMigration command to start.
     assert.soon(() => {
-        const res = assert.commandWorked(donorPrimary.adminCommand(
-            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancellation;
+        const res = assert.commandWorked(
+            donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+        const op = res.inprog.find(op => extractUUIDFromObject(op.instanceID) === migrationId);
+        return op.receivedCancellation;
     });
 
     fp.off();

@@ -27,7 +27,14 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {
+        setParameter: {
+            tenantMigrationGarbageCollectionDelayMS: 0,
+        }
+    }
+});
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";

@@ -98,7 +98,8 @@ migration2Thread.start();
 // still be blocking reads with timestamps < rejectReadsBeforeTimestamp from the previous migration.
 waitAfterCreatingMtab.wait();
 // Check that the current serverStatus reflects the recipient access blocker.
-const mtabStatus = tenantMigrationTest.getTenantMigrationAccessBlocker(donor2Primary, kTenantId);
+const mtabStatus = tenantMigrationTest.getTenantMigrationAccessBlocker(
+    {donorNode: donor2Primary, tenantId: kTenantId});
 assert.eq(
     mtabStatus.recipient.state, TenantMigrationTest.RecipientAccessState.kRejectBefore, mtabStatus);
 assert(mtabStatus.recipient.hasOwnProperty("rejectBeforeTimestamp"), mtabStatus);

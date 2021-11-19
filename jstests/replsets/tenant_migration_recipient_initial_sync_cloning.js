@@ -76,10 +76,10 @@ function restartNodeAndCheckState(tenantId, tenantMigrationTest, checkMtab) {
 
     if (checkMtab) {
         jsTestLog("Ensuring TenantMigrationAccessBlocker states match.");
-        const primaryMtab =
-            tenantMigrationTest.getTenantMigrationAccessBlocker(originalRecipientPrimary, tenantId);
-        const newNodeMtab =
-            tenantMigrationTest.getTenantMigrationAccessBlocker(initialSyncNode, tenantId);
+        const primaryMtab = tenantMigrationTest.getTenantMigrationAccessBlocker(
+            {recipientNode: originalRecipientPrimary, tenantId});
+        const newNodeMtab = tenantMigrationTest.getTenantMigrationAccessBlocker(
+            {recipientNode: initialSyncNode, tenantId});
 
         assert.eq(primaryMtab.recipient.state,
                   newNodeMtab.recipient.state,

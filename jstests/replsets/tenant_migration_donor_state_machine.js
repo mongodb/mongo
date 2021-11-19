@@ -48,8 +48,8 @@ function testDonorForgetMigrationAfterMigrationCompletes(
 
     // Wait for garbage collection on donor.
     donorRst.nodes.forEach((node) => {
-        assert.soon(() =>
-                        null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
+        assert.soon(() => null ==
+                        TenantMigrationUtil.getTenantMigrationAccessBlocker({donorNode: node}));
     });
 
     assert.soon(() => 0 === donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
@@ -65,8 +65,8 @@ function testDonorForgetMigrationAfterMigrationCompletes(
 
     // Wait for garbage collection on recipient.
     recipientRst.nodes.forEach((node) => {
-        assert.soon(() =>
-                        null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
+        assert.soon(() => null ==
+                        TenantMigrationUtil.getTenantMigrationAccessBlocker({recipientNode: node}));
     });
 
     assert.soon(() => 0 ===
@@ -151,10 +151,10 @@ function testStats(node, {
     // Wait for the migration to enter the blocking state.
     blockingFp.wait();
 
-    let mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-    assert.eq(mtabs[kTenantId].donor.state,
-              TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
-    assert(mtabs[kTenantId].donor.blockTimestamp);
+    let mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
+        {donorNode: donorPrimary, tenantId: kTenantId});
+    assert.eq(mtab.donor.state, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
+    assert(mtab.donor.blockTimestamp);
 
     let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     let blockOplogEntry =
@@ -187,10 +187,11 @@ function testStats(node, {
     assert.eq(donorDoc.commitOrAbortOpTime.ts, commitOplogEntry.ts);
 
     assert.soon(() => {
-        mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[kTenantId].donor.state === TenantMigrationTest.DonorAccessState.kReject;
+        mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
+            {donorNode: donorPrimary, tenantId: kTenantId});
+        return mtab.donor.state === TenantMigrationTest.DonorAccessState.kReject;
     });
-    assert(mtabs[kTenantId].donor.commitOpTime);
+    assert(mtab.donor.commitOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
@@ -229,12 +230,13 @@ function testStats(node, {
     assert.eq(donorDoc.commitOrAbortOpTime.ts, abortOplogEntry.ts);
     assert.eq(donorDoc.abortReason.code, ErrorCodes.InternalError);
 
-    let mtabs;
+    let mtab;
     assert.soon(() => {
-        mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[kTenantId].donor.state === TenantMigrationTest.DonorAccessState.kAborted;
+        mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
+            {donorNode: donorPrimary, tenantId: kTenantId});
+        return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
-    assert(mtabs[kTenantId].donor.abortOpTime);
+    assert(mtab.donor.abortOpTime);
 
     expectedRecipientSyncDataMetricsFailed++;
     expectedNumRecipientSyncDataCmdSent++;
@@ -271,12 +273,13 @@ function testStats(node, {
     assert.eq(donorDoc.commitOrAbortOpTime.ts, abortOplogEntry.ts);
     assert.eq(donorDoc.abortReason.code, ErrorCodes.InternalError);
 
-    let mtabs;
+    let mtab;
     assert.soon(() => {
-        mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[kTenantId].donor.state === TenantMigrationTest.DonorAccessState.kAborted;
+        mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
+            {donorNode: donorPrimary, tenantId: kTenantId});
+        return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
-    assert(mtabs[kTenantId].donor.abortOpTime);
+    assert(mtab.donor.abortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =

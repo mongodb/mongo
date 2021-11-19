@@ -259,16 +259,40 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
-     * Returns the TenantMigrationAccessBlocker serverStatus output for the migration for the given
-     * tenant if there one.
+     * Returns the TenantMigrationAccessBlocker serverStatus output for the migration or shard merge
+     * for the given node.
      */
-    function getTenantMigrationAccessBlocker(node, tenantId) {
-        const mtabs =
-            assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrationAccessBlocker;
-        if (!mtabs) {
-            return null;
+    function getTenantMigrationAccessBlocker({donorNode, recipientNode, tenantId}) {
+        if (donorNode && recipientNode) {
+            throw new Error("please specify either 'donorNode' or 'recipientNode' but not both");
         }
-        return mtabs[tenantId];
+        const node = donorNode || recipientNode;
+        const res = node.adminCommand({serverStatus: 1});
+        assert.commandWorked(res);
+
+        const isShardMergeEnabled = TenantMigrationUtil.isShardMergeEnabled(
+            typeof node.getDB === "function" ? node.getDB("admin") : node);
+        const {tenantMigrationAccessBlocker} = res;
+        if (!tenantMigrationAccessBlocker) {
+            return undefined;
+        }
+
+        if (isShardMergeEnabled && tenantId) {
+            tenantMigrationAccessBlocker.recipient = tenantMigrationAccessBlocker[tenantId] &&
+                tenantMigrationAccessBlocker[tenantId].recipient;
+            return tenantMigrationAccessBlocker;
+        }
+
+        if (tenantId) {
+            tenantMigrationAccessBlocker.donor = tenantMigrationAccessBlocker[tenantId] &&
+                tenantMigrationAccessBlocker[tenantId].donor;
+            tenantMigrationAccessBlocker.recipient = tenantMigrationAccessBlocker[tenantId] &&
+                tenantMigrationAccessBlocker[tenantId].recipient;
+
+            return tenantMigrationAccessBlocker;
+        }
+
+        return tenantMigrationAccessBlocker;
     }
 
     /**
@@ -276,7 +300,7 @@ var TenantMigrationUtil = (function() {
      * for the given tenant.
      */
     function getNumBlockedReads(donorNode, tenantId) {
-        const mtab = getTenantMigrationAccessBlocker(donorNode, tenantId);
+        const mtab = getTenantMigrationAccessBlocker({donorNode, tenantId});
         if (!mtab) {
             return 0;
         }
@@ -288,7 +312,7 @@ var TenantMigrationUtil = (function() {
      * migration for the given tenant.
      */
     function getNumBlockedWrites(donorNode, tenantId) {
-        const mtab = getTenantMigrationAccessBlocker(donorNode, tenantId);
+        const mtab = getTenantMigrationAccessBlocker({donorNode, tenantId});
         if (!mtab) {
             return 0;
         }

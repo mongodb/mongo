@@ -56,6 +56,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
         opCtx->getServiceContext(),
         donorStateDoc.getTenantId().toString(),
+        donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations),
         donorStateDoc.getRecipientConnectionString().toString());
 
     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())

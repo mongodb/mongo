@@ -51,7 +51,7 @@ function advanceClusterTime(conn, dbName, collName) {
 
 function getBlockTimestamp(conn, tenantId) {
     const mtabServerStatus =
-        TenantMigrationUtil.getTenantMigrationAccessBlocker(conn, tenantId).donor;
+        TenantMigrationUtil.getTenantMigrationAccessBlocker({donorNode: conn, tenantId}).donor;
     assert(mtabServerStatus.blockTimestamp, tojson(mtabServerStatus));
     return mtabServerStatus.blockTimestamp;
 }

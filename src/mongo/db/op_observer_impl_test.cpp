@@ -3159,7 +3159,10 @@ TEST_F(OpObserverTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
 
     // Add a tenant migration access blocker on donor for blocking writes.
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, "fakeConnString");
+        getServiceContext(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        "fakeConnString");
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
     donorMtab->startBlockingWrites();
 
@@ -3184,7 +3187,10 @@ TEST_F(OpObserverTransactionTest,
 
     // Add a tenant migration access blocker on donor for blocking writes.
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(), kTenantId, "fakeConnString");
+        getServiceContext(),
+        kTenantId,
+        MigrationProtocolEnum::kMultitenantMigrations,
+        "fakeConnString");
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     const NamespaceString nss("tenantId_db", "testColl");

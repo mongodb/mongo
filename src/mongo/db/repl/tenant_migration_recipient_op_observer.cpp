@@ -62,6 +62,7 @@ void createAccessBlockerIfNeeded(OperationContext* opCtx,
         opCtx->getServiceContext(),
         recipientStateDoc.getId(),
         recipientStateDoc.getTenantId().toString(),
+        recipientStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations),
         recipientStateDoc.getDonorConnectionString().toString());
 
     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())

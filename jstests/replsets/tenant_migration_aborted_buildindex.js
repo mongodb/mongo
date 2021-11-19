@@ -103,10 +103,10 @@ fpCheckIndexBuildable.off();
 const blockingFp =
     configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
 dataSyncFp.off();
-assert.soon(
-    () =>
-        tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).donor.state ===
-        TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
+assert.soon(() =>
+                tenantMigrationTest
+                    .getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: kTenantId})
+                    .donor.state === TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 
 // Reset the counter.
 fpCheckIndexBuildable =

@@ -87,9 +87,10 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
     // Wait for donorAbortMigration command to start.
     assert.soon(() => {
-        const res = assert.commandWorked(donorPrimary.adminCommand(
-            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancellation;
+        const res = assert.commandWorked(
+            donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+        const op = res.inprog.find(op => extractUUIDFromObject(op.instanceID) === migrationId1);
+        return op.receivedCancellation;
     });
 
     fp.off();

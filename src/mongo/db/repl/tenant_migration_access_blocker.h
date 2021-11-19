@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
@@ -49,7 +50,8 @@ public:
      */
     enum class BlockerType { kDonor, kRecipient };
 
-    TenantMigrationAccessBlocker(BlockerType type) : _type(type) {}
+    TenantMigrationAccessBlocker(BlockerType type, MigrationProtocolEnum protocol)
+        : _type(type), _protocol(protocol) {}
     virtual ~TenantMigrationAccessBlocker() = default;
 
     //
@@ -103,12 +105,20 @@ public:
     /**
      * Returns the type of access blocker.
      */
-    virtual BlockerType getType() {
+    BlockerType getType() {
         return _type;
+    }
+
+    /**
+     * Returns the protocol of the access blocker.
+     */
+    MigrationProtocolEnum getProtocol() {
+        return _protocol;
     }
 
 private:
     const BlockerType _type;
+    const MigrationProtocolEnum _protocol;
 };
 
 }  // namespace mongo

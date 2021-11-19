@@ -66,7 +66,8 @@ if (recipientDoc) {
         case TenantMigrationTest.RecipientState.kStarted:
             if (recipientDoc.dataConsistentStopDonorOpTime) {
                 assert.soon(() => tenantMigrationTest
-                                      .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
+                                      .getTenantMigrationAccessBlocker(
+                                          {recipientNode: initialSyncNode, tenantId: kTenantId})
                                       .recipient.state ==
                                 TenantMigrationTest.RecipientAccessState.kReject);
             }
@@ -74,17 +75,20 @@ if (recipientDoc) {
         case TenantMigrationTest.RecipientState.kConsistent:
             if (recipientDoc.rejectReadsBeforeTimestamp) {
                 assert.soon(() => tenantMigrationTest
-                                      .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
+                                      .getTenantMigrationAccessBlocker(
+                                          {recipientNode: initialSyncNode, tenantId: kTenantId})
                                       .recipient.state ==
                                 TenantMigrationTest.RecipientAccessState.kRejectBefore);
-                assert.soon(() => bsonWoCompare(tenantMigrationTest
-                                                    .getTenantMigrationAccessBlocker(
-                                                        initialSyncNode, kTenantId)
-                                                    .recipient.rejectBeforeTimestamp,
-                                                recipientDoc.rejectReadsBeforeTimestamp) == 0);
+                assert.soon(() => bsonWoCompare(
+                                      tenantMigrationTest
+                                          .getTenantMigrationAccessBlocker(
+                                              {recipientNode: initialSyncNode, tenantId: kTenantId})
+                                          .recipient.rejectBeforeTimestamp,
+                                      recipientDoc.rejectReadsBeforeTimestamp) == 0);
             } else {
                 assert.soon(() => tenantMigrationTest
-                                      .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
+                                      .getTenantMigrationAccessBlocker(
+                                          {recipientNode: initialSyncNode, tenantId: kTenantId})
                                       .recipient.state ==
                                 TenantMigrationTest.RecipientAccessState.kReject);
             }

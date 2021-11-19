@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
@@ -181,6 +182,7 @@ class TenantMigrationDonorAccessBlocker
 public:
     TenantMigrationDonorAccessBlocker(ServiceContext* serviceContext,
                                       std::string tenantId,
+                                      MigrationProtocolEnum protocol,
                                       std::string recipientConnString);
 
     //
@@ -324,6 +326,7 @@ private:
 
     ServiceContext* _serviceContext;
     const std::string _tenantId;
+    const MigrationProtocolEnum _protocol;
     const std::string _recipientConnString;
 
     // Protects the state below.

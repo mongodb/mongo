@@ -32,12 +32,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
@@ -55,12 +57,15 @@ TenantMigrationRecipientAccessBlocker::TenantMigrationRecipientAccessBlocker(
     ServiceContext* serviceContext,
     UUID migrationId,
     std::string tenantId,
+    MigrationProtocolEnum protocol,
     std::string donorConnString)
-    : TenantMigrationAccessBlocker(BlockerType::kRecipient),
+    : TenantMigrationAccessBlocker(BlockerType::kRecipient, protocol),
       _serviceContext(serviceContext),
       _migrationId(migrationId),
       _tenantId(std::move(tenantId)),
+      _protocol(protocol),
       _donorConnString(std::move(donorConnString)) {
+    invariant(tenant_migration_util::protocolTenantIdCompatibilityCheck(_protocol, _tenantId));
     _asyncBlockingOperationsExecutor = TenantMigrationAccessBlockerExecutor::get(serviceContext)
                                            .getOrCreateBlockedOperationsExecutor();
 }
@@ -190,15 +195,14 @@ void TenantMigrationRecipientAccessBlocker::appendInfoForServerStatus(
     BSONObjBuilder* builder) const {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    BSONObjBuilder tenantBuilder;
-    tenantBuilder.append("state", _state.toString());
+    builder->append("state", _state.toString());
     if (_rejectBeforeTimestamp) {
-        tenantBuilder.append("rejectBeforeTimestamp", _rejectBeforeTimestamp.get());
+        builder->append("rejectBeforeTimestamp", _rejectBeforeTimestamp.get());
     }
-    tenantBuilder.append("ttlIsBlocked", _ttlIsBlocked);
-    tenantBuilder.append("tenantId", _tenantId);
-
-    builder->append("recipient", tenantBuilder.obj());
+    builder->append("ttlIsBlocked", _ttlIsBlocked);
+    if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+        builder->append("tenantId", _tenantId);
+    }
 }
 
 std::string TenantMigrationRecipientAccessBlocker::BlockerState::toString() const {

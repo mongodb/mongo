@@ -128,7 +128,9 @@ jsTestLog("Allowing migration to commit");
 dataSyncFp.off();
 assert.soon(() => {
     const state =
-        tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).donor.state;
+        tenantMigrationTest
+            .getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: kTenantId})
+            .donor.state;
     return state === TenantMigrationTest.DonorAccessState.kBlockWritesAndReads ||
         state === TenantMigrationTest.DonorAccessState.kReject;
 });
