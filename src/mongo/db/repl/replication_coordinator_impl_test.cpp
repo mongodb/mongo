@@ -3092,7 +3092,8 @@ TEST_F(ReplCoordTest, DoNotAllowMaintenanceModeWhilePrimary) {
 
     // Step down from primary.
     getReplCoord()->updateTerm(opCtx.get(), getReplCoord()->getTerm() + 1).transitional_ignore();
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Seconds(1)));
+    ASSERT_OK(
+        getReplCoord()->waitForMemberState(opCtx.get(), MemberState::RS_SECONDARY, Seconds(1)));
 
     status = getReplCoord()->setMaintenanceMode(opCtx.get(), false);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -3125,7 +3126,7 @@ TEST_F(ReplCoordTest, DoNotAllowSettingMaintenanceModeWhileConductingAnElection)
     // Step down from primary.
     getReplCoord()->updateTerm(opCtx.get(), getReplCoord()->getTerm() + 1).transitional_ignore();
     getReplCoord()
-        ->waitForMemberState(MemberState::RS_SECONDARY, Milliseconds(10 * 1000))
+        ->waitForMemberState(opCtx.get(), MemberState::RS_SECONDARY, Milliseconds(10 * 1000))
         .transitional_ignore();
 
     // Can't modify maintenance mode when running for election (before and after dry run).
@@ -3739,7 +3740,8 @@ TEST_F(ReplCoordTest, HelloReturnsErrorInQuiesceModeWhenNodeIsRemoved) {
     exitNetwork();
 
     // Wait for the node to be removed. Test that we increment the topology version.
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
+    ASSERT_OK(getReplCoord()->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_REMOVED, Seconds(1)));
     ASSERT_EQUALS(removedFromConfig.getConfigVersion(), getReplCoord()->getConfigVersion());
     auto topologyVersionAfterRemoved = getTopoCoord().getTopologyVersion();
     ASSERT_EQUALS(topologyVersionAfterQuiesceMode.getCounter() + 1,
@@ -4392,7 +4394,8 @@ TEST_F(ReplCoordTest, HelloOnRemovedNode) {
     exitNetwork();
 
     // node1 no longer exists in the replica set config.
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
+    ASSERT_OK(getReplCoord()->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_REMOVED, Seconds(1)));
     ASSERT_EQUALS(removedFromConfig.getConfigVersion(), getReplCoord()->getConfigVersion());
 
     const auto maxAwaitTime = Milliseconds(5000);
@@ -4553,7 +4556,7 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
     exitNetwork();
 
     // node1 no longer exists in the replica set config.
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
+    ASSERT_OK(getReplCoord()->waitForMemberState(opCtx.get(), MemberState::RS_REMOVED, Seconds(1)));
     ASSERT_EQUALS(removedFromConfig.getConfigVersion(), getReplCoord()->getConfigVersion());
     getHelloWaitingForRemovedNodeThread.join();
     const std::string newHorizonSniName = "newhorizon.com";
@@ -4593,7 +4596,8 @@ TEST_F(ReplCoordTest, AwaitHelloRespondsCorrectlyWhenNodeRemovedAndReadded) {
     });
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Seconds(1)));
+    ASSERT_OK(
+        getReplCoord()->waitForMemberState(opCtx.get(), MemberState::RS_SECONDARY, Seconds(1)));
     getHelloThread.join();
 
     stdx::thread getHelloThreadNewHorizon([&] {
@@ -6605,7 +6609,8 @@ TEST_F(ReplCoordTest,
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
+    ASSERT_OK(getReplCoord()->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_REMOVED, Seconds(1)));
     ASSERT_EQUALS(config.getConfigVersion(), getReplCoord()->getConfigVersion());
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
@@ -7293,7 +7298,8 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     }
     getNet()->exitNetwork();
 
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Hours{1}));
+    ASSERT_OK(getReplCoord()->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_SECONDARY, Hours{1}));
 }
 
 TEST_F(ReplCoordTest, WaitForMemberState) {
@@ -7318,17 +7324,30 @@ TEST_F(ReplCoordTest, WaitForMemberState) {
     ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
 
     auto timeout = Milliseconds(1);
-    ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
+    ASSERT_OK(replCoord->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_PRIMARY, timeout));
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
-                  replCoord->waitForMemberState(MemberState::RS_REMOVED, timeout));
+                  replCoord->waitForMemberState(
+                      Interruptible::notInterruptible(), MemberState::RS_REMOVED, timeout));
 
     ASSERT_EQUALS(ErrorCodes::BadValue,
-                  replCoord->waitForMemberState(MemberState::RS_PRIMARY, Milliseconds(-1)));
+                  replCoord->waitForMemberState(Interruptible::notInterruptible(),
+                                                MemberState::RS_PRIMARY,
+                                                Milliseconds(-1)));
 
     // Zero timeout is fine.
-    ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, Milliseconds(0)));
+    ASSERT_OK(replCoord->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_PRIMARY, Milliseconds(0)));
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
-                  replCoord->waitForMemberState(MemberState::RS_ARBITER, Milliseconds(0)));
+                  replCoord->waitForMemberState(
+                      Interruptible::notInterruptible(), MemberState::RS_ARBITER, Milliseconds(0)));
+
+    // Make sure it can be interrupted.
+    auto opCtx = makeOperationContext();
+    opCtx->markKilled(ErrorCodes::Interrupted);
+    ASSERT_THROWS(
+        replCoord->waitForMemberState(opCtx.get(), MemberState::RS_ARBITER, Milliseconds(0)),
+        ExceptionFor<ErrorCodes::Interrupted>);
 }
 
 TEST_F(

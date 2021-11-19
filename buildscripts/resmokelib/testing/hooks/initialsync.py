@@ -60,6 +60,8 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
     """BackgroundInitialSyncTestCase class."""
 
     JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
+    INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
+    INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
 
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, test_name, description, base_test_name, hook, shell_options=None):
@@ -83,7 +85,17 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                 [("replSetTest", 1), ("waitForMemberState", 2),
                  ("timeoutMillis",
                   fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)])
-            sync_node_conn.admin.command(cmd)
+            while True:
+                try:
+                    sync_node_conn.admin.command(cmd)
+                    break
+                except pymongo.errors.OperationFailure as err:
+                    if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
+                            and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                        raise
+                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
+                       ).format(err)
+                self.logger.error(msg)
 
         # Check if the initial sync node is in SECONDARY state. If it's been 'n' tests, then it
         # should have waited to be in SECONDARY state and the test should be marked as a failure.

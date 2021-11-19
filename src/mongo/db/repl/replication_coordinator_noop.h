@@ -101,7 +101,7 @@ public:
 
     std::vector<MemberData> getMemberData() const final;
 
-    Status waitForMemberState(MemberState, Milliseconds) final;
+    Status waitForMemberState(Interruptible*, MemberState, Milliseconds) final;
 
     Seconds getSecondaryDelaySecs() const final;
 

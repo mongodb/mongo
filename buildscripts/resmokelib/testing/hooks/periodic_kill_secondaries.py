@@ -123,6 +123,9 @@ class PeriodicKillSecondaries(interface.Hook):
 class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     """PeriodicKillSecondariesTestCase class."""
 
+    INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
+    INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
+
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, test_name, description, base_test_name, hook, test_report):
         """Initialize PeriodicKillSecondariesTestCase."""
@@ -434,19 +437,28 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
     def _await_secondary_state(self, secondary):
         client = secondary.mongo_client()
-        try:
-            client.admin.command(
-                bson.SON([
-                    ("replSetTest", 1),
-                    ("waitForMemberState", 2),  # 2 = SECONDARY
-                    ("timeoutMillis",
-                     fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)
-                ]))
-        except pymongo.errors.OperationFailure as err:
-            self.logger.exception(
-                "mongod on port %d failed to reach state SECONDARY after %d seconds",
-                secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
-            raise errors.ServerFailure(
-                "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
-                    secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
-                    err.args[0]))
+        while True:
+            try:
+                client.admin.command(
+                    bson.SON([
+                        ("replSetTest", 1),
+                        ("waitForMemberState", 2),  # 2 = SECONDARY
+                        ("timeoutMillis",
+                         fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)
+                    ]))
+                break
+            except pymongo.errors.OperationFailure as err:
+                if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
+                        and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                    self.logger.exception(
+                        "mongod on port %d failed to reach state SECONDARY after %d seconds",
+                        secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
+                    raise errors.ServerFailure(
+                        "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".
+                        format(secondary.port,
+                               fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
+                               err.args[0]))
+
+                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
+                       ).format(err)
+                self.logger.error(msg)

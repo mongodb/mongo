@@ -139,7 +139,8 @@ void ReplicationCoordinatorMock::setCanAcceptNonLocalWrites(bool canAcceptNonLoc
     _canAcceptNonLocalWrites = canAcceptNonLocalWrites;
 }
 
-Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
+Status ReplicationCoordinatorMock::waitForMemberState(Interruptible* interruptible,
+                                                      MemberState expectedState,
                                                       Milliseconds timeout) {
     MONGO_UNREACHABLE;
     return Status::OK();

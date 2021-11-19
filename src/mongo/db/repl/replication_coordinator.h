@@ -196,8 +196,11 @@ public:
      * Returns OK if member state is 'state'.
      * Returns ErrorCodes::ExceededTimeLimit if we timed out waiting for the state change.
      * Returns ErrorCodes::BadValue if timeout is negative.
+     * Throws if interrupted (pass Interruptible::notInterruptible() if interruption is not desired.
      */
-    virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) = 0;
+    virtual Status waitForMemberState(Interruptible* interruptible,
+                                      MemberState expectedState,
+                                      Milliseconds timeout) = 0;
 
     /**
      * Returns true if this node is in state PRIMARY or SECONDARY.

@@ -91,7 +91,9 @@ public:
 
     virtual bool canAcceptNonLocalWrites() const;
 
-    virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
+    virtual Status waitForMemberState(Interruptible* interruptible,
+                                      MemberState expectedState,
+                                      Milliseconds timeout) override;
 
     virtual bool isInPrimaryOrSecondaryState(OperationContext* opCtx) const;
 

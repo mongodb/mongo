@@ -129,7 +129,7 @@ public:
                   "timeout"_attr = timeout,
                   "expectedState"_attr = expectedState);
 
-            status = replCoord->waitForMemberState(expectedState, timeout);
+            status = replCoord->waitForMemberState(opCtx, expectedState, timeout);
 
             uassertStatusOK(status);
             return true;

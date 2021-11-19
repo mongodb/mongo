@@ -1074,7 +1074,8 @@ MemberState ReplicationCoordinatorImpl::_getMemberState_inlock() const {
     return _memberState;
 }
 
-Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
+Status ReplicationCoordinatorImpl::waitForMemberState(Interruptible* interruptible,
+                                                      MemberState expectedState,
                                                       Milliseconds timeout) {
     if (timeout < Milliseconds(0)) {
         return Status(ErrorCodes::BadValue, "Timeout duration cannot be negative");
@@ -1082,7 +1083,7 @@ Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
 
     stdx::unique_lock<Latch> lk(_mutex);
     auto pred = [this, expectedState]() { return _memberState == expectedState; };
-    if (!_memberStateChange.wait_for(lk, timeout.toSystemDuration(), pred)) {
+    if (!interruptible->waitForConditionOrInterruptFor(_memberStateChange, lk, timeout, pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       str::stream()
                           << "Timed out waiting for state to become " << expectedState.toString()

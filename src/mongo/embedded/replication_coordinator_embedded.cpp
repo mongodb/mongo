@@ -170,7 +170,9 @@ bool ReplicationCoordinatorEmbedded::canAcceptNonLocalWrites() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::waitForMemberState(MemberState, Milliseconds) {
+Status ReplicationCoordinatorEmbedded::waitForMemberState(Interruptible*,
+                                                          MemberState,
+                                                          Milliseconds) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

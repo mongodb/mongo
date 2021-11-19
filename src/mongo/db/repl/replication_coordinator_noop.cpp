@@ -165,7 +165,7 @@ bool ReplicationCoordinatorNoOp::canAcceptNonLocalWrites() const {
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::waitForMemberState(MemberState, Milliseconds) {
+Status ReplicationCoordinatorNoOp::waitForMemberState(Interruptible*, MemberState, Milliseconds) {
     MONGO_UNREACHABLE;
 }
 

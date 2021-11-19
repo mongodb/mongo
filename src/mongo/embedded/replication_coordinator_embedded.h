@@ -105,7 +105,7 @@ public:
 
     std::vector<repl::MemberData> getMemberData() const override;
 
-    Status waitForMemberState(repl::MemberState, Milliseconds) override;
+    Status waitForMemberState(Interruptible*, repl::MemberState, Milliseconds) override;
 
     Seconds getSecondaryDelaySecs() const override;
 

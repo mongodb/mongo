@@ -1520,7 +1520,8 @@ void HBStepdownAndReconfigTest::assertSteppedDown() {
     LOGV2(463811, "Waiting for step down to complete");
     // Wait for step down to finish since it may be asynchronous.
     auto timeout = Milliseconds(5 * 60 * 1000);
-    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, timeout));
+    ASSERT_OK(getReplCoord()->waitForMemberState(
+        Interruptible::notInterruptible(), MemberState::RS_SECONDARY, timeout));
 
     // Primary stepped down.
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
