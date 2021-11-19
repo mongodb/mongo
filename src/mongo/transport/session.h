@@ -157,6 +157,11 @@ public:
      */
     virtual bool isConnected() = 0;
 
+    /**
+     * Returns true if this session was connected through an L4 load balancer.
+     */
+    virtual bool isFromLoadBalancer() const = 0;
+
     virtual const HostAndPort& remote() const = 0;
     virtual const HostAndPort& local() const = 0;
 

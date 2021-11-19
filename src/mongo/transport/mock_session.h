@@ -78,6 +78,10 @@ public:
         return true;
     }
 
+    bool isFromLoadBalancer() const override {
+        return false;
+    }
+
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() const override {
         return nullptr;

@@ -34,7 +34,9 @@
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/asio_utils.h"
+#include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future_util.h"
 
 namespace mongo::transport {
 
@@ -118,6 +120,10 @@ TransportLayerASIO::ASIOSession::ASIOSession(
     }
 
     _local = HostAndPort(_localAddr.toString(true));
+    if (tl->loadBalancerPort()) {
+        _isFromLoadBalancer = _local.port() == *tl->loadBalancerPort();
+    }
+
     _remote = HostAndPort(_remoteAddr.toString(true));
 #ifdef MONGO_CONFIG_SSL
     _sslContext = transientSSLContext ? transientSSLContext : *tl->_sslContext;
@@ -375,6 +381,44 @@ auto TransportLayerASIO::ASIOSession::getSocket() -> GenericSocket& {
     }
 #endif
     return _socket;
+}
+
+ExecutorFuture<void> TransportLayerASIO::ASIOSession::parseProxyProtocolHeader(
+    const ReactorHandle& reactor) {
+    invariant(_isIngressSession);
+    invariant(reactor);
+    auto buffer = std::make_shared<std::array<char, kProxyProtocolHeaderSizeUpperBound>>();
+    return AsyncTry([this, buffer] {
+               const auto bytesRead = peekASIOStream(
+                   _socket, asio::buffer(buffer->data(), kProxyProtocolHeaderSizeUpperBound));
+               return transport::parseProxyProtocolHeader(StringData(buffer->data(), bytesRead));
+           })
+        .until([](StatusWith<boost::optional<ParserResults>> sw) {
+            return !sw.isOK() || sw.getValue();
+        })
+        .on(reactor, CancellationToken::uncancelable())
+        .then([this, buffer](const boost::optional<ParserResults>& results) mutable {
+            invariant(results);
+
+            // There may not be any endpoints if this connection is directly
+            // from the proxy itself or the information isn't available.
+            if (results->endpoints) {
+                _proxiedSrcEndpoint = results->endpoints->sourceAddress;
+                _proxiedDstEndpoint = results->endpoints->destinationAddress;
+            } else {
+                _proxiedSrcEndpoint = {};
+                _proxiedDstEndpoint = {};
+            }
+
+            // Drain the read buffer.
+            opportunisticRead(_socket, asio::buffer(buffer.get(), results->bytesParsed)).get();
+        })
+        .onError([this](Status s) {
+            LOGV2_ERROR(
+                6067900, "Error while parsing proxy protocol header", "error"_attr = redact(s));
+            end();
+            return s;
+        });
 }
 
 Future<Message> TransportLayerASIO::ASIOSession::sourceMessageImpl(const BatonHandle& baton) {

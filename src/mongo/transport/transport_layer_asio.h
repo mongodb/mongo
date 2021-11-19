@@ -91,7 +91,8 @@ public:
         constexpr static auto kIngress = 0x1;
         constexpr static auto kEgress = 0x10;
 
-        explicit Options(const ServerGlobalParams* params);
+        explicit Options(const ServerGlobalParams* params) : Options(params, {}) {}
+        Options(const ServerGlobalParams* params, boost::optional<int> loadBalancerPort);
         Options() = default;
 
         int mode = kIngress | kEgress;
@@ -105,6 +106,7 @@ public:
         }
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
+        boost::optional<int> loadBalancerPort;         // accepts load balancer connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
@@ -143,6 +145,10 @@ public:
 
     int listenerPort() const {
         return _listenerPort;
+    }
+
+    boost::optional<int> loadBalancerPort() const {
+        return _listenerOptions.loadBalancerPort;
     }
 
 #ifdef __linux__

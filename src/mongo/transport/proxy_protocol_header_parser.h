@@ -44,6 +44,12 @@
 namespace mongo::transport {
 
 /**
+ * The maximum number of bytes ever needed by a proxy protocol header; represents
+ * the minimum TCP MTU.
+ */
+static constexpr size_t kProxyProtocolHeaderSizeUpperBound = 536;
+
+/**
  * Represents the true endpoints that a proxy using the Proxy Protocol is proxying for us.
  */
 struct ProxiedEndpoints {
@@ -77,9 +83,6 @@ struct ParserResults {
 boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer);
 
 namespace proxy_protocol_details {
-// The maximum number of bytes ever needed by a proxy protocol header; represents
-// the minimum TCP MTU.
-static constexpr size_t kBytesToFetch = 536;
 static constexpr size_t kMaxUnixPathLength = 108;
 
 template <typename AddrUn = sockaddr_un>
