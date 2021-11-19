@@ -84,13 +84,6 @@ class PerfStat:
             as_dict['values'] = self.values
         return [as_dict]
 
-    def are_values_all_zero(self):
-        result = True
-        for value in self.values:
-            if value != 0:
-                result = False
-        return result
-
 
 class PerfStatMin(PerfStat):
     def get_value(self):
