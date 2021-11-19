@@ -204,8 +204,6 @@ private:
     static constexpr int kNumPartitions = 16;
     friend class ClientCursorPin;
 
-    CursorId allocateCursorId_inlock();
-
     ClientCursorPin _registerCursor(
         OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 

@@ -37,7 +37,7 @@
 namespace mongo::generic_cursor {
 
 /**
- * Allocates a positive Cursor Id that satisfies 'pred', which checks that the CursorId is not
+ * Allocates a positive CursorId that satisfies 'pred', which checks that the CursorId is not
  * already in use.
  *
  * The caller of this function is responsible for synchronization between the check of whether a
