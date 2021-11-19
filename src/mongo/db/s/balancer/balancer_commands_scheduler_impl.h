@@ -466,7 +466,7 @@ public:
         return _commandInfo->getNameSpace();
     }
 
-    const bool holdsDistributedLock() const {
+    bool holdsDistributedLock() const {
         return _holdingDistLock;
     }
 
