@@ -84,10 +84,6 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOn
 
 const int kMaxRecipientKeyDocsFindAttempts = 10;
 
-bool shouldStopInsertingDonorStateDoc(Status status) {
-    return status.isOK() || status == ErrorCodes::ConflictingOperationInProgress;
-}
-
 bool shouldStopSendingRecipientForgetMigrationCommand(Status status) {
     return status.isOK() ||
         !(ErrorCodes::isRetriableError(status) ||
@@ -494,9 +490,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([](StatusWith<repl::OpTime> swOpTime) {
-            return shouldStopInsertingDonorStateDoc(swOpTime.getStatus());
-        })
+        .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }
@@ -1313,9 +1307,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
 
     auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
         _serviceContext, _tenantId);
-    if ((status == ErrorCodes::ConflictingOperationInProgress &&
-         !_initialDonorStateDurablePromise.getFuture().isReady()) ||
-        !mtab) {
+    if (!_initialDonorStateDurablePromise.getFuture().isReady() || !mtab) {
         // The migration failed either before or during inserting the state doc. Use the status to
         // fulfill the _initialDonorStateDurablePromise to fail the donorStartMigration command
         // immediately.
