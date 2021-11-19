@@ -46,6 +46,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_asio.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -467,8 +468,12 @@ private:
  * during the `ASIOSession` constructor, that the thrown `asio::system_error`
  * is handled safely (translated to a Status holding a SocketException).
  */
-#if 0
 TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
+    // Under TFO, no SYN is sent until the client has data to send.  For this
+    // test, we need the server to respond when the client hits the failpoint
+    // in the ASIOSession ctor. So we have to disable TFO.
+    auto savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
+    ScopeGuard savedTFOClientRestore = [&] { transport::gTCPFastOpenClient = savedTFOClient; };
     // The `server` accepts connections, only to immediately reset them.
     TestFixture tf;
     asio::io_context ioContext;
@@ -503,7 +508,6 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
                     .getStatus(),
                 StatusIs(AnyOf(Eq(ErrorCodes::SocketException), Eq(ErrorCodes::OK)), Any()));
 }
-#endif  // 0
 
 /**
  * With no regard to mongo code, just check what the ASIO socket
