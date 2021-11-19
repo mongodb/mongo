@@ -712,15 +712,15 @@ DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
     opObserver.onDelete(opCtx.get(), nss, UUID::gen(), kUninitializedStmtId, {});
 }
 
-DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
+DEATH_TEST_REGEX_F(OpObserverTest,
+                   AboutToDeleteRequiresIdField,
+                   "Invariant failure.*!id.isEmpty()") {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
     UUID uuid = UUID::gen();
     opObserver.aboutToDelete(opCtx.get(), nss, uuid, {});
-    opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
-    opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
 }
 
 DEATH_TEST_REGEX_F(OpObserverTest,
