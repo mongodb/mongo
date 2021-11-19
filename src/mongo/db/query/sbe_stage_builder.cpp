@@ -460,7 +460,7 @@ const QuerySolutionNode* getLoneNodeByType(const QuerySolutionNode* root, StageT
     auto [result, count] = getFirstNodeByType(root, type);
     const auto msgCount = count;
     tassert(5474506,
-            str::stream() << "Found " << msgCount << " nodes of type " << type
+            str::stream() << "Found " << msgCount << " nodes of type " << stageTypeToString(type)
                           << ", expected one or zero",
             count < 2);
     return result;
@@ -1423,8 +1423,6 @@ SlotBasedStageBuilder::buildSortKeyGeneraror(const QuerySolutionNode* root,
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     using namespace std::literals;
-    invariant(!reqs.getIndexKeyBitset());
-
     auto mergeSortNode = static_cast<const MergeSortNode*>(root);
 
     const auto sortPattern = SortPattern{mergeSortNode->sort, _cq.getExpCtx()};
@@ -1444,25 +1442,48 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // addition, children must always produce a 'recordIdSlot' if the 'dedup' flag is true.
     auto childReqs = reqs.copy().setIf(kRecordId, mergeSortNode->dedup);
 
+    // If a parent node has requested an index key bitset, then we will produce index keys
+    // corresponding to the sort pattern parts needed by said parent node.
+    bool parentRequestsIdxKeys = reqs.getIndexKeyBitset().has_value();
+
     for (auto&& child : mergeSortNode->children) {
         sbe::value::SlotVector inputKeysForChild;
 
-        // Map of field name to position within the index key. This is used to account for
-        // mismatches between the sort pattern and the index key pattern. For instance, suppose the
-        // requested sort is {a: 1, b: 1} and the index key pattern is {c: 1, b: 1, a: 1}. When the
-        // slots for the relevant components of the index key are generated (i.e. extract keys for
-        // 'b' and 'a'),  we wish to insert them into 'inputKeys' in the order that they appear in
-        // the sort pattern.
-        StringMap<size_t> indexKeyPositionMap;
-        auto ixnNode = getLoneNodeByType(child, STAGE_IXSCAN);
-        tassert(5184300,
-                str::stream() << "Can't build exec tree for node: " << child->toString(),
-                ixnNode);
+        // Retrieve the sort pattern provided by the subtree rooted at 'child'. In particular, if
+        // our child is a MERGE_SORT, it will provide the sort directly. If instead it's a tree
+        // containing a lone IXSCAN, we have to check the key pattern because 'providedSorts()' may
+        // or may not provide the baseSortPattern depending on the index bounds (in particular,
+        // if the bounds are fixed, the fields will be marked as 'ignored'). Otherwise, we attempt
+        // to retrieve it from 'providedSorts'.
+        auto childSortPattern = [&]() {
+            if (auto [msn, _] = getFirstNodeByType(child, STAGE_SORT_MERGE); msn) {
+                auto node = static_cast<const MergeSortNode*>(msn);
+                return node->sort;
+            } else {
+                auto [ixn, ct] = getFirstNodeByType(child, STAGE_IXSCAN);
+                if (ixn && ct == 1) {
+                    auto node = static_cast<const IndexScanNode*>(ixn);
+                    return node->index.keyPattern;
+                }
+            }
+            auto baseSort = child->providedSorts().getBaseSortPattern();
+            tassert(6149600,
+                    str::stream() << "Did not find sort pattern for child " << child->toString(),
+                    !baseSort.isEmpty());
+            return baseSort;
+        }();
 
-        auto ixn = static_cast<const IndexScanNode*>(ixnNode);
+        // Map of field name to position within the index key. This is used to account for
+        // mismatches between the sort pattern and the index key pattern. For instance, suppose
+        // the requested sort is {a: 1, b: 1} and the index key pattern is {c: 1, b: 1, a: 1}.
+        // When the slots for the relevant components of the index key are generated (i.e.
+        // extract keys for 'b' and 'a'),  we wish to insert them into 'inputKeys' in the order
+        // that they appear in the sort pattern.
+        StringMap<size_t> indexKeyPositionMap;
+
         sbe::IndexKeysInclusionSet indexKeyBitset;
         size_t i = 0;
-        for (auto&& elt : ixn->index.keyPattern) {
+        for (auto&& elt : childSortPattern) {
             for (auto&& sortPart : sortPattern) {
                 auto path = sortPart.fieldPath->fullPath();
                 if (elt.fieldNameStringData() == path) {
@@ -1515,6 +1536,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto sv = sbe::makeSV();
         outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
 
+        // If the parent of 'root' has requested index keys, then we need to pass along our input
+        // keys as input values, as they will be part of the output 'root' provides its parent.
+        if (parentRequestsIdxKeys) {
+            for (auto&& inputKey : inputKeys.back()) {
+                sv.push_back(inputKey);
+            }
+        }
         inputVals.push_back(std::move(sv));
     }
 
@@ -1522,6 +1550,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     PlanStageSlots outputs(childReqs, &_slotIdGenerator);
     outputs.forEachSlot(childReqs, [&](auto&& slot) { outputVals.push_back(slot); });
+
+    // If the parent of 'root' has requested index keys, then we need to generate output slots to
+    // hold the index keys that will be used as input to the parent of 'root'.
+    if (parentRequestsIdxKeys) {
+        auto idxKeySv = sbe::makeSV();
+        for (int idx = 0; idx < mergeSortNode->sort.nFields(); ++idx) {
+            idxKeySv.emplace_back(_slotIdGenerator.generate());
+        }
+        outputs.setIndexKeySlots(idxKeySv);
+
+        for (auto keySlot : idxKeySv) {
+            outputVals.push_back(keySlot);
+        }
+    }
 
     auto stage = sbe::makeS<sbe::SortedMergeStage>(std::move(inputStages),
                                                    std::move(inputKeys),
