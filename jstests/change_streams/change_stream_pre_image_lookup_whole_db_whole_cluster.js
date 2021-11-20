@@ -30,6 +30,13 @@ if (!canRecordPreImagesInConfigDb && FixtureHelpers.isMongos(db)) {
     return;
 }
 
+if (canRecordPreImagesInConfigDb &&
+    (jsTestOptions().shardMixedBinVersionss || jsTestOptions().mixedBinVersions)) {
+    jsTestLog("Skipping test because multiversion test-suite is unsupported when flag " +
+              "'featureFlagChangeStreamPreAndPostImages' enabled");
+    return;
+}
+
 assert.commandWorked(testDB.dropDatabase());
 
 // Create one collection that has pre-image recording enabled...

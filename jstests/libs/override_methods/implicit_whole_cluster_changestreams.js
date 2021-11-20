@@ -57,12 +57,13 @@ ChangeStreamPassthroughHelpers.passthroughType = function() {
 // Although calls to the shell helpers will ultimately resolve to the overridden runCommand anyway,
 // we need to override the helper to ensure that the Mongo.watch function itself is exercised by the
 // passthrough wherever Collection.watch or DB.watch is called.
+const originalDbWatchImpl = DB.prototype.watch;
 DB.prototype.watch = function(pipeline, options) {
-    // If the database being watched is 'admin', then don't update the pipeline. The pipeline in
-    // this case will update the 'ns.db' to 'admin' which will match nothing.
-    if (this.getName() !== "admin") {
-        pipeline = Object.assign([], pipeline);
-        pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
+    // If the database being watched is 'admin', don't attempt to upconvert.
+    if (this.getName() === "admin") {
+        return originalDbWatchImpl.apply(this, [pipeline, options]);
     }
+    pipeline = Object.assign([], pipeline);
+    pipeline.unshift(ChangeStreamPassthroughHelpers.nsMatchFilter(this, 1));
     return this.getMongo().watch(pipeline, options);
 };

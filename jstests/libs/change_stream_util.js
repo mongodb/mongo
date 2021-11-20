@@ -50,11 +50,10 @@ function isChangeStreamsRewriteEnabled(db) {
 function canRecordPreImagesInConfigDatabase(db) {
     // Clustered index feature must be enabled to record pre-images in 'system.preimages'
     // collection.
-    const clusteredIndexesEnabled =
-        assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1}))
-            .featureFlagClusteredIndexes.value;
-
-    return isChangeStreamPreAndPostImagesEnabled(db) && clusteredIndexesEnabled;
+    const getParam = db.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1});
+    return isChangeStreamPreAndPostImagesEnabled(db) &&
+        getParam.hasOwnProperty("featureFlagClusteredIndexes") &&
+        getParam.featureFlagClusteredIndexes.value;
 }
 
 /**
