@@ -82,8 +82,7 @@ public:
      */
     struct SharedTransactionOptions {
         // Set for all distributed transactions.
-        TxnNumber txnNumber;
-        TxnRetryCounter txnRetryCounter;
+        TxnNumberAndRetryCounter txnNumberAndRetryCounter;
         APIParameters apiParameters;
         repl::ReadConcernArgs readConcernArgs;
 
@@ -323,8 +322,8 @@ public:
         /**
          * Returns if the router has received at least one request for a transaction.
          */
-        auto isInitialized() {
-            return o().txnNumber != kUninitializedTxnNumber;
+        auto isInitialized() const {
+            return o().txnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber;
         }
 
     protected:
@@ -369,9 +368,8 @@ public:
          * the previous transaction state.
          */
         void beginOrContinueTxn(OperationContext* opCtx,
-                                TxnNumber txnNumber,
-                                TransactionActions action,
-                                TxnRetryCounter txnRetryCounter);
+                                TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                                TransactionActions action);
 
         /**
          * Updates transaction diagnostics when the transaction's session is checked in.
@@ -548,34 +546,30 @@ public:
          * but instead reuse the same object across different transactions.
          */
         void _resetRouterState(OperationContext* opCtx,
-                               const TxnNumber& txnNumber,
-                               const TxnRetryCounter& txnRetryCounter);
+                               const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
         /**
          * Calls _resetRouterState and then resets the read concern and the cluster time of the
          * timestamp that all participant shards in the current transaction with snapshot level read
          * concern must read from.
          */
-        void _resetRouterStateForStartTransaction(OperationContext* opCtx,
-                                                  const TxnNumber& txnNumber,
-                                                  const TxnRetryCounter& txnRetryCounter);
+        void _resetRouterStateForStartTransaction(
+            OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
         /**
          * Continues or restarts the currently active transaction.
          */
         void _beginOrContinueActiveTxnNumber(OperationContext* opCtx,
-                                             TxnNumber txnNumber,
-                                             TransactionActions action,
-                                             TxnRetryCounter txnRetryCounter);
+                                             TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                                             TransactionActions action);
 
         /**
          * Starts a new transaction or continues a transaction started by a different router to
          * recover the commit decision.
          */
         void _beginNewTxnNumber(OperationContext* opCtx,
-                                TxnNumber txnNumber,
-                                TransactionActions action,
-                                TxnRetryCounter txnRetryCounter);
+                                TxnNumberAndRetryCounter txnNumberAndRetryCounter,
+                                TransactionActions action);
 
         /**
          * Internal method for committing a transaction. Should only throw on failure to send
@@ -733,13 +727,13 @@ private:
      * o(WithLock) method for writing.
      */
     struct ObservableState {
-        // The currently active transaction number on this router, if beginOrContinueTxn has been
-        // called. Otherwise set to kUninitializedTxnNumber.
-        TxnNumber txnNumber{kUninitializedTxnNumber};
 
-        // The last seen txnRetryCounter for the currently active transaction, if beginOrContinueTxn
-        // has been called. Otherwise set to kUninitializedTxnRetryCounter.
-        TxnRetryCounter txnRetryCounter{kUninitializedTxnRetryCounter};
+        // Struct with fields txnNumber and txnRetryCounter.
+        // If beginOrContinueTxn has been called, txnNumber and txnRetryCounter reflect
+        // the router's currently active transaction. Otherwise, they are set to
+        // kUninitializedTxnNumber and kUninitializedTxnRetryCounter by default.
+        TxnNumberAndRetryCounter txnNumberAndRetryCounter{kUninitializedTxnNumber,
+                                                          kUninitializedTxnRetryCounter};
 
         // Is updated at commit time to reflect which commit path was taken.
         CommitType commitType{CommitType::kNotInitiated};

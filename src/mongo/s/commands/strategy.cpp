@@ -648,7 +648,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         })();
 
         startTransaction = (transactionAction == TransactionRouter::TransactionActions::kStart);
-        txnRouter.beginOrContinueTxn(opCtx, *txnNumber, transactionAction, *txnRetryCounter);
+        txnRouter.beginOrContinueTxn(
+            opCtx, TxnNumberAndRetryCounter(*txnNumber, *txnRetryCounter), transactionAction);
     }
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();
