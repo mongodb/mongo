@@ -311,6 +311,10 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
                 pairs.append(f"'{key}': {str(value)}")
         return "{" + ", ".join(pairs) + "}"
 
+    def __repr__(self):
+        # eval(repr(self)) isn't valid, but this is at least useful for debugging.
+        return f'{self.__class__.__name__}({repr(self._value_store)})'
+
     def _record_write(self, key, value):
         written = None
         if type(value) in ALLOWED_TYPES and value is not Historic:

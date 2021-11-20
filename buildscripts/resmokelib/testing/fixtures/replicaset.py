@@ -619,7 +619,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 chosen_node.mongod.wait()
 
                 self.logger.info(
-                    "Attempting to restart the chosen secondary on port %d of replica set '%s.",
+                    "Attempting to restart the chosen secondary on port %d of replica set '%s'.",
                     chosen_node.port, self.replset_name)
 
                 chosen_node.setup()
@@ -640,7 +640,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         """Try to step up the given node; return whether the attempt was successful."""
         try:
             self.logger.info(
-                "Attempting to step up the chosen secondary on port %d of replica set '%s.",
+                "Attempting to step up the chosen secondary on port %d of replica set '%s'.",
                 node.port, self.replset_name)
             client = interface.authenticate(node.mongo_client(), auth_options)
             client.admin.command("replSetStepUp")
@@ -665,7 +665,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
         chosen.mongod.wait()
 
-        self.logger.info("Attempting to restart the old primary on port %d of replica set '%s.",
+        self.logger.info("Attempting to restart the old primary on port %d of replica set '%s'.",
                          chosen.port, self.replset_name)
 
         # Restart the mongod on the old primary and wait until we can contact it again. Keep the

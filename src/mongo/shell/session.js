@@ -398,7 +398,7 @@ var {
                     if (res === undefined) {
                         if (jsTest.options().logRetryAttempts) {
                             jsTest.log("Retrying " + cmdName +
-                                       "with original command request: " + tojson(cmdObj) +
+                                       " with original command request: " + tojson(cmdObj) +
                                        " due to network error, subsequent retries remaining: " +
                                        numRetries);
                         }
@@ -408,7 +408,7 @@ var {
                     if (isRetryableCode(res.code)) {
                         if (jsTest.options().logRetryAttempts) {
                             jsTest.log("Retrying " + cmdName +
-                                       "with original command request: " + tojson(cmdObj) +
+                                       " with original command request: " + tojson(cmdObj) +
                                        " due to retryable error (code=" + res.code +
                                        "), subsequent retries remaining: " + numRetries);
                         }
@@ -428,7 +428,7 @@ var {
                             if (jsTest.options().logRetryAttempts) {
                                 jsTest.log(
                                     "Retrying " + cmdName +
-                                    "with original command request: " + tojson(cmdObj) +
+                                    " with original command request: " + tojson(cmdObj) +
                                     " due to retryable write error (code=" + writeError.code +
                                     "), subsequent retries remaining: " + numRetries);
                             }
@@ -444,7 +444,7 @@ var {
                         isRetryableCode(res.writeConcernError.code)) {
                         if (jsTest.options().logRetryAttempts) {
                             jsTest.log("Retrying " + cmdName +
-                                       "with original command request: " + tojson(cmdObj) +
+                                       " with original command request: " + tojson(cmdObj) +
                                        " due to retryable write concern error (code=" +
                                        res.writeConcernError.code +
                                        "), subsequent retries remaining: " + numRetries);
