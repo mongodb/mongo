@@ -182,6 +182,8 @@ public:
     };
 
     void shutdown() override {}
+
+    void join() override {}
 };
 
 class ReshardingRecipientServiceForTest : public ReshardingRecipientService {
