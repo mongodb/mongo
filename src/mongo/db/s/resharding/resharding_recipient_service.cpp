@@ -349,6 +349,13 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMandatoryCleanup(
     Status status, const CancellationToken& stepdownToken) {
+    if (_dataReplication) {
+        // We explicitly shut down and join the ReshardingDataReplication::_oplogFetcherExecutor
+        // because waiting on the _dataReplicationQuiesced future may not do this automatically if
+        // the scoped task executor was already been shut down.
+        _dataReplication->shutdown();
+        _dataReplication->join();
+    }
 
     return _dataReplicationQuiesced.thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this,

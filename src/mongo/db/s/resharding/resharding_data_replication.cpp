@@ -411,6 +411,10 @@ void ReshardingDataReplication::shutdown() {
     _oplogFetcherExecutor->shutdown();
 }
 
+void ReshardingDataReplication::join() {
+    _oplogFetcherExecutor->join();
+}
+
 std::vector<NamespaceString> ReshardingDataReplication::ensureStashCollectionsExist(
     OperationContext* opCtx,
     const ChunkManager& sourceChunkMgr,

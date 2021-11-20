@@ -126,6 +126,8 @@ public:
     virtual SharedSemiFuture<void> awaitStrictlyConsistent() = 0;
 
     virtual void shutdown() = 0;
+
+    virtual void join() = 0;
 };
 
 class ReshardingDataReplication : public ReshardingDataReplicationInterface {
@@ -168,6 +170,8 @@ public:
     SharedSemiFuture<void> awaitStrictlyConsistent() override;
 
     void shutdown() override;
+
+    void join() override;
 
     // The following methods are called by ReshardingDataReplication::make() and only exposed
     // publicly for unit-testing purposes.
