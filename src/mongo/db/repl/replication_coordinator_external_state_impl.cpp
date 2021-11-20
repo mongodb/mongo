@@ -460,11 +460,18 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // Permit writing to the oplog before we step up to primary.
                                AllowNonLocalWritesBlock allowNonLocalWrites(opCtx);
                                Lock::GlobalWrite globalWrite(opCtx);
-                               WriteUnitOfWork wuow(opCtx);
-                               Helpers::putSingleton(opCtx, configCollectionName, config);
-                               const auto msgObj = BSON("msg" << kInitiatingSetMsg);
-                               _service->getOpObserver()->onOpMessage(opCtx, msgObj);
-                               wuow.commit();
+                               {
+                                   // Writes to 'local.system.replset' must be untimestamped.
+                                   WriteUnitOfWork wuow(opCtx);
+                                   Helpers::putSingleton(opCtx, configCollectionName, config);
+                                   wuow.commit();
+                               }
+                               {
+                                   WriteUnitOfWork wuow(opCtx);
+                                   const auto msgObj = BSON("msg" << kInitiatingSetMsg);
+                                   _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                                   wuow.commit();
+                               }
                            });
 
         // ReplSetTest assumes that immediately after the replSetInitiate command returns, it can
@@ -607,17 +614,27 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          bool writeOplog) {
     try {
         writeConflictRetry(opCtx, "save replica set config", configCollectionName, [&] {
-            WriteUnitOfWork wuow(opCtx);
-            Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
-            Helpers::putSingleton(opCtx, configCollectionName, config);
+            {
+                // Writes to 'local.system.replset' must be untimestamped.
+                WriteUnitOfWork wuow(opCtx);
+                Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
+                Helpers::putSingleton(opCtx, configCollectionName, config);
+                wuow.commit();
+            }
 
             if (writeOplog) {
+                // The no-op write doesn't affect the correctness of the safe reconfig protocol and
+                // so it doesn't have to be written in the same WUOW as the config write. In fact,
+                // the no-op write is only needed for some corner cases where the committed snapshot
+                // is dropped after a force reconfig that changes the config content or a safe
+                // reconfig that changes writeConcernMajorityJournalDefault.
+                WriteUnitOfWork wuow(opCtx);
                 auto msgObj = BSON("msg"
                                    << "Reconfig set"
                                    << "version" << config["version"]);
                 _service->getOpObserver()->onOpMessage(opCtx, msgObj);
+                wuow.commit();
             }
-            wuow.commit();
         });
         return Status::OK();
     } catch (const DBException& ex) {
