@@ -107,8 +107,7 @@ public:
     bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline);
 
 private:
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
-                                                                         const Pipeline& pipeline);
+    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(const Pipeline& pipeline);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
 
