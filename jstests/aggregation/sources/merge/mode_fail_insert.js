@@ -102,6 +102,44 @@ assert.doesNotThrow(() => coll.aggregate([
 assert.eq(1, targetColl.find().itcount());
 
 //
+// Tests that a $merge aggregation fails with an error message indicating the duplicate key error
+// occured during the $merge.
+//
+coll.drop();
+assert.commandWorked(coll.insert({a: 0, b: {c: 2}}));
+dropWithoutImplicitRecreate(targetColl.getName());
+assert.commandWorked(targetColl.createIndex({a: 1, "b.c": 1}, {unique: true}));
+assert.commandWorked(targetColl.insert({_id: 1, a: 0, b: {c: 2}}));
+
+// This time we should fail due to a collision on the "on" fields.
+let res = assert.throws(() => coll.aggregate({
+    $merge: {
+        into: targetColl.getName(),
+        whenMatched: "fail",
+        whenNotMatched: "insert",
+        on: ["a", "b.c"]
+    }
+}));
+assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+assert.includes(
+    res.message,
+    "$merge with whenMatched: fail found an existing document with the same values for the 'on' fields");
+
+// This time we should fail due to a collision on the "_id" field.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, a: 3, b: {c: 4}}));
+res = assert.throws(() => coll.aggregate({
+    $merge: {
+        into: targetColl.getName(),
+        whenMatched: "fail",
+        whenNotMatched: "insert",
+        on: ["a", "b.c"]
+    }
+}));
+assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+assert.includes(res.message, "$merge failed due to a DuplicateKey error");
+
+//
 // Tests for $merge to a database that differs from the aggregation database.
 //
 const foreignDb = db.getSiblingDB("merge_insert_only_foreign");

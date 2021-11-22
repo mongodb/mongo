@@ -130,13 +130,12 @@ assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}]));
 
 dropWithoutImplicitRecreate(outColl.getName());
 assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
-assertErrorCode(
-    coll,
-    [
-        {$addFields: {a: 0}},
-        {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
-    ],
-    ErrorCodes.DuplicateKey);
+const res = assert.throws(() => coll.aggregate([
+    {$addFields: {a: 0}},
+    {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
+]));
+assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+assert.includes(res.message, "$merge failed due to a DuplicateKey error");
 
 // Test that $merge fails if the "on" fields contains an array.
 coll.drop();

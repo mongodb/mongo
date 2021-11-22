@@ -41,6 +41,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -557,6 +558,23 @@ void DocumentSourceMerge::spill(BatchedObjects&& batch) try {
     uassertStatusOKWithContext(ex.toStatus(),
                                "$merge failed to update the matching document, did you "
                                "attempt to modify the _id or the shard key?");
+} catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+    // A DuplicateKey error could be due to a collision on the 'on' fields or on any other unique
+    // index.
+    auto dupKeyPattern = ex->getKeyPattern();
+    bool dupKeyFromMatchingOnFields =
+        (static_cast<size_t>(dupKeyPattern.nFields()) == _mergeOnFields.size()) &&
+        std::all_of(_mergeOnFields.begin(), _mergeOnFields.end(), [&](auto onField) {
+            return dupKeyPattern.hasField(onField.fullPath());
+        });
+
+    if (_descriptor.mode == kFailInsertMode && dupKeyFromMatchingOnFields) {
+        uassertStatusOKWithContext(ex.toStatus(),
+                                   "$merge with whenMatched: fail found an existing document with "
+                                   "the same values for the 'on' fields");
+    } else {
+        uassertStatusOKWithContext(ex.toStatus(), "$merge failed due to a DuplicateKey error");
+    }
 }
 
 void DocumentSourceMerge::waitWhileFailPointEnabled() {
