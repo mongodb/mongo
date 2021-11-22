@@ -4263,6 +4263,7 @@ buildvariants:
       top_dir=$(git rev-parse --show-toplevel)
       top_builddir=$top_dir/build_posix
       LD_LIBRARY_PATH=$top_builddir/.libs
+    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
   - name: compile
   - name: generate-datafile-little-endian
