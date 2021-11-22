@@ -475,6 +475,16 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             newContext.fullPathToParentElemMatch = fullPathToNode;
             newContext.innermostParentElemMatch = static_cast<ElemMatchValueMatchExpression*>(node);
 
+            FieldRef path(fullPathToNode);
+            // If the index path has at least two components, and the last component of the path is
+            // numeric, this component could be an array index because the preceding path component
+            // may contain an array. Currently it is not known whether the preceding path component
+            // could be an array because indexes which positionally index array elements are not
+            // considered multikey.
+            if (path.numParts() > 1 && path.isNumericPathComponentStrict(path.numParts() - 1)) {
+                return false;
+            }
+
             auto&& children = node->getChildVector();
             if (!std::all_of(children->begin(), children->end(), [&](auto&& child) {
                     const auto newPath = fullPathToNode.toString() + child->path();
