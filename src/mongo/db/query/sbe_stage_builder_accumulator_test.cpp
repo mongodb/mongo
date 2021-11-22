@@ -153,7 +153,8 @@ protected:
      */
     void runAddToSetTest(StringData groupSpec,
                          std::vector<BSONArray> inputDocs,
-                         const BSONArray& expectedResult) {
+                         const BSONArray& expectedResult,
+                         std::unique_ptr<CollatorInterface> collator = nullptr) {
         using namespace mongo::sbe::value;
 
         // Create ArraySet Value from the expectedResult.
@@ -165,7 +166,7 @@ protected:
 
         // Run the accumulator.
         auto [resultsTag, resultsVal] =
-            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs);
+            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs, std::move(collator));
         ValueGuard resultGuard{resultsTag, resultsVal};
         ASSERT_EQ(resultsTag, TypeTags::Array);
 
@@ -1020,6 +1021,18 @@ TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationAllMissingFields)
     auto docs = std::vector<BSONArray>{
         BSON_ARRAY(BSON("a" << 1)), BSON_ARRAY(BSON("a" << 2)), BSON_ARRAY(BSON("a" << 3))};
     runAddToSetTest("{_id: null, x: {$addToSet: '$b'}}", docs, BSONArray{});
+}
+
+TEST_F(SbeStageBuilderGroupTest, AddToSetAccumulatorTranslationWithCollation) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "x")),
+                                       BSON_ARRAY(BSON("a" << 2 << "b"
+                                                           << "y"))};
+    runAddToSetTest(
+        "{_id: null, x: {$addToSet: '$b'}}",
+        docs,
+        BSON_ARRAY("x"),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
 }
 
 TEST_F(SbeStageBuilderGroupTest, PushAccumulatorTranslationNoDocs) {

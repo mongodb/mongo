@@ -309,7 +309,13 @@ std::pair<std::vector<std::unique_ptr<sbe::EExpression>>, EvalStage> buildAccumu
     EvalStage inputStage,
     PlanNodeId planNodeId) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
-    aggs.push_back(makeFunction("addToSet", std::move(arg)));
+    auto collatorSlot = state.env->getSlotIfExists("collator"_sd);
+    if (collatorSlot) {
+        aggs.push_back(makeFunction(
+            "collAddToSet"_sd, sbe::makeE<sbe::EVariable>(*collatorSlot), std::move(arg)));
+    } else {
+        aggs.push_back(makeFunction("addToSet", std::move(arg)));
+    }
     return {std::move(aggs), std::move(inputStage)};
 }
 
