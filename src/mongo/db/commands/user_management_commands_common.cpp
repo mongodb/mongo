@@ -178,9 +178,9 @@ bool isAuthorizedToChangeOwnCustomDataAsUser(AuthorizationSession* authzSession,
     return authzSession->isAuthorizedToChangeAsUser(userName, ActionType::changeOwnCustomData);
 }
 
-void checkAuthForTypedCommand(Client* client, const CreateUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const CreateUserCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to create users on db: " << dbname,
@@ -194,9 +194,9 @@ void checkAuthForTypedCommand(Client* client, const CreateUserCommand& request) 
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     UserName userName(request.getCommandParameter(), dbname);
     uassert(ErrorCodes::Unauthorized,
@@ -230,14 +230,14 @@ void checkAuthForTypedCommand(Client* client, const UpdateUserCommand& request) 
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const GrantRolesToUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const GrantRolesToUserCommand& request) {
     auto roles = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToGrantRoles(as, roles));
 }
 
-void checkAuthForTypedCommand(Client* client, const CreateRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const CreateRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     const auto& dbname = request.getDbName();
     RoleName roleName(request.getCommandParameter(), dbname);
 
@@ -251,8 +251,8 @@ void checkAuthForTypedCommand(Client* client, const CreateRoleCommand& request) 
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const UpdateRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     const auto& dbname = request.getDbName();
 
     // You don't know what roles or privileges you might be revoking, so require the ability
@@ -273,19 +273,20 @@ void checkAuthForTypedCommand(Client* client, const UpdateRoleCommand& request) 
         as, request.getAuthenticationRestrictions() != boost::none, dbname));
 }
 
-void checkAuthForTypedCommand(Client* client, const GrantRolesToRoleCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const GrantRolesToRoleCommand& request) {
     auto rolesToRemove = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToGrantRoles(as, rolesToRemove));
 }
 
-void checkAuthForTypedCommand(Client* client, const GrantPrivilegesToRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const GrantPrivilegesToRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToGrantPrivileges(as, request.getPrivileges()));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropUserCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const DropUserCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     UserName userName(request.getCommandParameter(), request.getDbName());
 
     uassert(ErrorCodes::Unauthorized,
@@ -295,9 +296,9 @@ void checkAuthForTypedCommand(Client* client, const DropUserCommand& request) {
                                                  ActionType::dropUser));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropRoleCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const DropRoleCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to drop roles from the " << dbname << " database",
@@ -305,31 +306,32 @@ void checkAuthForTypedCommand(Client* client, const DropRoleCommand& request) {
                                                  ActionType::dropRole));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropAllUsersFromDatabaseCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const DropAllUsersFromDatabaseCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to drop users from the " << dbname << " database",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::dropUser));
 }
 
-void checkAuthForTypedCommand(Client* client, const RevokeRolesFromUserCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const RevokeRolesFromUserCommand& request) {
     auto roles = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToRevokeRoles(as, roles));
 }
 
-void checkAuthForTypedCommand(Client* client, const RevokeRolesFromRoleCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const RevokeRolesFromRoleCommand& request) {
     auto rolesToRemove = resolveRoleNames(request.getRoles(), request.getDbName());
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToRevokeRoles(as, rolesToRemove));
 }
 
-void checkAuthForTypedCommand(Client* client, const UsersInfoCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& request) {
     const auto& dbname = request.getDbName();
     const auto& arg = request.getCommandParameter();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     if (arg.isAllOnCurrentDB()) {
         uassert(ErrorCodes::Unauthorized,
@@ -357,24 +359,26 @@ void checkAuthForTypedCommand(Client* client, const UsersInfoCommand& request) {
     }
 }
 
-void checkAuthForTypedCommand(Client* client, const RevokePrivilegesFromRoleCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const RevokePrivilegesFromRoleCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassertStatusOK(checkAuthorizedToRevokePrivileges(as, request.getPrivileges()));
 }
 
-void checkAuthForTypedCommand(Client* client, const DropAllRolesFromDatabaseCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const DropAllRolesFromDatabaseCommand& request) {
     const auto& dbname = request.getDbName();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to drop roles from the " << dbname << " database",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::dropRole));
 }
 
-void checkAuthForTypedCommand(Client* client, const RolesInfoCommand& request) {
+void checkAuthForTypedCommand(OperationContext* opCtx, const RolesInfoCommand& request) {
     const auto& dbname = request.getDbName();
     const auto& arg = request.getCommandParameter();
-    auto* as = AuthorizationSession::get(client);
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     invariant(!arg.isAllForAllDBs());
     if (arg.isAllOnCurrentDB()) {
@@ -399,24 +403,26 @@ void checkAuthForTypedCommand(Client* client, const RolesInfoCommand& request) {
     }
 }
 
-void checkAuthForTypedCommand(Client* client, const InvalidateUserCacheCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx, const InvalidateUserCacheCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to invalidate user cache",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                  ActionType::invalidateUserCache));
 }
 
-void checkAuthForTypedCommand(Client* client, const GetUserCacheGenerationCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const GetUserCacheGenerationCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to get cache generation",
             as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                  ActionType::internal));
 }
 
-void checkAuthForTypedCommand(Client* client, const MergeAuthzCollectionsCommand& request) {
-    auto* as = AuthorizationSession::get(client);
+void checkAuthForTypedCommand(OperationContext* opCtx,
+                              const MergeAuthzCollectionsCommand& request) {
+    auto* as = AuthorizationSession::get(opCtx->getClient());
 
     ActionSet actions;
     actions.addAction(ActionType::createUser);

@@ -79,25 +79,25 @@ Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
 // checkAuthFor*Command methods
 //
 
-void checkAuthForTypedCommand(Client*, const CreateUserCommand&);
-void checkAuthForTypedCommand(Client*, const UpdateUserCommand&);
-void checkAuthForTypedCommand(Client*, const GrantRolesToUserCommand&);
-void checkAuthForTypedCommand(Client*, const CreateRoleCommand&);
-void checkAuthForTypedCommand(Client*, const UpdateRoleCommand&);
-void checkAuthForTypedCommand(Client*, const GrantRolesToRoleCommand&);
-void checkAuthForTypedCommand(Client*, const GrantPrivilegesToRoleCommand&);
-void checkAuthForTypedCommand(Client*, const DropAllUsersFromDatabaseCommand&);
-void checkAuthForTypedCommand(Client*, const RevokeRolesFromUserCommand&);
-void checkAuthForTypedCommand(Client*, const RevokeRolesFromRoleCommand&);
-void checkAuthForTypedCommand(Client*, const DropUserCommand&);
-void checkAuthForTypedCommand(Client*, const DropRoleCommand&);
-void checkAuthForTypedCommand(Client*, const RevokePrivilegesFromRoleCommand&);
-void checkAuthForTypedCommand(Client*, const DropAllRolesFromDatabaseCommand&);
-void checkAuthForTypedCommand(Client*, const UsersInfoCommand&);
-void checkAuthForTypedCommand(Client*, const RolesInfoCommand&);
-void checkAuthForTypedCommand(Client*, const InvalidateUserCacheCommand&);
-void checkAuthForTypedCommand(Client*, const GetUserCacheGenerationCommand&);
-void checkAuthForTypedCommand(Client*, const MergeAuthzCollectionsCommand&);
+void checkAuthForTypedCommand(OperationContext*, const CreateUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const UpdateUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GrantRolesToUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const CreateRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const UpdateRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GrantRolesToRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GrantPrivilegesToRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropAllUsersFromDatabaseCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RevokeRolesFromUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RevokeRolesFromRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropUserCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RevokePrivilegesFromRoleCommand&);
+void checkAuthForTypedCommand(OperationContext*, const DropAllRolesFromDatabaseCommand&);
+void checkAuthForTypedCommand(OperationContext*, const UsersInfoCommand&);
+void checkAuthForTypedCommand(OperationContext*, const RolesInfoCommand&);
+void checkAuthForTypedCommand(OperationContext*, const InvalidateUserCacheCommand&);
+void checkAuthForTypedCommand(OperationContext*, const GetUserCacheGenerationCommand&);
+void checkAuthForTypedCommand(OperationContext*, const MergeAuthzCollectionsCommand&);
 
 }  // namespace auth
 }  // namespace mongo

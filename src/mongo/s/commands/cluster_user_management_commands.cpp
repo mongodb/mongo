@@ -160,7 +160,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
-            auth::checkAuthForTypedCommand(opCtx->getClient(), request());
+            auth::checkAuthForTypedCommand(opCtx, request());
         }
 
         NamespaceString ns() const override {
@@ -247,7 +247,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
-            auth::checkAuthForTypedCommand(opCtx->getClient(), request());
+            auth::checkAuthForTypedCommand(opCtx, request());
         }
 
         NamespaceString ns() const override {
@@ -282,7 +282,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
-            auth::checkAuthForTypedCommand(opCtx->getClient(), request());
+            auth::checkAuthForTypedCommand(opCtx, request());
         }
 
         NamespaceString ns() const override {
