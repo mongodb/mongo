@@ -1,0 +1,10 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/serverless/*.js
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
