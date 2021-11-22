@@ -506,18 +506,6 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     return std::move(responses.front());
 }
 
-AsyncRequestsSender::Response executeRawCommandAgainstDatabasePrimary(
-    OperationContext* opCtx,
-    StringData dbName,
-    const CachedDatabaseInfo& dbInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
-    auto responses =
-        gatherResponses(opCtx, dbName, readPref, retryPolicy, {{dbInfo.primaryId(), cmdObj}});
-    return std::move(responses.front());
-}
-
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
