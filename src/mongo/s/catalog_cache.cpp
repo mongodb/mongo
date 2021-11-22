@@ -275,6 +275,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                                     std::move(collEntry),
                                     atClusterTime);
             } catch (const DBException& ex) {
+                _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
                 bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
                     ex.code() == ErrorCodes::ConflictingOperationInProgress ||
                     ex.code() == ErrorCodes::QueryPlanKilled;
@@ -287,7 +288,6 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                                           "Collection refresh failed",
                                           "namespace"_attr = nss,
                                           "exception"_attr = redact(ex));
-                _stats.totalRefreshWaitTimeMicros.addAndFetch(t.micros());
                 acquireTries++;
                 if (acquireTries == kMaxInconsistentRoutingInfoRefreshAttempts) {
                     return ex.toStatus();
