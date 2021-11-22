@@ -76,8 +76,13 @@ jsTestLog("Waiting for node 1 to vote in election");
 checkLog.containsJson(node1, 5972100);
 
 jsTestLog("Waiting for node 1 to replicate diverging branch");
+// Disconnect node 1 from node 2 so that node 1 won't switch sync sources from node 0 to node 2.
+// It's okay if node 1 doesn't have a sync source since it should have already received the batch
+// from node 0 by the time we stopped replication.
+node1.disconnect(node2);
 node1StopRepl.off();
 awaitOpTime(node1, node0);
+node1.reconnect(node2);
 
 jsTestLog("Waiting for node 2 to be writable primary");
 
@@ -92,7 +97,6 @@ rst.awaitSecondaryNodes(null, [node0]);
 node0StopRepl.wait();
 
 jsTestLog("Stepping node 1 up");
-
 // Step up node 1, which causes an untimestamped write to the minValid collection.
 rst.stepUp(node1, {awaitReplicationBeforeStepUp: false});
 
