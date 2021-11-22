@@ -10,6 +10,8 @@ selector:
   exclude_files:
   # Transactions are not supported on MongoDB standalone nodes.
   - jstests/core/txns/**/*.js
+  exclude_with_any_tags:
+  - does_not_support_encrypted_storage_engine
 executor:
   archive:
     hooks:

@@ -452,6 +452,11 @@ public:
         SemiFuture<void> _onCloneSuccess();
 
         /*
+         * For protocol "shard merge", revert copied files to a consistent snapshot.
+         */
+        SemiFuture<void> _rollbackToStable();
+
+        /*
          * Returns a future that will be fulfilled when the tenant migration reaches consistent
          * state.
          */

@@ -9,7 +9,8 @@ selector:
   - jstests/sharding/*.js
   - jstests/sharding/change_streams/*.js
   - jstests/sharding/query/*.js
-
+  exclude_with_any_tags:
+  - does_not_support_encrypted_storage_engine
 executor:
   archive:
     tests:

@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/filesystem/operations.hpp>
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -64,6 +66,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
@@ -1640,6 +1643,32 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
         .semi();
 }
 
+SemiFuture<void> TenantMigrationRecipientService::Instance::_rollbackToStable() {
+    stdx::lock_guard lk(_mutex);
+
+    return ExecutorFuture(**_scopedExecutor)
+        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
+            if (stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
+                return SemiFuture<void>::makeReady();
+            }
+
+            // TODO (SERVER-61133): Use the temp dir where we copied donor files.
+            const std::string kTempDirectory = "/tmp/tenant_migration_test_data";
+            boost::filesystem::path tempPath(kTempDirectory);
+            if (!boost::filesystem::exists(tempPath)) {
+                LOGV2_WARNING(61137,
+                              "No temp directory of donor files to import",
+                              "tempDirectory"_attr = kTempDirectory);
+                return SemiFuture<void>::makeReady();
+            }
+
+            auto opCtx = cc().makeOperationContext();
+            wiredTigerImportFromBackupCursor(opCtx.get(), kTempDirectory);
+            return SemiFuture<void>::makeReady();
+        })
+        .semi();
+}
+
 SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFuture() {
     stdx::lock_guard lk(_mutex);
     // PrimaryOnlyService::onStepUp() before starting instance makes sure that the state doc
@@ -2299,6 +2328,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        return clonerFuture;
                    })
                    .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
+                   .then([this, self = shared_from_this()] { return _rollbackToStable(); })
                    .then([this, self = shared_from_this()] {
                        {
                            auto opCtx = cc().makeOperationContext();

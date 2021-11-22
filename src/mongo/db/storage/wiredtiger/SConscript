@@ -193,6 +193,17 @@ wtEnv.Library(
 )
 
 
+wtEnv.Library(
+    target='storage_wiredtiger_import',
+    source=[
+        'wiredtiger_import.cpp',
+    ],
+    LIBDEPS=[
+        'storage_wiredtiger_core',
+    ],
+)
+
+
 wtEnv.CppUnitTest(
     target='storage_wiredtiger_record_store_and_index_test',
     source=[
