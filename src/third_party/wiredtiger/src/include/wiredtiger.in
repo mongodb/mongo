@@ -803,6 +803,11 @@ struct __wt_session {
 	 * wait for space to be available in cache before giving up.  Default value will be the
 	 * global setting of the connection config., an integer greater than or equal to 0; default
 	 * \c 0.}
+	 * @config{debug = (, configure debug specific behavior on a session.  Generally only used
+	 * for internal testing purposes., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict_page, Configure the session to evict the
+	 * page when it is released and no longer needed., a boolean flag; default \c false.}
+	 * @config{ ),,}
 	 * @config{ignore_cache_size, when set\, operations performed by this session ignore the
 	 * cache size and are not blocked when the cache is full.  Note that use of this option for
 	 * operations that create cache pressure can starve ordinary sessions that obey the cache
@@ -2387,6 +2392,11 @@ struct __wt_connection {
 	 * wait for space to be available in cache before giving up.  Default value will be the
 	 * global setting of the connection config., an integer greater than or equal to 0; default
 	 * \c 0.}
+	 * @config{debug = (, configure debug specific behavior on a session.  Generally only used
+	 * for internal testing purposes., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict_page, Configure the session to evict the
+	 * page when it is released and no longer needed., a boolean flag; default \c false.}
+	 * @config{ ),,}
 	 * @config{ignore_cache_size, when set\, operations performed by this session ignore the
 	 * cache size and are not blocked when the cache is full.  Note that use of this option for
 	 * operations that create cache pressure can starve ordinary sessions that obey the cache

@@ -1099,6 +1099,15 @@ session_config = [
         closed. This value is inherited from ::wiredtiger_open
         \c cache_cursors''',
         type='boolean'),
+    Config('debug', '', r'''
+        configure debug specific behavior on a session. Generally only used
+        for internal testing purposes.''',
+        type='category', subconfig=[
+        Config('release_evict_page', 'false', r'''
+            Configure the session to evict the page when it is released and
+            no longer needed.''',
+            type='boolean'),
+        ]),
     Config('cache_max_wait_ms', '0', r'''
         the maximum number of milliseconds an application thread will wait
         for space to be available in cache before giving up.
