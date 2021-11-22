@@ -27,7 +27,7 @@ const setUpDb = function setUpDatabaseAndEnableSharding() {
 };
 
 // Use the setAllowMigrations command to set the permitMigrations flag in the collection.
-const setAllowMigrations = function(ns, allow) {
+const setAllowMigrationsCmd = function(ns, allow) {
     assert.commandWorked(st.s.adminCommand({setAllowMigrations: ns, allowMigrations: allow}));
 };
 
@@ -42,7 +42,7 @@ const setAllowMigrations = function(ns, allow) {
     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-    setAllowMigrations(ns, false);
+    setAllowMigrationsCmd(ns, false);
 
     // setAllowMigrations was called, sending a new moveChunk command should fail.
     assert.commandFailedWithCode(
@@ -93,7 +93,7 @@ const testBalancer = function(setAllowMigrations, collBSetNoBalanceParam) {
     assert.commandWorked(
         configDB.collections.update({_id: collB.getFullName()}, {$set: collBSetNoBalanceParam}));
 
-    setAllowMigrations(collB.getFullName(), setAllowMigrations);
+    setAllowMigrationsCmd(collB.getFullName(), setAllowMigrations);
 
     st.startBalancer();
     assert.soon(() => {
@@ -137,13 +137,13 @@ const testSetAllowMigrationsCommand = function() {
     ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 0));
 
     // Use setAllowMigrations to forbid migrations from happening
-    setAllowMigrations(ns, false);
+    setAllowMigrationsCmd(ns, false);
 
     // Check that allowMigrations has been set to 'false' on the configsvr config.collections.
     assert.eq(false, configDB.collections.findOne({_id: ns}).permitMigrations);
 
     // Use setAllowMigrations to allow migrations to happen
-    setAllowMigrations(ns, true);
+    setAllowMigrationsCmd(ns, true);
 
     // Check that permitMigrations has been unset (that implies migrations are allowed) on the
     // configsvr config.collections.
