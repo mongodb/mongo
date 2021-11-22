@@ -78,7 +78,12 @@ bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
 }
 
 bool AuthorizationContract::contains(const AuthorizationContract& other) const {
-    stdx::lock_guard<Mutex> lck(_mutex);
+
+    if (this == &other) {
+        return true;  // this and other are same - so contains is necessarily true
+    }
+
+    std::scoped_lock<Mutex, Mutex> lk(_mutex, other._mutex);
 
     if ((_checks | other._checks) != _checks) {
         if (kDebugBuild) {
