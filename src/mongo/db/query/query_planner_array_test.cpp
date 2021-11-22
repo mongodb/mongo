@@ -2566,6 +2566,47 @@ TEST_F(QueryPlannerTest,
         "}}}}}}}");
 }
 
+// Test for older versions of indexes where it is possible to have empty MultikeyPaths,
+// but still the index is considered multikey. In that case the index should not be
+// considered to evaluate an $elemMatch predicate with a positional path component.
+TEST_F(QueryPlannerTest, ElemMatchValueMultikeyIndexEmptyMultikeyPaths) {
+    addIndex(BSON("a.0" << 1), true);
+    runQuery(fromjson("{'a.0': {$elemMatch: {$eq: 42}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchValuePositionalIndexPath1) {
+    MultikeyPaths multikeyPaths{std::set<size_t>{}};
+    addIndex(BSON("f1.0" << 1), multikeyPaths);
+    runQuery(fromjson("{'f1.0': {$elemMatch: {$eq: 42}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchValuePositionalIndexPath2) {
+    MultikeyPaths multikeyPaths{{0U}};
+    addIndex(BSON("f1.0" << 1), multikeyPaths);
+    runQuery(fromjson("{'f1.0': {$elemMatch: {$eq: 42}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchValuePositionalIndexPath3) {
+    MultikeyPaths multikeyPaths{std::set<size_t>{}};
+    addIndex(BSON("0" << 1), multikeyPaths);
+    runQuery(fromjson("{'0': {$elemMatch: {$eq: 42}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'0': 1}, bounds: "
+        "{'0': [[42,42,true,true]]}}}}}");
+}
+
 TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullMultiKey) {
     const bool isMultiKey = true;
     addIndex(BSON("a.b" << 1 << "c.d" << 1), isMultiKey);
