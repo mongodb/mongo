@@ -140,6 +140,15 @@ structs:
                 description: "Latest version of the collection"
                 optional: false
 
+    SetAllowMigrationsRequest:
+        description: "Parameters sent for the set allow migrations command"
+        strict: false
+        fields:
+            allowMigrations:
+                type: bool
+                description: "If false balancer rounds should be disabled and migrations commit prohibited."
+                optional: false
+
 commands:
 
     _shardsvrCreateCollection:
@@ -214,6 +223,16 @@ commands:
         api_version: ""
         chained_structs:
             RenameCollectionRequest: RenameCollectionRequest
+
+    _shardsvrSetAllowMigrations:
+        command_name: _shardsvrSetAllowMigrations
+        cpp_name: shardsvrSetAllowMigrations
+        description: "Internal setAllowMigrations command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        api_version: ""
+        chained_structs:
+            SetAllowMigrationsRequest: SetAllowMigrationsRequest
 
     _configsvrRenameCollectionMetadata:
         command_name: _configsvrRenameCollectionMetadata

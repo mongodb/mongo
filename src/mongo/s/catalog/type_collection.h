@@ -85,6 +85,7 @@ public:
     static constexpr auto kUuidFieldName = kPre50CompatibleUuidFieldName;
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
     using CollectionTypeBase::kNssFieldName;
+    using CollectionTypeBase::kPermitMigrationsFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
     using CollectionTypeBase::kTimeseriesFieldsFieldName;
     using CollectionTypeBase::kTimestampFieldName;

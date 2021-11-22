@@ -47,6 +47,7 @@ enums:
             kDropCollection: "dropCollection"
             kRenameCollection: "renameCollection"
             kCreateCollection: "createCollection"
+            kSetAllowMigrations: "setAllowMigrations"
 
 types:
     ForwardableOperationMetadata:

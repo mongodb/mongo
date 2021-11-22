@@ -13,6 +13,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "commitReshardCollection",
     "reshardCollection",
     "rotateCertificates",
+    "setAllowMigrations",
     "testDeprecation",
     "testDeprecationInVersion2",
     "testRemoval",

@@ -146,6 +146,7 @@ let viewsCommandTests = {
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},
     _shardsvrReshardCollection: {skip: isAnInternalCommand},
     _shardsvrReshardingOperationTime: {skip: isAnInternalCommand},
+    _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _shardsvrShardCollection: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
@@ -537,6 +538,16 @@ let viewsCommandTests = {
     },
     revokeRolesFromRole: {skip: isUnrelated},
     revokeRolesFromUser: {skip: isUnrelated},
+    setAllowMigrations: {
+        command: {setAllowMigrations: "test.view", allowMigrations: false},
+        setup: function(conn) {
+            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+        },
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true
+    },
     rolesInfo: {skip: isUnrelated},
     rotateCertificates: {skip: isUnrelated},
     saslContinue: {skip: isUnrelated},

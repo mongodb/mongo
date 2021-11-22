@@ -61,6 +61,24 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
 }
 
 {
+    jsTestLog('Check set allow migrations shows in current op');
+
+    let ddlOpThread = new Thread((mongosConnString, nss) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.adminCommand({setAllowMigrations: nss, allowMigrations: true});
+    }, st.s0.host, nss);
+
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'SetAllowMigrationsCoordinator');
+
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(nss, currOp[0].ns);
+    assert(currOp[0].hasOwnProperty('command'));
+    assert(currOp[0].command.hasOwnProperty('allowMigrations'));
+    assert.eq(true, currOp[0].command.allowMigrations);
+}
+
+{
     jsTestLog('Check rename collection shows in current op');
 
     let ddlOpThread = new Thread((mongosConnString, fromNss, toNss) => {
