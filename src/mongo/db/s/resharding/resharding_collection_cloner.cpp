@@ -171,7 +171,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
-    OperationContext* opCtx, const Pipeline& pipeline) {
+    const Pipeline& pipeline) {
+    auto opCtx = pipeline.getContext()->opCtx;
     // We associate the aggregation cursors established on each donor shard with a logical session
     // to prevent them from killing the cursor when it is idle locally. Due to the cursor's merging
     // behavior across all donor shards, it is possible for the cursor to be active on one donor
@@ -193,7 +194,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
                                 << repl::readConcernLevels::kSnapshotName
                                 << repl::ReadConcernArgs::kAtClusterTimeFieldName
                                 << _atClusterTime));
-    request.setUnwrappedReadPref(ReadPreferenceSetting{ReadPreference::Nearest}.toContainingBSON());
+    // The read preference on the request is merely informational (e.g. for profiler entries) -- the
+    // pipeline's opCtx setting is actually used when sending the request.
+    auto readPref = ReadPreferenceSetting{ReadPreference::Nearest};
+    request.setUnwrappedReadPref(readPref.toContainingBSON());
+    ReadPreferenceSetting::get(opCtx) = readPref;
 
     return shardVersionRetry(opCtx,
                              Grid::get(opCtx)->catalogCache(),
@@ -227,7 +232,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
     auto pipeline = _targetAggregationRequest(
-        opCtx, *makePipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom));
+        *makePipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom));
 
     if (!idToResumeFrom.missing()) {
         // Skip inserting the first document retrieved after resuming because $gte was used in the
