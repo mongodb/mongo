@@ -578,6 +578,9 @@ class WiredTigerTestCase(unittest.TestCase):
     def readStdout(self, maxchars=10000):
         return self.captureout.readFileFrom(self.captureout.filename, self.captureout.expectpos, maxchars)
 
+    def readStderr(self, maxchars=10000):
+        return self.captureerr.readFileFrom(self.captureerr.filename, self.captureerr.expectpos, maxchars)
+
     def ignoreStdoutPatternIfExists(self, pat, re_flags=0):
         if self.captureout.hasUnexpectedOutput(self):
             self.captureout.checkAdditionalPattern(self, pat, re_flags)
