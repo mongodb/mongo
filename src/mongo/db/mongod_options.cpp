@@ -617,7 +617,7 @@ Status storeMongodOptions(const moe::Environment& params) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Cannot start a " << clusterRoleParam
                                         << " as a standalone server. Please use the option "
-                                           "--replset to start the node as a replica set.");
+                                           "--replSet to start the node as a replica set.");
         }
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
