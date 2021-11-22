@@ -13,30 +13,34 @@ load("jstests/replsets/rslib.js");
 // We use GTE to account for the possibility of other writes in the system (e.g. HMAC).
 // Comparison is GTE by default, GT if 'strict' is specified.
 function checkWallTimes(primary, greaterMemberIndex, lesserMemberIndex, strict = false) {
-    let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-    assert(res.members, () => tojson(res));
+    assert.soonNoExcept(function() {
+        let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+        assert(res.members, () => tojson(res));
 
-    const greater = res.members[greaterMemberIndex];
-    assert(greater, () => tojson(res));
-    const greaterApplied = greater.lastAppliedWallTime;
-    const greaterDurable = greater.lastAppliedWallTime;
-    assert(greaterApplied, () => tojson(res));
-    assert(greaterDurable, () => tojson(res));
+        const greater = res.members[greaterMemberIndex];
+        assert(greater, () => tojson(res));
+        const greaterApplied = greater.lastAppliedWallTime;
+        const greaterDurable = greater.lastAppliedWallTime;
+        assert(greaterApplied, () => tojson(res));
+        assert(greaterDurable, () => tojson(res));
 
-    const lesser = res.members[lesserMemberIndex];
-    assert(lesser, () => tojson(res));
-    const lesserApplied = lesser.lastAppliedWallTime;
-    const lesserDurable = lesser.lastDurableWallTime;
-    assert(lesser.lastAppliedWallTime, () => tojson(res));
-    assert(lesser.lastDurableWallTime, () => tojson(res));
+        const lesser = res.members[lesserMemberIndex];
+        assert(lesser, () => tojson(res));
+        const lesserApplied = lesser.lastAppliedWallTime;
+        const lesserDurable = lesser.lastDurableWallTime;
+        assert(lesser.lastAppliedWallTime, () => tojson(res));
+        assert(lesser.lastDurableWallTime, () => tojson(res));
 
-    if (!strict) {
-        assert.gte(greaterApplied, lesserApplied, () => tojson(res));
-        assert.gte(greaterDurable, lesserDurable, () => tojson(res));
-    } else {
-        assert.gt(greaterApplied, lesserApplied, () => tojson(res));
-        assert.gt(greaterDurable, lesserDurable, () => tojson(res));
-    }
+        if (!strict) {
+            assert.gte(greaterApplied, lesserApplied, () => tojson(res));
+            assert.gte(greaterDurable, lesserDurable, () => tojson(res));
+        } else {
+            assert.gt(greaterApplied, lesserApplied, () => tojson(res));
+            assert.gt(greaterDurable, lesserDurable, () => tojson(res));
+        }
+
+        return true;
+    });
 }
 
 const name = jsTestName();
