@@ -14,6 +14,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "configureCollectionAutoSplitter",
     "reshardCollection",
     "rotateCertificates",
+    "setAllowMigrations",
     "testDeprecation",
     "testDeprecationInVersion2",
     "testRemoval",

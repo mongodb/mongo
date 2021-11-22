@@ -533,6 +533,7 @@ const testCases = {
     _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
+    _shardsvrSetAllowMigrations: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrShardCollection:
         {skip: isNotRunOnUserDatabase},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
@@ -934,6 +935,7 @@ const testCases = {
     saslStart: {skip: isAuthCommand},
     sbe: {skip: isNotRunOnUserDatabase},
     serverStatus: {skip: isNotRunOnUserDatabase},
+    setAllowMigrations: {skip: isNotRunOnUserDatabase},
     setCommittedSnapshot: {skip: isNotRunOnUserDatabase},
     setDefaultRWConcern: {skip: isNotRunOnUserDatabase},
     setFeatureCompatibilityVersion: {skip: isNotRunOnUserDatabase},

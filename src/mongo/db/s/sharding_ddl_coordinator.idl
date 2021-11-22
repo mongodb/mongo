@@ -49,6 +49,7 @@ enums:
             kRenameCollection: "renameCollection"
             kCreateCollection: "createCollection"
             kRefineCollectionShardKey: "refineCollectionShardKey"
+            kSetAllowMigrations: "setAllowMigrations"
 
 types:
     ForwardableOperationMetadata:

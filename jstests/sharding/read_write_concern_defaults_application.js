@@ -152,6 +152,7 @@ let testCases = {
     _shardsvrRenameCollectionParticipantUnblock: {skip: "internal command"},
     _shardsvrReshardCollection: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
+    _shardsvrSetAllowMigrations: {skip: "internal command"},
     _shardsvrShardCollection:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _transferMods: {skip: "internal command"},
@@ -641,6 +642,7 @@ let testCases = {
     saslStart: {skip: "does not accept read or write concern"},
     sbe: {skip: "internal command"},
     serverStatus: {skip: "does not accept read or write concern"},
+    setAllowMigrations: {skip: "does not accept read or write concern"},
     setAuditConfig: {skip: "does not accept read or write concern"},
     setCommittedSnapshot: {skip: "internal command"},
     setDefaultRWConcern: {skip: "special case (must run after all other commands)"},

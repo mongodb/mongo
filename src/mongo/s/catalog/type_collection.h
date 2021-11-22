@@ -88,6 +88,7 @@ public:
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
     using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;
+    using CollectionTypeBase::kPermitMigrationsFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
     using CollectionTypeBase::kSupportingLongNameFieldName;
     using CollectionTypeBase::kTimeseriesFieldsFieldName;
