@@ -1447,8 +1447,8 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
         // R"(_id: null, agg: {$accumulator: {init: "a", accumulate: "b", accumulateArgs:
         // ["$copies"], merge: "c", lang: "js"}})",
         // R"(_id: null, agg: {$mergeObjects: "$item"})",
-        // R"(_id: null, agg: {$min: "$item"})",
-        // R"(_id: null, agg: {$max: "$item"})",
+        R"(_id: null, agg: {$min: "$item"})",
+        R"(_id: null, agg: {$max: "$item"})",
         // R"(_id: null, agg: {$push: "$item"})",
         R"(_id: null, agg: {$stdDevPop: "$item"})",
         R"(_id: null, agg: {$stdDevSamp: "$item"})",

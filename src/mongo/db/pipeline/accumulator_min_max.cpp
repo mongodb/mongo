@@ -41,8 +41,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR(max, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorMax>);
-REGISTER_ACCUMULATOR(min, genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorMin>);
+REGISTER_ACCUMULATOR(max, genericParseSingleExpressionAccumulator<AccumulatorMax>);
+REGISTER_ACCUMULATOR(min, genericParseSingleExpressionAccumulator<AccumulatorMin>);
 REGISTER_STABLE_EXPRESSION(max, ExpressionFromAccumulator<AccumulatorMax>::parse);
 REGISTER_STABLE_EXPRESSION(min, ExpressionFromAccumulator<AccumulatorMin>::parse);
 REGISTER_REMOVABLE_WINDOW_FUNCTION(max, AccumulatorMax, WindowFunctionMax);

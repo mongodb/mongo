@@ -4,10 +4,11 @@
 
 (function() {
 "use strict";
-load("jstests/aggregation/extras/utils.js");       // For arrayEq.
-load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
+load("jstests/aggregation/extras/utils.js");        // For arrayEq.
+load("jstests/libs/collection_drop_recreate.js");   // For assertDropAndRecreateCollection.
+load("jstests/libs/fixture_helpers.js");            // For FixtureHelpers.
+load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -142,6 +143,13 @@ if (groupPushdownEnabled) {
         db: testDB.getSiblingDB("admin"),
         cmdObj: {
             setParameter: 1,
+            "internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate": 1,
+        }
+    });
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: testDB.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
             "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill": 1,
         }
     });
@@ -233,7 +241,15 @@ if (groupPushdownEnabled) {
         db: testDB.getSiblingDB("admin"),
         cmdObj: {
             setParameter: 1,
-            "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill": 1024 * 1024,
+            "internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate": 1,
+        }
+    });
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: testDB.getSiblingDB("admin"),
+        cmdObj: {
+            setParameter: 1,
+            "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill":
+                100 * 1024 * 1024,
         }
     });
 }
