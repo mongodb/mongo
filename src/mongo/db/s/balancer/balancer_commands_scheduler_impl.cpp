@@ -271,11 +271,12 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
 Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAndEnqueueNewRequest(
     OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo) {
     const auto newRequestId = UUID::gen();
-    LOGV2(5847202,
-          "Enqueuing new Balancer command request",
-          "reqId"_attr = newRequestId,
-          "command"_attr = redact(commandInfo->serialise().toString()),
-          "recoveryDocRequired"_attr = commandInfo->requiresRecoveryOnCrash());
+    LOGV2_DEBUG(5847202,
+                2,
+                "Enqueuing new Balancer command request",
+                "reqId"_attr = newRequestId,
+                "command"_attr = redact(commandInfo->serialise().toString()),
+                "recoveryDocRequired"_attr = commandInfo->requiresRecoveryOnCrash());
 
     if (commandInfo->requiresRecoveryOnCrash()) {
         DBDirectClient dbClient(opCtx);
@@ -293,10 +294,10 @@ Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAnd
             WriteConcernOptions::Majority);
 
         if (auto writeStatus = getStatusFromWriteCommandReply(reply); !writeStatus.isOK()) {
-            LOGV2(5847210,
-                  "Failed to persist request command document",
-                  "reqId"_attr = newRequestId,
-                  "status"_attr = writeStatus);
+            LOGV2_WARNING(5847210,
+                          "Failed to persist request command document",
+                          "reqId"_attr = newRequestId,
+                          "error"_attr = writeStatus);
             return Future<executor::RemoteCommandResponse>::makeReady(writeStatus);
         }
     }
@@ -324,7 +325,8 @@ void BalancerCommandsSchedulerImpl::_enqueueRequest(WithLock, RequestData&& requ
 
 CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     OperationContext* opCtx, const CommandSubmissionParameters& params) {
-    LOGV2(5847203, "Balancer command request submitted for execution", "reqId"_attr = params.id);
+    LOGV2_DEBUG(
+        5847203, 2, "Balancer command request submitted for execution", "reqId"_attr = params.id);
     bool distLockTaken = false;
 
     const auto shardWithStatus =
@@ -402,10 +404,11 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
         }
         _stateUpdatedCV.notify_all();
     }
-    LOGV2(5847204,
-          "Execution of balancer command request completed",
-          "reqId"_attr = requestId,
-          "response"_attr = response.toString());
+    LOGV2_DEBUG(5847204,
+                2,
+                "Execution of balancer command request completed",
+                "reqId"_attr = requestId,
+                "response"_attr = response);
 }
 
 std::vector<RequestData> BalancerCommandsSchedulerImpl::_loadRequestsToRecover(
@@ -415,10 +418,11 @@ std::vector<RequestData> BalancerCommandsSchedulerImpl::_loadRequestsToRecover(
         auto originalCommand = PersistedBalancerCommand::parse(
             IDLParserErrorContext("BalancerCommandsScheduler"), commandToRecoverDoc);
         auto recoveryCommand = std::make_shared<RecoveryCommandInfo>(originalCommand);
-        LOGV2(5847212,
-              "Command request recovered and set for rescheduling",
-              "reqId"_attr = originalCommand.getRequestId(),
-              "command"_attr = redact(recoveryCommand->serialise()));
+        LOGV2_DEBUG(5847212,
+                    1,
+                    "Command request recovered and set for rescheduling",
+                    "reqId"_attr = originalCommand.getRequestId(),
+                    "command"_attr = redact(recoveryCommand->serialise()));
         requestsToRecover.emplace_back(originalCommand.getRequestId(), std::move(recoveryCommand));
     };
     DBDirectClient dbClient(opCtx);
@@ -426,7 +430,7 @@ std::vector<RequestData> BalancerCommandsSchedulerImpl::_loadRequestsToRecover(
         dbClient.query(
             documentProcessor, NamespaceString::kConfigBalancerCommandsNamespace, BSONObj());
     } catch (const DBException& e) {
-        LOGV2(5847215, "Failed to load requests to recover", "error"_attr = redact(e));
+        LOGV2_ERROR(5847215, "Failed to load requests to recover", "error"_attr = redact(e));
     }
 
     return requestsToRecover;
@@ -460,7 +464,7 @@ void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
     try {
         dbClient.remove(NamespaceString::kConfigBalancerCommandsNamespace.toString(), query);
     } catch (const DBException& e) {
-        LOGV2(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
+        LOGV2_ERROR(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
     }
     deferredCleanupCompletedCheckpoint.pauseWhileSet();
 }
