@@ -48,6 +48,7 @@
 #include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
+#include "mongo/db/s/set_allow_migrations_coordinator.h"
 
 namespace mongo {
 namespace {
@@ -76,6 +77,9 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             return std::make_shared<RefineCollectionShardKeyCoordinator>(service,
                                                                          std::move(initialState));
             break;
+        case DDLCoordinatorTypeEnum::kSetAllowMigrations:
+            return std::make_shared<SetAllowMigrationsCoordinator>(service,
+                                                                   std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

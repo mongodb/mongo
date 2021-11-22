@@ -26,6 +26,9 @@
 # it in the license file.
 #
 
+# This file defines the format of documents stored in config.ddl.dropCollections, used by the
+# shard coordinator to guarantee resilience in the event of stepdowns while creating collections.
+
 global:
     cpp_namespace: "mongo"
 
@@ -34,32 +37,11 @@ imports:
     - "mongo/db/s/sharding_ddl_coordinator.idl"
     - "mongo/s/request_types/sharded_ddl_commands.idl"
 
-commands:
-    _configsvrSetAllowMigrations:
-        command_name: _configsvrSetAllowMigrations
-        cpp_name: ConfigsvrSetAllowMigrations
-        description: "internal setAllowMigrations command for config server"
-        namespace: type
-        api_version: ""
-        type: namespacestring
-        strict: false
-        fields:
-          allowMigrations:
-              type: bool
-              description: "The new allowMigrations flag state to be set."
-              optional: false
-          collectionUUID:
-              type: uuid
-              description: "The uuid of the collection."
-              optional: true # Optional for backwards compatibility
-                
-    setAllowMigrations:
-        command_name: setAllowMigrations
-        cpp_name: SetAllowMigrations
-        description: "user faced setAllowMigrations command"
-        namespace: type
-        api_version: ""
-        type: namespacestring
-        strict: false
-        chained_structs: 
+structs:
+    SetAllowMigrationsCoordinatorDocument:
+        description: "Represents a set allow migrations operation on the coordinator shard."
+        generate_comparison_operators: false
+        strict: true
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
             SetAllowMigrationsRequest: SetAllowMigrationsRequest

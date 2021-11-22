@@ -1158,6 +1158,23 @@ let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {
+            commandName: "setAllowMigrations",
+            run: {
+                inAPIVersion1: false,
+                shardCommandName: "_shardsvrSetAllowMigrations",
+                runsAgainstAdminDb: true,
+                permittedInTxn: false,
+                requiresShardedCollection: true,
+                setUp: () => {
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
+                    assert.commandWorked(
+                        st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
+                },
+                command: () => ({setAllowMigrations: "db.collection", allowMigrations: true})
+            }
+        },
+        {
             commandName: "setDefaultRWConcern",
             run: {
                 inAPIVersion1: false,
