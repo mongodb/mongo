@@ -129,33 +129,5 @@ stepNames.forEach((stepName) => {
     }
 });
 
-stepNames.forEach((stepName) => {
-    jsTest.log(`Testing that collMod aborts concurrent outgoing migrations that are in step ${
-        stepName}...`);
-    const collName = "testCollModMoveChunkStep" + stepName;
-    const ns = dbName + "." + collName;
-
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-
-    assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
-        assert.commandWorked(
-            testDB.runCommand({collMod: collName, validator: {x: {$type: "string"}}}));
-    });
-
-    // Verify that the index command succeeds.
-    assert.commandFailedWithCode(st.shard0.getCollection(ns).insert({x: 1}),
-                                 ErrorCodes.DocumentValidationFailure);
-
-    // If collMod is run after the migration has reached the steady state, shard1
-    // will not perform schema validation because the validation rule just does not
-    // exist when shard1 clones the collection options from shard0. However, if collMod
-    // is run after the cloning step starts but before the steady state is reached,
-    // shard0 may have the validation rule when shard1 does the cloning so shard1 may
-    // or may not perform schema validation.
-    if (stepName == moveChunkStepNames.reachedSteadyState) {
-        assert.commandWorked(st.shard1.getCollection(ns).insert({x: 1}));
-    }
-});
-
 st.stop();
 })();

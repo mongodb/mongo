@@ -144,11 +144,13 @@ function buildCommands(collName, shouldFail) {
         },
         {
             command: {collMod: collName, index: {keyPattern: {c: 1}, expireAfterSeconds: 3600}},
-            shouldFail: shouldFail
+            shouldFail: true,
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
             command: {collMod: collName + "View", viewOn: collName, pipeline: [{$match: {_id: 1}}]},
-            shouldFail: true
+            shouldFail: true,
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {command: {convertToCapped: "unshardedFoo", size: 1000000}, shouldFail: true},
         {command: {dropIndexes: collName, index: collName + "Index"}, shouldFail: shouldFail},

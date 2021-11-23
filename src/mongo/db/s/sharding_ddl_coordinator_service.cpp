@@ -42,6 +42,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/logv2/log.h"
 
+#include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
@@ -80,6 +81,10 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kSetAllowMigrations:
             return std::make_shared<SetAllowMigrationsCoordinator>(service,
                                                                    std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kCollMod:
+            return std::make_shared<CollModCoordinator>(service, std::move(initialState));
+            break;
         default:
             uasserted(ErrorCodes::BadValue,
                       str::stream()

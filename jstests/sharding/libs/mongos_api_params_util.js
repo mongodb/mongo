@@ -217,7 +217,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "collMod",
             run: {
                 inAPIVersion1: true,
-                shardCommandName: "collMod",
+                shardCommandName: "_shardsvrCollMod",
                 permittedInTxn: false,
                 command: () => ({collMod: "collection"}),
             }

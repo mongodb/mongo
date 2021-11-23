@@ -31,7 +31,11 @@ var $config = (function() {
             const toName = this.getRandomView(this.viewList);
             const cmd = {collMod: fromName, viewOn: toName, pipeline: []};
             const res = db.runCommand(cmd);
-            const errorCodes = [ErrorCodes.GraphContainsCycle, ErrorCodes.NamespaceNotFound];
+            const errorCodes = [
+                ErrorCodes.GraphContainsCycle,
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.ConflictingOperationInProgress
+            ];
             assertAlways.commandWorkedOrFailedWithCode(
                 res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }

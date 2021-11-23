@@ -103,10 +103,12 @@ runTest(() => assert.commandWorked(mongos1Coll.remove({x: 250})), [
 /**
  * Verify that non-CRUD commands get logged when blocked by a refresh.
  */
-runTest(() => assert.commandWorked(mongos1DB.runCommand({collMod: collName})), [
-    {opType: 'countAllOperations', increase: 1},
-    {opType: 'countCommands', increase: 1},
-]);
+runTest(() => assert.commandWorked(mongos1DB.runCommand(
+            {createIndexes: collName, indexes: [{key: {a: 1}, name: 'index'}]})),
+        [
+            {opType: 'countAllOperations', increase: 1},
+            {opType: 'countCommands', increase: 1},
+        ]);
 
 st.stop();
 })();

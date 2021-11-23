@@ -35,6 +35,7 @@ imports:
     - "mongo/db/commands/rename_collection.idl"
     - "mongo/db/drop_database.idl"
     - "mongo/db/keypattern.idl"
+    - "mongo/db/coll_mod.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/database_version.idl"
@@ -326,3 +327,13 @@ commands:
                 description: "May only be set to 'true'. If set, indicates to the config server that
                               it must turn on the 'enableSharding' bit for that database."
                 optional: true
+
+    _shardsvrCollMod:
+        command_name: _shardsvrCollMod
+        cpp_name: ShardsvrCollMod
+        description: "Internal command sent to the primary shard in a collMod procedure"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            CollModRequest: CollModRequest

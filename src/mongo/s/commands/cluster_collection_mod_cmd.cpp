@@ -36,11 +36,11 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
@@ -84,7 +84,7 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
-        auto cmd = requestParser.request();
+        const auto& cmd = requestParser.request();
         auto nss = cmd.getNamespace();
         LOGV2_DEBUG(22748,
                     1,
@@ -93,32 +93,23 @@ public:
                     "namespace"_attr = nss,
                     "command"_attr = redact(cmdObj));
 
-        const auto targeter = ChunkManagerTargeter(opCtx, nss);
-        const auto& routingInfo = targeter.getRoutingInfo();
-        auto cmdToBeSent = cmdObj;
-        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
-            cmdToBeSent = timeseries::makeTimeseriesCommand(
-                cmdToBeSent, nss, getName(), CollMod::kIsTimeseriesNamespaceFieldName);
-        }
+        const auto dbInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName()));
+        ShardsvrCollMod collModCommand(nss);
+        collModCommand.setCollModRequest(cmd.getCollModRequest());
+        auto cmdResponse =
+            uassertStatusOK(executeCommandAgainstDatabasePrimary(
+                                opCtx,
+                                db,
+                                dbInfo,
+                                CommandHelpers::appendMajorityWriteConcern(
+                                    collModCommand.toBSON({}), opCtx->getWriteConcern()),
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                Shard::RetryPolicy::kIdempotent)
+                                .swResponse);
 
-        auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
-            opCtx,
-            cmd.getDbName(),
-            targeter.getNS(),
-            routingInfo,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
-            ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNoRetry,
-            BSONObj() /* query */,
-            BSONObj() /* collation */);
-        std::string errmsg;
-        auto ok = appendRawResponses(opCtx, &errmsg, &result, std::move(shardResponses)).responseOK;
-        if (!errmsg.empty()) {
-            CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
-        }
-
-        return ok;
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data, &result);
+        return cmdResponse.isOK();
     }
 
     void validateResult(const BSONObj& resultObj) final {
