@@ -1,6 +1,6 @@
 /**
  * Tests createIndexes returns the expected tenant migration error or succeeds when sent through
- * mongos after a tenant migration commits or aborts.
+ * mongoq after a tenant migration commits or aborts.
  *
  * @tags: [requires_fcv_52]
  */
@@ -9,6 +9,8 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/serverless/serverless_test.js");
+load('jstests/concurrency/fsm_libs/worker_thread.js');
 
 // A function, not a constant, to ensure unique UUIDs.
 function donorStartMigrationCmd(tenantID, realConnUrl) {
@@ -23,24 +25,19 @@ function donorStartMigrationCmd(tenantID, realConnUrl) {
 
 let createIndexesCmd = {createIndexes: "foo", indexes: [{key: {x: 1}, name: "x_1"}]};
 
-let st = new ShardingTest({
-    shards: 2,
-    mongosOptions: {setParameter: {tenantMigrationDisableX509Auth: true}},
-    shardOptions: {setParameter: {tenantMigrationDisableX509Auth: true}}
-});
-
+let st = new ServerlessTest();
 let donor = st.rs0;
 let recipient = st.rs1;
-let mongos = st.s0;
+let mongoq = st.q0;
 let adminDB = donor.getPrimary().getDB('admin');
 
 (() => {
     jsTest.log("Starting test calling createIndexes after the migration has committed.");
     const kTenantID = ObjectId();
     const kDbName = kTenantID.str + "_testDB";
-    let db = mongos.getDB(kDbName);
+    let db = mongoq.getDB(kDbName);
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(mongoq.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     // Run donorStartMigration command to start migration and poll the migration status with the
@@ -59,9 +56,9 @@ let adminDB = donor.getPrimary().getDB('admin');
     jsTest.log("Starting test calling createIndexes after the migration has aborted.");
     const kTenantID = ObjectId();
     const kDbName = kTenantID.str + "_testDB";
-    let db = mongos.getDB(kDbName);
+    let db = mongoq.getDB(kDbName);
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(mongoq.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     let abortFailPoint =
@@ -83,7 +80,7 @@ let adminDB = donor.getPrimary().getDB('admin');
     const kTenantID = ObjectId();
     const kDbName = kTenantID.str + "_testDB";
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(mongoq.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     let blockingFailPoint =
@@ -98,12 +95,12 @@ let adminDB = donor.getPrimary().getDB('admin');
 
     blockingFailPoint.wait();
 
-    // Send createIndexes command to mongos in an individual thread.
-    let createIndexesThread = new Thread((mongosConnString, kDbName, createIndexesCmd) => {
-        let mongosConn = new Mongo(mongosConnString);
+    // Send createIndexes command to mongoq in an individual thread.
+    let createIndexesThread = new Thread((mongoqConnString, kDbName, createIndexesCmd) => {
+        let mongoqConn = new Mongo(mongoqConnString);
         // Expect to receive an ok response for the createIndexes command.
-        assert.commandWorked(mongosConn.getDB(kDbName).runCommand(createIndexesCmd));
-    }, st.s0.host, kDbName, createIndexesCmd);
+        assert.commandWorked(mongoqConn.getDB(kDbName).runCommand(createIndexesCmd));
+    }, st.q0.host, kDbName, createIndexesCmd);
     createIndexesThread.start();
 
     // Poll the numBlockedWrites of tenant migration access blocker from donor and expect it's

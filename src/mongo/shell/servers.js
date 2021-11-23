@@ -79,6 +79,7 @@ MongoRunner.dataPath = "/data/db/";
 
 MongoRunner.mongodPath = "mongod";
 MongoRunner.mongosPath = "mongos";
+MongoRunner.mongoqPath = "mongoqd";
 MongoRunner.mongoShellPath = "mongo";
 
 MongoRunner.VersionSub = function(pattern, version) {
@@ -853,6 +854,63 @@ MongoRunner.mongosOptions = function(opts) {
     return opts;
 };
 
+MongoRunner.mongoqOptions = function(opts) {
+    opts = MongoRunner.mongoOptions(opts);
+
+    // Normalize configdb option to be host string if currently a host
+    if (opts.configdb && opts.configdb.getDB) {
+        opts.configdb = opts.configdb.host;
+    }
+
+    if (jsTestOptions().alwaysUseLogFiles) {
+        if (opts.useLogFiles === false) {
+            throw new Error("Always using log files, but received conflicting option.");
+        }
+
+        opts.useLogFiles = true;
+        opts.logappend = "";
+    }
+
+    opts.pathOpts = Object.merge(opts.pathOpts, {configdb: opts.configdb.replace(/:|\/|,/g, "-")});
+
+    if (!opts.logFile && opts.useLogFiles) {
+        opts.logFile = MongoRunner.toRealFile("$dataDir/mongoq-$configdb-$port.log", opts.pathOpts);
+    } else if (opts.logFile) {
+        opts.logFile = MongoRunner.toRealFile(opts.logFile, opts.pathOpts);
+    }
+
+    if (opts.logFile !== undefined) {
+        opts.logpath = opts.logFile;
+    }
+
+    var testOptions = jsTestOptions();
+    if (testOptions.keyFile && !opts.keyFile) {
+        opts.keyFile = testOptions.keyFile;
+    }
+
+    if (opts.hasOwnProperty("auditDestination")) {
+        // opts.auditDestination, if set, must be a string
+        if (typeof opts.auditDestination !== "string") {
+            throw new Error("The auditDestination option must be a string if it is specified");
+        }
+    } else if (testOptions.auditDestination !== undefined) {
+        if (typeof (testOptions.auditDestination) !== "string") {
+            throw new Error("The auditDestination option must be a string if it is specified");
+        }
+        opts.auditDestination = testOptions.auditDestination;
+    }
+
+    if (!opts.hasOwnProperty('binVersion') && testOptions.mongoqBinVersion) {
+        opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongoqBinVersion);
+    }
+
+    if (opts.hasOwnProperty("auditPath")) {
+        // We need to reformat the auditPath to include the proper port
+        opts.auditPath = MongoRunner.toRealPath(opts.auditPath, opts);
+    }
+    return opts;
+};
+
 /**
  * @return {NumberLong[]} Running pids e.g. those started by `MongoRunner.runMongod`.
  */
@@ -982,6 +1040,43 @@ MongoRunner.runMongos = function(opts) {
     mongos.fullOptions = fullOptions;
 
     return mongos;
+};
+
+MongoRunner.runMongoq = function(opts) {
+    opts = opts || {};
+
+    var env = undefined;
+    var useHostName = false;
+    var runId = null;
+    var waitForConnect = true;
+    var fullOptions = opts;
+
+    if (isObject(opts)) {
+        opts = MongoRunner.mongoqOptions(opts);
+        fullOptions = opts;
+
+        useHostName = opts.useHostName || opts.useHostname;
+        runId = opts.runId;
+        waitForConnect = opts.waitForConnect;
+        env = opts.env;
+        var mongoqProgram = MongoRunner.mongoqPath;
+        opts = MongoRunner.arrOptions(mongoqProgram, opts);
+    }
+
+    var mongoq = MongoRunner._startWithArgs(opts, env, waitForConnect);
+    if (!mongoq) {
+        return null;
+    }
+
+    mongoq.commandLine = MongoRunner.arrToOpts(opts);
+    mongoq.name = (useHostName ? getHostName() : "localhost") + ":" + mongoq.commandLine.port;
+    mongoq.host = mongoq.name;
+    mongoq.port = parseInt(mongoq.commandLine.port);
+    mongoq.runId = runId || ObjectId();
+    mongoq.savedOptions = MongoRunner.savedOptions[mongoq.runId];
+    mongoq.fullOptions = fullOptions;
+
+    return mongoq;
 };
 
 MongoRunner.StopError = function(returnCode) {
@@ -1114,6 +1209,7 @@ var stopMongoProgram = function(conn, signal, opts, waitpid) {
 
 MongoRunner.stopMongod = stopMongoProgram;
 MongoRunner.stopMongos = stopMongoProgram;
+MongoRunner.stopMongoq = stopMongoProgram;
 
 // Given a test name figures out a directory for that test to use for dump files and makes sure
 // that directory exists and is empty.

@@ -419,6 +419,10 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
     bool isMongosProgram = isMongo &&
         (string("mongos") == programName ||
          programName.string().compare(0, prefix.size(), prefix) == 0);
+    prefix = "mongoqd-";
+    bool isMongoqProgram = isMongo &&
+        (string("mongoqd") == programName ||
+         programName.string().compare(0, prefix.size(), prefix) == 0);
 
     if (!isMongo) {
         _name = "sh";
@@ -426,6 +430,8 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
         _name = "d";
     } else if (isMongosProgram) {
         _name = "s";
+    } else if (isMongoqProgram) {
+        _name = "q";
     } else if (programName == "mongobridge") {
         _name = "b";
     } else {
@@ -508,8 +514,8 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
         ++environEntry;
     }
 #endif
-    bool needsPort =
-        isMongo && (isMongodProgram || isMongosProgram || (programName == "mongobridge"));
+    bool needsPort = isMongo &&
+        (isMongodProgram || isMongosProgram || isMongoqProgram || (programName == "mongobridge"));
     if (!needsPort) {
         _port = -1;
     }
@@ -587,7 +593,11 @@ void ProgramRunner::start() {
 
     _pipe = pipeEnds[0];
 
-    LOGV2_INFO(22810, "shell: Started program", "pid"_attr = _pid, "argv"_attr = _argv);
+    LOGV2_INFO(22810,
+               "shell: Started program",
+               "pid"_attr = _pid,
+               "port"_attr = _port,
+               "argv"_attr = _argv);
 }
 
 void ProgramRunner::operator()() {
