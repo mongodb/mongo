@@ -1,0 +1,36 @@
+# Configuration for search_near_03 default test.
+# The population phase performs unique index insertions based on the number of collections and
+# key count for each collection. 
+# Threads:
+#  - Each insert thread performs unique index insertions on existing prefixes.
+#  - Each read thread counts the number of current records in each collection, and checks if the
+# table has changed.
+# For the stress test set a large key and value size, as we want the key and values to take enough
+# space to split across pages.
+duration_seconds=1800,
+cache_size_mb=500,
+timestamp_manager=
+(
+    stable_lag=60,
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=10,
+        key_count_per_collection=2000,
+        key_size=30,
+        value_size=40
+    ),
+    insert_config=
+    (
+        op_rate=10ms,
+        thread_count=15,
+        value_size=40
+    ),
+    read_config=
+    (
+        op_rate=100ms,
+        thread_count=1
+    )
+)

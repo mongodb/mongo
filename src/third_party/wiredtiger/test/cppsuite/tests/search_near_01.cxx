@@ -81,7 +81,8 @@ class search_near_01 : public test_harness::test {
                             /* We failed to insert, rollback our transaction and retry. */
                             tc->transaction.rollback();
                             ++rollback_retries;
-                            --count;
+                            if (count > 0)
+                                --count;
                         } else {
                             /* Commit txn at commit timestamp 100. */
                             testutil_assert(tc->transaction.commit(

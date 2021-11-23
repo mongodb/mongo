@@ -1,0 +1,32 @@
+# Configuration for search_near_03 default test.
+# The population phase performs unique index insertions based on the number of collections and
+# key count for each collection. 
+# Threads:
+#  - Each insert thread performs unique index insertions on existing prefixes.
+#  - Each read thread counts the number of current records in each collection, and check if the
+# table has changed.
+duration_seconds=300,
+cache_size_mb=500,
+timestamp_manager=
+(
+    stable_lag=30,
+),
+workload_generator=
+(
+    populate_config=
+    (
+        collection_count=10,
+        key_count_per_collection=100,
+        key_size=5
+    ),
+    insert_config=
+    (
+        op_rate=100ms,
+        thread_count=10
+    ),
+    read_config=
+    (
+        op_rate=250ms,
+        thread_count=1
+    )
+)

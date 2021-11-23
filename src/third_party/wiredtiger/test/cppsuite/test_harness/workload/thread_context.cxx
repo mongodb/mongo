@@ -285,6 +285,45 @@ thread_context::insert(
     return (true);
 }
 
+bool
+thread_context::remove(
+  scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts)
+{
+    WT_DECL_RET;
+    testutil_assert(tracking != nullptr);
+    testutil_assert(cursor.get() != nullptr);
+
+    /*
+     * When no timestamp is specified, get one to apply for the deletion. We still do this even if
+     * the timestamp manager is not enabled as it will return a value for the tracking table.
+     */
+    if (ts == 0)
+        ts = tsm->get_next_ts();
+    transaction.set_commit_timestamp(ts);
+
+    cursor->set_key(cursor.get(), key.c_str());
+    ret = cursor->remove(cursor.get());
+    if (ret != 0) {
+        if (ret == WT_ROLLBACK) {
+            transaction.set_needs_rollback(true);
+            return (false);
+        } else
+            testutil_die(ret, "unhandled error while trying to remove a key");
+    }
+    ret = tracking->save_operation(
+      tracking_operation::DELETE_KEY, collection_id, key.c_str(), "", ts, op_track_cursor);
+    if (ret != 0) {
+        if (ret == WT_ROLLBACK) {
+            transaction.set_needs_rollback(true);
+            return (false);
+        } else
+            testutil_die(
+              ret, "unhandled error while trying to save a remove to the tracking table");
+    }
+    transaction.add_op();
+    return (true);
+}
+
 void
 thread_context::sleep()
 {

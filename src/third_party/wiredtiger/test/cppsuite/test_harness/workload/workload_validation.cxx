@@ -249,26 +249,25 @@ workload_validation::verify_key_value(scoped_session &session, const uint64_t co
       session.open_scoped_cursor(database::build_collection_name(collection_id));
     cursor->set_key(cursor.get(), key.c_str());
     ret = cursor->search(cursor.get());
-    if (ret != 0) {
-        if (ret == WT_NOTFOUND && key_state.exists)
-            testutil_die(LOG_ERROR,
-              "Validation failed: Search failed to find key that should exist. Key: %s, "
-              "Collection_id: %lu",
-              key.c_str(), collection_id);
-        else
-            testutil_die(LOG_ERROR,
-              "Validation failed: Unexpected error while searching for a key. Key: %s, "
-              "Collection_id: %lu",
-              key.c_str(), collection_id);
+    testutil_assertfmt(ret == 0 || ret == WT_NOTFOUND,
+      "Validation failed: Unexpected error returned %d while searching for a key. Key: %s, "
+      "Collection_id: %lu",
+      ret, key.c_str(), collection_id);
+    if (ret == WT_NOTFOUND && key_state.exists)
+        testutil_die(LOG_ERROR,
+          "Validation failed: Search failed to find key that should exist. Key: %s, "
+          "Collection_id: %lu",
+          key.c_str(), collection_id);
+    else if (ret == 0 && key_state.exists == false) {
+        testutil_die(LOG_ERROR,
+          "Validation failed: Key exists when it is expected to be deleted. Key: %s, "
+          "Collection_id: %lu",
+          key.c_str(), collection_id);
     }
-    if (key_state.exists == false) {
-        if (ret == 0)
-            testutil_die(LOG_ERROR,
-              "Validation failed: Key exists when it is expected to be deleted. Key: %s, "
-              "Collection_id: %lu",
-              key.c_str(), collection_id);
+
+    if (key_state.exists == false)
         return;
-    }
+
     testutil_check(cursor->get_value(cursor.get(), &retrieved_value));
     if (key_state.value != key_value_t(retrieved_value))
         testutil_die(LOG_ERROR,

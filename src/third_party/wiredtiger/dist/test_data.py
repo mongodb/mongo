@@ -222,4 +222,5 @@ methods = {
     'hs_cleanup' : Method(test_config),
     'search_near_01' : Method(test_config),
     'search_near_02' : Method(test_config),
+    'search_near_03' : Method(test_config),
 }

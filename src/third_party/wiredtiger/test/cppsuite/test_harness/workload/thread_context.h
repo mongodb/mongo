@@ -140,6 +140,14 @@ class thread_context {
     bool insert(
       scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts = 0);
 
+    /*
+     * Generic remove function, takes a collection_id and key and will delete the key if it exists.
+     *
+     * Return true if the operation was successful, a return value of false implies the transaction
+     * needs to be rolled back.
+     */
+    bool remove(
+      scoped_cursor &cursor, uint64_t collection_id, const std::string &key, wt_timestamp_t ts = 0);
     void sleep();
     bool running() const;
 
