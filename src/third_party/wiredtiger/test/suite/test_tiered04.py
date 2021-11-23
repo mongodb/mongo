@@ -161,7 +161,9 @@ class test_tiered04(wttest.WiredTigerTestCase):
         # the internal thread to process the work units.
         self.session.flush_tier('force=true')
         flush += 1
-        #time.sleep(1)
+        # We still sleep to give the internal thread a chance to run. Some slower
+        # systems can fail here if we don't give them time.
+        time.sleep(1)
         self.pr("Check removal of ")
         self.pr(self.obj1file)
         self.assertFalse(os.path.exists(self.obj1file))
