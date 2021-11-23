@@ -77,16 +77,17 @@ extern const std::string STABLE_TS;
 extern const std::string STATISTICS_LOG;
 
 /*
- * Use the Snappy compressor for stress testing to avoid excessive disk space usage. Our CMake
- * builds load the `SNAPPY_PATH` automatically if it's enabled so we only need to infer the path to
- * the library if it's not already set.
+ * Use the Snappy compressor for stress testing to avoid excessive disk space usage. Our builds can
+ * pre-specify 'EXTSUBPATH' to indicate any special sub-directories the module is located. If unset
+ * we fallback to the '.libs' sub-directory used by autoconf.
  */
 #define BLKCMP_PFX "block_compressor="
 #define SNAPPY_BLK BLKCMP_PFX "snappy"
 #define EXTPATH "../../ext/"
-#ifndef SNAPPY_PATH
-#define SNAPPY_PATH EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#ifndef EXTSUBPATH
+#define EXTSUBPATH ".libs/"
 #endif
+#define SNAPPY_PATH EXTPATH "compressors/snappy/" EXTSUBPATH "libwiredtiger_snappy.so"
 #define SNAPPY_EXT ",extensions=(" SNAPPY_PATH ")"
 
 /* Test harness consts. */

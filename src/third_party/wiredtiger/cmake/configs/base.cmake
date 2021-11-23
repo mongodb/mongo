@@ -121,7 +121,7 @@ config_choice(
         "pthread;SPINLOCK_PTHREAD_MUTEX;HAVE_LIBPTHREAD"
         "gcc;SPINLOCK_GCC;"
         "msvc;SPINLOCK_MSVC;WT_WIN"
-        "pthread_adaptive;SPINLOCK_PTHREAD_ADAPTIVE;HAVE_LIBPTHREAD"
+        "pthread_adaptive;SPINLOCK_PTHREAD_MUTEX_ADAPTIVE;HAVE_LIBPTHREAD"
 )
 
 config_bool(

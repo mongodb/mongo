@@ -34,34 +34,23 @@
 #include <signal.h>
 
 #define EXTPATH "../../ext/" /* Extensions path */
-
-#ifndef LZ4_PATH
-#define LZ4_PATH EXTPATH "compressors/lz4/.libs/libwiredtiger_lz4.so"
+#ifndef EXT_LIBPATH
+#define EXT_LIBPATH ".libs/"
 #endif
 
-#ifndef SNAPPY_PATH
-#define SNAPPY_PATH EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
-#endif
+#define LZ4_PATH EXTPATH "compressors/lz4/" EXT_LIBPATH "libwiredtiger_lz4.so"
 
-#ifndef ZLIB_PATH
-#define ZLIB_PATH EXTPATH "compressors/zlib/.libs/libwiredtiger_zlib.so"
-#endif
+#define SNAPPY_PATH EXTPATH "compressors/snappy/" EXT_LIBPATH "libwiredtiger_snappy.so"
 
-#ifndef ZSTD_PATH
-#define ZSTD_PATH EXTPATH "compressors/zstd/.libs/libwiredtiger_zstd.so"
-#endif
+#define ZLIB_PATH EXTPATH "compressors/zlib/" EXT_LIBPATH "libwiredtiger_zlib.so"
 
-#ifndef REVERSE_PATH
-#define REVERSE_PATH EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
-#endif
+#define ZSTD_PATH EXTPATH "compressors/zstd/" EXT_LIBPATH "libwiredtiger_zstd.so"
 
-#ifndef ROTN_PATH
-#define ROTN_PATH EXTPATH "encryptors/rotn/.libs/libwiredtiger_rotn.so"
-#endif
+#define REVERSE_PATH EXTPATH "collators/reverse/" EXT_LIBPATH "libwiredtiger_reverse_collator.so"
 
-#ifndef SODIUM_PATH
-#define SODIUM_PATH EXTPATH "encryptors/sodium/.libs/libwiredtiger_sodium.so"
-#endif
+#define ROTN_PATH EXTPATH "encryptors/rotn/" EXT_LIBPATH "libwiredtiger_rotn.so"
+
+#define SODIUM_PATH EXTPATH "encryptors/sodium/" EXT_LIBPATH "libwiredtiger_sodium.so"
 
 /*
  * To test the sodium encryptor, we use secretkey= rather than setting a keyid, because for a "real"

@@ -51,7 +51,12 @@ import os, re, subprocess, sys
 OP_FILE = "WT_TEST/CONFIG.wtperf"
 TMP_CONF = "__tmp.wtperf"
 WTPERF_BIN = "./wtperf"
-WTPERF_DIR = "../../build_posix/bench/wtperf/"
+
+env_wtperfdir = os.getenv('WTPERF_DIR')
+if env_wtperfdir:
+    WTPERF_DIR = env_wtperfdir
+else:
+    WTPERF_DIR = "../../build_posix/bench/wtperf/"
 
 CONF_NOT_PROVIDED = -2
 
