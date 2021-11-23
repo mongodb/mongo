@@ -51,6 +51,14 @@ assert.commandFailedWithCode(db.runCommand({"collMod": collName, "viewOn": "foo"
 assert.commandFailedWithCode(db.runCommand({"collMod": collName, "recordPreImages": true}),
                              ErrorCodes.InvalidOptions);
 
+// Tries to set 'changeStreamPreAndPostImages' for a time-series collection.
+assert.commandFailedWithCode(
+    db.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: true}}), [
+        ErrorCodes.InvalidOptions,
+        // TODO SERVER-52282: remove the error code.
+        5846901
+    ]);
+
 // Successfully sets 'expireAfterSeconds' for a time-series collection.
 assert.commandWorked(db.runCommand({"collMod": collName, "expireAfterSeconds": 60}));
 
