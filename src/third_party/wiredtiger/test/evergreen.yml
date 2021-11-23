@@ -3955,7 +3955,7 @@ buildvariants:
 - name: ubuntu2004-perf-tests
   display_name: Ubuntu 20.04 Performance tests
   run_on:
-    - ubuntu2004-large
+    - ubuntu2004-medium
   expansions:
     test_env_vars:
       top_dir=$(git rev-parse --show-toplevel)
