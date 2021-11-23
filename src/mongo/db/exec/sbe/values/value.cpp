@@ -1313,7 +1313,7 @@ void readKeyStringValueIntoAccessors(const KeyString::Value& keyString,
                                      BufBuilder* valueBufferBuilder,
                                      std::vector<OwnedValueAccessor>* accessors,
                                      boost::optional<IndexKeysInclusionSet> indexKeysToInclude) {
-    ValueBuilder valBuilder(valueBufferBuilder);
+    OwnedValueAccessorValueBuilder valBuilder(valueBufferBuilder);
     invariant(!indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
 
     BufReader reader(keyString.getBuffer(), keyString.getSize());

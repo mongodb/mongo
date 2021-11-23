@@ -31,9 +31,12 @@
 
 #include "mongo/db/exec/sbe/values/slot.h"
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/bufreader.h"
 
@@ -363,6 +366,184 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     }
 }
 
+static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, Value val) {
+    switch (tag) {
+        case TypeTags::Nothing: {
+            buf.appendBool(false);
+            break;
+        }
+        case TypeTags::NumberInt32: {
+            buf.appendBool(true);
+            buf.appendNumberInt(bitcastTo<int32_t>(val));
+            break;
+        }
+        case TypeTags::NumberInt64: {
+            buf.appendBool(true);
+            buf.appendNumberLong(bitcastTo<int64_t>(val));
+            break;
+        }
+        case TypeTags::NumberDouble: {
+            buf.appendBool(true);
+            buf.appendNumberDouble(bitcastTo<double>(val));
+            break;
+        }
+        case TypeTags::NumberDecimal: {
+            buf.appendBool(true);
+            buf.appendNumberDecimal(value::bitcastTo<Decimal128>(val));
+            break;
+        }
+        case TypeTags::Date: {
+            buf.appendBool(true);
+            buf.appendDate(Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(val)));
+            break;
+        }
+        case TypeTags::Timestamp: {
+            buf.appendBool(true);
+            buf.appendTimestamp(Timestamp(value::bitcastTo<uint64_t>(val)));
+            break;
+        }
+        case TypeTags::Boolean: {
+            buf.appendBool(true);
+            buf.appendBool(bitcastTo<bool>(val));
+            break;
+        }
+        case TypeTags::Null: {
+            buf.appendBool(true);
+            buf.appendNull();
+            break;
+        }
+        case TypeTags::MinKey:
+        case TypeTags::MaxKey: {
+            BSONObjBuilder bob;
+            if (tag == value::TypeTags::MinKey) {
+                bob.appendMinKey("");
+            } else {
+                bob.appendMaxKey("");
+            }
+            buf.appendBool(true);
+            buf.appendBSONElement(bob.obj().firstElement(), nullptr);
+            break;
+        }
+        case TypeTags::bsonUndefined: {
+            buf.appendBool(true);
+            buf.appendUndefined();
+            break;
+        }
+        case TypeTags::StringSmall: {
+            // Small strings cannot contain null bytes, so it is safe to serialize them as plain
+            // C-strings with a null terminator.
+            buf.appendBool(true);
+            buf.appendString(getStringView(tag, val));
+            break;
+        }
+        case TypeTags::StringBig:
+        case TypeTags::bsonString: {
+            buf.appendBool(true);
+            buf.appendString(getStringOrSymbolView(tag, val));
+            break;
+        }
+        case TypeTags::bsonSymbol: {
+            buf.appendBool(true);
+            buf.appendSymbol(getStringOrSymbolView(tag, val));
+            break;
+        }
+        case TypeTags::ArraySet:
+        case TypeTags::Array: {
+            // TODO SERVER-61629: convert this to serialize the 'arr' directly instead of
+            // constructing a BSONArray.
+            BSONArrayBuilder builder;
+            bson::convertToBsonObj(builder, getArrayView(val));
+            buf.appendBool(true);
+            buf.appendArray(BSONArray(builder.done()));
+            break;
+        }
+        case TypeTags::Object: {
+            // TODO SERVER-61629: convert this to serialize the 'obj' directly instead of
+            // constructing a BSONObj.
+            BSONObjBuilder builder;
+            bson::convertToBsonObj(builder, getObjectView(val));
+            buf.appendBool(true);
+            buf.appendObject(builder.done());
+            break;
+        }
+        case TypeTags::ObjectId: {
+            buf.appendBool(true);
+            buf.appendBytes(getObjectIdView(val), sizeof(ObjectIdType));
+            break;
+        }
+        case TypeTags::bsonObject: {
+            buf.appendBool(true);
+            buf.appendObject(BSONObj(getRawPointerView(val)));
+            break;
+        }
+        case TypeTags::bsonArray: {
+            buf.appendBool(true);
+            buf.appendArray(BSONArray(BSONObj(getRawPointerView(val))));
+            break;
+        }
+        case TypeTags::bsonObjectId: {
+            buf.appendBool(true);
+            buf.appendOID(OID::from(getRawPointerView(val)));
+            break;
+        }
+        case TypeTags::bsonBinData: {
+            BufBuilder innerBinDataBuf;
+            innerBinDataBuf.appendUChar(static_cast<uint8_t>(tag));
+            innerBinDataBuf.appendBuf(getRawPointerView(val),
+                                      getBSONBinDataSize(tag, val) + sizeof(uint32_t) + 1);
+            buf.appendBool(true);
+            buf.appendBinData(
+                BSONBinData(innerBinDataBuf.buf(), innerBinDataBuf.len(), BinDataGeneral));
+            break;
+        }
+        case TypeTags::bsonRegex: {
+            auto regex = getBsonRegexView(val);
+            buf.appendBool(true);
+            buf.appendRegex(BSONRegEx(regex.pattern, regex.flags));
+            break;
+        }
+        case TypeTags::bsonJavascript: {
+            buf.appendBool(true);
+            buf.appendCode(getBsonJavascriptView(val));
+            break;
+        }
+        case TypeTags::bsonDBPointer: {
+            auto dbptr = getBsonDBPointerView(val);
+            buf.appendBool(true);
+            buf.appendDBRef(BSONDBRef(dbptr.ns, OID::from(dbptr.id)));
+            break;
+        }
+        case TypeTags::bsonCodeWScope: {
+            auto cws = getBsonCodeWScopeView(val);
+            buf.appendBool(true);
+            buf.appendCodeWString(BSONCodeWScope(cws.code, BSONObj(cws.scope)));
+            break;
+        }
+        case TypeTags::ksValue: {
+            auto ks = getKeyStringView(val);
+            BufBuilder innerBinDataBuf;
+            innerBinDataBuf.appendUChar(static_cast<uint8_t>(tag));
+            ks->serialize(innerBinDataBuf);
+            buf.appendBool(true);
+            buf.appendBinData(
+                BSONBinData(innerBinDataBuf.buf(), innerBinDataBuf.len(), BinDataGeneral));
+            break;
+        }
+        case TypeTags::RecordId: {
+            // TODO SERVER-61630: Support RecordId strings when sbe also supports this.
+            BufBuilder innerBinDataBuf;
+            innerBinDataBuf.appendUChar(static_cast<uint8_t>(tag));
+            innerBinDataBuf.appendNum(bitcastTo<int64_t>(val));
+            buf.appendBool(true);
+            buf.appendBinData(BSONBinData(
+                innerBinDataBuf.buf(), innerBinDataBuf.len(), BinDataType::BinDataGeneral));
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 void MaterializedRow::serializeForSorter(BufBuilder& buf) const {
     buf.appendNum(size());
 
@@ -370,6 +551,32 @@ void MaterializedRow::serializeForSorter(BufBuilder& buf) const {
         auto [tag, val] = getViewOfValue(idx);
         serializeValue(buf, tag, val);
     }
+}
+
+void MaterializedRow::serializeIntoKeyString(KeyString::Builder& buf) const {
+    for (size_t idx = 0; idx < size(); ++idx) {
+        auto [tag, val] = getViewOfValue(idx);
+        serializeValueIntoKeyString(buf, tag, val);
+    }
+}
+
+MaterializedRow MaterializedRow::deserializeFromKeyString(const KeyString::Value& keyString,
+                                                          BufBuilder* valueBufferBuilder) {
+    BufReader reader(keyString.getBuffer(), keyString.getSize());
+    KeyString::TypeBits typeBits(keyString.getTypeBits());
+    KeyString::TypeBits::Reader typeBitsReader(typeBits);
+
+    MaterializedRowValueBuilder valBuilder(valueBufferBuilder);
+    auto keepReading = true;
+    do {
+        keepReading = KeyString::readSBEValue(
+            &reader, &typeBitsReader, false /* inverted */, typeBits.version, &valBuilder);
+    } while (keepReading);
+
+    MaterializedRow result{valBuilder.numValues()};
+    valBuilder.readValues(result);
+
+    return result;
 }
 
 int getApproximateSize(TypeTags tag, Value val) {

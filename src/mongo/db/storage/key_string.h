@@ -560,15 +560,27 @@ public:
      */
     void appendBSONElement(const BSONElement& elem, const StringTransformFn& f = nullptr);
 
+    void appendBool(bool val);
     void appendString(StringData val);
+    void appendSymbol(StringData val);
     void appendNumberDouble(double num);
     void appendNumberLong(long long num);
+    void appendNumberInt(int num);
+    void appendNumberDecimal(Decimal128 num);
     void appendNull();
     void appendUndefined();
+    void appendCodeWString(const BSONCodeWScope& val);
     void appendBinData(const BSONBinData& data);
+    void appendRegex(const BSONRegEx& val);
     void appendSetAsArray(const BSONElementSet& set, const StringTransformFn& f = nullptr);
     void appendOID(OID oid);
     void appendDate(Date_t date);
+    void appendTimestamp(Timestamp val);
+    void appendBytes(const void* source, size_t bytes);
+    void appendDBRef(const BSONDBRef& val);
+    void appendObject(const BSONObj& val, const StringTransformFn& f = nullptr);
+    void appendArray(const BSONArray& val, const StringTransformFn& f = nullptr);
+    void appendCode(StringData val);
 
     /**
      * Appends a Discriminator byte and kEnd byte to a key string.

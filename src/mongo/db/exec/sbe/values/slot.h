@@ -474,6 +474,17 @@ public:
         return result;
     }
 
+    /**
+     * With these functions, an SBE value can be saved as a KeyString. This functionality is
+     * intended for spilling key values used in the HashAgg stage. The format is not guaranteed to
+     * be stable between versions, so it should not be used for long-term storage or communication
+     * between instances.
+     */
+    static MaterializedRow deserializeFromKeyString(const KeyString::Value& keyString,
+
+                                                    BufBuilder* valueBufferBuilder);
+    void serializeIntoKeyString(KeyString::Builder& builder) const;
+
 private:
     static size_t sizeInBytes(size_t count) {
         return count * (sizeof(value::Value) + sizeof(value::TypeTags) + sizeof(bool));
