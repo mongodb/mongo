@@ -11,6 +11,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkBothEnginesAreRunOnCluster.
 
 const coll = db.orToIn;
 coll.drop();
@@ -27,12 +28,17 @@ function compareValues(v1, v2) {
 function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     const expectedExplain = coll.find(expectedQuery).explain("queryPlanner");
     const actualExplain = coll.find(actualQuery).explain("queryPlanner");
+
     // The queries must be rewritten into the same form.
     assert.docEq(expectedExplain.parsedQuery, actualExplain.parsedQuery);
+
     // Make sure both queries have the same access plan.
     const expectedPlan = getWinningPlan(expectedExplain.queryPlanner);
     const actualPlan = getWinningPlan(actualExplain.queryPlanner);
-    assert.docEq(expectedPlan, actualPlan);
+    if (!checkBothEnginesAreRunOnCluster(db)) {
+        assert.docEq(expectedPlan, actualPlan);
+    }
+
     // The queries must produce the same result.
     const expectedRes = coll.find(expectedQuery).toArray();
     const actualRes = coll.find(actualQuery).toArray();

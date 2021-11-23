@@ -138,3 +138,10 @@ function checkBothEnginesAreRunOnCluster(theDB) {
 
     return result;
 }
+
+/**
+ * Returns 'true' if SBE is enabled on at least on one node for the given connection 'db'.
+ */
+function checkSBEEnabledOnSomeNode(db) {
+    return checkSBEEnabled(db) || checkBothEnginesAreRunOnCluster(db);
+}

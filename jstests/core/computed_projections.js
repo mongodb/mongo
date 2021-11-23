@@ -4,7 +4,7 @@
 load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db);
+const isSBEEnabled = checkSBEEnabledOnSomeNode(db);
 if (isSBEEnabled) {
     // Override error-code-checking APIs. We only load this when SBE is explicitly enabled, because
     // it causes failures in the parallel suites.

@@ -92,7 +92,10 @@ function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
     ];
     assert.eq(metricsToCheck.nReturned, coll.aggregate(pipelineWithProject, aggOptions).itcount());
     let explain = coll.explain("executionStats").aggregate(pipelineWithProject, aggOptions);
-    assert(getAggPlanStage(explain, "COLLSCAN", isSBEEnabled /* useQueryPlannerSection */),
+    assert(getAggPlanStage(explain, "COLLSCAN", isSBEEnabled /* useQueryPlannerSection */) ||
+               checkBothEnginesAreRunOnCluster(db) &&
+                   (getAggPlanStage(explain, "COLLSCAN", false /* useQueryPlannerSection */) ||
+                    getAggPlanStage(explain, "COLLSCAN", true /* useQueryPlannerSection */)),
            explain);
 
     // Verifies that there are no rejected plans, and that the winning plan uses the expected
