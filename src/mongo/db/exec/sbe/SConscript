@@ -63,7 +63,6 @@ sbeEnv.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/exec/js_function',
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/mongohasher',
@@ -120,8 +119,6 @@ env.Library(
         'query_sbe',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
     ],
 )
@@ -171,15 +168,13 @@ env.CppUnitTest(
         'sbe_test.cpp',
         'sbe_trial_run_tracker_test.cpp',
         'sbe_unique_test.cpp',
-        'values/value_serialization_test.cpp',
+        'values/value_serialize_for_sorter_test.cpp',
         "values/value_test.cpp",
         'values/write_value_to_stream_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'query_sbe_parser',
         'sbe_plan_stage_test',
