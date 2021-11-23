@@ -69,6 +69,14 @@ public:
     bool isEnabledAndIgnoreFCV() const;
 
     /**
+     * Returns true if the flag is set to true and enabled on the target FCV version.
+     *
+     * This function is used in the 'setFeatureCompatibilityVersion' command where the in-memory FCV
+     * is in flux.
+     */
+    bool isEnabledOnVersion(multiversion::FeatureCompatibilityVersion targetFCV) const;
+
+    /**
      * Return the version associated with this feature flag.
      *
      * Throws if feature is not enabled.

@@ -62,7 +62,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/long_collection_names_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/service_entry_point.h"
@@ -579,137 +578,121 @@ void _updateConfigDocument(OperationContext* opCtx,
     uassertStatusOK(getWriteConcernStatusFromCommandResult(commandReply));
 }
 
-void ShardingCatalogManager::_enableSupportForLongCollectionName(OperationContext* opCtx) {
-    // List all collections for which the long name support is disabled.
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const auto collectionDocs =
-        uassertStatusOK(
-            configShard->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                CollectionType::ConfigNS,
-                BSON(CollectionType::kSupportingLongNameFieldName << BSON("$exists" << false)),
-                BSONObj(),
-                boost::none))
-            .docs;
-
-    // Implicitly enable the long name support on all collections for which it is disabled.
-    _updateConfigDocument(
-        opCtx,
-        CollectionType::ConfigNS,
-        BSON(CollectionType::kSupportingLongNameFieldName << BSON("$exists" << false)),
-        BSON("$set" << BSON(CollectionType::kSupportingLongNameFieldName
-                            << SupportingLongNameStatus_serializer(
-                                   SupportingLongNameStatusEnum::kImplicitlyEnabled))),
-        false /* upsert */,
-        true /* multi */);
-
-    // Wait until the last operation is majority-committed.
-    WriteConcernResult ignoreResult;
-    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
-
-    // Force the catalog cache refresh of updated collections on each shard.
-    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    const auto fixedExecutor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-    for (const auto& doc : collectionDocs) {
-        const CollectionType coll(doc);
-        const auto collNss = coll.getNss();
-
-        try {
-            sharding_util::tellShardsToRefreshCollection(opCtx, shardIds, collNss, fixedExecutor);
-        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
-            LOGV2_ERROR(5857400,
-                        "Failed to refresh collection on shards after enabling long name support",
-                        logAttrs(collNss),
-                        "error"_attr = redact(e));
-        }
-    }
-}
-
-void ShardingCatalogManager::_disableSupportForLongCollectionName(OperationContext* opCtx) {
-    // List all collections for which the long name support is implicitly enabled.
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const auto collectionDocs =
-        uassertStatusOK(configShard->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            repl::ReadConcernLevel::kLocalReadConcern,
-                            CollectionType::ConfigNS,
-                            BSON(CollectionType::kSupportingLongNameFieldName
-                                 << SupportingLongNameStatus_serializer(
-                                        SupportingLongNameStatusEnum::kImplicitlyEnabled)),
-                            BSONObj(),
-                            boost::none))
-            .docs;
-
-    // Disable the long name support on all collections for which it is implicitly enabled.
-    _updateConfigDocument(
-        opCtx,
-        CollectionType::ConfigNS,
-        BSON(CollectionType::kSupportingLongNameFieldName << SupportingLongNameStatus_serializer(
-                 SupportingLongNameStatusEnum::kImplicitlyEnabled)),
-        BSON("$unset" << BSON(CollectionType::kSupportingLongNameFieldName << 1)),
-        false /* upsert */,
-        true /* multi */);
-
-    // Wait until the last operation is majority-committed.
-    WriteConcernResult ignoreResult;
-    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
-
-    // Force the catalog cache refresh of updated collections on each shard.
-    const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    const auto fixedExecutor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-    for (const auto& doc : collectionDocs) {
-        const CollectionType coll(doc);
-        const auto collNss = coll.getNss();
-
-        try {
-            sharding_util::tellShardsToRefreshCollection(opCtx, shardIds, collNss, fixedExecutor);
-        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
-            LOGV2_ERROR(5857401,
-                        "Failed to refresh collection on shards after disabling long name support",
-                        logAttrs(collNss),
-                        "error"_attr = redact(e));
-        }
-    }
-}
-
-void ShardingCatalogManager::upgradeMetadataTo51Phase2(OperationContext* opCtx) {
-    LOGV2(5857402, "Starting metadata upgrade to FCV 5.1 (phase 2)");
-
+void ShardingCatalogManager::enableSupportForLongCollectionName(OperationContext* opCtx) {
     try {
-        if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
-            _enableSupportForLongCollectionName(opCtx);
-        }
-    } catch (const DBException& e) {
-        LOGV2_ERROR(
-            5857403, "Failed to upgrade metadata to FCV 5.1 (phase 2)", "error"_attr = redact(e));
-        throw;
-    }
+        // List all collections for which the long name support is disabled.
+        const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        const auto collectionDocs =
+            uassertStatusOK(
+                configShard->exhaustiveFindOnConfig(
+                    opCtx,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    repl::ReadConcernLevel::kLocalReadConcern,
+                    CollectionType::ConfigNS,
+                    BSON(CollectionType::kSupportingLongNameFieldName << BSON("$exists" << false)),
+                    BSONObj(),
+                    boost::none))
+                .docs;
 
-    LOGV2(5857404, "Successfully upgraded metadata to FCV 5.1 (phase 2)");
-}
+        // Implicitly enable the long name support on all collections for which it is disabled.
+        _updateConfigDocument(
+            opCtx,
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kSupportingLongNameFieldName << BSON("$exists" << false)),
+            BSON("$set" << BSON(CollectionType::kSupportingLongNameFieldName
+                                << SupportingLongNameStatus_serializer(
+                                       SupportingLongNameStatusEnum::kImplicitlyEnabled))),
+            false /* upsert */,
+            true /* multi */);
 
-void ShardingCatalogManager::downgradeMetadataToPre51Phase2(OperationContext* opCtx) {
-    LOGV2(5857405, "Starting metadata downgrade to pre FCV 5.1 (phase 2)");
+        // Wait until the last operation is majority-committed.
+        WriteConcernResult ignoreResult;
+        const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        uassertStatusOK(waitForWriteConcern(
+            opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
-    try {
-        if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
-            _disableSupportForLongCollectionName(opCtx);
-        }
-    } catch (const DBException& e) {
-        LOGV2_ERROR(5857406,
-                    "Failed to downgrade metadata to pre FCV 5.1 (phase 2)",
+        // Force the catalog cache refresh of updated collections on each shard.
+        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        const auto fixedExecutor =
+            Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+        for (const auto& doc : collectionDocs) {
+            const CollectionType coll(doc);
+            const auto collNss = coll.getNss();
+
+            try {
+                sharding_util::tellShardsToRefreshCollection(
+                    opCtx, shardIds, collNss, fixedExecutor);
+            } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
+                LOGV2_ERROR(
+                    5857400,
+                    "Failed to refresh collection on shards after enabling long name support",
+                    logAttrs(collNss),
                     "error"_attr = redact(e));
+            }
+        }
+    } catch (const DBException& e) {
+        LOGV2_ERROR(5857402, "Failed to enable long name support", "error"_attr = redact(e));
         throw;
     }
+}
 
-    LOGV2(5857407, "Successfully downgraded metadata to pre FCV 5.1 (phase 2)");
+void ShardingCatalogManager::disableSupportForLongCollectionName(OperationContext* opCtx) {
+    try {
+        // List all collections for which the long name support is implicitly enabled.
+        const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        const auto collectionDocs =
+            uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                repl::ReadConcernLevel::kLocalReadConcern,
+                                CollectionType::ConfigNS,
+                                BSON(CollectionType::kSupportingLongNameFieldName
+                                     << SupportingLongNameStatus_serializer(
+                                            SupportingLongNameStatusEnum::kImplicitlyEnabled)),
+                                BSONObj(),
+                                boost::none))
+                .docs;
+
+        // Disable the long name support on all collections for which it is implicitly enabled.
+        _updateConfigDocument(
+            opCtx,
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kSupportingLongNameFieldName
+                 << SupportingLongNameStatus_serializer(
+                        SupportingLongNameStatusEnum::kImplicitlyEnabled)),
+            BSON("$unset" << BSON(CollectionType::kSupportingLongNameFieldName << 1)),
+            false /* upsert */,
+            true /* multi */);
+
+        // Wait until the last operation is majority-committed.
+        WriteConcernResult ignoreResult;
+        const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        uassertStatusOK(waitForWriteConcern(
+            opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
+
+        // Force the catalog cache refresh of updated collections on each shard.
+        const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        const auto fixedExecutor =
+            Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
+        for (const auto& doc : collectionDocs) {
+            const CollectionType coll(doc);
+            const auto collNss = coll.getNss();
+
+            try {
+                sharding_util::tellShardsToRefreshCollection(
+                    opCtx, shardIds, collNss, fixedExecutor);
+            } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
+                LOGV2_ERROR(
+                    5857401,
+                    "Failed to refresh collection on shards after disabling long name support",
+                    logAttrs(collNss),
+                    "error"_attr = redact(e));
+            }
+        }
+    } catch (const DBException& e) {
+        LOGV2_ERROR(5857403, "Failed to disable long name support", "error"_attr = redact(e));
+        throw;
+    }
 }
 
 StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(

@@ -68,6 +68,14 @@ bool FeatureFlag::isEnabledAndIgnoreFCV() const {
     return _enabled;
 }
 
+bool FeatureFlag::isEnabledOnVersion(multiversion::FeatureCompatibilityVersion targetFCV) const {
+    if (!_enabled) {
+        return false;
+    }
+
+    return targetFCV >= _version;
+}
+
 multiversion::FeatureCompatibilityVersion FeatureFlag::getVersion() const {
     uassert(5111001, "Feature Flag is not enabled, cannot retrieve version", _enabled);
 

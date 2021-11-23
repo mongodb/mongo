@@ -73,6 +73,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/long_collection_names_gen.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -324,12 +325,13 @@ public:
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
                 boost::optional<MigrationBlockingGuard> drainNewMoveChunks;
-                // Downgrades from a version >= 5.2 to 5.1 or lower must drain new protocol
-                // moveChunks
-                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                        .isEnabledAndIgnoreFCV() &&
-                    actualVersion > multiversion::FeatureCompatibilityVersion::kVersion_5_1 &&
-                    requestedVersion <= multiversion::FeatureCompatibilityVersion::kVersion_5_1)
+
+                // Drain moveChunks if the actualVersion relies on the new migration protocol but
+                // the requestedVersion uses the old one (downgrading).
+                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                        actualVersion) &&
+                    !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
+                         .isEnabledOnVersion(requestedVersion))
                     drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
 
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
@@ -357,18 +359,20 @@ public:
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
 
         if (requestedVersion > actualVersion) {
-            _runUpgrade(opCtx, request, changeTimestamp);
+            _runUpgrade(opCtx, actualVersion, request, changeTimestamp);
         } else {
-            _runDowngrade(opCtx, request, changeTimestamp);
+            _runDowngrade(opCtx, actualVersion, request, changeTimestamp);
         }
 
         {
             boost::optional<MigrationBlockingGuard> drainOldMoveChunks;
-            // Upgrades from a version <= 5.1 to 5.2 or greater must drain old protocol moveChunks
-            if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                    .isEnabledAndIgnoreFCV() &&
-                actualVersion <= multiversion::FeatureCompatibilityVersion::kVersion_5_1 &&
-                requestedVersion > multiversion::FeatureCompatibilityVersion::kVersion_5_1)
+
+            // Drain moveChunks if the actualVersion relies on the old migration protocol but the
+            // requestedVersion uses the new one (upgrading).
+            if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                    actualVersion) &&
+                feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
+                    requestedVersion))
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
 
             // Complete transition by updating the local FCV document to the fully upgraded or
@@ -391,6 +395,7 @@ public:
 
 private:
     void _runUpgrade(OperationContext* opCtx,
+                     mongo::multiversion::FeatureCompatibilityVersion originalVersion,
                      const SetFeatureCompatibilityVersion& request,
                      boost::optional<Timestamp> changeTimestamp) {
 
@@ -476,8 +481,11 @@ private:
 
             // TODO: Remove once FCV 6.0 becomes last-lts
             const auto requestedVersion = request.getCommandParameter();
-            if (requestedVersion >= multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
-                ShardingCatalogManager::get(opCtx)->upgradeMetadataTo51Phase2(opCtx);
+            if (!feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
+                    originalVersion) &&
+                feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
+                    requestedVersion)) {
+                ShardingCatalogManager::get(opCtx)->enableSupportForLongCollectionName(opCtx);
             }
 
             // Always abort the reshardCollection regardless of version to ensure that it will run
@@ -490,6 +498,7 @@ private:
     }
 
     void _runDowngrade(OperationContext* opCtx,
+                       mongo::multiversion::FeatureCompatibilityVersion originalVersion,
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
@@ -624,8 +633,11 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO: Remove once FCV 6.0 becomes last-lts
-            if (requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_1) {
-                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre51Phase2(opCtx);
+            if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
+                    originalVersion) &&
+                !feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
+                    requestedVersion)) {
+                ShardingCatalogManager::get(opCtx)->disableSupportForLongCollectionName(opCtx);
             }
         }
 
