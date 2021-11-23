@@ -1959,7 +1959,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/util/net/network',
         'repl/repl_coordinator_interface',
         'repl/replica_set_messages',
