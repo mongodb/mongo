@@ -413,7 +413,10 @@ log_db_size(WT_SESSION *session, const char *uri)
 
     get_file_stats(session, uri, &file_sz, &avail_bytes);
 
-    /* Check if there's maximum of 10% space available after compaction. */
+    /*
+     * It is expected that up to 20% of the file is available for reuse: up to 10% in the first 90%
+     * and up to 10% in the last 10% of the file.
+     */
     available_pct = (avail_bytes * 100) / file_sz;
     printf(" - Compacted file size: %" PRIu64 "MB (%" PRIu64 "B)\n - Available for reuse: %" PRIu64
            "MB (%" PRIu64 "B)\n - %" PRIu64 "%% space available in the file.\n",
