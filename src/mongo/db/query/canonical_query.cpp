@@ -162,6 +162,11 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     if (!statusWithMatcher.isOK()) {
         return statusWithMatcher.getStatus();
     }
+
+    // Stop counting match expressions after they have been parsed to exclude expressions created
+    // during optimization and other processing steps.
+    newExpCtx->stopExpressionCounters();
+
     std::unique_ptr<MatchExpression> me = std::move(statusWithMatcher.getValue());
 
     // Make the CQ we'll hopefully return.

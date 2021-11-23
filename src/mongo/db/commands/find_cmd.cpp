@@ -42,6 +42,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
@@ -73,6 +74,21 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
         qr->setRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     }
     return qr;
+}
+
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
+                                                              const QueryRequest& queryRequest) {
+    std::unique_ptr<CollatorInterface> collator;
+    if (!queryRequest.getCollation().isEmpty()) {
+        collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                       ->makeFromBSON(queryRequest.getCollation()));
+    }
+
+    boost::intrusive_ptr<ExpressionContext> expCtx(
+        new ExpressionContext(opCtx, std::move(collator), queryRequest.getRuntimeConstants()));
+    expCtx->startExpressionCounters();
+
+    return expCtx;
 }
 
 /**
@@ -185,7 +201,7 @@ public:
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            const boost::intrusive_ptr<ExpressionContext> expCtx;
+            auto expCtx = makeExpressionContext(opCtx, *qr);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(qr),
@@ -383,7 +399,7 @@ public:
 
             // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            const boost::intrusive_ptr<ExpressionContext> expCtx;
+            auto expCtx = makeExpressionContext(opCtx, *qr);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(qr),

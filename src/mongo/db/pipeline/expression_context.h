@@ -54,6 +54,15 @@
 
 namespace mongo {
 
+/**
+ * The structure ExpressionCounters encapsulates counters for match, aggregate, and other
+ * expression types as seen in the end-user queries.
+ */
+struct ExpressionCounters {
+    StringMap<uint64_t> aggExprCountersMap;
+    StringMap<uint64_t> matchExprCountersMap;
+};
+
 class ExpressionContext : public RefCountable {
 public:
     struct ResolvedNamespace {
@@ -115,6 +124,12 @@ public:
                       const CollatorInterface* collator,
                       const boost::optional<RuntimeConstants>& runtimeConstants = boost::none);
 
+    /**
+     * Constructs an ExpressionContext suitable for find which owns the collator.
+     */
+    ExpressionContext(OperationContext* opCtx,
+                      std::unique_ptr<CollatorInterface> collator,
+                      const boost::optional<RuntimeConstants>& runtimeConstants = boost::none);
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
      * this aggregation pipeline has been interrupted.
@@ -197,6 +212,23 @@ public:
     auto getRuntimeConstants() const {
         return variables.getRuntimeConstants();
     }
+
+    /**
+     * Create optional internal expression counters and start counting.
+     */
+    void startExpressionCounters();
+
+    /**
+     * Increment the counter for the match expression with a given name.
+     */
+    void incrementMatchExprCounter(StringData name);
+
+    /**
+     * Merge expression counters from the current expression context into the global maps
+     * and stop counting.
+     */
+    void stopExpressionCounters();
+
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 
@@ -288,6 +320,9 @@ protected:
     StringMap<ResolvedNamespace> _resolvedNamespaces;
 
     int _interruptCounter = kInterruptCheckPeriod;
+
+private:
+    boost::optional<ExpressionCounters> _expressionCounters = boost::none;
 };
 
 }  // namespace mongo

@@ -651,7 +651,9 @@ Status runAggregate(OperationContext* opCtx,
         invariant(collatorToUse);
         expCtx = makeExpressionContext(opCtx, request, std::move(*collatorToUse), uuid);
 
+        expCtx->startExpressionCounters();
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
+        expCtx->stopExpressionCounters();
 
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.

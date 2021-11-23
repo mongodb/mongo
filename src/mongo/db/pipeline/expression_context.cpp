@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
@@ -88,6 +89,13 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     if (runtimeConstants) {
         variables.setRuntimeConstants(*runtimeConstants);
     }
+}
+
+ExpressionContext::ExpressionContext(OperationContext* opCtx,
+                                     std::unique_ptr<CollatorInterface> collator,
+                                     const boost::optional<RuntimeConstants>& runtimeConstants)
+    : ExpressionContext(opCtx, collator.get(), runtimeConstants) {
+    _ownedCollator = std::move(collator);
 }
 
 ExpressionContext::ExpressionContext(NamespaceString nss,
@@ -194,6 +202,25 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     // intended to be used for executing a separate aggregation pipeline.
 
     return expCtx;
+}
+
+void ExpressionContext::startExpressionCounters() {
+    if (!_expressionCounters) {
+        _expressionCounters = boost::make_optional<ExpressionCounters>({});
+    }
+}
+
+void ExpressionContext::incrementMatchExprCounter(StringData name) {
+    if (_expressionCounters) {
+        ++_expressionCounters->matchExprCountersMap[name];
+    }
+}
+
+void ExpressionContext::stopExpressionCounters() {
+    if (_expressionCounters) {
+        operatorCountersMatchExpressions.mergeCounters(_expressionCounters->matchExprCountersMap);
+    }
+    _expressionCounters = {};
 }
 
 }  // namespace mongo

@@ -65,6 +65,7 @@
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -135,10 +136,13 @@ stdx::function<StatusWithMatchExpression(StringData,
                                          DocumentParseLevel)>
 retrievePathlessParser(StringData name);
 
-StatusWithMatchExpression parseRegexElement(StringData name, BSONElement e) {
+StatusWithMatchExpression parseRegexElement(StringData name,
+                                            BSONElement e,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (e.type() != BSONType::RegEx)
         return {Status(ErrorCodes::BadValue, "not a regex")};
 
+    expCtx->incrementMatchExprCounter("$regex");
     return {stdx::make_unique<RegexMatchExpression>(name, e.regex(), e.regexFlags())};
 }
 
@@ -274,6 +278,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
                 root->add(parsedExpression.getValue().release());
             }
 
+            expCtx->incrementMatchExprCounter(e.fieldNameStringData());
             continue;
         }
 
@@ -291,7 +296,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
         }
 
         if (e.type() == BSONType::RegEx) {
-            auto result = parseRegexElement(e.fieldNameStringData(), e);
+            auto result = parseRegexElement(e.fieldNameStringData(), e, expCtx);
             if (!result.isOK())
                 return result;
             root->add(result.getValue().release());
@@ -307,6 +312,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
         if (!eq.isOK())
             return eq;
 
+        expCtx->incrementMatchExprCounter("$eq");
         root->add(eq.getValue().release());
     }
 
@@ -1025,6 +1031,7 @@ StatusWithMatchExpression parseInternalSchemaMatchArrayIndex(
 StatusWithMatchExpression parseGeo(StringData name,
                                    PathAcceptingKeyword type,
                                    const BSONObj& section,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     if (PathAcceptingKeyword::WITHIN == type || PathAcceptingKeyword::GEO_INTERSECTS == type) {
         auto gq = stdx::make_unique<GeoExpression>(name.toString());
@@ -1046,6 +1053,7 @@ StatusWithMatchExpression parseGeo(StringData name,
         if (!status.isOK()) {
             return status;
         }
+        expCtx->incrementMatchExprCounter(section.firstElementFieldName());
         return {stdx::make_unique<GeoNearMatchExpression>(name, nq.release(), section)};
     }
 }
@@ -1277,7 +1285,7 @@ StatusWithMatchExpression parseNot(StringData name,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                    DocumentParseLevel currentLevel) {
     if (elem.type() == BSONType::RegEx) {
-        auto regex = parseRegexElement(name, elem);
+        auto regex = parseRegexElement(name, elem, expCtx);
         if (!regex.isOK()) {
             return regex;
         }
@@ -1493,7 +1501,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
 
         case PathAcceptingKeyword::WITHIN:
         case PathAcceptingKeyword::GEO_INTERSECTS:
-            return parseGeo(name, *parseExpMatchType, context, allowedFeatures);
+            return parseGeo(name, *parseExpMatchType, context, expCtx, allowedFeatures);
 
         case PathAcceptingKeyword::GEO_NEAR:
             return {Status(ErrorCodes::BadValue,
@@ -1697,7 +1705,8 @@ Status parseSub(StringData name,
         if (firstElt.isABSONObj()) {
             if (MatchExpressionParser::parsePathAcceptingKeyword(firstElt) ==
                 PathAcceptingKeyword::GEO_NEAR) {
-                auto s = parseGeo(name, PathAcceptingKeyword::GEO_NEAR, sub, allowedFeatures);
+                auto s =
+                    parseGeo(name, PathAcceptingKeyword::GEO_NEAR, sub, expCtx, allowedFeatures);
                 if (s.isOK()) {
                     root->add(s.getValue().release());
                 }
@@ -1714,6 +1723,7 @@ Status parseSub(StringData name,
         if (!s.isOK())
             return s.getStatus();
 
+        expCtx->incrementMatchExprCounter(deep.fieldNameStringData());
         if (s.getValue())
             root->add(s.getValue().release());
     }
@@ -1863,6 +1873,35 @@ retrievePathlessParser(StringData name) {
     }
     return func->second;
 }
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(MatchExpressionCounters,
+                                     ("PathlessOperatorMap", "MatchExpressionParser"))
+(InitializerContext* context) {
+    static const std::set<std::string> exceptionsSet{"within",   // deprecated
+                                                     "geoNear",  // aggregation stage
+                                                     "db",       // $-prefixed field names
+                                                     "id",
+                                                     "ref",
+                                                     "options"};
+
+    for (auto&& [name, keyword] : *queryOperatorMap) {
+        if (name[0] == '_' || exceptionsSet.count(name) > 0) {
+            continue;
+        }
+        operatorCountersMatchExpressions.addMatchExprCounter("$" + name);
+    }
+    for (auto&& [name, fn] : *pathlessOperatorMap) {
+        if (name[0] == '_' || exceptionsSet.count(name) > 0) {
+            continue;
+        }
+        operatorCountersMatchExpressions.addMatchExprCounter("$" + name);
+    }
+    operatorCountersMatchExpressions.addMatchExprCounter("$not");
+    operatorCountersMatchExpressions.addMatchExprCounter("$eq");
+    return Status::OK();
+}
+
+
 }  // namespace
 
 boost::optional<PathAcceptingKeyword> MatchExpressionParser::parsePathAcceptingKeyword(

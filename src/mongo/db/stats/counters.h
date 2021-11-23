@@ -190,4 +190,37 @@ public:
 };
 
 extern AggStageCounters aggStageCounters;
+
+/**
+ * Global counters for match expressions.
+ */
+class OperatorCountersMatchExpressions {
+private:
+    struct MatchExprCounter {
+        MatchExprCounter(StringData name) : metric("operatorCounters.match." + name, &counter) {}
+
+        Counter64 counter;
+        ServerStatusMetricField<Counter64> metric;
+    };
+
+public:
+    void addMatchExprCounter(StringData name) {
+        operatorCountersMatchExprMap[name] = std::make_unique<MatchExprCounter>(name);
+    }
+
+    void mergeCounters(StringMap<uint64_t>& toMerge) {
+        for (auto&& [name, cnt] : toMerge) {
+            if (auto it = operatorCountersMatchExprMap.find(name);
+                it != operatorCountersMatchExprMap.end()) {
+                it->second->counter.increment(cnt);
+            }
+        }
+    }
+
+private:
+    // Map of match expressions to the number of occurrences in queries.
+    StringMap<std::unique_ptr<MatchExprCounter>> operatorCountersMatchExprMap = {};
+};
+
+extern OperatorCountersMatchExpressions operatorCountersMatchExpressions;
 }  // namespace mongo

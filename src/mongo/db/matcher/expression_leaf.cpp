@@ -725,29 +725,29 @@ bool BitTestMatchExpression::matchesSingleElement(const BSONElement& e,
     return performBitTest(eValue);
 }
 
-void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
-    _debugAddSpace(debug, indentationLevel);
-
-    debug << path() << " ";
-
+std::string BitTestMatchExpression::name() const {
     switch (matchType()) {
         case BITS_ALL_SET:
-            debug << "$bitsAllSet:";
-            break;
+            return "$bitsAllSet";
+
         case BITS_ALL_CLEAR:
-            debug << "$bitsAllClear:";
-            break;
+            return "$bitsAllClear";
+
         case BITS_ANY_SET:
-            debug << "$bitsAnySet:";
-            break;
+            return "$bitsAnySet";
+
         case BITS_ANY_CLEAR:
-            debug << "$bitsAnyClear:";
-            break;
+            return "$bitsAnyClear";
+
         default:
             MONGO_UNREACHABLE;
     }
+}
 
-    debug << " [";
+void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
+    _debugAddSpace(debug, indentationLevel);
+
+    debug << path() << " " << name() << ": [";
     for (size_t i = 0; i < _bitPositions.size(); i++) {
         debug << _bitPositions[i];
         if (i != _bitPositions.size() - 1) {
