@@ -813,5 +813,4 @@ public:
 private:
     OperationContext* _opCtx;
 };
-
 }  // namespace mongo

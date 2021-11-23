@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -296,10 +297,12 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             // The updates were not in place. Apply them through the file manager.
 
             newObj = _doc.getObject();
-            uassert(17419,
-                    str::stream() << "Resulting document after update is larger than "
-                                  << BSONObjMaxUserSize,
-                    newObj.objsize() <= BSONObjMaxUserSize);
+            if (!DocumentValidationSettings::get(opCtx()).isInternalValidationDisabled()) {
+                uassert(17419,
+                        str::stream() << "Resulting document after update is larger than "
+                                      << BSONObjMaxUserSize,
+                        newObj.objsize() <= BSONObjMaxUserSize);
+            }
 
             if (!request->explain()) {
                 if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(newObj, oldObj) &&

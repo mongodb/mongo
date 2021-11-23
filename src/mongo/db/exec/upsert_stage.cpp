@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/upsert_stage.h"
 
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -227,9 +228,11 @@ BSONObj UpsertStage::_produceNewDocumentForInsert() {
 
     // Fifth: validate that the newly-produced document does not exceed the maximum BSON user size.
     auto newDocument = _doc.getObject();
-    uassert(17420,
-            str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
-            newDocument.objsize() <= BSONObjMaxUserSize);
+    if (!DocumentValidationSettings::get(opCtx()).isInternalValidationDisabled()) {
+        uassert(17420,
+                str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
+                newDocument.objsize() <= BSONObjMaxUserSize);
+    }
 
     return newDocument;
 }

@@ -51,6 +51,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
@@ -281,6 +282,9 @@ void writeToImageCollection(OperationContext* opCtx,
         imageEntry.setInvalidated(true);
         imageEntry.setInvalidatedReason(invalidatedReason);
     }
+
+    DisableDocumentValidation documentValidationDisabler(
+        opCtx, DocumentValidationSettings::kDisableInternalValidation);
 
     UpdateRequest request;
     request.setNamespaceString(NamespaceString::kConfigImagesNamespace);

@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
@@ -300,6 +301,8 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setImage(dataImage);
 
     repl::UnreplicatedWritesBlock unreplicated(opCtx);
+    DisableDocumentValidation documentValidationDisabler(
+        opCtx, DocumentValidationSettings::kDisableInternalValidation);
 
     // In practice, this lock acquisition on kConfigImagesNamespace cannot block. The only time a
     // stronger lock acquisition is taken on this namespace is during step up to create the
