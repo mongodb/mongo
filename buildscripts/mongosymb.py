@@ -17,15 +17,21 @@ You can also pass --output-format=json, to get rich json output. It shows some e
 but emits json instead of plain text.
 """
 
-import json
 import argparse
+import json
 import os
 import subprocess
 import sys
+import time
 from collections import OrderedDict
+from pathlib import Path
 from typing import Dict
 
 import requests
+
+# pylint: disable=wrong-import-position
+sys.path.append(str(Path(os.getcwd(), __file__).parent.parent))
+from buildscripts.util.oauth import Configs, get_oauth_credentials
 
 
 class PathDbgFileResolver(object):
@@ -150,10 +156,20 @@ class PathResolver(object):
     Cache size differs according to the situation, system resources and overall decision of development team.
     """
 
-    default_host = 'http://127.0.0.1:8000'  # the main (API) sever that we'll be sending requests to
-    default_cache_dir = os.path.join(os.getcwd(), 'dl_cache')
+    # pylint: disable=too-many-instance-attributes
+    # This amount of attributes are necessary.
 
-    def __init__(self, host: str = None, cache_size: int = 0, cache_dir: str = None):
+    # the main (API) sever that we'll be sending requests to
+    default_host = 'https://symbolizer-service.server-tig.staging.corp.mongodb.com'
+    default_cache_dir = os.path.join(os.getcwd(), 'build', 'symbolizer_downloads_cache')
+    default_creds_file_path = os.path.join(os.getcwd(), '.symbolizer_credentials.json')
+    default_client_credentials_scope = "servertig-symbolizer-fullaccess"
+    default_client_credentials_user_name = "client-user"
+
+    def __init__(self, host: str = None, cache_size: int = 0, cache_dir: str = None,
+                 client_credentials_scope: str = None, client_credentials_user_name: str = None,
+                 client_id: str = None, redirect_port: int = None, scope: str = None,
+                 auth_domain: str = None):
         """
         Initialize instance.
 
@@ -165,10 +181,47 @@ class PathResolver(object):
         self._cached_results = CachedResults(max_cache_size=cache_size)
         self.cache_dir = cache_dir or self.default_cache_dir
         self.mci_build_dir = None
+        self.client_credentials_scope = client_credentials_scope or self.default_client_credentials_scope
+        self.client_credentials_user_name = client_credentials_user_name or self.default_client_credentials_user_name
+        self.client_id = client_id
+        self.redirect_port = redirect_port
+        self.scope = scope
+        self.auth_domain = auth_domain
+        self.configs = Configs(client_credentials_scope=self.client_credentials_scope,
+                               client_credentials_user_name=self.client_credentials_user_name,
+                               client_id=self.client_id, auth_domain=self.auth_domain,
+                               redirect_port=self.redirect_port, scope=self.scope)
+        self.http_client = requests.Session()
 
         # create cache dir if it doesn't exist
         if not os.path.exists(self.cache_dir):
-            os.mkdir(self.cache_dir)
+            os.makedirs(self.cache_dir)
+
+        self.authenticate()
+
+    def authenticate(self):
+        """Login & get credentials for further requests to web service."""
+
+        # try to read from file
+        if os.path.exists(self.default_creds_file_path):
+            with open(self.default_creds_file_path) as cfile:
+                data = json.loads(cfile.read())
+                access_token, expire_time = data.get("access_token"), data.get("expire_time")
+                if time.time() < expire_time:
+                    # credentials hasn't expired yet
+                    self.http_client.headers.update({"Authorization": f"Bearer {access_token}"})
+                    return
+
+        credentials = get_oauth_credentials(configs=self.configs, print_auth_url=True)
+        self.http_client.headers.update({"Authorization": f"Bearer {credentials.access_token}"})
+
+        # write credentials to local file for further useage
+        with open(self.default_creds_file_path, "w") as cfile:
+            cfile.write(
+                json.dumps({
+                    "access_token": credentials.access_token,
+                    "expire_time": time.time() + credentials.expires_in
+                }))
 
     @staticmethod
     def is_valid_path(path: str) -> bool:
@@ -259,7 +312,8 @@ class PathResolver(object):
         if not path:
             # path does not exist in cache, so we send request to server
             try:
-                response = requests.get(f'{self.host}/find_by_id', params={'build_id': build_id})
+                response = self.http_client.get(f'{self.host}/find_by_id',
+                                                params={'build_id': build_id})
                 if response.status_code != 200:
                     sys.stderr.write(
                         f"Server returned unsuccessful status: {response.status_code}, "
