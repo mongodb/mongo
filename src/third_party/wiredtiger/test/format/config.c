@@ -482,6 +482,7 @@ static void
 config_backward_compatible_table(TABLE *table, void *arg)
 {
     (void)arg; /* unused argument */
+    testutil_assert(table != NULL);
 
 #undef BC_CHECK
 #define BC_CHECK(name, flag)                                                               \

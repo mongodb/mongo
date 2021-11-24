@@ -127,6 +127,7 @@ wts_salvage(TABLE *table, void *arg)
     char buf[MAX_FORMAT_PATH * 5], path[MAX_FORMAT_PATH];
 
     (void)arg; /* unused argument */
+    testutil_assert(table != NULL);
 
     if (GV(OPS_SALVAGE) == 0 || DATASOURCE(table, "lsm"))
         return;

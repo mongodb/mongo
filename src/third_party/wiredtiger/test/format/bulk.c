@@ -90,6 +90,7 @@ wts_load(TABLE *table, void *arg)
     bool is_bulk;
 
     (void)arg; /* unused argument */
+    testutil_assert(table != NULL);
 
     conn = g.wts_conn;
 
