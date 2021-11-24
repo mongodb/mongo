@@ -261,7 +261,7 @@ workload_compact(const char *home, const char *table_config)
         log_db_size(session, uri1);
 
         /* If we made progress with compact, verify that compact stats support that. */
-        get_compact_progress(session, uri1, &pages_reviewed, &pages_rewritten, &pages_skipped);
+        get_compact_progress(session, uri1, &pages_reviewed, &pages_skipped, &pages_rewritten);
         printf(" - Pages reviewed: %" PRIu64 "\n", pages_reviewed);
         printf(" - Pages selected for being rewritten: %" PRIu64 "\n", pages_rewritten);
         printf(" - Pages skipped: %" PRIu64 "\n", pages_skipped);

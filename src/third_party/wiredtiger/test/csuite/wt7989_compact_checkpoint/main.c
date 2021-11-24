@@ -184,7 +184,7 @@ run_test(bool stress_test, bool column_store, const char *home, const char *uri)
     (void)pthread_join(thread_compact, NULL);
 
     /* Collect compact progress stats. */
-    get_compact_progress(session, uri, &pages_reviewed, &pages_rewritten, &pages_skipped);
+    get_compact_progress(session, uri, &pages_reviewed, &pages_skipped, &pages_rewritten);
     size_check_res = check_db_size(session, uri);
 
     /* Cleanup */
