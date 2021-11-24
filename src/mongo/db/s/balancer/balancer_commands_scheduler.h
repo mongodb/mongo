@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/s/shard_id.h"
@@ -80,14 +81,6 @@ struct SplitVectorSettings {
     boost::optional<long long> maxChunkSizeBytes;
 };
 
-struct DataSizeResponse {
-    DataSizeResponse(long long sizeBytes, long long numObjects)
-        : sizeBytes(sizeBytes), numObjects(numObjects) {}
-
-    long long sizeBytes;
-    long long numObjects;
-};
-
 /**
  * Interface for the asynchronous submission of chunk-related commands.
  * Every method assumes that the ChunkType input parameter is filled up with information about
@@ -122,17 +115,21 @@ public:
                                                 const ChunkRange& chunkRange,
                                                 const ChunkVersion& version) = 0;
 
-    virtual SemiFuture<std::vector<BSONObj>> requestSplitVector(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& chunk,
-        const KeyPattern& keyPattern,
-        const SplitVectorSettings& commandSettings) = 0;
+    virtual SemiFuture<std::vector<BSONObj>> requestAutoSplitVector(OperationContext* opCtx,
+                                                                    const NamespaceString& nss,
+                                                                    const ShardId& shardId,
+                                                                    const BSONObj& keyPattern,
+                                                                    const BSONObj& minKey,
+                                                                    const BSONObj& maxKey,
+                                                                    int64_t maxChunkSizeBytes) = 0;
 
     virtual SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
                                                const NamespaceString& nss,
-                                               const ChunkType& chunk,
+                                               const ShardId& shardId,
+                                               const ChunkVersion& collectionVersion,
                                                const KeyPattern& keyPattern,
+                                               const BSONObj& minKey,
+                                               const BSONObj& maxKey,
                                                const std::vector<BSONObj>& splitPoints) = 0;
 
     virtual SemiFuture<DataSizeResponse> requestDataSize(OperationContext* opCtx,

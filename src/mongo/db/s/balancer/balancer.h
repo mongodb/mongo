@@ -33,6 +33,7 @@
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
@@ -40,8 +41,8 @@ namespace mongo {
 
 class ChunkType;
 class ClusterStatistics;
-class BalancerChunkMerger;
 class BalancerCommandsScheduler;
+class BalancerDefragmentationPolicy;
 class MigrationSecondaryThrottleOptions;
 class OperationContext;
 class ServiceContext;
@@ -214,6 +215,11 @@ private:
     void _mainThread();
 
     /**
+     * The secondary balancer loop, which performs merges and splits.
+     */
+    void _consumeActionStreamLoop();
+
+    /**
      * Checks whether the balancer main thread has been requested to stop.
      */
     bool _stopRequested();
@@ -266,13 +272,7 @@ private:
      * Schedules migrations for the specified set of chunks and returns how many chunks were
      * successfully processed.
      */
-    int _moveChunks(OperationContext* opCtx,
-                    const BalancerChunkSelectionPolicy::MigrateInfoVector& candidateChunks);
-
-    /**
-     * Merge chunks on collections where the balancerShouldMergeChunks flag is set to true
-     */
-    void _mergeChunksIfNeeded(OperationContext* opCtx);
+    int _moveChunks(OperationContext* opCtx, const MigrateInfoVector& candidateChunks);
 
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
@@ -280,8 +280,9 @@ private:
     // Indicates the current state of the balancer
     State _state{kStopped};
 
-    // The main balancer thread
+    // The main balancer threads
     stdx::thread _thread;
+    stdx::thread _actionStreamConsumerThread;
     stdx::condition_variable _joinCond;
 
     // The operation context of the main balancer thread. This value may only be available in the
@@ -318,7 +319,7 @@ private:
 
     std::unique_ptr<BalancerCommandsScheduler> _commandScheduler;
 
-    std::unique_ptr<BalancerChunkMerger> _chunkMerger;
+    std::unique_ptr<BalancerDefragmentationPolicy> _defragmentationPolicy;
 };
 
 }  // namespace mongo

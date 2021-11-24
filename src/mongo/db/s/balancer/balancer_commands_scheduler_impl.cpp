@@ -80,15 +80,6 @@ const std::string DataSizeCommandInfo::kMinValue = "min";
 const std::string DataSizeCommandInfo::kMaxValue = "max";
 const std::string DataSizeCommandInfo::kEstimatedValue = "estimate";
 
-const std::string SplitVectorCommandInfo::kCommandName = "splitVector";
-const std::string SplitVectorCommandInfo::kKeyPattern = "keyPattern";
-const std::string SplitVectorCommandInfo::kLowerBound = "min";
-const std::string SplitVectorCommandInfo::kUpperBound = "max";
-const std::string SplitVectorCommandInfo::kMaxChunkSizeBytes = "maxChunkSizeBytes";
-const std::string SplitVectorCommandInfo::kMaxSplitPoints = "maxSplitPoints";
-const std::string SplitVectorCommandInfo::kMaxChunkObjects = "maxChunkObjects";
-const std::string SplitVectorCommandInfo::kForceSplit = "force";
-
 const std::string SplitChunkCommandInfo::kCommandName = "splitChunk";
 const std::string SplitChunkCommandInfo::kShardName = "from";
 const std::string SplitChunkCommandInfo::kKeyPattern = "keyPattern";
@@ -182,23 +173,16 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationCont
         .semi();
 }
 
-SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestSplitVector(
+SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkType& chunk,
-    const KeyPattern& keyPattern,
-    const SplitVectorSettings& commandSettings) {
-
-    auto commandInfo = std::make_shared<SplitVectorCommandInfo>(nss,
-                                                                chunk.getShard(),
-                                                                keyPattern.toBSON(),
-                                                                chunk.getMin(),
-                                                                chunk.getMax(),
-                                                                commandSettings.maxSplitPoints,
-                                                                commandSettings.maxChunkObjects,
-                                                                commandSettings.maxChunkSizeBytes,
-                                                                commandSettings.force);
-
+    const ShardId& shardId,
+    const BSONObj& keyPattern,
+    const BSONObj& minKey,
+    const BSONObj& maxKey,
+    int64_t maxChunkSizeBytes) {
+    auto commandInfo = std::make_shared<AutoSplitVectorCommandInfo>(
+        nss, shardId, keyPattern, minKey, maxKey, maxChunkSizeBytes);
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
         .then([opCtx](const executor::RemoteCommandResponse& remoteResponse)
                   -> StatusWith<std::vector<BSONObj>> {
@@ -206,12 +190,9 @@ SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestSplitVect
             if (!responseStatus.isOK()) {
                 return responseStatus;
             }
-            std::vector<BSONObj> splitKeys;
-            BSONObjIterator it(remoteResponse.data.getObjectField("splitKeys"));
-            while (it.more()) {
-                splitKeys.emplace_back(it.next().Obj().getOwned());
-            }
-            return splitKeys;
+            const auto payload = AutoSplitVectorResponse::parse(
+                IDLParserErrorContext("AutoSplitVectorResponse"), std::move(remoteResponse.data));
+            return payload.getSplitKeys();
         })
         .semi();
 }
@@ -219,17 +200,15 @@ SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestSplitVect
 SemiFuture<void> BalancerCommandsSchedulerImpl::requestSplitChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkType& chunk,
-    const KeyPattern& shardKeyPattern,
+    const ShardId& shardId,
+    const ChunkVersion& collectionVersion,
+    const KeyPattern& keyPattern,
+    const BSONObj& minKey,
+    const BSONObj& maxKey,
     const std::vector<BSONObj>& splitPoints) {
 
-    auto commandInfo = std::make_shared<SplitChunkCommandInfo>(nss,
-                                                               chunk.getShard(),
-                                                               shardKeyPattern.toBSON(),
-                                                               chunk.getMin(),
-                                                               chunk.getMax(),
-                                                               chunk.getVersion(),
-                                                               splitPoints);
+    auto commandInfo = std::make_shared<SplitChunkCommandInfo>(
+        nss, shardId, keyPattern.toBSON(), minKey, maxKey, collectionVersion, splitPoints);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
         .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
@@ -466,6 +445,7 @@ void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
     } catch (const DBException& e) {
         LOGV2_ERROR(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
     }
+
     deferredCleanupCompletedCheckpoint.pauseWhileSet();
 }
 

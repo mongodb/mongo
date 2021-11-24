@@ -30,6 +30,7 @@
 #pragma once
 
 #include <set>
+#include <variant>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
@@ -78,6 +79,118 @@ struct MigrateInfo {
     MoveChunkRequest::ForceJumbo forceJumbo;
     MigrationReason reason;
 };
+
+typedef std::vector<MigrateInfo> MigrateInfoVector;
+
+/**
+ * Describes a chunk which needs to be split, because it violates the balancer policy.
+ */
+struct SplitInfo {
+    SplitInfo(const ShardId& shardId,
+              const NamespaceString& nss,
+              const ChunkVersion& collectionVersion,
+              const ChunkVersion& chunkVersion,
+              const BSONObj& minKey,
+              const BSONObj& maxKey,
+              std::vector<BSONObj> splitKeys);
+
+    std::string toString() const;
+
+    ShardId shardId;
+    NamespaceString nss;
+    ChunkVersion collectionVersion;
+    ChunkVersion chunkVersion;
+    BSONObj minKey;
+    BSONObj maxKey;
+    std::vector<BSONObj> splitKeys;
+};
+
+typedef std::vector<SplitInfo> SplitInfoVector;
+
+struct SplitInfoWithKeyPattern {
+    SplitInfoWithKeyPattern(const ShardId& shardId,
+                            const NamespaceString& nss,
+                            const ChunkVersion& collectionVersion,
+                            const BSONObj& minKey,
+                            const BSONObj& maxKey,
+                            std::vector<BSONObj> splitKeys,
+                            const UUID& uuid,
+                            const BSONObj& keyPattern);
+    SplitInfo info;
+    UUID uuid;
+    BSONObj keyPattern;
+};
+
+struct AutoSplitVectorInfo {
+    AutoSplitVectorInfo(const ShardId& shardId,
+                        const NamespaceString& nss,
+                        const UUID& uuid,
+                        const ChunkVersion& collectionVersion,
+                        const BSONObj& keyPattern,
+                        const BSONObj& minKey,
+                        const BSONObj& maxKey,
+                        long long maxChunkSizeBytes);
+
+    ShardId shardId;
+    NamespaceString nss;
+    UUID uuid;
+    ChunkVersion collectionVersion;
+    BSONObj keyPattern;
+    BSONObj minKey;
+    BSONObj maxKey;
+    long long maxChunkSizeBytes;
+};
+
+struct MergeInfo {
+    MergeInfo(const ShardId& shardId,
+              const NamespaceString& nss,
+              const UUID& uuid,
+              const ChunkVersion& collectionVersion,
+              const ChunkRange& chunkRange);
+
+    std::string toString() const;
+
+    ShardId shardId;
+    NamespaceString nss;
+    UUID uuid;
+    ChunkVersion collectionVersion;
+    ChunkRange chunkRange;
+};
+
+struct DataSizeInfo {
+    DataSizeInfo(const ShardId& shardId,
+                 const NamespaceString& nss,
+                 const UUID& uuid,
+                 const ChunkRange& chunkRange,
+                 const ChunkVersion& version,
+                 const KeyPattern& keyPattern,
+                 bool estimatedValue);
+
+    ShardId shardId;
+    NamespaceString nss;
+    UUID uuid;
+    ChunkRange chunkRange;
+    ChunkVersion version;
+    KeyPattern keyPattern;
+    bool estimatedValue;
+};
+
+struct DataSizeResponse {
+    DataSizeResponse(long long sizeBytes, long long numObjects)
+        : sizeBytes(sizeBytes), numObjects(numObjects) {}
+
+    long long sizeBytes;
+    long long numObjects;
+};
+
+struct EndOfActionStream {};
+
+typedef stdx::variant<MergeInfo,
+                      AutoSplitVectorInfo,
+                      DataSizeInfo,
+                      SplitInfoWithKeyPattern,
+                      EndOfActionStream>
+    DefragmentationAction;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;

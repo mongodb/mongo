@@ -54,33 +54,6 @@ class BalancerChunkSelectionPolicy {
     BalancerChunkSelectionPolicy& operator=(const BalancerChunkSelectionPolicy&) = delete;
 
 public:
-    /**
-     * Describes a chunk which needs to be split, because it violates the balancer policy.
-     */
-    struct SplitInfo {
-        SplitInfo(ShardId shardId,
-                  NamespaceString nss,
-                  ChunkVersion collectionVersion,
-                  ChunkVersion chunkVersion,
-                  const BSONObj& minKey,
-                  const BSONObj& maxKey,
-                  std::vector<BSONObj> splitKeys);
-
-        std::string toString() const;
-
-        ShardId shardId;
-        NamespaceString nss;
-        ChunkVersion collectionVersion;
-        ChunkVersion chunkVersion;
-        BSONObj minKey;
-        BSONObj maxKey;
-        std::vector<BSONObj> splitKeys;
-    };
-
-    typedef std::vector<SplitInfo> SplitInfoVector;
-
-    typedef std::vector<MigrateInfo> MigrateInfoVector;
-
     virtual ~BalancerChunkSelectionPolicy();
 
     /**

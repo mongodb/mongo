@@ -224,6 +224,7 @@ env.Library(
         'balancer/balancer_chunk_selection_policy.cpp',
         'balancer/balancer_command_document.idl',
         'balancer/balancer_commands_scheduler_impl.cpp',
+        'balancer/balancer_defragmentation_policy_impl.cpp',
         'balancer/balancer_dist_locks.cpp',
         'balancer/balancer_policy.cpp',
         'balancer/balancer.cpp',
@@ -554,6 +555,7 @@ env.CppUnitTest(
     target='db_s_config_server_test',
     source=[
         'balancer/balancer_chunk_selection_policy_test.cpp',
+        'balancer/balancer_defragmentation_policy_test.cpp',
         'balancer/balancer_policy_test.cpp',
         'balancer/cluster_statistics_test.cpp',
         'balancer/core_options_stub.cpp',

@@ -53,6 +53,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
@@ -449,6 +450,7 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
             maxChunkSizeBytes || balancerShouldMergeChunks || enableAutoSplitter);
 
     short updatedFields = 0;
+    bool doMerge, doSplit = false;
     BSONObjBuilder updateCmd;
     {
         BSONObjBuilder setBuilder(updateCmd.subobjStart("$set"));
@@ -464,12 +466,12 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
             updatedFields++;
         }
         if (balancerShouldMergeChunks) {
-            const bool doMerge = balancerShouldMergeChunks.get();
+            doMerge = balancerShouldMergeChunks.get();
             setBuilder.append(CollectionType::kBalancerShouldMergeChunksFieldName, doMerge);
             updatedFields++;
         }
         if (enableAutoSplitter) {
-            const bool doSplit = enableAutoSplitter.get();
+            doSplit = enableAutoSplitter.get();
             setBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
             updatedFields++;
         }
@@ -478,6 +480,11 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
         BSONObjBuilder unsetBuilder(updateCmd.subobjStart("$unset"));
         unsetBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, 0);
         updatedFields++;
+    }
+    if (balancerShouldMergeChunks && enableAutoSplitter) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Autosplitter and defragmentation cannot both be enabled for a collection",
+                !(doMerge && doSplit));
     }
 
     if (updatedFields == 0) {

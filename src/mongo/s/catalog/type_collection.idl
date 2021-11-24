@@ -36,6 +36,16 @@ imports:
     - "mongo/s/resharding/type_collection_fields.idl"
     - "mongo/s/type_collection_common_types.idl"
 
+enums:
+    DefragmentationPhase:
+        description: "The list of phases composing the Collection Chunks Defragmentation Algorithm"
+        type: string
+        values:
+            kNotStarted: "notStarted"
+            kMergeChunks : "mergeChunks"
+            kMoveAndMergeChunks: "moveAndMergeChunks"
+            kSplitChunks: "splitChunks"
+
 structs:
     CollectionTypeBase:
         description: "Represents the layout and contents of documents contained in the config 
@@ -117,6 +127,11 @@ structs:
             noAutoSplit: 
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."
+                optional: true
+            defragmentationPhase:
+                type: DefragmentationPhase
+                description: "When the balancer is performing defragmentation on the collection,
+                              stores the ID of the currently active phase of the process."
                 optional: true
             noBalance:
                 type: bool

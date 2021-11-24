@@ -85,6 +85,7 @@ public:
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
 
     using CollectionTypeBase::kBalancerShouldMergeChunksFieldName;
+    using CollectionTypeBase::kDefragmentationPhaseFieldName;
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
     using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;

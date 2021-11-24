@@ -52,6 +52,7 @@ using std::numeric_limits;
 using std::set;
 using std::string;
 using std::vector;
+using namespace fmt::literals;
 
 namespace {
 
@@ -748,5 +749,97 @@ string MigrateInfo::toString() const {
     return str::stream() << uuid << ": [" << minKey << ", " << maxKey << "), from " << from
                          << ", to " << to;
 }
+
+SplitInfo::SplitInfo(const ShardId& inShardId,
+                     const NamespaceString& inNss,
+                     const ChunkVersion& inCollectionVersion,
+                     const ChunkVersion& inChunkVersion,
+                     const BSONObj& inMinKey,
+                     const BSONObj& inMaxKey,
+                     std::vector<BSONObj> inSplitKeys)
+    : shardId(inShardId),
+      nss(inNss),
+      collectionVersion(inCollectionVersion),
+      chunkVersion(inChunkVersion),
+      minKey(inMinKey),
+      maxKey(inMaxKey),
+      splitKeys(std::move(inSplitKeys)) {}
+
+std::string SplitInfo::toString() const {
+    StringBuilder splitKeysBuilder;
+    for (const auto& splitKey : splitKeys) {
+        splitKeysBuilder << splitKey.toString() << ", ";
+    }
+
+    return "Splitting chunk in {} [ {}, {} ), residing on {} at [ {} ] with version {} and collection version {}"_format(
+        nss.ns(),
+        minKey.toString(),
+        maxKey.toString(),
+        shardId.toString(),
+        splitKeysBuilder.str(),
+        chunkVersion.toString(),
+        collectionVersion.toString());
+}
+
+SplitInfoWithKeyPattern::SplitInfoWithKeyPattern(const ShardId& shardId,
+                                                 const NamespaceString& nss,
+                                                 const ChunkVersion& collectionVersion,
+                                                 const BSONObj& minKey,
+                                                 const BSONObj& maxKey,
+                                                 std::vector<BSONObj> splitKeys,
+                                                 const UUID& uuid,
+                                                 const BSONObj& keyPattern)
+    : info(SplitInfo(
+          shardId, nss, collectionVersion, ChunkVersion(), minKey, maxKey, std::move(splitKeys))),
+      uuid(uuid),
+      keyPattern(keyPattern) {}
+
+AutoSplitVectorInfo::AutoSplitVectorInfo(const ShardId& shardId,
+                                         const NamespaceString& nss,
+                                         const UUID& uuid,
+                                         const ChunkVersion& collectionVersion,
+                                         const BSONObj& keyPattern,
+                                         const BSONObj& minKey,
+                                         const BSONObj& maxKey,
+                                         long long maxChunkSizeBytes)
+    : shardId(shardId),
+      nss(nss),
+      uuid(uuid),
+      collectionVersion(collectionVersion),
+      keyPattern(keyPattern),
+      minKey(minKey),
+      maxKey(maxKey),
+      maxChunkSizeBytes(maxChunkSizeBytes) {}
+
+MergeInfo::MergeInfo(const ShardId& shardId,
+                     const NamespaceString& nss,
+                     const UUID& uuid,
+                     const ChunkVersion& collectionVersion,
+                     const ChunkRange& chunkRange)
+    : shardId(shardId),
+      nss(nss),
+      uuid(uuid),
+      collectionVersion(collectionVersion),
+      chunkRange(chunkRange) {}
+
+std::string MergeInfo::toString() const {
+    return "Merging chunk range {} in {} residing on {} with collection version {}"_format(
+        chunkRange.toString(), nss.toString(), shardId.toString(), collectionVersion.toString());
+}
+
+DataSizeInfo::DataSizeInfo(const ShardId& shardId,
+                           const NamespaceString& nss,
+                           const UUID& uuid,
+                           const ChunkRange& chunkRange,
+                           const ChunkVersion& version,
+                           const KeyPattern& keyPattern,
+                           bool estimatedValue)
+    : shardId(shardId),
+      nss(nss),
+      uuid(uuid),
+      chunkRange(chunkRange),
+      version(version),
+      keyPattern(keyPattern),
+      estimatedValue(estimatedValue) {}
 
 }  // namespace mongo

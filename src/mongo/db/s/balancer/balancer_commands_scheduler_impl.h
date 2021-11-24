@@ -37,6 +37,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 
@@ -202,63 +203,34 @@ private:
     static const std::string kConfig;
 };
 
-class SplitVectorCommandInfo : public CommandInfo {
+class AutoSplitVectorCommandInfo : public CommandInfo {
 public:
-    SplitVectorCommandInfo(const NamespaceString& nss,
-                           const ShardId& shardId,
-                           const BSONObj& shardKeyPattern,
-                           const BSONObj& lowerBoundKey,
-                           const BSONObj& upperBoundKey,
-                           boost::optional<long long> maxSplitPoints,
-                           boost::optional<long long> maxChunkObjects,
-                           boost::optional<long long> maxChunkSizeBytes,
-                           bool force)
+    AutoSplitVectorCommandInfo(const NamespaceString& nss,
+                               const ShardId& shardId,
+                               const BSONObj& shardKeyPattern,
+                               const BSONObj& lowerBoundKey,
+                               const BSONObj& upperBoundKey,
+                               int64_t maxChunkSizeBytes)
         : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
-          _maxSplitPoints(maxSplitPoints),
-          _maxChunkObjects(maxChunkObjects),
-          _maxChunkSizeBytes(maxChunkSizeBytes),
-          _force(force) {}
+          _maxChunkSizeBytes(maxChunkSizeBytes) {}
 
     BSONObj serialise() const override {
-        BSONObjBuilder commandBuilder;
-        commandBuilder.append(kCommandName, getNameSpace().toString())
-            .append(kKeyPattern, _shardKeyPattern)
-            .append(kLowerBound, _lowerBoundKey)
-            .append(kUpperBound, _upperBoundKey)
-            .append(kForceSplit, _force);
-        if (_maxSplitPoints) {
-            commandBuilder.append(kMaxSplitPoints, _maxSplitPoints.get());
-        }
-        if (_maxChunkObjects) {
-            commandBuilder.append(kMaxChunkObjects, _maxChunkObjects.get());
-        }
-        if (_maxChunkSizeBytes) {
-            commandBuilder.append(kMaxChunkSizeBytes, _maxChunkSizeBytes.get());
-        }
-        return commandBuilder.obj();
+        return AutoSplitVectorRequest(getNameSpace(),
+                                      _shardKeyPattern,
+                                      _lowerBoundKey,
+                                      _upperBoundKey,
+                                      _maxChunkSizeBytes)
+            .toBSON({});
     }
 
 private:
     BSONObj _shardKeyPattern;
-    BSONObj _lowerBoundKey;
-    BSONObj _upperBoundKey;
-    boost::optional<long long> _maxSplitPoints;
-    boost::optional<long long> _maxChunkObjects;
-    boost::optional<long long> _maxChunkSizeBytes;
-    bool _force;
-
-
-    static const std::string kCommandName;
-    static const std::string kKeyPattern;
-    static const std::string kLowerBound;
-    static const std::string kUpperBound;
-    static const std::string kMaxChunkSizeBytes;
-    static const std::string kMaxSplitPoints;
-    static const std::string kMaxChunkObjects;
-    static const std::string kForceSplit;
+    const BSONObj _lowerBoundKey;
+    const BSONObj _upperBoundKey;
+    int64_t _maxChunkSizeBytes;
 };
 
 class DataSizeCommandInfo : public CommandInfo {
@@ -528,17 +500,21 @@ public:
                                         const ChunkRange& chunkRange,
                                         const ChunkVersion& version) override;
 
-    SemiFuture<std::vector<BSONObj>> requestSplitVector(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const ChunkType& chunk,
-        const KeyPattern& keyPattern,
-        const SplitVectorSettings& commandSettings) override;
+    SemiFuture<std::vector<BSONObj>> requestAutoSplitVector(OperationContext* opCtx,
+                                                            const NamespaceString& nss,
+                                                            const ShardId& shardId,
+                                                            const BSONObj& keyPattern,
+                                                            const BSONObj& minKey,
+                                                            const BSONObj& maxKey,
+                                                            int64_t maxChunkSizeBytes) override;
 
     SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
                                        const NamespaceString& nss,
-                                       const ChunkType& chunk,
+                                       const ShardId& shardId,
+                                       const ChunkVersion& collectionVersion,
                                        const KeyPattern& keyPattern,
+                                       const BSONObj& minKey,
+                                       const BSONObj& maxKey,
                                        const std::vector<BSONObj>& splitPoints) override;
 
     SemiFuture<DataSizeResponse> requestDataSize(OperationContext* opCtx,

@@ -52,9 +52,6 @@
 
 namespace mongo {
 
-using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
-using SplitInfoVector = BalancerChunkSelectionPolicy::SplitInfoVector;
-
 namespace {
 
 /**
@@ -115,8 +112,7 @@ public:
     SplitCandidatesBuffer(NamespaceString nss, ChunkVersion collectionVersion)
         : _nss(std::move(nss)),
           _collectionVersion(collectionVersion),
-          _chunkSplitPoints(SimpleBSONObjComparator::kInstance
-                                .makeBSONObjIndexedMap<BalancerChunkSelectionPolicy::SplitInfo>()) {
+          _chunkSplitPoints(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<SplitInfo>()) {
     }
 
     /**
@@ -127,13 +123,13 @@ public:
         auto it = _chunkSplitPoints.find(chunk.getMin());
         if (it == _chunkSplitPoints.end()) {
             _chunkSplitPoints.emplace(chunk.getMin(),
-                                      BalancerChunkSelectionPolicy::SplitInfo(chunk.getShardId(),
-                                                                              _nss,
-                                                                              _collectionVersion,
-                                                                              chunk.getLastmod(),
-                                                                              chunk.getMin(),
-                                                                              chunk.getMax(),
-                                                                              {splitPoint}));
+                                      SplitInfo(chunk.getShardId(),
+                                                _nss,
+                                                _collectionVersion,
+                                                chunk.getLastmod(),
+                                                chunk.getMin(),
+                                                chunk.getMax(),
+                                                {splitPoint}));
         } else if (splitPoint.woCompare(it->second.splitKeys.back()) > 0) {
             it->second.splitKeys.push_back(splitPoint);
         } else {
@@ -147,7 +143,7 @@ public:
      * a vector of split infos to be passed to the split call.
      */
     SplitInfoVector done() {
-        BalancerChunkSelectionPolicy::SplitInfoVector splitPoints;
+        SplitInfoVector splitPoints;
         for (const auto& entry : _chunkSplitPoints) {
             splitPoints.push_back(std::move(entry.second));
         }
@@ -161,7 +157,7 @@ private:
     const ChunkVersion _collectionVersion;
 
     // Chunk min key and split vector associated with that chunk
-    BSONObjIndexedMap<BalancerChunkSelectionPolicy::SplitInfo> _chunkSplitPoints;
+    BSONObjIndexedMap<SplitInfo> _chunkSplitPoints;
 };
 
 /**

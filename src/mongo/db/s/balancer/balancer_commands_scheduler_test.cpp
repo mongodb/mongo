@@ -177,26 +177,33 @@ TEST_F(BalancerCommandsSchedulerTest, MergeChunkNonexistentShard) {
     _scheduler.stop();
 }
 
-TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitVectorCommand) {
+TEST_F(BalancerCommandsSchedulerTest, SuccessfulAutoSplitVectorCommand) {
     _scheduler.start(operationContext());
     ChunkType splitChunk = makeChunk(0, kShardId0);
-    BSONObjBuilder splitChunkResponse;
-    splitChunkResponse.append("ok", "1");
-    BSONArrayBuilder splitKeys(splitChunkResponse.subarrayStart("splitKeys"));
-    splitKeys.append(BSON("x" << 5));
+    BSONObjBuilder autoSplitVectorResponse;
+    autoSplitVectorResponse.append("ok", "1");
+    BSONArrayBuilder splitKeys(autoSplitVectorResponse.subarrayStart("splitKeys"));
+    splitKeys.append(BSON("x" << 7));
+    splitKeys.append(BSON("x" << 9));
     splitKeys.done();
     auto networkResponseFuture = launchAsync([&]() {
         onCommand([&](const executor::RemoteCommandRequest& request) {
-            return splitChunkResponse.obj();
+            return autoSplitVectorResponse.obj();
         });
     });
-    auto futureResponse = _scheduler.requestSplitVector(
-        operationContext(), kNss, splitChunk, KeyPattern(BSON("x" << 1)), SplitVectorSettings());
+    auto futureResponse = _scheduler.requestAutoSplitVector(operationContext(),
+                                                            kNss,
+                                                            splitChunk.getShard(),
+                                                            BSON("x" << 1),
+                                                            splitChunk.getMin(),
+                                                            splitChunk.getMax(),
+                                                            4);
     auto swReceivedSplitKeys = futureResponse.getNoThrow();
     ASSERT_OK(swReceivedSplitKeys.getStatus());
     auto receivedSplitKeys = swReceivedSplitKeys.getValue();
-    ASSERT_EQ(receivedSplitKeys.size(), 1);
-    ASSERT_BSONOBJ_EQ(receivedSplitKeys[0], BSON("x" << 5));
+    ASSERT_EQ(receivedSplitKeys.size(), 2);
+    ASSERT_BSONOBJ_EQ(receivedSplitKeys[0], BSON("x" << 7));
+    ASSERT_BSONOBJ_EQ(receivedSplitKeys[1], BSON("x" << 9));
     networkResponseFuture.default_timed_get();
     _scheduler.stop();
 }
@@ -210,8 +217,11 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulSplitChunkCommand) {
     });
     auto futureResponse = _scheduler.requestSplitChunk(operationContext(),
                                                        kNss,
-                                                       splitChunk,
+                                                       splitChunk.getShard(),
+                                                       splitChunk.getVersion(),
                                                        KeyPattern(BSON("x" << 1)),
+                                                       splitChunk.getMin(),
+                                                       splitChunk.getMax(),
                                                        std::vector<BSONObj>{BSON("x" << 5)});
     ASSERT_OK(futureResponse.getNoThrow());
     networkResponseFuture.default_timed_get();
