@@ -9,21 +9,6 @@ load("jstests/aggregation/extras/utils.js");
 const coll = db[jsTestName()];
 coll.drop();
 
-const isExactTopNEnabled = db.adminCommand({getParameter: 1, featureFlagExactTopNAccumulator: 1})
-                               .featureFlagExactTopNAccumulator.value;
-
-if (!isExactTopNEnabled) {
-    // Verify that $firstN/$lastN cannot be used if the feature flag is set to false and ignore the
-    // rest of the test.
-    assert.commandFailedWithCode(coll.runCommand("aggregate", {
-        pipeline:
-            [{$group: {_id: {'st': '$state'}, firstValues: {$firstN: {input: '$sales', n: 2}}}}],
-        cursor: {}
-    }),
-                                 15952);
-    return;
-}
-
 const largestInt =
     NumberDecimal("9223372036854775807");  // This is max int64 which is supported as N.
 const largestIntPlus1 = NumberDecimal("9223372036854775808");  // Adding 1 puts it over the edge.

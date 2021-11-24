@@ -35,91 +35,93 @@ namespace mongo {
 using FirstLastSense = AccumulatorFirstLastN::Sense;
 using MinMaxSense = AccumulatorMinMax::Sense;
 
-// TODO SERVER-52247 Replace boost::none with 'gFeatureFlagExactTopNAccumulator.getVersion()' below
-// once 'gFeatureFlagExactTopNAccumulator' is set to true by default and is configured with an FCV.
+// Register macros for the various accumulators/expressions in this file. Note that we check
+// 'isEnabledAndIgnoreFCV()' because the feature flag is a property set at startup, while FCV can
+// change while the server is running.
+// TODO SERVER-61855 Add these accumulators/expressions to the stable API.
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     maxN,
     AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMax>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     minN,
     AccumulatorMinMaxN::parseMinMaxN<MinMaxSense::kMin>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_EXPRESSION_CONDITIONALLY(
     maxN,
     AccumulatorMinMaxN::parseExpression<MinMaxSense::kMax>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_EXPRESSION_CONDITIONALLY(
     minN,
     AccumulatorMinMaxN::parseExpression<MinMaxSense::kMin>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     firstN,
     AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kFirst>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     lastN,
     AccumulatorFirstLastN::parseFirstLastN<FirstLastSense::kLast>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_EXPRESSION_CONDITIONALLY(
     firstN,
     AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_EXPRESSION_CONDITIONALLY(
     lastN,
     AccumulatorFirstLastN::parseExpression<FirstLastSense::kLast>,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     topN,
     (AccumulatorTopBottomN<TopBottomSense::kTop, false>::parseTopBottomN),
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     bottomN,
     (AccumulatorTopBottomN<TopBottomSense::kBottom, false>::parseTopBottomN),
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     top,
     (AccumulatorTopBottomN<TopBottomSense::kTop, true>::parseTopBottomN),
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_ACCUMULATOR_CONDITIONALLY(
     bottom,
     (AccumulatorTopBottomN<TopBottomSense::kBottom, true>::parseTopBottomN),
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 // TODO SERVER-57886 Add $topN/$bottomN/$top/$bottom as window functions.
 

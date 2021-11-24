@@ -56,7 +56,8 @@ feature_flags:
     featureFlagExactTopNAccumulator:
       description: "Feature flag for allowing use of topN family of accumulators"
       cpp_varname: gFeatureFlagExactTopNAccumulator
-      default: false
+      default: true
+      version: 5.2
 
     featureFlagShardedLookup:
       description: "Feature flag for allowing $lookup/$graphLookup into a sharded collection"

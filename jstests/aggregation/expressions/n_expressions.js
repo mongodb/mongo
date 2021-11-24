@@ -11,20 +11,6 @@ const doc = {
     diff: 2
 };
 
-const isExactTopNEnabled = db.adminCommand({getParameter: 1, featureFlagExactTopNAccumulator: 1})
-                               .featureFlagExactTopNAccumulator.value;
-
-if (!isExactTopNEnabled) {
-    // Verify that $minN/$maxN cannot be used if the feature flag is set to false and ignore the
-    // rest of the test.
-    assert.commandFailedWithCode(
-        coll.runCommand(
-            "aggregate",
-            {pipeline: [{$project: {output: {'$minN': {n: 3, input: [3, 1, 2, 3]}}}}], cursor: {}}),
-        31325);
-    return;
-}
-
 coll.drop();
 assert.commandWorked(coll.insert(doc));
 

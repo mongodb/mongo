@@ -7,20 +7,6 @@
 const coll = db[jsTestName()];
 coll.drop();
 
-const isExactTopNEnabled = db.adminCommand({getParameter: 1, featureFlagExactTopNAccumulator: 1})
-                               .featureFlagExactTopNAccumulator.value;
-
-if (!isExactTopNEnabled) {
-    // Verify that $minN/$maxN cannot be used if the feature flag is set to false and ignore the
-    // rest of the test.
-    assert.commandFailedWithCode(coll.runCommand("aggregate", {
-        pipeline: [{$group: {_id: {'st': '$state'}, minSales: {$minN: {input: '$sales', n: 2}}}}],
-        cursor: {}
-    }),
-                                 15952);
-    return;
-}
-
 // Basic correctness tests.
 let docs = [];
 const n = 4;

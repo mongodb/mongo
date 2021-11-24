@@ -11,26 +11,6 @@ coll.drop();
 
 // TODO SERVER-57886: Add test cases for $top/$bottom/$topN/$bottomN window functions.
 const nAccumulators = ["$minN", "$maxN", "$firstN", "$lastN"];
-const isExactTopNEnabled = db.adminCommand({getParameter: 1, featureFlagExactTopNAccumulator: 1})
-                               .featureFlagExactTopNAccumulator.value;
-
-if (!isExactTopNEnabled) {
-    // Verify that $minN/$maxN/$firstN/$lastN cannot be used if the feature flag is set to false and
-    // ignore the rest of the test.
-    for (const acc of nAccumulators) {
-        assert.commandFailedWithCode(coll.runCommand("aggregate", {
-            pipeline: [{
-                $setWindowFields: {
-                    sortBy: {ts: 1},
-                    output: {outputField: {[acc]: {n: 3, input: "$foo"}}},
-                }
-            }],
-            cursor: {}
-        }),
-                                     ErrorCodes.FailedToParse);
-    }
-    return;
-}
 
 // Create a collection of tickers and prices.
 const nDocsPerTicker = 10;

@@ -55,27 +55,28 @@ REGISTER_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
 REGISTER_WINDOW_FUNCTION(first, ExpressionFirst::parse);
 REGISTER_WINDOW_FUNCTION(last, ExpressionLast::parse);
 
-// TODO SERVER-52247 Replace boost::none with 'gFeatureFlagExactTopNAccumulator.getVersion()' below
-// once 'gFeatureFlagExactTopNAccumulator' is set to true by default and is configured with an FCV.
+// Register macros for the various accumulators/expressions in this file. Note that we check
+// 'isEnabledAndIgnoreFCV()' because the feature flag is a property set at startup, while FCV can
+// change while the server is running.
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     minN,
     ExpressionN<WindowFunctionMinN>::parse,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     maxN,
     ExpressionN<WindowFunctionMaxN>::parse,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     firstN,
     ExpressionN<WindowFunctionFirstN>::parse,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     lastN,
     ExpressionN<WindowFunctionLastN>::parse,
-    boost::none,
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 
 StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;
