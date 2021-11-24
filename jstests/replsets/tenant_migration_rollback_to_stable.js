@@ -23,11 +23,13 @@
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
-const kDataDir = "/tmp/tenant_migration_test_data";
-assert.eq(runNonMongoProgram("rm", "-rf", kDataDir), 0);
-assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
+const migrationId = UUID();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
+const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+const kDataDir =
+    `${recipientPrimary.dbpath}/migrationTmpFiles.${extractUUIDFromObject(migrationId)}`;
+assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
 
 (function() {
 jsTestLog("Generate test data: open a backup cursor on the donor and copy files");
@@ -65,9 +67,10 @@ for (let f of cursor.firstBatch) {
 
     /*
      * Create directories as needed, e.g. copy
-     * /data/db/job0/mongorunner/test-0/journal/WiredTigerLog.0000000001 to
-     * /tmp/tenant_migration_test_data/journal/WiredTigerLog.0000000001, by passing "--relative
-     * /data/db/job0/mongorunner/test-0/./journal/WiredTigerLog.0000000001". Note the "/./" marker.
+     * /data/db/job0/mongorunner/test-0/journal/WiredTigerLog.01 to
+     * /data/db/job0/mongorunner/test-1/migrationTmpFiles.migrationId/journal/WiredTigerLog.01,
+     * by passing "--relative /data/db/job0/mongorunner/test-0/./journal/WiredTigerLog.01".
+     * Note the "/./" marker.
      */
     assert.eq(runNonMongoProgram(
                   "rsync", "-a", "--relative", `${donorPrimary.dbpath}/.${suffix}`, kDataDir),
@@ -80,7 +83,6 @@ donorPrimary.adminCommand({killCursors: "$cmd.aggregate", cursors: [cursor.id]})
 
 jsTestLog("Run migration");
 const kTenantId = "testTenantId";
-const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,

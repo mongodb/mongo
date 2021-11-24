@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
+#include <fmt/format.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/client/dbclient_connection.h"
@@ -79,6 +80,7 @@
 namespace mongo {
 namespace repl {
 namespace {
+using namespace fmt;
 const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
@@ -124,6 +126,11 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
 bool isRetriableOplogFetcherError(Status oplogFetcherStatus) {
     return oplogFetcherStatus == ErrorCodes::InvalidSyncSource ||
         oplogFetcherStatus == ErrorCodes::ShutdownInProgress;
+}
+
+boost::filesystem::path fileClonerTempDir(UUID migrationId) {
+    return boost::filesystem::path(storageGlobalParams.dbpath) /
+        ("migrationTmpFiles.{}"_format(migrationId.toString()));
 }
 
 }  // namespace
@@ -1652,18 +1659,17 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_rollbackToStable() 
                 return SemiFuture<void>::makeReady();
             }
 
-            // TODO (SERVER-61133): Use the temp dir where we copied donor files.
-            const std::string kTempDirectory = "/tmp/tenant_migration_test_data";
-            boost::filesystem::path tempPath(kTempDirectory);
-            if (!boost::filesystem::exists(tempPath)) {
+            auto tempDirectory = fileClonerTempDir(stateDoc.getId());
+            if (!boost::filesystem::exists(tempDirectory)) {
+                // TODO (SERVER-61133): Abort the merge if no files.
                 LOGV2_WARNING(61137,
                               "No temp directory of donor files to import",
-                              "tempDirectory"_attr = kTempDirectory);
+                              "tempDirectory"_attr = tempDirectory.string());
                 return SemiFuture<void>::makeReady();
             }
 
             auto opCtx = cc().makeOperationContext();
-            wiredTigerImportFromBackupCursor(opCtx.get(), kTempDirectory);
+            wiredTigerImportFromBackupCursor(opCtx.get(), tempDirectory.string());
             return SemiFuture<void>::makeReady();
         })
         .semi();
