@@ -40,12 +40,15 @@ const newnode = rst.add({
     sslCAFile: "jstests/libs/trusted-ca.pem",
     sslClusterFile: "jstests/libs/trusted-client.pem",
     sslAllowInvalidHostnames: "",
+    // IMPORTANT: shell will not be able to talk to the new node due to cert rotation
+    // therefore we set "waitForConnect:false" to ensure shell does not try to acess it
     waitForConnect: false,
 });
 
 // Emulate waitForConnect so we wait for new node to come up before killing rst
 const host = "localhost:" + newnode.port;
 assert.soon(() => {
+    print(`Testing that ${host} is up`);
     return 0 ===
         runMongoProgram("mongo",
                         "--ssl",
@@ -60,12 +63,42 @@ assert.soon(() => {
                         ";");
 });
 
+print("Reinitiating replica set");
 rst.reInitiate();
+
+assert.soon(() => {
+    print(`Waiting for ${host} to join replica set`);
+    return 0 ===
+        runMongoProgram("mongo",
+                        "--ssl",
+                        "--sslAllowInvalidHostnames",
+                        "--host",
+                        host,
+                        "--sslPEMKeyFile",
+                        "jstests/libs/trusted-client.pem",
+                        "--sslCAFile",
+                        "jstests/libs/trusted-ca.pem",
+                        "--eval",
+                        `const PRIMARY = 1;
+                        const SECONDARY = 2;
+                        const s = db.adminCommand({replSetGetStatus: 1});
+                        if (!s.ok) {
+                            print('replSetGetStatus is not ok');
+                            quit(1);
+                        }
+                        if (s.myState != PRIMARY && s.myState != SECONDARY) {
+                            print('node is not primary or secondary');
+                            quit(1);
+                        };
+                        print('node is online and in cluster');
+                        `);
+});
 
 // Make sure each node can connect to each other node
 for (let node of rst.nodeList()) {
     for (let target of rst.nodeList()) {
         if (node !== target) {
+            print(`Testing connectivity of ${node} to ${target}`);
             assert.eq(0,
                       runMongoProgram(
                           "mongo",
