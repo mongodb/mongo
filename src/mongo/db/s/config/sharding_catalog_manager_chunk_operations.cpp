@@ -107,6 +107,7 @@ BSONArray buildMergeChunksTransactionUpdates(const std::vector<ChunkType>& chunk
 
         // fill in additional details for sending through transaction
         mergedChunk.setVersion(mergeVersion);
+        mergedChunk.setEstimatedSizeBytes(boost::none);
 
         invariant(validAfter);
         mergedChunk.setHistory({ChunkHistory(validAfter.get(), mergedChunk.getShard())});
@@ -596,6 +597,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         newChunk.setVersion(currentMaxVersion);
         newChunk.setMin(startKey);
         newChunk.setMax(endKey);
+        newChunk.setEstimatedSizeBytes(boost::none);
 
         op.append("o", newChunk.toConfigBSON());
 

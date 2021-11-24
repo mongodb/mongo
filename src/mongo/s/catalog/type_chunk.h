@@ -307,6 +307,8 @@ public:
         return _estimatedSizeBytes;
     }
 
+    void setEstimatedSizeBytes(const boost::optional<long long>& estimatedSize);
+
     bool getJumbo() const {
         return _jumbo.get_value_or(false);
     }

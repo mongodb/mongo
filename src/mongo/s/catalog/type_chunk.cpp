@@ -479,6 +479,10 @@ void ChunkType::setShard(const ShardId& shard) {
     _shard = shard;
 }
 
+void ChunkType::setEstimatedSizeBytes(const boost::optional<long long>& estimatedSize) {
+    _estimatedSizeBytes = estimatedSize;
+}
+
 void ChunkType::setJumbo(bool jumbo) {
     _jumbo = jumbo;
 }
