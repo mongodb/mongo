@@ -585,11 +585,17 @@ struct OCSPFetchResponse {
                       boost::optional<Date_t> refreshTime)
         : statusOfResponse(statusOfResponse),
           response(std::move(response)),
-          refreshTime(refreshTime.value_or(Date_t::now() + 2 * kOCSPUnknownStatusRefreshRate)) {}
+          refreshTime(refreshTime.value_or(Date_t::now() + 2 * kOCSPUnknownStatusRefreshRate)),
+          hasNextUpdate(refreshTime) {}
 
     Status statusOfResponse;
     UniqueOCSPResponse response;
     Date_t refreshTime;
+    bool hasNextUpdate;
+
+    const bool cacheable() {
+        return (statusOfResponse == ErrorCodes::OCSPCertificateStatusRevoked) || hasNextUpdate;
+    }
 
     const Milliseconds fetchNewResponseDuration() {
         Milliseconds timeBeforeNextUpdate = refreshTime - Date_t::now();
@@ -838,7 +844,7 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> iterateResponse(
         }
     }
 
-    if (earliestNextUpdate < Date_t::now()) {
+    if (earliestNextUpdate && earliestNextUpdate < Date_t::now()) {
         return getSSLFailure("OCSP Basic Response is invalid: Response is expired.");
     }
 
@@ -910,6 +916,12 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
         std::shared_ptr<STACK_OF(X509)> intermediateCerts;
     };
 
+    if (purpose == OCSPPurpose::kClientVerify) {
+        LOGV2_INFO(6144501, "Dispatching OCSP requests for client-side verification");
+    } else {
+        LOGV2_INFO(6144502, "Dispatching OCSP requests for server stapling");
+    }
+
     std::vector<Future<UniqueOCSPResponse>> futureResponses{};
 
     for (auto host : leafResponders) {
@@ -961,7 +973,9 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                     if (state->finishLine.arriveWeakly()) {
                         state->promise.setError(
                             Status(ErrorCodes::OCSPCertificateStatusUnknown,
-                                   "Could not obtain status information of certificates."));
+                                   swCertIDSetAndDuration.getStatus().reason())
+                                .withContext(
+                                    "Could not obtain status information of certificates"));
                         return;
                     }
                 }
@@ -1042,7 +1056,10 @@ private:
                                                ocspContext,
                                                OCSPPurpose::kClientVerify)
                               .getNoThrow();
-        if (!swResponse.isOK()) {
+        if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
+            // if the response is unknown or not cacheable, (ie. because of
+            // a missing nextUpdate field), then return none so that the
+            // response is not cached
             return LookupResult(boost::none);
         }
 
@@ -1983,8 +2000,11 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
             return {Status::OK(), boost::none};
         }
 
-        // If lookup returns a boost::none, then we have an invalid value and
-        // we can't look into it.
+        // If lookup returns a boost::none, then it is either because the OCSP
+        // cert status is 'Unknown', or the status is 'Good', but the response
+        // containing this status cannot be cached due to a missing nextUpdate
+        // time. If the status is Unknown, we still let the client connect to
+        // the server since the server certificate is not definitively revoked
         if (!swOcspFetchResponse.getValue()) {
             return {Status::OK(), boost::none};
         }
@@ -2285,8 +2305,14 @@ Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     StatusWith<OCSPFetchResponse> swResponse) {
     stdx::lock_guard<mongo::Mutex> guard(_sharedResponseMutex);
 
-    if (!swResponse.isOK()) {
-        LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
+    if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
+        if (!swResponse.isOK()) {
+            LOGV2_WARNING(23233, "Could not staple OCSP response to outgoing certificate.");
+        } else {
+            LOGV2_WARNING(6144500,
+                          "Server will not staple the OCSP response because it is missing a "
+                          "nextUpdate time.");
+        }
 
         Milliseconds nextRefreshDuration = _fetcherBackoff.getNextRefreshDuration();
 
