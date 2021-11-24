@@ -55,6 +55,8 @@ src_c/stem_UTF_8_romanian.c
 src_c/stem_UTF_8_romanian.h
 src_c/stem_UTF_8_russian.c
 src_c/stem_UTF_8_russian.h
+src_c/stem_UTF_8_serbian.c
+src_c/stem_UTF_8_serbian.h
 src_c/stem_UTF_8_spanish.c
 src_c/stem_UTF_8_spanish.h
 src_c/stem_UTF_8_swedish.c

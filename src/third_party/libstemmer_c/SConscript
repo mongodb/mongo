@@ -37,6 +37,7 @@ stemming_packages = [
     "UTF_8_french",
     "UTF_8_norwegian",
     "UTF_8_russian",
+    "UTF_8_serbian",
     ]
 
 stemmer_files = [

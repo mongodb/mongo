@@ -26,6 +26,7 @@ stop_word_languages = [
     'portuguese',
     'romanian',
     'russian',
+    'serbian',
     'spanish',
     'swedish',
     'turkish',
