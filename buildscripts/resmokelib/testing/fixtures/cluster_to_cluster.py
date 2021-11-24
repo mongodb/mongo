@@ -60,13 +60,13 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
         # The cluster that starts off with the data.
         self.source_cluster_index = 0
 
-    def setup(self):
-        """Set up the cluster to cluster fixture according to the options provided."""
-
         for cluster_options in self.both_cluster_options:
             cluster = self.fixturelib.make_fixture(cluster_options["class"], self.logger,
                                                    self.job_num, **cluster_options["settings"])
             self.clusters.append(cluster)
+
+    def setup(self):
+        """Set up the cluster to cluster fixture according to the options provided."""
 
         for i, cluster in enumerate(self.clusters):
             self.logger.info(f"Setting up cluster {i}.")
