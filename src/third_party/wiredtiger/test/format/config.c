@@ -212,6 +212,8 @@ config_table(TABLE *table, void *arg)
 
     (void)arg; /* unused argument */
 
+    testutil_assert(table != NULL);
+
     /*
      * Choose a file format and a data source: they're interrelated (LSM is only compatible with
      * row-store) and other items depend on them.
