@@ -525,8 +525,7 @@ config_backward_compatible(void)
 static void
 config_cache(void)
 {
-    uint64_t cache;
-    uint32_t workers;
+    uint64_t cache, workers;
 
     /* Check if both min and max cache sizes have been specified and if they're consistent. */
     if (config_explicit(NULL, "cache")) {
