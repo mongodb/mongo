@@ -53,19 +53,15 @@ check_copy(void)
      */
     testutil_check(__wt_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE_TMP));
     ret = unlink(path);
-    /* It is fine if the file does not exist. */
-    if (ret == 0 || errno == ENOENT)
-        ret = 0;
-    else
-        testutil_die(errno, "unlink %s", path);
+    /* Check if unlink command failed. It is fine if the file does not exist. */
+    if (ret != 0 && errno != ENOENT)
+        testutil_die(errno, "unlink command failed with error code: %s", path);
 
     testutil_check(__wt_snprintf(path, len, "%s/%s", g.home, BACKUP_INFO_FILE));
     ret = unlink(path);
-    /* It is fine if the file does not exist. */
-    if (ret == 0 || errno == ENOENT)
-        ret = 0;
-    else
-        testutil_die(errno, "unlink %s", path);
+    /* Check if unlink command failed. It is fine if the file does not exist. */
+    if (ret != 0 && errno != ENOENT)
+        testutil_die(errno, "unlink command failed with error code: %s", path);
 
     /* Now setup and open the path for real. */
     testutil_check(__wt_snprintf(path, len, "%s/BACKUP", g.home));
