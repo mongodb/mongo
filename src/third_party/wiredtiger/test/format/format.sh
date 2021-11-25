@@ -47,8 +47,7 @@ smoke_base_2="$smoke_base_1 leaf_page_max=9 internal_page_max=9"
 smoke_list=(
 	# Three access methods.
 	"$smoke_base_1 file_type=row"
-    # Temporarily disabled: FIXME FLCS
-	# "$smoke_base_1 file_type=fix"
+	"$smoke_base_1 file_type=fix"
 	"$smoke_base_1 file_type=var"
 
 	# Huffman value encoding.
