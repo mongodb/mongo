@@ -2315,11 +2315,10 @@ tasks:
         vars:
           config: ../../../test/format/CONFIG.coverage
           extra_args: file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
-      # FIXME-WT-8016: temporarily disable FLCS
-      # - func: "format test"
-      #   vars:
-      #     config: ../../../test/format/CONFIG.coverage
-      #     extra_args: file_type=fix
+      - func: "format test"
+        vars:
+          config: ../../../test/format/CONFIG.coverage
+          extra_args: file_type=fix
       - command: shell.exec
         params:
           shell: bash
