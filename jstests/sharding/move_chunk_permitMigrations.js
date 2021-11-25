@@ -114,7 +114,7 @@ const testBalancer = function(setAllowMigrations, collBSetNoBalanceParam) {
     assert.eq(collBBalanceStatus.balancerCompliant, false);
     assert.eq(collBBalanceStatus.firstComplianceViolation, 'chunksImbalance');
     assert.eq(
-        4, configDB.chunks.countDocuments({ns: collA.getFullName(), shard: st.shard0.shardName}));
+        4, configDB.chunks.countDocuments({ns: collB.getFullName(), shard: st.shard0.shardName}));
 };
 
 const testSetAllowMigrationsCommand = function() {
