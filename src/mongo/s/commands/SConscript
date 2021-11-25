@@ -75,6 +75,7 @@ env.Library(
         'cluster_repl_set_get_status_cmd.cpp',
         'cluster_reset_error_cmd.cpp',
         'cluster_restart_catalog_command.cpp',
+        'cluster_set_allow_migrations_cmd.cpp',
         'cluster_set_feature_compatibility_version_cmd.cpp',
         'cluster_set_free_monitoring.cpp' if get_option("enable-free-mon") == 'on' else [],
         'cluster_shard_collection_cmd.cpp',

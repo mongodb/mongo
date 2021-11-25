@@ -3,7 +3,8 @@
  * moveChunk and disables the balancer.
  *
  * @tags: [
- *   multiversion_incompatible
+ *   multiversion_incompatible,
+ *   does_not_support_stepdowns,
  * ]
  */
 (function() {
@@ -14,7 +15,7 @@ load('jstests/libs/parallel_shell_helpers.js');
 
 const st = new ShardingTest({shards: 2});
 const configDB = st.s.getDB("config");
-const dbName = 'PermitMigrations';
+const dbName = 'AllowMigrations';
 
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic
 const setUpDb = function setUpDatabaseAndEnableSharding() {
@@ -23,15 +24,13 @@ const setUpDb = function setUpDatabaseAndEnableSharding() {
         st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 };
 
-const setPermitMigrations = function(ns, permit) {
-    // For now update the flag manually, a user-facing command will be implemented with
-    // SERVER-56227.
-    assert.commandWorked(configDB.collections.updateOne(
-        {_id: ns}, {$set: {permitMigrations: permit}}, {writeConcern: {w: "majority"}}));
+// Use the setAllowMigrations command to set the permitMigrations flag in the collection.
+const setAllowMigrationsCmd = function(ns, allow) {
+    assert.commandWorked(st.s.adminCommand({setAllowMigrations: ns, allowMigrations: allow}));
 };
 
-// Tests that moveChunk does not succeed when {permitMigrations: false}
-(function testPermitMigrationsFalsePreventsMoveChunk() {
+// Tests that moveChunk does not succeed when setAllowMigrations is called with a false value.
+(function testSetAllowMigrationsFalsePreventsMoveChunk() {
     setUpDb();
 
     const collName = "collA";
@@ -41,31 +40,19 @@ const setPermitMigrations = function(ns, permit) {
     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-    // Confirm that an inProgress moveChunk fails once {permitMigrations: false}
-    const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
-    const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName) {
-            assert.commandFailedWithCode(
-                db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                ErrorCodes.ConflictingOperationInProgress);
-        }, ns, st.shard1.shardName), st.s.port);
-    fp.wait();
-    setPermitMigrations(ns, false);
-    fp.off();
-    awaitResult();
+    setAllowMigrationsCmd(ns, false);
 
-    // {permitMigrations: false} is set, sending a new moveChunk command should also fail.
+    // setAllowMigrations was called, sending a new moveChunk command should fail.
     assert.commandFailedWithCode(
         st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}),
         ErrorCodes.ConflictingOperationInProgress);
 })();
 
-// Tests {permitMigrations: false} disables balancing for collB and does not interfere with
+// Tests setAllowMigrations disables balancing for collB and does not interfere with
 // balancing for collA.
 //
 // collBSetParams specify the field(s) that will be set on the collB in config.collections.
-const testBalancer = function testPermitMigrationsFalseDisablesBalancer(permitMigrations,
-                                                                        collBSetNoBalanceParam) {
+const testBalancer = function(setAllowMigrations, collBSetNoBalanceParam) {
     setUpDb();
 
     const collAName = "collA";
@@ -92,11 +79,12 @@ const testBalancer = function testPermitMigrationsFalseDisablesBalancer(permitMi
             configDB.chunks.countDocuments({ns: coll.getFullName(), shard: st.shard0.shardName}));
     }
 
-    jsTestLog(`Disabling balancing of ${collB.getFullName()} with permitMigrations ${
-        permitMigrations} and parameters ${tojson(collBSetNoBalanceParam)}`);
+    jsTestLog(`Disabling balancing of ${collB.getFullName()} with setAllowMigrations ${
+        setAllowMigrations} and parameters ${tojson(collBSetNoBalanceParam)}`);
     assert.commandWorked(
         configDB.collections.update({_id: collB.getFullName()}, {$set: collBSetNoBalanceParam}));
-    setPermitMigrations(collB.getFullName(), permitMigrations);
+
+    setAllowMigrationsCmd(collB.getFullName(), setAllowMigrations);
 
     st.startBalancer();
     assert.soon(() => {
@@ -110,14 +98,40 @@ const testBalancer = function testPermitMigrationsFalseDisablesBalancer(permitMi
     }, `Balancer failed to balance ${collA.getFullName()}`, 1000 * 60 * 10);
     st.stopBalancer();
 
+    // collB should still be unbalanced.
     assert.eq(
         4, configDB.chunks.countDocuments({ns: collB.getFullName(), shard: st.shard0.shardName}));
 };
 
+const testSetAllowMigrationsCommand = function() {
+    setUpDb();
+
+    const collName = "foo";
+    const ns = dbName + "." + collName;
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+
+    // Use setAllowMigrations to forbid migrations from happening
+    setAllowMigrationsCmd(ns, false);
+
+    // Check that allowMigrations has been set to 'false' on the configsvr config.collections.
+    assert.eq(false, configDB.collections.findOne({_id: ns}).permitMigrations);
+
+    // Use setAllowMigrations to allow migrations to happen
+    setAllowMigrationsCmd(ns, true);
+
+    // Check that permitMigrations has been unset (that implies migrations are allowed) on the
+    // configsvr config.collections.
+    assert.eq(undefined, configDB.collections.findOne({_id: ns}).permitMigrations);
+};
+
 // Test cases that should disable the balancer.
-testBalancer(false /* permitMigrations */, {});
-testBalancer(false /* permitMigrations */, {noBalance: false});
-testBalancer(false /* permitMigrations */, {noBalance: true});
+testBalancer(false /* setAllowMigrations */, {});
+testBalancer(false /* setAllowMigrations */, {noBalance: false});
+testBalancer(false /* setAllowMigrations */, {noBalance: true});
+
+// Test the setAllowMigrations command.
+testSetAllowMigrationsCommand();
 
 st.stop();
 })();

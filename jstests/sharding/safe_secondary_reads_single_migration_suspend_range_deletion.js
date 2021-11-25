@@ -314,6 +314,7 @@ let testCases = {
     saslContinue: {skip: "primary only"},
     saslStart: {skip: "primary only"},
     serverStatus: {skip: "does not return user data"},
+    setAllowMigrations: {skip: "primary only"},
     setCommittedSnapshot: {skip: "does not return user data"},
     setFeatureCompatibilityVersion: {skip: "primary only"},
     setFreeMonitoring: {skip: "primary only"},

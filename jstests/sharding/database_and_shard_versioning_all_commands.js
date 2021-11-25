@@ -386,6 +386,7 @@ let testCases = {
     saslContinue: {skip: "not on a user database"},
     saslStart: {skip: "not on a user database"},
     serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
+    setAllowMigrations: {skip: "not on a user database"},
     setFeatureCompatibilityVersion: {skip: "not on a user database"},
     setFreeMonitoring:
         {skip: "explicitly fails for mongos, primary mongod only", conditional: true},

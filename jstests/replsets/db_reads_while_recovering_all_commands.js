@@ -67,6 +67,7 @@ const allCommands = {
     _recvChunkStatus: {skip: isPrimaryOnly},
     _shardsvrCloneCatalogData: {skip: isPrimaryOnly},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
+    _shardsvrSetAllowMigrations: {skip: isPrimaryOnly},
     _shardsvrShardCollection: {skip: isPrimaryOnly},
     _transferMods: {skip: isPrimaryOnly},
     abortTransaction: {skip: isPrimaryOnly},

@@ -81,6 +81,7 @@ public:
     static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
     static const BSONField<UUID> uuid;
+    static const BSONField<bool> permitMigrations;
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.

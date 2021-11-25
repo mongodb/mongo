@@ -346,6 +346,7 @@ env.Library(
         'set_shard_version_command.cpp',
         'sharding_server_status.cpp',
         'sharding_state_command.cpp',
+        'shardsvr_set_allow_migrations_command.cpp',
         'shardsvr_shard_collection.cpp',
         'split_chunk_command.cpp',
         'split_vector_command.cpp',

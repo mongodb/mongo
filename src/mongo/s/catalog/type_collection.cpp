@@ -44,7 +44,6 @@ namespace {
 const BSONField<bool> kNoBalance("noBalance");
 const BSONField<bool> kDropped("dropped");
 const auto kIsAssignedShardKey = "isAssignedShardKey"_sd;
-const BSONField<bool> kPermitMigrations("permitMigrations");
 
 }  // namespace
 
@@ -57,6 +56,7 @@ const BSONField<BSONObj> CollectionType::keyPattern("key");
 const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> CollectionType::unique("unique");
 const BSONField<UUID> CollectionType::uuid("uuid");
+const BSONField<bool> CollectionType::permitMigrations("permitMigrations");
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     CollectionType coll;
@@ -196,7 +196,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     {
         bool collPermitMigrations;
         Status status =
-            bsonExtractBooleanField(source, kPermitMigrations.name(), &collPermitMigrations);
+            bsonExtractBooleanField(source, permitMigrations.name(), &collPermitMigrations);
         if (status.isOK()) {
             coll._permitMigrations = collPermitMigrations;
         } else if (status == ErrorCodes::NoSuchKey) {
@@ -284,7 +284,7 @@ BSONObj CollectionType::toBSON() const {
     }
 
     if (_permitMigrations.is_initialized()) {
-        builder.append(kPermitMigrations.name(), _permitMigrations.get());
+        builder.append(permitMigrations.name(), _permitMigrations.get());
     }
 
     return builder.obj();
