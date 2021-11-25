@@ -691,6 +691,6 @@ snap_repeat_rollback(TINFO **tinfo_array, size_t tinfo_count)
     } else
         g.rts_no_check = 0;
 
-    if (session == NULL)
+    if (session != NULL)
         testutil_check(session->close(session, NULL));
 }
