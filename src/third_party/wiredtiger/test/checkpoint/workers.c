@@ -43,19 +43,24 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 {
     int ret;
     char config[256];
+    const char *kf, *lsm, *vf;
+
+    kf = cookie->type == COL || cookie->type == FIX ? "r" : "q";
+    lsm = cookie->type == LSM ? ",type=lsm" : "";
+    vf = cookie->type == FIX ? "8t" : "S";
 
     /*
      * If we're using timestamps, turn off logging for the table.
      */
     if (g.use_timestamps)
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=%s,value_format=S,allocation_size=512,"
+          "key_format=%s,value_format=%s,allocation_size=512,"
           "leaf_page_max=1KB,internal_page_max=1KB,"
           "memory_page_max=64KB,log=(enabled=false),%s",
-          cookie->type == COL ? "r" : "q", cookie->type == LSM ? ",type=lsm" : ""));
+          kf, vf, lsm));
     else
-        testutil_check(__wt_snprintf(config, sizeof(config), "key_format=%s,value_format=S,%s",
-          cookie->type == COL ? "r" : "q", cookie->type == LSM ? ",type=lsm" : ""));
+        testutil_check(
+          __wt_snprintf(config, sizeof(config), "key_format=%s,value_format=%s,%s", kf, vf, lsm));
 
     if ((ret = session->create(session, cookie->uri, config)) != 0)
         if (ret != EEXIST)
@@ -174,13 +179,27 @@ worker_mm_delete(WT_CURSOR *cursor, uint64_t keyno)
 }
 
 /*
+ * cursor_fix_at_zero --
+ *     Check if we're on a zero (deleted) value. FLCS only.
+ */
+static bool
+cursor_fix_at_zero(WT_CURSOR *cursor)
+{
+    uint8_t val;
+
+    testutil_check(cursor->get_value(cursor, &val));
+    return (val == 0);
+}
+
+/*
  * worker_op --
  *     Write operation.
  */
 static inline int
-worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
+worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
 {
     WT_MODIFY entries[MAX_MODIFY_ENTRIES];
+    uint8_t val8;
     int cmp, ret;
     int nentries;
     char valuebuf[64];
@@ -196,6 +215,7 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
             return (log_print_err("cursor.search_near", ret, 1));
         }
         if (cmp < 0) {
+            /* Advance to the next key that exists. */
             if ((ret = cursor->next(cursor)) != 0) {
                 if (ret == WT_NOTFOUND)
                     return (0);
@@ -203,7 +223,18 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.next", ret, 1));
             }
+        } else if (type == FIX) {
+            /* To match what happens in VAR and ROW, advance to the next nonzero key. */
+            while (cursor_fix_at_zero(cursor))
+                if ((ret = cursor->next(cursor)) != 0) {
+                    if (ret == WT_NOTFOUND)
+                        return (0);
+                    if (ret == WT_ROLLBACK)
+                        return (WT_ROLLBACK);
+                    return (log_print_err("cursor.next", ret, 1));
+                }
         }
+
         for (int i = 10; i > 0; i--) {
             if ((ret = cursor->remove(cursor)) != 0) {
                 if (ret == WT_ROLLBACK)
@@ -216,6 +247,17 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                 if (ret == WT_ROLLBACK)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.next", ret, 1));
+            }
+            if (type == FIX) {
+                /* To match what happens in VAR and ROW, advance to the next nonzero key. */
+                while (cursor_fix_at_zero(cursor))
+                    if ((ret = cursor->next(cursor)) != 0) {
+                        if (ret == WT_NOTFOUND)
+                            return (0);
+                        if (ret == WT_ROLLBACK)
+                            return (WT_ROLLBACK);
+                        return (log_print_err("cursor.next", ret, 1));
+                    }
             }
         }
         if (g.sweep_stress)
@@ -232,15 +274,24 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
         if (new_val % 39 < 30) {
             // Do modify
             ret = cursor->search(cursor);
-            if (ret == 0) {
+            if (ret == 0 && (type != FIX || !cursor_fix_at_zero(cursor))) {
                 modify_build(entries, &nentries, new_val);
-                if ((ret = cursor->modify(cursor, entries, nentries)) != 0) {
+                if (type == FIX) {
+                    /* Deleted (including not-yet-written) values read back as 0; accommodate. */
+                    ret = cursor->get_value(cursor, &val8);
+                    if (ret != 0)
+                        return (log_print_err("cursor.get_value", ret, 1));
+                    cursor->set_value(cursor, flcs_modify(entries, nentries, val8));
+                    ret = cursor->update(cursor);
+                } else
+                    ret = cursor->modify(cursor, entries, nentries);
+                if (ret != 0) {
                     if (ret == WT_ROLLBACK)
                         return (WT_ROLLBACK);
                     return (log_print_err("cursor.modify", ret, 1));
                 }
                 return (0);
-            } else if (ret != WT_NOTFOUND) {
+            } else if (ret != 0 && ret != WT_NOTFOUND) {
                 if (ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.search", ret, 1));
@@ -249,7 +300,10 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 
         // If key doesn't exist, turn modify into an insert.
         testutil_check(__wt_snprintf(valuebuf, sizeof(valuebuf), "%052u", new_val));
-        cursor->set_value(cursor, valuebuf);
+        if (type == FIX)
+            cursor->set_value(cursor, flcs_encode(valuebuf));
+        else
+            cursor->set_value(cursor, valuebuf);
         if ((ret = cursor->insert(cursor)) != 0) {
             if (ret == WT_ROLLBACK)
                 return (WT_ROLLBACK);
@@ -358,7 +412,7 @@ real_worker(void)
             new_txn = false;
 
         for (j = 0; ret == 0 && j < g.ntables; j++)
-            ret = worker_op(cursors[j], keyno, i);
+            ret = worker_op(cursors[j], g.cookies[j].type, keyno, i);
         if (ret != 0 && ret != WT_ROLLBACK) {
             (void)log_print_err("worker op failed", ret, 1);
             goto err;

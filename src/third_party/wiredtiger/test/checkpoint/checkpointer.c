@@ -30,8 +30,8 @@
 
 static WT_THREAD_RET checkpointer(void *);
 static WT_THREAD_RET clock_thread(void *);
-static int compare_cursors(WT_CURSOR *, const char *, WT_CURSOR *, const char *);
-static int diagnose_key_error(WT_CURSOR *, int, WT_CURSOR *, int);
+static int compare_cursors(WT_CURSOR *, table_type, WT_CURSOR *, table_type);
+static int diagnose_key_error(WT_CURSOR *, table_type, int, WT_CURSOR *, table_type, int);
 static int real_checkpointer(void);
 
 /*
@@ -243,6 +243,74 @@ done:
 }
 
 /*
+ * do_cursor_next --
+ *     Wrapper around cursor->next to handle retry cases.
+ */
+static int
+do_cursor_next(table_type type, WT_CURSOR *cursor)
+{
+    uint8_t val;
+    int ret;
+
+    while ((ret = cursor->next(cursor)) != WT_NOTFOUND) {
+        if (ret == 0) {
+            /*
+             * In FLCS deleted values read back as 0; skip over them. We've arranged to avoid
+             * writing out any of our own zero values so this check won't generate false positives.
+             */
+            if (type == FIX) {
+                ret = cursor->get_value(cursor, &val);
+                if (ret != 0)
+                    return (log_print_err("cursor->get_value", ret, 1));
+                if (val == 0)
+                    continue;
+            }
+            break;
+        } else if (ret != WT_PREPARE_CONFLICT) {
+            (void)log_print_err("cursor->next", ret, 1);
+            return (ret);
+        }
+        __wt_yield();
+    }
+
+    return (ret);
+}
+
+/*
+ * do_cursor_prev --
+ *     Wrapper around cursor->prev to handle retry cases.
+ */
+static int
+do_cursor_prev(table_type type, WT_CURSOR *cursor)
+{
+    uint8_t val;
+    int ret;
+
+    while ((ret = cursor->prev(cursor)) != WT_NOTFOUND) {
+        if (ret == 0) {
+            /*
+             * In FLCS deleted values read back as 0; skip over them. We've arranged to avoid
+             * writing out any of our own zero values so this check won't generate false positives.
+             */
+            if (type == FIX) {
+                ret = cursor->get_value(cursor, &val);
+                if (ret != 0)
+                    return (log_print_err("cursor->get_value", ret, 1));
+                if (val == 0)
+                    continue;
+            }
+            break;
+        } else if (ret != WT_PREPARE_CONFLICT) {
+            (void)log_print_err("cursor->next", ret, 1);
+            return (ret);
+        }
+        __wt_yield();
+    }
+
+    return (ret);
+}
+
+/*
  * verify_consistency --
  *     Open a cursor on each table at the last checkpoint and walk through the tables in parallel.
  *     The key/values should match across all tables.
@@ -252,9 +320,8 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts)
 {
     WT_CURSOR **cursors;
     uint64_t key_count;
-    int i, ret, t_ret;
+    int i, reference_table, ret, t_ret;
     char cfg_buf[128], next_uri[128];
-    const char *type0, *typei;
 
     ret = t_ret = 0;
     key_count = 0;
@@ -277,22 +344,25 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts)
         }
     }
 
+    /* Pick a reference table: the first table that's not FLCS and not LSM, if possible; else 0. */
+    reference_table = 0;
+    for (i = 0; i < g.ntables; i++)
+        if (g.cookies[i].type != FIX && g.cookies[i].type != LSM) {
+            reference_table = i;
+            break;
+        }
+
     /* There's no way to verify LSM-only runs. */
-    if (cursors[0] == NULL) {
+    if (cursors[reference_table] == NULL) {
         printf("LSM-only, skipping checkpoint verification\n");
         goto err;
     }
 
     while (ret == 0) {
-        while ((ret = cursors[0]->next(cursors[0])) != 0) {
-            if (ret == WT_NOTFOUND)
-                break;
-            if (ret != WT_PREPARE_CONFLICT) {
-                (void)log_print_err("cursor->next", ret, 1);
-                goto err;
-            }
-            __wt_yield();
-        }
+        /* Advance the reference table's cursor. */
+        ret = do_cursor_next(g.cookies[reference_table].type, cursors[reference_table]);
+        if (ret != 0 && ret != WT_NOTFOUND)
+            goto err;
 
         if (ret == 0)
             ++key_count;
@@ -300,20 +370,19 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts)
         /*
          * Check to see that all remaining cursors have the same key/value pair.
          */
-        for (i = 1; i < g.ntables; i++) {
+        for (i = 0; i < g.ntables; i++) {
+            if (i == reference_table)
+                continue;
+
             /*
              * TODO: LSM doesn't currently support reading from checkpoints.
              */
             if (g.cookies[i].type == LSM)
                 continue;
-            while ((t_ret = cursors[i]->next(cursors[i])) != 0) {
-                if (t_ret == WT_NOTFOUND)
-                    break;
-                if (t_ret != WT_PREPARE_CONFLICT) {
-                    (void)log_print_err("cursor->next", t_ret, 1);
-                    goto err;
-                }
-                __wt_yield();
+            t_ret = do_cursor_next(g.cookies[i].type, cursors[i]);
+            if (t_ret != 0 && t_ret != WT_NOTFOUND) {
+                ret = t_ret;
+                goto err;
             }
 
             if (ret == WT_NOTFOUND && t_ret == WT_NOTFOUND)
@@ -324,10 +393,10 @@ verify_consistency(WT_SESSION *session, wt_timestamp_t verify_ts)
                 goto err;
             }
 
-            type0 = type_to_string(g.cookies[0].type);
-            typei = type_to_string(g.cookies[i].type);
-            if ((ret = compare_cursors(cursors[0], type0, cursors[i], typei)) != 0) {
-                (void)diagnose_key_error(cursors[0], 0, cursors[i], i);
+            if ((ret = compare_cursors(cursors[reference_table], g.cookies[reference_table].type,
+                   cursors[i], g.cookies[i].type)) != 0) {
+                (void)diagnose_key_error(cursors[reference_table], g.cookies[reference_table].type,
+                  reference_table, cursors[i], g.cookies[i].type, i);
                 (void)log_print_err("verify_consistency - mismatching data", EFAULT, 1);
                 goto err;
             }
@@ -349,40 +418,85 @@ err:
 
 /*
  * compare_cursors --
- *     Compare the key/value pairs from two cursors.
+ *     Compare the key/value pairs from two cursors, which might be different table types.
  */
 static int
-compare_cursors(WT_CURSOR *cursor1, const char *type1, WT_CURSOR *cursor2, const char *type2)
+compare_cursors(WT_CURSOR *cursor1, table_type type1, WT_CURSOR *cursor2, table_type type2)
 {
     uint64_t key1, key2;
+    uint8_t fixval1, fixval2;
     int ret;
-    char buf[128], *val1, *val2;
+    char fixbuf1[4], fixbuf2[4], *strval1, *strval2;
 
     ret = 0;
-    memset(buf, 0, 128);
 
     if (cursor1->get_key(cursor1, &key1) != 0 || cursor2->get_key(cursor2, &key2) != 0)
         return (log_print_err("Error getting keys", EINVAL, 1));
 
-    if (cursor1->get_value(cursor1, &val1) != 0 || cursor2->get_value(cursor2, &val2) != 0)
-        return (log_print_err("Error getting values", EINVAL, 1));
+    /*
+     * Get the values. For all table types set both the string value (so we can print) and the FLCS
+     * value.
+     */
+
+    if (type1 == FIX) {
+        if (cursor1->get_value(cursor1, &fixval1) != 0)
+            goto valuefail;
+        testutil_check(__wt_snprintf(fixbuf1, sizeof(fixbuf1), "%" PRIu8, fixval1));
+        strval1 = fixbuf1;
+    } else {
+        if (cursor1->get_value(cursor1, &strval1) != 0)
+            goto valuefail;
+        fixval1 = flcs_encode(strval1);
+    }
+
+    if (type2 == FIX) {
+        if (cursor2->get_value(cursor2, &fixval2) != 0)
+            goto valuefail;
+        testutil_check(__wt_snprintf(fixbuf2, sizeof(fixbuf2), "%" PRIu8, fixval2));
+        strval2 = fixbuf2;
+    } else {
+        if (cursor2->get_value(cursor2, &strval2) != 0)
+            goto valuefail;
+        fixval2 = flcs_encode(strval2);
+    }
 
     if (g.logfp != NULL)
-        fprintf(
-          g.logfp, "k1: %" PRIu64 " k2: %" PRIu64 " val1: %s val2: %s \n", key1, key2, val1, val2);
+        fprintf(g.logfp, "k1: %" PRIu64 " k2: %" PRIu64 " val1: %s val2: %s \n", key1, key2,
+          strval1, strval2);
 
-    if (key1 != key2)
+    if (key1 != key2) {
         ret = ERR_KEY_MISMATCH;
-    else if (strlen(val1) != strlen(val2) || strcmp(val1, val2) != 0)
-        ret = ERR_DATA_MISMATCH;
-    else
-        return (0);
+        goto mismatch;
+    }
 
-    printf("Key/value mismatch: %" PRIu64 "/%s from a %s table is not %" PRIu64
-           "/%s from a %s table\n",
-      key1, val1, type1, key2, val2, type2);
+    /*
+     * The FLCS value encoding loses information, so if an FLCS table tells us FLCS_UNKNOWN we have
+     * to treat it as matching any value from another table type.
+     */
+    if ((type1 == FIX && type2 != FIX && fixval1 == FLCS_UNKNOWN) ||
+      (type1 != FIX && type2 == FIX && fixval2 == FLCS_UNKNOWN)) {
+        return (0);
+    }
+
+    /* If either table is FLCS, compare the 8-bit values; otherwise the strings. */
+    if (((type1 == FIX || type2 == FIX) && fixval1 != fixval2) ||
+      (type1 != FIX && type2 != FIX &&
+        (strlen(strval1) != strlen(strval2) || strcmp(strval1, strval2) != 0))) {
+        ret = ERR_DATA_MISMATCH;
+        goto mismatch;
+    }
+
+    return (0);
+
+mismatch:
+    printf("Key/value mismatch: %" PRIu64 "/%s (%" PRIu8 ") from a %s table is not %" PRIu64
+           "/%s (%" PRIu8 ") from a %s table\n",
+      key1, strval1, fixval1, type_to_string(type1), key2, strval2, fixval2, type_to_string(type2));
 
     return (ret);
+
+valuefail:
+    return (log_print_err("Error getting values", EINVAL, 1));
 }
 
 /*
@@ -391,7 +505,8 @@ compare_cursors(WT_CURSOR *cursor1, const char *type1, WT_CURSOR *cursor2, const
  *     as we can.
  */
 static int
-diagnose_key_error(WT_CURSOR *cursor1, int index1, WT_CURSOR *cursor2, int index2)
+diagnose_key_error(WT_CURSOR *cursor1, table_type type1, int index1, WT_CURSOR *cursor2,
+  table_type type2, int index2)
 {
     WT_CURSOR *c;
     WT_SESSION *session;
@@ -414,22 +529,28 @@ diagnose_key_error(WT_CURSOR *cursor1, int index1, WT_CURSOR *cursor2, int index
     if (key1_orig == key2_orig)
         goto live_check;
 
+    /*
+     * Note: for now the code below hasn't been adapted for FLCS (where it would need to skip zero
+     * values when searching forward and backward) because that's a fairly large nuisance and it's
+     * not, at least for the moment, all that helpful. FUTURE.
+     */
+
     /* See if previous values are still valid. */
-    if (cursor1->prev(cursor1) != 0 || cursor2->prev(cursor2) != 0)
+    if (do_cursor_prev(type1, cursor1) != 0 || do_cursor_prev(type2, cursor2) != 0)
         return (1);
     if (cursor1->get_key(cursor1, &key1) != 0 || cursor2->get_key(cursor2, &key2) != 0)
         (void)log_print_err("Error decoding key", EINVAL, 1);
     else if (key1 != key2)
         (void)log_print_err("Now previous keys don't match", EINVAL, 0);
 
-    if (cursor1->next(cursor1) != 0 || cursor2->next(cursor2) != 0)
+    if (do_cursor_next(type1, cursor1) != 0 || do_cursor_next(type2, cursor2) != 0)
         return (1);
     if (cursor1->get_key(cursor1, &key1) != 0 || cursor2->get_key(cursor2, &key2) != 0)
         (void)log_print_err("Error decoding key", EINVAL, 1);
     else if (key1 == key2)
         (void)log_print_err("After prev/next keys match", EINVAL, 0);
 
-    if (cursor1->next(cursor1) != 0 || cursor2->next(cursor2) != 0)
+    if (do_cursor_next(type1, cursor1) != 0 || do_cursor_next(type2, cursor2) != 0)
         return (1);
     if (cursor1->get_key(cursor1, &key1) != 0 || cursor2->get_key(cursor2, &key2) != 0)
         (void)log_print_err("Error decoding key", EINVAL, 1);

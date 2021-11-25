@@ -138,6 +138,9 @@ main(int argc, char *argv[])
             case 'c':
                 ttype = COL;
                 break;
+            case 'f':
+                ttype = FIX;
+                break;
             case 'l':
                 ttype = LSM;
                 break;
@@ -394,14 +397,146 @@ log_print_err(const char *m, int e, int fatal)
 }
 
 /*
- * path_setup --
- *     Build the standard paths and shell commands we use.
+ * Value encoding for FLCS tables.
+ *
+ * The string value is a large number of digits pushed around arbitrarily with modify. This is
+ * difficult to track incrementally in any useful way with just 8 bits. We try to track the offset
+ * of the first digit that's a prime (2, 3, 5, or 7), and which prime it is. We encode this as
+ * digit-number * 4 + [2 -> 0; 3 -> 1; 5 -> 2; 7 -> 3], plus 1 overall so as to never store zero.
+ * (That allows assuming any zero read back is a deleted value.) If there is no such digit, we
+ * return FLCS_NONE. If we lose track, we return FLCS_UNKNOWN. This allows remembering offsets up to
+ * 62 before we lose track.
+ */
+
+#define FLCS_OFFSET 1 /* avoid storing zero */
+
+/* The magic values are to be tested _before_ subtracting off FLCS_OFFSET. */
+#define FLCS_NONE 254
+/* FLCS_UNKNOWN lives in test_checkpoint.h so it can be used in compare_cursors(). */
+
+#define FLCS_TRACKED_DIGIT(c) ((c) == '2' || (c) == '3' || (c) == '5' || (c) == '7')
+
+/*
+ * flcs_encode_value --
+ *     Store an offset and digit in an 8-bit value.
+ */
+static uint8_t
+flcs_encode_value(size_t offset, char digit)
+{
+    uint8_t digitx;
+
+    if (offset > 62)
+        return FLCS_UNKNOWN;
+
+    if (digit == '2')
+        digitx = 0;
+    else if (digit == '3')
+        digitx = 1;
+    else if (digit == '5')
+        digitx = 2;
+    else
+        digitx = 3;
+
+    return (FLCS_OFFSET + (uint8_t)(offset * 4 + digitx));
+}
+
+/*
+ * flcs_decode_value --
+ *     Unpack flcs_encode_value results.
+ */
+static void
+flcs_decode_value(uint8_t value, size_t *offsetp, char *digitp)
+{
+    static const char digits[4] = "2357";
+
+    value -= FLCS_OFFSET;
+
+    *offsetp = value >> 2;
+    *digitp = digits[value & 3];
+}
+
+/*
+ * flcs_encode --
+ *     Extract the corresponding 8-bit FLCS value from a string value.
+ */
+uint8_t
+flcs_encode(const char *s)
+{
+    u_int i;
+
+    for (i = 0; s[i] != '\0'; i++) {
+        if (FLCS_TRACKED_DIGIT(s[i]))
+            return (flcs_encode_value(i, s[i]));
+    }
+    return (FLCS_NONE);
+}
+
+/*
+ * flcs_modify --
+ *     Update the corresponding 8-bit FLCS value given a modify applied to its string.
+ */
+uint8_t
+flcs_modify(WT_MODIFY *entries, int nentries, uint8_t oldval)
+{
+    size_t j, offset;
+    int i;
+    char digit, newdigit;
+
+    newdigit = 0; /* clang -Wconditional-uninitialized */
+
+    /* If we've lost track, we've lost track. */
+    if (oldval == FLCS_UNKNOWN)
+        return (FLCS_UNKNOWN);
+
+    if (oldval == FLCS_NONE) {
+        offset = 0;
+        digit = 0;
+    } else
+        flcs_decode_value(oldval, &offset, &digit);
+
+    for (i = 0; i < nentries; i++) {
+        /* If it starts after us, never mind. */
+        if (digit != 0 && entries[i].offset > offset)
+            continue;
+        /* Find the first appropriate digit. */
+        for (j = 0; j < entries[i].data.size; j++) {
+            newdigit = ((const char *)entries[i].data.data)[j];
+            if (FLCS_TRACKED_DIGIT(newdigit))
+                break;
+        }
+        if (j < entries[i].data.size) {
+            /* Found a suitable digit. Remember it. */
+            offset = entries[i].offset + j;
+            digit = newdigit;
+            continue;
+        }
+
+        /* If at this point we had no position before, we still don't. */
+        if (digit == 0)
+            continue;
+
+        /* If this modify overwrote us, we lost track. */
+        if (entries[i].offset + entries[i].size > offset)
+            return (FLCS_UNKNOWN);
+
+        /* Otherwise, it is fully in front of us, so update our offset and keep going. */
+        offset = offset - entries[i].size + entries[i].data.size;
+    }
+
+    return (digit == 0 ? FLCS_NONE : flcs_encode_value(offset, digit));
+}
+
+/*
+ * type_to_string --
+ *     Return the string name of a table type.
  */
 const char *
 type_to_string(table_type type)
 {
     if (type == COL)
         return ("COL");
+    if (type == FIX)
+        return ("FIX");
     if (type == LSM)
         return ("LSM");
     if (type == ROW)

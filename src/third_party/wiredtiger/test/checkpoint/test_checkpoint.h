@@ -35,12 +35,15 @@
 #define ERR_KEY_MISMATCH 0x200001
 #define ERR_DATA_MISMATCH 0x200002
 
+/* Magic value to store in FLCS if we have lost track of the corresponding string value. */
+#define FLCS_UNKNOWN 255
+
 /*
  * There are three different table types in the test, and a 'special' type of mixed (i.e a mixture
  * of the other three types.
  */
-#define MAX_TABLE_TYPE 3
-typedef enum { MIX = 0, COL, LSM, ROW } table_type; /* File type */
+#define MAX_TABLE_TYPE 4
+typedef enum { MIX = 0, COL, FIX, LSM, ROW } table_type; /* File type */
 
 /*
  * Per-table cookie structure.
@@ -85,6 +88,8 @@ typedef struct {
 extern GLOBAL g;
 
 void end_checkpoints(void);
+uint8_t flcs_encode(const char *);
+uint8_t flcs_modify(WT_MODIFY *, int, uint8_t);
 int log_print_err(const char *, int, int);
 void start_checkpoints(void);
 int start_workers(void);
