@@ -113,6 +113,7 @@ __flush_tier_once(WT_SESSION_IMPL *session, uint32_t flags)
     __wt_seconds(session, &flush_time);
     /* XXX If/when flush tier no longer requires the checkpoint lock, this needs consideration. */
     conn->flush_most_recent = WT_MAX(flush_time, conn->ckpt_most_recent);
+    conn->flush_ts = conn->txn_global.last_ckpt_timestamp;
 
     /*
      * Walk the metadata cursor to find tiered tables to flush. This should be optimized to avoid
@@ -238,14 +239,17 @@ static int
 __tier_flush_meta(
   WT_SESSION_IMPL *session, WT_TIERED *tiered, const char *local_uri, const char *obj_uri)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
     uint64_t now;
+    char hex_timestamp[WT_TS_HEX_STRING_SIZE];
     char *newconfig, *obj_value;
     const char *cfg[3] = {NULL, NULL, NULL};
     bool release, tracking;
 
+    conn = S2C(session);
     release = tracking = false;
     WT_RET(__wt_scr_alloc(session, 512, &buf));
     dhandle = &tiered->iface;
@@ -260,10 +264,12 @@ __tier_flush_meta(
      * Once the flush call succeeds we want to first remove the file: entry from the metadata and
      * then update the object: metadata to indicate the flush is complete.
      */
+    __wt_timestamp_to_hex_string(conn->txn_global.last_ckpt_timestamp, hex_timestamp);
     WT_ERR(__wt_metadata_remove(session, local_uri));
     WT_ERR(__wt_metadata_search(session, obj_uri, &obj_value));
     __wt_seconds(session, &now);
-    WT_ERR(__wt_buf_fmt(session, buf, "flush_time=%" PRIu64, now));
+    WT_ERR(__wt_buf_fmt(
+      session, buf, "flush_time=%" PRIu64 ",flush_timestamp=\"%s\"", now, hex_timestamp));
     cfg[0] = obj_value;
     cfg[1] = buf->mem;
     WT_ERR(__wt_config_collapse(session, cfg, &newconfig));

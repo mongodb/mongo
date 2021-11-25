@@ -429,6 +429,7 @@ struct __wt_connection_impl {
     bool tiered_server_running;      /* Internal tiered server operating */
     uint64_t flush_most_recent;      /* Clock value of most recent flush_tier */
     uint32_t flush_state;            /* State of last flush tier */
+    wt_timestamp_t flush_ts;         /* Timestamp of most recent flush_tier */
 
     WT_TIERED_MANAGER tiered_mgr;        /* Tiered manager thread information */
     WT_SESSION_IMPL *tiered_mgr_session; /* Tiered manager thread session */
