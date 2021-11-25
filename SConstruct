@@ -3226,9 +3226,10 @@ def doConfigure(myenv):
 
         myenv = conf.Finish()
 
-    # We set this to work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
-    if not myenv.ToolchainIs('msvc'):
-        AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
+    # We set this with GCC on x86 platforms to work around
+    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
+    if myenv.ToolchainIs('gcc') and (env['TARGET_ARCH'] in ['i386', 'x86_64']):
+        AddToCCFLAGSIfSupported(myenv, '-fno-builtin-memcmp')
 
     def CheckThreadLocal(context):
         test_body = """
