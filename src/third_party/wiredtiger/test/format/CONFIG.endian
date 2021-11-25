@@ -4,4 +4,3 @@ logging.archive=0
 logging=1
 runs.timer=4
 runs.rows=1000000
-runs.type=row,var
