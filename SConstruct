@@ -3838,9 +3838,11 @@ def doConfigure(myenv):
 
         myenv = conf.Finish()
 
-    # We set this to work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
-    if not myenv.ToolchainIs('msvc') and not 'builtin-memcmp' in selected_experimental_optimizations:
-        AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
+    # We set this with GCC on x86 platforms to work around
+    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
+    if myenv.ToolchainIs('gcc') and (env['TARGET_ARCH'] in ['i386', 'x86_64']):
+        if not 'builtin-memcmp' in selected_experimental_optimizations:
+            AddToCCFLAGSIfSupported(myenv, '-fno-builtin-memcmp')
 
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
