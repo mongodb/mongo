@@ -82,6 +82,7 @@ public:
     static const BSONField<bool> unique;
     static const BSONField<UUID> uuid;
     static const BSONField<std::string> distributionMode;
+    static const BSONField<bool> permitMigrations;
 
     /**
      * Constructs a new CollectionType object from BSON. Also does validation of the contents.

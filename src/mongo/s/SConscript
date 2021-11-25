@@ -196,6 +196,7 @@ env.Library(
         'request_types/move_primary.idl',
         'request_types/shard_collection.idl',
         'request_types/refine_collection_shard_key.idl',
+        'request_types/set_allow_migrations.idl',
         'request_types/wait_for_fail_point.idl',
     ],
     LIBDEPS=[

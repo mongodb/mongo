@@ -116,6 +116,7 @@ let testCases = {
     _shardsvrCloneCatalogData: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
+    _shardsvrSetAllowMigrations: {skip: "internal command"},
     _shardsvrShardCollection: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     abortTransaction: {
@@ -593,6 +594,7 @@ let testCases = {
     saslContinue: {skip: "does not accept read or write concern"},
     saslStart: {skip: "does not accept read or write concern"},
     serverStatus: {skip: "does not accept read or write concern"},
+    setAllowMigrations: {skip: "does not accept read or write concern"},
     setCommittedSnapshot: {skip: "internal command"},
     setDefaultRWConcern: {skip: "special case (must run after all other commands)"},
     setFeatureCompatibilityVersion: {skip: "does not accept read or write concern"},

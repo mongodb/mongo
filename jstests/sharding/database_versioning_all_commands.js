@@ -607,6 +607,7 @@ let testCases = {
     saslContinue: {skip: "not on a user database"},
     saslStart: {skip: "not on a user database"},
     serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
+    setAllowMigrations: {skip: "not on a user database"},
     setDefaultRWConcern: {skip: "always targets the config server"},
     setIndexCommitQuorum: {
         run: {

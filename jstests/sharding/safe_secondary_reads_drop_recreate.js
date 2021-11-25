@@ -286,6 +286,7 @@ let testCases = {
     saslContinue: {skip: "primary only"},
     saslStart: {skip: "primary only"},
     serverStatus: {skip: "does not return user data"},
+    setAllowMigrations: {skip: "primary only"},
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},
     setIndexCommitQuorum: {skip: "primary only"},

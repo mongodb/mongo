@@ -123,6 +123,7 @@ let viewsCommandTests = {
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
+    _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _shardsvrShardCollection: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     abortTransaction: {skip: isUnrelated},
@@ -500,6 +501,16 @@ let viewsCommandTests = {
     saslContinue: {skip: isUnrelated},
     saslStart: {skip: isUnrelated},
     serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
+    setAllowMigrations: {
+        command: {setAllowMigrations: "test.view", allowMigrations: false},
+        setup: function(conn) {
+            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
+        },
+        expectedErrorCode: ErrorCodes.NamespaceNotSharded,
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true
+    },
     setIndexCommitQuorum: {skip: isUnrelated},
     setCommittedSnapshot: {skip: isAnInternalCommand},
     setDefaultRWConcern: {skip: isUnrelated},
