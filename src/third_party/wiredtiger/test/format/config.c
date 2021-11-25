@@ -1250,7 +1250,7 @@ void
 config_file(const char *name)
 {
     FILE *fp;
-    char buf[256], *p, *t;
+    char buf[256], *p;
 
     /*
      * Turn off multi-table configuration for all configuration files, for backward compatibility.
@@ -1266,29 +1266,39 @@ config_file(const char *name)
         testutil_die(errno, "fopen: %s", name);
 
     /*
-     * Skip leading Evergreen timestamps by skipping up to a closing brace and following whitespace.
-     * This is a little fragile: we're in trouble if Evergreen changes its timestamp format or if
-     * this program includes closing braces in its commands.
+     * Skip whitespace leading up to the configuration. Skip Evergreen timestamps by skipping a pair
+     * of enclosing braces and trailing whitespace. This is fragile: we're in trouble if Evergreen
+     * changes its timestamp format.
      */
     while (fgets(buf, sizeof(buf), fp) != NULL) {
-        for (p = t = buf; *p != '\0'; ++p) {
-            if (*p == '\n') { /* Configuration end. */
+        /* Replace any newline character. */
+        for (p = buf; *p != '\0'; ++p)
+            if (*p == '\n') {
                 *p = '\0';
                 break;
             }
-            if (*p == '#') { /* Comment */
-                t = p;
+
+        /* Skip any leading whitespace. */
+        for (p = buf; *p != '\0'; ++p)
+            if (!isblank(*p))
                 break;
-            }
-            if (t == buf && *p == ']') { /* Closing brace, configuration starts after it. */
-                while (isblank((unsigned char)*++p))
-                    ;
-                t = p--;
-            }
-        }
-        if (*t == '\0' || *t == '#')
-            continue;
-        config_single(NULL, t, true);
+
+        /* Skip any Evergreen timestamp. */
+        if (*p == '[')
+            for (; *p != '\0'; ++p)
+                if (*p == ']') {
+                    ++p;
+                    break;
+                }
+
+        /* Skip any trailing whitespace. */
+        for (; *p != '\0'; ++p)
+            if (!isblank(*p))
+                break;
+
+        /* Skip any comments or empty lines. */
+        if (*p != '\0' && *p != '#')
+            config_single(NULL, p, true);
     }
     fclose_and_clear(&fp);
 }
