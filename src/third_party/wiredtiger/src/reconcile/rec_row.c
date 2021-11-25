@@ -751,6 +751,9 @@ __wt_rec_row_leaf(
 
         /* Build value cell. */
         if (upd == NULL) {
+            /* Clear the on-disk cell time window if it is obsolete. */
+            __wt_rec_time_window_clear_obsolete(session, NULL, vpack, r);
+
             /*
              * When the page was read into memory, there may not have been a value item.
              *

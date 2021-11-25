@@ -481,8 +481,19 @@ __wt_rec_dict_replace(
  *     Where possible modify time window values to avoid writing obsolete values to the cell later.
  */
 static inline void
-__wt_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_RECONCILE *r)
+__wt_rec_time_window_clear_obsolete(
+  WT_SESSION_IMPL *session, WT_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r)
 {
+    WT_TIME_WINDOW *tw;
+
+    WT_ASSERT(
+      session, (upd_select != NULL && vpack == NULL) || (upd_select == NULL && vpack != NULL));
+    tw = upd_select != NULL ? &upd_select->tw : &vpack->tw;
+
+    /* Return if the time window is empty. */
+    if (WT_TIME_WINDOW_IS_EMPTY(tw))
+        return;
+
     /*
      * In memory database don't need to avoid writing values to the cell. If we remove this check we
      * create an extra update on the end of the chain later in reconciliation as we'll re-append the
@@ -499,6 +510,10 @@ __wt_rec_time_window_clear_obsolete(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw
 
             tw->start_ts = tw->durable_start_ts = WT_TS_NONE;
             tw->start_txn = WT_TXN_NONE;
+
+            /* Mark the cell with time window cleared flag to let the cell to be rebuild again. */
+            if (vpack)
+                F_SET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
         }
     }
 }

@@ -718,6 +718,9 @@ __wt_rec_col_fix(
             cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
             __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
 
+            /* Clear the on-disk cell time window if it is obsolete. */
+            __wt_rec_time_window_clear_obsolete(session, NULL, &unpack, r);
+
             /* If it's from a previous run, it might become empty; if so, skip it. */
             if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
                 WT_ERR(__wt_rec_col_fix_addtw(session, r,
@@ -822,6 +825,9 @@ __wt_rec_col_fix(
         if (salvage != NULL && (recno < curstartrecno || recno >= curstartrecno + entry))
             /* This time window is for an item salvage wants us to skip. */
             continue;
+
+        /* Clear the on-disk cell time window if it is obsolete. */
+        __wt_rec_time_window_clear_obsolete(session, NULL, &unpack, r);
 
         /* If it's from a previous run, it might become empty; if so, skip it. */
         if (!WT_TIME_WINDOW_IS_EMPTY(&unpack.tw))
@@ -1347,6 +1353,9 @@ record_loop:
                     goto compare;
                 }
                 twp = &vpack->tw;
+
+                /* Clear the on-disk cell time window if it is obsolete. */
+                __wt_rec_time_window_clear_obsolete(session, NULL, vpack, r);
 
                 /*
                  * If we are handling overflow items, use the overflow item itself exactly once,
