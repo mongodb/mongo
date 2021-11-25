@@ -5130,56 +5130,50 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1008
 /*! LSM: tree queue hit maximum */
 #define	WT_STAT_CONN_LSM_WORK_QUEUE_MAX			1009
-/*! block-manager: block cache cached blocks updated */
+/*! block-cache: cached blocks updated */
 #define	WT_STAT_CONN_BLOCK_CACHE_BLOCKS_UPDATE		1010
-/*! block-manager: block cache cached bytes updated */
+/*! block-cache: cached bytes updated */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYTES_UPDATE		1011
-/*! block-manager: block cache evicted blocks */
+/*! block-cache: evicted blocks */
 #define	WT_STAT_CONN_BLOCK_CACHE_BLOCKS_EVICTED		1012
-/*! block-manager: block cache file size causing bypass */
+/*! block-cache: file size causing bypass */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYPASS_FILESIZE	1013
-/*! block-manager: block cache lookups */
-#define	WT_STAT_CONN_BLOCK_CACHE_DATA_REFS		1014
-/*!
- * block-manager: block cache number of blocks not evicted due to
- * overhead
- */
+/*! block-cache: lookups */
+#define	WT_STAT_CONN_BLOCK_CACHE_LOOKUPS		1014
+/*! block-cache: number of blocks not evicted due to overhead */
 #define	WT_STAT_CONN_BLOCK_CACHE_NOT_EVICTED_OVERHEAD	1015
 /*!
- * block-manager: block cache number of bypasses because no-write-
- * allocate setting was on
+ * block-cache: number of bypasses because no-write-allocate setting was
+ * on
  */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYPASS_WRITEALLOC	1016
-/*! block-manager: block cache number of bypasses due to overhead on put */
+/*! block-cache: number of bypasses due to overhead on put */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYPASS_OVERHEAD_PUT	1017
-/*! block-manager: block cache number of bypasses on get */
+/*! block-cache: number of bypasses on get */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYPASS_GET		1018
-/*!
- * block-manager: block cache number of bypasses on put because file is
- * too small
- */
+/*! block-cache: number of bypasses on put because file is too small */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYPASS_PUT		1019
-/*! block-manager: block cache number of eviction passes */
+/*! block-cache: number of eviction passes */
 #define	WT_STAT_CONN_BLOCK_CACHE_EVICTION_PASSES	1020
-/*! block-manager: block cache number of hits including existence checks */
+/*! block-cache: number of hits */
 #define	WT_STAT_CONN_BLOCK_CACHE_HITS			1021
-/*! block-manager: block cache number of misses including existence checks */
+/*! block-cache: number of misses */
 #define	WT_STAT_CONN_BLOCK_CACHE_MISSES			1022
-/*! block-manager: block cache number of put bypasses on checkpoint I/O */
+/*! block-cache: number of put bypasses on checkpoint I/O */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYPASS_CHKPT		1023
-/*! block-manager: block cache removed blocks */
+/*! block-cache: removed blocks */
 #define	WT_STAT_CONN_BLOCK_CACHE_BLOCKS_REMOVED		1024
-/*! block-manager: block cache total blocks */
+/*! block-cache: total blocks */
 #define	WT_STAT_CONN_BLOCK_CACHE_BLOCKS			1025
-/*! block-manager: block cache total blocks inserted on read path */
+/*! block-cache: total blocks inserted on read path */
 #define	WT_STAT_CONN_BLOCK_CACHE_BLOCKS_INSERT_READ	1026
-/*! block-manager: block cache total blocks inserted on write path */
+/*! block-cache: total blocks inserted on write path */
 #define	WT_STAT_CONN_BLOCK_CACHE_BLOCKS_INSERT_WRITE	1027
-/*! block-manager: block cache total bytes */
+/*! block-cache: total bytes */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYTES			1028
-/*! block-manager: block cache total bytes inserted on read path */
+/*! block-cache: total bytes inserted on read path */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYTES_INSERT_READ	1029
-/*! block-manager: block cache total bytes inserted on write path */
+/*! block-cache: total bytes inserted on write path */
 #define	WT_STAT_CONN_BLOCK_CACHE_BYTES_INSERT_WRITE	1030
 /*! block-manager: blocks pre-loaded */
 #define	WT_STAT_CONN_BLOCK_PRELOAD			1031

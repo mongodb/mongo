@@ -31,6 +31,10 @@ class Stat:
     def __cmp__(self, other):
         return cmp(self.desc.lower(), other.desc.lower())
 
+class BlockCacheStat(Stat):
+    prefix = 'block-cache'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, BlockCacheStat.prefix, desc, flags)
 class BlockStat(Stat):
     prefix = 'block-manager'
     def __init__(self, name, desc, flags=''):
@@ -129,6 +133,7 @@ class YieldStat(Stat):
 groups = {}
 groups['cursor'] = [CursorStat.prefix, SessionOpStat.prefix]
 groups['evict'] = [
+    BlockCacheStat.prefix,
     BlockStat.prefix,
     CacheStat.prefix,
     CacheWalkStat.prefix,
@@ -177,6 +182,31 @@ conn_stats = [
     ##########################################
     # Block manager statistics
     ##########################################
+    BlockCacheStat('block_cache_blocks', 'total blocks'),
+    BlockCacheStat('block_cache_blocks_evicted', 'evicted blocks'),
+    BlockCacheStat('block_cache_blocks_insert_read', 'total blocks inserted on read path'),
+    BlockCacheStat('block_cache_blocks_insert_write', 'total blocks inserted on write path'),
+    BlockCacheStat('block_cache_blocks_removed', 'removed blocks'),
+    BlockCacheStat('block_cache_blocks_update', 'cached blocks updated'),
+    BlockCacheStat('block_cache_bypass_chkpt', 'number of put bypasses on checkpoint I/O'),
+    BlockCacheStat('block_cache_bypass_filesize', 'file size causing bypass'),
+    BlockCacheStat('block_cache_bypass_get', 'number of bypasses on get'),
+    BlockCacheStat('block_cache_bypass_overhead_put', 'number of bypasses due to overhead on put'),
+    BlockCacheStat('block_cache_bypass_put', 'number of bypasses on put because file is too small'),
+    BlockCacheStat('block_cache_bypass_writealloc', 'number of bypasses because no-write-allocate setting was on'),
+    BlockCacheStat('block_cache_bytes', 'total bytes'),
+    BlockCacheStat('block_cache_bytes_insert_read', 'total bytes inserted on read path'),
+    BlockCacheStat('block_cache_bytes_insert_write', 'total bytes inserted on write path'),
+    BlockCacheStat('block_cache_bytes_update', 'cached bytes updated'),
+    BlockCacheStat('block_cache_eviction_passes', 'number of eviction passes'),
+    BlockCacheStat('block_cache_hits', 'number of hits'),
+    BlockCacheStat('block_cache_lookups', 'lookups'),
+    BlockCacheStat('block_cache_misses', 'number of misses'),
+    BlockCacheStat('block_cache_not_evicted_overhead', 'number of blocks not evicted due to overhead'),
+
+    ##########################################
+    # Block manager statistics
+    ##########################################
     BlockStat('block_byte_map_read', 'mapped bytes read', 'size'),
     BlockStat('block_byte_read', 'bytes read', 'size'),
     BlockStat('block_byte_read_mmap', 'bytes read via memory map API', 'size'),
@@ -185,27 +215,6 @@ conn_stats = [
     BlockStat('block_byte_write_checkpoint', 'bytes written for checkpoint', 'size'),
     BlockStat('block_byte_write_mmap', 'bytes written via memory map API', 'size'),
     BlockStat('block_byte_write_syscall', 'bytes written via system call API', 'size'),
-    BlockStat('block_cache_blocks', 'block cache total blocks'),
-    BlockStat('block_cache_blocks_evicted', 'block cache evicted blocks'),
-    BlockStat('block_cache_blocks_removed', 'block cache removed blocks'),
-    BlockStat('block_cache_blocks_update', 'block cache cached blocks updated'),
-    BlockStat('block_cache_blocks_insert_read', 'block cache total blocks inserted on read path'),
-    BlockStat('block_cache_blocks_insert_write', 'block cache total blocks inserted on write path'),
-    BlockStat('block_cache_bypass_chkpt', 'block cache number of put bypasses on checkpoint I/O'),
-    BlockStat('block_cache_bypass_get', 'block cache number of bypasses on get'),
-    BlockStat('block_cache_bypass_filesize', 'block cache file size causing bypass'),
-    BlockStat('block_cache_bypass_overhead_put', 'block cache number of bypasses due to overhead on put'),
-    BlockStat('block_cache_bypass_put', 'block cache number of bypasses on put because file is too small'),
-    BlockStat('block_cache_bypass_writealloc', 'block cache number of bypasses because no-write-allocate setting was on'),
-    BlockStat('block_cache_bytes', 'block cache total bytes'),
-    BlockStat('block_cache_bytes_update', 'block cache cached bytes updated'),
-    BlockStat('block_cache_bytes_insert_read', 'block cache total bytes inserted on read path'),
-    BlockStat('block_cache_bytes_insert_write', 'block cache total bytes inserted on write path'),
-    BlockStat('block_cache_data_refs', 'block cache lookups'),
-    BlockStat('block_cache_eviction_passes', 'block cache number of eviction passes'),
-    BlockStat('block_cache_hits', 'block cache number of hits including existence checks'),
-    BlockStat('block_cache_misses', 'block cache number of misses including existence checks'),
-    BlockStat('block_cache_not_evicted_overhead', 'block cache number of blocks not evicted due to overhead'),
     BlockStat('block_map_read', 'mapped blocks read'),
     BlockStat('block_preload', 'blocks pre-loaded'),
     BlockStat('block_read', 'blocks read'),

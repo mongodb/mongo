@@ -24,33 +24,19 @@
 #define BLKCACHE_HASHSIZE_MIN 512
 #define BLKCACHE_HASHSIZE_MAX WT_GIGABYTE
 
-#define WT_BLKCACHE_FULL -2
-#define WT_BLKCACHE_BYPASS -3
-
 #define BLKCACHE_MINREF_INCREMENT 20
 #define BLKCACHE_EVICT_OTHER 0
 #define BLKCACHE_NOT_EVICTION_CANDIDATE 1
-
-/*
- * WT_BLKCACHE_ID --
- *    File ID, checksum, offset and size uniquely identify a block.
- */
-WT_PACKED_STRUCT_BEGIN(__wt_blkcache_id)
-    uint32_t fid;
-    uint32_t checksum;
-    uint32_t size;
-    wt_off_t offset;
-WT_PACKED_STRUCT_END
-#define WT_BLKCACHE_ID_SIZE (sizeof(wt_off_t) + 3 * sizeof(uint32_t))
 
 /*
  * WT_BLKCACHE_ITEM --
  *     Block cache item. It links with other items in the same hash bucket.
  */
 struct __wt_blkcache_item {
-    struct __wt_blkcache_id id;
     TAILQ_ENTRY(__wt_blkcache_item) hashq;
+
     void *data;
+    uint32_t data_size;
     uint32_t num_references;
 
     /*
@@ -60,6 +46,10 @@ struct __wt_blkcache_item {
      * this counter is a metric combining frequency and recency, and hence its name.
      */
     int32_t freq_rec_counter;
+
+    uint32_t fid;      /* File ID */
+    uint8_t addr_size; /* Address cookie */
+    uint8_t addr[];
 };
 
 /*
@@ -107,14 +97,14 @@ struct __wt_blkcache {
     int refs_since_filesize_estimated; /* Counter for recalculating the aggregate file size */
 
     /*
-     * This fraction tells us the good enough ratio of file data cached in the DRAM resident OS
-     * buffer cache, which makes the use of this block cache unnecessary. Suppose we set that
-     * fraction to 50%. Then if half of our file data fits into system DRAM, we consider this block
-     * cache unhelpful.
+     * This fraction tells us the ratio of total file data to the application-declared size of the
+     * OS filesystem buffer cache, which makes the use of this block cache unnecessary. Suppose we
+     * set that fraction to 50%. Then if half of our total file data fits into whatever value the
+     * user gives us for the filesystem buffer cache, we consider this block cache unhelpful.
      *
-     * E.g., if the fraction is set to 50%, our aggregate file size is 500GB, and we have 300GB of
-     * RAM, then we will not use this block cache, because we know that half of our files (250GB)
-     * must be cached by the OS in DRAM.
+     * E.g., if the fraction is set to 50%, our aggregate file size is 500GB, and the application
+     * declares there to be 300GB of OS filesystem buffer cache, then we will not use this block
+     * cache, because half of our total file size (250GB) would fit into such a buffer cache.
      */
     u_int percent_file_in_os_cache;
 

@@ -2,13 +2,11 @@
 #	List of source files for WiredTiger library.
 
 src/block/block_addr.c
-src/block/block_cache.c
 src/block/block_ckpt.c
 src/block/block_ckpt_scan.c
 src/block/block_compact.c
 src/block/block_ext.c
 src/block/block_map.c
-src/block/block_mgr.c
 src/block/block_open.c
 src/block/block_read.c
 src/block/block_session.c
@@ -16,6 +14,8 @@ src/block/block_slvg.c
 src/block/block_tiered.c
 src/block/block_vrfy.c
 src/block/block_write.c
+src/block_cache/block_cache.c
+src/block_cache/block_mgr.c
 src/bloom/bloom.c
 src/btree/bt_compact.c
 src/btree/bt_curnext.c
@@ -51,8 +51,8 @@ src/checksum/arm64/crc32-arm64.c	ARM64_HOST
 src/checksum/power8/crc32.sx		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
 src/checksum/software/checksum.c
-src/checksum/x86/crc32-x86.c		X86_HOST
 src/checksum/x86/crc32-x86-alt.c	X86_HOST
+src/checksum/x86/crc32-x86.c		X86_HOST
 src/checksum/zseries/crc32-s390x.c	ZSERIES_HOST
 src/checksum/zseries/crc32le-vx.sx	ZSERIES_HOST
 src/config/config.c
@@ -100,8 +100,8 @@ src/evict/evict_page.c
 src/evict/evict_stat.c
 src/history/hs_conn.c
 src/history/hs_cursor.c
-src/history/hs_verify.c
 src/history/hs_rec.c
+src/history/hs_verify.c
 src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c

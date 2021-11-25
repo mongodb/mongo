@@ -49,7 +49,6 @@ static inline void
 __wt_verify_build(void)
 {
     /* Check specific structures weren't padded. */
-    WT_SIZE_CHECK(WT_BLKCACHE_ID, WT_BLKCACHE_ID_SIZE);
     WT_SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
     WT_SIZE_CHECK(WT_REF, WT_REF_SIZE);
 

@@ -1058,27 +1058,27 @@ static const char *const __stats_connection_desc[] = {
   "LSM: tree maintenance operations executed",
   "LSM: tree maintenance operations scheduled",
   "LSM: tree queue hit maximum",
-  "block-manager: block cache cached blocks updated",
-  "block-manager: block cache cached bytes updated",
-  "block-manager: block cache evicted blocks",
-  "block-manager: block cache file size causing bypass",
-  "block-manager: block cache lookups",
-  "block-manager: block cache number of blocks not evicted due to overhead",
-  "block-manager: block cache number of bypasses because no-write-allocate setting was on",
-  "block-manager: block cache number of bypasses due to overhead on put",
-  "block-manager: block cache number of bypasses on get",
-  "block-manager: block cache number of bypasses on put because file is too small",
-  "block-manager: block cache number of eviction passes",
-  "block-manager: block cache number of hits including existence checks",
-  "block-manager: block cache number of misses including existence checks",
-  "block-manager: block cache number of put bypasses on checkpoint I/O",
-  "block-manager: block cache removed blocks",
-  "block-manager: block cache total blocks",
-  "block-manager: block cache total blocks inserted on read path",
-  "block-manager: block cache total blocks inserted on write path",
-  "block-manager: block cache total bytes",
-  "block-manager: block cache total bytes inserted on read path",
-  "block-manager: block cache total bytes inserted on write path",
+  "block-cache: cached blocks updated",
+  "block-cache: cached bytes updated",
+  "block-cache: evicted blocks",
+  "block-cache: file size causing bypass",
+  "block-cache: lookups",
+  "block-cache: number of blocks not evicted due to overhead",
+  "block-cache: number of bypasses because no-write-allocate setting was on",
+  "block-cache: number of bypasses due to overhead on put",
+  "block-cache: number of bypasses on get",
+  "block-cache: number of bypasses on put because file is too small",
+  "block-cache: number of eviction passes",
+  "block-cache: number of hits",
+  "block-cache: number of misses",
+  "block-cache: number of put bypasses on checkpoint I/O",
+  "block-cache: removed blocks",
+  "block-cache: total blocks",
+  "block-cache: total blocks inserted on read path",
+  "block-cache: total blocks inserted on write path",
+  "block-cache: total bytes",
+  "block-cache: total bytes inserted on read path",
+  "block-cache: total bytes inserted on write path",
   "block-manager: blocks pre-loaded",
   "block-manager: blocks read",
   "block-manager: blocks written",
@@ -1637,7 +1637,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_cache_bytes_update = 0;
     stats->block_cache_blocks_evicted = 0;
     stats->block_cache_bypass_filesize = 0;
-    stats->block_cache_data_refs = 0;
+    stats->block_cache_lookups = 0;
     stats->block_cache_not_evicted_overhead = 0;
     stats->block_cache_bypass_writealloc = 0;
     stats->block_cache_bypass_overhead_put = 0;
@@ -2171,7 +2171,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_cache_bytes_update += WT_STAT_READ(from, block_cache_bytes_update);
     to->block_cache_blocks_evicted += WT_STAT_READ(from, block_cache_blocks_evicted);
     to->block_cache_bypass_filesize += WT_STAT_READ(from, block_cache_bypass_filesize);
-    to->block_cache_data_refs += WT_STAT_READ(from, block_cache_data_refs);
+    to->block_cache_lookups += WT_STAT_READ(from, block_cache_lookups);
     to->block_cache_not_evicted_overhead += WT_STAT_READ(from, block_cache_not_evicted_overhead);
     to->block_cache_bypass_writealloc += WT_STAT_READ(from, block_cache_bypass_writealloc);
     to->block_cache_bypass_overhead_put += WT_STAT_READ(from, block_cache_bypass_overhead_put);

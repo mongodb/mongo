@@ -73,8 +73,6 @@ struct __wt_blkcache;
 typedef struct __wt_blkcache WT_BLKCACHE;
 struct __wt_blkcache_bucket_metadata;
 typedef struct __wt_blkcache_bucket_metadata WT_BLKCACHE_BUCKET_METADATA;
-struct __wt_blkcache_id;
-typedef struct __wt_blkcache_id WT_BLKCACHE_ID;
 struct __wt_blkcache_item;
 typedef struct __wt_blkcache_item WT_BLKCACHE_ITEM;
 struct __wt_blkincr;
