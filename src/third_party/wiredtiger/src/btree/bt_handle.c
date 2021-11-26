@@ -920,8 +920,9 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
     if (cval.val < WT_BTREE_MIN_SPLIT_PCT) {
         btree->split_pct = WT_BTREE_MIN_SPLIT_PCT;
-        WT_RET(__wt_msg(session, "Re-setting split_pct for %s to the minimum allowed of %d%%",
-          session->dhandle->name, WT_BTREE_MIN_SPLIT_PCT));
+        __wt_verbose_notice(session, WT_VERB_SPLIT,
+          "Re-setting split_pct for %s to the minimum allowed of %d%%", session->dhandle->name,
+          WT_BTREE_MIN_SPLIT_PCT);
     } else
         btree->split_pct = (int)cval.val;
     leaf_split_size = __wt_split_page_size(btree->split_pct, btree->maxleafpage, btree->allocsize);

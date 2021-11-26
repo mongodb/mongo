@@ -152,10 +152,10 @@ __verify_set_file_size(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 
     if (block->verify_layout) {
         WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-        WT_ERR(__wt_msg(session, "%s: physical size %s", block->name,
-          __wt_buf_set_size(session, (uint64_t)block->size, true, tmp)));
-        WT_ERR(__wt_msg(session, "%s: correcting to %s checkpoint size %s", block->name, ckpt->name,
-          __wt_buf_set_size(session, (uint64_t)ci->file_size, true, tmp)));
+        __wt_verbose_notice(session, WT_VERB_VERIFY, "%s: physical size %s", block->name,
+          __wt_buf_set_size(session, (uint64_t)block->size, true, tmp));
+        __wt_verbose_notice(session, WT_VERB_VERIFY, "%s: correcting to %s checkpoint size %s",
+          block->name, ckpt->name, __wt_buf_set_size(session, (uint64_t)ci->file_size, true, tmp));
     }
 
     /*

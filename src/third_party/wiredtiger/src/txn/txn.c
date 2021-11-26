@@ -913,15 +913,15 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
     ts_flags = op->btree->dhandle->ts_flags;
 
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_ALWAYS) && !txn_has_ts)
-        WT_RET(__wt_msg(session,
+        __wt_verbose_notice(session, WT_VERB_TRANSACTION, "%s",
           WT_COMMIT_TS_VERB_PREFIX
-          "commit timestamp not used on table configured to require timestamps"));
+          "commit timestamp not used on table configured to require timestamps");
 
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_NEVER) && txn_has_ts)
-        WT_RET(__wt_msg(session,
+        __wt_verbose_notice(session, WT_VERB_TRANSACTION,
           WT_COMMIT_TS_VERB_PREFIX
           "commit timestamp %s used on table configured to not use timestamps",
-          __wt_timestamp_to_string(op_ts, ts_string[0])));
+          __wt_timestamp_to_string(op_ts, ts_string[0]));
 
 #ifdef HAVE_DIAGNOSTIC
     prev_op_durable_ts = upd->prev_durable_ts;
@@ -932,10 +932,10 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
      */
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_KEY_CONSISTENT) && prev_op_durable_ts != WT_TS_NONE &&
       !txn_has_ts) {
-        WT_RET(__wt_msg(session,
+        __wt_verbose_error(session, WT_VERB_TRANSACTION, "%s",
           WT_COMMIT_TS_VERB_PREFIX
           "no timestamp provided for an update to a "
-          "table configured to always use timestamps once they are first used"));
+          "table configured to always use timestamps once they are first used");
         WT_ASSERT(session, false);
     }
 
@@ -944,13 +944,13 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
      * ordering.
      */
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_ORDERED) && txn_has_ts && prev_op_durable_ts > op_ts) {
-        WT_RET(__wt_msg(session,
+        __wt_verbose_error(session, WT_VERB_TRANSACTION,
           WT_COMMIT_TS_VERB_PREFIX
           "committing a transaction that updates a "
           "value with an older timestamp (%s) than is associated with the previous "
           "update (%s) on a table configured for strict ordering",
           __wt_timestamp_to_string(op_ts, ts_string[0]),
-          __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
+          __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1]));
         WT_ASSERT(session, false);
     }
 
@@ -961,24 +961,24 @@ __txn_commit_timestamps_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_
      */
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_ORDERED) && prev_op_durable_ts != WT_TS_NONE &&
       !txn_has_ts) {
-        WT_RET(
-          __wt_msg(session,
-            WT_COMMIT_TS_VERB_PREFIX "committing a transaction that updates a value without "
-                                     "a timestamp while the previous update (%s) is timestamped "
-                                     "on a table configured for strict ordering",
-            __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
+        __wt_verbose_error(session, WT_VERB_TRANSACTION,
+          WT_COMMIT_TS_VERB_PREFIX
+          "committing a transaction that updates a value without "
+          "a timestamp while the previous update (%s) is timestamped "
+          "on a table configured for strict ordering",
+          __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1]));
         WT_ASSERT(session, false);
     }
 
     if (FLD_ISSET(ts_flags, WT_DHANDLE_TS_MIXED_MODE) && F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
       op_ts != WT_TS_NONE && prev_op_durable_ts > op_ts) {
-        WT_RET(__wt_msg(session,
+        __wt_verbose_error(session, WT_VERB_TRANSACTION,
           WT_COMMIT_TS_VERB_PREFIX
           "committing a transaction that updates a "
           "value with an older timestamp (%s) than is associated with the previous "
           "update (%s) on a table configured for mixed mode ordering",
           __wt_timestamp_to_string(op_ts, ts_string[0]),
-          __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1])));
+          __wt_timestamp_to_string(prev_op_durable_ts, ts_string[1]));
         WT_ASSERT(session, false);
     }
 #else

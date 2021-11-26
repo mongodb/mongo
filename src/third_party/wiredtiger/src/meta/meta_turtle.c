@@ -208,8 +208,8 @@ __wt_turtle_exists(WT_SESSION_IMPL *session, bool *existp)
         return (0);
 
     WT_RET(__wt_fs_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE, true));
-    WT_RET(__wt_msg(session, "%s not found, %s renamed to %s", WT_METADATA_TURTLE,
-      WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
+    __wt_verbose_notice(session, WT_VERB_METADATA, "%s not found, %s renamed to %s",
+      WT_METADATA_TURTLE, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
     *existp = true;
     return (0);
 }
@@ -289,8 +289,9 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
          * from the backup.
          */
         if (exist_backup) {
-            WT_RET(__wt_msg(session, "Both %s and %s exist; recreating metadata from backup",
-              WT_METADATA_TURTLE, WT_METADATA_BACKUP));
+            __wt_verbose_notice(session, WT_VERB_METADATA,
+              "Both %s and %s exist; recreating metadata from backup", WT_METADATA_TURTLE,
+              WT_METADATA_BACKUP);
             WT_RET(__wt_remove_if_exists(session, WT_METAFILE, false));
             WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));
             load = true;

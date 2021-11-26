@@ -28,6 +28,7 @@
     gen(WT_VERB_EVICT_STUCK)           \
     gen(WT_VERB_EXTENSION)             \
     gen(WT_VERB_FILEOPS)               \
+    gen(WT_VERB_GENERATION)            \
     gen(WT_VERB_HANDLEOPS)             \
     gen(WT_VERB_HS)                    \
     gen(WT_VERB_HS_ACTIVITY)           \
@@ -36,6 +37,7 @@
     gen(WT_VERB_LSM_MANAGER)           \
     gen(WT_VERB_METADATA)              \
     gen(WT_VERB_MUTEX)                 \
+    gen(WT_VERB_OUT_OF_ORDER)          \
     gen(WT_VERB_OVERFLOW)              \
     gen(WT_VERB_READ)                  \
     gen(WT_VERB_RECONCILE)             \
@@ -73,8 +75,9 @@ typedef enum {
  * level (mostly adopted for debugging).
  */
 typedef enum {
-    WT_VERBOSE_ERROR = -2,
+    WT_VERBOSE_ERROR = -3,
     WT_VERBOSE_WARNING,
+    WT_VERBOSE_NOTICE,
     WT_VERBOSE_INFO,
     WT_VERBOSE_DEBUG
 } WT_VERBOSE_LEVEL;
@@ -89,6 +92,9 @@ typedef enum {
             break;                             \
         case WT_VERBOSE_WARNING:               \
             (level_str) = "WARNING";           \
+            break;                             \
+        case WT_VERBOSE_NOTICE:                \
+            (level_str) = "NOTICE";            \
             break;                             \
         case WT_VERBOSE_INFO:                  \
             (level_str) = "INFO";              \
@@ -158,6 +164,13 @@ struct __wt_verbose_multi_category {
  */
 #define __wt_verbose_warning(session, category, fmt, ...) \
     __wt_verbose_level(session, category, WT_VERBOSE_WARNING, fmt, __VA_ARGS__)
+
+/*
+ * __wt_verbose_notice --
+ *     Wrapper to __wt_verbose_level defaulting the verbosity level to WT_VERBOSE_NOTICE.
+ */
+#define __wt_verbose_notice(session, category, fmt, ...) \
+    __wt_verbose_level(session, category, WT_VERBOSE_NOTICE, fmt, __VA_ARGS__)
 
 /*
  * __wt_verbose_info --

@@ -53,8 +53,8 @@ __wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename, uint32
             WT_ERR(__wt_fs_exist(session, tmp->data, &exists));
             if (!exists) {
                 WT_ERR(__wt_fs_rename(session, filename, tmp->data, false));
-                WT_ERR(__wt_msg(session, "unexpected file %s found, renamed to %s", filename,
-                  (const char *)tmp->data));
+                __wt_verbose_notice(session, WT_VERB_BLOCK,
+                  "unexpected file %s found, renamed to %s", filename, (const char *)tmp->data);
                 break;
             }
         }

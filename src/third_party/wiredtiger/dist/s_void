@@ -46,6 +46,8 @@ func_ok()
 	    -e '/int __im_file_sync$/d' \
 	    -e '/int __im_fs_directory_list_free$/d' \
 	    -e '/int __im_fs_exist$/d' \
+	    -e '/int __log_record_verify$/d' \
+	    -e '/int __log_salvage_message$/d' \
 	    -e '/int __page_write_gen_wrapped_check$/d' \
 	    -e '/int __posix_terminate$/d' \
 	    -e '/int __rec_destroy_session$/d' \

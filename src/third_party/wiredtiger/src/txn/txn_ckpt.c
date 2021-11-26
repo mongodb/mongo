@@ -287,8 +287,8 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
              * rollback error. We will ignore this dhandle as part of this checkpoint by returning
              * from here.
              */
-            WT_IGNORE_RET(__wt_msg(
-              session, "WT_ROLLBACK: checkpoint raced with transaction operating on dhandle"));
+            __wt_verbose_notice(session, WT_VERB_CHECKPOINT, "%s",
+              "WT_ROLLBACK: checkpoint raced with transaction operating on dhandle");
             WT_TRET(__wt_metadata_cursor_release(session, &meta_cursor));
             return (0);
         }

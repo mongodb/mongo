@@ -990,30 +990,30 @@ __log_record_verify(
     __wt_log_record_byteswap(&logrec);
 
     if (F_ISSET(&logrec, ~(WT_LOG_RECORD_ALL_FLAGS))) {
-        WT_RET(
-          __wt_msg(session, "%s: log record at position %" PRIu32 " has flag corruption 0x%" PRIx16,
-            log_fh->name, offset, logrec.flags));
+        __wt_verbose_notice(session, WT_VERB_LOG,
+          "%s: log record at position %" PRIu32 " has flag corruption 0x%" PRIx16, log_fh->name,
+          offset, logrec.flags);
         *corrupt = true;
     }
     for (i = 0; i < sizeof(logrec.unused); i++)
         if (logrec.unused[i] != 0) {
-            WT_RET(__wt_msg(session,
+            __wt_verbose_notice(session, WT_VERB_LOG,
               "%s: log record at position %" PRIu32 " has unused[%" WT_SIZET_FMT
               "] corruption 0x%" PRIx8,
-              log_fh->name, offset, i, logrec.unused[i]));
+              log_fh->name, offset, i, logrec.unused[i]);
             *corrupt = true;
         }
     if (logrec.mem_len != 0 &&
       !F_ISSET(&logrec, WT_LOG_RECORD_COMPRESSED | WT_LOG_RECORD_ENCRYPTED)) {
-        WT_RET(__wt_msg(session,
+        __wt_verbose_notice(session, WT_VERB_LOG,
           "%s: log record at position %" PRIu32 " has memory len corruption 0x%" PRIx32,
-          log_fh->name, offset, logrec.mem_len));
+          log_fh->name, offset, logrec.mem_len);
         *corrupt = true;
     }
     if (logrec.len <= offsetof(WT_LOG_RECORD, record)) {
-        WT_RET(__wt_msg(session,
+        __wt_verbose_notice(session, WT_VERB_LOG,
           "%s: log record at position %" PRIu32 " has record len corruption 0x%" PRIx32,
-          log_fh->name, offset, logrec.len));
+          log_fh->name, offset, logrec.len);
         *corrupt = true;
     }
     return (0);
@@ -1407,7 +1407,8 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, bool this_log, bool salvag
     WT_ERR(__wt_close(session, &log_fh));
 
     if (salvage_mode)
-        WT_ERR(__wt_msg(session, "salvage: log file %" PRIu32 " truncated", lsn->l.file));
+        __wt_verbose_notice(
+          session, WT_VERB_LOG, "salvage: log file %" PRIu32 " truncated", lsn->l.file);
 
     /*
      * If we just want to truncate the current log, return and skip looking for intervening logs.
@@ -1453,12 +1454,12 @@ err:
     WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
     if (salvage_first != 0) {
         if (salvage_last > salvage_first)
-            WT_TRET(
-              __wt_msg(session, "salvage: log files %" PRIu32 "-%" PRIu32 " truncated at beginning",
-                salvage_first, salvage_last));
+            __wt_verbose_notice(session, WT_VERB_LOG,
+              "salvage: log files %" PRIu32 "-%" PRIu32 " truncated at beginning", salvage_first,
+              salvage_last);
         else
-            WT_TRET(__wt_msg(
-              session, "salvage: log file %" PRIu32 " truncated at beginning", salvage_first));
+            __wt_verbose_notice(session, WT_VERB_LOG,
+              "salvage: log file %" PRIu32 " truncated at beginning", salvage_first);
     }
     return (ret);
 }
@@ -1634,7 +1635,8 @@ again:
          */
         if (need_salvage) {
             WT_ERR(__wt_log_remove(session, WT_LOG_FILENAME, lastlog));
-            WT_ERR(__wt_msg(session, "salvage: log file %" PRIu32 " removed", lastlog));
+            __wt_verbose_notice(
+              session, WT_VERB_LOG, "salvage: log file %" PRIu32 " removed", lastlog);
             WT_ERR(__wt_fs_directory_list_free(session, &logfiles, logcount));
             logfiles = NULL;
             goto again;
@@ -2001,8 +2003,9 @@ static int
 __log_salvage_message(
   WT_SESSION_IMPL *session, const char *log_name, const char *extra_msg, wt_off_t offset)
 {
-    WT_RET(__wt_msg(session, "log file %s corrupted%s at position %" PRIuMAX ", truncated",
-      log_name, extra_msg, (uintmax_t)offset));
+    __wt_verbose_notice(session, WT_VERB_LOG,
+      "log file %s corrupted%s at position %" PRIuMAX ", truncated", log_name, extra_msg,
+      (uintmax_t)offset);
     F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
     return (WT_ERROR);
 }

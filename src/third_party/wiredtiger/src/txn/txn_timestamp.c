@@ -811,9 +811,10 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
              * error message because that logs a MongoDB error, use an informational message to
              * provide the context instead.
              */
-            WT_RET(__wt_msg(session, "read timestamp %s less than the %s timestamp %s",
+            __wt_verbose_notice(session, WT_VERB_TIMESTAMP,
+              "read timestamp %s less than the %s timestamp %s",
               __wt_timestamp_to_string(read_ts, ts_string[0]), use_pinned_ts ? "pinned" : "oldest",
-              __wt_timestamp_to_string(ts_oldest, ts_string[1])));
+              __wt_timestamp_to_string(ts_oldest, ts_string[1]));
             return (EINVAL);
         }
     } else

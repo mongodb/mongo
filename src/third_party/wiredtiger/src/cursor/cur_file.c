@@ -413,8 +413,8 @@ __curfile_remove(WT_CURSOR *cursor)
 
     /* If we've lost an initial position, we must fail. */
     if (positioned && !F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
-        WT_IGNORE_RET(__wt_msg(
-          session, "WT_ROLLBACK: rolling back cursor remove as initial position was lost"));
+        __wt_verbose_notice(session, WT_VERB_ERROR_RETURNS, "%s",
+          "WT_ROLLBACK: rolling back cursor remove as initial position was lost");
         WT_ERR(WT_ROLLBACK);
     }
 
