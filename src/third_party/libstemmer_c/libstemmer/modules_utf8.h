@@ -117,7 +117,7 @@ static const char * algorithm_names[] = {
   "porter", 
   "portuguese", 
   "romanian", 
-  "russian",
+  "russian", 
   "serbian", 
   "spanish", 
   "swedish", 
