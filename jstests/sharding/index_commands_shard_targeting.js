@@ -50,18 +50,15 @@ function assertCommandChecksShardVersions(st, dbName, collName, testCase) {
     }
     assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
 
-    if (!testCase.skipShardVersionCheck) {
-        // Assert that primary shard still has stale collection version after the command is run
-        // because both the shard version in the command and in the shard's cache are UNSHARDED
-        // (no chunks).
-        ShardVersioningUtil.assertCollectionVersionOlderThan(
-            st.shard0, ns, latestCollectionVersion);
+    // Assert that primary shard still has stale collection version after the command is run
+    // because both the shard version in the command and in the shard's cache are UNSHARDED
+    // (no chunks).
+    ShardVersioningUtil.assertCollectionVersionOlderThan(st.shard0, ns, latestCollectionVersion);
 
-        // Assert that the targeted shards have the latest collection version after the command is
-        // run.
-        ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
-        ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, latestCollectionVersion);
-    }
+    // Assert that the targeted shards have the latest collection version after the command is
+    // run.
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard1, ns, latestCollectionVersion);
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard2, ns, latestCollectionVersion);
 }
 
 /*
@@ -181,20 +178,6 @@ const testCases = {
             },
             assertCommandDidNotRunOnShard: (shard) => {
                 ShardedIndexUtil.assertIndexExistsOnShard(shard, dbName, collName, index.key);
-            }
-        };
-    },
-    collMod: collName => {
-        return {
-            command: {collMod: collName, validator: {x: {$type: "string"}}},
-            skipShardVersionCheck: true,
-            assertCommandRanOnShard: (shard) => {
-                assert.commandFailedWithCode(
-                    shard.getCollection(dbName + "." + collName).insert({x: 1}),
-                    ErrorCodes.DocumentValidationFailure);
-            },
-            assertCommandDidNotRunOnShard: (shard) => {
-                assert.commandWorked(shard.getCollection(dbName + "." + collName).insert({x: 1}));
             }
         };
     },
