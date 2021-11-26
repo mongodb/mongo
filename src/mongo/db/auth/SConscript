@@ -207,7 +207,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/audit', # audit:logLogout in AuthZSession.
-        '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/caching',

@@ -33,5 +33,9 @@
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo::create_command_validation {
-Status validateViewOnNotEmpty(const std::string& viewOn);
+inline Status validateViewOnNotEmpty(const std::string& viewOn) {
+    return viewOn.empty()
+        ? Status(ErrorCodes::BadValue, str::stream() << "'viewOn' cannot be empty")
+        : Status::OK();
+}
 }  // namespace mongo::create_command_validation

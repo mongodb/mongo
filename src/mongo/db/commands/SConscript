@@ -271,7 +271,6 @@ env.Library(
     target='create_command',
     source=[
         'create.idl',
-        'create_command_validation.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
