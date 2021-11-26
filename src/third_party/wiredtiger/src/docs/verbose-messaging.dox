@@ -1,0 +1,62 @@
+/*! @page verbose_messaging Verbose Messaging
+
+As part of normal operation, WiredTiger will produce verbose messages
+around various events, actions and possible issues/errors. Verbose
+messages are spread across various categories, representing different sub-systems
+throughout WiredTiger. Verbose messages can be usefully leveraged to monitor,
+debug and diagnose events across WiredTiger's runtime.
+
+@section verbosity_levels Verbosity Levels
+
+WiredTiger associates a verbosity level with each message. The verbosity
+level denotes the severity of a given message, ranging from high
+severity error messages (\c ERROR) to low severity debug informational
+messages (\c DEBUG). The full range of verbosity levels and their associated
+meanings are:
+
+<table>
+@hrow{Level, Value, Description}
+@row{\c ERROR, -3, Critical error conditions triggered in WiredTiger. Usually requiring a DB restart. }
+@row{\c WARNING, -2, Warning conditions potentially signaling non-imminent errors and behaviors. Important to be aware of and useful for diagnosing potential error states. }
+@row{\c NOTICE, -1, Messages for significant events in WiredTiger\, usually worth noting. Notice messages are associated with normal runtime operations i.e not produced from any state considered harmful or error-prone.}
+@row{\c INFO, 0, Informational style messages\, usually describing statuses and actions performed by WiredTiger. }
+@row{\c DEBUG, 1, Low severity messages\, useful for debugging purposes. }
+</table>
+
+@section verbosity_categories Verbosity Categories
+
+Each verbose message is associated with a category. Verbose categories represent a range of different
+sub-systems in WiredTiger, where messages will denote a specific operation or event under a given sub-system.
+To see the complete exhaustive list of available verbose categories, refer to the \c 'verbose' configuration option
+under ::wiredtiger_open.
+
+Each verbosity category can be individually configured with a verbosity level (as described in @ref verbosity_levels).
+This allowing the end user to fine tune and tailor the verbosity of each category to fit their use case
+e.g configuring WiredTiger's runtime for debugging/monitoring a specific sub-system.
+
+When a category is assigned a verbosity level, any associated message less than or equal to (\c <=) that level will be displayed.
+As an example, configuring the \c checkpoint category with the \c DEBUG verbosity level would display \c checkpoint related messages
+less than or equal to the \c DEBUG level.
+Any category that is not explicitly configured with a verbosity level will default to the \c NOTICE (\c -1) level, effectively masking
+\c INFO and \c DEBUG informational messages.
+
+@subsection verbosity_configuration Configuring Verbose Categories
+
+Configuration of the verbose messaging system is achieved via the \c verbose configuration option when either
+opening a wiredtiger connection (::wiredtiger_open) or re-configuring a wiredtiger connection (WT_CONNECTION::reconfigure).
+The \c verbose configuration takes in a list of categories, where each category can be optionally associated with a verbosity level.
+An example configuring a WiredTiger connection with verbosity enabled:
+
+@snippet ex_verbose.c Configure verbose_messaging
+
+In the above example:
+- \c api is configured to the \c DEBUG verbosity level.
+- \c version is configured to the \c DEBUG verbosity level. If a category is passed without a verbosity
+level (.e.g \c <code>:0</code>), the category will default to the \c DEBUG level (i.e \c <code>verbose=[version]</code> is equivalent to <code>verbose=[version:1]</code>).
+- \c write is configured to the \c INFO verbosity level.
+
+When configuring verbosity levels, the lowest value the user can associate with a category is \c 0 (\c INFO). This ensuring
+the lower verbosity levels, \c NOTICE (\c -1) and below, are unmasked. Messages with levels less than or equal to \c NOTICE are considered
+to have important diagnostic information and thus should not be hidden.
+
+*/
