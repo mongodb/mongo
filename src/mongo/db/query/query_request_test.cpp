@@ -1565,7 +1565,7 @@ TEST(QueryRequestHelperTest, ValidateResponseWrongDataType) {
 class QueryRequestTest : public ServiceContextTest {};
 
 TEST_F(QueryRequestTest, ParseFromUUID) {
-    const CollectionUUID uuid = UUID::gen();
+    const UUID uuid = UUID::gen();
 
 
     NamespaceStringOrUUID nssOrUUID("test", uuid);

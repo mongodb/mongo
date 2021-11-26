@@ -166,12 +166,13 @@ OplogInterfaceMock::Operation makeCreateIndexOplogEntry(const CollectionPtr& col
                           RecordId(time));
 }
 
-OplogInterfaceMock::Operation makeRenameCollectionOplogEntry(const NamespaceString& renameFrom,
-                                                             const NamespaceString& renameTo,
-                                                             const UUID collectionUUID,
-                                                             OptionalCollectionUUID dropTarget,
-                                                             const bool stayTemp,
-                                                             OpTime opTime) {
+OplogInterfaceMock::Operation makeRenameCollectionOplogEntry(
+    const NamespaceString& renameFrom,
+    const NamespaceString& renameTo,
+    const UUID collectionUUID,
+    const boost::optional<UUID>& dropTarget,
+    const bool stayTemp,
+    OpTime opTime) {
     BSONObjBuilder cmd;
     cmd.append("renameCollection", renameFrom.ns());
     cmd.append("to", renameTo.ns());

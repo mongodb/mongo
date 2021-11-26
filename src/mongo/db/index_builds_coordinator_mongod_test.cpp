@@ -54,13 +54,13 @@ public:
     /**
      * Creates a collection with a default CollectionsOptions and the given UUID.
      */
-    void createCollection(const NamespaceString& nss, CollectionUUID uuid);
+    void createCollection(const NamespaceString& nss, UUID uuid);
 
-    const CollectionUUID _testFooUUID = UUID::gen();
+    const UUID _testFooUUID = UUID::gen();
     const NamespaceString _testFooNss = NamespaceString("test.foo");
-    const CollectionUUID _testBarUUID = UUID::gen();
+    const UUID _testBarUUID = UUID::gen();
     const NamespaceString _testBarNss = NamespaceString("test.bar");
-    const CollectionUUID _othertestFooUUID = UUID::gen();
+    const UUID _othertestFooUUID = UUID::gen();
     const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
@@ -87,8 +87,7 @@ void IndexBuildsCoordinatorMongodTest::tearDown() {
     CatalogTestFixture::tearDown();
 }
 
-void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& nss,
-                                                        CollectionUUID uuid) {
+void IndexBuildsCoordinatorMongodTest::createCollection(const NamespaceString& nss, UUID uuid) {
     CollectionOptions options;
     options.uuid = uuid;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));

@@ -70,14 +70,14 @@ public:
     virtual MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const CollectionUUID& uuid,
+        const UUID& uuid,
         Timestamp afterClusterTime,
         StringData reason) = 0;
 
     virtual MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const CollectionUUID& uuid,
+        const UUID& uuid,
         Timestamp afterClusterTime,
         StringData reason) = 0;
 
@@ -118,13 +118,13 @@ public:
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const CollectionUUID& uuid,
+        const UUID& uuid,
         Timestamp afterClusterTime,
         StringData reason) override;
 
     MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(OperationContext* opCtx,
                                                                         const NamespaceString& nss,
-                                                                        const CollectionUUID& uuid,
+                                                                        const UUID& uuid,
                                                                         Timestamp afterClusterTime,
                                                                         StringData reason) override;
 

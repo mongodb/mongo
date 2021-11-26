@@ -122,7 +122,7 @@ void UncommittedCollections::erase(UUID uuid, NamespaceString nss, UncommittedCo
 }
 
 void UncommittedCollections::rollback(OperationContext* opCtx,
-                                      CollectionUUID uuid,
+                                      UUID uuid,
                                       UncommittedCollectionsMap* map) {
     std::shared_ptr<Collection> collPtr;
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {

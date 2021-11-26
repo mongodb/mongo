@@ -81,7 +81,7 @@ public:
 
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       CollectionUUID uuid,
+                       const UUID& uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) final {
         if (nss == nssToCapture) {

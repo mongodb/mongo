@@ -123,7 +123,7 @@ protected:
 
 private:
     const NamespaceString _sourceNss = NamespaceString("test"_sd, "collection_being_resharded"_sd);
-    const CollectionUUID _sourceUUID = UUID::gen();
+    const UUID _sourceUUID = UUID::gen();
 
     ServiceContext::UniqueOperationContext _opCtx = makeOperationContext();
     std::unique_ptr<ReshardingMetrics> _metrics;

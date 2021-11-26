@@ -159,7 +159,7 @@ TEST_F(ParseNsOrUUID, ParseValidColl) {
 }
 
 TEST_F(ParseNsOrUUID, ParseValidUUID) {
-    const CollectionUUID uuid = UUID::gen();
+    const UUID uuid = UUID::gen();
     auto cmd = BSON("query" << uuid);
     auto parsedNsOrUUID = CommandHelpers::parseNsOrUUID("test", cmd);
     ASSERT_EQUALS(uuid, *parsedNsOrUUID.uuid());

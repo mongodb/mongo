@@ -115,7 +115,7 @@ ChunkManager RecipientStateMachineExternalStateImpl::getShardedCollectionRouting
 MigrationDestinationManager::CollectionOptionsAndUUID
 RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* opCtx,
                                                              const NamespaceString& nss,
-                                                             const CollectionUUID& uuid,
+                                                             const UUID& uuid,
                                                              Timestamp afterClusterTime,
                                                              StringData reason) {
     // Load the collection options from the primary shard for the database.
@@ -133,7 +133,7 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* o
 MigrationDestinationManager::IndexesAndIdIndex
 RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* opCtx,
                                                              const NamespaceString& nss,
-                                                             const CollectionUUID& uuid,
+                                                             const UUID& uuid,
                                                              Timestamp afterClusterTime,
                                                              StringData reason) {
     // Load the list of indexes from the shard which owns the global minimum chunk.

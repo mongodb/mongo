@@ -65,7 +65,7 @@ class TenantOplogApplierTestOpObserver : public OplogApplierImplOpObserver {
 public:
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             OptionalCollectionUUID uuid,
+                             const boost::optional<UUID>& uuid,
                              const BSONObj& msgObj,
                              const boost::optional<BSONObj> o2MsgObj,
                              const boost::optional<repl::OpTime> preImageOpTime,
@@ -613,7 +613,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString&,
-                                  OptionalCollectionUUID,
+                                  boost::optional<UUID>,
                                   StmtId,
                                   const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
     pushOps({entry});
@@ -636,7 +636,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString&,
-                                  OptionalCollectionUUID,
+                                  boost::optional<UUID>,
                                   StmtId,
                                   const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
     pushOps({entry});
@@ -660,7 +660,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString&,
-                                  OptionalCollectionUUID,
+                                  boost::optional<UUID>,
                                   StmtId,
                                   const OplogDeleteEntryArgs&) { onDeleteCalled = true; };
     pushOps({entry});
@@ -685,7 +685,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
     bool onDeleteCalled = false;
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  OptionalCollectionUUID observer_uuid,
+                                  const boost::optional<UUID>& observer_uuid,
                                   StmtId,
                                   const OplogDeleteEntryArgs& args) {
         onDeleteCalled = true;
@@ -753,8 +753,8 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
     _opObserver->onRenameCollectionFn = [&](OperationContext* opCtx,
                                             const NamespaceString& fromColl,
                                             const NamespaceString& toColl,
-                                            OptionalCollectionUUID uuid,
-                                            OptionalCollectionUUID dropTargetUUID,
+                                            const boost::optional<UUID>& uuid,
+                                            const boost::optional<UUID>& dropTargetUUID,
                                             std::uint64_t numRecords,
                                             bool stayTemp) { applyCmdCalled = true; };
     auto entry = OplogEntry(op);
@@ -818,7 +818,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
     bool applyCmdCalled = false;
     _opObserver->onCreateIndexFn = [&](OperationContext* opCtx,
                                        const NamespaceString& collNss,
-                                       CollectionUUID collUuid,
+                                       const UUID& collUuid,
                                        BSONObj indexDoc,
                                        bool fromMigrate) {
         ASSERT_FALSE(applyCmdCalled);
@@ -908,7 +908,7 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
     bool applyCmdCalled = false;
     _opObserver->onDropIndexFn = [&](OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     OptionalCollectionUUID uuid,
+                                     const boost::optional<UUID>& uuid,
                                      const std::string& indexName,
                                      const BSONObj& idxDescriptor) { applyCmdCalled = true; };
 

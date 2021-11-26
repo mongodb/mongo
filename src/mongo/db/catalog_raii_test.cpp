@@ -226,7 +226,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeGlobalLockDeadline) {
             AutoGetCollectionLockFree coll(
                 client2.second.get(),
                 nss,
-                [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {},
+                [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {},
                 AutoGetCollectionViewMode::kViewsForbidden,
                 Date_t::now() + timeoutMs);
         },
@@ -240,9 +240,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithCollection
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     AutoGetCollectionLockFree coll(
-        client2.second.get(),
-        nss,
-        [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {});
+        client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {
+        });
     ASSERT(client2.second->lockState()->isLocked());
 }
 
@@ -251,9 +250,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithDatabaseEx
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 
     AutoGetCollectionLockFree coll(
-        client2.second.get(),
-        nss,
-        [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {});
+        client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {
+        });
     ASSERT(client2.second->lockState()->isLocked());
 }
 
@@ -263,9 +261,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithRSTLExclus
     ASSERT(client1.second->lockState()->isRSTLExclusive());
 
     AutoGetCollectionLockFree coll(
-        client2.second.get(),
-        nss,
-        [](std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID) {});
+        client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {
+        });
     ASSERT(client2.second->lockState()->isLocked());
 }
 

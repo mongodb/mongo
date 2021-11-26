@@ -66,13 +66,13 @@ struct OplogUpdateEntryArgs {
     CollectionUpdateArgs* updateArgs;
 
     NamespaceString nss;
-    CollectionUUID uuid;
+    UUID uuid;
 
     // Specifies the pre-image recording option for retryable "findAndModify" commands.
     RetryableFindAndModifyLocation retryableFindAndModifyLocation =
         RetryableFindAndModifyLocation::kNone;
 
-    OplogUpdateEntryArgs(CollectionUpdateArgs* updateArgs, NamespaceString nss, CollectionUUID uuid)
+    OplogUpdateEntryArgs(CollectionUpdateArgs* updateArgs, NamespaceString nss, UUID uuid)
         : updateArgs(updateArgs), nss(std::move(nss)), uuid(std::move(uuid)) {}
 };
 
@@ -126,13 +126,13 @@ public:
 
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               CollectionUUID uuid,
+                               const UUID& uuid,
                                BSONObj indexDoc,
                                bool fromMigrate) = 0;
 
     virtual void onStartIndexBuild(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   CollectionUUID collUUID,
+                                   const UUID& collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
                                    bool fromMigrate) = 0;
@@ -149,14 +149,14 @@ public:
 
     virtual void onCommitIndexBuild(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    CollectionUUID collUUID,
+                                    const UUID& collUUID,
                                     const UUID& indexBuildUUID,
                                     const std::vector<BSONObj>& indexes,
                                     bool fromMigrate) = 0;
 
     virtual void onAbortIndexBuild(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   CollectionUUID collUUID,
+                                   const UUID& collUUID,
                                    const UUID& indexBuildUUID,
                                    const std::vector<BSONObj>& indexes,
                                    const Status& cause,
@@ -197,7 +197,7 @@ public:
      */
     virtual void onInternalOpMessage(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     OptionalCollectionUUID uuid,
+                                     const boost::optional<UUID>& uuid,
                                      const BSONObj& msgObj,
                                      boost::optional<BSONObj> o2MsgObj,
                                      boost::optional<repl::OpTime> preImageOpTime,
@@ -314,14 +314,14 @@ public:
                                              const NamespaceString& fromCollection,
                                              const NamespaceString& toCollection,
                                              const UUID& uuid,
-                                             OptionalCollectionUUID dropTargetUUID,
+                                             const boost::optional<UUID>& dropTargetUUID,
                                              std::uint64_t numRecords,
                                              bool stayTemp) = 0;
     virtual repl::OpTime preRenameCollection(OperationContext* opCtx,
                                              const NamespaceString& fromCollection,
                                              const NamespaceString& toCollection,
                                              const UUID& uuid,
-                                             OptionalCollectionUUID dropTargetUUID,
+                                             const boost::optional<UUID>& dropTargetUUID,
                                              std::uint64_t numRecords,
                                              bool stayTemp,
                                              bool markFromMigrate) {
@@ -338,7 +338,7 @@ public:
                                       const NamespaceString& fromCollection,
                                       const NamespaceString& toCollection,
                                       const UUID& uuid,
-                                      OptionalCollectionUUID dropTargetUUID,
+                                      const boost::optional<UUID>& dropTargetUUID,
                                       bool stayTemp) = 0;
     /**
      * This function logs an oplog entry when a 'renameCollection' command on a collection is
@@ -349,14 +349,14 @@ public:
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     const UUID& uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
+                                    const boost::optional<UUID>& dropTargetUUID,
                                     std::uint64_t numRecords,
                                     bool stayTemp) = 0;
     virtual void onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     const UUID& uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
+                                    const boost::optional<UUID>& dropTargetUUID,
                                     std::uint64_t numRecords,
                                     bool stayTemp,
                                     bool markFromMigrate) {

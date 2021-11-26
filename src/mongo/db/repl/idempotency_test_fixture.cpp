@@ -215,7 +215,7 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
     }
 }
 
-OplogEntry IdempotencyTest::createCollection(CollectionUUID uuid) {
+OplogEntry IdempotencyTest::createCollection(UUID uuid) {
     return makeCreateCollectionOplogEntry(nextOpTime(), nss, BSON("uuid" << uuid));
 }
 
@@ -372,7 +372,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
 }
 
 CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
-    auto collUUID = [&]() -> OptionalCollectionUUID {
+    auto collUUID = [&]() -> boost::optional<UUID> {
         AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
         if (const auto& collection = autoColl.getCollection()) {
             return collection->uuid();

@@ -68,7 +68,7 @@ void ensureCollectionExists(OperationContext* opCtx,
  */
 void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<CollectionUUID>& uuid = boost::none);
+                             const boost::optional<UUID>& uuid = boost::none);
 /**
  * Removes documents from the oplog applier progress and transaction applier progress collections
  * that are associated with an in-progress resharding operation. Also drops all oplog buffer

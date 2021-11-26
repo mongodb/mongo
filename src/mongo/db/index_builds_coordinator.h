@@ -138,7 +138,7 @@ public:
     virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
         std::string dbName,
-        CollectionUUID collectionUUID,
+        const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
         IndexBuildProtocol protocol,
@@ -158,7 +158,7 @@ public:
     virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(
         OperationContext* opCtx,
         std::string dbName,
-        CollectionUUID collectionUUID,
+        const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
         const ResumeIndexInfo& resumeInfo) = 0;
@@ -536,7 +536,7 @@ protected:
     StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
     _filterSpecsAndRegisterBuild(OperationContext* opCtx,
                                  StringData dbName,
-                                 CollectionUUID collectionUUID,
+                                 const UUID& collectionUUID,
                                  const std::vector<BSONObj>& specs,
                                  const UUID& buildUUID,
                                  IndexBuildProtocol protocol);
@@ -569,7 +569,7 @@ protected:
      */
     Status _setUpIndexBuildForTwoPhaseRecovery(OperationContext* opCtx,
                                                StringData dbName,
-                                               CollectionUUID collectionUUID,
+                                               const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID);
     /**
@@ -578,7 +578,7 @@ protected:
      */
     Status _setUpResumeIndexBuild(OperationContext* opCtx,
                                   std::string dbName,
-                                  CollectionUUID collectionUUID,
+                                  const UUID& collectionUUID,
                                   const std::vector<BSONObj>& specs,
                                   const UUID& buildUUID,
                                   const ResumeIndexInfo& resumeInfo);

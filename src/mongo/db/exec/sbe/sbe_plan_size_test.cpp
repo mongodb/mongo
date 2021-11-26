@@ -160,7 +160,7 @@ TEST_F(PlanSizeTest, HashJoin) {
 }
 
 TEST_F(PlanSizeTest, IndexScan) {
-    auto collUuid = CollectionUUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto stage = makeS<IndexScanStage>(collUuid,
                                        StringData(),
                                        true,
@@ -221,7 +221,7 @@ TEST_F(PlanSizeTest, Project) {
 }
 
 TEST_F(PlanSizeTest, Scan) {
-    auto collUuid = CollectionUUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto stage = makeS<ScanStage>(collUuid,
                                   generateSlotId(),
                                   generateSlotId(),

@@ -1885,7 +1885,7 @@ std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
     return std::move(ast->stage);
 }
 
-CollectionUUID Parser::getCollectionUuid(const std::string& collName) {
+UUID Parser::getCollectionUuid(const std::string& collName) {
     if (!_opCtx) {
         // The SBE plan cannot actually run without a valid UUID, but it's useful to allow the
         // parser to run in isolation for unit testing.

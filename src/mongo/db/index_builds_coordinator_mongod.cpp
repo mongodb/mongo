@@ -123,7 +123,7 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
                                               std::string dbName,
-                                              CollectionUUID collectionUUID,
+                                              const UUID& collectionUUID,
                                               const std::vector<BSONObj>& specs,
                                               const UUID& buildUUID,
                                               IndexBuildProtocol protocol,
@@ -135,7 +135,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
                                                std::string dbName,
-                                               CollectionUUID collectionUUID,
+                                               const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID,
                                                const ResumeIndexInfo& resumeInfo) {
@@ -154,7 +154,7 @@ IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                std::string dbName,
-                                               CollectionUUID collectionUUID,
+                                               const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID,
                                                IndexBuildProtocol protocol,

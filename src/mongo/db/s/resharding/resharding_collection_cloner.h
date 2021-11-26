@@ -76,7 +76,7 @@ public:
     ReshardingCollectionCloner(std::unique_ptr<Env> env,
                                ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
-                               CollectionUUID sourceUUID,
+                               const UUID& sourceUUID,
                                ShardId recipientShard,
                                Timestamp atClusterTime,
                                NamespaceString outputNss);
@@ -114,7 +114,7 @@ private:
     const std::unique_ptr<Env> _env;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
-    const CollectionUUID _sourceUUID;
+    const UUID _sourceUUID;
     const ShardId _recipientShard;
     const Timestamp _atClusterTime;
     const NamespaceString _outputNss;

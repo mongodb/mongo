@@ -82,7 +82,7 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
 ReshardingCollectionCloner::ReshardingCollectionCloner(std::unique_ptr<Env> env,
                                                        ShardKeyPattern newShardKeyPattern,
                                                        NamespaceString sourceNss,
-                                                       CollectionUUID sourceUUID,
+                                                       const UUID& sourceUUID,
                                                        ShardId recipientShard,
                                                        Timestamp atClusterTime,
                                                        NamespaceString outputNss)

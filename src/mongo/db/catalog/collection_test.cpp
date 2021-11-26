@@ -488,12 +488,11 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
 
     int numRestoreCalls = 0;
 
-    CollectionPtr coll(operationContext(),
-                       &beforeYield,
-                       [&afterYield, &numRestoreCalls](OperationContext*, CollectionUUID) {
-                           ++numRestoreCalls;
-                           return &afterYield;
-                       });
+    CollectionPtr coll(
+        operationContext(), &beforeYield, [&afterYield, &numRestoreCalls](OperationContext*, UUID) {
+            ++numRestoreCalls;
+            return &afterYield;
+        });
 
     ASSERT_TRUE(coll);
     ASSERT_EQ(coll.get(), &beforeYield);

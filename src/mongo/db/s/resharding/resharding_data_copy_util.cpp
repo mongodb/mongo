@@ -73,7 +73,7 @@ void ensureCollectionExists(OperationContext* opCtx,
 
 void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<CollectionUUID>& uuid) {
+                             const boost::optional<UUID>& uuid) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 

@@ -311,7 +311,7 @@ private:
 TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
     NamespaceString nss("test.coll");
     UUID indexBuildUUID = UUID::gen();
 
@@ -351,7 +351,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
 TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
     NamespaceString nss("test.coll");
     UUID indexBuildUUID = UUID::gen();
 
@@ -391,7 +391,7 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
 TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
     NamespaceString nss("test.coll");
     UUID indexBuildUUID = UUID::gen();
 
@@ -440,7 +440,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
 
     // Create 'collMod' command.
     NamespaceString nss("test.coll");
@@ -499,7 +499,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
 TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
 
     // Create 'collMod' command.
     NamespaceString nss("test.coll");
@@ -541,7 +541,7 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
 TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
 
     // Create 'drop' command.
     NamespaceString nss("test.coll");
@@ -573,8 +573,8 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
 
-    auto uuid = CollectionUUID::gen();
-    auto dropTargetUuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
+    auto dropTargetUuid = UUID::gen();
     auto stayTemp = false;
     NamespaceString sourceNss("test.foo");
     NamespaceString targetNss("test.bar");
@@ -608,7 +608,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
 
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
     auto stayTemp = true;
     NamespaceString sourceNss("test.foo");
     NamespaceString targetNss("test.bar");
@@ -962,8 +962,8 @@ protected:
 TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -1042,7 +1042,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
 
 TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
     const NamespaceString nss("testDB", "testColl");
-    const auto uuid = CollectionUUID::gen();
+    const auto uuid = UUID::gen();
     const auto doc = BSON("_id" << 0 << "data"
                                 << "x");
 
@@ -1111,7 +1111,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
 
 TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
     const NamespaceString nss("testDB", "testColl");
-    const auto uuid = CollectionUUID::gen();
+    const auto uuid = UUID::gen();
     const auto doc = BSON("_id" << 0 << "data"
                                 << "x");
 
@@ -1174,7 +1174,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedAbortTest) {
 
 TEST_F(OpObserverTransactionTest, TransactionalUnpreparedAbortTest) {
     const NamespaceString nss("testDB", "testColl");
-    const auto uuid = CollectionUUID::gen();
+    const auto uuid = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -1299,7 +1299,7 @@ TEST_F(OpObserverTransactionTest, AbortingPreparedTransactionWritesToTransaction
 
 TEST_F(OpObserverTransactionTest, CommittingUnpreparedNonEmptyTransactionWritesToTransactionTable) {
     const NamespaceString nss("testDB", "testColl");
-    const auto uuid = CollectionUUID::gen();
+    const auto uuid = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
 
@@ -1376,8 +1376,8 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
 TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -1435,8 +1435,8 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
 TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
@@ -1489,8 +1489,8 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
 TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
@@ -1546,7 +1546,7 @@ private:
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionSingleStatementTest) {
     const NamespaceString nss("testDB", "testColl");
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     std::vector<InsertStatement> inserts;
@@ -1584,7 +1584,7 @@ public:
 protected:
     void testRetryableFindAndModifyUpdateRequestingPostImageHasNeedsRetryImage() {
         NamespaceString nss = {"test", "coll"};
-        const auto uuid = CollectionUUID::gen();
+        const auto uuid = UUID::gen();
 
         CollectionUpdateArgs updateArgs;
         updateArgs.stmtIds = {0};
@@ -1614,7 +1614,7 @@ protected:
 
     void testRetryableFindAndModifyUpdateRequestingPreImageHasNeedsRetryImage() {
         NamespaceString nss = {"test", "coll"};
-        const auto uuid = CollectionUUID::gen();
+        const auto uuid = UUID::gen();
 
         CollectionUpdateArgs updateArgs;
         updateArgs.stmtIds = {0};
@@ -1644,7 +1644,7 @@ protected:
 
     void testRetryableFindAndModifyDeleteHasNeedsRetryImage() {
         NamespaceString nss = {"test", "coll"};
-        const auto uuid = CollectionUUID::gen();
+        const auto uuid = UUID::gen();
 
         WriteUnitOfWork wunit(opCtx());
         AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
@@ -2025,7 +2025,7 @@ protected:
         {kFaMPost, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2}};
 
     const NamespaceString _nss{"test", "coll"};
-    const CollectionUUID _uuid = CollectionUUID::gen();
+    const UUID _uuid = UUID::gen();
 };
 
 TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
@@ -2136,7 +2136,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
     opObserver.addObserver(std::make_unique<OpObserverImpl>());
 
     NamespaceString nss("test", "coll");
-    CollectionUUID uuid = CollectionUUID::gen();
+    UUID uuid = UUID::gen();
 
     const bool isRetryableWrite = true;
     const bool isNotRetryableWrite = false;
@@ -2360,7 +2360,7 @@ protected:
         {kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2}};
 
     const NamespaceString _nss{"test", "coll"};
-    const CollectionUUID _uuid = CollectionUUID::gen();
+    const UUID _uuid = UUID::gen();
     const BSONObj _deletedDoc = BSON("_id" << 0 << "valuePriorToDelete"
                                            << "marvelous");
 };
@@ -2470,8 +2470,8 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     std::vector<InsertStatement> inserts1;
@@ -2534,8 +2534,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertTest) {
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
@@ -2603,7 +2603,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionPreImageTest) {
     const NamespaceString nss1("testDB", "testColl");
-    auto uuid1 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "txntest");
 
@@ -2680,7 +2680,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionPreImageTest) {
 
 TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPreImageTest) {
     const NamespaceString nss1("testDB", "testColl");
-    auto uuid1 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "txntest");
 
@@ -2765,8 +2765,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPreImageTest) {
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
@@ -2822,8 +2822,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -2902,8 +2902,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalInsertPrepareTest) {
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
@@ -2982,8 +2982,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "delete");
@@ -3051,7 +3051,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
 
 TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
     const NamespaceString nss1("testDB", "testColl");
-    auto uuid1 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -3137,7 +3137,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
 
 TEST_F(OpObserverMultiEntryTransactionTest, AbortPreparedTest) {
     const NamespaceString nss1("testDB", "testColl");
-    auto uuid1 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -3214,8 +3214,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, UnpreparedTransactionPackingTest) {
 
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     std::vector<InsertStatement> inserts1;
@@ -3268,8 +3268,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
 
     const NamespaceString nss1("testDB", "testColl");
     const NamespaceString nss2("testDB2", "testColl2");
-    auto uuid1 = CollectionUUID::gen();
-    auto uuid2 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
+    auto uuid2 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
     std::vector<InsertStatement> inserts1;
@@ -3324,7 +3324,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPackingTest) {
 TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
     gMaxNumberOfTransactionOperationsInSingleOplogEntry = std::numeric_limits<int>::max();
     const NamespaceString nss1("testDB", "testColl");
-    auto uuid1 = CollectionUUID::gen();
+    auto uuid1 = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -3422,7 +3422,7 @@ private:
 // two oplog entry transaction.
 TEST_F(OpObserverLargeTransactionTest, LargeTransactionCreatesMultipleOplogEntries) {
     const NamespaceString nss("testDB", "testColl");
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
@@ -3513,7 +3513,7 @@ TEST_F(OpObserverTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
     auto opCtx = cc().makeOperationContext();
     const std::string kTenantId = "tenantId";
     const NamespaceString nss("tenantId_db", "testColl");
-    const auto uuid = CollectionUUID::gen();
+    const auto uuid = UUID::gen();
 
     // Add a tenant migration access blocker on donor for blocking writes.
     auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
@@ -3552,7 +3552,7 @@ TEST_F(OpObserverTransactionTest,
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     const NamespaceString nss("tenantId_db", "testColl");
-    const auto uuid = CollectionUUID::gen();
+    const auto uuid = UUID::gen();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 

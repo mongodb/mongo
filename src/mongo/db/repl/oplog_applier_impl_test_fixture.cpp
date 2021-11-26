@@ -104,7 +104,7 @@ void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
                                                     const NamespaceString& fromCollection,
                                                     const NamespaceString& toCollection,
                                                     const UUID& uuid,
-                                                    OptionalCollectionUUID dropTargetUUID,
+                                                    const boost::optional<UUID>& dropTargetUUID,
                                                     std::uint64_t numRecords,
                                                     bool stayTemp) {
     if (!onRenameCollectionFn) {
@@ -116,7 +116,7 @@ void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
 
 void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
                                                const NamespaceString& nss,
-                                               CollectionUUID uuid,
+                                               const UUID& uuid,
                                                BSONObj indexDoc,
                                                bool fromMigrate) {
     if (!onCreateIndexFn) {
@@ -240,7 +240,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
 
     _opObserver->onDeleteFn = [&](OperationContext* opCtx,
                                   const NamespaceString& nss,
-                                  OptionalCollectionUUID uuid,
+                                  const boost::optional<UUID>& uuid,
                                   StmtId stmtId,
                                   const OplogDeleteEntryArgs& args) {
         applyOpCalled = true;
@@ -401,7 +401,7 @@ bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
  */
 OplogEntry makeOplogEntry(OpTypeEnum opType,
                           NamespaceString nss,
-                          OptionalCollectionUUID uuid,
+                          const boost::optional<UUID>& uuid,
                           BSONObj o,
                           boost::optional<BSONObj> o2,
                           boost::optional<bool> fromMigrate) {
@@ -426,7 +426,7 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                               boost::none)};  // needsRetryImage
 }
 
-OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid) {
+OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optional<UUID> uuid) {
     return makeOplogEntry(opType, nss, uuid, BSON("_id" << 0), boost::none);
 }
 

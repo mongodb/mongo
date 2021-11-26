@@ -58,8 +58,7 @@ protected:
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(kNss);
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(
-                operationContext(), CollectionUUID::gen(), std::move(collection));
+            catalog.registerCollection(operationContext(), UUID::gen(), std::move(collection));
         });
     }
 
@@ -269,7 +268,7 @@ public:
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             for (size_t i = 0; i < NumCollections; ++i) {
                 catalog.registerCollection(operationContext(),
-                                           CollectionUUID::gen(),
+                                           UUID::gen(),
                                            std::make_shared<CollectionMock>(
                                                NamespaceString("many", fmt::format("coll{}", i))));
             }

@@ -39,7 +39,7 @@
 #include "mongo/db/index/index_access_method.h"
 
 namespace mongo::sbe {
-IndexScanStage::IndexScanStage(CollectionUUID collUuid,
+IndexScanStage::IndexScanStage(UUID collUuid,
                                StringData indexName,
                                bool forward,
                                boost::optional<value::SlotId> recordSlot,

@@ -41,11 +41,6 @@
 
 namespace mongo {
 
-/**
- * This class comprises a UUID to collection catalog, allowing for efficient
- * collection lookup by UUID.
- */
-using CollectionUUID = UUID;
 class CollectionCatalog;
 class Database;
 
@@ -75,13 +70,13 @@ public:
 
         iterator(OperationContext* opCtx, StringData dbName, const CollectionCatalog& catalog);
         iterator(OperationContext* opCtx,
-                 std::map<std::pair<std::string, CollectionUUID>,
-                          std::shared_ptr<Collection>>::const_iterator mapIter,
+                 std::map<std::pair<std::string, UUID>, std::shared_ptr<Collection>>::const_iterator
+                     mapIter,
                  const CollectionCatalog& catalog);
         value_type operator*();
         iterator operator++();
         iterator operator++(int);
-        boost::optional<CollectionUUID> uuid();
+        boost::optional<UUID> uuid();
 
         Collection* getWritableCollection(OperationContext* opCtx, LifetimeMode mode);
 
@@ -97,9 +92,9 @@ public:
 
         OperationContext* _opCtx;
         std::string _dbName;
-        boost::optional<CollectionUUID> _uuid;
-        std::map<std::pair<std::string, CollectionUUID>,
-                 std::shared_ptr<Collection>>::const_iterator _mapIter;
+        boost::optional<UUID> _uuid;
+        std::map<std::pair<std::string, UUID>, std::shared_ptr<Collection>>::const_iterator
+            _mapIter;
         const CollectionCatalog* _catalog;
     };
 
@@ -174,13 +169,13 @@ public:
      * Register the collection with `uuid`.
      */
     void registerCollection(OperationContext* opCtx,
-                            CollectionUUID uuid,
+                            const UUID& uuid,
                             std::shared_ptr<Collection> collection);
 
     /**
      * Deregister the collection.
      */
-    std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx, CollectionUUID uuid);
+    std::shared_ptr<Collection> deregisterCollection(OperationContext* opCtx, const UUID& uuid);
 
     /**
      * Deregister all the collection objects and view namespaces.
@@ -207,7 +202,7 @@ public:
     void replaceViewsForDatabase(StringData dbName, absl::flat_hash_set<NamespaceString> views);
 
     /**
-     * This function gets the Collection pointer that corresponds to the CollectionUUID.
+     * This function gets the Collection pointer that corresponds to the UUID.
      *
      * The required locks must be obtained prior to calling this function, or else the found
      * Collection pointer might no longer be valid when the call returns.
@@ -224,16 +219,16 @@ public:
      */
     Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
                                                        LifetimeMode mode,
-                                                       CollectionUUID uuid) const;
-    CollectionPtr lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
+                                                       const UUID& uuid) const;
+    CollectionPtr lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const;
     std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
-                                                                    CollectionUUID uuid) const;
+                                                                    const UUID& uuid) const;
 
     /**
      * Returns true if the collection has been registered in the CollectionCatalog but not yet made
      * visible.
      */
-    bool isCollectionAwaitingVisibility(CollectionUUID uuid) const;
+    bool isCollectionAwaitingVisibility(UUID uuid) const;
 
     /**
      * These functions fetch a Collection pointer that corresponds to the NamespaceString.
@@ -261,17 +256,17 @@ public:
 
     /**
      * This function gets the NamespaceString from the collection catalog entry that
-     * corresponds to CollectionUUID uuid. If no collection exists with the uuid, return
+     * corresponds to UUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.
      */
     boost::optional<NamespaceString> lookupNSSByUUID(OperationContext* opCtx,
-                                                     CollectionUUID uuid) const;
+                                                     const UUID& uuid) const;
 
     /**
      * Returns the UUID if `nss` exists in CollectionCatalog.
      */
-    boost::optional<CollectionUUID> lookupUUIDByNSS(OperationContext* opCtx,
-                                                    const NamespaceString& nss) const;
+    boost::optional<UUID> lookupUUIDByNSS(OperationContext* opCtx,
+                                          const NamespaceString& nss) const;
 
     /**
      * Without acquiring any locks resolves the given NamespaceStringOrUUID to an actual namespace.
@@ -285,7 +280,7 @@ public:
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
      * collection with 'uuid' is not found, false is returned.
      */
-    bool checkIfCollectionSatisfiable(CollectionUUID uuid, CollectionInfoFn predicate) const;
+    bool checkIfCollectionSatisfiable(UUID uuid, CollectionInfoFn predicate) const;
 
     /**
      * This function gets the UUIDs of all collections from `dbName`.
@@ -295,7 +290,7 @@ public:
      *
      * Returns empty vector if the 'dbName' is not known.
      */
-    std::vector<CollectionUUID> getAllCollectionUUIDsFromDb(StringData dbName) const;
+    std::vector<UUID> getAllCollectionUUIDsFromDb(StringData dbName) const;
 
     /**
      * This function gets the ns of all collections from `dbName`. The result is not sorted.
@@ -421,20 +416,17 @@ private:
     friend class CollectionCatalog::iterator;
     class PublishCatalogUpdates;
 
-    std::shared_ptr<Collection> _lookupCollectionByUUID(CollectionUUID uuid) const;
+    std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
      */
-    boost::optional<
-        mongo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
-        _shadowCatalog;
+    boost::optional<mongo::stdx::unordered_map<UUID, NamespaceString, UUID::Hash>> _shadowCatalog;
 
-    using CollectionCatalogMap =
-        stdx::unordered_map<CollectionUUID, std::shared_ptr<Collection>, CollectionUUID::Hash>;
+    using CollectionCatalogMap = stdx::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
     using OrderedCollectionMap =
-        std::map<std::pair<std::string, CollectionUUID>, std::shared_ptr<Collection>>;
+        std::map<std::pair<std::string, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
@@ -519,7 +511,7 @@ private:
  * restore implementation for CollectionPtr when acquired from the catalog.
  */
 struct LookupCollectionForYieldRestore {
-    const Collection* operator()(OperationContext* opCtx, CollectionUUID uuid) const;
+    const Collection* operator()(OperationContext* opCtx, const UUID& uuid) const;
 };
 
 /**

@@ -264,7 +264,7 @@ Status dropIndexByDescriptor(OperationContext* opCtx,
  */
 std::vector<UUID> abortActiveIndexBuilders(OperationContext* opCtx,
                                            const NamespaceString& collectionNs,
-                                           CollectionUUID collectionUUID,
+                                           const UUID& collectionUUID,
                                            const std::vector<std::string>& indexNames) {
     if (indexNames.empty()) {
         return {};

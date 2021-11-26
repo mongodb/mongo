@@ -36,7 +36,7 @@
 namespace mongo::sbe {
 
 std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(OperationContext* opCtx,
-                                                                       CollectionUUID collUuid) {
+                                                                       const UUID& collUuid) {
     // The collection is either locked at a higher level or a snapshot of the catalog (consistent
     // with the storage engine snapshot from which we are reading) has been stashed on the
     // 'OperationContext'. Either way, this means that the UUID must still exist in our view of the
@@ -50,7 +50,7 @@ std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(Operation
 
 CollectionPtr restoreCollection(OperationContext* opCtx,
                                 const NamespaceString& collName,
-                                CollectionUUID collUuid,
+                                const UUID& collUuid,
                                 uint64_t catalogEpoch) {
     // Re-lookup the collection pointer, by UUID. If the collection has been dropped, then this UUID
     // lookup will result in a null pointer. If the collection has been renamed, then the resulting

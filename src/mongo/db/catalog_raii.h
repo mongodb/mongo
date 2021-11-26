@@ -229,7 +229,7 @@ public:
      * Function used to customize restore after yield behavior
      */
     using RestoreFromYieldFn =
-        std::function<void(std::shared_ptr<const Collection>&, OperationContext*, CollectionUUID)>;
+        std::function<void(std::shared_ptr<const Collection>&, OperationContext*, UUID)>;
 
     /**
      * Used by AutoGetCollectionForReadLockFree where it provides implementation for restore after
@@ -353,7 +353,7 @@ class CollectionWriter final {
 public:
     // Gets the collection from the catalog for the provided uuid
     CollectionWriter(OperationContext* opCtx,
-                     const CollectionUUID& uuid,
+                     const UUID& uuid,
                      CollectionCatalog::LifetimeMode mode =
                          CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
     // Gets the collection from the catalog for the provided namespace string

@@ -133,7 +133,7 @@ CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceS
 /**
  * Returns UUID of collection.
  */
-CollectionUUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
+UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     auto options = getCollectionOptions(opCtx, nss);
     ASSERT_TRUE(options.uuid);
     return *(options.uuid);

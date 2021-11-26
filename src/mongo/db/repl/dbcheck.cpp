@@ -236,8 +236,7 @@ std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
     auto catalog = CollectionCatalog::get(opCtx);
     const UUID uuid = collection->uuid();
 
-    std::vector<CollectionUUID> collectionUUIDs =
-        catalog->getAllCollectionUUIDsFromDb(collection->ns().db());
+    std::vector<UUID> collectionUUIDs = catalog->getAllCollectionUUIDsFromDb(collection->ns().db());
     auto uuidIt = std::find(collectionUUIDs.begin(), collectionUUIDs.end(), uuid);
     invariant(uuidIt != collectionUUIDs.end());
 

@@ -72,7 +72,7 @@ namespace mongo::sbe {
  */
 class IndexScanStage final : public PlanStage {
 public:
-    IndexScanStage(CollectionUUID collUuid,
+    IndexScanStage(UUID collUuid,
                    StringData indexName,
                    bool forward,
                    boost::optional<value::SlotId> recordSlot,
@@ -118,7 +118,7 @@ private:
     const KeyString::Value& getSeekKeyLow() const;
     const KeyString::Value* getSeekKeyHigh() const;
 
-    const CollectionUUID _collUuid;
+    const UUID _collUuid;
     const std::string _indexName;
     const bool _forward;
     const boost::optional<value::SlotId> _recordSlot;

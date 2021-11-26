@@ -690,7 +690,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                                 "Attempted to create a new collection without a UUID",
                                 "namespace"_attr = nss);
         } else {
-            optionsWithUUID.uuid.emplace(CollectionUUID::gen());
+            optionsWithUUID.uuid.emplace(UUID::gen());
             generatedUUID = true;
         }
     }

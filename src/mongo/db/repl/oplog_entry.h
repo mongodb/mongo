@@ -161,7 +161,7 @@ public:
                                            const BSONObj& idIndex);
 
     static ReplOperation makeCreateIndexesCommand(NamespaceString nss,
-                                                  CollectionUUID uuid,
+                                                  const UUID& uuid,
                                                   const BSONObj& indexDoc);
 
     static BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,

@@ -192,7 +192,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
  * Creates an applyOps command object with a single insert operation.
  */
 BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
-                                        const OptionalCollectionUUID& uuid,
+                                        const boost::optional<UUID>& uuid,
                                         const BSONObj& documentToInsert) {
     auto insertOp = uuid ? BSON("op"
                                 << "i"

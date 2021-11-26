@@ -71,7 +71,7 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx);
  */
 Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
-                                   const OptionalCollectionUUID& ui,
+                                   const boost::optional<UUID>& ui,
                                    const BSONObj& cmdObj,
                                    bool allowRenameOutOfTheWay,
                                    boost::optional<BSONObj> idIndex = boost::none);

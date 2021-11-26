@@ -207,10 +207,7 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
 
 ChunkType::ChunkType() = default;
 
-ChunkType::ChunkType(CollectionUUID collectionUUID,
-                     ChunkRange range,
-                     ChunkVersion version,
-                     ShardId shardId)
+ChunkType::ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId)
     : _collectionUUID(collectionUUID),
       _min(range.getMin()),
       _max(range.getMax()),
@@ -455,7 +452,7 @@ void ChunkType::setName(const OID& id) {
     _id = id;
 }
 
-void ChunkType::setCollectionUUID(const CollectionUUID& uuid) {
+void ChunkType::setCollectionUUID(const UUID& uuid) {
     _collectionUUID = uuid;
 }
 

@@ -91,7 +91,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
         StringData fieldName = e.fieldName();
 
         if (fieldName == "uuid" && kind == parseForStorage) {
-            auto res = CollectionUUID::parse(e);
+            auto res = UUID::parse(e);
             if (!res.isOK()) {
                 return res.getStatus();
             }

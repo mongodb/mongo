@@ -41,7 +41,7 @@
 
 namespace mongo {
 namespace sbe {
-ScanStage::ScanStage(CollectionUUID collectionUuid,
+ScanStage::ScanStage(UUID collectionUuid,
                      boost::optional<value::SlotId> recordSlot,
                      boost::optional<value::SlotId> recordIdSlot,
                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -559,7 +559,7 @@ size_t ScanStage::estimateCompileTimeSize() const {
     return size;
 }
 
-ParallelScanStage::ParallelScanStage(CollectionUUID collectionUuid,
+ParallelScanStage::ParallelScanStage(UUID collectionUuid,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
@@ -588,7 +588,7 @@ ParallelScanStage::ParallelScanStage(CollectionUUID collectionUuid,
 }
 
 ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state,
-                                     CollectionUUID collectionUuid,
+                                     const UUID& collectionUuid,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,

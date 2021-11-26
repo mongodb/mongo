@@ -196,7 +196,7 @@ auto acquireCollectionAndConsistentSnapshot(
  */
 Status checkSecondaryCollection(OperationContext* opCtx,
                                 boost::optional<NamespaceString> nss,
-                                boost::optional<CollectionUUID> uuid,
+                                const boost::optional<UUID>& uuid,
                                 const std::shared_ptr<const Collection>& collection,
                                 boost::optional<Timestamp> readTimestamp) {
     invariant(nss || uuid);
@@ -492,9 +492,7 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
         _nsOrUUID,
         /* restoreFromYield */
         [& catalogStasher = _catalogStasher, isSubOperation = _isLockFreeReadSubOperation](
-            std::shared_ptr<const Collection>& collection,
-            OperationContext* opCtx,
-            CollectionUUID uuid) {
+            std::shared_ptr<const Collection>& collection, OperationContext* opCtx, UUID uuid) {
             // A sub-operation should never yield because it would break the consistent in-memory
             // and on-disk view of the higher level operation.
             invariant(!isSubOperation);
@@ -695,7 +693,7 @@ AutoGetCollectionMultiForReadCommandLockFree::AutoGetCollectionMultiForReadComma
         _autoCollForReadCommandLockFree._getCollectionPtrForModify().detachRestoreFn();
 
     _autoCollForReadCommandLockFree._getCollectionPtrForModify().attachRestoreFn(
-        [&](OperationContext* opCtx, CollectionUUID collUUID) {
+        [&](OperationContext* opCtx, UUID collUUID) {
             const Collection* primaryCollection = _primaryCollectionRestoreFn(opCtx, collUUID);
             _secondaryCollectionsRestoreFn(opCtx);
             return primaryCollection;

@@ -2394,7 +2394,7 @@ TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
 TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     ASSERT_OK(ReplicationCoordinator::get(getGlobalServiceContext())
                   ->setFollowerMode(MemberState::RS_RECOVERING));
-    CollectionUUID uuid = UUID::gen();
+    UUID uuid = UUID::gen();
 
     auto runOpsAndValidate = [this, uuid]() {
         auto options = BSON("collation"

@@ -241,7 +241,7 @@ public:
      */
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       CollectionUUID uuid,
+                       const UUID& uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
 
@@ -251,7 +251,7 @@ public:
      */
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           CollectionUUID collUUID,
+                           const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            bool fromMigrate) override;
@@ -299,7 +299,7 @@ public:
 
 void MapReduceOpObserver::onCreateIndex(OperationContext* opCtx,
                                         const NamespaceString& nss,
-                                        CollectionUUID uuid,
+                                        const UUID& uuid,
                                         BSONObj indexDoc,
                                         bool fromMigrate) {
     indexesCreated.push_back(indexDoc.getOwned());
@@ -307,7 +307,7 @@ void MapReduceOpObserver::onCreateIndex(OperationContext* opCtx,
 
 void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                             const NamespaceString& nss,
-                                            CollectionUUID collUUID,
+                                            const UUID& collUUID,
                                             const UUID& indexBuildUUID,
                                             const std::vector<BSONObj>& indexes,
                                             bool fromMigrate) {

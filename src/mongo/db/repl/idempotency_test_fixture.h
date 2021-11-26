@@ -103,7 +103,7 @@ public:
 
 protected:
     enum class SequenceType : int { kEntireSequence, kAnyPrefix, kAnySuffix, kAnyPrefixOrSuffix };
-    OplogEntry createCollection(CollectionUUID uuid = UUID::gen());
+    OplogEntry createCollection(UUID uuid = UUID::gen());
     OplogEntry dropCollection();
     OplogEntry insert(const BSONObj& obj);
     template <class IdType>

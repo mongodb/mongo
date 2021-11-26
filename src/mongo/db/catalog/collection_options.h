@@ -46,17 +46,6 @@ namespace mongo {
 class CollatorFactoryInterface;
 class CreateCommand;
 
-/**
- * A CollectionUUID is a 128-bit unique identifier, per RFC 4122, v4. for a database collection.
- * Newly created collections are assigned a new randomly generated CollectionUUID. In a replica-set
- * or a sharded cluster, all nodes will use the same UUID for a given collection. The UUID stays
- * with the collection until it is dropped, so even across renames. A copied collection must have
- * its own new unique UUID though.
- */
-using CollectionUUID = UUID;
-
-using OptionalCollectionUUID = boost::optional<CollectionUUID>;
-
 struct CollectionOptions {
     /**
      * Returns true if the options indicate the namespace is a view.
@@ -114,7 +103,7 @@ struct CollectionOptions {
 
     // Collection UUID. If not set, specifies that the storage engine should generate the UUID (for
     // a new collection). For an existing collection parsed for storage, it will always be present.
-    OptionalCollectionUUID uuid;
+    boost::optional<UUID> uuid;
 
     bool capped = false;
     long long cappedSize = 0;

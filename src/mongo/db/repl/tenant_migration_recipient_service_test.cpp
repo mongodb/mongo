@@ -83,7 +83,7 @@ const Timestamp kDefaultStartMigrationTimestamp(1, 1);
 OplogEntry makeOplogEntry(OpTime opTime,
                           OpTypeEnum opType,
                           NamespaceString nss,
-                          OptionalCollectionUUID uuid,
+                          const boost::optional<UUID>& uuid,
                           BSONObj o,
                           boost::optional<BSONObj> o2) {
     return {DurableOplogEntry(opTime,                     // optime
@@ -109,7 +109,7 @@ OplogEntry makeOplogEntry(OpTime opTime,
 
 MutableOplogEntry makeNoOpOplogEntry(OpTime opTime,
                                      NamespaceString nss,
-                                     OptionalCollectionUUID uuid,
+                                     const boost::optional<UUID>& uuid,
                                      BSONObj o,
                                      boost::optional<UUID> migrationUUID) {
     MutableOplogEntry oplogEntry;

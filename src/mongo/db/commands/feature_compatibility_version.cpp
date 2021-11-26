@@ -356,7 +356,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
     {
         CollectionOptions options;
-        options.uuid = CollectionUUID::gen();
+        options.uuid = UUID::gen();
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
     }
 

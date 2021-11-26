@@ -112,7 +112,7 @@ public:
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
-                            OptionalCollectionUUID dropTargetUUID,
+                            const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) override;
 
@@ -121,7 +121,7 @@ public:
      */
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       CollectionUUID uuid,
+                       const UUID& uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
 
@@ -151,7 +151,7 @@ public:
 
     std::function<void(OperationContext*,
                        const NamespaceString&,
-                       OptionalCollectionUUID,
+                       boost::optional<UUID>,
                        StmtId,
                        const OplogDeleteEntryArgs&)>
         onDeleteFn;
@@ -168,18 +168,18 @@ public:
     std::function<void(OperationContext*,
                        const NamespaceString&,
                        const NamespaceString&,
-                       OptionalCollectionUUID,
-                       OptionalCollectionUUID,
+                       boost::optional<UUID>,
+                       boost::optional<UUID>,
                        std::uint64_t,
                        bool)>
         onRenameCollectionFn;
 
-    std::function<void(OperationContext*, const NamespaceString&, CollectionUUID, BSONObj, bool)>
+    std::function<void(OperationContext*, const NamespaceString&, UUID, BSONObj, bool)>
         onCreateIndexFn;
 
     std::function<void(OperationContext*,
                        const NamespaceString&,
-                       OptionalCollectionUUID,
+                       boost::optional<UUID>,
                        const std::string&,
                        const BSONObj&)>
         onDropIndexFn;
@@ -266,12 +266,12 @@ bool docExists(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
  */
 OplogEntry makeOplogEntry(OpTypeEnum opType,
                           NamespaceString nss,
-                          OptionalCollectionUUID uuid,
+                          const boost::optional<UUID>& uuid,
                           BSONObj o,
                           boost::optional<BSONObj> o2 = boost::none,
                           boost::optional<bool> fromMigrate = boost::none);
 
-OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid);
+OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optional<UUID> uuid);
 
 /**
  * Creates collection options suitable for oplog.

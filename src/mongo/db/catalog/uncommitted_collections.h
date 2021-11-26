@@ -103,9 +103,7 @@ public:
      * entries for the collection identified by `uuid` to UncommittedCollections. This function
      * assumes `commit` has previously been called for `uuid`.
      */
-    static void rollback(OperationContext* opCtx,
-                         CollectionUUID uuid,
-                         UncommittedCollectionsMap* map);
+    static void rollback(OperationContext* opCtx, UUID uuid, UncommittedCollectionsMap* map);
 
 
     /**

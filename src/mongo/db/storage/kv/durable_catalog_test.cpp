@@ -86,7 +86,7 @@ public:
             operationContext(), *_collectionUUID, CollectionCatalog::LifetimeMode::kInplace);
     }
 
-    CollectionUUID createCollection(const NamespaceString& nss, CollectionOptions options) {
+    UUID createCollection(const NamespaceString& nss, CollectionOptions options) {
         Lock::DBLock dbLk(operationContext(), nss.db(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), nss, MODE_IX);
 
@@ -205,7 +205,7 @@ private:
 
     size_t _numIndexesCreated = 0;
 
-    OptionalCollectionUUID _collectionUUID;
+    boost::optional<UUID> _collectionUUID;
 };
 
 TEST_F(DurableCatalogTest, MultikeyPathsForBtreeIndexInitializedToVectorOfEmptySets) {

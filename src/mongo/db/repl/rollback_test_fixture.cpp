@@ -166,7 +166,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
 
 
 std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
-                                                         OptionalCollectionUUID uuid,
+                                                         const boost::optional<UUID>& uuid,
                                                          StringData nss,
                                                          BSONObj cmdObj,
                                                          int recordId,
@@ -188,7 +188,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
     return std::make_pair(bob.obj(), RecordId(recordId));
 }
 
-std::pair<BSONObj, RecordId> RollbackTest::makeCommandOpForApplyOps(OptionalCollectionUUID uuid,
+std::pair<BSONObj, RecordId> RollbackTest::makeCommandOpForApplyOps(boost::optional<UUID> uuid,
                                                                     StringData nss,
                                                                     BSONObj cmdObj,
                                                                     int recordId,

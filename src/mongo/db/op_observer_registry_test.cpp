@@ -68,7 +68,7 @@ struct TestObserver : public OpObserverNoop {
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
-                            OptionalCollectionUUID dropTargetUUID,
+                            const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) {
         preRenameCollection(
@@ -81,7 +81,7 @@ struct TestObserver : public OpObserverNoop {
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
-                                     OptionalCollectionUUID dropTargetUUID,
+                                     const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp) override {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
@@ -91,7 +91,7 @@ struct TestObserver : public OpObserverNoop {
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
                               const UUID& uuid,
-                              OptionalCollectionUUID dropTargetUUID,
+                              const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) override {}
 };
 

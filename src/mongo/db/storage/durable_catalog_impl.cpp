@@ -599,7 +599,7 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
 
     // Generate a new UUID for the orphaned collection.
     CollectionOptions optionsWithUUID;
-    optionsWithUUID.uuid.emplace(CollectionUUID::gen());
+    optionsWithUUID.uuid.emplace(UUID::gen());
     BSONObj obj;
     {
         BSONObjBuilder b;
@@ -661,7 +661,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         return status;
 
     auto ru = opCtx->recoveryUnit();
-    CollectionUUID uuid = options.uuid.get();
+    UUID uuid = options.uuid.get();
     opCtx->recoveryUnit()->onRollback([ru, catalog = this, nss, ident = entry.ident, uuid]() {
         // Intentionally ignoring failure
         catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
@@ -716,7 +716,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     const auto& catalogEntry = [&] {
         if (uuidOption == ImportCollectionUUIDOption::kGenerateNew) {
             // Generate a new UUID for the collection.
-            md.options.uuid = CollectionUUID::gen();
+            md.options.uuid = UUID::gen();
             BSONObjBuilder catalogEntryBuilder;
             // Generate a new "md" field after setting the new UUID.
             catalogEntryBuilder.append("md", md.toBSON());

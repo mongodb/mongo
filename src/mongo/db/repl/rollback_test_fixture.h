@@ -100,7 +100,7 @@ public:
      * Creates an oplog entry with a recordId for a command operation.
      */
     static std::pair<BSONObj, RecordId> makeCommandOp(Timestamp ts,
-                                                      OptionalCollectionUUID uuid,
+                                                      const boost::optional<UUID>& uuid,
                                                       StringData nss,
                                                       BSONObj cmdObj,
                                                       int recordId,
@@ -111,7 +111,7 @@ public:
      * a "ts" or "wall" field. This is used for creating inner ops for applyOps entries.
      */
     static std::pair<BSONObj, RecordId> makeCommandOpForApplyOps(
-        OptionalCollectionUUID uuid,
+        boost::optional<UUID> uuid,
         StringData nss,
         BSONObj cmdObj,
         int recordId,

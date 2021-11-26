@@ -300,7 +300,7 @@ TEST(CollectionOptions, WriteConcernAllowlistedOptionIgnored) {
 
 TEST(CollectionOptions, ParseUUID) {
     CollectionOptions options;
-    CollectionUUID uuid = CollectionUUID::gen();
+    UUID uuid = UUID::gen();
 
     // Check required parse failures
     ASSERT_FALSE(options.uuid);

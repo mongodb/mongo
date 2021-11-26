@@ -60,7 +60,7 @@ public:
 
     void onCreateIndex(OperationContext* const opCtx,
                        const NamespaceString& nss,
-                       CollectionUUID uuid,
+                       const UUID& uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override {
         ReservedTimes times{opCtx};
@@ -70,7 +70,7 @@ public:
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           CollectionUUID collUUID,
+                           const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            bool fromMigrate) override {
@@ -98,7 +98,7 @@ public:
 
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            CollectionUUID collUUID,
+                            const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
                             bool fromMigrate) override {
@@ -110,7 +110,7 @@ public:
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           CollectionUUID collUUID,
+                           const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
@@ -159,7 +159,7 @@ public:
 
     void onInternalOpMessage(OperationContext* const opCtx,
                              const NamespaceString& nss,
-                             OptionalCollectionUUID uuid,
+                             const boost::optional<UUID>& uuid,
                              const BSONObj& msgObj,
                              const boost::optional<BSONObj> o2MsgObj,
                              const boost::optional<repl::OpTime> preImageOpTime,
@@ -245,7 +245,7 @@ public:
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
-                            OptionalCollectionUUID dropTargetUUID,
+                            const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) override {
         onRenameCollection(opCtx,
@@ -262,7 +262,7 @@ public:
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
-                            OptionalCollectionUUID dropTargetUUID,
+                            const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp,
                             bool markFromMigrate) override {
@@ -302,7 +302,7 @@ public:
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
-                                     OptionalCollectionUUID dropTargetUUID,
+                                     const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp) override {
         return preRenameCollection(opCtx,
@@ -319,7 +319,7 @@ public:
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
-                                     OptionalCollectionUUID dropTargetUUID,
+                                     const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp,
                                      bool markFromMigrate) override {
@@ -342,7 +342,7 @@ public:
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
                               const UUID& uuid,
-                              OptionalCollectionUUID dropTargetUUID,
+                              const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)

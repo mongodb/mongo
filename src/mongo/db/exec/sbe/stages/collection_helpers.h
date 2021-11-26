@@ -63,7 +63,7 @@ using IndexKeyCorruptionCheckCallback =
  * the catalog.
  */
 std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(OperationContext* opCtx,
-                                                                       CollectionUUID collUuid);
+                                                                       const UUID& collUuid);
 
 /**
  * Re-acquires a pointer to the collection, intended for use during SBE yield recovery or when a
@@ -74,6 +74,6 @@ std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(Operation
  */
 CollectionPtr restoreCollection(OperationContext* opCtx,
                                 const NamespaceString& collName,
-                                CollectionUUID collUuid,
+                                const UUID& collUuid,
                                 uint64_t catalogEpoch);
 }  // namespace mongo::sbe

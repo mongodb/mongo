@@ -45,7 +45,7 @@ void IndexBuildsCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
                                                 std::string dbName,
-                                                CollectionUUID collectionUUID,
+                                                const UUID& collectionUUID,
                                                 const std::vector<BSONObj>& specs,
                                                 const UUID& buildUUID,
                                                 IndexBuildProtocol protocol,
@@ -78,7 +78,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorEmbedded::resumeIndexBuild(OperationContext* opCtx,
                                                  std::string dbName,
-                                                 CollectionUUID collectionUUID,
+                                                 const UUID& collectionUUID,
                                                  const std::vector<BSONObj>& specs,
                                                  const UUID& buildUUID,
                                                  const ResumeIndexInfo& resumeInfo) {

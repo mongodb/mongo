@@ -239,7 +239,7 @@ private:
                                              value::SlotVector correlated,
                                              value::SlotId outputSlot);
 
-    CollectionUUID getCollectionUuid(const std::string& collName);
+    UUID getCollectionUuid(const std::string& collName);
 
     PlanNodeId getCurrentPlanNodeId();
 };

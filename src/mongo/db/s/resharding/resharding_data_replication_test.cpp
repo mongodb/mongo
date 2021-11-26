@@ -102,7 +102,7 @@ public:
         return _sourceNss;
     }
 
-    const CollectionUUID& sourceUUID() {
+    const UUID& sourceUUID() {
         return _sourceUUID;
     }
 
@@ -117,7 +117,7 @@ private:
     const StringData _currentShardKey = "sk";
 
     const NamespaceString _sourceNss{"test_crud", "collection_being_resharded"};
-    const CollectionUUID _sourceUUID = UUID::gen();
+    const UUID _sourceUUID = UUID::gen();
 
     const ShardId _myDonorId{"myDonorId"};
 };

@@ -297,7 +297,7 @@ private:
 
     ChunkManager makeChunkManagerForOutputCollection() {
         const OID epoch = OID::gen();
-        const CollectionUUID outputUuid = UUID::gen();
+        const UUID outputUuid = UUID::gen();
         std::vector<ChunkType> chunks = {
             ChunkType{outputUuid,
                       ChunkRange{BSON(_newShardKey << MINKEY), BSON(_newShardKey << MAXKEY)},
@@ -319,7 +319,7 @@ private:
     const StringData _newShardKey = "new_sk";
 
     const NamespaceString _sourceNss{"test_crud", "collection_being_resharded"};
-    const CollectionUUID _sourceUUID = UUID::gen();
+    const UUID _sourceUUID = UUID::gen();
 
     const ShardId _myDonorId{"myDonorId"};
     const ShardId _otherDonorId{"otherDonorId"};

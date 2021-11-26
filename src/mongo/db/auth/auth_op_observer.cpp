@@ -164,7 +164,7 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
                                           const NamespaceString& fromCollection,
                                           const NamespaceString& toCollection,
                                           const UUID& uuid,
-                                          OptionalCollectionUUID dropTargetUUID,
+                                          const boost::optional<UUID>& dropTargetUUID,
                                           bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
 
@@ -186,7 +186,7 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
                                         const UUID& uuid,
-                                        OptionalCollectionUUID dropTargetUUID,
+                                        const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp) {
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);

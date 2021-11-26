@@ -467,10 +467,10 @@ private:
 
     // Save a reference to the 'primary' CollectionPtr's original restore lambda so that the new one
     // can reference it.
-    std::function<const Collection*(OperationContext*, CollectionUUID)> _primaryCollectionRestoreFn;
+    std::function<const Collection*(OperationContext*, UUID)> _primaryCollectionRestoreFn;
 
     // Used on query yield restore to identify the 'secondary' collections to check.
-    std::vector<CollectionUUID> _secondaryCollectionUUIDs;
+    std::vector<UUID> _secondaryCollectionUUIDs;
 };
 
 /**

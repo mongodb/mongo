@@ -105,7 +105,7 @@ public:
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const CollectionUUID& uuid,
+        const UUID& uuid,
         Timestamp afterClusterTime,
         StringData reason) override {
         invariant(nss == _sourceNss);
@@ -115,7 +115,7 @@ public:
     MigrationDestinationManager::IndexesAndIdIndex getCollectionIndexes(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const CollectionUUID& uuid,
+        const UUID& uuid,
         Timestamp afterClusterTime,
         StringData reason) override {
         invariant(nss == _sourceNss);
@@ -146,7 +146,7 @@ private:
     const StringData _currentShardKey = "oldKey";
 
     const NamespaceString _sourceNss{"sourcedb", "sourcecollection"};
-    const CollectionUUID _sourceUUID = UUID::gen();
+    const UUID _sourceUUID = UUID::gen();
 
     const ShardId _someDonorId{"myDonorId"};
 };

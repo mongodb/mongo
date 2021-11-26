@@ -641,7 +641,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
 Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
                                                       std::string dbName,
-                                                      CollectionUUID collectionUUID,
+                                                      const UUID& collectionUUID,
                                                       const std::vector<BSONObj>& specs,
                                                       const UUID& buildUUID,
                                                       const ResumeIndexInfo& resumeInfo) {
@@ -1688,7 +1688,7 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
 Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     OperationContext* opCtx,
     StringData dbName,
-    CollectionUUID collectionUUID,
+    const UUID& collectionUUID,
     const std::vector<BSONObj>& specs,
     const UUID& buildUUID) {
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
@@ -1707,7 +1707,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
 StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
 IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
                                                      StringData dbName,
-                                                     CollectionUUID collectionUUID,
+                                                     const UUID& collectionUUID,
                                                      const std::vector<BSONObj>& specs,
                                                      const UUID& buildUUID,
                                                      IndexBuildProtocol protocol) {

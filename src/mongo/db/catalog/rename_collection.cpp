@@ -336,7 +336,7 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
 Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                            const NamespaceString& source,
                                            const NamespaceString& target,
-                                           OptionalCollectionUUID uuidToDrop,
+                                           const boost::optional<UUID>& uuidToDrop,
                                            repl::OpTime renameOpTimeFromApplyOps,
                                            const RenameCollectionOptions& options) {
     invariant(source.db() == target.db());
@@ -883,7 +883,7 @@ Status renameCollection(OperationContext* opCtx,
 
 Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
-                                   const OptionalCollectionUUID& uuidToRename,
+                                   const boost::optional<UUID>& uuidToRename,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime) {
 
@@ -915,7 +915,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     options.dropTarget = cmd["dropTarget"].trueValue();
     options.stayTemp = cmd["stayTemp"].trueValue();
 
-    OptionalCollectionUUID uuidToDrop;
+    boost::optional<UUID> uuidToDrop;
     if (cmd["dropTarget"].type() == BinData) {
         auto uuid = uassertStatusOK(UUID::parse(cmd["dropTarget"]));
         uuidToDrop = uuid;

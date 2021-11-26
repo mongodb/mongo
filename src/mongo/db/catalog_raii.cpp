@@ -229,13 +229,13 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
 
     // When we restore from yield on this CollectionPtr we will update _collection above and use its
     // new pointer in the CollectionPtr
-    _collectionPtr = CollectionPtr(opCtx,
-                                   _collection.get(),
-                                   [this, restoreFromYield = std::move(restoreFromYield)](
-                                       OperationContext* opCtx, CollectionUUID uuid) {
-                                       restoreFromYield(_collection, opCtx, uuid);
-                                       return _collection.get();
-                                   });
+    _collectionPtr = CollectionPtr(
+        opCtx,
+        _collection.get(),
+        [this, restoreFromYield = std::move(restoreFromYield)](OperationContext* opCtx, UUID uuid) {
+            restoreFromYield(_collection, opCtx, uuid);
+            return _collection.get();
+        });
 
     {
         // Check that the sharding database version matches our read.
@@ -284,18 +284,16 @@ AutoGetCollectionMaybeLockFree::AutoGetCollectionMaybeLockFree(
     AutoGetCollectionViewMode viewMode,
     Date_t deadline) {
     if (opCtx->isLockFreeReadsOp()) {
-        _autoGetLockFree.emplace(opCtx,
-                                 nsOrUUID,
-                                 [](std::shared_ptr<const Collection>& collection,
-                                    OperationContext* opCtx,
-                                    CollectionUUID uuid) {
-                                     LOGV2_FATAL(
-                                         5342700,
-                                         "This is a nested lock helper and there was an attempt to "
-                                         "yield locks, which should be impossible");
-                                 },
-                                 viewMode,
-                                 deadline);
+        _autoGetLockFree.emplace(
+            opCtx,
+            nsOrUUID,
+            [](std::shared_ptr<const Collection>& collection, OperationContext* opCtx, UUID uuid) {
+                LOGV2_FATAL(5342700,
+                            "This is a nested lock helper and there was an attempt to "
+                            "yield locks, which should be impossible");
+            },
+            viewMode,
+            deadline);
     } else {
         _autoGet.emplace(opCtx, nsOrUUID, modeColl, viewMode, deadline);
     }
@@ -309,7 +307,7 @@ struct CollectionWriter::SharedImpl {
 };
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx,
-                                   const CollectionUUID& uuid,
+                                   const UUID& uuid,
                                    CollectionCatalog::LifetimeMode mode)
     : _collection(&_storedCollection),
       _opCtx(opCtx),

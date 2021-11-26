@@ -46,7 +46,7 @@ namespace mongo::sbe {
 using TrialRunTrackerTest = PlanStageTestFixture;
 
 TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
-    auto collUuid = CollectionUUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto scanStage = makeS<ScanStage>(collUuid,
                                       generateSlotId(),
                                       generateSlotId(),
@@ -90,7 +90,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
 }
 
 TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
-    auto collUuid = CollectionUUID::parse("00000000-0000-0000-0000-000000000000").getValue();
+    auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto scanStage = makeS<ScanStage>(collUuid,
                                       generateSlotId(),
                                       generateSlotId(),

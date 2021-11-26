@@ -231,7 +231,7 @@ ReplOperation MutableOplogEntry::makeCreateCommand(const NamespaceString nss,
 }
 
 ReplOperation MutableOplogEntry::makeCreateIndexesCommand(const NamespaceString nss,
-                                                          CollectionUUID uuid,
+                                                          const UUID& uuid,
                                                           const BSONObj& indexDoc) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kCommand);

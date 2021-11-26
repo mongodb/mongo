@@ -75,27 +75,27 @@ class OpObserverMock : public OpObserverNoop {
 public:
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       CollectionUUID uuid,
+                       const UUID& uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           CollectionUUID collUUID,
+                           const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            bool fromMigrate) override;
 
     void onCommitIndexBuild(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            CollectionUUID collUUID,
+                            const UUID& collUUID,
                             const UUID& indexBuildUUID,
                             const std::vector<BSONObj>& indexes,
                             bool fromMigrate) override;
 
     void onAbortIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
-                           CollectionUUID collUUID,
+                           const UUID& collUUID,
                            const UUID& indexBuildUUID,
                            const std::vector<BSONObj>& indexes,
                            const Status& cause,
@@ -127,7 +127,7 @@ public:
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
                             const UUID& uuid,
-                            OptionalCollectionUUID dropTargetUUID,
+                            const boost::optional<UUID>& dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) override;
 
@@ -136,14 +136,14 @@ public:
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,
                                      const UUID& uuid,
-                                     OptionalCollectionUUID dropTargetUUID,
+                                     const boost::optional<UUID>& dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp) override;
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
                               const UUID& uuid,
-                              OptionalCollectionUUID dropTargetUUID,
+                              const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) override;
     // Operations written to the oplog. These are operations for which
     // ReplicationCoordinator::isOplogDisabled() returns false.
@@ -153,7 +153,7 @@ public:
     bool onInsertsIsTargetDatabaseExclusivelyLocked = false;
 
     bool onRenameCollectionCalled = false;
-    OptionalCollectionUUID onRenameCollectionDropTarget;
+    boost::optional<UUID> onRenameCollectionDropTarget;
     repl::OpTime renameOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 
     repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
@@ -169,7 +169,7 @@ private:
 
 void OpObserverMock::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
-                                   CollectionUUID uuid,
+                                   const UUID& uuid,
                                    BSONObj indexDoc,
                                    bool fromMigrate) {
     _logOp(opCtx, nss, "index");
@@ -178,7 +178,7 @@ void OpObserverMock::onCreateIndex(OperationContext* opCtx,
 
 void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
                                        const NamespaceString& nss,
-                                       CollectionUUID collUUID,
+                                       const UUID& collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
                                        bool fromMigrate) {
@@ -188,7 +188,7 @@ void OpObserverMock::onStartIndexBuild(OperationContext* opCtx,
 
 void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,
                                         const NamespaceString& nss,
-                                        CollectionUUID collUUID,
+                                        const UUID& collUUID,
                                         const UUID& indexBuildUUID,
                                         const std::vector<BSONObj>& indexes,
                                         bool fromMigrate) {
@@ -198,7 +198,7 @@ void OpObserverMock::onCommitIndexBuild(OperationContext* opCtx,
 
 void OpObserverMock::onAbortIndexBuild(OperationContext* opCtx,
                                        const NamespaceString& nss,
-                                       CollectionUUID collUUID,
+                                       const UUID& collUUID,
                                        const UUID& indexBuildUUID,
                                        const std::vector<BSONObj>& indexes,
                                        const Status& cause,
@@ -256,7 +256,7 @@ void OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                         const NamespaceString& fromCollection,
                                         const NamespaceString& toCollection,
                                         const UUID& uuid,
-                                        OptionalCollectionUUID dropTargetUUID,
+                                        const boost::optional<UUID>& dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp) {
     preRenameCollection(
@@ -271,7 +271,7 @@ void OpObserverMock::postRenameCollection(OperationContext* opCtx,
                                           const NamespaceString& fromCollection,
                                           const NamespaceString& toCollection,
                                           const UUID& uuid,
-                                          OptionalCollectionUUID dropTargetUUID,
+                                          const boost::optional<UUID>& dropTargetUUID,
                                           bool stayTemp) {
     OpObserverNoop::postRenameCollection(
         opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
@@ -283,7 +283,7 @@ repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
                                                  const NamespaceString& fromCollection,
                                                  const NamespaceString& toCollection,
                                                  const UUID& uuid,
-                                                 OptionalCollectionUUID dropTargetUUID,
+                                                 const boost::optional<UUID>& dropTargetUUID,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp) {
     _logOp(opCtx, fromCollection, "rename");
@@ -404,7 +404,7 @@ CollectionOptions _makeCollectionOptionsWithUuid() {
 /**
  * Creates a collection with UUID and returns the UUID.
  */
-CollectionUUID _createCollectionWithUUID(OperationContext* opCtx, const NamespaceString& nss) {
+UUID _createCollectionWithUUID(OperationContext* opCtx, const NamespaceString& nss) {
     const auto options = _makeCollectionOptionsWithUuid();
     _createCollection(opCtx, nss, options);
     return options.uuid.get();
@@ -430,7 +430,7 @@ CollectionOptions _getCollectionOptions(OperationContext* opCtx, const Namespace
 /**
  * Returns UUID of collection.
  */
-CollectionUUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
+UUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     auto options = _getCollectionOptions(opCtx, nss);
     ASSERT_TRUE(options.uuid);
     return *(options.uuid);

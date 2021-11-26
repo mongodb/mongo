@@ -51,9 +51,9 @@ public:
     CollectionCatalogTest()
         : nss("testdb", "testcol"),
           col(nullptr),
-          colUUID(CollectionUUID::gen()),
-          nextUUID(CollectionUUID::gen()),
-          prevUUID(CollectionUUID::gen()) {
+          colUUID(UUID::gen()),
+          nextUUID(UUID::gen()),
+          prevUUID(UUID::gen()) {
         if (prevUUID > colUUID)
             std::swap(prevUUID, colUUID);
         if (colUUID > nextUUID)
@@ -79,9 +79,9 @@ protected:
     ServiceContext::UniqueOperationContext opCtx;
     NamespaceString nss;
     CollectionPtr col;
-    CollectionUUID colUUID;
-    CollectionUUID nextUUID;
-    CollectionUUID prevUUID;
+    UUID colUUID;
+    UUID nextUUID;
+    UUID prevUUID;
 };
 
 class CollectionCatalogIterationTest : public unittest::Test {
@@ -91,10 +91,10 @@ public:
             NamespaceString fooNss("foo", "coll" + std::to_string(counter));
             NamespaceString barNss("bar", "coll" + std::to_string(counter));
 
-            auto fooUuid = CollectionUUID::gen();
+            auto fooUuid = UUID::gen();
             std::shared_ptr<Collection> fooColl = std::make_shared<CollectionMock>(fooNss);
 
-            auto barUuid = CollectionUUID::gen();
+            auto barUuid = UUID::gen();
             std::shared_ptr<Collection> barColl = std::make_shared<CollectionMock>(barNss);
 
             dbMap["foo"].insert(std::make_pair(fooUuid, fooColl.get()));
@@ -112,13 +112,13 @@ public:
         }
     }
 
-    std::map<CollectionUUID, CollectionPtr>::iterator collsIterator(std::string dbName) {
+    std::map<UUID, CollectionPtr>::iterator collsIterator(std::string dbName) {
         auto it = dbMap.find(dbName);
         ASSERT(it != dbMap.end());
         return it->second.begin();
     }
 
-    std::map<CollectionUUID, CollectionPtr>::iterator collsIteratorEnd(std::string dbName) {
+    std::map<UUID, CollectionPtr>::iterator collsIteratorEnd(std::string dbName) {
         auto it = dbMap.find(dbName);
         ASSERT(it != dbMap.end());
         return it->second.end();
@@ -142,14 +142,14 @@ public:
         ASSERT_EQUALS(counter, dbMap[dbName].size());
     }
 
-    void dropColl(const std::string dbName, CollectionUUID uuid) {
+    void dropColl(const std::string dbName, UUID uuid) {
         dbMap[dbName].erase(uuid);
     }
 
 protected:
     CollectionCatalog catalog;
     OperationContextNoop opCtx;
-    std::map<std::string, std::map<CollectionUUID, CollectionPtr>> dbMap;
+    std::map<std::string, std::map<UUID, CollectionPtr>> dbMap;
 };
 
 class CollectionCatalogResourceMapTest : public unittest::Test {
@@ -294,7 +294,7 @@ public:
     }
 
     void tearDown() {
-        std::vector<CollectionUUID> collectionsToDeregister;
+        std::vector<UUID> collectionsToDeregister;
         for (auto it = catalog.begin(&opCtx, "resourceDb"); it != catalog.end(&opCtx); ++it) {
             auto coll = *it;
             auto uuid = coll->uuid();
@@ -405,18 +405,18 @@ TEST_F(CollectionCatalogTest, LookupCollectionByUUID) {
     // nss.ns().
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID)->ns().ns(), nss.ns());
     // Ensure lookups of unknown UUIDs result in null pointers.
-    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), CollectionUUID::gen()) == nullptr);
+    ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), UUID::gen()) == nullptr);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
     // Ensure the string value of the obtained NamespaceString is equal to nss.ns().
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns(), nss.ns());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), CollectionUUID::gen()), boost::none);
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), UUID::gen()), boost::none);
 }
 
 TEST_F(CollectionCatalogTest, InsertAfterLookup) {
-    auto newUUID = CollectionUUID::gen();
+    auto newUUID = UUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
     std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
     auto newCol = newCollShared.get();
@@ -436,7 +436,7 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
 }
 
 TEST_F(CollectionCatalogTest, RenameCollection) {
-    auto uuid = CollectionUUID::gen();
+    auto uuid = UUID::gen();
     NamespaceString oldNss(nss.db(), "oldcol");
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(oldNss);
     auto collection = collShared.get();
@@ -468,7 +468,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDrop
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreatedNSS) {
-    auto newUUID = CollectionUUID::gen();
+    auto newUUID = UUID::gen();
     NamespaceString newNss(nss.db(), "newcol");
     std::shared_ptr<Collection> newCollShared = std::make_shared<CollectionMock>(newNss);
     auto newCol = newCollShared.get();
@@ -553,7 +553,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
         std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
-        auto uuid = CollectionUUID::gen();
+        auto uuid = UUID::gen();
         catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }
 
@@ -604,7 +604,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
     for (auto& nss : nsss) {
         std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
-        auto uuid = CollectionUUID::gen();
+        auto uuid = UUID::gen();
         catalog.registerCollection(opCtx.get(), uuid, std::move(newColl));
     }
 
