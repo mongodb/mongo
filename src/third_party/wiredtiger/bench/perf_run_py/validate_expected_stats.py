@@ -36,21 +36,25 @@ import re
 
 def main():
     """
-    Validate the expected output from the last run of wtperf_run.py
+    Validate the expected output from the last run of perf_run.py
     Take in a list of stats and their values as json and verify them against the contents of evergreen_out.json.
     Example usage:
-        ./validate_perf_stats.py '{"Pages seen by eviction": 200, "Insert count": 1153326}' './evergreen_out.json'
+        ./validate_perf_stats.py './evergreen_out.json' 'eq' '{"Pages seen by eviction": 200}'
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('expected_stats', type=str, help='The expected stats and their values')
     parser.add_argument('stat_file', type=str, help='The evergreen stat file produced by the perf test')
+    parser.add_argument('comparison_op', type=str, help="Compare the stats between the stat_file and expected stats.")
+    parser.add_argument('expected_stats', type=str, help='The expected stats and their values')
     args = parser.parse_args()
 
-    stat_file_regex = re.compile(r"evergreen_out[\w-]*\.json")
+    stat_file_regex = re.compile(r"evergreen_out[\w\\.-]*\.json")
     if not re.match(stat_file_regex, os.path.basename(args.stat_file)):
         print(f"ERROR: '{args.stat_file}' should be the path to an evergreen_out*.json file")
         exit(1)
+
+    if args.comparison_op not in ["eq", "gt", "lt"]:
+        print(f"ERROR: comparison operator should be 'eq', 'gt', or 'lt', provided operator: '{args.comparison_op}'")
 
     expected_stats = json.loads(args.expected_stats)
 
@@ -61,9 +65,16 @@ def main():
     for stat in expected_stats:
         if stat not in test_output:
             errors.append(f"'{stat}'\t not present in evergreen_out.json")
-        elif expected_stats[stat] != test_output[stat]:
-            errors.append(f"'{stat}'\t value mismatch. Expected: {expected_stats[stat]}, Actual: {test_output[stat]}")
-
+        else:
+            if args.comparison_op == "eq":
+                if test_output[stat] != expected_stats[stat]:
+                    errors.append(f"Error: '{stat}'\t value mismatch. Expected: {expected_stats[stat]}, Actual: {test_output[stat]}")
+            elif args.comparison_op == "gt":
+                if test_output[stat] <= expected_stats[stat]:
+                    errors.append(f"Error: '{stat}' (value: {test_output[stat]}) in '{args.stat_file}' is less than (or equal) to {expected_stats[stat]}")
+            elif args.comparison_op == "lt":
+                if test_output[stat] >= expected_stats[stat]:
+                    errors.append(f"Error: '{stat}' (value: {test_output[stat]}) in '{args.stat_file}' is greater than (or equal) to the threshold value {expected_stats[stat]}")
     if errors:
         print("ERROR: Expected values not found:")
         print('\n'.join(errors))

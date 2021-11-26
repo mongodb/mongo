@@ -133,7 +133,27 @@ class PerfStatLatency(PerfStat):
 
     def get_value_list(self, brief: bool):
         as_list = []
-        for i in range(1, self.num_max + 1):
+        num_max = min(len(self.values), self.num_max)
+        for i in range(1, num_max + 1):
+            as_dict = {
+                'name': self.output_label + str(i),
+                'value': self.get_value(i)
+            }
+            if not brief:
+                as_dict['values'] = self.values
+            as_list.append(as_dict)
+        return as_list
+
+
+class PerfStatLatencyWorkgen(PerfStat):
+    def get_value(self, nth_max: int):
+        """Return the nth maximum number from all the gathered values"""
+        return sorted(self.values)[-nth_max]
+
+    def get_value_list(self, brief: bool):
+        as_list = []
+        num_max = min(len(self.values), 5)
+        for i in range(1, num_max + 1):
             as_dict = {
                 'name': self.output_label + str(i),
                 'value': self.get_value(i)

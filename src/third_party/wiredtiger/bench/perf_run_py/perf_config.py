@@ -28,41 +28,58 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-class WTPerfConfig:
+class TestType:
+    def __init__(self, is_wtperf: bool, is_workgen: bool):
+        self.is_wtperf = is_wtperf
+        self.is_workgen = is_workgen
+
+    def get_home_arg(self, home: str):
+        if self.is_wtperf:
+            return ['-h', home]
+        if self.is_workgen:
+            return ['--home', home]
+
+    def get_test_arg(self, test: str):
+        if self.is_wtperf:
+            return ['-O', test]
+        if self.is_workgen:
+            return [test]
+
+
+class PerfConfig:
     def __init__(self,
-                 wtperf_path: str,
+                 test_type: TestType,
+                 exec_path: str,
                  home_dir: str,
                  test: str,
                  batch_file: str = None,
                  arguments=None,
                  operations=None,
-                 environment: str = None,
                  run_max: int = 1,
                  verbose: bool = False,
                  git_root: str = None,
                  json_info=None):
         if json_info is None:
             json_info = {}
-        self.wtperf_path: str = wtperf_path
+        self.test_type: TestType = test_type
+        self.exec_path: str = exec_path
         self.home_dir: str = home_dir
         self.test: str = test
         self.batch_file = batch_file
         self.arguments = arguments
         self.operations = operations
-        self.environment: str = environment
         self.run_max: int = run_max
         self.verbose: bool = verbose
         self.git_root: str = git_root
         self.json_info: dict = json_info
 
     def to_value_dict(self):
-        as_dict = {'wt_perf_path': self.wtperf_path,
+        as_dict = {'exec_path': self.exec_path,
                    'test': self.test,
                    'batch_file': self.batch_file,
                    'arguments': self.arguments,
                    'operations': self.operations,
                    'home_dir': self.home_dir,
-                   'environment': self.environment,
                    'run_max': self.run_max,
                    'verbose': self.verbose,
                    'git_root': self.git_root,
