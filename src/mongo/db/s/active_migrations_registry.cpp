@@ -39,6 +39,7 @@
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -72,10 +73,14 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) 
     LOGV2(467560, "Going to start blocking migrations", "reason"_attr = reason);
     _migrationsBlocked = true;
 
+    ScopeGuard unblockMigrationsOnError([&] { _migrationsBlocked = false; });
+
     // Wait for any ongoing chunk modifications to complete
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, lock, [this] {
         return !(_activeMoveChunkState || _activeReceiveChunkState);
     });
+
+    unblockMigrationsOnError.dismiss();
 }
 
 void ActiveMigrationsRegistry::unlock(StringData reason) {
