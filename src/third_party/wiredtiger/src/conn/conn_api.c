@@ -2176,8 +2176,6 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
       {"failpoint_history_delete_key_from_ts",
         WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS},
-      {"failpoint_history_store_insert_1", WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_1},
-      {"failpoint_history_store_insert_2", WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_INSERT_2},
       {"history_store_checkpoint_delay", WT_TIMING_STRESS_HS_CHECKPOINT_DELAY},
       {"history_store_search", WT_TIMING_STRESS_HS_SEARCH},
       {"history_store_sweep_race", WT_TIMING_STRESS_HS_SWEEP},

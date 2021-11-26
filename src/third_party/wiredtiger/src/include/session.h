@@ -181,7 +181,7 @@ struct __wt_session_impl {
     size_t op_handle_allocated; /* Bytes allocated */
 
     void *reconcile; /* Reconciliation support */
-    int (*reconcile_cleanup)(WT_SESSION_IMPL *);
+    void (*reconcile_cleanup)(WT_SESSION_IMPL *);
 
     /* Salvage support. */
     void *salvage_track;

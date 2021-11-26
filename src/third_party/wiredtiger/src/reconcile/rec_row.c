@@ -868,10 +868,10 @@ __wt_rec_row_leaf(
                     WT_ERR(__wt_hs_delete_key_from_ts(
                       session, hs_cursor, btree->id, tmpkey, WT_TS_NONE, false, false));
 
-                    /* Fail 1% of the time. */
+                    /* Fail 0.01% of the time. */
                     if (F_ISSET(r, WT_REC_EVICT) &&
                       __wt_failpoint(
-                        session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 1))
+                        session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 0.01))
                         WT_ERR(EBUSY);
                     WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
                     WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
