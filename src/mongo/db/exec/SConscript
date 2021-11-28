@@ -57,6 +57,7 @@ env.Library(
         "bucket_unpacker.cpp",
     ],
     LIBDEPS = [
+        "$BUILD_DIR/mongo/db/matcher/expressions",
         "document_value/document_value",
     ],
     LIBDEPS_PRIVATE = [

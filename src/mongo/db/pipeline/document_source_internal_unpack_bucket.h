@@ -134,6 +134,12 @@ public:
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const;
 
     /**
+     * Convenience wrapper around BucketSpec::createPredicatesOnBucketLevelField().
+     */
+    std::unique_ptr<MatchExpression> createPredicatesOnBucketLevelField(
+        const MatchExpression* matchExpr) const;
+
+    /**
      * Attempts to split 'match' into two stages, where the first is dependent only on the metaField
      * and the second is the remainder, so that applying them in sequence is equivalent to applying
      * 'match' once. Will return two intrusive_ptrs to new $match stages. Either pointer may be
@@ -142,25 +148,6 @@ public:
      */
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
     splitMatchOnMetaAndRename(boost::intrusive_ptr<DocumentSourceMatch> match);
-
-    /**
-     * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument and
-     * attempts to map it to a new predicate on the 'control' field. For example, the predicate
-     * {a: {$gt: 5}} will generate the predicate {control.max.a: {$_internalExprGt: 5}}, which will
-     * be added before the $_internalUnpackBucket stage.
-     *
-     * If the original predicate is on the bucket's timeField we may also create a new predicate
-     * on the '_id' field to assist in index utilization. For example, the predicate
-     * {time: {$lt: new Date(...)}} will generate the following predicate:
-     * {$and: [
-     *      {_id: {$lt: ObjectId(...)}},
-     *      {control.min.time: {$_internalExprLt: new Date(...)}}
-     * ]}
-     *
-     * If the provided predicate is ineligible for this mapping, the function will return a nullptr.
-     */
-    std::unique_ptr<MatchExpression> createPredicatesOnBucketLevelField(
-        const MatchExpression* matchExpr) const;
 
     /**
      * Sets the sample size to 'n' and the maximum number of measurements in a bucket to be

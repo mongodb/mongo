@@ -35,6 +35,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 /**
@@ -63,6 +65,33 @@ public:
     void setMetaField(boost::optional<std::string>&& field);
     const boost::optional<std::string>& metaField() const;
     boost::optional<HashedFieldName> metaFieldHashed() const;
+
+    // Returns whether 'field' depends on a pushed down $addFields or computed $project.
+    bool fieldIsComputed(StringData field) const;
+
+    /**
+     * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument and
+     * attempts to map it to a new predicate on the 'control' field. For example, the predicate
+     * {a: {$gt: 5}} will generate the predicate {control.max.a: {$_internalExprGt: 5}}, which will
+     * be added before the $_internalUnpackBucket stage.
+     *
+     * If the original predicate is on the bucket's timeField we may also create a new predicate
+     * on the '_id' field to assist in index utilization. For example, the predicate
+     * {time: {$lt: new Date(...)}} will generate the following predicate:
+     * {$and: [
+     *      {_id: {$lt: ObjectId(...)}},
+     *      {control.min.time: {$_internalExprLt: new Date(...)}}
+     * ]}
+     *
+     * If the provided predicate is ineligible for this mapping, the function will return a nullptr.
+     */
+    static std::unique_ptr<MatchExpression> createPredicatesOnBucketLevelField(
+        const MatchExpression* matchExpr,
+        const BucketSpec& bucketSpec,
+        int bucketMaxSpanSeconds,
+        ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+        bool assumeNoMixedSchemaData);
 
     // The set of field names in the data region that should be included or excluded.
     std::set<std::string> fieldSet;
