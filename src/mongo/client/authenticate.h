@@ -160,12 +160,8 @@ Future<void> authenticateInternalClient(
  *     @dbname: The database target of the auth command.
  *     @username: The std::string name of the user to authenticate.
  *     @passwordText: The std::string representing the user's password.
- *     @digestPassword: Set to true if the password is undigested.
  */
-BSONObj buildAuthParams(StringData dbname,
-                        StringData username,
-                        StringData passwordText,
-                        bool digestPassword);
+BSONObj buildAuthParams(StringData dbname, StringData username, StringData passwordText);
 
 /**
  * Run an isMaster exchange to negotiate a SASL mechanism for authentication.

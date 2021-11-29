@@ -20,13 +20,13 @@ executor:
       global_vars:
         TestData:
           auth: true
-          authMechanism: SCRAM-SHA-1
+          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
       eval: jsTest.authenticate(db.getMongo())
       authenticationDatabase: local
-      authenticationMechanism: SCRAM-SHA-1
+      authenticationMechanism: SCRAM-SHA-256
       password: *keyFileData
       username: __system
   hooks:

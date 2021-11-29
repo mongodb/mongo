@@ -277,12 +277,10 @@ public:
      *        of the credential information for the user. May be "$external" if
      *        credential information is stored outside of the mongo cluster. Mandatory.
      *  'pwd': The password data.
-     *  'digestPassword': Boolean, set to true if the "pwd" is undigested (default).
      *  'serviceName': The GSSAPI service name to use. Defaults to "mongodb".
      *  'serviceHostname': The GSSAPI hostname to use. Defaults to the name of the remote host.
      *
      * Other fields in 'params' are silently ignored.
-     *
      * Returns normally on success, and throws on error. Throws a DBException with getCode() ==
      * ErrorCodes::AuthenticationFailed if authentication is rejected. All other exceptions are
      * tantamount to authentication failure, but may also indicate more serious problems.
@@ -296,16 +294,12 @@ public:
      * number of databases on a single connection. The "admin" database is special and once
      * authenticated provides access to all databases on the server.
      *
-     *  'digestPassword': If password is plain text, set this to true. otherwise assumed to be
-     *                    pre-digested.
-     *
      *   Returns true if successful.
      */
     bool auth(const std::string& dbname,
               const std::string& username,
               const std::string& pwd,
-              std::string& errmsg,
-              bool digestPassword = true);
+              std::string& errmsg);
 
     /**
      * Logs out the connection for the given database.

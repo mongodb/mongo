@@ -416,11 +416,9 @@ void DBClientBase::auth(const BSONObj& params) {
 bool DBClientBase::auth(const string& dbname,
                         const string& username,
                         const string& password_text,
-                        string& errmsg,
-                        bool digestPassword) {
+                        string& errmsg) {
     try {
-        const auto authParams =
-            auth::buildAuthParams(dbname, username, password_text, digestPassword);
+        const auto authParams = auth::buildAuthParams(dbname, username, password_text);
         auth(authParams);
         return true;
     } catch (const AssertionException& ex) {

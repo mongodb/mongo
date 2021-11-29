@@ -39,7 +39,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -58,8 +57,7 @@ constexpr size_t kMaxKeyLength = 1024;
 class CredentialsGenerator {
 public:
     explicit CredentialsGenerator(StringData filename)
-        : _salt1(scram::Presecrets<SHA1Block>::generateSecureRandomSalt()),
-          _salt256(scram::Presecrets<SHA256Block>::generateSecureRandomSalt()),
+        : _salt256(scram::Presecrets<SHA256Block>::generateSecureRandomSalt()),
           _filename(filename) {}
 
     boost::optional<User::CredentialData> generate(const std::string& password) {
@@ -87,11 +85,6 @@ public:
             (*internalSecurity.getUser())->getName().getUser(), password);
 
         User::CredentialData credentials;
-        if (!_copyCredentials(
-                credentials.scram_sha1,
-                scram::Secrets<SHA1Block>::generateCredentials(
-                    _salt1, passwordDigest, saslGlobalParams.scramSHA1IterationCount.load())))
-            return boost::none;
 
         if (!_copyCredentials(credentials.scram_sha256,
                               scram::Secrets<SHA256Block>::generateCredentials(
@@ -120,7 +113,6 @@ private:
         return true;
     }
 
-    const std::vector<uint8_t> _salt1;
     const std::vector<uint8_t> _salt256;
     const StringData _filename;
 };

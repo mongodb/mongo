@@ -69,7 +69,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
     let authAsKeyFileCluster = function() {
         const authParams = {
             user: '__system',
-            mechanism: 'SCRAM-SHA-1',
+            mechanism: 'SCRAM-SHA-256',
             pwd: cat(keyFile).replace(/[\011-\015\040]/g, '')
         };
 

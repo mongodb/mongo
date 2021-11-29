@@ -12,12 +12,12 @@ config_variables:
 - &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 - &authOptions
   authenticationDatabase: admin
-  authenticationMechanism: SCRAM-SHA-1
+  authenticationMechanism: SCRAM-SHA-256
   password: *keyFileData
   username: __system
 - TestData: &TestData
     auth: true
-    authMechanism: SCRAM-SHA-1
+    authMechanism: SCRAM-SHA-256
     keyFile: *keyFile
     keyFileData: *keyFileData
 

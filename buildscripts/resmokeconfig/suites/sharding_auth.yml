@@ -43,7 +43,7 @@ executor:
       global_vars:
         TestData:
           auth: true
-          authMechanism: SCRAM-SHA-1
+          authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true

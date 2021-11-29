@@ -277,14 +277,11 @@ Future<void> authenticateInternalClient(
         });
 }
 
-BSONObj buildAuthParams(StringData dbname,
-                        StringData username,
-                        StringData passwordText,
-                        bool digestPassword) {
-    return BSON(saslCommandMechanismFieldName
-                << "SCRAM-SHA-1" << saslCommandUserDBFieldName << dbname << saslCommandUserFieldName
-                << username << saslCommandPasswordFieldName << passwordText
-                << saslCommandDigestPasswordFieldName << digestPassword);
+BSONObj buildAuthParams(StringData dbname, StringData username, StringData passwordText) {
+
+    return BSON(saslCommandMechanismFieldName << "SCRAM-SHA-256" << saslCommandUserDBFieldName
+                                              << dbname << saslCommandUserFieldName << username
+                                              << saslCommandPasswordFieldName << passwordText);
 }
 
 StringData getSaslCommandUserDBFieldName() {

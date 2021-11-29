@@ -226,11 +226,9 @@ void AuthCounter::initializeMechanismMap(const std::vector<std::string>& mechani
     // Ensure it's always included in counts.
     addMechanism(auth::kMechanismMongoX509.toString());
 
-    // SERVER-46399 Use only configured SASL mechanisms for intra-cluster auth.
-    // It's possible for intracluster auth to use a default fallback mechanism of SCRAM-SHA-1/256
+    // It's possible for intracluster auth to use a default fallback mechanism of SCRAM-SHA-256
     // even if it's not configured to do so.
-    // Explicitly add these to the map for now so that they can be incremented if this happens.
-    addMechanism(auth::kMechanismScramSha1.toString());
+    // Explicitly add this to the map for now so that they can be incremented if this happens.
     addMechanism(auth::kMechanismScramSha256.toString());
 }
 

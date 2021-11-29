@@ -66,8 +66,8 @@ function runTest(conn) {
     checkMechs("admin.\u2168", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
 
     // __system's mechanisms can be queried on local and admin if the server is in test mode
-    checkMechs("local.__system", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
-    checkMechs("admin.__system", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
+    checkMechs("local.__system", ["SCRAM-SHA-256"]);
+    checkMechs("admin.__system", ["SCRAM-SHA-256"]);
 }
 
 // Test standalone.

@@ -1290,7 +1290,7 @@ function appendSetParameterArgs(argArray) {
             }
         }
 
-        if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
+        if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-256") {
             if (!argArrayContainsSetParameterValue('authenticationMechanisms=')) {
                 argArray.push(...['--setParameter',
                                   "authenticationMechanisms=" + jsTest.options().authMechanism]);

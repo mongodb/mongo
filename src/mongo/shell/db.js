@@ -5,6 +5,7 @@ var DB;
 (function() {
 
 var _defaultWriteConcern = {w: 'majority', wtimeout: 10 * 60 * 1000};
+const kWireVersionSupportingScramSha256Fallback = 15;
 
 if (DB === undefined) {
     DB = function(mongo, name) {
@@ -1403,10 +1404,17 @@ DB.prototype.__pwHash = function(nonce, username, pass) {
 
 DB.prototype._defaultAuthenticationMechanism = null;
 
+function _fallbackToScramSha256(helloResult) {
+    return helloResult && isNumber(helloResult.maxWireVersion) &&
+        helloResult.maxWireVersion >= kWireVersionSupportingScramSha256Fallback;
+}
+
 DB.prototype._getDefaultAuthenticationMechanism = function(username, database) {
+    let result = null;
     if (username !== undefined) {
         const userid = database + "." + username;
-        const result = this._helloOrLegacyHello({saslSupportedMechs: userid});
+        result = this._helloOrLegacyHello({saslSupportedMechs: userid});
+
         if (result.ok && (result.saslSupportedMechs !== undefined)) {
             const mechs = result.saslSupportedMechs;
             if (!Array.isArray(mechs)) {
@@ -1428,14 +1436,18 @@ DB.prototype._getDefaultAuthenticationMechanism = function(username, database) {
         }
         // If isMaster doesn't support saslSupportedMechs,
         // or if we couldn't agree on a mechanism,
-        // then fallthrough to configured default or SCRAM-SHA-1.
+        // then fall through to a default mech, either
+        // configured or implicit based on the wire version
     }
 
     // Use the default auth mechanism if set on the command line.
-    if (this._defaultAuthenticationMechanism != null)
+    if (this._defaultAuthenticationMechanism != null) {
         return this._defaultAuthenticationMechanism;
+    }
 
-    return "SCRAM-SHA-1";
+    // for later wire versions, we prefer (or require) SCRAM-SHA-256
+    // if a fallback is required
+    return _fallbackToScramSha256(result) ? "SCRAM-SHA-256" : "SCRAM-SHA-1";
 };
 
 DB.prototype._defaultGssapiServiceName = null;

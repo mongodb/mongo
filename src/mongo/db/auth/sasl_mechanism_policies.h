@@ -78,7 +78,7 @@ struct SCRAMSHA1Policy {
         return 2;
     }
     static constexpr bool isInternalAuthMech() {
-        return true;
+        return false;
     }
 };
 

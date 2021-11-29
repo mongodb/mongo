@@ -114,7 +114,7 @@ authutil.asCluster = function(conn, keyfile, action) {
 
         authutil.assertAuthenticate(conn, 'admin', {
             user: '__system',
-            mechanism: 'SCRAM-SHA-1',
+            mechanism: 'SCRAM-SHA-256',
             pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
         });
     } else if (authMode === 'x509' || authMode === 'sendX509') {
