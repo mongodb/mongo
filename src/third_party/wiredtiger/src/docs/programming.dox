@@ -15,6 +15,7 @@ each of which is ordered by one or more columns.
 - @subpage cursors
 - @subpage transactions
 - @subpage error_handling
+- @subpage message_handling
 - @subpage verbose_messaging
 
 <h2>Storage options</h2>
