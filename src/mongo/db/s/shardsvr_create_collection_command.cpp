@@ -200,16 +200,23 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
                 feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
-        if (!createCmdRequest.getTimeseries()) {
-            createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());
-        } else if (bucketsColl) {
-            uassert(5731500,
-                    str::stream() << "the 'timeseries' spec provided must match that of exists '"
-                                  << nss << "' collection",
-                    timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
-                                                *bucketsColl->getTimeseriesOptions()));
-        }
+        if (bucketsColl) {
+            uassert(6159000,
+                    str::stream() << "the collection '" << bucketsNs
+                                  << "' does not have 'timeseries' options",
+                    bucketsColl->getTimeseriesOptions());
 
+            if (createCmdRequest.getTimeseries()) {
+                uassert(5731500,
+                        str::stream()
+                            << "the 'timeseries' spec provided must match that of exists '" << nss
+                            << "' collection",
+                        timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
+                                                    *bucketsColl->getTimeseriesOptions()));
+            } else {
+                createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());
+            }
+        }
         auto timeField = createCmdRequest.getTimeseries()->getTimeField();
         auto metaField = createCmdRequest.getTimeseries()->getMetaField();
         BSONObjIterator iter{*createCmdRequest.getShardKey()};
