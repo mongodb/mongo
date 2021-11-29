@@ -90,8 +90,7 @@ var $config = (function() {
                 const acceptableCodes = [
                     ErrorCodes.Interrupted,
                     ErrorCodes.DuplicateKey,
-                    ErrorCodes.BackgroundOperationInProgressForNamespace,
-                    ErrorCodes.LockBusy,
+                    ErrorCodes.BackgroundOperationInProgressForNamespace
                 ];
                 if (e.code && acceptableCodes.includes(e.code) ||
                     // Indexes may be transiently inconsistent across shards, which can lead a
@@ -168,8 +167,7 @@ var $config = (function() {
                 collMod: this.collName,
                 index: {keyPattern: indexToModify, expireAfterSeconds: data.expireAfterSeconds}
             });
-            assertAlways.commandWorkedOrFailedWithCode(result,
-                                                       ErrorCodes.ConflictingOperationInProgress);
+            assertAlways.commandWorked(result);
         },
 
         // Verify that the indexes that we expect to be on disk are actually there and that indexes

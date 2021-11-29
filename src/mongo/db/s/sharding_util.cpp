@@ -36,6 +36,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 namespace mongo {
@@ -54,18 +55,16 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
 }
 
-std::vector<AsyncRequestsSender::Response> sendCommandToShards(
-    OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
+void sendCommandToShards(OperationContext* opCtx,
+                         StringData dbName,
+                         const BSONObj& command,
+                         const std::vector<ShardId>& shardIds,
+                         const std::shared_ptr<executor::TaskExecutor>& executor) {
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : shardIds) {
         requests.emplace_back(shardId, command);
     }
 
-    std::vector<AsyncRequestsSender::Response> responses;
     if (!requests.empty()) {
         // The _flushRoutingTableCacheUpdatesWithWriteConcern command will fail with a
         // QueryPlanKilled error response if the config.cache.chunks collection is dropped
@@ -94,11 +93,8 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
 
             auto wcStatus = getWriteConcernStatusFromCommandResult(shardResponse.data);
             uassertStatusOKWithContext(wcStatus, errorContext);
-
-            responses.push_back(std::move(response));
         }
     }
-    return responses;
 }
 
 }  // namespace sharding_util

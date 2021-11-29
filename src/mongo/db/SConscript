@@ -608,23 +608,9 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="coll_mod_command_idl",
-    source=[
-        'coll_mod.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.Library(
     target="commands",
     source=[
+        'coll_mod.idl',
         'coll_mod_reply_validation.cpp',
         'commands.cpp',
         'drop.idl',
@@ -653,7 +639,6 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/rpc/rpc',
         'audit',
-        'coll_mod_command_idl',
         'index_commands_idl',
         'namespace_string',
     ],

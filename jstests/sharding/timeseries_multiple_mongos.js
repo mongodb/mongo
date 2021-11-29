@@ -58,7 +58,6 @@ function generateBatch(size) {
 function runTest({shardKey, cmdObj, numProfilerEntries}) {
     const isDelete = cmdObj["delete"] !== undefined;
     const isUpdate = cmdObj["update"] !== undefined;
-    const isCollMod = cmdObj["collMod"] !== undefined;
     const cmdCollName = cmdObj[Object.keys(cmdObj)[0]];
     const shardKeyHasMetaField = shardKey[metaField] !== undefined;
 
@@ -113,10 +112,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
             filter = {"op": "update", "ns": `${dbName}.${cmdCollName}`, "ok": {$ne: 0}};
         } else if (isDelete) {
             filter = {"op": "remove", "ns": `${dbName}.${cmdCollName}`, "ok": {$ne: 0}};
-        } else if (isCollMod) {
-            const command = unVersioned ? "_shardsvrCollMod" : "_shardsvrCollModParticipant";
-            filter = {[`command.${command}`]: cmdCollName, "ok": {$ne: 0}};
-        } else if (unVersioned && !isCollMod) {
+        } else if (unVersioned) {
             filter["command.shardVersion.0"] = Timestamp(0, 0);
         }
 
@@ -134,7 +130,7 @@ function runTest({shardKey, cmdObj, numProfilerEntries}) {
     }
 
     // The update command is always logged as being on the user-provided namespace.
-    validateCommand((isUpdate || isDelete || isCollMod) ? cmdCollName : bucketsCollName,
+    validateCommand((isUpdate || isDelete) ? cmdCollName : bucketsCollName,
                     numProfilerEntries.sharded);
 
     // Insert dummy data so that the 'mongos1' sees the collection as sharded.

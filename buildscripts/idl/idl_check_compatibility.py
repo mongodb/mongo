@@ -152,9 +152,6 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
 ]
 
 SKIPPED_FILES = ["unittest.idl"]
-# TODO (SERVER-61551): CollModRequest has been extracted out as a chained struct of collMod command.
-# Whitelist collMod until chained struct comparison works for IDL compatibility check.
-SKIPPED_FILES += ["coll_mod.idl"]
 
 
 @dataclass

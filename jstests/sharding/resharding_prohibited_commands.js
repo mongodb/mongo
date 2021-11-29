@@ -33,9 +33,7 @@ const indexDroppedByTest = {
 };
 
 const prohibitedCommands = [
-    // The collMod is serialized with the resharding command, so we explicitly add an timeout to the
-    // command so that it doesn't get blocked and timeout the test.
-    {collMod: collectionName, maxTimeMS: 5000},
+    {collMod: collectionName},
     {createIndexes: collectionName, indexes: [{name: "idx1", key: indexCreatedByTest}]},
     {dropIndexes: collectionName, index: indexDroppedByTest},
 ];
@@ -65,9 +63,8 @@ const assertCommandsSucceedAfterReshardingOpFinishes = (database) => {
 const assertCommandsFailDuringReshardingOp = (database) => {
     prohibitedCommands.forEach((command) => {
         jsTest.log(`Testing that ${tojson(command)} fails during resharding operation`);
-        assert.commandFailedWithCode(
-            database.runCommand(command),
-            [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.MaxTimeMSExpired]);
+        assert.commandFailedWithCode(database.runCommand(command),
+                                     ErrorCodes.ReshardCollectionInProgress);
     });
 };
 

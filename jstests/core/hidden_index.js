@@ -98,9 +98,7 @@ assert.eq(idxSpec.hidden, true);
 // Can't hide any index in a system collection.
 const systemColl = db.getSiblingDB('admin').system.version;
 assert.commandWorked(systemColl.createIndex({a: 1}));
-assert.commandFailedWithCode(
-    systemColl.hideIndex("a_1"),
-    FixtureHelpers.isMongos(db) ? ErrorCodes.NoShardingEnabled : ErrorCodes.BadValue);
+assert.commandFailedWithCode(systemColl.hideIndex("a_1"), 2);
 assert.commandFailedWithCode(systemColl.createIndex({a: 1}, {hidden: true}), 2);
 
 // Can't hide the '_id' index.

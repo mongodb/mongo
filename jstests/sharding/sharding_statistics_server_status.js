@@ -116,11 +116,8 @@ const coll = mongos.getCollection(dbName + "." + collName);
 const numDocsToInsert = 3;
 const shardArr = [st.shard0, st.shard1];
 const stats = [new ShardStat(), new ShardStat()];
-const index1 = {
+const index = {
     x: 1
-};
-const index2 = {
-    y: 1
 };
 let numDocsInserted = 0;
 
@@ -245,7 +242,7 @@ moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.startedMoveChunk);
 
 // Run an index command.
-assert.commandWorked(coll.createIndexes([index1]));
+assert.commandWorked(coll.createIndexes([index]));
 
 // Unpause the migration and verify that it gets aborted.
 unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.startedMoveChunk);
@@ -262,7 +259,8 @@ moveChunkThread.start();
 waitForMoveChunkStep(donorConn, moveChunkStepNames.reachedSteadyState);
 
 // Run an index command.
-assert.commandWorked(coll.createIndexes([index2]));
+assert.commandWorked(
+    st.s.getDB(dbName).runCommand({collMod: collName, validator: {x: {$type: "string"}}}));
 
 // Unpause the migration and verify that it gets aborted.
 unpauseMoveChunkAtStep(donorConn, moveChunkStepNames.reachedSteadyState);

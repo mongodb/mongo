@@ -226,7 +226,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/query/query_request',

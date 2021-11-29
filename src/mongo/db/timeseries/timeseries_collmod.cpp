@@ -69,20 +69,18 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
 
     auto ns =
         isCommandOnTimeseriesBucketNamespace ? origNs : origNs.makeTimeseriesBucketsNamespace();
-    CollModRequest request;
-    request.setIndex(index);
-    request.setValidator(origCmd.getValidator());
-    request.setValidationLevel(origCmd.getValidationLevel());
-    request.setValidationAction(origCmd.getValidationAction());
-    request.setViewOn(origCmd.getViewOn());
-    request.setPipeline(origCmd.getPipeline());
-    request.setRecordPreImages(origCmd.getRecordPreImages());
-    request.setChangeStreamPreAndPostImages(origCmd.getChangeStreamPreAndPostImages());
-    request.setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
-    request.setTimeseries(origCmd.getTimeseries());
-    request.setDryRun(origCmd.getDryRun());
     auto cmd = std::make_unique<CollMod>(ns);
-    cmd->setCollModRequest(request);
+    cmd->setIndex(index);
+    cmd->setValidator(origCmd.getValidator());
+    cmd->setValidationLevel(origCmd.getValidationLevel());
+    cmd->setValidationAction(origCmd.getValidationAction());
+    cmd->setViewOn(origCmd.getViewOn());
+    cmd->setPipeline(origCmd.getPipeline());
+    cmd->setRecordPreImages(origCmd.getRecordPreImages());
+    cmd->setChangeStreamPreAndPostImages(origCmd.getChangeStreamPreAndPostImages());
+    cmd->setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
+    cmd->setTimeseries(origCmd.getTimeseries());
+
     return cmd;
 }
 
@@ -110,9 +108,7 @@ std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCt
                 constexpr bool asArray = false;
                 std::vector<BSONObj> pipeline = {
                     timeseries::generateViewPipeline(newOptions, asArray)};
-                CollModRequest viewRequest;
-                viewRequest.setPipeline(std::move(pipeline));
-                cmd->setCollModRequest(viewRequest);
+                cmd->setPipeline(std::move(pipeline));
                 return cmd;
             }
         }

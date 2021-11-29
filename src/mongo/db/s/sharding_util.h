@@ -34,7 +34,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -52,12 +51,11 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
 /**
  * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
  */
-std::vector<AsyncRequestsSender::Response> sendCommandToShards(
-    OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor);
+void sendCommandToShards(OperationContext* opCtx,
+                         StringData dbName,
+                         const BSONObj& command,
+                         const std::vector<ShardId>& shardIds,
+                         const std::shared_ptr<executor::TaskExecutor>& executor);
 
 }  // namespace sharding_util
 }  // namespace mongo
