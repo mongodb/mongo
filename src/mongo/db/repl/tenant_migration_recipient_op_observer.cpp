@@ -35,6 +35,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -111,9 +112,20 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                 mtab->stopBlockingTTL();
             }
 
-            switch (recipientStateDoc.getState()) {
+            auto state = recipientStateDoc.getState();
+            auto protocol = recipientStateDoc.getProtocol().value_or(kDefaultMigrationProtocol);
+            switch (state) {
                 case TenantMigrationRecipientStateEnum::kUninitialized:
                 case TenantMigrationRecipientStateEnum::kDone:
+                    break;
+                case TenantMigrationRecipientStateEnum::kLearnedFilenames:
+                case TenantMigrationRecipientStateEnum::kCopiedFiles:
+                    tassert(6112900,
+                            str::stream()
+                                << "Bad state " << TenantMigrationRecipientState_serializer(state)
+                                << " for protocol '" << MigrationProtocol_serializer(protocol)
+                                << "'",
+                            protocol == MigrationProtocolEnum::kMultitenantMigrations);
                     break;
                 case TenantMigrationRecipientStateEnum::kStarted:
                     createAccessBlockerIfNeeded(opCtx, recipientStateDoc);

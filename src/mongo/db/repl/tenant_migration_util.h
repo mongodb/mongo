@@ -47,7 +47,7 @@
 
 namespace mongo {
 
-constexpr auto kDefaulMigrationProtocol = MigrationProtocolEnum::kMultitenantMigrations;
+constexpr auto kDefaultMigrationProtocol = MigrationProtocolEnum::kMultitenantMigrations;
 
 namespace {
 

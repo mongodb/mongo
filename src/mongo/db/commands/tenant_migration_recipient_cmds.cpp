@@ -70,7 +70,7 @@ public:
                 !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
             const auto& cmd = request();
-            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
+            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
 
             uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
                 migrationProtocol, cmd.getTenantId().toString()));
@@ -189,7 +189,7 @@ public:
                         serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
             const auto& cmd = request();
-            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaulMigrationProtocol);
+            const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
 
             uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
                 migrationProtocol, cmd.getTenantId().toString()));

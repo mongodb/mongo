@@ -55,10 +55,13 @@ enums:
         description: "The state of an tenant migration on recipient side."
         type: string
         values:
+            # The odd order is for the sake of backward compatibility.
             kUninitialized: "uninitialized"
             kStarted: "started"
             kConsistent: "consistent"
             kDone: "done"
+            kLearnedFilenames: "learned filenames"
+            kCopiedFiles: "copied files"
 
 structs:
     tenantMigrationDonorDocument:
@@ -83,7 +86,8 @@ structs:
                     which node in the donor replica set to clone from.
             tenantId:
                 type: string
-                description: "The tenantId for the migration."
+                description: >-
+                    The tenantId for the migration, when protocol is 'multitenant migrations'.
             state:
                 type: TenantMigrationDonorState
                 description: "The state of the tenant migration."
