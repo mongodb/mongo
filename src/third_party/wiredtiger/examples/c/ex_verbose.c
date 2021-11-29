@@ -43,7 +43,7 @@ handle_wiredtiger_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const 
 {
     /* Unused parameters */
     (void)handler;
-    printf("WiredTiger Message - Session: %p, Message: %s\n", session, message);
+    printf("WiredTiger Message - Session: %p, Message: %s\n", (void *)session, message);
 
     return (0);
 }
