@@ -37,12 +37,11 @@ def generate_eviction_configs(rng):
 def generate_table_configs(rng):
     """Generate random configurations for WiredTiger tables."""
 
-    # TODO(SERVER-60747): Add fuzzing for leaf_page_max
-
     internal_page_max = rng.choice([4, 8, 12, 1024, 10 * 1024]) * 1024
+    leaf_page_max = rng.choice([4, 8, 12, 1024, 10 * 1024]) * 1024
     leaf_value_max = rng.choice([1, 32, 128, 256]) * 1024 * 1024
 
-    memory_page_max_lower_bound = 16 * 1024  # leaf_page_max
+    memory_page_max_lower_bound = leaf_page_max
     # Assume WT cache size of 1GB as most MDB tests specify this as the cache size.
     memory_page_max_upper_bound = round(
         (rng.randint(256, 1024) * 1024 * 1024) / 10)  # cache_size / 10
@@ -52,13 +51,14 @@ def generate_table_configs(rng):
     prefix_compression = rng.choice(["true", "false"])
     block_compressor = rng.choice(["none", "snappy", "zlib", "zstd"])
 
-    return "block_compressor={0},internal_page_max={1},leaf_value_max={2},memory_page_max={3},"\
-           "prefix_compression={4},split_pct={5}".format(block_compressor,
-                                                         internal_page_max,
-                                                         leaf_value_max,
-                                                         memory_page_max,
-                                                         prefix_compression,
-                                                         split_pct)
+    return "block_compressor={0},internal_page_max={1},leaf_page_max={2},leaf_value_max={3},"\
+           "memory_page_max={4},prefix_compression={5},split_pct={6}".format(block_compressor,
+                                                                             internal_page_max,
+                                                                             leaf_page_max,
+                                                                             leaf_value_max,
+                                                                             memory_page_max,
+                                                                             prefix_compression,
+                                                                             split_pct)
 
 
 def generate_flow_control_parameters(rng):
