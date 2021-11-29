@@ -130,6 +130,7 @@ env.Library(
         'conn_pool_stats.cpp',
         'conn_pool_sync.cpp',
         'connection_status.cpp',
+        'connection_status.idl',
         'drop_connections_command.cpp',
         'rotate_certificates_command.cpp',
         'generic_servers.cpp',
