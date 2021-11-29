@@ -6,7 +6,6 @@ src/block/block_ckpt.c
 src/block/block_ckpt_scan.c
 src/block/block_compact.c
 src/block/block_ext.c
-src/block/block_map.c
 src/block/block_open.c
 src/block/block_read.c
 src/block/block_session.c
@@ -15,6 +14,7 @@ src/block/block_tiered.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/block_cache/block_cache.c
+src/block_cache/block_map.c
 src/block_cache/block_mgr.c
 src/bloom/bloom.c
 src/btree/bt_compact.c

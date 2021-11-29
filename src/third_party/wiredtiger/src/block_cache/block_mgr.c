@@ -108,7 +108,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, s
          * Read-only objects are optionally mapped into memory instead of being read into cache
          * buffers.
          */
-        WT_RET(__wt_block_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
+        WT_RET(__wt_blkcache_map(session, bm->block, &bm->map, &bm->maplen, &bm->mapped_cookie));
 
         /*
          * If this handle is for a checkpoint, that is, read-only, there isn't a lot you can do with
@@ -174,7 +174,7 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 
     /* Unmap any mapped segment. */
     if (bm->map != NULL)
-        WT_TRET(__wt_block_unmap(session, bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
+        WT_TRET(__wt_blkcache_unmap(session, bm->block, bm->map, bm->maplen, &bm->mapped_cookie));
 
     /* Unload the checkpoint. */
     WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));
@@ -392,6 +392,11 @@ __bm_read(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr
 
     blkcache = &S2C(session)->blkcache;
 
+    /* Check for mapped blocks. */
+    WT_RET(__wt_blkcache_map_read(bm, session, buf, addr, addr_size, &found));
+    if (found)
+        return (0);
+
     /* Check the block cache. */
     skip_cache = true;
     if (blkcache->type != BLKCACHE_UNCONFIGURED) {
@@ -407,27 +412,6 @@ __bm_read(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr
     if (!skip_cache)
         WT_RET(__wt_blkcache_put(session, buf, addr, addr_size, false, false));
     return (0);
-}
-
-/*
- * __bm_preload --
- *     Pre-load a page.
- */
-static int
-__bm_preload(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
-{
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
-
-    /* Ignore underlying preload errors, just use them as an indication preload didn't work. */
-    if (__wt_bm_preload(bm, session, addr, addr_size) == 0)
-        return (0);
-
-    /* Do it the slow way. */
-    WT_RET(__wt_scr_alloc(session, 0, &tmp));
-    ret = __bm_read(bm, session, tmp, addr, addr_size);
-    __wt_scr_free(session, &tmp);
-    return (ret);
 }
 
 /*
@@ -696,7 +680,6 @@ __bm_method_set(WT_BM *bm, bool readonly)
     bm->free = __bm_free;
     bm->is_mapped = __bm_is_mapped;
     bm->map_discard = __bm_map_discard;
-    bm->preload = __bm_preload;
     bm->read = __bm_read;
     bm->salvage_end = __bm_salvage_end;
     bm->salvage_next = __bm_salvage_next;

@@ -797,17 +797,30 @@ __btree_preload(WT_SESSION_IMPL *session)
     WT_ADDR_COPY addr;
     WT_BM *bm;
     WT_BTREE *btree;
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
     WT_REF *ref;
+    uint64_t block_preload;
 
     btree = S2BT(session);
     bm = btree->bm;
+    block_preload = 0;
+
+    WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
     /* Pre-load the second-level internal pages. */
     WT_INTL_FOREACH_BEGIN (session, btree->root.page, ref)
-        if (__wt_ref_addr_copy(session, ref, &addr))
-            WT_RET(bm->preload(bm, session, addr.addr, addr.size));
+        if (__wt_ref_addr_copy(session, ref, &addr)) {
+            WT_ERR(bm->read(bm, session, tmp, addr.addr, addr.size));
+            ++block_preload;
+        }
     WT_INTL_FOREACH_END;
-    return (0);
+
+err:
+    __wt_scr_free(session, &tmp);
+
+    WT_STAT_CONN_INCRV(session, block_preload, block_preload);
+    return (ret);
 }
 
 /*
