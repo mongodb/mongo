@@ -70,11 +70,15 @@ var CheckOrphansAreDeletedHelpers = (function() {
                 .chunks.find({ns: ns, shard: {$ne: shardId}})
                 .forEach(chunkDoc => {
                     // Use $min/$max so this will also work with hashed and compound shard keys.
-                    const orphans = coll.find({})
-                                        .hint(collDoc.key)
-                                        .min(chunkDoc.min)
-                                        .max(chunkDoc.max)
+                    const orphans = new DBCommandCursor(
+                                        coll.getDB(), assert.commandWorked(coll.runCommand("find", {
+                                            collation: {locale: "simple"},
+                                            hint: collDoc.key,
+                                            min: chunkDoc.min,
+                                            max: chunkDoc.max
+                                        })))
                                         .toArray();
+
                     assert.eq(0,
                               orphans.length,
                               'found orphans @ ' + shardId + ' within chunk: ' + tojson(chunkDoc) +
