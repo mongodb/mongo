@@ -64,7 +64,7 @@ function assertFailure(creds, mech, db = test) {
 }
 
 function assertSuccessInternal() {
-    const mech = "SCRAM-SHA-1";
+    const mech = "SCRAM-SHA-256";
     // asCluster exiting cleanly indicates successful auth
     assert.eq(authutil.asCluster(replTest.nodes, keyfile, () => true), true);
     ++expected[mech].authenticate.received;
@@ -75,8 +75,11 @@ function assertSuccessInternal() {
     assertSuccess({user: 'admin', pwd: 'pwd'}, 'SCRAM-SHA-256', admin);
 }
 
+// Because authutil.asCluster utilizes SCRAM-SHA-256 as a default keyfile mechanism, we will attempt
+// to record this authentication with an invalid keyfile, and then verify that the # of
+// successful attempts made using the fallback (SCRAM-SHA-256) has NOT been incremented
 function assertFailureInternal() {
-    const mech = "SCRAM-SHA-1";
+    const mech = "SCRAM-SHA-256";
     // If asCluster fails, it explodes.
     assert.throws(authutil.asCluster, [replTest.nodes, badKeyfile, () => true]);
     ++expected[mech].authenticate.received;

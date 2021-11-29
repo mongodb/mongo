@@ -47,6 +47,7 @@ rst.awaitReplication();
 const admin = rst.getPrimary().getDB('admin');
 admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
 admin.auth('admin', 'pwd');
+
 assert.commandWorked(admin.setLogLevel(3, 'accessControl'));
 
 function getMechStats(db) {
@@ -55,8 +56,13 @@ function getMechStats(db) {
 }
 
 // Capture statistics after a fresh instantiation of a 1-node replica set.
+// initialMechStats contains stats state for the test setup (e.g. shell authentication) actions
+// that will have incremented the internal counters but are not relevant to the functionality under
+// test
 const initialMechStats = getMechStats(admin);
+
 printjson(initialMechStats);
+
 assert(initialMechStats['SCRAM-SHA-256'] !== undefined);
 
 // We've made no client connections for which speculation was possible,
@@ -65,12 +71,6 @@ assert(initialMechStats['SCRAM-SHA-256'] !== undefined);
 Object.keys(initialMechStats).forEach(function(mech) {
     const specStats = initialMechStats[mech].speculativeAuthenticate;
     const clusterStats = initialMechStats[mech].clusterAuthenticate;
-
-    if (mech === 'SCRAM-SHA-256') {
-        // It appears that replication helpers use SCRAM-SHA-1, preventing SCRAM-SHA-256 cluster
-        // stats from being incremented during test setup.
-        assert.eq(clusterStats.received, 0);
-    }
 
     // No speculation has occured
     assert.eq(specStats.received, 0);
@@ -110,10 +110,19 @@ Object.keys(initialMechStats).forEach(function(mech) {
     assert.gt(newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful,
               initialMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
 
+    // Speculative and cluster auth counts should align with the authentication events in the server
+    // log
     const logCounts = countAuthInLog(admin);
+
     assert.eq(logCounts.speculative,
               newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
-    assert.eq(logCounts.cluster, newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
+
+    // Subtract the initial mech stats for cluster authentication that were incremented
+    // during test setup, so we can assert on only the "real" cluster authetnication count
+    assert.eq(logCounts.cluster,
+              newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful -
+                  initialMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
+
     assert.gt(logCounts.speculativeCluster,
               0,
               "Expected to observe at least one speculative cluster authentication attempt");
