@@ -196,13 +196,13 @@ __eventv_unpack_json_str(u_char *dest, size_t dest_len, char *src, size_t src_le
  *     Generate a formatted message.
  */
 static int
-__eventv_gen_msg(WT_SESSION_IMPL *session, char *buffer, size_t *buffer_len, bool is_json,
-  int error, const char *func, int line, WT_VERBOSE_CATEGORY category, WT_VERBOSE_LEVEL level,
-  const char *fmt, va_list ap) WT_GCC_FUNC_ATTRIBUTE((cold))
+__eventv_gen_msg(WT_SESSION_IMPL *session, char *buffer, size_t *remain, bool is_json, int error,
+  const char *func, int line, WT_VERBOSE_CATEGORY category, WT_VERBOSE_LEVEL level, const char *msg)
+  WT_GCC_FUNC_ATTRIBUTE((cold))
 {
     struct timespec ts;
     WT_DECL_RET;
-    size_t len, msg_len, remain, remain_msg, unpacked_msg_len;
+    size_t len, msg_len, remain_msg, unpacked_msg_len;
     u_char *unpacked_json_str;
     char msg_str[2 * 1024], *p, *p_msg, tid[128];
     const char *err, *prefix, *verbosity_level_tag;
@@ -211,62 +211,58 @@ __eventv_gen_msg(WT_SESSION_IMPL *session, char *buffer, size_t *buffer_len, boo
     p_msg = msg_str;
     unpacked_json_str = NULL;
 
-    remain = *buffer_len;
     remain_msg = sizeof(msg_str);
 
     if (is_json)
-        WT_ERROR_APPEND(p, remain, "{");
+        WT_ERROR_APPEND(p, *remain, "{");
 
     /* Timestamp and thread id. */
     __wt_epoch(session, &ts);
     WT_ERR(__wt_thread_str(tid, sizeof(tid)));
     if (is_json) {
-        WT_ERROR_APPEND(p, remain, "\"ts_sec\":%" PRIuMAX ",", (uintmax_t)ts.tv_sec);
+        WT_ERROR_APPEND(p, *remain, "\"ts_sec\":%" PRIuMAX ",", (uintmax_t)ts.tv_sec);
         WT_ERROR_APPEND(
-          p, remain, "\"ts_usec\":%" PRIuMAX ",", (uintmax_t)ts.tv_nsec / WT_THOUSAND);
-        WT_ERROR_APPEND(p, remain, "\"thread\":\"%s\",", tid);
-    } else {
-        WT_ERR(__wt_thread_str(tid, sizeof(tid)));
-        WT_ERROR_APPEND(p, remain, "[%" PRIuMAX ":%" PRIuMAX "][%s]", (uintmax_t)ts.tv_sec,
+          p, *remain, "\"ts_usec\":%" PRIuMAX ",", (uintmax_t)ts.tv_nsec / WT_THOUSAND);
+        WT_ERROR_APPEND(p, *remain, "\"thread\":\"%s\",", tid);
+    } else
+        WT_ERROR_APPEND(p, *remain, "[%" PRIuMAX ":%" PRIuMAX "][%s]", (uintmax_t)ts.tv_sec,
           (uintmax_t)ts.tv_nsec / WT_THOUSAND, tid);
-    }
 
     /* Error prefix. */
     if ((prefix = S2C(session)->error_prefix) != NULL) {
         if (is_json)
-            WT_ERROR_APPEND(p, remain, "\"session_err_prefix\":\"%s\",", prefix);
+            WT_ERROR_APPEND(p, *remain, "\"session_err_prefix\":\"%s\",", prefix);
         else
-            WT_ERROR_APPEND(p, remain, ", %s", prefix);
+            WT_ERROR_APPEND(p, *remain, ", %s", prefix);
     }
 
     /* Session dhandle name. */
     prefix = session->dhandle == NULL ? NULL : session->dhandle->name;
     if (prefix != NULL) {
         if (is_json)
-            WT_ERROR_APPEND(p, remain, "\"session_dhandle_name\":\"%s\",", prefix);
+            WT_ERROR_APPEND(p, *remain, "\"session_dhandle_name\":\"%s\",", prefix);
         else
-            WT_ERROR_APPEND(p, remain, ", %s", prefix);
+            WT_ERROR_APPEND(p, *remain, ", %s", prefix);
     }
 
     /* Session name. */
     if ((prefix = session->name) != NULL) {
         if (is_json)
-            WT_ERROR_APPEND(p, remain, "\"session_name\":\"%s\",", prefix);
+            WT_ERROR_APPEND(p, *remain, "\"session_name\":\"%s\",", prefix);
         else
-            WT_ERROR_APPEND(p, remain, ", %s", prefix);
+            WT_ERROR_APPEND(p, *remain, ", %s", prefix);
     }
 
-    /* Message. */
     if (is_json) {
         /* Category and verbosity level. */
-        WT_ERROR_APPEND(p, remain, "\"category\":\"%s\",", WT_VERBOSE_CATEGORY_STR(category));
-        WT_ERROR_APPEND(p, remain, "\"category_id\":%" PRIu32 ",", category);
+        WT_ERROR_APPEND(p, *remain, "\"category\":\"%s\",", WT_VERBOSE_CATEGORY_STR(category));
+        WT_ERROR_APPEND(p, *remain, "\"category_id\":%" PRIu32 ",", category);
         WT_VERBOSE_LEVEL_STR(level, verbosity_level_tag);
-        WT_ERROR_APPEND(p, remain, "\"verbose_level\":\"%s\",", verbosity_level_tag);
-        WT_ERROR_APPEND(p, remain, "\"verbose_level_id\":%d,", level);
+        WT_ERROR_APPEND(p, *remain, "\"verbose_level\":\"%s\",", verbosity_level_tag);
+        WT_ERROR_APPEND(p, *remain, "\"verbose_level_id\":%d,", level);
 
         /* Format the content of the message into an intermediate buffer. */
-        WT_ERROR_APPEND_AP(p_msg, remain_msg, fmt, ap);
+        WT_ERROR_APPEND(p_msg, remain_msg, "%s", msg);
 
         /* Escape any characters that are special for JSON. */
         msg_len = sizeof(msg_str) - remain_msg;
@@ -274,23 +270,24 @@ __eventv_gen_msg(WT_SESSION_IMPL *session, char *buffer, size_t *buffer_len, boo
         WT_ERR(__wt_malloc(session, unpacked_msg_len + 1, &unpacked_json_str));
         WT_UNUSED(__eventv_unpack_json_str(unpacked_json_str, unpacked_msg_len, msg_str, msg_len));
 
-        WT_ERROR_APPEND(p, remain, "\"msg\":\"");
+        /* Message. */
+        WT_ERROR_APPEND(p, *remain, "\"msg\":\"");
         if (func != NULL)
-            WT_ERROR_APPEND(p, remain, "%s:%d:", func, line);
-        WT_ERROR_APPEND(p, remain, "%s", unpacked_json_str);
-        WT_ERROR_APPEND(p, remain, "\"");
+            WT_ERROR_APPEND(p, *remain, "%s:%d:", func, line);
+        WT_ERROR_APPEND(p, *remain, "%s", unpacked_json_str);
+        WT_ERROR_APPEND(p, *remain, "\"");
     } else {
-        WT_ERROR_APPEND(p, remain, ": ");
+        WT_ERROR_APPEND(p, *remain, ": ");
         if (func != NULL)
-            WT_ERROR_APPEND(p, remain, "%s, %d: ", func, line);
+            WT_ERROR_APPEND(p, *remain, "%s, %d: ", func, line);
 
         /* Category and verbosity level. */
         WT_VERBOSE_LEVEL_STR(level, verbosity_level_tag);
         WT_ERROR_APPEND(
-          p, remain, "[%s][%s]", WT_VERBOSE_CATEGORY_STR(category), verbosity_level_tag);
+          p, *remain, "[%s][%s]", WT_VERBOSE_CATEGORY_STR(category), verbosity_level_tag);
 
-        WT_ERROR_APPEND(p, remain, ": ");
-        WT_ERROR_APPEND_AP(p, remain, fmt, ap);
+        /* Message. */
+        WT_ERROR_APPEND(p, *remain, ": %s", msg);
     }
 
     /* Error message. */
@@ -306,18 +303,18 @@ __eventv_gen_msg(WT_SESSION_IMPL *session, char *buffer, size_t *buffer_len, boo
          */
         err = __wt_strerror(session, error, NULL, 0);
         if (is_json) {
-            WT_ERROR_APPEND(p, remain, ",");
-            WT_ERROR_APPEND(p, remain, "\"error_str\":\"%s\",", err);
-            WT_ERROR_APPEND(p, remain, "\"error_code\":%d", error);
+            WT_ERROR_APPEND(p, *remain, ",");
+            WT_ERROR_APPEND(p, *remain, "\"error_str\":\"%s\",", err);
+            WT_ERROR_APPEND(p, *remain, "\"error_code\":%d", error);
         } else {
             len = strlen(err);
             if (WT_PTRDIFF(p, buffer) < len || strcmp(p - len, err) != 0)
-                WT_ERROR_APPEND(p, remain, ": %s", err);
+                WT_ERROR_APPEND(p, *remain, ": %s", err);
         }
     }
 
     if (is_json)
-        WT_ERROR_APPEND(p, remain, "}");
+        WT_ERROR_APPEND(p, *remain, "}");
 
 err:
     __wt_free(session, unpacked_json_str);
@@ -336,7 +333,8 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, bool is_json, int error, cons
     WT_DECL_RET;
     WT_EVENT_HANDLER *handler;
     WT_SESSION *wt_session;
-    size_t remain;
+    size_t remain, remain_msg;
+    char *p;
 
     /*
      * We're using a stack buffer because we want error messages no matter
@@ -346,8 +344,10 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, bool is_json, int error, cons
      * SECURITY:
      * Buffer placed at the end of the stack in case snprintf overflows.
      */
-    char s[4 * 1024];
+    char msg[4 * 1024], s[4 * 1024];
+    p = msg;
     remain = sizeof(s);
+    remain_msg = sizeof(msg);
 
     /*
      * !!!
@@ -363,8 +363,8 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, bool is_json, int error, cons
         goto err;
 
     /* Format the message. */
-    WT_ERR(
-      __eventv_gen_msg(session, s, &remain, is_json, error, func, line, category, level, fmt, ap));
+    WT_ERROR_APPEND_AP(p, remain_msg, fmt, ap);
+    WT_ERR(__eventv_gen_msg(session, s, &remain, is_json, error, func, line, category, level, msg));
 
     /*
      * If a handler fails, return the error status: if we're in the process of handling an error,
@@ -683,18 +683,41 @@ __wt_ext_strerror(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, int error)
  *     Progress message.
  */
 int
-__wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
+__wt_progress(WT_SESSION_IMPL *session, WT_VERBOSE_CATEGORY category, const char *s, uint64_t v)
 {
     WT_DECL_RET;
     WT_EVENT_HANDLER *handler;
     WT_SESSION *wt_session;
+    size_t remain;
+    char operation[1024];
+    const char *msg;
+    bool is_json;
 
     wt_session = (WT_SESSION *)session;
+
     handler = session->event_handler;
+    is_json = FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_PROGRESS);
+    msg = s == NULL ? session->name : s;
+    remain = sizeof(operation);
+
+    /* Generate message. */
+    WT_RET(__eventv_gen_msg(
+      session, operation, &remain, is_json, 0, NULL, 0, category, WT_VERBOSE_NOTICE, msg));
+
+    /* Write message. */
     if (handler != NULL && handler->handle_progress != NULL)
-        if ((ret = handler->handle_progress(
-               handler, wt_session, s == NULL ? session->name : s, v)) != 0)
+        if ((ret = handler->handle_progress(handler, wt_session, operation, v)) != 0)
             __handler_failure(session, ret, "progress", false);
+
+    /*
+     * The buffer is fixed sized, complain if we overflow. (The test is for no more bytes remaining
+     * in the buffer, so technically we might have filled it exactly.) Be cautious changing this
+     * code, it's a recursive call.
+     */
+    if (ret == 0 && remain == 0)
+        __wt_err(
+          session, ENOMEM, "error or message truncated: internal WiredTiger buffer too small");
+
     return (0);
 }
 

@@ -41,19 +41,19 @@ class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
     # each field's name, associated type and whether we always expect for that field to be
     # present.
     expected_json_schema = {
-        'ts_sec': {'type': int, 'always_expected': True },
-        'ts_usec': {'type': int, 'always_expected': True },
-        'thread': {'type': str, 'always_expected': True },
-        'session_err_prefix': {'type': str, 'always_expected': False },
-        'session_dhandle_name': {'type': str, 'always_expected': False },
-        'session_name': {'type': str, 'always_expected': False },
-        'error_str': {'type': str, 'always_expected': False },
-        'error_code': {'type': int, 'always_expected': False },
         'category': {'type': str, 'always_expected': True },
         'category_id': {'type': int, 'always_expected': True },
+        'error_str': {'type': str, 'always_expected': False },
+        'error_code': {'type': int, 'always_expected': False },
+        'msg': {'type': str, 'always_expected': True },
+        'session_dhandle_name': {'type': str, 'always_expected': False },
+        'session_err_prefix': {'type': str, 'always_expected': False },
+        'session_name': {'type': str, 'always_expected': False },
+        'thread': {'type': str, 'always_expected': True },
+        'ts_sec': {'type': int, 'always_expected': True },
+        'ts_usec': {'type': int, 'always_expected': True },
         'verbose_level': {'type': str, 'always_expected': True },
         'verbose_level_id': {'type': int, 'always_expected': True },
-        'msg': {'type': str, 'always_expected': True },
     }
 
     # Validates the JSON schema of a given event handler message, ensuring the schema is consistent and expected.
