@@ -343,18 +343,14 @@ void TransportLayerASIO::ASIOSession::ensureSync() {
                         "session send timeout",
                         logv2::LogSeverity::Info(),
                         ec);
-        if (auto status = errorCodeToStatus(ec); !status.isOK()) {
-            tasserted(5342000, status.reason());
-        }
+        uassertStatusOK(errorCodeToStatus(ec));
 
         setSocketOption(getSocket(),
                         ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout),
                         "session receive timeout",
                         logv2::LogSeverity::Info(),
                         ec);
-        if (auto status = errorCodeToStatus(ec); !status.isOK()) {
-            tasserted(5342001, status.reason());
-        }
+        uassertStatusOK(errorCodeToStatus(ec));
 
         _socketTimeout = _configuredTimeout;
     }
