@@ -210,6 +210,25 @@ class UUIDPrinter(object):
         return str(uuid.UUID("".join(uuid_hex_bytes)))
 
 
+class OIDPrinter(object):
+    """Pretty-printer for mongo::OID."""
+
+    def __init__(self, val):
+        """Initialize OIDPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'string'
+
+    def to_string(self):
+        """Return OID for printing."""
+        raw_bytes = [int(self.val['_data'][i]) for i in range(12)]
+        oid_hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
+        return "ObjectID('%s')" % "".join(oid_hex_bytes)
+
+
 class RecordIdPrinter(object):
     """Pretty-printer for mongo::RecordId."""
 
@@ -676,6 +695,7 @@ def build_pretty_printer():
     pp.add('flat_hash_set', 'absl::lts_20210324::flat_hash_set', True, AbslFlatHashSetPrinter)
     pp.add('RecordId', 'mongo::RecordId', False, RecordIdPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
+    pp.add('OID', 'mongo::OID', False, OIDPrinter)
     pp.add('OplogEntry', 'mongo::repl::OplogEntry', False, OplogEntryPrinter)
     pp.add('__wt_cursor', '__wt_cursor', False, WtCursorPrinter)
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
