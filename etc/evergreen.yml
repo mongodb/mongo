@@ -8372,6 +8372,7 @@ buildvariants:
     test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
+        --excludeWithAnyTags=incompatible_with_shard_merge
   tasks:
     - name: compile_and_archive_dist_test_then_package_TG
       distros:
@@ -9195,6 +9196,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
       --runAllFeatureFlagTests
+      --excludeWithAnyTags=incompatible_with_shard_merge
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -9524,6 +9526,7 @@ buildvariants:
     # No feature flag tests since they aren't compatible with the older binaries.
     test_flags: >-
       --runAllFeatureFlagsNoTests
+      --excludeWithAnyTags=incompatible_with_shard_merge
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"
@@ -10219,6 +10222,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_with_shard_merge
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
@@ -10898,6 +10902,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --runAllFeatureFlagTests
+        --excludeWithAnyTags=incompatible_with_shard_merge
     separate_debug: off
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -11134,6 +11139,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
+        --excludeWithAnyTags=incompatible_with_shard_merge
         --runAllFeatureFlagTests
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -11307,6 +11313,7 @@ buildvariants:
     # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
+        --excludeWithAnyTags=incompatible_with_shard_merge
         --runAllFeatureFlagTests
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
@@ -11768,6 +11775,7 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagTests
       --excludeWithAnyTags=resource_intensive
+      --excludeWithAnyTags=incompatible_with_shard_merge
 
 - name: enterprise-ubuntu1804-64-libvoidstar
   display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar

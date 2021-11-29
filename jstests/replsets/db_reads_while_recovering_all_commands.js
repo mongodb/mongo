@@ -341,6 +341,7 @@ const allCommands = {
     },
     voteCommitImportCollection: {skip: isNotAUserDataRead},
     voteCommitIndexBuild: {skip: isNotAUserDataRead},
+    voteCommitMigrationProgress: {skip: isNotAUserDataRead},
     waitForFailPoint: {skip: isNotAUserDataRead},
     waitForOngoingChunkSplits: {skip: isNotAUserDataRead},
     whatsmysni: {skip: isNotAUserDataRead},

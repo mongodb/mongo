@@ -1,5 +1,5 @@
 /**
- * Tests that a migration will retry if the oplog fetcher discoveres that its sync source is too
+ * Tests that a migration will retry if the oplog fetcher discovers that its sync source is too
  * stale. We test this with a donor replica set that has two secondaries, 'donorSecondary' and
  * 'delayedSecondary'. We force the recipient to sync from 'donorSecondary'. Then, after the
  * recipient has set its 'startFetchingDonorOpTime', we stop replication on 'delayedSecondary' and
@@ -9,9 +9,12 @@
  * 'delayedSecondary', it should see that it is too stale. As a result, it should retry sync source
  * selection until it finds a sync source that is no longer too stale.
  *
+ * TODO SERVER-61231: shard merge can't handle restart, adapt this test.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

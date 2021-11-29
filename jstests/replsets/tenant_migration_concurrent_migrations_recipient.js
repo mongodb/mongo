@@ -1,9 +1,13 @@
 /**
  * Tests running 50 concurrent migrations against the same recipient.
+ *
+ * Incompatible with shard merge, which can't handle concurrent migrations.
+ *
  * @tags: [
  *   incompatible_with_amazon_linux,
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

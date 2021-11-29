@@ -2,9 +2,12 @@
  * Tests that tenant migrations correctly set the TTL values for keys in the
  * config.external_validation_keys collection.
  *
+ * TODO SERVER-61231: shard merge can't handle concurrent migrations, adapt this test.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

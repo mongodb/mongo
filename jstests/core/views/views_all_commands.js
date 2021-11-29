@@ -637,6 +637,7 @@ let viewsCommandTests = {
     waitForOngoingChunkSplits: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},
+    voteCommitMigrationProgress: {skip: isUnrelated},
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
     waitForFailPoint: {skip: isUnrelated},

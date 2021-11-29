@@ -60,10 +60,12 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/repl/tenant_migration_recipient_coordinator.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_migration_statistics.h"
+#include "mongo/db/repl/vote_commit_migration_progress_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -2324,6 +2326,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                                                 _writerPool.get(),
                                                                 resumeBatchingTs);
 
+                       if (_stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge) {
+                           // TODO (SERVER-61135): Store the future, wait on it, kill backup cursor.
+                           [[maybe_unused]] auto copiedFilesFuture =
+                               TenantMigrationRecipientCoordinator::get(_serviceContext)
+                                   ->step(getMigrationUUID(),
+                                          MigrationProgressStepEnum::kCopiedFiles);
+                       }
+
                        // Start the cloner.
                        auto clonerFuture = _startTenantAllDatabaseCloner(lk);
 
@@ -2475,6 +2485,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 hangBeforeTaskCompletion.pauseWhileSet();
             }
 
+            TenantMigrationRecipientCoordinator::get(_serviceContext)->reset();
             _cleanupOnDataSyncCompletion(status);
             _setMigrationStatsOnCompletion(status);
 

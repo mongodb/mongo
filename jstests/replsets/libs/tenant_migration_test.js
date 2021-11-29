@@ -138,14 +138,22 @@ function TenantMigrationTest({
      *
      * Returns the result of the last 'donorStartMigration' command executed.
      */
-    this.waitForMigrationToComplete = function(migrationOpts, retryOnRetryableErrors = false) {
+    this.waitForMigrationToComplete = function(
+        migrationOpts, retryOnRetryableErrors = false, forgetMigration = false) {
         // Assert that the migration has already been started.
         const tenantId = migrationOpts.tenantId;
         assert(this.getDonorPrimary()
                    .getCollection(TenantMigrationTest.kConfigDonorsNS)
                    .findOne({tenantId}));
-        return this.runDonorStartMigration(
+
+        const donorStartReply = this.runDonorStartMigration(
             migrationOpts, true /* waitForMigrationToComplete */, retryOnRetryableErrors);
+        if (!forgetMigration) {
+            return donorStartReply;
+        }
+
+        this.forgetMigration(migrationOpts.migrationIdString, retryOnRetryableErrors);
+        return donorStartReply;
     };
 
     /**

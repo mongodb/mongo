@@ -244,6 +244,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     migrationThread.join();
 
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     let bulkWriteRes = bulkWriteThread.returnData();
     let writeErrors = bulkWriteRes.res.writeErrors;
@@ -312,6 +313,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     abortFp.off();
 
     TenantMigrationTest.assertAborted(migrationThread.returnData());
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;
@@ -414,6 +416,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     migrationThread.join();
 
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;
 
@@ -474,6 +477,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     abortFp.off();
 
     TenantMigrationTest.assertAborted(migrationThread.returnData());
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;
@@ -528,6 +532,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     migrationThread.join();
 
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     let bulkWriteRes = bulkWriteThread.returnData();
     assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
@@ -577,6 +582,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     migrationThread.join();
 
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     let bulkWriteRes = bulkWriteThread.returnData();
     assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));

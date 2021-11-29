@@ -6,9 +6,12 @@
  * 3) Retrying while the migration is updating, and the donor starts a new transaction on an
  *    existing session.
  *
+ * TODO SERVER-61231: shard merge can't handle restart, adapt this test.
+ *
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

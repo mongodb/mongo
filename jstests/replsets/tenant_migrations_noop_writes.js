@@ -130,7 +130,8 @@ const recipientPrimary = tmt.getRecipientPrimary();
               tojson(donorRes));
 
     fp.off();
-    TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* forgetMigration */));
 
     //
     // Verify reading on the recipient with an afterClusterTime > the block timestamp
@@ -174,7 +175,8 @@ const recipientPrimary = tmt.getRecipientPrimary();
     stopServerReplication(laggedDonorSecondary);
 
     fp.off();
-    TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(migrationOpts));
+    TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* forgetMigration */));
 
     //
     // Advance cluster time on the recipient beyond the block timestamp.

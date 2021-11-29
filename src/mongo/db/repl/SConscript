@@ -1344,10 +1344,14 @@ env.Library(
 env.Library(
     target='tenant_migration_recipient_service',
     source=[
+        'tenant_migration_recipient_coordinator.cpp',
         'tenant_migration_recipient_service.cpp',
+        'vote_commit_migration_progress.cpp',
+        'vote_commit_migration_progress.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',
         'primary_only_service',
         'tenant_migration_access_blocker',

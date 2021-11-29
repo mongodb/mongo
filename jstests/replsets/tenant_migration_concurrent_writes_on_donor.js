@@ -995,6 +995,7 @@ const testCases = {
     usersInfo: {skip: isNotRunOnUserDatabase},
     validate: {skip: isNotWriteCommand},
     voteCommitIndexBuild: {skip: isNotRunOnUserDatabase},
+    voteCommitMigrationProgress: {skip: isNotRunOnUserDatabase},
     waitForFailPoint: {skip: isNotRunOnUserDatabase},
     waitForOngoingChunkSplits: {skip: isNotRunOnUserDatabase},
     whatsmysni: {skip: isNotRunOnUserDatabase},

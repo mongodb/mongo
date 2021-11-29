@@ -710,6 +710,7 @@ let testCases = {
     validateDBMetadata: {skip: "does not accept read or write concern"},
     voteCommitImportCollection: {skip: "internal command"},
     voteCommitIndexBuild: {skip: "internal command"},
+    voteCommitMigrationProgress: {skip: "internal command"},
     waitForFailPoint: {skip: "does not accept read or write concern"},
     waitForOngoingChunkSplits: {skip: "does not accept read or write concern"},
     whatsmysni: {skip: "does not accept read or write concern"},
