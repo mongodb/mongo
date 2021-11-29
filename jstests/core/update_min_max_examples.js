@@ -19,7 +19,7 @@ assert.commandWorked(res);
 assert.eq(coll.findOne({_id: 2}).a, 2);
 
 // $min for Date
-let date = new Date();
+let date = new Date(2021, 19, 11, 12, 29, 31, 757);
 coll.insert({_id: 3, a: date});
 // setMilliseconds() will roll over to change seconds if necessary.
 date.setMilliseconds(date.getMilliseconds() + 2);
