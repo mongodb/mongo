@@ -7,17 +7,31 @@
 branch_name=$(git rev-parse --abbrev-ref HEAD 2>&1 || echo "BRANCH_NOT_FOUND")
 
 # We expect the following syntax (case insensitive): wt-<digits>[-<alphanum>].
-regex="^(wt|WT|wT|Wt)-[0-9]+(-[a-zA-Z0-9-]+)?"
-if [[ ! $branch_name =~ $regex ]]; then
+wt_ticket_regex="(wt|WT|wT|Wt)-[0-9]+(-[a-zA-Z0-9-]+)?"
+if [[ ! $branch_name =~ ^$wt_ticket_regex ]]; then
     exit 0
 fi
 
 # Get what could be the ticket id.
 ticket_id=$(echo "$branch_name" | cut -d "-" -f-2)
 
+search_function="grep -Iinr --exclude-dir=.git $ticket_id ../ 2>&1"
+
+# The wiredtiger file path needs to be relative to $HOME as some scripts strip $HOME from the path.
+wt_src_path=$(readlink -f ../)
+wt_src_path=${wt_src_path#"$(readlink -f "$HOME")/"}
+
+if [[ $wt_src_path =~ .*${wt_ticket_regex}.* ]]; then
+    # If the wiredtiger filepath contains $ticket_id (e.g. ~/src/$ticket_id/wiredtiger) then we will
+    # match generated build scripts containing this path. Filter these results from the search.
+    search_function="$search_function | grep -v $wt_src_path 2>&1"
+fi
+
 # Check for comments related to the ticket.
-if grep -inr --exclude-dir=.git "$ticket_id" ../. > /dev/null 2>&1; then
-    echo "There are comments mentioning $ticket_id in the code, please check them."
+if eval "$search_function >/dev/null" ; then
+    echo "There are comments mentioning $ticket_id in the code, please check if they need to be \
+resolved:"
+    eval "$search_function"
 fi
 
 exit 0

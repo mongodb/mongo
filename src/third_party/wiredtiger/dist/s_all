@@ -63,13 +63,18 @@ errchk()
 	    errfound=1;
 	fi
 
+	# Ignore errors if the script is marked warning-only
+	if [ "$3" = "--warning-only" ]; then
+		errfound=0;
+	fi
+
 	rm -f $2
 }
 
 run()
 {
 	2>&1 $1 > $t
-	errchk "$1" $t
+	errchk "$1" $t "$2"
 }
 
 # Non parallelizable scripts The following scripts either modify files or
@@ -88,7 +93,7 @@ run "python prototypes.py"
 run "sh ./s_typedef -b"
 run "python test_tag.py"
 # The s_mentions script requires bash.
-run "./s_mentions"
+run "./s_mentions" "--warning-only"
 if command -v evergreen > /dev/null; then
 	run "evergreen validate ../test/evergreen.yml"
 fi
