@@ -693,8 +693,8 @@ main(int argc, char *argv[])
          */
         memset(&sa, 0, sizeof(sa));
         sa.sa_handler = handler;
-        testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-        testutil_checksys((pid = fork()) < 0);
+        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+        testutil_assert_errno((pid = fork()) >= 0);
 
         if (pid == 0) { /* child */
             fill_db(nth);
@@ -730,7 +730,7 @@ main(int argc, char *argv[])
         }
         sleep(timeout);
         sa.sa_handler = SIG_DFL;
-        testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
+        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
 
         /*
          * !!! It should be plenty long enough to make sure more than
@@ -738,8 +738,8 @@ main(int argc, char *argv[])
          * here.
          */
         printf("Kill child\n");
-        testutil_checksys(kill(pid, SIGKILL) != 0);
-        testutil_checksys(waitpid(pid, &status, 0) == -1);
+        testutil_assert_errno(kill(pid, SIGKILL) == 0);
+        testutil_assert_errno(waitpid(pid, &status, 0) != -1);
     }
     /*
      * !!! If we wanted to take a copy of the directory before recovery,

@@ -117,9 +117,9 @@ thread_ckpt_run(void *arg)
          * finished and can start its timer.
          */
         if (first_ckpt) {
-            testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
+            testutil_assert_errno((fp = fopen(ckpt_file, "w")) != NULL);
             first_ckpt = false;
-            testutil_checksys(fclose(fp) != 0);
+            testutil_assert_errno(fclose(fp) == 0);
         }
     }
     /* NOTREACHED */
@@ -311,8 +311,8 @@ main(int argc, char *argv[])
      */
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = handler;
-    testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-    testutil_checksys((pid = fork()) < 0);
+    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+    testutil_assert_errno((pid = fork()) >= 0);
 
     if (pid == 0) { /* child */
         run_workload();
@@ -330,11 +330,11 @@ main(int argc, char *argv[])
         testutil_sleep_wait(1, pid);
     sleep(timeout);
     sa.sa_handler = SIG_DFL;
-    testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
+    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
 
     printf("Kill child\n");
-    testutil_checksys(kill(pid, SIGKILL) != 0);
-    testutil_checksys(waitpid(pid, &status, 0) == -1);
+    testutil_assert_errno(kill(pid, SIGKILL) == 0);
+    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
 
     /*
      * !!! If we wanted to take a copy of the directory before recovery,

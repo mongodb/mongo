@@ -159,7 +159,7 @@ run(int r)
 
     testutil_make_work_dir(HOME);
 
-    testutil_checksys((res_fp = fopen(RSLT, "w")) == NULL);
+    testutil_assert_errno((res_fp = fopen(RSLT, "w")) != NULL);
 
     /*
      * Each run builds the LOAD file, and then appends the first page of the LOAD file into the SLVG
@@ -587,16 +587,16 @@ copy(u_int gen, u_int recno)
     uint32_t cksum32, gen32;
     char buf[PSIZE];
 
-    testutil_checksys((ifp = fopen(LOAD, "r")) == NULL);
+    testutil_assert_errno((ifp = fopen(LOAD, "r")) != NULL);
 
     /*
      * If the salvage file doesn't exist, then we're creating it: copy the first sector (the file
      * description). Otherwise, we are appending to an existing file.
      */
     if (file_exists(SLVG))
-        testutil_checksys((ofp = fopen(SLVG, "a")) == NULL);
+        testutil_assert_errno((ofp = fopen(SLVG, "a")) != NULL);
     else {
-        testutil_checksys((ofp = fopen(SLVG, "w")) == NULL);
+        testutil_assert_errno((ofp = fopen(SLVG, "w")) != NULL);
         testutil_assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
         testutil_assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
     }
@@ -670,7 +670,7 @@ process(void)
     testutil_check(conn->close(conn, 0));
 
     /* Dump. */
-    testutil_checksys((fp = fopen(DUMP, "w")) == NULL);
+    testutil_assert_errno((fp = fopen(DUMP, "w")) != NULL);
     testutil_check(wiredtiger_open(HOME, NULL, config, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->open_cursor(session, SLVG_URI, NULL, "dump=print", &cursor));

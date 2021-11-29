@@ -147,7 +147,7 @@ test_hs_workload(TEST_OPTS *opts, const char *hs_file_max)
      * This way, we can safely check the exit code of the child process and confirm that it is what
      * we expected.
      */
-    testutil_checksys((pid = fork()) < 0);
+    testutil_assert_errno((pid = fork()) >= 0);
 
     if (pid == 0) {
         /* Child process from here. */
@@ -167,7 +167,7 @@ test_hs_workload(TEST_OPTS *opts, const char *hs_file_max)
     }
 
     /* Parent process from here. */
-    testutil_checksys(waitpid(pid, &status, 0) == -1);
+    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
     testutil_assert(status == 0);
 }
 

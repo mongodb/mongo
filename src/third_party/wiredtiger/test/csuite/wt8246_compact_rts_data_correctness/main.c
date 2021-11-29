@@ -132,8 +132,8 @@ run_test(bool column_store, const char *uri, bool preserve)
     /* Fork a child to create tables and perform operations on them. */
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sig_handler;
-    testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-    testutil_checksys((pid = fork()) < 0);
+    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+    testutil_assert_errno((pid = fork()) >= 0);
 
     if (pid == 0) { /* child */
 
@@ -160,12 +160,12 @@ run_test(bool column_store, const char *uri, bool preserve)
     /* Sleep for a while. Let the child process do some operations on the tables. */
     sleep(TIMEOUT);
     sa.sa_handler = SIG_DFL;
-    testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
+    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
 
     /* Kill the child process. */
     printf("Kill child\n");
-    testutil_checksys(kill(pid, SIGKILL) != 0);
-    testutil_checksys(waitpid(pid, &status, 0) == -1);
+    testutil_assert_errno(kill(pid, SIGKILL) == 0);
+    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
 
     printf("Compact process interrupted and killed...\n");
 
@@ -263,8 +263,8 @@ workload_compact(const char *home, const char *table_config, const char *uri)
      * Create the compact_started file so that the parent process can start its timer.
      */
     testutil_check(__wt_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home));
-    testutil_checksys((fp = fopen(compact_file, "w")) == NULL);
-    testutil_checksys(fclose(fp) != 0);
+    testutil_assert_errno((fp = fopen(compact_file, "w")) != NULL);
+    testutil_assert_errno(fclose(fp) == 0);
 
     run_compact(session, uri);
 }

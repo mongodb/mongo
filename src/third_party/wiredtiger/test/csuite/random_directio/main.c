@@ -775,9 +775,9 @@ kill_child(pid_t pid)
      * abort, then signal continue so that the child process will process the abort and dump core.
      */
     printf("Send abort to child process ID %d\n", (int)pid);
-    testutil_checksys(kill(pid, SIGABRT) != 0);
-    testutil_checksys(kill(pid, SIGCONT) != 0);
-    testutil_checksys(waitpid(pid, &status, 0) == -1);
+    testutil_assert_errno(kill(pid, SIGABRT) == 0);
+    testutil_assert_errno(kill(pid, SIGCONT) == 0);
+    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
 }
 
 /*
@@ -998,7 +998,7 @@ handler(int sig)
     int status, termsig;
 
     WT_UNUSED(sig);
-    testutil_checksys((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) == -1);
+    testutil_assert_errno((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) != -1);
     if (pid == 0)
         return; /* Nothing to wait for. */
     if (WIFSTOPPED(status))
@@ -1207,8 +1207,8 @@ main(int argc, char *argv[])
              */
             memset(&sa, 0, sizeof(sa));
             sa.sa_handler = handler;
-            testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-            testutil_checksys((pid = fork()) < 0);
+            testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+            testutil_assert_errno((pid = fork()) >= 0);
         }
         if (pid == 0) { /* child, or populate_only */
             fill_db(nth, datasize, method, flags);
@@ -1242,9 +1242,9 @@ main(int argc, char *argv[])
 
         printf("Kill child\n");
         sa.sa_handler = SIG_DFL;
-        testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
-        testutil_checksys(kill(pid, SIGKILL) != 0);
-        testutil_checksys(waitpid(pid, &status, 0) == -1);
+        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+        testutil_assert_errno(kill(pid, SIGKILL) == 0);
+        testutil_assert_errno(waitpid(pid, &status, 0) != -1);
     }
     if (verify_only && !check_db(nth, datasize, 0, false, flags)) {
         printf("FAIL\n");
