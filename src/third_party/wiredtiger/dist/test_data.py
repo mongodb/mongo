@@ -220,7 +220,9 @@ methods = {
                             How long the insertions will occur for.''')]),
     'example_test' : Method(test_config),
     'hs_cleanup' : Method(test_config),
-    'search_near_01' : Method(test_config),
+    'search_near_01' : Method(test_config + [
+                        Config("search_near_threads", 10, r'''
+                            Number of threads that execute search near calls.''')]),
     'search_near_02' : Method(test_config),
     'search_near_03' : Method(test_config),
 }

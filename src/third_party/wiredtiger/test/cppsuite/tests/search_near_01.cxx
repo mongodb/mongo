@@ -37,8 +37,11 @@ using namespace test_harness;
  * In this test, we want to verify that search_near with prefix enabled only traverses the portion
  * of the tree that follows the prefix portion of the search key. The test is composed of a populate
  * phase followed by a read phase. The populate phase will insert a set of random generated keys
- * with a prefix of aaa -> zzz. The read phase will continuously perform prefix search near calls,
- * and validate that the number of entries traversed is within bounds of the search key.
+ * with a prefix of aaa -> zzz. During the read phase, we have one read thread that peforms:
+ *  - Spawning multiple threads to perform one prefix search near.
+ *  - Waiting on all threads to finish.
+ *  - Using WiredTiger statistics to validate that the number of entries traversed is within
+ * bounds of the search key.
  */
 class search_near_01 : public test_harness::test {
     uint64_t keys_per_prefix = 0;
@@ -170,116 +173,133 @@ class search_near_01 : public test_harness::test {
         logger::log_msg(LOG_INFO, "Populate: finished.");
     }
 
+    static void
+    perform_search_near(test_harness::thread_context *tc, std::string collection_name,
+      uint64_t srchkey_len, std::atomic<int64_t> &z_key_searches)
+    {
+        std::string srch_key;
+        int cmpp = 0;
+
+        scoped_cursor cursor = tc->session.open_scoped_cursor(collection_name);
+        cursor->reconfigure(cursor.get(), "prefix_search=true");
+        /* Generate search prefix key of random length between a -> zzz. */
+        srch_key = random_generator::instance().generate_random_string(
+          srchkey_len, characters_type::ALPHABET);
+        logger::log_msg(LOG_INFO,
+          "Search near thread {" + std::to_string(tc->id) +
+            "} performing prefix search near with key: " + srch_key);
+
+        /*
+         * Read at timestamp 10, so that no keys are visible to this transaction. When performing
+         * prefix search near, we expect the search to early exit out of its prefix range and return
+         * WT_NOTFOUND.
+         */
+        tc->transaction.begin("read_timestamp=" + tc->tsm->decimal_to_hex(10));
+        if (tc->transaction.active()) {
+            cursor->set_key(cursor.get(), srch_key.c_str());
+            testutil_assert(cursor->search_near(cursor.get(), &cmpp) == WT_NOTFOUND);
+            tc->transaction.add_op();
+
+            /*
+             * There is an edge case where we may not early exit the prefix search near call because
+             * the specified prefix matches the rest of the entries in the tree.
+             *
+             * In this test, the keys in our database start with prefixes aaa -> zzz. If we search
+             * with a prefix such as "z", we will not early exit the search near call because the
+             * rest of the keys will also start with "z" and match the prefix. The statistic will
+             * stay the same if we do not early exit search near, track this through incrementing
+             * the number of z key searches we have done this iteration.
+             */
+            if (srch_key == "z" || srch_key == "zz" || srch_key == "zzz")
+                ++z_key_searches;
+            tc->transaction.rollback();
+        }
+    }
+
     void
     read_operation(test_harness::thread_context *tc) override final
     {
         /* Make sure that thread statistics cursor is null before we open it. */
         testutil_assert(tc->stat_cursor.get() == nullptr);
-        logger::log_msg(
-          LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
-        std::map<uint64_t, scoped_cursor> cursors;
-        tc->stat_cursor = tc->session.open_scoped_cursor(STATISTICS_URI);
-        std::string srch_key;
-        int64_t entries_stat, prefix_stat, prev_entries_stat, prev_prefix_stat, expected_entries,
-          buffer;
-        int cmpp;
+        /* This test will only work with one read thread. */
+        testutil_assert(tc->thread_count == 1);
+        test_harness::configuration *workload_config, *read_config;
+        std::vector<thread_context *> workers;
+        std::atomic<int64_t> z_key_searches;
+        int64_t entries_stat, expected_entries, prefix_stat, prev_entries_stat, prev_prefix_stat;
+        int num_threads;
 
-        cmpp = 0;
         prev_entries_stat = 0;
         prev_prefix_stat = 0;
+        num_threads = _config->get_int("search_near_threads");
+        tc->stat_cursor = tc->session.open_scoped_cursor(STATISTICS_URI);
+        workload_config = _config->get_subconfig(WORKLOAD_GENERATOR);
+        read_config = workload_config->get_subconfig(READ_CONFIG);
+        z_key_searches = 0;
+
+        logger::log_msg(LOG_INFO,
+          type_string(tc->type) + " thread commencing. Spawning " + std::to_string(num_threads) +
+            " search near threads.");
 
         /*
          * The number of expected entries is calculated to account for the maximum allowed entries
          * per search near function call. The key we search near can be different in length, which
          * will increase the number of entries search by a factor of 26.
          */
-        expected_entries =
-          tc->thread_count * keys_per_prefix * pow(ALPHABET.size(), PREFIX_KEY_LEN - srchkey_len);
-
-        /*
-         * Read at timestamp 10, so that no keys are visible to this transaction. This allows prefix
-         * search near to early exit out of it's prefix range when it's trying to search for a
-         * visible key in the tree.
-         */
-        tc->transaction.begin("read_timestamp=" + tc->tsm->decimal_to_hex(10));
+        expected_entries = keys_per_prefix * pow(ALPHABET.size(), PREFIX_KEY_LEN - srchkey_len);
         while (tc->running()) {
+            runtime_monitor::get_stat(
+              tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &prev_entries_stat);
+            runtime_monitor::get_stat(tc->stat_cursor,
+              WT_STAT_CONN_CURSOR_SEARCH_NEAR_PREFIX_FAST_PATHS, &prev_prefix_stat);
 
-            /* Get a collection and find a cached cursor. */
-            collection &coll = tc->db.get_random_collection();
-            if (cursors.find(coll.id) == cursors.end()) {
-                scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
-                cursor->reconfigure(cursor.get(), "prefix_search=true");
-                cursors.emplace(coll.id, std::move(cursor));
+            thread_manager tm;
+            for (uint64_t i = 0; i < num_threads; ++i) {
+                /* Get a collection and find a cached cursor. */
+                collection &coll = tc->db.get_random_collection();
+                thread_context *search_near_tc =
+                  new thread_context(i, thread_type::READ, read_config,
+                    connection_manager::instance().create_session(), tc->tsm, tc->tracking, tc->db);
+                workers.push_back(search_near_tc);
+                tm.add_thread(perform_search_near, search_near_tc, coll.name, srchkey_len,
+                  std::ref(z_key_searches));
             }
 
-            /* Generate search prefix key of random length between a -> zzz. */
-            srch_key = random_generator::instance().generate_random_string(
-              srchkey_len, characters_type::ALPHABET);
+            tm.join();
+
+            /* Cleanup our workers. */
+            for (auto &it : workers) {
+                delete it;
+                it = nullptr;
+            }
+            workers.clear();
+
+            runtime_monitor::get_stat(
+              tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &entries_stat);
+            runtime_monitor::get_stat(
+              tc->stat_cursor, WT_STAT_CONN_CURSOR_SEARCH_NEAR_PREFIX_FAST_PATHS, &prefix_stat);
             logger::log_msg(LOG_INFO,
-              "Read thread {" + std::to_string(tc->id) +
-                "} performing prefix search near with key: " + srch_key);
-
-            /* Do a second lookup now that we know it exists. */
-            auto &cursor = cursors[coll.id];
-            if (tc->transaction.active()) {
-                runtime_monitor::get_stat(
-                  tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &prev_entries_stat);
-                runtime_monitor::get_stat(tc->stat_cursor,
-                  WT_STAT_CONN_CURSOR_SEARCH_NEAR_PREFIX_FAST_PATHS, &prev_prefix_stat);
-
-                cursor->set_key(cursor.get(), srch_key.c_str());
-                testutil_assert(cursor->search_near(cursor.get(), &cmpp) == WT_NOTFOUND);
-
-                runtime_monitor::get_stat(
-                  tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &entries_stat);
-                runtime_monitor::get_stat(
-                  tc->stat_cursor, WT_STAT_CONN_CURSOR_SEARCH_NEAR_PREFIX_FAST_PATHS, &prefix_stat);
-                logger::log_msg(LOG_INFO,
-                  "Read thread {" + std::to_string(tc->id) +
-                    "} skipped entries: " + std::to_string(entries_stat - prev_entries_stat) +
-                    " prefix fash path:  " + std::to_string(prefix_stat - prev_prefix_stat));
-
-                /*
-                 * Due to the concurrency of multiple threads and how WiredTiger increments the
-                 * entries skipped stat, it is possible that a thread can perform multiple search
-                 * nears before another can finish one. Account for this problem by creating a
-                 * buffer taking the maximum of either calculated 2 * expected entries or the
-                 * minimum expected entries. The minimum expected entries is necessary in the case
-                 * that expected entries is a low number.
-                 *
-                 * Assert that the number of expected entries is the maximum allowed limit that the
-                 * prefix search nears can traverse.
-                 */
-                buffer = std::max(2 * expected_entries, MINIMUM_EXPECTED_ENTRIES);
-                testutil_assert((expected_entries + buffer) >= entries_stat - prev_entries_stat);
-
-                /*
-                 * There is an edge case where we may not early exit the prefix search near call
-                 * because the specified prefix matches the rest of the entries in the tree.
-                 *
-                 * In this test, the keys in our database start with prefixes aaa -> zzz. If we
-                 * search with a prefix such as "z", we will not early exit the search near call
-                 * because the rest of the keys will also start with "z" and match the prefix. The
-                 * statistic will stay the same if we do not early exit search near.
-                 *
-                 * However, we still need to keep the assertion as >= rather than a strictly equals
-                 * as the test is multithreaded and other threads may increment the statistic if
-                 * they are searching with a different prefix that will early exit.
-                 */
-                if (srch_key == "z" || srch_key == "zz" || srch_key == "zzz") {
-                    testutil_assert(prefix_stat >= prev_prefix_stat);
-                } else {
-                    testutil_assert(prefix_stat > prev_prefix_stat);
-                }
-
-                tc->transaction.add_op();
-                tc->sleep();
-            }
-            /* Reset our cursor to avoid pinning content. */
-            testutil_check(cursor->reset(cursor.get()));
+              "Read thread skipped entries: " + std::to_string(entries_stat - prev_entries_stat) +
+                " prefix early exit: " +
+                std::to_string(prefix_stat - prev_prefix_stat - z_key_searches));
+            /*
+             * It is possible that WiredTiger increments the entries skipped stat irrelevant to
+             * prefix search near. This is dependent on how many read threads are present in the
+             * test. Account for this by creating a small buffer using thread count. Assert that the
+             * number of expected entries is the upper limit which the prefix search near can
+             * traverse.
+             *
+             * Assert that the number of expected entries is the maximum allowed limit that the
+             * prefix search nears can traverse and that the prefix fast path has increased by the
+             * number of threads minus the number of search nears with z key.
+             */
+            testutil_assert(num_threads * expected_entries + (2 * num_threads) >=
+              entries_stat - prev_entries_stat);
+            testutil_assert(prefix_stat - prev_prefix_stat == num_threads - z_key_searches);
+            z_key_searches = 0;
+            tc->sleep();
         }
-        /* Make sure the last transaction is rolled back now the work is finished. */
-        if (tc->transaction.active())
-            tc->transaction.rollback();
+        delete read_config;
+        delete workload_config;
     }
 };
