@@ -250,6 +250,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 MigrationSourceManager::~MigrationSourceManager() {
     invariant(!_cloneDriver);
     _stats.totalDonorMoveChunkTimeMillis.addAndFetch(_entireOpTimer.millis());
+
+    _completion.emplaceValue();
 }
 
 void MigrationSourceManager::startClone() {
@@ -337,7 +339,7 @@ void MigrationSourceManager::awaitToCatchUp() {
 
     _state = kCloneCaughtUp;
     _moveTimingHelper.done(4);
-    moveChunkHangAtStep4.pauseWhileSet();
+    moveChunkHangAtStep4.pauseWhileSet(_opCtx);
     scopedGuard.dismiss();
 }
 
@@ -596,7 +598,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     moveChunkHangAtStep6.pauseWhileSet();
 }
 
-void MigrationSourceManager::_cleanupOnError() {
+void MigrationSourceManager::_cleanupOnError() noexcept {
     if (_state == kDone) {
         return;
     }
@@ -612,10 +614,12 @@ void MigrationSourceManager::_cleanupOnError() {
     _cleanup(true);
 }
 
-void MigrationSourceManager::abortDueToConflictingIndexOperation(OperationContext* opCtx) {
+SharedSemiFuture<void> MigrationSourceManager::abort() {
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
     _opCtx->markKilled();
     _stats.countDonorMoveChunkAbortConflictingIndexOperation.addAndFetch(1);
+
+    return _completion.getFuture();
 }
 
 CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {

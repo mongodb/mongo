@@ -102,7 +102,7 @@ public:
 
     StatusWith<BSONObj> commitClone(OperationContext* opCtx, bool acquireCSOnRecipient) override;
 
-    void cancelClone(OperationContext* opCtx) override;
+    void cancelClone(OperationContext* opCtx) noexcept override;
 
     bool isDocumentInMigratingChunk(const BSONObj& doc) override;
 
@@ -214,7 +214,7 @@ private:
      * Idempotent method, which cleans up any previously initialized state. It is safe to be called
      * at any time, but no methods should be called after it.
      */
-    void _cleanup(OperationContext* opCtx);
+    void _cleanup();
 
     /**
      * Synchronously invokes the recipient shard with the specified command and either returns the

@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -52,12 +53,12 @@
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
 
-namespace {
 void onDbVersionMismatch(OperationContext* opCtx,
                          const StringData dbName,
                          const DatabaseVersion& clientDbVersion,
@@ -149,8 +150,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 // A view can potentially be created after spawning a thread to recover nss's shard
                 // version. It is then ok to lock views in order to clear filtering metadata.
                 //
-                // DBLock and CollectionLock are used here to avoid throwing further recursive stale
-                // config errors.
+                // DBLock and CollectionLock must be used in order to avoid shard version checks
                 Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
@@ -174,6 +174,28 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             auto currentMetadata = forceGetCurrentMetadata(opCtx, nss);
 
             if (currentMetadata.isSharded()) {
+                // If migrations are disallowed for the namespace, join any migrations which may be
+                // executing currently
+                if (!currentMetadata.allowMigrations()) {
+                    boost::optional<SharedSemiFuture<void>> waitForMigrationAbort;
+                    {
+                        // DBLock and CollectionLock must be used in order to avoid shard version
+                        // checks
+                        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+
+                        auto const& csr = CollectionShardingRuntime::get(opCtx, nss);
+                        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+                        if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+                            waitForMigrationAbort.emplace(msm->abort());
+                        }
+                    }
+
+                    if (waitForMigrationAbort) {
+                        waitForMigrationAbort->get(opCtx);
+                    }
+                }
+
                 // If the collection metadata after a refresh has 'reshardingFields', then pass it
                 // to the resharding subsystem to process.
                 const auto& reshardingFields = currentMetadata.getReshardingFields();
@@ -212,13 +234,13 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 "namespace"_attr = nss,
                 "shardVersionReceived"_attr = shardVersionReceived);
 
-    // If we are in a transaction, limit the time we can wait behind the critical section. This is
-    // needed in order to prevent distributed deadlocks in situations where a DDL operation needs to
-    // acquire the critical section on several shards. In that case, a shard running a transaction
-    // could be waiting for the critical section to be exited, while on another shard the
-    // transaction has already executed some statement and stashed locks which prevent the critical
-    // section from being acquired in that node. Limiting the wait behind the critical section will
-    // ensure that the transaction will eventually get aborted.
+    // If we are in a transaction, limit the time we can wait behind the critical section. This
+    // is needed in order to prevent distributed deadlocks in situations where a DDL operation
+    // needs to acquire the critical section on several shards. In that case, a shard running a
+    // transaction could be waiting for the critical section to be exited, while on another
+    // shard the transaction has already executed some statement and stashed locks which prevent
+    // the critical section from being acquired in that node. Limiting the wait behind the
+    // critical section will ensure that the transaction will eventually get aborted.
     const auto criticalSectionMaxWait = opCtx->inMultiDocumentTransaction()
         ? Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load())
         : Milliseconds::max();
@@ -244,8 +266,8 @@ void onShardVersionMismatch(OperationContext* opCtx,
             // Check if the current shard version is fresh enough
             if (shardVersionReceived) {
                 const auto currentShardVersion = metadata->getShardVersion();
-                // Don't need to remotely reload if the requested version is smaller than the known
-                // one. This means that the remote side is behind.
+                // Don't need to remotely reload if the requested version is smaller than the
+                // known one. This means that the remote side is behind.
                 if (shardVersionReceived->isOlderOrEqualThan(currentShardVersion)) {
                     return;
                 }
@@ -333,9 +355,9 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
 
     if (!cm.isSharded()) {
-        // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
-        // errors, as well as a possible InvalidViewDefinition error if an invalid view is in the
-        // 'system.views' collection.
+        // DBLock and CollectionLock are used here to avoid throwing further recursive stale
+        // config errors, as well as a possible InvalidViewDefinition error if an invalid view
+        // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)
@@ -344,12 +366,12 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         return ChunkVersion::UNSHARDED();
     }
 
-    // Optimistic check with only IS lock in order to avoid threads piling up on the collection X
-    // lock below
+    // Optimistic check with only IS lock in order to avoid threads piling up on the collection
+    // X lock below
     {
-        // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
-        // errors, as well as a possible InvalidViewDefinition error if an invalid view is in the
-        // 'system.views' collection.
+        // DBLock and CollectionLock are used here to avoid throwing further recursive stale
+        // config errors, as well as a possible InvalidViewDefinition error if an invalid view
+        // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
         auto optMetadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();

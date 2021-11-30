@@ -162,7 +162,7 @@ public:
      * Aborts the migration after observing a concurrent index operation by marking its operation
      * context as killed.
      */
-    void abortDueToConflictingIndexOperation(OperationContext* opCtx);
+    SharedSemiFuture<void> abort();
 
     /**
      * Returns a report on the active migration.
@@ -207,7 +207,7 @@ private:
      * Expected state: Any
      * Resulting state: kDone
      */
-    void _cleanupOnError();
+    void _cleanupOnError() noexcept;
 
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
@@ -236,6 +236,10 @@ private:
 
     // Utility for constructing detailed logs for the steps of the chunk migration
     MoveTimingHelper _moveTimingHelper;
+
+    // Promise which will be signaled when the migration source manager has finished running and is
+    // ready to be destroyed
+    SharedPromise<void> _completion;
 
     // Starts counting from creation time and is used to time various parts from the lifetime of the
     // move chunk sequence

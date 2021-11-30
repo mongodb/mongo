@@ -358,7 +358,6 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
         _sessionCatalogSource->onCommitCloneStarted();
     }
 
-
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
         builder.append(kRecvChunkCommit, _args.getNss().ns());
@@ -368,7 +367,7 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
     }());
 
     if (responseStatus.isOK()) {
-        _cleanup(opCtx);
+        _cleanup();
 
         if (_sessionCatalogSource && _sessionCatalogSource->hasMoreOplog()) {
             return {ErrorCodes::SessionTransferIncomplete,
@@ -383,7 +382,7 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
     return responseStatus.getStatus();
 }
 
-void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
+void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) noexcept {
     invariant(!opCtx->lockState()->isLocked());
 
     if (_sessionCatalogSource) {
@@ -407,7 +406,7 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
         }
         // Intentional fall through
         case kNew:
-            _cleanup(opCtx);
+            _cleanup();
             break;
         default:
             MONGO_UNREACHABLE;
@@ -778,7 +777,7 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
     return Status::OK();
 }
 
-void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
+void MigrationChunkClonerSourceLegacy::_cleanup() {
     stdx::unique_lock<Latch> lk(_mutex);
     _state = kDone;
 

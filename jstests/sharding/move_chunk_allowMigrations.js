@@ -108,12 +108,12 @@ function setUpDatabaseAndEnableSharding(dbName) {
     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
 
     // Confirm that an inProgress moveChunk fails once {allowMigrations: false}
-    const fp = configureFailPoint(st.shard1, "migrateThreadHangAtStep4");
+    const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
     const awaitResult = startParallelShell(
         funWithArgs(function(ns, toShardName) {
             assert.commandFailedWithCode(
                 db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                ErrorCodes.ConflictingOperationInProgress);
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.Interrupted]);
         }, ns, st.shard1.shardName), st.s.port);
     fp.wait();
     assert.commandWorked(st.configRS.getPrimary().adminCommand(

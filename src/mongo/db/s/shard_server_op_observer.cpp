@@ -209,9 +209,9 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
 void abortOngoingMigrationIfNeeded(OperationContext* opCtx, const NamespaceString nss) {
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    if (msm) {
-        msm->abortDueToConflictingIndexOperation(opCtx);
+    if (auto msm = MigrationSourceManager::get(csr, csrLock)) {
+        // Only interrupt the migration, but don't actually join
+        (void)msm->abort();
     }
 }
 

@@ -416,7 +416,6 @@ void stopMigrations(OperationContext* opCtx,
                                              // version to be bumped), it is safe to be retried.
         );
 
-
     try {
         uassertStatusOKWithContext(
             Shard::CommandResponse::getEffectiveStatus(std::move(swSetAllowMigrationsResult)),

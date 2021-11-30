@@ -113,7 +113,7 @@ public:
      *
      * NOTE: Must be called without any locks.
      */
-    virtual void cancelClone(OperationContext* opCtx) = 0;
+    virtual void cancelClone(OperationContext* opCtx) noexcept = 0;
 
     // These methods are only meaningful for the legacy cloner and they are used as a way to keep a
     // running list of changes, which need to be fetched.
