@@ -113,6 +113,9 @@ var ShardingTest = function(params) {
     // concern (5 minutes)
     var kDefaultWTimeoutMs = 5 * 60 * 1000;
 
+    // Ensure we don't mutate the passed-in parameters.
+    params = Object.extend({}, params, true);
+
     // Publicly exposed variables
 
     /**

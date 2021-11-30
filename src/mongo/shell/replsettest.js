@@ -3336,6 +3336,8 @@ var ReplSetTest = function(opts) {
         self.nodeOptions = nodeOptions;
     }
 
+    // If opts is passed in as a string, let it pass unmodified since strings are pass-by-value.
+    // if it is an object, though, pass in a deep copy.
     if (typeof opts === 'string' || opts instanceof String) {
         retryOnNetworkError(function() {
             // The primary may unexpectedly step down during startup if under heavy load
@@ -3344,9 +3346,9 @@ var ReplSetTest = function(opts) {
             _constructFromExistingSeedNode(opts);
         }, ReplSetTest.kDefaultRetries);
     } else if (typeof opts.rstArgs === "object") {
-        _constructFromExistingNodes(opts.rstArgs);
+        _constructFromExistingNodes(Object.extend({}, opts.rstArgs, true));
     } else {
-        _constructStartNewInstances(opts);
+        _constructStartNewInstances(Object.extend({}, opts, true));
     }
 
     /**
