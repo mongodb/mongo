@@ -1225,9 +1225,6 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 }
 
-Counter64 moveCounter;
-ServerStatusMetricField<Counter64> moveCounterDisplay("record.moves", &moveCounter);
-
 RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
                                         RecordId oldLocation,
                                         const Snapshotted<BSONObj>& oldDoc,
