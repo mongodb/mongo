@@ -29,7 +29,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-from perf_stat import PerfStat, PerfStatCount, PerfStatLatency, PerfStatMax, PerfStatMin, PerfStatLatencyWorkgen
+from perf_stat import PerfStat, PerfStatCount, PerfStatLatency, PerfStatMinMax, PerfStatLatencyWorkgen
 from typing import List
 
 
@@ -82,14 +82,10 @@ class PerfStatCollection:
                      pattern=r'Executed \d+ checkpoint operations',
                      input_offset=1,
                      output_label='Checkpoint count'),
-            PerfStatMax(short_label="max_update_throughput",
-                        pattern=r'updates,',
-                        input_offset=8,
-                        output_label='Max update throughput'),
-            PerfStatMin(short_label="min_update_throughput",
-                        pattern=r'updates,',
-                        input_offset=8,
-                        output_label='Min update throughput'),
+            PerfStatMinMax(short_label="min_max_update_throughput",
+                           pattern=r'updates,',
+                           input_offset=8,
+                           output_label='update throughput'),
             PerfStatCount(short_label="warnings",
                           pattern='WARN',
                           output_label='Latency warnings'),
@@ -112,14 +108,10 @@ class PerfStatCollection:
                             output_label='Latency(read, update) Max',
                             ops=['read', 'update'],
                             num_max=1),
-            PerfStatMax(short_label="max_read_throughput",
-                        pattern=r'updates,',
-                        input_offset=4,
-                        output_label='Max read throughput'),
-            PerfStatMin(short_label="min_read_throughput",
-                        pattern=r'updates,',
-                        input_offset=4,
-                        output_label='Min read throughput'),
+            PerfStatMinMax(short_label="min_max_read_throughput",
+                           pattern=r'updates,',
+                           input_offset=4,
+                           output_label='read throughput'),
             PerfStatCount(short_label="warning_operations",
                           stat_file='../stdout_file.txt',
                           pattern='max latency exceeded',

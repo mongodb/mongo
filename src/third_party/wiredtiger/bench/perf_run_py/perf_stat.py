@@ -85,18 +85,19 @@ class PerfStat:
         return [as_dict]
 
 
-class PerfStatMin(PerfStat):
-    def get_value(self):
-        """Return the averaged minimum of all gathered values"""
-        min_3_vals = sorted(self.values)[:3]
-        return self.average(min_3_vals)
+class PerfStatMinMax(PerfStat):
+    def get_value_list(self, brief: bool):
+        avg_min_3_vals = self.average(sorted(self.values)[:3])
+        avg_max_3_vals = self.average(sorted(self.values)[-3:])
 
+        as_list = [
+            {'name': f"Min {self.output_label}", 'value': avg_min_3_vals},
+            {'name': f"Max {self.output_label}", 'value': avg_max_3_vals},
+        ]
 
-class PerfStatMax(PerfStat):
-    def get_value(self):
-        """Return the averaged maximum of all gathered values"""
-        max_3_vals = sorted(self.values)[-3:]
-        return self.average(max_3_vals)
+        if not brief:
+            as_list.append({'name': f"All {self.output_label}s", 'values': sorted(self.values)})
+        return as_list
 
 
 class PerfStatCount(PerfStat):
@@ -139,9 +140,12 @@ class PerfStatLatency(PerfStat):
                 'name': self.output_label + str(i),
                 'value': self.get_value(i)
             }
-            if not brief:
-                as_dict['values'] = self.values
             as_list.append(as_dict)
+        if not brief:
+            as_list.append({
+                'name': "Latencies",
+                'values': sorted(self.values)
+            })
         return as_list
 
 
@@ -158,7 +162,10 @@ class PerfStatLatencyWorkgen(PerfStat):
                 'name': self.output_label + str(i),
                 'value': self.get_value(i)
             }
-            if not brief:
-                as_dict['values'] = self.values
             as_list.append(as_dict)
+        if not brief:
+            as_list.append({
+                'name': "Latencies",
+                'values': sorted(self.values)
+            })
         return as_list
