@@ -354,7 +354,7 @@ TEST(Simple8bTypeUtil, TestObjectId) {
     OID objId("112233445566778899AABBCC");
     int64_t encodedObjId = Simple8bTypeUtil::encodeObjectId(objId);
 
-    int64_t expectedEncodedObjId = 0x11AA22BB33CC44;
+    int64_t expectedEncodedObjId = 0x1122AA33BB44CC;
     ASSERT_EQUALS(encodedObjId, expectedEncodedObjId);
 
     OID actualObjId = Simple8bTypeUtil::decodeObjectId(encodedObjId, objId.getInstanceUnique());

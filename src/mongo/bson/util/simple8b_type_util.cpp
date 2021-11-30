@@ -78,12 +78,12 @@ int64_t Simple8bTypeUtil::encodeObjectId(const OID& oid) {
     ConstDataView cdv = oid.view();
 
     // Copy counter and timestamp bytes so that they match the specs in the header.
-    encodedBytes[0] = cdv.read<uint8_t>(3);   // Timestamp index 3.
-    encodedBytes[1] = cdv.read<uint8_t>(11);  // Counter index 2.
-    encodedBytes[2] = cdv.read<uint8_t>(2);   // Timestamp index 2.
-    encodedBytes[3] = cdv.read<uint8_t>(10);  // Counter index 1.
-    encodedBytes[4] = cdv.read<uint8_t>(1);   // Timestamp index 1.
-    encodedBytes[5] = cdv.read<uint8_t>(9);   // Counter index 0.
+    encodedBytes[0] = cdv.read<uint8_t>(11);  // Counter index 2.
+    encodedBytes[1] = cdv.read<uint8_t>(3);   // Timestamp index 3.
+    encodedBytes[2] = cdv.read<uint8_t>(10);  // Counter index 1.
+    encodedBytes[3] = cdv.read<uint8_t>(2);   // Timestamp index 2.
+    encodedBytes[4] = cdv.read<uint8_t>(9);   // Counter index 0.
+    encodedBytes[5] = cdv.read<uint8_t>(1);   // Timestamp index 1.
     encodedBytes[6] = cdv.read<uint8_t>(0);   // Timestamp index 0.
 
     return LittleEndian<uint64_t>::load(encoded);
@@ -97,12 +97,12 @@ void Simple8bTypeUtil::decodeObjectIdInto(char* buffer,
 
     // Set Timestamp and Counter variables together.
     buffer[0] = encodedBytes[6];   // Timestamp index 0.
-    buffer[1] = encodedBytes[4];   // Timestamp index 1.
-    buffer[2] = encodedBytes[2];   // Timestamp index 2.
-    buffer[3] = encodedBytes[0];   // Timestamp index 3.
-    buffer[9] = encodedBytes[5];   // Counter index 0;
-    buffer[10] = encodedBytes[3];  // Counter index 1.
-    buffer[11] = encodedBytes[1];  // Counter index 2.
+    buffer[1] = encodedBytes[5];   // Timestamp index 1.
+    buffer[2] = encodedBytes[3];   // Timestamp index 2.
+    buffer[3] = encodedBytes[1];   // Timestamp index 3.
+    buffer[9] = encodedBytes[4];   // Counter index 0;
+    buffer[10] = encodedBytes[2];  // Counter index 1.
+    buffer[11] = encodedBytes[0];  // Counter index 2.
 
     // Finally set Process Unique.
     std::copy(processUnique.bytes,

@@ -59,8 +59,8 @@ public:
     // Re-organize the bytes so that most of the entropy is in the least significant bytes.
     // Since TS = Timestamp is in big endian and C = Counter is in big endian,
     // then rearrange the bytes to:
-    // | Byte Usage | TS3 | C2 | TS2 | C1 | TS1 | C0 | TS0 |
-    // | Byte Index |  0  |  1 |  2  | 3  |  4  | 5  |  6  |
+    // | Byte Usage | C2 | TS3 | C1 | TS2 | C0 | TS1 | TS0 |
+    // | Byte Index |  0 |  1  |  2 |  3  |  4 |  5  |  6  |
     // The buffer passed to decodeObjectIdInto() must have at least OID::kOIDSize size.
     static int64_t encodeObjectId(const OID& oid);
     static void decodeObjectIdInto(char* buffer, int64_t val, OID::InstanceUnique processUnique);

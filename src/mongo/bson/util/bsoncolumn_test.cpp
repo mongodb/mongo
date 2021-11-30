@@ -229,6 +229,10 @@ public:
     }
 
     static uint64_t deltaObjectId(BSONElement val, BSONElement prev) {
+        ASSERT_EQ(memcmp(val.OID().getInstanceUnique().bytes,
+                         prev.OID().getInstanceUnique().bytes,
+                         OID::kInstanceUniqueSize),
+                  0);
         return Simple8bTypeUtil::encodeInt64(Simple8bTypeUtil::encodeObjectId(val.OID()) -
                                              Simple8bTypeUtil::encodeObjectId(prev.OID()));
     }
@@ -1363,8 +1367,9 @@ TEST_F(BSONColumnTest, BasicObjectId) {
 
     auto first = createObjectId(OID("112233445566778899AABBCC"));
     // Increment the lower byte for timestamp and counter.
-    auto second = createObjectId(OID("112234445566778899AABBEE"));
-    auto third = createObjectId(OID("112234445566778899AABBFF"));
+    auto second = createObjectId(OID("112233455566778899AABBEE"));
+    // Increment the lower byte for counter.
+    auto third = createObjectId(OID("112233455566778899AABBFF"));
 
     cb.append(first);
     cb.append(second);
