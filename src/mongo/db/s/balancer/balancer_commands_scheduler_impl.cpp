@@ -293,9 +293,14 @@ Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAnd
 void BalancerCommandsSchedulerImpl::_enqueueRequest(WithLock, RequestData&& request) {
     auto requestId = request.getId();
     if (_state == SchedulerState::Recovering || _state == SchedulerState::Running) {
-        _requests.emplace(std::make_pair(requestId, std::move(request)));
-        _unsubmittedRequestIds.push_back(requestId);
-        _stateUpdatedCV.notify_all();
+        // A request with persisted recovery info may be enqueued more than once when received while
+        // the node is transitioning from Stopped to Recovering; if this happens, just resolve as a
+        // no-op.
+        if (_requests.find(requestId) == _requests.end()) {
+            _requests.emplace(std::make_pair(requestId, std::move(request)));
+            _unsubmittedRequestIds.push_back(requestId);
+            _stateUpdatedCV.notify_all();
+        }
     } else {
         request.setOutcome(Status(ErrorCodes::BalancerInterrupted,
                                   "Request rejected - balancer scheduler is stopped"));
