@@ -93,9 +93,10 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                     if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
                             and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
                         raise
-                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
-                       ).format(err)
-                self.logger.error(msg)
+                    msg = (
+                        "Interrupted while waiting for node to reach secondary state, retrying: {}"
+                    ).format(err)
+                    self.logger.error(msg)
 
         # Check if the initial sync node is in SECONDARY state. If it's been 'n' tests, then it
         # should have waited to be in SECONDARY state and the test should be marked as a failure.
@@ -220,7 +221,17 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
             [("replSetTest", 1), ("waitForMemberState", 2),
              ("timeoutMillis",
               fixture_interface.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)])
-        sync_node_conn.admin.command(cmd)
+        while True:
+            try:
+                sync_node_conn.admin.command(cmd)
+                break
+            except pymongo.errors.OperationFailure as err:
+                if (err.code != self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE
+                        and err.code != self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                    raise
+                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
+                       ).format(err)
+                self.logger.error(msg)
 
         # Run data validation and dbhash checking.
         self._js_test_case.run_test()

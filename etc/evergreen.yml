@@ -3650,6 +3650,21 @@ tasks:
       suite: jstestfuzz_replication_initsync
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
+## jstestfuzz file copy based initial sync replica set ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_fcbis_gen
+  tags: ["require_npm", "random_name"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 8
+      num_tasks: 5
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      suite: jstestfuzz_replication_fcbis
+      resmoke_args: --storageEngine=wiredTiger
+      name: jstestfuzz_replication_fcbis
+
 ## jstestfuzz replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_session_gen
@@ -4624,6 +4639,13 @@ tasks:
   tags: ["replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: replica_sets_fcbis_jscore_passthrough_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
 
 - <<: *task_template
   name: replica_sets_initsync_static_jscore_passthrough
@@ -8398,11 +8420,13 @@ buildvariants:
     - name: jsCore_ese
     - name: jsCore_txns_large_txns_format
     - name: .jstestfuzz .common
+    - name: jstestfuzz_replication_fcbis_gen
     - name: mqlrun
     - name: noPassthrough_gen
     - name: noPassthroughWithMongod_gen
     - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
     - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough
+    - name: replica_sets_fcbis_jscore_passthrough_gen
     - name: replica_sets_jscore_passthrough_gen
     - name: replica_sets_ese_gen
     - name: sasl
@@ -9240,6 +9264,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: jstestfuzz_replication_fcbis_gen
   - name: libunwind_tests
   - name: mqlrun
   - name: .multi_shard
@@ -9253,6 +9278,7 @@ buildvariants:
     - rhel80-medium
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
+  - name: replica_sets_fcbis_jscore_passthrough_gen
     distros:
     - rhel80-medium
   - name: replica_sets_api_version_jscore_passthrough_gen

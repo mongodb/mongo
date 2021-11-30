@@ -3452,6 +3452,21 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: jstestfuzz_replication_initsync
 
+## jstestfuzz file copy based initial sync replica set ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_fcbis_gen
+  tags: ["jstestfuzz", "initsync", "require_npm", "random_name"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 8
+      num_tasks: 5
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      suite: jstestfuzz_replication_fcbis
+      resmoke_args: --storageEngine=wiredTiger
+      name: jstestfuzz_replication_fcbis
+
 ## jstestfuzz replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_session_gen
@@ -4538,6 +4553,14 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_initsync_jscore_passthrough_gen
+  tags: ["replica_sets", "san", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: --storageEngine=wiredTiger
+
+- <<: *gen_task_template
+  name: replica_sets_fcbis_jscore_passthrough_gen
   tags: ["replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
