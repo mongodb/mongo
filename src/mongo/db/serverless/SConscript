@@ -16,9 +16,9 @@ env.Library(
 )
 
 env.Library(
-    target='tenant_split_state_machine',
+    target='shard_split_state_machine',
     source=[
-        'tenant_split_state_machine.idl',
+        'shard_split_state_machine.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -29,10 +29,10 @@ env.Library(
 )
 
 env.Library(
-    target='tenant_split_commands',
+    target='shard_split_commands',
     source=[
-        'tenant_split_commands.idl',
-        'tenant_split_commands.cpp',
+        'shard_split_commands.idl',
+        'shard_split_commands.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -40,18 +40,18 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_utils',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'tenant_split_donor_service',
+        'shard_split_donor_service',
     ]
 )
 
 env.Library(
-    target='tenant_split_donor_service',
+    target='shard_split_donor_service',
     source=[
-        'tenant_split_donor_service.cpp',
+        'shard_split_donor_service.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
-        'tenant_split_state_machine'
+        'shard_split_state_machine'
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/db_raii',
@@ -63,7 +63,7 @@ env.Library(
 env.CppUnitTest(
     target='db_serverless_test',
     source=[
-        'tenant_split_donor_service_test.cpp',
+        'shard_split_donor_service_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -122,6 +122,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        'tenant_split_donor_service',
+        'shard_split_donor_service',
     ]
 )

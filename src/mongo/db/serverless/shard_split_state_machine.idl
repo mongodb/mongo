@@ -34,8 +34,8 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 enums:
-    TenantSplitDonorState:
-        description: "The state of a tenant split operation."
+    ShardSplitDonorState:
+        description: "The state of a shard split operation."
         type: string
         values:
             kUninitialized: "uninitialized"
@@ -45,13 +45,13 @@ enums:
             kAborted: "aborted"
 
 structs:
-    TenantSplitDonorDocument:
-        description: "The state document for an in-progress tenant split operation."
+    ShardSplitDonorDocument:
+        description: "The state document for an in-progress shard split operation."
         strict: true
         fields:
             _id:
                 type: uuid
-                description: "Unique identifier for the tenant split operation."
+                description: "Unique identifier for the shard split operation."
                 cpp_name: id
             recipientConnectionString:
                 type: string
@@ -64,6 +64,6 @@ structs:
                 optional: true
                 description: "The identifier for the tenant being migrated."
             state:
-                type: TenantSplitDonorState
-                description: "The current state of the tenant split operation."
+                type: ShardSplitDonorState
+                description: "The current state of the shard split operation."
                 default: kUninitialized

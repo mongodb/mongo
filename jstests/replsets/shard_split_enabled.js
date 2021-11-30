@@ -12,19 +12,16 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const kDummyConnStr = "mongodb://localhost/?replicaSet=foo";
 function makeShardSplitTest() {
     return function(downgradeFCV) {
-        function donorStartSplitCmd() {
+        function commitShardSplitCmd() {
             return {
-                donorStartSplit: 1,
+                commitShardSplit: 1,
                 tenantId: "foo",
                 migrationId: UUID(),
                 recipientConnectionString: kDummyConnStr
             };
         }
-        function donorForgetSplitCmd() {
-            return {donorForgetSplit: 1, migrationId: UUID()};
-        }
-        function donorAbortSplitCmd() {
-            return {donorAbortSplit: 1, migrationId: UUID()};
+        function abortShardSplitCmd() {
+            return {abortShardSplit: 1, migrationId: UUID()};
         }
 
         // start up a replica set
@@ -39,33 +36,25 @@ function makeShardSplitTest() {
         assert.eq(getFCVConstants().latest,
                   adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version);
 
-        let res = adminDB.runCommand(donorStartSplitCmd());
+        let res = adminDB.runCommand(commitShardSplitCmd());
         assert.neq(res.code,
                    6057900,
-                   `donorStartSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
-        res = adminDB.runCommand(donorForgetSplitCmd());
-        assert.neq(res.code,
-                   6057901,
-                   `donorForgetSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
-        res = adminDB.runCommand(donorAbortSplitCmd());
+                   `commitShardSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
+        res = adminDB.runCommand(abortShardSplitCmd());
         assert.neq(res.code,
                    6057902,
-                   `donorAbortSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
+                   `abortShardSplitCmd shouldn't reject when featureFlagShardSplit is enabled`);
 
         assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
 
         assert.commandFailedWithCode(
-            adminDB.runCommand(donorStartSplitCmd()),
+            adminDB.runCommand(commitShardSplitCmd()),
             6057900,
-            `donorStartSplitCmd should reject when featureFlagShardSplit is disabled`);
+            `commitShardSplitCmd should reject when featureFlagShardSplit is disabled`);
         assert.commandFailedWithCode(
-            adminDB.runCommand(donorForgetSplitCmd()),
-            6057901,
-            `donorForgetSplitCmd should reject when featureFlagShardSplit is disabled`);
-        assert.commandFailedWithCode(
-            adminDB.runCommand(donorAbortSplitCmd()),
+            adminDB.runCommand(abortShardSplitCmd()),
             6057902,
-            `donorAbortSplitCmd should reject when featureFlagShardSplit is disabled`);
+            `abortShardSplitCmd should reject when featureFlagShardSplit is disabled`);
 
         // shut down replica set
         rst.stopSet();

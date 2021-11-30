@@ -1,5 +1,5 @@
 /*
- * Test invocation of donorAbortSplit command
+ * Test invocation of commitShardSplit command
  * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
@@ -43,8 +43,8 @@ function runSuccess() {
     jsTestLog("Asserting no state document exist before command");
     assert.isnull(findMigration(primary, migrationId));
 
-    jsTestLog("Running donorAbortSplit command");
-    assert.commandWorked(adminDb.runCommand({donorAbortSplit: 1, migrationId: migrationId}));
+    jsTestLog("Running abortShardSplit command");
+    assert.commandWorked(adminDb.runCommand({abortShardSplit: 1, migrationId: migrationId}));
 
     jsTestLog("Asserting state document exist after command");
     assertDocumentState(primary, migrationId, "aborted");

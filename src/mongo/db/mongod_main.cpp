@@ -152,7 +152,7 @@
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/tenant_split_donor_service.h"
+#include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_killer.h"
@@ -330,7 +330,7 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     } else {
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-        services.push_back(std::make_unique<TenantSplitDonorService>(serviceContext));
+        services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
     }
 
     for (auto& service : services) {

@@ -30,17 +30,17 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/serverless/tenant_split_commands_gen.h"
-#include "mongo/db/serverless/tenant_split_donor_service.h"
+#include "mongo/db/serverless/shard_split_commands_gen.h"
+#include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
 
-class DonorStartSplitCmd : public TypedCommand<DonorStartSplitCmd> {
+class CommitShardSplitCmd : public TypedCommand<CommitShardSplitCmd> {
 public:
-    using Request = DonorStartSplit;
-    using Response = DonorStartSplitResponse;
+    using Request = CommitShardSplit;
+    using Response = CommitShardSplitResponse;
 
     class Invocation : public InvocationBase {
 
@@ -52,7 +52,7 @@ public:
                     "feature \"shard split\" not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            return Response(TenantSplitDonorStateEnum::kCommitted);
+            return Response(ShardSplitDonorStateEnum::kCommitted);
         }
 
     private:
@@ -84,59 +84,11 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} donorStartSplitCmd;
+} commitShardSplitCmd;
 
-class DonorForgetSplitCmd : public TypedCommand<DonorForgetSplitCmd> {
+class AbortShardSplitCmd : public TypedCommand<AbortShardSplitCmd> {
 public:
-    using Request = DonorForgetSplit;
-
-    class Invocation : public InvocationBase {
-
-    public:
-        using InvocationBase::InvocationBase;
-
-        void typedRun(OperationContext* opCtx) {
-            uassert(6057901,
-                    "feature \"shard split\" not supported",
-                    repl::feature_flags::gShardSplit.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-            return;
-        }
-
-    private:
-        void doCheckAuthorization(OperationContext* opCtx) const final {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::runTenantMigration));
-        }
-
-        bool supportsWriteConcern() const override {
-            return true;
-        }
-
-        NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
-        }
-    };
-
-    std::string help() const override {
-        return "Forget a shard split operation.";
-    }
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return BasicCommand::AllowedOnSecondary::kNever;
-    }
-} donorForgetSplitCmd;
-
-class DonorAbortSplitCmd : public TypedCommand<DonorAbortSplitCmd> {
-public:
-    using Request = DonorAbortSplit;
+    using Request = AbortShardSplit;
 
     class Invocation : public InvocationBase {
 
@@ -153,16 +105,16 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-            auto donorService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                                    ->lookupServiceByName(TenantSplitDonorService::kServiceName);
-            auto donorPtr = TenantSplitDonorService::DonorStateMachine::getOrCreate(
-                opCtx, donorService, BSON("_id" << cmd.getMigrationId()));
+            auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                                    ->lookupServiceByName(ShardSplitDonorService::kServiceName);
+            auto instance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+                opCtx, splitService, BSON("_id" << cmd.getMigrationId()));
 
-            invariant(donorPtr != nullptr);
+            invariant(instance);
 
-            donorPtr->tryAbort();
+            instance->tryAbort();
 
-            auto state = donorPtr->completionFuture().get(opCtx);
+            auto state = instance->completionFuture().get(opCtx);
 
             uassert(ErrorCodes::CommandFailed,
                     "Failed to abort shard split",
@@ -171,7 +123,7 @@ public:
 
             uassert(ErrorCodes::TenantMigrationCommitted,
                     "Failed to abort : shard split already committed",
-                    state.state == TenantSplitDonorStateEnum::kAborted);
+                    state.state == ShardSplitDonorStateEnum::kAborted);
         }
 
     private:
@@ -203,7 +155,7 @@ public:
     BasicCommand::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return BasicCommand::AllowedOnSecondary::kNever;
     }
-} donorAbortSplitCmd;
+} abortShardSplitCmd;
 
 }  // namespace
 }  // namespace mongo

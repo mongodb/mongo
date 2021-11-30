@@ -32,32 +32,32 @@ global:
     - "mongo/db/repl/tenant_migration_util.h"
 
 imports:
-  - "mongo/db/serverless/tenant_split_state_machine.idl"
+  - "mongo/db/serverless/shard_split_state_machine.idl"
   - "mongo/idl/basic_types.idl"
 
 structs:
-    DonorStartSplitResponse:
-        description: "Response for the `donorStartSplit` command."
+    CommitShardSplitResponse:
+        description: "Response for the `commitShardSplit` command."
         strict: false
         fields:
             state:
-                type: TenantSplitDonorState
-                description: "The state of the tenant split operation."
+                type: ShardSplitDonorState
+                description: "The state of the shard split operation."
             abortReason:
                 type: object
-                description: "The error that caused the tenant split operation to abort."
+                description: "The error that caused the shard split operation to abort."
                 optional: true
 
 commands:
-  donorStartSplit:
-    description: "Parser for the `donorStartSplit` command."
-    command_name: donorStartSplit
+  commitShardSplit:
+    description: "Parser for the `commitShardSplit` command."
+    command_name: commitShardSplit
     strict: true
     namespace: ignored
     api_version: ""
     fields:
       migrationId:
-        description: "Unique identifier for the tenant split operation."
+        description: "Unique identifier for the shard split operation."
         type: uuid
       recipientConnectionString:
         description: "The connection string for the recipient slice."
@@ -70,24 +70,13 @@ commands:
         validator:
           callback: "tenant_migration_util::validateDatabasePrefix"
 
-  donorForgetSplit:
-    description: "Parser for the `donorForgetSplit` command."
-    command_name: donorForgetSplit
+  abortShardSplit:
+    description: "Parser for the `abortShardSplit` command."
+    command_name: abortShardSplit
     strict: true
     namespace: ignored
     api_version: ""
     fields:
       migrationId:
-        description: "Unique identifier for the tenant split operation."
-        type: uuid
-
-  donorAbortSplit:
-    description: "Parser for the `donorAbortSplit` command."
-    command_name: donorAbortSplit
-    strict: true
-    namespace: ignored
-    api_version: ""
-    fields:
-      migrationId:
-        description: "Unique identifier for the tenant split operation."
+        description: "Unique identifier for the shard split operation."
         type: uuid

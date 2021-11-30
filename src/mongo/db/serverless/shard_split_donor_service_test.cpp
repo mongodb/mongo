@@ -41,8 +41,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/serverless/tenant_split_donor_service.h"
-#include "mongo/db/serverless/tenant_split_state_machine_gen.h"
+#include "mongo/db/serverless/shard_split_donor_service.h"
+#include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -59,21 +59,21 @@ constexpr std::int32_t stopFailPointErrorCode = 9822402;
 }
 
 std::ostringstream& operator<<(std::ostringstream& builder,
-                               const mongo::TenantSplitDonorStateEnum state) {
+                               const mongo::ShardSplitDonorStateEnum state) {
     switch (state) {
-        case mongo::TenantSplitDonorStateEnum::kUninitialized:
+        case mongo::ShardSplitDonorStateEnum::kUninitialized:
             builder << "kUninitialized";
             break;
-        case mongo::TenantSplitDonorStateEnum::kAborted:
+        case mongo::ShardSplitDonorStateEnum::kAborted:
             builder << "kAborted";
             break;
-        case mongo::TenantSplitDonorStateEnum::kBlocking:
+        case mongo::ShardSplitDonorStateEnum::kBlocking:
             builder << "kBlocking";
             break;
-        case mongo::TenantSplitDonorStateEnum::kCommitted:
+        case mongo::ShardSplitDonorStateEnum::kCommitted:
             builder << "kCommitted";
             break;
-        case mongo::TenantSplitDonorStateEnum::kDataSync:
+        case mongo::ShardSplitDonorStateEnum::kDataSync:
             builder << "kDataSync";
             break;
     }
@@ -81,7 +81,7 @@ std::ostringstream& operator<<(std::ostringstream& builder,
     return builder;
 }
 
-class TenantSplitDonorServiceTest : public ServiceContextMongoDTest {
+class ShardSplitDonorServiceTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -131,14 +131,14 @@ public:
                 std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
 
             _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
-            std::unique_ptr<TenantSplitDonorService> service =
-                std::make_unique<TenantSplitDonorService>(getServiceContext());
+            std::unique_ptr<ShardSplitDonorService> service =
+                std::make_unique<ShardSplitDonorService>(getServiceContext());
             _registry->registerService(std::move(service));
             _registry->onStartup(opCtx.get());
         }
         stepUp();
 
-        _service = _registry->lookupServiceByName(TenantSplitDonorService::kServiceName);
+        _service = _registry->lookupServiceByName(ShardSplitDonorService::kServiceName);
         ASSERT(_service);
 
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
@@ -188,14 +188,14 @@ private:
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
 };
 
-TEST_F(TenantSplitDonorServiceTest, BasicTenantSplitDonorServiceInstanceCreation) {
+TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
     const UUID migrationUUID = UUID::gen();
 
-    TenantSplitDonorDocument initialStateDocument(migrationUUID);
+    ShardSplitDonorDocument initialStateDocument(migrationUUID);
 
     // Create and start the instance.
     auto opCtx = makeOperationContext();
-    auto serviceInstance = TenantSplitDonorService::DonorStateMachine::getOrCreate(
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(serviceInstance.get());
     ASSERT_EQ(migrationUUID, serviceInstance->getId());
@@ -203,20 +203,20 @@ TEST_F(TenantSplitDonorServiceTest, BasicTenantSplitDonorServiceInstanceCreation
     // Wait for task completion.
     auto result = serviceInstance->completionFuture().get(opCtx.get());
     ASSERT(!result.abortReason);
-    ASSERT_EQ(result.state, mongo::TenantSplitDonorStateEnum::kDataSync);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kDataSync);
 }
 
-TEST_F(TenantSplitDonorServiceTest, Abort) {
+TEST_F(ShardSplitDonorServiceTest, Abort) {
     const UUID migrationUUID = UUID::gen();
-    TenantSplitDonorDocument initialStateDocument(migrationUUID);
+    ShardSplitDonorDocument initialStateDocument(migrationUUID);
     auto opCtx = makeOperationContext();
-    std::shared_ptr<TenantSplitDonorService::DonorStateMachine> serviceInstance;
+    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
     {
         FailPointEnableBlock fp("pauseShardSplitAfterInitialSync");
         auto initialTimesEntered = fp.initialTimesEntered();
 
-        serviceInstance = TenantSplitDonorService::DonorStateMachine::getOrCreate(
+        serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
             opCtx.get(), _service, initialStateDocument.toBSON());
         ASSERT(serviceInstance.get());
 
@@ -229,20 +229,20 @@ TEST_F(TenantSplitDonorServiceTest, Abort) {
 
     ASSERT(!!result.abortReason);
     ASSERT_EQ(result.abortReason->code(), ErrorCodes::TenantMigrationAborted);
-    ASSERT_EQ(result.state, mongo::TenantSplitDonorStateEnum::kAborted);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
 }
 
-TEST_F(TenantSplitDonorServiceTest, StepDownTest) {
+TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     const UUID migrationUUID = UUID::gen();
-    TenantSplitDonorDocument initialStateDocument(migrationUUID);
+    ShardSplitDonorDocument initialStateDocument(migrationUUID);
     auto opCtx = makeOperationContext();
-    std::shared_ptr<TenantSplitDonorService::DonorStateMachine> serviceInstance;
+    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
     {
         FailPointEnableBlock fp("pauseShardSplitAfterInitialSync");
         auto initialTimesEntered = fp.initialTimesEntered();
 
-        serviceInstance = TenantSplitDonorService::DonorStateMachine::getOrCreate(
+        serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
             opCtx.get(), _service, initialStateDocument.toBSON());
         ASSERT(serviceInstance.get());
 

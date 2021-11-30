@@ -30,20 +30,20 @@
 #pragma once
 
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/serverless/tenant_split_state_machine_gen.h"
+#include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/executor/cancelable_executor.h"
 
 namespace mongo {
 
 using ScopedTaskExecutorPtr = std::shared_ptr<executor::ScopedTaskExecutor>;
 
-class TenantSplitDonorService final : public repl::PrimaryOnlyService {
+class ShardSplitDonorService final : public repl::PrimaryOnlyService {
 public:
-    static constexpr StringData kServiceName = "TenantSplitDonorService"_sd;
+    static constexpr StringData kServiceName = "ShardSplitDonorService"_sd;
 
-    explicit TenantSplitDonorService(ServiceContext* const serviceContext)
+    explicit ShardSplitDonorService(ServiceContext* const serviceContext)
         : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
-    ~TenantSplitDonorService() = default;
+    ~ShardSplitDonorService() = default;
 
     class DonorStateMachine;
 
@@ -70,17 +70,17 @@ private:
     ServiceContext* const _serviceContext;
 };
 
-class TenantSplitDonorService::DonorStateMachine final
+class ShardSplitDonorService::DonorStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
 public:
     struct DurableState {
-        TenantSplitDonorStateEnum state;
+        ShardSplitDonorStateEnum state;
         boost::optional<Status> abortReason;
     };
 
     DonorStateMachine(ServiceContext* serviceContext,
-                      TenantSplitDonorService* serviceInstance,
-                      const TenantSplitDonorDocument& initialState);
+                      ShardSplitDonorService* serviceInstance,
+                      const ShardSplitDonorDocument& initialState);
 
     ~DonorStateMachine() = default;
 
@@ -134,18 +134,18 @@ private:
 
 private:
     const NamespaceString _stateDocumentsNS = NamespaceString::kTenantSplitDonorsNamespace;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantSplitDonorService::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardSplitDonorService::_mutex");
 
     const UUID _migrationId;
     ServiceContext* const _serviceContext;
-    TenantSplitDonorService* const _tenantSplitService;
-    TenantSplitDonorDocument _stateDoc;
+    ShardSplitDonorService* const _shardSplitService;
+    ShardSplitDonorDocument _stateDoc;
 
     bool _abortRequested = false;
     boost::optional<CancellationSource> _abortSource;
     boost::optional<Status> _abortReason;
 
-    // A promise fulfilled when the tenant split operation has fully completed
+    // A promise fulfilled when the shard split operation has fully completed
     SharedPromise<DurableState> _completionPromise;
 };
 
