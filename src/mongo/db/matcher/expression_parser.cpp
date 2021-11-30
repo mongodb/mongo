@@ -696,58 +696,13 @@ StatusWith<std::vector<uint32_t>> parseBitPositionsArray(const BSONObj& theArray
 
     // Fill temporary bit position array with integers read from the BSON array.
     for (auto e : theArray) {
-        if (!e.isNumber()) {
+        auto status = e.parseIntegerElementToNonNegativeInt();
+        if (!status.isOK()) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "bit positions must be an integer but got: " << e);
+                          str::stream()
+                              << "Failed to parse bit position. " << status.getStatus().reason());
         }
-
-        if (e.type() == BSONType::NumberDouble) {
-            auto eDouble = e.numberDouble();
-
-            // NaN doubles are rejected.
-            if (std::isnan(eDouble)) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "bit positions cannot take a NaN: " << e);
-            }
-
-            // This makes sure e does not overflow a 32-bit integer container.
-            if (eDouble > std::numeric_limits<int>::max() ||
-                eDouble < std::numeric_limits<int>::min()) {
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream()
-                        << "bit positions cannot be represented as a 32-bit signed integer: " << e);
-            }
-
-            // This checks if e is integral.
-            if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "bit positions must be an integer but got: " << e);
-            }
-        }
-
-        if (e.type() == BSONType::NumberLong) {
-            auto eLong = e.numberLong();
-
-            // This makes sure e does not overflow a 32-bit integer container.
-            if (eLong > std::numeric_limits<int>::max() ||
-                eLong < std::numeric_limits<int>::min()) {
-                return Status(
-                    ErrorCodes::BadValue,
-                    str::stream()
-                        << "bit positions cannot be represented as a 32-bit signed integer: " << e);
-            }
-        }
-
-        auto eValue = e.numberInt();
-
-        // No negatives.
-        if (eValue < 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "bit positions must be >= 0 but got: " << e);
-        }
-
-        bitPositions.push_back(eValue);
+        bitPositions.push_back(status.getValue());
     }
 
     return bitPositions;
@@ -1724,29 +1679,13 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::SIZE: {
-            int size = 0;
-            if (e.type() == BSONType::NumberInt) {
-                size = e.numberInt();
-            } else if (e.type() == BSONType::NumberLong) {
-                if (e.numberInt() == e.numberLong()) {
-                    size = e.numberInt();
-                } else {
-                    return {Status(ErrorCodes::BadValue,
-                                   "$size must be representable as a 32-bit integer")};
-                }
-            } else if (e.type() == BSONType::NumberDouble) {
-                if (e.numberInt() == e.numberDouble()) {
-                    size = e.numberInt();
-                } else {
-                    return {Status(ErrorCodes::BadValue, "$size must be a whole number")};
-                }
-            } else {
-                return {Status(ErrorCodes::BadValue, "$size needs a number")};
+            auto status = e.parseIntegerElementToNonNegativeInt();
+            if (!status.isOK()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "Failed to parse $size. " << status.getStatus().reason());
             }
-
-            if (size < 0) {
-                return {Status(ErrorCodes::BadValue, "$size may not be negative")};
-            }
+            int size = status.getValue();
             return {std::make_unique<SizeMatchExpression>(
                 name,
                 size,

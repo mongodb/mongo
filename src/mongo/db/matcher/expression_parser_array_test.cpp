@@ -109,6 +109,13 @@ TEST(MatchExpressionParserArrayTest, SizeWithNegativeIntegralDouble) {
     ASSERT_FALSE(result.isOK());
 }
 
+TEST(MatchExpressionParserArrayTest, SizeWithTooLargeDouble) {
+    BSONObj query = BSON("x" << BSON("$size" << 1e12));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_FALSE(result.isOK());
+}
+
 TEST(MatchExpressionParserArrayTest, SizeWithDouble) {
     BSONObj query = BSON("x" << BSON("$size" << 2.5));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

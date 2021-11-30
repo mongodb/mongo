@@ -515,7 +515,8 @@ StatusWith<long long> BSONElement::parseIntegerElementToNonNegativeLong() const 
 
     if (number.getValue() < 0) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Expected a positive number in: " << toString(true, true));
+                      str::stream()
+                          << "Expected a non-negative number in: " << toString(true, true));
     }
 
     return number;
@@ -583,6 +584,21 @@ StatusWith<int> BSONElement::parseIntegerElementToInt() const {
                 str::stream() << "Cannot represent " << toString(true, true) << " in an int"};
     }
     return static_cast<int>(valueLong);
+}
+
+StatusWith<int> BSONElement::parseIntegerElementToNonNegativeInt() const {
+    auto number = parseIntegerElementToInt();
+    if (!number.isOK()) {
+        return number;
+    }
+
+    if (number.getValue() < 0) {
+        return Status(ErrorCodes::FailedToParse,
+                      str::stream()
+                          << "Expected a non-negative number in: " << toString(true, true));
+    }
+
+    return number;
 }
 
 BSONObj BSONElement::embeddedObjectUserCheck() const {

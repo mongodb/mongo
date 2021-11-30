@@ -412,7 +412,7 @@ public:
     long long exactNumberLong() const;
 
     /**
-     * Parses a BSONElement of any numeric type into a positive long long, failing if the value
+     * Parses a BSONElement of any numeric type into a non-negative long long, failing if the value
      * is any of the following:
      *
      * - NaN.
@@ -431,6 +431,17 @@ public:
      * - Too large in the positive or negative direction to fit within a 64-bit signed integer.
      */
     StatusWith<long long> parseIntegerElementToLong() const;
+
+    /**
+     * Parses a BSONElement of any numeric type into a non-negative int, failing if the value
+     * is any of the following:
+     *
+     * - NaN
+     * - Negative
+     * - a non-integral number
+     * - too large in the positive or negative direction to fit in an int
+     */
+    StatusWith<int> parseIntegerElementToNonNegativeInt() const;
 
     /**
      * Parses a BSONElement of any numeric type into an integer, failing if the value is:

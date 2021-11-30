@@ -519,6 +519,64 @@ TEST(MatchExpressionParserTest, SampleRateFailureCases) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(MatchExpressionParserTest, BitwiseOperators) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    std::vector<std::string> bitwiseOperators{
+        "$bitsAllClear", "$bitsAllSet", "$bitsAnyClear", "$bitsAnySet"};
+    for (auto& bitwiseOperator : bitwiseOperators) {
+        // Test accepting valid type coercion
+        auto result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(1))), expCtx);
+        ASSERT_TRUE(result.isOK());
+        result = MatchExpressionParser::parse(BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(1LL))),
+                                              expCtx);
+        ASSERT_TRUE(result.isOK());
+        result = MatchExpressionParser::parse(BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(1.0))),
+                                              expCtx);
+        ASSERT_TRUE(result.isOK());
+
+        // Test rejecting overflow values.
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(std::numeric_limits<long long>::min()))),
+            expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(std::numeric_limits<long long>::max()))),
+            expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(1e30))), expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(-1e30))), expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+
+        // Test rejecting non-integral values.
+        result = MatchExpressionParser::parse(BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(1.5))),
+                                              expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+
+        // Test rejecting negative values.
+        result = MatchExpressionParser::parse(BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(-1))),
+                                              expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(-1LL))), expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(-1.0))), expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+
+        // Test rejecting non-numeric values.
+        result = MatchExpressionParser::parse(
+            BSON("x" << BSON(bitwiseOperator << BSON_ARRAY("string"))), expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+        result = MatchExpressionParser::parse(BSON("x" << BSON(bitwiseOperator << BSON_ARRAY(NAN))),
+                                              expCtx);
+        ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    }
+}
+
 TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeParsesCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = BSON("a" << BSON("$_internalSchemaBinDataSubType" << BinDataType::bdtCustom));
