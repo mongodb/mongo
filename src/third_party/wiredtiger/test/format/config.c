@@ -1280,7 +1280,7 @@ config_file(const char *name)
 
         /* Skip any leading whitespace. */
         for (p = buf; *p != '\0'; ++p)
-            if (!isblank(*p))
+            if (!isblank((unsigned char)*p))
                 break;
 
         /* Skip any Evergreen timestamp. */
@@ -1293,7 +1293,7 @@ config_file(const char *name)
 
         /* Skip any trailing whitespace. */
         for (; *p != '\0'; ++p)
-            if (!isblank(*p))
+            if (!isblank((unsigned char)*p))
                 break;
 
         /* Skip any comments or empty lines. */
