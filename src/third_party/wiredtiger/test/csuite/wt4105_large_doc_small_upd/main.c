@@ -89,7 +89,8 @@ main(int argc, char *argv[])
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),
-      "key_format=%s,value_format=u,leaf_item_max=64M,leaf_page_max=32k,memory_page_max=1M",
+      "key_format=%s,value_format=u,leaf_key_max=64M,leaf_value_max=64M,leaf_page_max=32k,memory_"
+      "page_max=1M",
       opts->table_type == TABLE_ROW ? "Q" : "r"));
     testutil_check(session->create(session, uri, tableconf));
 

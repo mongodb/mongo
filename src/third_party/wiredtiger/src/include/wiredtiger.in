@@ -1177,8 +1177,6 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;repair, whether to reconstruct the metadata from
 	 * the raw file content., a boolean flag; default \c false.}
 	 * @config{ ),,}
-	 * @config{internal_item_max, This option is no longer supported\, retained for backward
-	 * compatibility., an integer greater than or equal to 0; default \c 0.}
 	 * @config{internal_key_max, This option is no longer supported\, retained for backward
 	 * compatibility., an integer greater than or equal to 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\, discarding unnecessary
@@ -1196,8 +1194,6 @@ struct __wt_session {
 	 * number are stored in column-store files., a format string; default \c u.}
 	 * @config{key_gap, This option is no longer supported\, retained for backward
 	 * compatibility., an integer greater than or equal to 0; default \c 10.}
-	 * @config{leaf_item_max, This option is no longer supported\, retained for backward
-	 * compatibility., an integer greater than or equal to 0; default \c 0.}
 	 * @config{leaf_key_max, the largest key stored in a leaf node\, in bytes.  If set\, keys
 	 * larger than the specified size are stored as overflow items (which may require additional
 	 * I/O to access). The default value is one-tenth the size of a newly split leaf page., an

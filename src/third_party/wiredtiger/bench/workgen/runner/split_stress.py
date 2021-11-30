@@ -42,7 +42,7 @@ conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
 # Table configuration.
-table_config = "leaf_page_max=8k,internal_page_max=8k,leaf_item_max=1433,internal_item_max=3100,type=file,memory_page_max=1MB,split_deepen_min_child=100"
+table_config = "leaf_page_max=8k,internal_page_max=8k,leaf_key_max=1433,leaf_value_max=1433,type=file,memory_page_max=1MB,split_deepen_min_child=100"
 tables = []
 table_count = 3
 for i in range(0, table_count):

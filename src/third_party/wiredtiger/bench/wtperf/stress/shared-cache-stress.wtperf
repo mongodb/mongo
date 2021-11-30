@@ -1,6 +1,6 @@
 # Stress out the shared cache.
 conn_config="shared_cache=(name=wt-cache,size=536870912,reserve=10MB,chunk=20MB,)"
-table_config="allocation_size=4KB,key_gap=10,split_pct=75,internal_page_max=4KB,internal_key_truncate=false,prefix_compression=false,leaf_item_max=1433,type=file,internal_item_max=1433,exclusive=true,leaf_page_max=4KB,block_compressor=,"
+table_config="allocation_size=4KB,key_gap=10,split_pct=75,internal_page_max=4KB,internal_key_truncate=false,prefix_compression=false,type=file,leaf_key_max=1433,leaf_value_max=1433,exclusive=true,leaf_page_max=4KB,block_compressor=,"
 checkpoint_interval=100
 checkpoint_threads=1
 icount=50000

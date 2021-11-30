@@ -966,19 +966,10 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
         return (0);
     }
 
-    /*
-     * In historic versions of WiredTiger, the maximum leaf page key/value sizes were set by the
-     * leaf_item_max configuration string. Look for that string if we don't find the newer ones.
-     */
     WT_RET(__wt_config_gets(session, cfg, "leaf_key_max", &cval));
     btree->maxleafkey = (uint32_t)cval.val;
     WT_RET(__wt_config_gets(session, cfg, "leaf_value_max", &cval));
     btree->maxleafvalue = (uint32_t)cval.val;
-    if (btree->maxleafkey == 0 && btree->maxleafvalue == 0) {
-        WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
-        btree->maxleafkey = (uint32_t)cval.val;
-        btree->maxleafvalue = (uint32_t)cval.val;
-    }
 
     /*
      * Default max for leaf keys: split-page / 10. Default max for leaf values: split-page / 2.

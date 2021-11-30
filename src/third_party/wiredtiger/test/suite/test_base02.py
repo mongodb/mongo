@@ -64,9 +64,9 @@ class test_base02(wttest.WiredTigerTestCase):
         conf_confsize = [
             None,
             'allocation_size=1024',
-            'internal_page_max=64k,internal_item_max=1k',
-            'leaf_page_max=128k,leaf_item_max=512',
-            'leaf_page_max=256k,leaf_item_max=256,internal_page_max=8k,internal_item_max=128',
+            'internal_page_max=64k',
+            'leaf_page_max=128k,leaf_key_max=512,leaf_value_max=512',
+            'leaf_page_max=256k,leaf_key_max=256,leaf_value_max=256,internal_page_max=8k',
             ]
         conf_col = [
             'columns=(first,second)',

@@ -290,14 +290,10 @@ class wtscenario:
         Return the associated configuration string
         """
         res = ''
-        if hasattr(self, 'ioverflow'):
-            res += ',internal_item_max=' + str(self.ioverflow)
         if hasattr(self, 'imax'):
             res += ',internal_page_max=' + str(self.imax)
             if self.imax < 4*1024:
                 res += ',allocation_size=512'
-        if hasattr(self, 'loverflow'):
-            res += ',leaf_item_max=' + str(self.loverflow)
         if hasattr(self, 'lmax'):
             res += ',leaf_page_max=' + str(self.lmax)
             if self.lmax < 4*1024:
