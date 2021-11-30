@@ -315,7 +315,7 @@ TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     BSONObjBuilder builder;
-    rs->appendCustomStats(opCtx.get(), &builder, 1.0);
+    rs->appendAllCustomStats(opCtx.get(), &builder, 1.0);
     BSONObj customStats = builder.obj();
 
     BSONElement wiredTigerElement = customStats.getField(kWiredTigerEngineName);
@@ -331,6 +331,30 @@ TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
 
     BSONElement creationStringElement = wiredTiger.getField("creationString");
     ASSERT_EQUALS(creationStringElement.type(), String);
+}
+
+TEST(WiredTigerRecordStoreTest, AppendCustomNumericStats) {
+    std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
+    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore("a.c"));
+
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    BSONObjBuilder builder;
+    rs->appendNumericCustomStats(opCtx.get(), &builder, 1.0);
+    BSONObj customStats = builder.obj();
+
+    BSONElement wiredTigerElement = customStats.getField(kWiredTigerEngineName);
+    ASSERT_TRUE(wiredTigerElement.isABSONObj());
+    BSONObj wiredTiger = wiredTigerElement.Obj();
+
+    ASSERT_FALSE(wiredTiger.hasField("metadata"));
+    ASSERT_FALSE(wiredTiger.hasField("creationString"));
+
+    BSONElement cacheElement = wiredTiger.getField("cache");
+    ASSERT_TRUE(cacheElement.isABSONObj());
+    BSONObj cache = cacheElement.Obj();
+
+    BSONElement bytesElement = cache.getField("bytes currently in the cache");
+    ASSERT_TRUE(bytesElement.isNumber());
 }
 
 BSONObj makeBSONObjWithSize(const Timestamp& opTime, int size, char fill = 'x') {

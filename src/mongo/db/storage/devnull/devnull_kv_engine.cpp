@@ -145,9 +145,9 @@ public:
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {}
 
-    virtual void appendCustomStats(OperationContext* opCtx,
-                                   BSONObjBuilder* result,
-                                   double scale) const {
+    virtual void appendNumericCustomStats(OperationContext* opCtx,
+                                          BSONObjBuilder* result,
+                                          double scale) const {
         result->appendNumber("numInserts", _numInserts);
     }
 

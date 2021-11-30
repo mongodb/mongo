@@ -491,11 +491,24 @@ public:
 
     /**
      * @param scaleSize - amount by which to scale size metrics
-     * appends any custom stats from the RecordStore or other unique stats
+     * Appends any numeric custom stats from the RecordStore or other unique stats, it should
+     * avoid any expensive calls
      */
-    virtual void appendCustomStats(OperationContext* opCtx,
-                                   BSONObjBuilder* result,
-                                   double scale) const = 0;
+    virtual void appendNumericCustomStats(OperationContext* opCtx,
+                                          BSONObjBuilder* result,
+                                          double scale) const = 0;
+
+
+    /**
+     * @param scaleSize - amount by which to scale size metrics
+     * Appends all custom stats from the RecordStore or other unique stats, it can be more
+     * expensive than RecordStore::appendNumericCustomStats
+     */
+    virtual void appendAllCustomStats(OperationContext* opCtx,
+                                      BSONObjBuilder* result,
+                                      double scale) const {
+        appendNumericCustomStats(opCtx, result, scale);
+    };
 
     /**
      * When we write to an oplog, we call this so that that the storage engine can manage the

@@ -48,3 +48,6 @@ structs:
       waitForLock:
         type: optionalBool
         default: true
+      numericOnly:
+        type: optionalBool
+        default: false

@@ -188,9 +188,13 @@ public:
                           ValidateResults* results,
                           BSONObjBuilder* output);
 
-    virtual void appendCustomStats(OperationContext* opCtx,
-                                   BSONObjBuilder* result,
-                                   double scale) const;
+    virtual void appendNumericCustomStats(OperationContext* opCtx,
+                                          BSONObjBuilder* result,
+                                          double scale) const;
+
+    virtual void appendAllCustomStats(OperationContext* opCtx,
+                                      BSONObjBuilder* result,
+                                      double scale) const;
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 

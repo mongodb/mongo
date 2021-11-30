@@ -53,6 +53,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     auto scale = storageStatsSpec.getScale().value_or(1);
     bool verbose = storageStatsSpec.getVerbose();
     bool waitForLock = storageStatsSpec.getWaitForLock();
+    bool numericOnly = storageStatsSpec.getNumericOnly();
 
     const auto bucketNss = nss.makeTimeseriesBucketsNamespace();
     const auto isTimeseries = nss.isTimeseriesBucketsCollection() ||
@@ -122,7 +123,11 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->appendNumber("maxSize", collection->getCappedMaxSize() / scale);
     }
 
-    recordStore->appendCustomStats(opCtx, result, scale);
+    if (numericOnly) {
+        recordStore->appendNumericCustomStats(opCtx, result, scale);
+    } else {
+        recordStore->appendAllCustomStats(opCtx, result, scale);
+    }
 
     const IndexCatalog* indexCatalog = collection->getIndexCatalog();
     result->append("nindexes", indexCatalog->numIndexesTotal(opCtx));

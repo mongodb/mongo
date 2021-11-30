@@ -113,6 +113,16 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 
     fassertNoTrace(39998, appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
 }
+
+void appendNumericStats(WT_SESSION* s, const std::string& uri, BSONObjBuilder& bob) {
+    Status status =
+        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", &bob);
+    if (!status.isOK()) {
+        bob.append("error", "unable to retrieve statistics");
+        bob.append("code", static_cast<int>(status.code()));
+        bob.append("reason", status.reason());
+    }
+}
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
@@ -1679,9 +1689,20 @@ void WiredTigerRecordStore::validate(OperationContext* opCtx,
     results->valid = false;
 }
 
-void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
-                                              BSONObjBuilder* result,
-                                              double scale) const {
+void WiredTigerRecordStore::appendNumericCustomStats(OperationContext* opCtx,
+                                                     BSONObjBuilder* result,
+                                                     double scale) const {
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WT_SESSION* s = session->getSession();
+
+    BSONObjBuilder bob(result->subobjStart(_engineName));
+
+    appendNumericStats(s, getURI(), bob);
+}
+
+void WiredTigerRecordStore::appendAllCustomStats(OperationContext* opCtx,
+                                                 BSONObjBuilder* result,
+                                                 double scale) const {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     WT_SESSION* s = session->getSession();
     BSONObjBuilder bob(result->subobjStart(_engineName));
@@ -1710,13 +1731,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
         bob.append("type", type);
     }
 
-    Status status =
-        WiredTigerUtil::exportTableToBSON(s, "statistics:" + getURI(), "statistics=(fast)", &bob);
-    if (!status.isOK()) {
-        bob.append("error", "unable to retrieve statistics");
-        bob.append("code", static_cast<int>(status.code()));
-        bob.append("reason", status.reason());
-    }
+    appendNumericStats(s, getURI(), bob);
 }
 
 void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisibleImpl(

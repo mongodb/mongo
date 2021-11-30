@@ -90,9 +90,9 @@ public:
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
 
-    virtual void appendCustomStats(OperationContext* opCtx,
-                                   BSONObjBuilder* result,
-                                   double scale) const {}
+    virtual void appendNumericCustomStats(OperationContext* opCtx,
+                                          BSONObjBuilder* result,
+                                          double scale) const {}
 
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = nullptr,
