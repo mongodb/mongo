@@ -59,10 +59,10 @@ structs:
                 optional: true
                 validator:
                     callback: "tenant_migration_util::validateConnectionString"
-            tenantId:
-                type: string
+            tenantIds:
+                type: array<string>
                 optional: true
-                description: "The identifier for the tenant being migrated."
+                description: "The identifier for the list of tenants being migrated."
             state:
                 type: ShardSplitDonorState
                 description: "The current state of the shard split operation."

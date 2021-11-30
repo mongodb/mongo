@@ -90,6 +90,8 @@ public:
      */
     void tryAbort();
 
+    Status checkIfOptionsConflict(const ShardSplitDonorDocument& stateDoc) const;
+
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;
 

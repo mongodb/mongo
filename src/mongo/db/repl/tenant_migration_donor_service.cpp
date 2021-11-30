@@ -421,7 +421,7 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(
     return Status(ErrorCodes::ConflictingOperationInProgress,
                   str::stream() << "Found active migration for migrationId \""
                                 << _migrationUuid.toBSON() << "\" with different options "
-                                << tenant_migration_util::redactStateDoc(_stateDoc.toBSON()));
+                                << _stateDoc.toBSON());
 }
 
 boost::optional<TenantMigrationDonorService::Instance::DurableState>

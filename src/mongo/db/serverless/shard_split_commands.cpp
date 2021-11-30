@@ -52,7 +52,37 @@ public:
                     "feature \"shard split\" not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            return Response(ShardSplitDonorStateEnum::kCommitted);
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant split is not available on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::None ||
+                        serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+            const auto& cmd = request();
+            auto stateDoc = ShardSplitDonorDocument(cmd.getMigrationId());
+            stateDoc.setTenantIds(cmd.getTenantIds());
+            stateDoc.setRecipientConnectionString(cmd.getRecipientConnectionString());
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
+
+            auto donorService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                                    ->lookupServiceByName(ShardSplitDonorService::kServiceName);
+
+            auto donorPtr = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+                opCtx, donorService, stateDoc.toBSON());
+            invariant(donorPtr);
+
+            uassertStatusOK(donorPtr->checkIfOptionsConflict(stateDoc));
+
+            auto state = donorPtr->completionFuture().get(opCtx);
+
+            auto response = Response(state.state);
+            if (state.abortReason) {
+                BSONObjBuilder bob;
+                state.abortReason->serializeErrorToBSON(&bob);
+                response.setAbortReason(bob.obj());
+            }
+
+            return response;
         }
 
     private:
