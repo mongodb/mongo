@@ -129,7 +129,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const CollectionPtr* collection,
     size_t plannerOptions,
     NamespaceString nss,
-    bool isOpen,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
 /**

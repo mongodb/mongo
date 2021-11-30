@@ -1117,39 +1117,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = planner->plan(std::move(solutions), std::move(roots));
 
-        bool isOpen = true;
-        if (!cq->pipeline().empty()) {
-            // Extend the winning candidate with the agg pipeline and rebuild the execution tree.
-            auto&& winner = candidates.winner();
-            winner.root->close();
-            auto solution = QueryPlanner::extendWithAggPipeline(*cq, std::move(winner.solution));
-            auto&& [rootStage, data] = helper.buildExecutableTree(*solution);
-            rootStage->prepare(data.ctx);
-            candidates.plans[candidates.winnerIdx] = sbe::plan_ranker::CandidatePlan{
-                std::move(solution), std::move(rootStage), std::move(data)};
-            isOpen = false;
-
-            // Extending rejecting solutions is only useful if this is an explain query.
-            if (cq->getExplain()) {
-                for (size_t i = 0; i < candidates.plans.size(); ++i) {
-                    if (i == candidates.winnerIdx)
-                        continue;  // have already done the winner
-                    // Rejected plans are already closed and we also don't need to prepare them.
-                    auto solution = QueryPlanner::extendWithAggPipeline(
-                        *cq, std::move(candidates.plans[i].solution));
-                    auto&& [rootStage, data] = helper.buildExecutableTree(*solution);
-                    candidates.plans[i] = sbe::plan_ranker::CandidatePlan{
-                        std::move(solution), std::move(rootStage), std::move(data)};
-                }
-            }
-        }
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
                                            std::move(candidates),
                                            collection,
                                            plannerOptions,
                                            std::move(nss),
-                                           isOpen,
                                            std::move(yieldPolicy));
     }
 

@@ -48,8 +48,14 @@ namespace {
  * This failure is considered recoverable, as another candidate plan may require less memory, or may
  * not contain a stage requiring spilling to disk at all.
  */
-bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
-                       const std::pair<value::SlotAccessor*, value::SlotAccessor*>& slots) {
+enum class FetchDocStatus {
+    done = 0,
+    exitedEarly,
+    inProgress,
+};
+FetchDocStatus fetchNextDocument(
+    plan_ranker::CandidatePlan* candidate,
+    const std::pair<value::SlotAccessor*, value::SlotAccessor*>& slots) {
     try {
         BSONObj obj;
         RecordId recordId;
@@ -63,20 +69,19 @@ bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
                                true /* must return owned BSON */);
         if (state == PlanState::IS_EOF) {
             candidate->root->close();
-            return true;
+            return FetchDocStatus::done;
         }
 
         invariant(state == PlanState::ADVANCED);
         invariant(obj.isOwned());
         candidate->results.push({obj, {recordIdSlot != nullptr, recordId}});
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
-        candidate->exitedEarly = true;
-        return true;
+        return FetchDocStatus::exitedEarly;
     } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
         candidate->root->close();
         candidate->status = ex.toStatus();
     }
-    return false;
+    return FetchDocStatus::inProgress;
 }
 }  // namespace
 
@@ -113,28 +118,30 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
     return std::make_tuple(resultSlot, recordIdSlot, exitedEarly);
 }
 
-bool BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
+void BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
                                                size_t maxNumResults) {
     _indexExistenceChecker.check();
 
     auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data);
     if (!status.isOK()) {
         candidate->status = status.getStatus();
-        return false;
+        return;
     }
 
     auto [resultAccessor, recordIdAccessor, exitedEarly] = status.getValue();
-    candidate->exitedEarly = exitedEarly;
-
-    for (size_t it = 0; it < maxNumResults && candidate->status.isOK() && !candidate->exitedEarly &&
-         !candidate->needsReplanning;
-         ++it) {
-        if (fetchNextDocument(candidate, std::make_pair(resultAccessor, recordIdAccessor))) {
-            return true;
-        }
+    if (exitedEarly) {
+        candidate->exitedEarly = true;
+        return;
     }
 
-    return false;
+    for (size_t i = 0; i < maxNumResults && candidate->status.isOK(); ++i) {
+        FetchDocStatus fetch =
+            fetchNextDocument(candidate, std::make_pair(resultAccessor, recordIdAccessor));
+        if (fetch == FetchDocStatus::done || fetch == FetchDocStatus::exitedEarly) {
+            candidate->exitedEarly = (fetch == FetchDocStatus::exitedEarly);
+            return;
+        }
+    }
 }
 
 std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStats(
@@ -191,12 +198,13 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
                                   std::move(root),
                                   std::move(data),
                                   false /* exitedEarly */,
-                                  false /* needsReplanning */,
                                   Status::OK()});
             auto& currentCandidate = candidates.back();
-            bool candidateDone = executeCandidateTrial(&currentCandidate, maxNumResults);
-            if (candidateDone ||
-                (currentCandidate.status.isOK() && !currentCandidate.exitedEarly)) {
+            executeCandidateTrial(&currentCandidate, maxNumResults);
+
+            // Reduce the number of reads the next candidates are allocated if this candidate is
+            // more efficient than the current bound.
+            if (currentCandidate.status.isOK() && !currentCandidate.exitedEarly) {
                 maxNumReads = std::min(
                     maxNumReads, tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>());
             }

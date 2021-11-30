@@ -49,8 +49,20 @@ CandidatePlans CachedSolutionPlanner::plan(
     invariant(solutions.size() == 1);
     invariant(solutions.size() == roots.size());
 
-    const double evictionRatio = internalQueryCacheEvictionRatio;
-    const size_t maxReadsBeforeReplan = evictionRatio * _decisionReads;
+    // If the cached plan is accepted we'd like to keep the results from the trials even if there
+    // are parts of agg pipelines being lowered into SBE, so we run the trial with the extended
+    // plan. This works because TrialRunTracker, attached to HashAgg stage, tracks as "results" the
+    // results of its child stage. Thus, we can use the number of reads the plan was cached with
+    // during multiplanning even though multiplanning ran trials of pre-extended plans.
+    if (!_cq.pipeline().empty()) {
+        _yieldPolicy->clearRegisteredPlans();
+        solutions[0] = QueryPlanner::extendWithAggPipeline(_cq, std::move(solutions[0]));
+        roots[0] = stage_builder::buildSlotBasedExecutableTree(
+            _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
+    }
+
+    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * _decisionReads;
+
     // In cached solution planning we collect execution stats with an upper bound on reads allowed
     // per trial run computed based on previous decision reads. If the trial run ends before
     // reaching EOF, it will use the 'checkNumReads' function to determine if it should continue
@@ -73,23 +85,18 @@ CandidatePlans CachedSolutionPlanner::plan(
         return replan(false, str::stream() << "cached plan returned: " << candidate.status);
     }
 
-    auto visitor = PlanStatsNumReadsVisitor{};
-    candidate.root->accumulate(kEmptyPlanNodeId, &visitor);
-    auto numReads = visitor.numReads;
-
-    // If the trial run executed in 'collectExecutionStats()' did not determine that a replan is
-    // necessary, then return that plan as is. The executor can continue using it. All results
-    // generated during the trial are stored with the plan so that the executor can return those to
-    // the user as well.
-    if (!candidate.needsReplanning) {
-        tassert(590800,
-                "Cached plan exited early without 'needsReplanning' set.",
-                !candidate.exitedEarly);
+    // If the trial run did not exit early, it means no replanning is necessary and can return this
+    // candidate to the executor. All results generated during the trial are stored with the
+    // candidate so that the executor will be able to reuse them.
+    if (!candidate.exitedEarly) {
         return {makeVector(std::move(candidate)), 0};
     }
 
     // If we're here, the trial period took more than 'maxReadsBeforeReplan' physical reads. This
     // plan may not be efficient any longer, so we replan from scratch.
+    auto visitor = PlanStatsNumReadsVisitor{};
+    candidate.root->accumulate(kEmptyPlanNodeId, &visitor);
+    const auto numReads = visitor.numReads;
     LOGV2_DEBUG(
         2058001,
         1,
@@ -117,35 +124,33 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
                                          std::move(root),
                                          std::move(data),
                                          false /* exitedEarly*/,
-                                         false /* needsReplanning */,
                                          Status::OK()};
 
     ON_BLOCK_EXIT([rootPtr = candidate.root.get()] { rootPtr->detachFromTrialRunTracker(); });
 
-    auto needsReplanningCheck = [maxTrialPeriodNumReads](PlanStage* candidateRoot) {
-        auto visitor = PlanStatsNumReadsVisitor{};
-        candidateRoot->accumulate(kEmptyPlanNodeId, &visitor);
-        return visitor.numReads > maxTrialPeriodNumReads;
-    };
-    auto trackerRequirementCheck = [&needsReplanningCheck, &candidate]() {
-        bool shouldExitEarly = needsReplanningCheck(candidate.root.get());
-        if (!shouldExitEarly) {
-            candidate.root->detachFromTrialRunTracker();
+    // Callback for the tracker when it exceeds any of the tracked metrics. If the tracker exceeds
+    // the number of reads without reaching the expected number of results first (which for plans
+    // without blocking stages is observed through 'maxNumResults' passed to
+    // 'executeCandidateTrial()' and for plans with blocking stages is observed by the tracker
+    // itself), it means that the cached plan isn't performing as well as it used to and we'll need
+    // to replan, so we let the tracker terminate the trial. Otherwise, the plan is still good and
+    // we promote it from a candidate to "normal" by detaching the tracker and letting
+    // 'executeCandidateTrial()' reach 'maxNumResults'.
+    auto onMetricReached = [&candidate](TrialRunTracker::TrialRunMetric metric) {
+        switch (metric) {
+            case TrialRunTracker::kNumReads:
+                return true;  // terminate the trial run
+            case TrialRunTracker::kNumResults:
+                candidate.root->detachFromTrialRunTracker();
+                return false;  // upgrade the trial run into a normal one
+            default:
+                MONGO_UNREACHABLE;
         }
-        candidate.needsReplanning = (candidate.needsReplanning || shouldExitEarly);
-        return shouldExitEarly;
     };
     auto tracker = std::make_unique<TrialRunTracker>(
-        std::move(trackerRequirementCheck), maxNumResults, maxTrialPeriodNumReads);
-
-    candidate.root->attachToTrialRunTracker(std::move(tracker.get()));
-
-    auto candidateDone = executeCandidateTrial(&candidate, maxNumResults);
-    if (candidate.status.isOK() && !candidateDone && !candidate.needsReplanning) {
-        candidate.needsReplanning =
-            candidate.needsReplanning || needsReplanningCheck(candidate.root.get());
-    }
-
+        std::move(onMetricReached), maxNumResults, maxTrialPeriodNumReads);
+    candidate.root->attachToTrialRunTracker(tracker.get());
+    executeCandidateTrial(&candidate, maxNumResults);
     return candidate;
 }
 

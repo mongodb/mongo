@@ -99,18 +99,16 @@ protected:
 
     /**
      * Executes a candidate plan until it
-     *   - reaches EOF,
-     *   - reaches the 'maxNumResults' limit,
+     *   - reaches EOF, or
+     *   - reaches the 'maxNumResults' limit, or
      *   - early exits via the TrialRunTracker, or
      *   - returns a failure Status.
      *
      * The execution process populates the 'results' array of the 'candidate' plan with any results
      * from execution the plan. This function also sets the 'status' and 'exitedEarly' fields of the
      * input 'candidate' object when applicable.
-     *
-     * Returns true iff the candidate plan reaches EOF.
      */
-    bool executeCandidateTrial(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
+    void executeCandidateTrial(plan_ranker::CandidatePlan* candidate, size_t maxNumResults);
 
     /**
      * Executes each plan in a round-robin fashion to collect execution stats. Stops when:

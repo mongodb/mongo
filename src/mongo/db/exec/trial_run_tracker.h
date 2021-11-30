@@ -68,21 +68,23 @@ public:
     TrialRunTracker(MaxMetrics... maxMetrics) : _maxMetrics{maxMetrics...} {}
 
     /**
-     * Constructs a 'TrialRunTracker' that also has an '_onTrialEnd' function, which gets called
-     * when any 'TrialRunMetric' exceeds its maximum. When an '_onTrialEnd' callback is present, it
-     * must return true for 'trackProgress' to return true. By returning false, '_onTrialEnd' can
-     * prevent tracking from halting plan execution, thereby upgrading a trial run to a normal run.
+     * Constructs a 'TrialRunTracker' that also has an '_onMetricReached' function, which gets
+     * called when any 'TrialRunMetric' exceeds its maximum. When an '_onMetricReached' callback is
+     * present, it must return true for 'trackProgress' to return true. By returning false,
+     * '_onMetricReached' can prevent tracking from halting plan execution, thereby upgrading a
+     * trial run to a normal run.
      */
     template <typename... MaxMetrics>
-    TrialRunTracker(std::function<bool()> onTrialEnd, MaxMetrics... maxMetrics)
+    TrialRunTracker(std::function<bool(TrialRunMetric)> onMetricReached, MaxMetrics... maxMetrics)
         : TrialRunTracker{maxMetrics...} {
-        _onTrialEnd = std::move(onTrialEnd);
+        _onMetricReached = std::move(onMetricReached);
     }
 
     /**
      * Increments the trial run metric specified as a template parameter 'metric' by the
      * 'metricIncrement' value and, if the updated metric value has exceeded its maximum, calls the
-     * '_onTrialEnd' if there is one and returns true (unless '_onTrialEnd' returned false).
+     * '_onMetricReached' if there is one and returns true (unless '_onMetricReached' returned
+     * false).
      *
      * This is a no-op, and will return false, if the given metric is not being tracked by this
      * 'TrialRunTracker'.
@@ -104,8 +106,12 @@ public:
         }
 
         _metrics[metric] += metricIncrement;
-        if (_metrics[metric] > _maxMetrics[metric] && callOnTrialEnd()) {
-            _done = true;
+        if (_metrics[metric] > _maxMetrics[metric]) {
+            if (_onMetricReached) {
+                _done = _onMetricReached(metric);
+            } else {
+                _done = true;
+            }
         }
         return _done;
     }
@@ -116,14 +122,10 @@ public:
         return _metrics[metric];
     }
 
-    bool callOnTrialEnd() {
-        return !_onTrialEnd || _onTrialEnd();
-    }
-
 private:
     const size_t _maxMetrics[TrialRunMetric::kLastElem];
     size_t _metrics[TrialRunMetric::kLastElem]{0};
     bool _done{false};
-    std::function<bool()> _onTrialEnd{};
+    std::function<bool(TrialRunMetric)> _onMetricReached{};
 };
 }  // namespace mongo
