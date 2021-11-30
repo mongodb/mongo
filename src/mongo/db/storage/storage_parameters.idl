@@ -104,7 +104,8 @@ feature_flags:
     featureFlagTimeseriesBucketCompression:
         description: "Enable bucket compression on time-series collections"
         cpp_varname: feature_flags::gTimeseriesBucketCompression
-        default: false
+        default: true
+        version: 5.2
     featureFlagYieldingSupportForSBE:
         description: "Enable retaining valid cursor across query yield"
         cpp_varname: feature_flags::gYieldingSupportForSBE
