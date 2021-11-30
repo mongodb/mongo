@@ -8,6 +8,8 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/serverless/serverless_test.js");
+load('jstests/concurrency/fsm_libs/worker_thread.js');
 
 function donorStartMigrationCmd(tenantID, realConnUrl) {
     return {
@@ -51,7 +53,7 @@ function orderedBulkInsertDuringBlockingState(st, isBulkWriteOrdered) {
 
     const kCollName = 'foo';
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     let blockingFp = configureFailPoint(adminDB, "pauseTenantMigrationBeforeLeavingBlockingState");
@@ -72,7 +74,7 @@ function orderedBulkInsertDuringBlockingState(st, isBulkWriteOrdered) {
             assert.eq(res.res.writeErrors.length, 0);
         },
         bulkInsertDocs,
-        st.s0.host,
+        st.q0.host,
         kDbName,
         kCollName,
         kNumWriteOps,
@@ -112,7 +114,7 @@ function orderedBulkInsertAfterTenantMigrationAborted(st, isBulkWriteOrdered) {
 
     const kCollName = 'foo';
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     configureFailPoint(adminDB, "abortTenantMigrationBeforeLeavingBlockingState");
@@ -127,16 +129,12 @@ function orderedBulkInsertAfterTenantMigrationAborted(st, isBulkWriteOrdered) {
 
     const kNumWriteOps = 6;
     const bulkRes =
-        bulkInsertDocs(st.s0.host, kDbName, kCollName, kNumWriteOps, isBulkWriteOrdered);
+        bulkInsertDocs(st.q0.host, kDbName, kCollName, kNumWriteOps, isBulkWriteOrdered);
     assert.eq(bulkRes.res.nInserted, kNumWriteOps);
     assert.eq(bulkRes.res.writeErrors.length, 0);
 }
 
-let st = new ShardingTest({
-    shards: 2,
-    mongosOptions: {setParameter: {tenantMigrationDisableX509Auth: true}},
-    shardOptions: {setParameter: {tenantMigrationDisableX509Auth: true}}
-});
+let st = new ServerlessTest();
 
 orderedBulkInsertDuringBlockingState(st, true);
 orderedBulkInsertDuringBlockingState(st, false);

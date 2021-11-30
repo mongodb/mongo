@@ -8,6 +8,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/serverless/serverless_test.js");
 
 function donorStartMigrationCmd(tenantID, realConnUrl) {
     return {
@@ -19,11 +20,7 @@ function donorStartMigrationCmd(tenantID, realConnUrl) {
     };
 }
 
-let st = new ShardingTest({
-    shards: 2,
-    mongosOptions: {setParameter: {tenantMigrationDisableX509Auth: true}},
-    shardOptions: {setParameter: {tenantMigrationDisableX509Auth: true}}
-});
+let st = new ServerlessTest();
 
 /*
  * Test running a migration and then try to insert data after migration completes.
@@ -34,7 +31,7 @@ let st = new ShardingTest({
     const tenantID = ObjectId();
     var kDbName = tenantID.str + "_test2";
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     let cmdObj = donorStartMigrationCmd(tenantID, st.rs1.getURL());
@@ -44,7 +41,7 @@ let st = new ShardingTest({
         return res['state'] == "committed";
     }, "migration not in committed state", 1 * 10000, 1 * 1000);
 
-    let db = st.s0.getDB(kDbName);
+    let db = st.q0.getDB(kDbName);
     assert.commandFailedWithCode(db.runCommand({count: "bar"}),
                                  ErrorCodes.TenantMigrationCommitted);
 })();
@@ -58,9 +55,9 @@ let st = new ShardingTest({
     const tenantID = ObjectId();
     var kDbName = tenantID.str + "_test1";
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName}));
+    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
     st.ensurePrimaryShard(kDbName, st.shard0.shardName);
-    let db = st.s0.getDB(kDbName);
+    let db = st.q0.getDB(kDbName);
     assert.commandWorked(db.bar.insert([{n: 1}, {n: 2}, {n: 3}]));
 
     configureFailPoint(st.rs0.getPrimary().getDB('admin'),

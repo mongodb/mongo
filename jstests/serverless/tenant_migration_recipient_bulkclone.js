@@ -7,21 +7,13 @@
 (function() {
 "use strict";
 
-let st = new ShardingTest({
-    shards: 2,
-    mongosOptions: {setParameter: {tenantMigrationDisableX509Auth: true}},
-    shardOptions: {
-        setParameter: {
-            tenantMigrationDisableX509Auth: true,
-            // Allow non-timestamped reads on donor after migration completes for testing.
-            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'})
-        }
-    }
-});
+load("jstests/serverless/serverless_test.js");
+
+let st = new ServerlessTest();
 
 let donor = st.rs0;
 let recipient = st.rs1;
-let mongos = st.s0;
+let mongos = st.q0;
 let adminDB = donor.getPrimary().getDB('admin');
 
 jsTest.log(
@@ -59,5 +51,9 @@ assert.eq({_id: 10, x: 1}, targetDB.foo.findOne({_id: 10}));
 assert.eq({_id: 20, y: 1}, targetDB.foo.findOne({_id: 20}));
 assert.eq({_id: 30, z: 1}, targetDB.foo.findOne({_id: 30}));
 
+// Enable stale reads on the donor set so that end of test data consistency check can pass.
+donor.nodes.forEach(
+    node => assert.commandWorked(node.adminCommand(
+        {configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads", mode: "alwaysOn"})));
 st.stop();
 }());
