@@ -1,5 +1,4 @@
 click ~= 7.0
 GitPython ~= 3.1.7
-psutil
 pydantic ~= 1.7.3
 structlog >=19.1.0,<=19.2.0
