@@ -148,15 +148,20 @@ public:
         }
 
         const bool repair = cmdObj["repair"].trueValue();
+        if (storageGlobalParams.readOnly && repair) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Running the validate command with { repair: true } in"
+                                    << " read-only mode is not supported.");
+        }
         if (background && repair) {
             uasserted(ErrorCodes::InvalidOptions,
-                      str::stream() << "Running the validate command with both {background: true }"
+                      str::stream() << "Running the validate command with both { background: true }"
                                     << " and { repair: true } is not supported.");
         }
         if (enforceFastCount && repair) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
-                          << "Running the validate command with both {enforceFastCount: true }"
+                          << "Running the validate command with both { enforceFastCount: true }"
                           << " and { repair: true } is not supported.");
         }
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -221,6 +226,10 @@ public:
         }();
 
         auto repairMode = [&] {
+            if (storageGlobalParams.readOnly) {
+                // On read-only mode we can't make any adjustments.
+                return CollectionValidation::RepairMode::kNone;
+            }
             switch (mode) {
                 case CollectionValidation::ValidateMode::kForeground:
                 case CollectionValidation::ValidateMode::kForegroundFull:

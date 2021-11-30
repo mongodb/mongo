@@ -6,6 +6,8 @@ selector:
   exclude_files:
   # The test below use applyOps, SERVER-1439.
   - jstests/readonly/temp_collection.js
+  exclude_with_any_tags:
+  - assumes_against_mongod_not_mongos
 
 executor:
   config:
