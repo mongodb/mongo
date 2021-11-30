@@ -127,7 +127,7 @@ TEST(SortedDataInterface, SetEndPosition_Next_Reverse_Standard_Exclusive) {
     testSetEndPosition_Next_Reverse(false, false);
 }
 
-// Tests setEndPosition with seek() and seekExact().
+// Tests setEndPosition with seek().
 void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
@@ -145,14 +145,12 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
 
     // Directly seeking past end is considered out of range.
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key4, true, inclusive)), boost::none);
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key4)), boost::none);
 
     // Seeking to key3 directly or indirectly is only returned if endPosition is inclusive.
     auto maybeKey3 = inclusive ? boost::make_optional(IndexKeyEntry(key3, loc1)) : boost::none;
 
     // direct
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, inclusive)), maybeKey3);
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key3)), maybeKey3);
 
     // indirect
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, inclusive)), maybeKey3);
@@ -195,14 +193,12 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
     // Directly seeking past end is considered out of range.
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key1, false, inclusive)),
               boost::none);
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key1)), boost::none);
 
     // Seeking to key2 directly or indirectly is only returned if endPosition is inclusive.
     auto maybeKey2 = inclusive ? boost::make_optional(IndexKeyEntry(key2, loc1)) : boost::none;
 
     // direct
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, false, inclusive)), maybeKey2);
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), maybeKey2);
 
     // indirect
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true)), maybeKey2);

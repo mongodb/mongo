@@ -36,8 +36,8 @@
 
 namespace mongo {
 namespace {
-// Tests seekExact when it hits something.
-void testSeekExact_Hit(bool unique, bool forward) {
+// Tests findLoc when it hits something.
+void testFindLoc_Hit(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
@@ -48,35 +48,18 @@ void testSeekExact_Hit(bool unique, bool forward) {
                                                             {key3, loc1},
                                                         });
 
-    auto cursor = sorted->newCursor(opCtx.get(), forward);
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc1));
-
-    // Only return the requested RecordId.
-    ASSERT_EQ(
-        cursor->seekExact(makeKeyString(sorted.get(), key2), SortedDataInterface::Cursor::kWantLoc),
-        IndexKeyEntry({}, loc1));
-
-    // Make sure iterating works. We may consider loosening this requirement if it is a hardship
-    // for some storage engines.
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(forward ? key3 : key1, loc1));
-    ASSERT_EQ(cursor->next(), boost::none);
+    auto loc = sorted->findLoc(opCtx.get(), makeKeyString(sorted.get(), key2));
+    ASSERT_EQ(loc, loc1);
 }
-TEST(SortedDataInterface, SeekExact_Hit_Unique_Forward) {
-    testSeekExact_Hit(true, true);
+TEST(SortedDataInterface, SeekExact_Hit_Unique) {
+    testFindLoc_Hit(true);
 }
-TEST(SortedDataInterface, SeekExact_Hit_Unique_Reverse) {
-    testSeekExact_Hit(true, false);
-}
-TEST(SortedDataInterface, SeekExact_Hit_Standard_Forward) {
-    testSeekExact_Hit(false, true);
-}
-TEST(SortedDataInterface, SeekExact_Hit_Standard_Reverse) {
-    testSeekExact_Hit(false, false);
+TEST(SortedDataInterface, SeekExact_Hit_Standard) {
+    testFindLoc_Hit(false);
 }
 
-// Tests seekExact when it doesn't hit the query.
-void testSeekExact_Miss(bool unique, bool forward) {
+// Tests findLoc when it doesn't hit the query.
+void testFindLoc_Miss(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
@@ -87,71 +70,13 @@ void testSeekExact_Miss(bool unique, bool forward) {
                                                             {key3, loc1},
                                                         });
 
-    auto cursor = sorted->newCursor(opCtx.get(), forward);
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), boost::none);
-
-    // Not testing iteration since the cursors position following a failed seekExact is
-    // undefined. However, you must be able to seek somewhere else.
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key1)), IndexKeyEntry(key1, loc1));
+    ASSERT_EQ(sorted->findLoc(opCtx.get(), makeKeyString(sorted.get(), key2)), boost::none);
 }
-TEST(SortedDataInterface, SeekExact_Miss_Unique_Forward) {
-    testSeekExact_Miss(true, true);
+TEST(SortedDataInterface, SeekExact_Miss_Unique) {
+    testFindLoc_Miss(true);
 }
-TEST(SortedDataInterface, SeekExact_Miss_Unique_Reverse) {
-    testSeekExact_Miss(true, false);
-}
-TEST(SortedDataInterface, SeekExact_Miss_Standard_Forward) {
-    testSeekExact_Miss(false, true);
-}
-TEST(SortedDataInterface, SeekExact_Miss_Standard_Reverse) {
-    testSeekExact_Miss(false, false);
-}
-
-// Tests seekExact on forward cursor when it hits something with dup keys. Doesn't make sense
-// for unique indexes.
-TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        /*unique=*/false,
-        /*partial=*/false,
-        {
-            {key1, loc1},
-            {key2, loc1},
-            {key2, loc2},
-            {key3, loc1},
-        });
-
-    auto cursor = sorted->newCursor(opCtx.get());
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc1));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc2));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
-    ASSERT_EQ(cursor->next(), boost::none);
-}
-
-// Tests seekExact on reverse cursor when it hits something with dup keys. Doesn't make sense
-// for unique indexes.
-TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
-    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        /*unique=*/false,
-        /*partial=*/false,
-        {
-            {key1, loc1},
-            {key2, loc1},
-            {key2, loc2},
-            {key3, loc1},
-        });
-
-    auto cursor = sorted->newCursor(opCtx.get(), false);
-
-    ASSERT_EQ(cursor->seekExact(makeKeyString(sorted.get(), key2)), IndexKeyEntry(key2, loc2));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
-    ASSERT_EQ(cursor->next(), IndexKeyEntry(key1, loc1));
-    ASSERT_EQ(cursor->next(), boost::none);
+TEST(SortedDataInterface, SeekExact_Miss_Standard) {
+    testFindLoc_Miss(false);
 }
 }  // namespace
 }  // namespace mongo

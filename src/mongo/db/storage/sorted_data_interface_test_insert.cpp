@@ -562,7 +562,7 @@ TEST(SortedDataInterface, InsertAndSeekKeyString) {
 }
 
 /*
- * Insert multiple KeyStrings and seekExact to the inserted KeyStrings
+ * Insert multiple KeyStrings and use findLoc on the inserted KeyStrings.
  */
 TEST(SortedDataInterface, InsertAndSeekExactKeyString) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
@@ -594,61 +594,8 @@ TEST(SortedDataInterface, InsertAndSeekExactKeyString) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
 
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
-
-        auto ksEntry1 = cursor->seekExactForKeyString(keyString1WithoutRecordId);
-        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1), 0);
-        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2), -1);
-
-        auto ksEntry2 = cursor->seekExactForKeyString(keyString2WithoutRecordId);
-        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2), 0);
-        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1), 1);
-    }
-}
-
-/*
- * Insert multiple KeyStrings and seekExact to the inserted KeyStrings with reverse cursor.
- */
-TEST(SortedDataInterface, InsertAndSeekExactKeyString_Reverse) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(
-        harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
-
-    auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
-    auto keyString2 = makeKeyString(sorted.get(), key2, loc2);
-
-    auto keyString1WithoutRecordId = makeKeyString(sorted.get(), key1);
-    auto keyString2WithoutRecordId = makeKeyString(sorted.get(), key2);
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(sorted->isEmpty(opCtx.get()));
-    }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString1, false));
-            ASSERT_OK(sorted->insert(opCtx.get(), keyString2, false));
-            uow.commit();
-        }
-    }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
-
-        const std::unique_ptr<SortedDataInterface::Cursor> cursor(
-            sorted->newCursor(opCtx.get(), false));
-
-        auto ksEntry1 = cursor->seekExactForKeyString(keyString1WithoutRecordId);
-        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString1), 0);
-        ASSERT_EQUALS(ksEntry1->keyString.compare(keyString2), -1);
-
-        auto ksEntry2 = cursor->seekExactForKeyString(keyString2WithoutRecordId);
-        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString2), 0);
-        ASSERT_EQUALS(ksEntry2->keyString.compare(keyString1), 1);
+        ASSERT_EQ(loc1, sorted->findLoc(opCtx.get(), keyString1WithoutRecordId));
+        ASSERT_EQ(loc2, sorted->findLoc(opCtx.get(), keyString2WithoutRecordId));
     }
 }
 

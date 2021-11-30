@@ -92,6 +92,8 @@ public:
     }
     bool isEmpty(OperationContext* opCtx) override;
     Status initAsEmpty(OperationContext* opCtx) override;
+    boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                      const KeyString::Value& keyString) const override;
 
 protected:
     // These two are the same as before.

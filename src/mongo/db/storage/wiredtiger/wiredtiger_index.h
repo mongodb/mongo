@@ -107,6 +107,9 @@ public:
                          const KeyString::Value& keyString,
                          bool dupsAllowed);
 
+    virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                              const KeyString::Value& keyString) const override;
+
     virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
                               IndexValidateResults* fullResults) const;

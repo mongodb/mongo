@@ -518,10 +518,6 @@ public:
                                                 RequestedInfo parts = kKeyAndLoc) override;
     virtual boost::optional<KeyStringEntry> seekForKeyString(
         const KeyString::Value& keyStringValue) override;
-    virtual boost::optional<KeyStringEntry> seekExactForKeyString(
-        const KeyString::Value& keyStringValue) override;
-    virtual boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyStringValue,
-                                                     RequestedInfo) override;
     virtual void save() override;
     virtual void restore() override;
     virtual void detachFromOperationContext() override;
@@ -793,52 +789,6 @@ boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekForKeyString(
     _lastMoveWasRestore = false;
     _atEOF = false;
     return seekAfterProcessing(keyStringValue);
-}
-
-template <class CursorImpl>
-boost::optional<KeyStringEntry> CursorBase<CursorImpl>::seekExactForKeyString(
-    const KeyString::Value& keyStringValue) {
-    advanceSnapshotIfChanged();
-
-    dassert(KeyString::decodeDiscriminator(keyStringValue.getBuffer(),
-                                           keyStringValue.getSize(),
-                                           _order,
-                                           keyStringValue.getTypeBits()) ==
-            KeyString::Discriminator::kInclusive);
-    auto ksEntry = seekForKeyString(keyStringValue);
-    if (!ksEntry) {
-        return {};
-    }
-    auto sizeWithoutRecordId = KeyFormat::Long == _keyFormat
-        ? KeyString::sizeWithoutRecordIdLongAtEnd(ksEntry->keyString.getBuffer(),
-                                                  ksEntry->keyString.getSize())
-        : KeyString::sizeWithoutRecordIdStrAtEnd(ksEntry->keyString.getBuffer(),
-                                                 ksEntry->keyString.getSize());
-    if (KeyString::compare(ksEntry->keyString.getBuffer(),
-                           keyStringValue.getBuffer(),
-                           sizeWithoutRecordId,
-                           keyStringValue.getSize()) == 0) {
-        return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
-    }
-    return {};
-}
-
-template <class CursorImpl>
-boost::optional<IndexKeyEntry> CursorBase<CursorImpl>::seekExact(
-    const KeyString::Value& keyStringValue, RequestedInfo parts) {
-    auto ksEntry = seekExactForKeyString(keyStringValue);
-    if (!ksEntry) {
-        return {};
-    }
-
-    BSONObj bson;
-    if (parts & SortedDataInterface::Cursor::kWantKey) {
-        bson = KeyString::toBson(ksEntry->keyString.getBuffer(),
-                                 ksEntry->keyString.getSize(),
-                                 _order,
-                                 ksEntry->keyString.getTypeBits());
-    }
-    return IndexKeyEntry(std::move(bson), ksEntry->loc);
 }
 
 template <class CursorImpl>
@@ -1526,6 +1476,33 @@ bool SortedDataInterfaceBase::isEmpty(OperationContext* opCtx) {
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     return workingCopy->distance(workingCopy->lower_bound(_KSForIdentStart),
                                  workingCopy->upper_bound(_KSForIdentEnd)) == 0;
+}
+
+boost::optional<RecordId> SortedDataInterfaceBase::findLoc(
+    OperationContext* opCtx, const KeyString::Value& keyStringValue) const {
+    dassert(KeyString::decodeDiscriminator(keyStringValue.getBuffer(),
+                                           keyStringValue.getSize(),
+                                           _ordering,
+                                           keyStringValue.getTypeBits()) ==
+            KeyString::Discriminator::kInclusive);
+    auto cursor = newCursor(opCtx);
+    auto ksEntry = cursor->seekForKeyString(keyStringValue);
+    if (!ksEntry) {
+        return boost::none;
+    }
+
+    auto sizeWithoutRecordId = KeyFormat::Long == _rsKeyFormat
+        ? KeyString::sizeWithoutRecordIdLongAtEnd(ksEntry->keyString.getBuffer(),
+                                                  ksEntry->keyString.getSize())
+        : KeyString::sizeWithoutRecordIdStrAtEnd(ksEntry->keyString.getBuffer(),
+                                                 ksEntry->keyString.getSize());
+    if (KeyString::compare(ksEntry->keyString.getBuffer(),
+                           keyStringValue.getBuffer(),
+                           sizeWithoutRecordId,
+                           keyStringValue.getSize()) == 0) {
+        return ksEntry->loc;
+    }
+    return boost::none;
 }
 
 std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceUnique::newCursor(

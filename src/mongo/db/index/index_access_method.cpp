@@ -323,20 +323,9 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
         }
     }();
 
-    std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(opCtx));
-    const auto requestedInfo = kDebugBuild ? SortedDataInterface::Cursor::kKeyAndLoc
-                                           : SortedDataInterface::Cursor::kWantLoc;
-    if (auto kv = cursor->seekExact(actualKey, requestedInfo)) {
-        // StorageEngine should guarantee these.
-        dassert(!kv->loc.isNull());
-        dassert(kv->key.woCompare(KeyString::toBson(actualKey.getBuffer(),
-                                                    actualKey.getSize(),
-                                                    getSortedDataInterface()->getOrdering(),
-                                                    actualKey.getTypeBits()),
-                                  /*order*/ BSONObj(),
-                                  /*considerFieldNames*/ false) == 0);
-
-        return kv->loc;
+    if (auto loc = _newInterface->findLoc(opCtx, actualKey)) {
+        dassert(!loc->isNull());
+        return *loc;
     }
 
     return RecordId();

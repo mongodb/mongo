@@ -307,6 +307,31 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     _unindex(opCtx, c, keyString, dupsAllowed);
 }
 
+boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
+                                                   const KeyString::Value& key) const {
+    dassert(KeyString::decodeDiscriminator(
+                key.getBuffer(), key.getSize(), getOrdering(), key.getTypeBits()) ==
+            KeyString::Discriminator::kInclusive);
+
+    auto cursor = newCursor(opCtx);
+    auto ksEntry = cursor->seekForKeyString(key);
+    if (!ksEntry) {
+        return boost::none;
+    }
+
+    auto sizeWithoutRecordId = KeyFormat::Long == _rsKeyFormat
+        ? KeyString::sizeWithoutRecordIdLongAtEnd(ksEntry->keyString.getBuffer(),
+                                                  ksEntry->keyString.getSize())
+        : KeyString::sizeWithoutRecordIdStrAtEnd(ksEntry->keyString.getBuffer(),
+                                                 ksEntry->keyString.getSize());
+    if (KeyString::compare(
+            ksEntry->keyString.getBuffer(), key.getBuffer(), sizeWithoutRecordId, key.getSize()) ==
+        0) {
+        return ksEntry->loc;
+    }
+    return boost::none;
+}
+
 void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                                    long long* numKeysOut,
                                    IndexValidateResults* fullResults) const {
@@ -846,56 +871,6 @@ public:
         dassert(!_id.isNull());
 
         return getKeyStringEntry();
-    }
-
-    boost::optional<KeyStringEntry> seekExactForKeyString(const KeyString::Value& key) override {
-        dassert(KeyString::decodeDiscriminator(
-                    key.getBuffer(), key.getSize(), _idx.getOrdering(), key.getTypeBits()) ==
-                KeyString::Discriminator::kInclusive);
-        // seekExact is only used on the _id index, which only uses the Long format.
-        invariant(KeyFormat::Long == _idx.rsKeyFormat());
-
-        auto ksEntry = [&]() {
-            if (_forward) {
-                return seekForKeyString(key);
-            }
-
-            // Append a kExclusiveAfter discriminator if it's a reverse cursor to ensure that the
-            // KeyString we construct will always be greater than the KeyString that we retrieve
-            // (even when it has a RecordId).
-            KeyString::Builder keyCopy(_idx.getKeyStringVersion(), _idx.getOrdering());
-
-            // Reset by copying all but the last byte, the kEnd byte.
-            keyCopy.resetFromBuffer(key.getBuffer(), key.getSize() - 1);
-
-            // Append a different discriminator and new end byte.
-            keyCopy.appendDiscriminator(KeyString::Discriminator::kExclusiveAfter);
-            return seekForKeyString(keyCopy.getValueCopy());
-        }();
-
-        if (!ksEntry) {
-            return {};
-        }
-
-        if (KeyString::compare(ksEntry->keyString.getBuffer(),
-                               key.getBuffer(),
-                               KeyString::sizeWithoutRecordIdLongAtEnd(
-                                   ksEntry->keyString.getBuffer(), ksEntry->keyString.getSize()),
-                               key.getSize()) == 0) {
-            return KeyStringEntry(ksEntry->keyString, ksEntry->loc);
-        }
-        return {};
-    }
-
-    boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyStringValue,
-                                             RequestedInfo parts) override {
-        auto ksEntry = seekExactForKeyString(keyStringValue);
-        if (ksEntry) {
-            auto kv = curr(parts);
-            invariant(kv);
-            return kv;
-        }
-        return {};
     }
 
     void save() override {

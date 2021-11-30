@@ -206,6 +206,11 @@ public:
         return Status::OK();
     }
 
+    virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                              const KeyString::Value& keyString) const override {
+        return boost::none;
+    }
+
     virtual void fullValidate(OperationContext* opCtx,
                               long long* numKeysOut,
                               IndexValidateResults* fullResults) const {}

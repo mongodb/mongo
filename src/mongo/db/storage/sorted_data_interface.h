@@ -120,6 +120,14 @@ public:
                          bool dupsAllowed) = 0;
 
     /**
+     * Retuns the RecordId of the first key whose prefix matches this KeyString.
+     *
+     * This will not accept a KeyString with a Discriminator other than kInclusive.
+     */
+    virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                              const KeyString::Value& keyString) const = 0;
+
+    /**
      * Return ErrorCodes::DuplicateKey if there is more than one occurence of 'KeyString' in this
      * index, and Status::OK() otherwise. This call is only allowed on a unique index, and will
      * invariant otherwise.
@@ -296,31 +304,6 @@ public:
          */
         virtual boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
                                                     RequestedInfo parts = kKeyAndLoc) = 0;
-
-        /**
-         * Seeks to a key with a hint to the implementation that you only want exact matches. If
-         * an exact match can't be found, boost::none will be returned and the resulting
-         * position of the cursor is unspecified.
-         *
-         * This will not accept a KeyString with a Discriminator other than kInclusive. Since
-         * keys are not stored with Discriminators, an exact match would never be found.
-         */
-        virtual boost::optional<KeyStringEntry> seekExactForKeyString(
-            const KeyString::Value& keyString) = 0;
-
-        /**
-         * Seeks to a key with a hint to the implementation that you only want exact matches. If
-         * an exact match can't be found, boost::none will be returned and the resulting
-         * position of the cursor is unspecified.
-         *
-         * This will not accept a KeyString with a Discriminator other than kInclusive. Since
-         * keys are not stored with Discriminators, an exact match would never be found.
-         *
-         * Unlike the previous method, this one will return IndexKeyEntry if an exact match is
-         * found.
-         */
-        virtual boost::optional<IndexKeyEntry> seekExact(const KeyString::Value& keyString,
-                                                         RequestedInfo parts = kKeyAndLoc) = 0;
 
         //
         // Saving and restoring state
