@@ -359,9 +359,30 @@ void BuilderBase<BufferT>::appendBSONElement(const BSONElement& elem, const Stri
 }
 
 template <class BufferT>
+void BuilderBase<BufferT>::appendBool(bool val) {
+    _verifyAppendingState();
+    _appendBool(val, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
 void BuilderBase<BufferT>::appendString(StringData val) {
     _verifyAppendingState();
     _appendString(val, _shouldInvertOnAppend(), nullptr);
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendSymbol(StringData val) {
+    _verifyAppendingState();
+    _appendSymbol(val, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendCode(StringData val) {
+    _verifyAppendingState();
+    _appendCode(val, _shouldInvertOnAppend());
     _elemCount++;
 }
 
@@ -380,6 +401,20 @@ void BuilderBase<BufferT>::appendNumberLong(long long num) {
 }
 
 template <class BufferT>
+void BuilderBase<BufferT>::appendNumberInt(int num) {
+    _verifyAppendingState();
+    _appendNumberInt(num, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendNumberDecimal(Decimal128 num) {
+    _verifyAppendingState();
+    _appendNumberDecimal(num, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
 void BuilderBase<BufferT>::appendNull() {
     _verifyAppendingState();
     _append(CType::kNullish, _shouldInvertOnAppend());
@@ -394,9 +429,23 @@ void BuilderBase<BufferT>::appendUndefined() {
 }
 
 template <class BufferT>
+void BuilderBase<BufferT>::appendCodeWString(const BSONCodeWScope& val) {
+    _verifyAppendingState();
+    _appendCodeWString(val, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
 void BuilderBase<BufferT>::appendBinData(const BSONBinData& data) {
     _verifyAppendingState();
     _appendBinData(data, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendRegex(const BSONRegEx& val) {
+    _verifyAppendingState();
+    _appendRegex(val, _shouldInvertOnAppend());
     _elemCount++;
 }
 
@@ -418,6 +467,41 @@ template <class BufferT>
 void BuilderBase<BufferT>::appendDate(Date_t date) {
     _verifyAppendingState();
     _appendDate(date, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendTimestamp(Timestamp val) {
+    _verifyAppendingState();
+    _appendTimestamp(val, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendBytes(const void* source, size_t bytes) {
+    _verifyAppendingState();
+    _appendBytes(source, bytes, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendDBRef(const BSONDBRef& val) {
+    _verifyAppendingState();
+    _appendDBRef(val, _shouldInvertOnAppend());
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendObject(const BSONObj& val, const StringTransformFn& f) {
+    _verifyAppendingState();
+    _appendObject(val, _shouldInvertOnAppend(), f);
+    _elemCount++;
+}
+
+template <class BufferT>
+void BuilderBase<BufferT>::appendArray(const BSONArray& val, const StringTransformFn& f) {
+    _verifyAppendingState();
+    _appendArray(val, _shouldInvertOnAppend(), f);
     _elemCount++;
 }
 
