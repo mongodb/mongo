@@ -77,6 +77,10 @@ public:
                  CanonicalQuery* cq);
 
     static bool canUseSubplanning(const CanonicalQuery& query);
+    static bool needsSubplanning(const CanonicalQuery& query) {
+        return internalQueryPlanOrChildrenIndependently.load() &&
+            SubplanStage::canUseSubplanning(query);
+    }
 
     bool isEOF() final;
     StageState doWork(WorkingSetID* out) final;

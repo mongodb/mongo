@@ -316,6 +316,13 @@ const groupPossiblyPushedDown = {
 assertNoGroupPushdown(coll,
                       [matchWithOr, groupPossiblyPushedDown],
                       [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
+// A trival $and with only one $or will be optimized away and thus $or will be the top expression.
+const matchWithTrivialAndOr = {
+    $match: {$and: [{$or: [{"item": "a"}, {"price": 10}]}]}
+};
+assertNoGroupPushdown(coll,
+                      [matchWithTrivialAndOr, groupPossiblyPushedDown],
+                      [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
 
 // $bucketAuto/$bucket/$sortByCount are sugared $group stages which are not compatible with SBE.
 // TODO SERVER-60300: When we support pushdown of these stages, change these assertions to check

@@ -603,8 +603,7 @@ public:
             }
         }
 
-        if (internalQueryPlanOrChildrenIndependently.load() &&
-            SubplanStage::canUseSubplanning(*_cq)) {
+        if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",

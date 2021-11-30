@@ -49,6 +49,7 @@
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
+#include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/working_set.h"
@@ -122,7 +123,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     // because subplanning does not expect that the base query has pushed down $group stage(s) but
     // it does when $group stage exist in pipeline.
     // TODO SERVER-60197: Remove this check after supporting this scenario.
-    auto queryNeedsSubplanning = cq->getQueryObj().hasField("$or");
+    auto queryNeedsSubplanning = SubplanStage::needsSubplanning(*cq);
 
     // This handles the case of unionWith against an unknown collection.
     if (collection == nullptr) {
