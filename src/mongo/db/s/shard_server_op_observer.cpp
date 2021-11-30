@@ -606,7 +606,7 @@ void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const std::vector<BSONObj>& indexes,
                                               bool fromMigrate) {
     abortOngoingMigrationIfNeeded(opCtx, nss);
-};
+}
 
 void ShardServerOpObserver::onStartIndexBuildSinglePhase(OperationContext* opCtx,
                                                          const NamespaceString& nss) {

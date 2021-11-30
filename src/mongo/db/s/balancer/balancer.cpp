@@ -500,7 +500,6 @@ void Balancer::_mainThread() {
 
     _actionStreamConsumerThread = stdx::thread([&] { _consumeActionStreamLoop(); });
 
-
     LOGV2(6036606, "Balancer worker thread initialised. Entering main loop.");
 
     // Main balancer loop

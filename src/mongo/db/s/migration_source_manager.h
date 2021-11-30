@@ -39,7 +39,6 @@
 
 namespace mongo {
 
-class OperationContext;
 struct ShardingStatistics;
 
 /**
@@ -98,11 +97,6 @@ public:
     ~MigrationSourceManager();
 
     /**
-     * Returns the namespace for which this source manager is active.
-     */
-    NamespaceString getNss() const;
-
-    /**
      * Contacts the donor shard and tells it to start cloning the specified chunk. This method will
      * fail if for any reason the donor shard fails to initiate the cloning sequence.
      *
@@ -153,16 +147,6 @@ public:
      * Resulting state: kDone
      */
     Status commitChunkMetadataOnConfig();
-
-    /**
-     * May be called at any time. Unregisters the migration source manager from the collection,
-     * restores the committed metadata (if in critical section) and logs error in the change log to
-     * indicate that the migration has failed.
-     *
-     * Expected state: Any
-     * Resulting state: kDone
-     */
-    void cleanupOnError();
 
     /**
      * Aborts the migration after observing a concurrent index operation by marking its operation
@@ -216,6 +200,16 @@ private:
      */
     void _cleanup(bool completeMigration) noexcept;
 
+    /**
+     * May be called at any time. Unregisters the migration source manager from the collection,
+     * restores the committed metadata (if in critical section) and logs error in the change log to
+     * indicate that the migration has failed.
+     *
+     * Expected state: Any
+     * Resulting state: kDone
+     */
+    void _cleanupOnError();
+
     // This is the opCtx of the moveChunk request that constructed the MigrationSourceManager.
     // The caller must guarantee it outlives the MigrationSourceManager.
     OperationContext* const _opCtx;
@@ -231,6 +225,12 @@ private:
 
     // Stores a reference to the process sharding statistics object which needs to be updated
     ShardingStatistics& _stats;
+
+    // Information about the moveChunk to be used in the critical section.
+    const BSONObj _critSecReason;
+
+    // It states whether the critical section has to be acquired on the recipient.
+    const bool _acquireCSOnRecipient;
 
     // Times the entire moveChunk operation
     const Timer _entireOpTimer;
@@ -249,11 +249,11 @@ private:
     boost::optional<UUID> _collectionUUID;
 
     // The version of the chunk at the time the migration started.
-    ChunkVersion _chunkVersion;
+    boost::optional<ChunkVersion> _chunkVersion;
 
     // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
     // correctly updated based on whether the migration committed or aborted.
-    std::unique_ptr<migrationutil::MigrationCoordinator> _coordinator;
+    boost::optional<migrationutil::MigrationCoordinator> _coordinator;
 
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, a collection lock and the CSRLock need to be acquired first in order to block all
@@ -261,21 +261,17 @@ private:
     // cloning stage has completed.
     std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
 
+    // Holds the in-memory critical section for the collection. Only set when migration has reached
+    // the critical section phase.
+    boost::optional<CollectionCriticalSection> _critSec;
+
     // The statistics about a chunk migration to be included in moveChunk.commit
     BSONObj _recipientCloneCounts;
-
-    boost::optional<CollectionCriticalSection> _critSec;
 
     // Optional future that is populated if the migration succeeds and range deletion is scheduled
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was
     // sent with waitForDelete.
     boost::optional<SemiFuture<void>> _cleanupCompleteFuture;
-
-    // Information about the moveChunk to be used in the critical section.
-    const BSONObj _critSecReason;
-
-    // It states whether the critical section has to be acquired on the recipient.
-    const bool _acquireCSOnRecipient;
 };
 
 }  // namespace mongo
