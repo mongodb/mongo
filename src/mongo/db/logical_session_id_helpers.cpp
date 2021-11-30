@@ -93,6 +93,20 @@ bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId) {
     return sessionId.getTxnNumber().has_value();
 }
 
+LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid,
+                                                          TxnNumber txnNumber) {
+    auto lsid = LogicalSessionId(parentLsid.getId(), parentLsid.getUid());
+    lsid.getInternalSessionFields().setTxnNumber(txnNumber);
+    lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
+    return lsid;
+}
+
+LogicalSessionId makeLogicalSessionIdWithTxnUUID(const LogicalSessionId& parentLsid) {
+    auto lsid = LogicalSessionId(parentLsid.getId(), parentLsid.getUid());
+    lsid.getInternalSessionFields().setTxnUUID(UUID::gen());
+    return lsid;
+}
+
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient,
                                       OperationContext* opCtx,
                                       std::initializer_list<Privilege> allowSpoof) {

@@ -126,7 +126,7 @@ structs:
         unstable: false
 
   OperationSessionInfo:
-    description: "Parser for serializing sessionId/txnNumber combination"
+    description: "Parser for serializing session transaction metadata"
     strict: false
     fields:
       lsid:
@@ -142,9 +142,17 @@ structs:
         description: "The transaction retry counter for this transaction."
         type: TxnRetryCounter
         optional: true
+      autocommit:
+        type: bool
+        optional: true
+      startTransaction:
+        description: "Used to indicate that a command is the start of a multi-statement
+                      transaction."
+        type: bool
+        optional: true
 
   OperationSessionInfoFromClient:
-    description: "Parser for pulling out the sessionId/txnNumber combination from commands"
+    description: "Parser for pulling out session transaction metadata from commands"
     strict: false
     fields:
       lsid:

@@ -67,6 +67,13 @@ LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId);
 bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId);
 
 /**
+ * Helpers to make internal sessions.
+ */
+LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid,
+                                                          TxnNumber txnNumber);
+LogicalSessionId makeLogicalSessionIdWithTxnUUID(const LogicalSessionId& parentLsid);
+
+/**
  * Factory functions to generate logical session records.
  */
 LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& lsid,

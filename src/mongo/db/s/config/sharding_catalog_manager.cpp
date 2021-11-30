@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -822,6 +823,35 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
     }
 
     return result.front().getOwned();
+}
+
+void ShardingCatalogManager::withTransactionAPI(
+    OperationContext* opCtx,
+    const NamespaceString& namespaceForInitialFind,
+    unique_function<SemiFuture<void>(const txn_api::TransactionClient& txnClient,
+                                     ExecutorPtr txnExec)> func) {
+    // Callers should check this, but including as a sanity check.
+    uassert(ErrorCodes::IllegalOperation,
+            "Internal transaction API not enabled",
+            feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                serverGlobalParams.featureCompatibility));
+
+    auto txn = std::make_shared<txn_api::TransactionWithRetries>(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+    txn->runSync(opCtx,
+                 [&func, namespaceForInitialFind](const txn_api::TransactionClient& txnClient,
+                                                  ExecutorPtr txnExec) -> SemiFuture<void> {
+                     // Begin the transaction with a noop find.
+                     FindCommandRequest findCommand(namespaceForInitialFind);
+                     findCommand.setBatchSize(0);
+                     findCommand.setSingleBatch(true);
+                     return txnClient.exhaustiveFind(findCommand)
+                         .thenRunOn(txnExec)
+                         .then([&func, &txnClient, txnExec](auto foundDocs) {
+                             return func(txnClient, txnExec);
+                         })
+                         .semi();
+                 });
 }
 
 void ShardingCatalogManager::withTransaction(

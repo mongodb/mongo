@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/transaction_api.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -176,6 +177,12 @@ public:
     //
     // General utilities related to the ShardingCatalogManager
     //
+
+    static void withTransactionAPI(
+        OperationContext* opCtx,
+        const NamespaceString& namespaceForInitialFind,
+        unique_function<SemiFuture<void>(const txn_api::TransactionClient& txnClient,
+                                         ExecutorPtr txnExec)> func);
 
     /**
      * Starts and commits a transaction on the config server, with a no-op find on the specified
