@@ -59,6 +59,10 @@ public:
     }
 
 private:
+    bool _mustAlwaysMakeProgress() override {
+        return _doc.getPhase() >= Phase::kFreezeMigrations;
+    };
+
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();
     }
