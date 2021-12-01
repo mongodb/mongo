@@ -751,6 +751,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
 
         auto scopedCollectionDeleter = createClusteredCollection(ns, false /* prePopulate */);
 
+        Lock::GlobalLock lk{&_opCtx, MODE_IX};  // avoid global lock upgrade during insertion
         AutoGetCollectionForRead autoColl(&_opCtx, ns);
         const CollectionPtr& coll = autoColl.getCollection();
 

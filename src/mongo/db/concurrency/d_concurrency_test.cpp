@@ -2052,7 +2052,7 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnit
         ASSERT(recovUnitBorrowed->activeTransaction);
 
         {
-            Lock::GlobalLock gw2(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
+            Lock::GlobalLock gw2(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
             ASSERT(gw2.isLocked());
             ASSERT(recovUnitBorrowed->activeTransaction);
         }
@@ -2078,7 +2078,7 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
         ASSERT(recovUnitBorrowed->activeTransaction);
 
         {
-            Lock::GlobalLock gw2(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
+            Lock::GlobalLock gw2(opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
             ASSERT(gw2.isLocked());
             ASSERT(recovUnitBorrowed->activeTransaction);
         }

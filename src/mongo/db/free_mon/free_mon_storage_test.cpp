@@ -233,8 +233,8 @@ TEST_F(FreeMonStorageTest, TestSecondary) {
 void insertDoc(OperationContext* optCtx, const NamespaceString nss, StringData id) {
     auto storageInterface = repl::StorageInterface::get(optCtx);
 
-    Lock::DBLock dblk(optCtx, nss.db(), MODE_IS);
-    Lock::CollectionLock lk(optCtx, nss, MODE_IS);
+    Lock::DBLock dblk(optCtx, nss.db(), MODE_IX);
+    Lock::CollectionLock lk(optCtx, nss, MODE_IX);
 
     BSONObj fakeDoc = BSON("_id" << id);
     BSONElement elementKey = fakeDoc.firstElement();

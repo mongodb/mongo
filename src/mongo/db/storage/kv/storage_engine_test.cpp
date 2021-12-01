@@ -246,7 +246,7 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
 TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     auto opCtx = cc().makeOperationContext();
 
-    Lock::GlobalLock lk(&*opCtx, MODE_IS);
+    Lock::GlobalLock lk(&*opCtx, MODE_IX);
 
     const NamespaceString ns("db.coll1");
     const std::string indexName("a_1");
@@ -285,7 +285,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
 TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     auto opCtx = cc().makeOperationContext();
 
-    Lock::GlobalLock lk(&*opCtx, MODE_IS);
+    Lock::GlobalLock lk(&*opCtx, MODE_IX);
 
     const NamespaceString ns("db.coll1");
     const std::string indexName("a_1");
@@ -327,7 +327,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
 TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     auto opCtx = cc().makeOperationContext();
 
-    Lock::GlobalLock lk(&*opCtx, MODE_IS);
+    Lock::GlobalLock lk(&*opCtx, MODE_IX);
 
     const NamespaceString ns("db.coll1");
     const std::string indexA("a_1");
