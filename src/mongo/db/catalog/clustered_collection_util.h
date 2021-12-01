@@ -72,6 +72,11 @@ bool matchesClusterKey(const BSONObj& obj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo);
 
 /**
+ * Returns true if the collection is clustered on the _id field.
+ */
+bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo);
+
+/**
  * Returns the field name of a cluster key.
  */
 StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec);

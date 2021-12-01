@@ -97,6 +97,14 @@ BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo) 
     return bob.obj();
 }
 
+
+bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo) {
+    if (!collInfo) {
+        return false;
+    }
+    return clustered_util::matchesClusterKey(BSON("_id" << 1), collInfo);
+}
+
 bool matchesClusterKey(const BSONObj& obj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo) {
     const auto nFields = obj.nFields();

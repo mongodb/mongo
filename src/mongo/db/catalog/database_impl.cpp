@@ -41,6 +41,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -870,6 +871,10 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
 
         if (coll->getIndexCatalog()->findIdIndex(opCtx))
             continue;
+
+        if (clustered_util::isClusteredOnId(coll->getClusteredInfo())) {
+            continue;
+        }
 
         LOGV2_OPTIONS(
             20322,
