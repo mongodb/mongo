@@ -621,7 +621,7 @@ functions:
           set -o errexit
           ${virtualenv_binary} -p ${python_binary} venv
           source venv/bin/activate
-          ${pip3_binary} install pymongo[srv]
+          ${pip3_binary} install pymongo[srv]==3.12.2
           if [[ ! -d "automation-scripts" ]]; then
             git clone git@github.com:wiredtiger/automation-scripts.git
           fi
@@ -2913,7 +2913,7 @@ tasks:
             export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
             virtualenv -p python3 venv
             source venv/bin/activate
-            pip3 install lorem pymongo
+            pip3 install lorem pymongo==3.12.2
             ./run_many_coll.sh ../../mongo/build/opt/install/bin/mongod mongodb.log config/many-collection-testing many-collection clean-and-populate
 
       - command: shell.exec
@@ -2926,7 +2926,7 @@ tasks:
             set -o verbose
             virtualenv -p python3 venv
             source venv/bin/activate
-            pip3 install "pymongo[srv]"
+            pip3 install "pymongo[srv]==3.12.2"
             res_dir=`find ./ -type d -name "many-collection-[0-9]*" -print`
             ./upload-results-atlas.py ${atlas_wt_perf_test_user} ${atlas_wt_perf_pass} wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
 
