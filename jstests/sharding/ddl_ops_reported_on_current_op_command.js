@@ -55,7 +55,7 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     assert.eq(shardKey, currOp[0].command.shardKey);
 }
 
-// TODO SERVER-58912: remove mixed bin versions check when 6.0 becomes LTS, the test requires both
+// TODO SERVER-61756: remove mixed bin versions check when 6.0 becomes LTS, the test requires both
 // refineCollectionShardKey and movePrimary to use the new DDLCoordinator.
 if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shardMixedBinVersions) {
     jsTest.log(
