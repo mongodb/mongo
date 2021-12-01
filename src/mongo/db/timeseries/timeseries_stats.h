@@ -45,16 +45,17 @@ public:
     static const TimeseriesStats& get(const Collection* coll);
 
     struct CompressedBucketInfo {
+        Status result = Status::OK();
         int size = 0;
         int numInterleaveRestarts = 0;
+        bool decompressionFailed = false;
     };
 
     /**
      * Records stats for a closed time-series bucket. 'boost::none' for compressed means
      * compression failed for any reason.
      */
-    void onBucketClosed(int uncompressedSize,
-                        boost::optional<CompressedBucketInfo> compressed) const;
+    void onBucketClosed(int uncompressedSize, const CompressedBucketInfo& compressed) const;
 
     /**
      * Appends current stats to the given BSONObjBuilder.
@@ -69,5 +70,6 @@ private:
     mutable AtomicWord<long long> _compressedSubObjRestart;
     mutable AtomicWord<long long> _numCompressedBuckets;
     mutable AtomicWord<long long> _numUncompressedBuckets;
+    mutable AtomicWord<long long> _numFailedDecompressBuckets;
 };
 }  // namespace mongo

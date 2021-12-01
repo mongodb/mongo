@@ -766,11 +766,24 @@ BSONColumn::BSONColumn(BSONElement bin) {
     tassert(5857700,
             "Invalid BSON type for column",
             bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
+
     _binary = bin.binData(_size);
+    _name = bin.fieldNameStringData().toString();
+    _init();
+}
+
+BSONColumn::BSONColumn(BSONBinData bin, StringData name) {
+    tassert(6179300, "Invalid BSON type for column", bin.type == BinDataType::Column);
+    _binary = static_cast<const char*>(bin.data);
+    _size = bin.length;
+    _name = name.toString();
+    _init();
+}
+
+void BSONColumn::_init() {
     uassert(6067609, "Invalid BSON Column encoding", _size > 0);
     _elementCount = ConstDataView(_binary).read<LittleEndian<uint32_t>>();
     _maxDecodingStartPos._control = _binary;
-    _name = bin.fieldNameStringData().toString();
 }
 
 BSONColumn::Iterator BSONColumn::begin() {

@@ -40,15 +40,25 @@ namespace timeseries {
 
 /**
  * Returns a compressed timeseries bucket in v2 format for a given uncompressed v1 bucket and time
- * field. The compressed bucket will have all measurements sorted by time. 'numInterleavedRestarts'
- * may be provided to get how many times, in excess of one, subobject compression was started when
- * compressing buckets. Useful for statistics.
- *
- * If bucket compression is not possible for any reason, boost::none is returned.
+ * field. The compressed bucket will have all measurements sorted by time. If
+ * 'validateDecompression' is set to true we will validate that the bucket can be fully decompressed
+ * without any data loss.
  */
-boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
-                                        StringData timeFieldName,
-                                        int* numInterleavedRestarts = nullptr);
+struct CompressionResult {
+    // The compressed bucket, boost::none if compression failed for any reason.
+    boost::optional<BSONObj> compressedBucket;
+
+    // How many times, in excess of one, subobject compression was started when compressing buckets.
+    // Useful for statistics.
+    int numInterleavedRestarts = 0;
+
+    // Indicator if compression failed because we could not decompress without data loss.
+    bool decompressionFailed = false;
+};
+CompressionResult compressBucket(const BSONObj& bucketDoc,
+                                 StringData timeFieldName,
+                                 const NamespaceString& nss,
+                                 bool validateDecompression);
 
 }  // namespace timeseries
 }  // namespace mongo

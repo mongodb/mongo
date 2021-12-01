@@ -44,15 +44,19 @@ const TimeseriesStats& TimeseriesStats::get(const Collection* coll) {
 }
 
 void TimeseriesStats::onBucketClosed(int uncompressedSize,
-                                     boost::optional<CompressedBucketInfo> compressed) const {
+                                     const CompressedBucketInfo& compressed) const {
     _uncompressedSize.fetchAndAddRelaxed(uncompressedSize);
-    if (compressed) {
-        _compressedSize.fetchAndAddRelaxed(compressed->size);
-        _compressedSubObjRestart.fetchAndAddRelaxed(compressed->numInterleaveRestarts);
+    if (compressed.result.isOK() && compressed.size > 0) {
+        _compressedSize.fetchAndAddRelaxed(compressed.size);
+        _compressedSubObjRestart.fetchAndAddRelaxed(compressed.numInterleaveRestarts);
         _numCompressedBuckets.fetchAndAddRelaxed(1);
     } else {
         _compressedSize.fetchAndAddRelaxed(uncompressedSize);
         _numUncompressedBuckets.fetchAndAddRelaxed(1);
+
+        if (compressed.decompressionFailed) {
+            _numFailedDecompressBuckets.fetchAndAddRelaxed(1);
+        }
     }
 }
 
@@ -62,6 +66,7 @@ void TimeseriesStats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("numSubObjCompressionRestart", _compressedSubObjRestart.load());
     builder->appendNumber("numCompressedBuckets", _numCompressedBuckets.load());
     builder->appendNumber("numUncompressedBuckets", _numUncompressedBuckets.load());
+    builder->appendNumber("numFailedDecompressBuckets", _numFailedDecompressBuckets.load());
 }
 
 }  // namespace mongo

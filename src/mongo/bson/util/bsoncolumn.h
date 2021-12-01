@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/simple8b.h"
 
@@ -59,6 +60,7 @@ namespace mongo {
 class BSONColumn {
 public:
     BSONColumn(BSONElement bin);
+    BSONColumn(BSONBinData bin, StringData name);
 
     /**
      * Forward iterator type to access BSONElement from BSONColumn.
@@ -376,6 +378,11 @@ private:
 
         bool _contiguousEnabled = false;
     };
+
+    /**
+     * Initializes the BSONColumn. '_binary', '_size' and '_name' must be set before calling this.
+     */
+    void _init();
 
     struct SubObjectAllocator;
 

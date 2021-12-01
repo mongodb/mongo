@@ -32,27 +32,32 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 
 namespace timeseries {
 
-boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
-                                        StringData timeFieldName,
-                                        int* numInterleavedRestarts) try {
+namespace {
+MONGO_FAIL_POINT_DEFINE(simulateBsonColumnCompressionDataLoss);
+}
+
+CompressionResult compressBucket(const BSONObj& bucketDoc,
+                                 StringData timeFieldName,
+                                 const NamespaceString& nss,
+                                 bool validateDecompression) try {
+    CompressionResult result;
+
     // Helper for uncompressed measurements
     struct Measurement {
         BSONElement timeField;
         std::vector<BSONElement> dataFields;
     };
-
-    if (numInterleavedRestarts) {
-        *numInterleavedRestarts = 0;
-    }
 
     BSONObjBuilder builder;                 // builder to build the compressed bucket
     std::vector<Measurement> measurements;  // Extracted measurements from uncompressed bucket
@@ -60,11 +65,18 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
     std::vector<std::pair<StringData, BSONObjIterator>>
         columns;  // Iterators to read data fields from uncompressed bucket
 
+    BSONElement bucketId;
     BSONElement controlElement;
     std::vector<BSONElement> otherElements;
 
     // Read everything from the uncompressed bucket
     for (auto& elem : bucketDoc) {
+        // Record bucketId
+        if (elem.fieldNameStringData() == "_id"_sd) {
+            bucketId = elem;
+            continue;
+        }
+
         // Record control element, we need to parse the uncompressed bucket before writing new
         // control block.
         if (elem.fieldNameStringData() == kBucketControlFieldName) {
@@ -73,7 +85,7 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
         }
 
         // Everything that's not under data or control is left as-is, record elements so we can
-        // write later (we want control to be first).
+        // write later (we want _id and control to be first).
         if (elem.fieldNameStringData() != kBucketDataFieldName) {
             otherElements.push_back(elem);
             continue;
@@ -91,7 +103,7 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
 
     // If provided time field didn't exist then there is nothing to do
     if (!time) {
-        return boost::none;
+        return result;
     }
 
     // Read all measurements from bucket
@@ -141,7 +153,7 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
         LOGV2_DEBUG(5857801,
                     1,
                     "Failed to parse timeseries bucket during compression, leaving uncompressed");
-        return boost::none;
+        return result;
     }
 
     // Sort all the measurements on time order.
@@ -150,6 +162,11 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
               [](const Measurement& lhs, const Measurement& rhs) {
                   return lhs.timeField.timestamp() < rhs.timeField.timestamp();
               });
+
+    // Write _id unless EOO which it can be in some unittests
+    if (!bucketId.eoo()) {
+        builder.append(bucketId);
+    }
 
     // Write control block
     {
@@ -182,6 +199,61 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
 
     // Last, compress elements and build compressed bucket
     {
+        // Helper to validate compressed data by binary comparing decompressed with original.
+        auto validate = [&](BSONBinData binary, StringData fieldName, auto getField) {
+            if (!validateDecompression)
+                return true;
+
+            BSONColumn col(binary, ""_sd);
+            auto measurementEnd = measurements.end();
+            auto columnEnd = col.end();
+
+            auto res =
+                std::mismatch(measurements.begin(),
+                              measurementEnd,
+                              col.begin(),
+                              columnEnd,
+                              [&getField](const auto& measurement, BSONElement decompressed) {
+                                  return getField(measurement).binaryEqualValues(decompressed);
+                              });
+
+
+            // If both are at end then there is no mismatch
+            if (res.first == measurementEnd && res.second == columnEnd) {
+                return true;
+            }
+
+            // If one is at end then we have a size mismatch
+            if (res.first == measurementEnd || res.second == columnEnd) {
+                LOGV2_ERROR(
+                    6179302,
+                    "Time-series bucket compression failed due to decompression size mismatch",
+                    logAttrs(nss),
+                    "bucketId"_attr = bucketId.wrap(),
+                    "original"_attr = measurements.size(),
+                    "decompressed"_attr = col.size(),
+                    "bucket"_attr = redact(bucketDoc));
+                // invariant in debug builds to generate dump
+                dassert(simulateBsonColumnCompressionDataLoss.shouldFail());
+                return false;
+            }
+
+            // Otherwise the elements themselves don't match
+            auto index = std::distance(measurements.begin(), res.first);
+            LOGV2_ERROR(6179301,
+                        "Time-series bucket compression failed due to decompression data loss",
+                        logAttrs(nss),
+                        "bucketId"_attr = bucketId.wrap(),
+                        "index"_attr = index,
+                        "type"_attr = getField(*res.first).type(),
+                        "original"_attr = redact(getField(*res.first).wrap()),
+                        "decompressed"_attr = redact(res.second->wrap()),
+                        "bucket"_attr = redact(bucketDoc));
+            // invariant in debug builds to generate dump
+            dassert(simulateBsonColumnCompressionDataLoss.shouldFail());
+            return false;
+        };
+
         BSONObjBuilder dataBuilder = builder.subobjStart(kBucketDataFieldName);
         BufBuilder columnBuffer;  // Reusable buffer to avoid extra allocs per column.
 
@@ -191,7 +263,31 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
             for (const auto& measurement : measurements) {
                 timeColumn.append(measurement.timeField);
             }
-            dataBuilder.append(timeFieldName, timeColumn.finalize());
+            BSONBinData timeBinary = timeColumn.finalize();
+
+            // Simulate compression data loss by tampering with original data when FailPoint is set.
+            // This should be detected in the validate call below.
+            std::unique_ptr<char[]> tamperedData;
+            if (MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail() &&
+                               !measurements.empty())) {
+                // We copy the entire BSONElement and modify the first value byte. The original
+                // BSONElement is not touched
+                BSONElement elem = measurements.front().timeField;
+                tamperedData.reset(new char[elem.size()]);
+                memcpy(tamperedData.get(), elem.rawdata(), elem.size());
+
+                BSONElement tampered(tamperedData.get());
+                ++(*const_cast<char*>(tampered.value()));
+                measurements.front().timeField = tampered;
+            }
+
+            if (!validate(timeBinary, timeFieldName, [](const auto& measurement) {
+                    return measurement.timeField;
+                })) {
+                result.decompressionFailed = true;
+                return result;
+            }
+            dataBuilder.append(timeFieldName, timeBinary);
             columnBuffer = timeColumn.detach();
         }
 
@@ -205,25 +301,33 @@ boost::optional<BSONObj> compressBucket(const BSONObj& bucketDoc,
                     column.skip();
                 }
             }
-            dataBuilder.append(column.fieldName(), column.finalize());
+            BSONBinData dataBinary = column.finalize();
+            if (!validate(dataBinary, column.fieldName(), [i](const auto& measurement) {
+                    return measurement.dataFields[i];
+                })) {
+                result.decompressionFailed = true;
+                return result;
+            }
+            dataBuilder.append(column.fieldName(), dataBinary);
             // We only record when the interleaved mode has to re-start. i.e. when more than one
             // interleaved start control byte was written in the binary
             if (int interleavedStarts = column.numInterleavedStartWritten();
-                numInterleavedRestarts && interleavedStarts > 1) {
-                *numInterleavedRestarts += interleavedStarts - 1;
+                interleavedStarts > 1) {
+                result.numInterleavedRestarts += interleavedStarts - 1;
             }
             columnBuffer = column.detach();
         }
     }
 
-    return builder.obj();
+    result.compressedBucket = builder.obj();
+    return result;
 } catch (...) {
     // Skip compression if we encounter any exception
     LOGV2_DEBUG(5857800,
                 1,
                 "Exception when compressing timeseries bucket, leaving it uncompressed",
                 "error"_attr = exceptionToStatus());
-    return boost::none;
+    return {};
 }
 
 }  // namespace timeseries

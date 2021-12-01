@@ -87,6 +87,13 @@ server_parameters:
             name: StorageDirectoryPerDbParameter
             override_ctor: true
 
+    timeseriesValidateCompressedBuckets:
+        description: 'Validate that there is no data loss before committing compressed timeseries buckets'
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gValidateTimeseriesCompression
+        default: true
+
 feature_flags:
     featureFlagClusteredIndexes:
         description: "When enabled, support non time-series collections with clustered indexes"

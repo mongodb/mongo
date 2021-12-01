@@ -218,7 +218,7 @@ TEST_F(BucketUnpackerTest, ExcludeASingleField) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
@@ -244,7 +244,7 @@ TEST_F(BucketUnpackerTest, EmptyIncludeGetsEmptyMeasurements) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
@@ -272,7 +272,7 @@ TEST_F(BucketUnpackerTest, EmptyExcludeMaterializesAllFields) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther) {
@@ -298,7 +298,7 @@ TEST_F(BucketUnpackerTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther)
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
@@ -327,7 +327,7 @@ TEST_F(BucketUnpackerTest, UnpackBasicIncludeWithDollarPrefix) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
@@ -352,7 +352,7 @@ TEST_F(BucketUnpackerTest, BucketsWithMetadataOnly) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnorderedRowKeysDoesntAffectMaterialization) {
@@ -410,7 +410,7 @@ TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadata) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, MissingMetaFieldDoesntMaterializeMetadataUnorderedKeys) {
@@ -465,7 +465,7 @@ TEST_F(BucketUnpackerTest, ExcludedMetaFieldDoesntMaterializeMetadataWhenBucketH
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
@@ -484,7 +484,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUndefinedMeta) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
@@ -504,7 +504,7 @@ TEST_F(BucketUnpackerTest, UnpackerResetThrowsOnUnexpectedMeta) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
@@ -531,7 +531,7 @@ TEST_F(BucketUnpackerTest, NullMetaInBucketMaterializesAsNull) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
@@ -563,7 +563,7 @@ TEST_F(BucketUnpackerTest, GetNextHandlesMissingMetaInBucket) {
     };
 
     test(bucket);
-    test(*timeseries::compressBucket(bucket, "time"_sd));
+    test(*timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket);
 }
 
 TEST_F(BucketUnpackerTest, EmptyDataRegionInBucketIsTolerated) {
@@ -801,7 +801,8 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountLess) {
         "time: {'0':1, '1':2}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
-    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
     // Reduce the count by one to be 1.
     auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, -1);
 
@@ -835,7 +836,8 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMore) {
         "time: {'0':1, '1':2}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
-    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
     // Increase the count by one to be 3.
     auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 1);
 
@@ -869,7 +871,8 @@ TEST_F(BucketUnpackerTest, TamperedCompressedCountMissing) {
         "time: {'0':1, '1':2}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
-    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
     // Remove the count field
     auto modifiedCompressedBucket = modifyCompressedBucketElementCount(*compressedBucket, 0);
 
@@ -904,7 +907,8 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchDataField) {
         "time: {'0':1, '1':2}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
-    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
     // Remove an element in the "a" field.
     auto modifiedCompressedBucket =
         modifyCompressedBucketRemoveLastInField(*compressedBucket, "a"_sd);
@@ -938,7 +942,8 @@ TEST_F(BucketUnpackerTest, TamperedCompressedElementMismatchTimeField) {
         "time: {'0':1, '1':2}, "
         "a:{'0':1, '1':2}, b:{'1':1}}}");
 
-    auto compressedBucket = timeseries::compressBucket(bucket, "time"_sd);
+    auto compressedBucket =
+        timeseries::compressBucket(bucket, "time"_sd, {}, false).compressedBucket;
     // Remove an element in the time field
     auto modifiedCompressedBucket =
         modifyCompressedBucketRemoveLastInField(*compressedBucket, "time"_sd);
