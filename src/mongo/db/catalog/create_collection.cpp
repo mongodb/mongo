@@ -76,6 +76,14 @@ void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* d
 Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
                    CollectionOptions&& collectionOptions) {
+    // This must be checked before we take locks in order to avoid attempting to take multiple locks
+    // on the <db>.system.views namespace: first a IX lock on 'ns' and then a X lock on the database
+    // system.views collection.
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Cannot create a view called '" << nss.coll()
+                          << "': this is a reserved system namespace",
+            !nss.isSystemDotViews());
+
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
