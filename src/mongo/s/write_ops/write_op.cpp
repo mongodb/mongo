@@ -54,7 +54,7 @@ const WriteErrorDetail& WriteOp::getOpError() const {
 
 void WriteOp::targetWrites(OperationContext* opCtx,
                            const NSTargeter& targeter,
-                           std::vector<TargetedWrite*>* targetedWrites) {
+                           std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites) {
     auto endpoints = [&] {
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
@@ -91,9 +91,9 @@ void WriteOp::targetWrites(OperationContext* opCtx,
             endpoint.shardVersion = ChunkVersion::IGNORED();
         }
 
-        targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));
+        targetedWrites->push_back(std::make_unique<TargetedWrite>(std::move(endpoint), ref));
 
-        _childOps.back().pendingWrite = targetedWrites->back();
+        _childOps.back().pendingWrite = targetedWrites->back().get();
         _childOps.back().state = WriteOpState_Pending;
     }
 

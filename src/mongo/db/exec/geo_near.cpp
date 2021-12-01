@@ -38,7 +38,6 @@
 // For s2 search
 #include "third_party/s2/s2regionintersection.h"
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/fetch.h"

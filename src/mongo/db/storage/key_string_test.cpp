@@ -40,7 +40,6 @@
 #include <typeinfo>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"

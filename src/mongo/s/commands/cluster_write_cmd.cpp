@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"

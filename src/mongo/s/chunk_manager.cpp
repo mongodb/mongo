@@ -33,7 +33,6 @@
 
 #include "mongo/s/chunk_manager.h"
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collation_index_key.h"

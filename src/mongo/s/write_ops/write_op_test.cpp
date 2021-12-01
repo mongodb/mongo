@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mock_ns_targeter.h"
@@ -60,9 +59,10 @@ write_ops::DeleteOpEntry buildDelete(const BSONObj& query, bool multi) {
     return entry;
 }
 
-void sortByEndpoint(std::vector<TargetedWrite*>* writes) {
+void sortByEndpoint(std::vector<std::unique_ptr<TargetedWrite>>* writes) {
     struct EndpointComp {
-        bool operator()(const TargetedWrite* writeA, const TargetedWrite* writeB) const {
+        bool operator()(const std::unique_ptr<TargetedWrite>& writeA,
+                        const std::unique_ptr<TargetedWrite>& writeB) const {
             return writeA->endpoint.shardName.compare(writeB->endpoint.shardName) < 0;
         }
     };
@@ -119,8 +119,7 @@ TEST_F(WriteOpTest, TargetSingle) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
@@ -154,8 +153,7 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
                              MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
@@ -190,8 +188,7 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
                              MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 3u);
@@ -230,8 +227,7 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
                             {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 2u);
@@ -272,8 +268,7 @@ TEST_F(WriteOpTest, ErrorSingle) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
@@ -306,8 +301,7 @@ TEST_F(WriteOpTest, CancelSingle) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
@@ -339,8 +333,7 @@ TEST_F(WriteOpTest, RetrySingleOp) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
@@ -385,8 +378,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
                              MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
 
     // The write should only target shardA and shardB and send real shard versions to each.
@@ -431,8 +423,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
                             {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
 
-    OwnedPointerVector<TargetedWrite> targetedOwned;
-    std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
+    std::vector<std::unique_ptr<TargetedWrite>> targeted;
     writeOp.targetWrites(_opCtx, targeter, &targeted);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 2u);

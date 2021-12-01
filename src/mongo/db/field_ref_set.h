@@ -32,7 +32,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/field_ref.h"
 

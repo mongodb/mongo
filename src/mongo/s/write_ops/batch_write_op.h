@@ -33,7 +33,6 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -268,9 +267,7 @@ public:
         return _endpoint;
     }
 
-    const std::vector<TargetedWrite*>& getWrites() const {
-        return _writes.vector();
-    }
+    std::vector<TargetedWrite*> getWrites() const;
 
     size_t getNumOps() const {
         return _writes.size();
@@ -283,7 +280,7 @@ public:
     /**
      * TargetedWrite is owned here once given to the TargetedWriteBatch.
      */
-    void addWrite(TargetedWrite* targetedWrite, int estWriteSize);
+    void addWrite(std::unique_ptr<TargetedWrite> targetedWrite, int estWriteSize);
 
 private:
     // Where to send the batch
@@ -291,7 +288,7 @@ private:
 
     // Where the responses go
     // TargetedWrite*s are owned by the TargetedWriteBatch
-    OwnedPointerVector<TargetedWrite> _writes;
+    std::vector<std::unique_ptr<TargetedWrite>> _writes;
 
     // Conservatvely estimated size of the batch, for ensuring it doesn't grow past the maximum BSON
     // size

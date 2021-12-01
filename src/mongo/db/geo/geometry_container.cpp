@@ -55,8 +55,7 @@ PointWithCRS GeometryContainer::getPoint() const {
 bool GeometryContainer::supportsContains() const {
     return nullptr != _polygon || nullptr != _box || nullptr != _cap || nullptr != _multiPolygon ||
         (nullptr != _geometryCollection &&
-         (_geometryCollection->polygons.vector().size() > 0 ||
-          _geometryCollection->multiPolygons.vector().size() > 0));
+         (!_geometryCollection->polygons.empty() || !_geometryCollection->multiPolygons.empty()));
 }
 
 bool GeometryContainer::hasS2Region() const {
@@ -293,9 +292,8 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     }
 
     if (nullptr != otherContainer._multiLine) {
-        const vector<S2Polyline*>& lines = otherContainer._multiLine->lines.vector();
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (!contains(*lines[i])) {
+        for (const auto& line : otherContainer._multiLine->lines) {
+            if (!contains(*line)) {
                 return false;
             }
         }
@@ -303,9 +301,8 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     }
 
     if (nullptr != otherContainer._multiPolygon) {
-        const vector<S2Polygon*>& polys = otherContainer._multiPolygon->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (!contains(*polys[i])) {
+        for (const auto& polygon : otherContainer._multiPolygon->polygons) {
+            if (!contains(*polygon)) {
                 return false;
             }
         }
@@ -321,23 +318,19 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
             }
         }
 
-        const vector<LineWithCRS*>& lines = c.lines.vector();
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (!contains(lines[i]->line)) {
+        for (const auto& line : c.lines) {
+            if (!contains(line->line)) {
                 return false;
             }
         }
 
-        const vector<PolygonWithCRS*>& polys = c.polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (!contains(*polys[i]->s2Polygon)) {
+        for (const auto& polygon : c.polygons) {
+            if (!contains(*polygon->s2Polygon)) {
                 return false;
             }
         }
 
-        const vector<MultiPointWithCRS*>& multipoints = c.multiPoints.vector();
-        for (size_t i = 0; i < multipoints.size(); ++i) {
-            MultiPointWithCRS* mp = multipoints[i];
+        for (const auto& mp : c.multiPoints) {
             for (size_t j = 0; j < mp->points.size(); ++j) {
                 if (!contains(mp->cells[j], mp->points[j])) {
                     return false;
@@ -345,21 +338,17 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
             }
         }
 
-        const vector<MultiLineWithCRS*>& multilines = c.multiLines.vector();
-        for (size_t i = 0; i < multilines.size(); ++i) {
-            const vector<S2Polyline*>& lines = multilines[i]->lines.vector();
-            for (size_t j = 0; j < lines.size(); ++j) {
-                if (!contains(*lines[j])) {
+        for (const auto& multiLine : c.multiLines) {
+            for (const auto& line : multiLine->lines) {
+                if (!contains(*line)) {
                     return false;
                 }
             }
         }
 
-        const vector<MultiPolygonWithCRS*>& multipolys = c.multiPolygons.vector();
-        for (size_t i = 0; i < multipolys.size(); ++i) {
-            const vector<S2Polygon*>& polys = multipolys[i]->polygons.vector();
-            for (size_t j = 0; j < polys.size(); ++j) {
-                if (!contains(*polys[j])) {
+        for (const auto& multiPolygon : c.multiPolygons) {
+            for (const auto& polygon : multiPolygon->polygons) {
+                if (!contains(*polygon)) {
                     return false;
                 }
             }
@@ -396,28 +385,23 @@ bool GeometryContainer::contains(const S2Cell& otherCell, const S2Point& otherPo
     }
 
     if (nullptr != _multiPolygon) {
-        const vector<S2Polygon*>& polys = _multiPolygon->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (containsPoint(*polys[i], otherCell, otherPoint)) {
+        for (const auto& polys : _multiPolygon->polygons) {
+            if (containsPoint(*polys, otherCell, otherPoint)) {
                 return true;
             }
         }
     }
 
     if (nullptr != _geometryCollection) {
-        const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (containsPoint(*polys[i]->s2Polygon, otherCell, otherPoint)) {
+        for (const auto& polygon : _geometryCollection->polygons) {
+            if (containsPoint(*polygon->s2Polygon, otherCell, otherPoint)) {
                 return true;
             }
         }
 
-        const vector<MultiPolygonWithCRS*>& multipolys =
-            _geometryCollection->multiPolygons.vector();
-        for (size_t i = 0; i < multipolys.size(); ++i) {
-            const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
-            for (size_t j = 0; j < innerpolys.size(); ++j) {
-                if (containsPoint(*innerpolys[j], otherCell, otherPoint)) {
+        for (const auto& multiPolygon : _geometryCollection->multiPolygons) {
+            for (const auto& innerPolygon : multiPolygon->polygons) {
+                if (containsPoint(*innerPolygon, otherCell, otherPoint)) {
                     return true;
                 }
             }
@@ -468,28 +452,23 @@ bool GeometryContainer::contains(const S2Polyline& otherLine) const {
     }
 
     if (nullptr != _multiPolygon) {
-        const vector<S2Polygon*>& polys = _multiPolygon->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (containsLine(*polys[i], otherLine)) {
+        for (const auto& polygon : _multiPolygon->polygons) {
+            if (containsLine(*polygon, otherLine)) {
                 return true;
             }
         }
     }
 
     if (nullptr != _geometryCollection) {
-        const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (containsLine(*polys[i]->s2Polygon, otherLine)) {
+        for (const auto& polygon : _geometryCollection->polygons) {
+            if (containsLine(*polygon->s2Polygon, otherLine)) {
                 return true;
             }
         }
 
-        const vector<MultiPolygonWithCRS*>& multipolys =
-            _geometryCollection->multiPolygons.vector();
-        for (size_t i = 0; i < multipolys.size(); ++i) {
-            const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
-            for (size_t j = 0; j < innerpolys.size(); ++j) {
-                if (containsLine(*innerpolys[j], otherLine)) {
+        for (const auto& multiPolygon : _geometryCollection->multiPolygons) {
+            for (const auto& innerPolygon : multiPolygon->polygons) {
+                if (containsLine(*innerPolygon, otherLine)) {
                     return true;
                 }
             }
@@ -525,28 +504,23 @@ bool GeometryContainer::contains(const S2Polygon& otherPolygon) const {
     }
 
     if (nullptr != _multiPolygon) {
-        const vector<S2Polygon*>& polys = _multiPolygon->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (containsPolygon(*polys[i], otherPolygon)) {
+        for (const auto& polygon : _multiPolygon->polygons) {
+            if (containsPolygon(*polygon, otherPolygon)) {
                 return true;
             }
         }
     }
 
     if (nullptr != _geometryCollection) {
-        const vector<PolygonWithCRS*>& polys = _geometryCollection->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (containsPolygon(*polys[i]->s2Polygon, otherPolygon)) {
+        for (const auto& polygon : _geometryCollection->polygons) {
+            if (containsPolygon(*polygon->s2Polygon, otherPolygon)) {
                 return true;
             }
         }
 
-        const vector<MultiPolygonWithCRS*>& multipolys =
-            _geometryCollection->multiPolygons.vector();
-        for (size_t i = 0; i < multipolys.size(); ++i) {
-            const vector<S2Polygon*>& innerpolys = multipolys[i]->polygons.vector();
-            for (size_t j = 0; j < innerpolys.size(); ++j) {
-                if (containsPolygon(*innerpolys[j], otherPolygon)) {
+        for (const auto& multiPolygon : _geometryCollection->multiPolygons) {
+            for (const auto& innerPolygon : multiPolygon->polygons) {
+                if (containsPolygon(*innerPolygon, otherPolygon)) {
                     return true;
                 }
             }
@@ -581,32 +555,32 @@ bool GeometryContainer::intersects(const GeometryContainer& otherContainer) cons
             }
         }
 
-        for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-            if (intersects(*c.polygons.vector()[i]->s2Polygon)) {
+        for (size_t i = 0; i < c.polygons.size(); ++i) {
+            if (intersects(*c.polygons[i]->s2Polygon)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.lines.vector().size(); ++i) {
-            if (intersects(c.lines.vector()[i]->line)) {
+        for (size_t i = 0; i < c.lines.size(); ++i) {
+            if (intersects(c.lines[i]->line)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.multiPolygons.vector().size(); ++i) {
-            if (intersects(*c.multiPolygons.vector()[i])) {
+        for (size_t i = 0; i < c.multiPolygons.size(); ++i) {
+            if (intersects(*c.multiPolygons[i])) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.multiLines.vector().size(); ++i) {
-            if (intersects(*c.multiLines.vector()[i])) {
+        for (size_t i = 0; i < c.multiLines.size(); ++i) {
+            if (intersects(*c.multiLines[i])) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.multiPoints.vector().size(); ++i) {
-            if (intersects(*c.multiPoints.vector()[i])) {
+        for (size_t i = 0; i < c.multiPoints.size(); ++i) {
+            if (intersects(*c.multiPoints[i])) {
                 return true;
             }
         }
@@ -625,8 +599,8 @@ bool GeometryContainer::intersects(const MultiPointWithCRS& otherMultiPoint) con
 }
 
 bool GeometryContainer::intersects(const MultiLineWithCRS& otherMultiLine) const {
-    for (size_t i = 0; i < otherMultiLine.lines.vector().size(); ++i) {
-        if (intersects(*otherMultiLine.lines.vector()[i])) {
+    for (size_t i = 0; i < otherMultiLine.lines.size(); ++i) {
+        if (intersects(*otherMultiLine.lines[i])) {
             return true;
         }
     }
@@ -634,8 +608,8 @@ bool GeometryContainer::intersects(const MultiLineWithCRS& otherMultiLine) const
 }
 
 bool GeometryContainer::intersects(const MultiPolygonWithCRS& otherMultiPolygon) const {
-    for (size_t i = 0; i < otherMultiPolygon.polygons.vector().size(); ++i) {
-        if (intersects(*otherMultiPolygon.polygons.vector()[i])) {
+    for (size_t i = 0; i < otherMultiPolygon.polygons.size(); ++i) {
+        if (intersects(*otherMultiPolygon.polygons[i])) {
             return true;
         }
     }
@@ -660,16 +634,14 @@ bool GeometryContainer::intersects(const S2Cell& otherPoint) const {
             }
         }
     } else if (nullptr != _multiLine) {
-        const vector<S2Polyline*>& lines = _multiLine->lines.vector();
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (lines[i]->MayIntersect(otherPoint)) {
+        for (const auto& line : _multiLine->lines) {
+            if (line->MayIntersect(otherPoint)) {
                 return true;
             }
         }
     } else if (nullptr != _multiPolygon) {
-        const vector<S2Polygon*>& polys = _multiPolygon->polygons.vector();
-        for (size_t i = 0; i < polys.size(); ++i) {
-            if (polys[i]->MayIntersect(otherPoint)) {
+        for (const auto& polygon : _multiPolygon->polygons) {
+            if (polygon->MayIntersect(otherPoint)) {
                 return true;
             }
         }
@@ -682,20 +654,20 @@ bool GeometryContainer::intersects(const S2Cell& otherPoint) const {
             }
         }
 
-        for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-            if (c.polygons.vector()[i]->s2Polygon->MayIntersect(otherPoint)) {
+        for (size_t i = 0; i < c.polygons.size(); ++i) {
+            if (c.polygons[i]->s2Polygon->MayIntersect(otherPoint)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.lines.vector().size(); ++i) {
-            if (c.lines.vector()[i]->line.MayIntersect(otherPoint)) {
+        for (size_t i = 0; i < c.lines.size(); ++i) {
+            if (c.lines[i]->line.MayIntersect(otherPoint)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.multiPolygons.vector().size(); ++i) {
-            const vector<S2Polygon*>& innerPolys = c.multiPolygons.vector()[i]->polygons.vector();
+        for (size_t i = 0; i < c.multiPolygons.size(); ++i) {
+            const auto& innerPolys = c.multiPolygons[i]->polygons;
             for (size_t j = 0; j < innerPolys.size(); ++j) {
                 if (innerPolys[j]->MayIntersect(otherPoint)) {
                     return true;
@@ -703,8 +675,8 @@ bool GeometryContainer::intersects(const S2Cell& otherPoint) const {
             }
         }
 
-        for (size_t i = 0; i < c.multiLines.vector().size(); ++i) {
-            const vector<S2Polyline*>& innerLines = c.multiLines.vector()[i]->lines.vector();
+        for (size_t i = 0; i < c.multiLines.size(); ++i) {
+            const auto& innerLines = c.multiLines[i]->lines;
             for (size_t j = 0; j < innerLines.size(); ++j) {
                 if (innerLines[j]->MayIntersect(otherPoint)) {
                     return true;
@@ -712,8 +684,8 @@ bool GeometryContainer::intersects(const S2Cell& otherPoint) const {
             }
         }
 
-        for (size_t i = 0; i < c.multiPoints.vector().size(); ++i) {
-            const vector<S2Cell>& innerCells = c.multiPoints.vector()[i]->cells;
+        for (size_t i = 0; i < c.multiPoints.size(); ++i) {
+            const vector<S2Cell>& innerCells = c.multiPoints[i]->cells;
             for (size_t j = 0; j < innerCells.size(); ++j) {
                 if (innerCells[j].MayIntersect(otherPoint)) {
                     return true;
@@ -752,14 +724,14 @@ bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
             }
         }
     } else if (nullptr != _multiLine) {
-        for (size_t i = 0; i < _multiLine->lines.vector().size(); ++i) {
-            if (otherLine.Intersects(_multiLine->lines.vector()[i])) {
+        for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
+            if (otherLine.Intersects(_multiLine->lines[i].get())) {
                 return true;
             }
         }
     } else if (nullptr != _multiPolygon) {
-        for (size_t i = 0; i < _multiPolygon->polygons.vector().size(); ++i) {
-            if (polygonLineIntersection(otherLine, *_multiPolygon->polygons.vector()[i])) {
+        for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
+            if (polygonLineIntersection(otherLine, *_multiPolygon->polygons[i].get())) {
                 return true;
             }
         }
@@ -772,20 +744,20 @@ bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
             }
         }
 
-        for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-            if (polygonLineIntersection(otherLine, *c.polygons.vector()[i]->s2Polygon)) {
+        for (size_t i = 0; i < c.polygons.size(); ++i) {
+            if (polygonLineIntersection(otherLine, *c.polygons[i]->s2Polygon)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.lines.vector().size(); ++i) {
-            if (c.lines.vector()[i]->line.Intersects(&otherLine)) {
+        for (size_t i = 0; i < c.lines.size(); ++i) {
+            if (c.lines[i]->line.Intersects(&otherLine)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.multiPolygons.vector().size(); ++i) {
-            const vector<S2Polygon*>& innerPolys = c.multiPolygons.vector()[i]->polygons.vector();
+        for (size_t i = 0; i < c.multiPolygons.size(); ++i) {
+            const auto& innerPolys = c.multiPolygons[i]->polygons;
             for (size_t j = 0; j < innerPolys.size(); ++j) {
                 if (polygonLineIntersection(otherLine, *innerPolys[j])) {
                     return true;
@@ -793,8 +765,8 @@ bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
             }
         }
 
-        for (size_t i = 0; i < c.multiLines.vector().size(); ++i) {
-            const vector<S2Polyline*>& innerLines = c.multiLines.vector()[i]->lines.vector();
+        for (size_t i = 0; i < c.multiLines.size(); ++i) {
+            const auto& innerLines = c.multiLines[i]->lines;
             for (size_t j = 0; j < innerLines.size(); ++j) {
                 if (innerLines[j]->Intersects(&otherLine)) {
                     return true;
@@ -802,8 +774,8 @@ bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
             }
         }
 
-        for (size_t i = 0; i < c.multiPoints.vector().size(); ++i) {
-            const vector<S2Cell>& innerCells = c.multiPoints.vector()[i]->cells;
+        for (size_t i = 0; i < c.multiPoints.size(); ++i) {
+            const vector<S2Cell>& innerCells = c.multiPoints[i]->cells;
             for (size_t j = 0; j < innerCells.size(); ++j) {
                 if (otherLine.MayIntersect(innerCells[j])) {
                     return true;
@@ -832,14 +804,14 @@ bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
             }
         }
     } else if (nullptr != _multiLine) {
-        for (size_t i = 0; i < _multiLine->lines.vector().size(); ++i) {
-            if (polygonLineIntersection(*_multiLine->lines.vector()[i], otherPolygon)) {
+        for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
+            if (polygonLineIntersection(*_multiLine->lines[i], otherPolygon)) {
                 return true;
             }
         }
     } else if (nullptr != _multiPolygon) {
-        for (size_t i = 0; i < _multiPolygon->polygons.vector().size(); ++i) {
-            if (otherPolygon.Intersects(_multiPolygon->polygons.vector()[i])) {
+        for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
+            if (otherPolygon.Intersects(_multiPolygon->polygons[i].get())) {
                 return true;
             }
         }
@@ -852,29 +824,29 @@ bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
             }
         }
 
-        for (size_t i = 0; i < c.polygons.vector().size(); ++i) {
-            if (otherPolygon.Intersects(c.polygons.vector()[i]->s2Polygon.get())) {
+        for (size_t i = 0; i < c.polygons.size(); ++i) {
+            if (otherPolygon.Intersects(c.polygons[i]->s2Polygon.get())) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.lines.vector().size(); ++i) {
-            if (polygonLineIntersection(c.lines.vector()[i]->line, otherPolygon)) {
+        for (size_t i = 0; i < c.lines.size(); ++i) {
+            if (polygonLineIntersection(c.lines[i]->line, otherPolygon)) {
                 return true;
             }
         }
 
-        for (size_t i = 0; i < c.multiPolygons.vector().size(); ++i) {
-            const vector<S2Polygon*>& innerPolys = c.multiPolygons.vector()[i]->polygons.vector();
+        for (size_t i = 0; i < c.multiPolygons.size(); ++i) {
+            const auto& innerPolys = c.multiPolygons[i]->polygons;
             for (size_t j = 0; j < innerPolys.size(); ++j) {
-                if (otherPolygon.Intersects(innerPolys[j])) {
+                if (otherPolygon.Intersects(innerPolys[j].get())) {
                     return true;
                 }
             }
         }
 
-        for (size_t i = 0; i < c.multiLines.vector().size(); ++i) {
-            const vector<S2Polyline*>& innerLines = c.multiLines.vector()[i]->lines.vector();
+        for (size_t i = 0; i < c.multiLines.size(); ++i) {
+            const auto& innerLines = c.multiLines[i]->lines;
             for (size_t j = 0; j < innerLines.size(); ++j) {
                 if (polygonLineIntersection(*innerLines[j], otherPolygon)) {
                     return true;
@@ -882,8 +854,8 @@ bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
             }
         }
 
-        for (size_t i = 0; i < c.multiPoints.vector().size(); ++i) {
-            const vector<S2Cell>& innerCells = c.multiPoints.vector()[i]->cells;
+        for (size_t i = 0; i < c.multiPoints.size(); ++i) {
+            const vector<S2Cell>& innerCells = c.multiPoints[i]->cells;
             for (size_t j = 0; j < innerCells.size(); ++j) {
                 if (otherPolygon.MayIntersect(innerCells[j])) {
                     return true;
@@ -925,13 +897,13 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
         _multiLine.reset(new MultiLineWithCRS());
         status = GeoParser::parseMultiLine(obj, skipValidation, _multiLine.get());
         for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
-            regions.push_back(_multiLine->lines[i]);
+            regions.push_back(_multiLine->lines[i].get());
         }
     } else if (GeoParser::GEOJSON_MULTI_POLYGON == type) {
         _multiPolygon.reset(new MultiPolygonWithCRS());
         status = GeoParser::parseMultiPolygon(obj, skipValidation, _multiPolygon.get());
         for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
-            regions.push_back(_multiPolygon->polygons[i]);
+            regions.push_back(_multiPolygon->polygons[i].get());
         }
     } else if (GeoParser::GEOJSON_GEOMETRY_COLLECTION == type) {
         _geometryCollection.reset(new GeometryCollection());
@@ -948,21 +920,21 @@ Status GeometryContainer::parseFromGeoJSON(bool skipValidation) {
             regions.push_back(_geometryCollection->polygons[i]->s2Polygon.get());
         }
         for (size_t i = 0; i < _geometryCollection->multiPoints.size(); ++i) {
-            MultiPointWithCRS* multiPoint = _geometryCollection->multiPoints[i];
+            MultiPointWithCRS* multiPoint = _geometryCollection->multiPoints[i].get();
             for (size_t j = 0; j < multiPoint->cells.size(); ++j) {
                 regions.push_back(&multiPoint->cells[j]);
             }
         }
         for (size_t i = 0; i < _geometryCollection->multiLines.size(); ++i) {
-            const MultiLineWithCRS* multiLine = _geometryCollection->multiLines[i];
+            const MultiLineWithCRS* multiLine = _geometryCollection->multiLines[i].get();
             for (size_t j = 0; j < multiLine->lines.size(); ++j) {
-                regions.push_back(multiLine->lines[j]);
+                regions.push_back(multiLine->lines[j].get());
             }
         }
         for (size_t i = 0; i < _geometryCollection->multiPolygons.size(); ++i) {
-            const MultiPolygonWithCRS* multiPolygon = _geometryCollection->multiPolygons[i];
+            const MultiPolygonWithCRS* multiPolygon = _geometryCollection->multiPolygons[i].get();
             for (size_t j = 0; j < multiPolygon->polygons.size(); ++j) {
-                regions.push_back(multiPolygon->polygons[j]);
+                regions.push_back(multiPolygon->polygons[j].get());
             }
         }
     } else {
@@ -1185,10 +1157,8 @@ static double s2MinDistanceRad(const S2Point& s2Point, const MultiPointWithCRS& 
 
 static double s2MinDistanceRad(const S2Point& s2Point, const MultiLineWithCRS& s2MultiLine) {
     double minDistance = -1;
-    for (vector<S2Polyline*>::const_iterator it = s2MultiLine.lines.vector().begin();
-         it != s2MultiLine.lines.vector().end();
-         ++it) {
-        double nextDistance = S2Distance::minDistanceRad(s2Point, **it);
+    for (const auto& line : s2MultiLine.lines) {
+        double nextDistance = S2Distance::minDistanceRad(s2Point, *line);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }
@@ -1199,10 +1169,8 @@ static double s2MinDistanceRad(const S2Point& s2Point, const MultiLineWithCRS& s
 
 static double s2MinDistanceRad(const S2Point& s2Point, const MultiPolygonWithCRS& s2MultiPolygon) {
     double minDistance = -1;
-    for (vector<S2Polygon*>::const_iterator it = s2MultiPolygon.polygons.vector().begin();
-         it != s2MultiPolygon.polygons.vector().end();
-         ++it) {
-        double nextDistance = S2Distance::minDistanceRad(s2Point, **it);
+    for (const auto& polygon : s2MultiPolygon.polygons) {
+        double nextDistance = S2Distance::minDistanceRad(s2Point, *polygon);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }
@@ -1224,53 +1192,40 @@ static double s2MinDistanceRad(const S2Point& s2Point,
         }
     }
 
-    for (vector<LineWithCRS*>::const_iterator it = geometryCollection.lines.vector().begin();
-         it != geometryCollection.lines.vector().end();
-         ++it) {
-        invariant(SPHERE == (*it)->crs);
-        double nextDistance = S2Distance::minDistanceRad(s2Point, (*it)->line);
+    for (const auto& line : geometryCollection.lines) {
+        invariant(SPHERE == line->crs);
+        double nextDistance = S2Distance::minDistanceRad(s2Point, line->line);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }
     }
 
-    for (vector<PolygonWithCRS*>::const_iterator it = geometryCollection.polygons.vector().begin();
-         it != geometryCollection.polygons.vector().end();
-         ++it) {
-        invariant(SPHERE == (*it)->crs);
+    for (const auto& polygon : geometryCollection.polygons) {
+        invariant(SPHERE == polygon->crs);
         // We don't support distances for big polygons yet.
-        invariant(nullptr != (*it)->s2Polygon);
-        double nextDistance = S2Distance::minDistanceRad(s2Point, *((*it)->s2Polygon));
+        invariant(polygon->s2Polygon);
+        double nextDistance = S2Distance::minDistanceRad(s2Point, *(polygon->s2Polygon));
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }
     }
 
-    for (vector<MultiPointWithCRS*>::const_iterator it =
-             geometryCollection.multiPoints.vector().begin();
-         it != geometryCollection.multiPoints.vector().end();
-         ++it) {
-        double nextDistance = s2MinDistanceRad(s2Point, **it);
+    for (const auto& multiPoint : geometryCollection.multiPoints) {
+        double nextDistance = s2MinDistanceRad(s2Point, *multiPoint);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }
     }
 
-    for (vector<MultiLineWithCRS*>::const_iterator it =
-             geometryCollection.multiLines.vector().begin();
-         it != geometryCollection.multiLines.vector().end();
-         ++it) {
-        double nextDistance = s2MinDistanceRad(s2Point, **it);
+    for (const auto& multiLine : geometryCollection.multiLines) {
+        double nextDistance = s2MinDistanceRad(s2Point, *multiLine);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }
     }
 
-    for (vector<MultiPolygonWithCRS*>::const_iterator it =
-             geometryCollection.multiPolygons.vector().begin();
-         it != geometryCollection.multiPolygons.vector().end();
-         ++it) {
-        double nextDistance = s2MinDistanceRad(s2Point, **it);
+    for (const auto& multiPolygon : geometryCollection.multiPolygons) {
+        double nextDistance = s2MinDistanceRad(s2Point, *multiPolygon);
         if (minDistance < 0 || nextDistance < minDistance) {
             minDistance = nextDistance;
         }

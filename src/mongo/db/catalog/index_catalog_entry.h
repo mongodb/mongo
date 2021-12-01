@@ -33,7 +33,6 @@
 #include <functional>
 #include <string>
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"

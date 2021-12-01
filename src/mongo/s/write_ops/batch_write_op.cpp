@@ -31,7 +31,6 @@
 
 #include "mongo/s/write_ops/batch_write_op.h"
 
-#include <memory>
 #include <numeric>
 
 #include "mongo/base/error_codes.h"
@@ -89,9 +88,9 @@ void buildTargetError(const Status& errStatus, WriteErrorDetail* details) {
 /**
  * Helper to determine whether a number of targeted writes require a new targeted batch.
  */
-bool isNewBatchRequiredOrdered(const std::vector<TargetedWrite*>& writes,
+bool isNewBatchRequiredOrdered(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
                                const TargetedBatchMap& batchMap) {
-    for (const auto write : writes) {
+    for (auto&& write : writes) {
         if (batchMap.find(&write->endpoint) == batchMap.end()) {
             return true;
         }
@@ -105,10 +104,10 @@ bool isNewBatchRequiredOrdered(const std::vector<TargetedWrite*>& writes,
  * necessitates a new batch. This happens when a batch write incldues a multi target write and
  * a single target write.
  */
-bool isNewBatchRequiredUnordered(const std::vector<TargetedWrite*>& writes,
+bool isNewBatchRequiredUnordered(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
                                  const TargetedBatchMap& batchMap,
                                  const std::set<ShardId>& targetedShards) {
-    for (const auto write : writes) {
+    for (auto&& write : writes) {
         if (batchMap.find(&write->endpoint) == batchMap.end()) {
             if (targetedShards.find((&write->endpoint)->shardName) != targetedShards.end()) {
                 return true;
@@ -122,10 +121,10 @@ bool isNewBatchRequiredUnordered(const std::vector<TargetedWrite*>& writes,
 /**
  * Helper to determine whether a number of targeted writes require a new targeted batch.
  */
-bool wouldMakeBatchesTooBig(const std::vector<TargetedWrite*>& writes,
+bool wouldMakeBatchesTooBig(const std::vector<std::unique_ptr<TargetedWrite>>& writes,
                             int writeSizeBytes,
                             const TargetedBatchMap& batchMap) {
-    for (const auto write : writes) {
+    for (auto&& write : writes) {
         TargetedBatchMap::const_iterator it = batchMap.find(&write->endpoint);
         if (it == batchMap.end()) {
             // If this is the first item in the batch, it can't be too big
@@ -322,9 +321,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         // Get TargetedWrites from the targeter for the write operation
         //
         // TargetedWrites need to be owned once returned
-
-        OwnedPointerVector<TargetedWrite> writesOwned;
-        std::vector<TargetedWrite*>& writes = writesOwned.mutableVector();
+        std::vector<std::unique_ptr<TargetedWrite>> writes;
 
         Status targetStatus = Status::OK();
         try {
@@ -417,7 +414,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         // Targeting went ok, add to appropriate TargetedBatch
         //
 
-        for (const auto write : writes) {
+        for (auto&& write : writes) {
             TargetedBatchMap::iterator batchIt = batchMap.find(&write->endpoint);
             if (batchIt == batchMap.end()) {
                 TargetedWriteBatch* newBatch = new TargetedWriteBatch(write->endpoint);
@@ -426,11 +423,12 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             }
 
             TargetedWriteBatch* batch = batchIt->second;
-            batch->addWrite(write, std::max(writeSizeBytes, errorResponsePotentialSizeBytes));
+            batch->addWrite(std::move(write),
+                            std::max(writeSizeBytes, errorResponsePotentialSizeBytes));
         }
 
         // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
-        writesOwned.mutableVector().clear();
+        writes.clear();
 
         //
         // Break if we're ordered and we have more than one endpoint - later writes cannot be
@@ -638,10 +636,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     std::vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
     int index = 0;
     WriteErrorDetail* lastError = nullptr;
-    for (std::vector<TargetedWrite*>::const_iterator it = targetedBatch.getWrites().begin();
-         it != targetedBatch.getWrites().end();
-         ++it, ++index) {
-        const TargetedWrite* write = *it;
+    for (auto&& write : targetedBatch.getWrites()) {
         WriteOp& writeOp = _writeOps[write->writeOpRef.first];
 
         dassert(writeOp.getWriteState() == WriteOpState_Pending);
@@ -668,6 +663,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
             writeOp.noteWriteError(*write, *writeError);
             lastError = writeError;
         }
+        ++index;
     }
 
     // Track errors we care about, whether batch or individual errors
@@ -977,8 +973,15 @@ const std::vector<ShardError>& TrackedErrors::getErrors(int errCode) const {
     return _errorMap.find(errCode)->second;
 }
 
-void TargetedWriteBatch::addWrite(TargetedWrite* targetedWrite, int estWriteSize) {
-    _writes.mutableVector().push_back(targetedWrite);
+std::vector<TargetedWrite*> TargetedWriteBatch::getWrites() const {
+    std::vector<TargetedWrite*> rv;
+    std::transform(
+        _writes.begin(), _writes.end(), std::back_inserter(rv), [](auto&& w) { return w.get(); });
+    return rv;
+}
+
+void TargetedWriteBatch::addWrite(std::unique_ptr<TargetedWrite> targetedWrite, int estWriteSize) {
+    _writes.push_back(std::move(targetedWrite));
     _estimatedSizeBytes += estWriteSize;
 }
 

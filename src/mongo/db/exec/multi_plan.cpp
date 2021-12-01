@@ -37,8 +37,6 @@
 #include <math.h>
 #include <memory>
 
-#include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
