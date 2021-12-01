@@ -103,7 +103,7 @@ public:
     /**
      * Pipeline must be of type array.
      */
-    void setPipeline(const BSONElement& pipeline);
+    void setPipeline(std::vector<mongo::BSONObj> pipeline);
 
 private:
     NamespaceString _viewNss;

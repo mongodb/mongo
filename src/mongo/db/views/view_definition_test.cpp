@@ -110,35 +110,17 @@ TEST(ViewDefinitionTest, SetViewOnSucceedsIfNewViewOnIsInSameDatabaseAsView) {
     ASSERT_EQ(newViewOn, viewDef.viewOn());
 }
 
-DEATH_TEST_REGEX(ViewDefinitionTest,
-                 SetPiplineFailsIfPipelineTypeIsNotArray,
-                 R"#(Invariant failure.*pipeline.type\(\) == Array)#") {
-    ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
-
-    // We'll pass in a BSONElement that could be a valid array, but is BSONType::Object rather than
-    // BSONType::Array.
-    BSONObjBuilder builder;
-    BSONArrayBuilder pipelineBuilder(builder.subobjStart("pipeline"));
-    pipelineBuilder.append(BSON("skip" << 7));
-    pipelineBuilder.append(BSON("limit" << 4));
-    pipelineBuilder.doneFast();
-    BSONObj newPipeline = builder.obj();
-
-    viewDef.setPipeline(newPipeline["pipeline"]);
-}
-
 TEST(ViewDefinitionTest, SetPipelineSucceedsOnValidArrayBSONElement) {
     ViewDefinition viewDef(viewNss.db(), viewNss.coll(), backingNss.coll(), BSONObj(), nullptr);
     ASSERT(viewDef.pipeline().empty());
 
     BSONObj matchStage = BSON("match" << BSON("x" << 9));
     BSONObj sortStage = BSON("sort" << BSON("name" << -1));
-    BSONObj newPipeline = BSON("pipeline" << BSON_ARRAY(matchStage << sortStage));
+    std::vector<BSONObj> newPipeline{matchStage, sortStage};
 
-    viewDef.setPipeline(newPipeline["pipeline"]);
+    viewDef.setPipeline(newPipeline);
 
-    std::vector<BSONObj> expectedPipeline{matchStage, sortStage};
+    const auto& expectedPipeline = newPipeline;
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       viewDef.pipeline().begin(),

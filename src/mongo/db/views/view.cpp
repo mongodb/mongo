@@ -68,12 +68,10 @@ void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
     _viewOnNss = viewOnNss;
 }
 
-void ViewDefinition::setPipeline(const BSONElement& pipeline) {
-    invariant(pipeline.type() == Array);
-    _pipeline.clear();
-    for (BSONElement e : pipeline.Obj()) {
-        BSONObj value = e.Obj();
-        _pipeline.push_back(value.copy());
+void ViewDefinition::setPipeline(std::vector<mongo::BSONObj> pipeline) {
+    for (auto& stage : pipeline) {
+        stage = stage.copy();
     }
+    _pipeline.swap(pipeline);
 }
 }  // namespace mongo

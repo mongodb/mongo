@@ -106,7 +106,6 @@ struct ParsedCollModRequest {
     // and ParsedCollModIndexRequest.
     BSONObj cmdObj;  // owned
     ParsedCollModIndexRequest indexRequest;
-    BSONElement viewPipeLine = {};
     std::string viewOn = {};
     boost::optional<Collection::Validator> collValidator;
     boost::optional<ValidationActionEnum> collValidationAction;
@@ -360,10 +359,8 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 return Status(ErrorCodes::InvalidOptions,
                               "'pipeline' option only supported on a view");
             }
-            if (e.type() != mongo::Array) {
-                return Status(ErrorCodes::InvalidOptions, "not a valid aggregation pipeline");
-            }
-            cmr.viewPipeLine = e;
+            // Access this value through the generated CollMod IDL type.
+            // See CollModRequest::getPipeline().
         } else if (fieldName == "viewOn") {
             cmr.numModifications++;
             if (!isView) {
@@ -613,7 +610,6 @@ Status _collModInternal(OperationContext* opCtx,
 
     // Save both states of the ParsedCollModRequest to allow writeConflictRetries.
     ParsedCollModRequest cmrNew = std::move(statusW.getValue());
-    auto viewPipeline = cmrNew.viewPipeLine;
     auto viewOn = cmrNew.viewOn;
     auto ts = cmd.getTimeseries();
 
@@ -633,8 +629,8 @@ Status _collModInternal(OperationContext* opCtx,
         // Handle collMod on a view and return early. The View Catalog handles the creation of oplog
         // entries for modifications on a view.
         if (view) {
-            if (viewPipeline)
-                view->setPipeline(viewPipeline);
+            if (cmd.getPipeline())
+                view->setPipeline(*cmd.getPipeline());
 
             if (!viewOn.empty())
                 view->setViewOn(NamespaceString(dbName, viewOn));
