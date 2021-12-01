@@ -1,6 +1,6 @@
 /**
  * Tests that collStats does not return expensive creationString field when numericOnly is true.
- * @tags: [requires_wiredtiger, requires_collstats]
+ * @tags: [requires_wiredtiger, requires_fcv_52, requires_collstats]
  */
 (function() {
 "use strict";
