@@ -63,6 +63,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/version/releases.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 
@@ -105,7 +106,6 @@ struct ParsedCollModRequest {
     // and ParsedCollModIndexRequest.
     BSONObj cmdObj;  // owned
     ParsedCollModIndexRequest indexRequest;
-    BSONElement clusteredIndexExpireAfterSeconds = {};
     BSONElement viewPipeLine = {};
     std::string viewOn = {};
     boost::optional<Collection::Validator> collValidator;
@@ -416,7 +416,8 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 uassertStatusOK(index_key_validate::validateExpireAfterSeconds(elemNum));
             }
 
-            cmr.clusteredIndexExpireAfterSeconds = e;
+            // Access this value through the generated CollMod IDL type.
+            // See CollModRequest::getExpireAfterSeconds().
         } else if (fieldName == CollMod::kTimeseriesFieldName) {
             cmr.numModifications++;
             if (!isTimeseries) {
@@ -452,43 +453,44 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
     return {std::move(cmr)};
 }
 
-void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
-                                     const CollectionOptions& oldCollOptions,
-                                     Collection* coll,
-                                     const BSONElement& clusteredIndexExpireAfterSeconds) {
+void _setClusteredExpireAfterSeconds(
+    OperationContext* opCtx,
+    const CollectionOptions& oldCollOptions,
+    Collection* coll,
+    const stdx::variant<std::string, std::int64_t>& clusteredIndexExpireAfterSeconds) {
     invariant(oldCollOptions.clusteredIndex);
 
     boost::optional<int64_t> oldExpireAfterSeconds = oldCollOptions.expireAfterSeconds;
 
-    if (clusteredIndexExpireAfterSeconds.type() == mongo::String) {
-        const std::string newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.String();
-        invariant(newExpireAfterSeconds == "off");
-        if (!oldExpireAfterSeconds) {
-            // expireAfterSeconds is already disabled on the clustered index.
-            return;
-        }
+    stdx::visit(
+        visit_helper::Overloaded{
+            [&](const std::string& newExpireAfterSeconds) {
+                invariant(newExpireAfterSeconds == "off");
+                if (!oldExpireAfterSeconds) {
+                    // expireAfterSeconds is already disabled on the clustered index.
+                    return;
+                }
 
-        coll->updateClusteredIndexTTLSetting(opCtx, boost::none);
-        return;
-    }
+                coll->updateClusteredIndexTTLSetting(opCtx, boost::none);
+            },
+            [&](std::int64_t newExpireAfterSeconds) {
+                if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
+                    // expireAfterSeconds is already the requested value on the clustered index.
+                    return;
+                }
 
-    invariant(clusteredIndexExpireAfterSeconds.type() == mongo::NumberLong);
-    int64_t newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.safeNumberLong();
-    if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
-        // expireAfterSeconds is already the requested value on the clustered index.
-        return;
-    }
+                // If this collection was not previously TTL, inform the TTL monitor when we commit.
+                if (!oldExpireAfterSeconds) {
+                    auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+                    opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](auto _) {
+                        ttlCache->registerTTLInfo(uuid, TTLCollectionCache::ClusteredId());
+                    });
+                }
 
-    // If this collection was not previously TTL, inform the TTL monitor when we commit.
-    if (!oldExpireAfterSeconds) {
-        auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
-        opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](auto _) {
-            ttlCache->registerTTLInfo(uuid, TTLCollectionCache::ClusteredId());
-        });
-    }
-
-    invariant(newExpireAfterSeconds >= 0);
-    coll->updateClusteredIndexTTLSetting(opCtx, newExpireAfterSeconds);
+                invariant(newExpireAfterSeconds >= 0);
+                coll->updateClusteredIndexTTLSetting(opCtx, newExpireAfterSeconds);
+            }},
+        clusteredIndexExpireAfterSeconds);
 }
 
 Status _processCollModDryRunMode(OperationContext* opCtx,
@@ -613,7 +615,6 @@ Status _collModInternal(OperationContext* opCtx,
     ParsedCollModRequest cmrNew = std::move(statusW.getValue());
     auto viewPipeline = cmrNew.viewPipeLine;
     auto viewOn = cmrNew.viewOn;
-    auto clusteredIndexExpireAfterSeconds = cmrNew.clusteredIndexExpireAfterSeconds;
     auto ts = cmd.getTimeseries();
 
     if (!serverGlobalParams.quiet.load()) {
@@ -678,11 +679,9 @@ Status _collModInternal(OperationContext* opCtx,
         boost::optional<IndexCollModInfo> indexCollModInfo;
 
         // Handle collMod operation type appropriately.
-        if (clusteredIndexExpireAfterSeconds) {
-            _setClusteredExpireAfterSeconds(opCtx,
-                                            oldCollOptions,
-                                            coll.getWritableCollection(),
-                                            clusteredIndexExpireAfterSeconds);
+        if (cmd.getExpireAfterSeconds()) {
+            _setClusteredExpireAfterSeconds(
+                opCtx, oldCollOptions, coll.getWritableCollection(), *cmd.getExpireAfterSeconds());
         }
 
         // Handle index modifications.
