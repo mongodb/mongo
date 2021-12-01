@@ -9,7 +9,12 @@ import structlog
 import yaml
 
 from packaging.version import Version
-from buildscripts.resmokelib.setup_multiversion.config import USE_EXISTING_RELEASES_FILE
+try:
+    # when running resmoke
+    from buildscripts.resmokelib.multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
+except ImportError:
+    # when running db-contrib-tool
+    from multiversionsetupconstants import USE_EXISTING_RELEASES_FILE
 
 LOGGER = structlog.getLogger(__name__)
 

@@ -22,6 +22,7 @@ import yaml
 
 from requests.exceptions import HTTPError
 
+from buildscripts.resmokelib import multiversionsetupconstants
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib.setup_multiversion import config, download, github_conn
 from buildscripts.resmokelib.utils import evergreen_conn, is_windows
@@ -438,7 +439,7 @@ class SetupMultiversionPlugin(PluginInterface):
                                             dv=args.download_python_venv)
 
         if args.use_existing_releases_file:
-            config.USE_EXISTING_RELEASES_FILE = True
+            multiversionsetupconstants.USE_EXISTING_RELEASES_FILE = True
 
         return SetupMultiversion(
             install_dir=args.install_dir, link_dir=args.link_dir, mv_platform=args.platform,
