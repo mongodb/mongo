@@ -12,7 +12,8 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod(
+    {setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600}});
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);

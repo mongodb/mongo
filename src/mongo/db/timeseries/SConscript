@@ -8,12 +8,14 @@ env.Library(
     target='timeseries_options',
     source=[
         'timeseries.idl',
+        'timeseries_global_options.cpp',
         'timeseries_options.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/util/processinfo'
     ],
 )
 
