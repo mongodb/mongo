@@ -30,6 +30,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     WT_PAGE *page;
     WT_PAGE_MODIFY *mod;
     WT_SESSION_IMPL *session;
+    WT_TXN *txn;
     WT_UPDATE *last_upd, *old_upd, *upd;
     wt_timestamp_t prev_upd_ts;
     size_t ins_size, upd_size;
@@ -40,6 +41,7 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
     ins = NULL;
     page = cbt->ref->page;
     session = CUR2S(cbt);
+    txn = session->txn;
     last_upd = NULL;
     upd = upd_arg;
     prev_upd_ts = WT_TS_NONE;
@@ -270,6 +272,16 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
          * update corresponding to this operation.
          */
         __wt_txn_op_set_recno(session, cbt->recno);
+    }
+
+    /*
+     * This is temporary till we support more cases for resolving uncommitted updates: If we see a
+     * reserve update, we don't want to continue with resolving uncommitted updates. We also have to
+     * clear the weak hazard pointers we have already saved.
+     */
+    if (txn->resolve_weak_hazard_updates && modify_type == WT_UPDATE_RESERVE) {
+        txn->resolve_weak_hazard_updates = false;
+        WT_ERR(__wt_txn_op_list_clear_weak_hazard(session));
     }
 
     if (0) {

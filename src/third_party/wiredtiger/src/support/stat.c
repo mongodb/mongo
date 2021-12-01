@@ -1581,7 +1581,9 @@ static const char *const __stats_connection_desc[] = {
   "transaction: transaction rollback to stable currently running",
   "transaction: transaction walk of concurrent sessions",
   "transaction: transactions committed",
+  "transaction: transactions committed with one or more updates resolved through the slow path",
   "transaction: transactions rolled back",
+  "transaction: transactions rolled back with one or more updates resolved through the slow path",
   "transaction: update conflicts",
 };
 
@@ -2139,7 +2141,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing txn_rollback_to_stable_running */
     stats->txn_walk_sessions = 0;
     stats->txn_commit = 0;
+    stats->txn_commit_slow_resolved = 0;
     stats->txn_rollback = 0;
+    stats->txn_rollback_slow_resolved = 0;
     stats->txn_update_conflict = 0;
 }
 
@@ -2719,7 +2723,9 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_rollback_to_stable_running += WT_STAT_READ(from, txn_rollback_to_stable_running);
     to->txn_walk_sessions += WT_STAT_READ(from, txn_walk_sessions);
     to->txn_commit += WT_STAT_READ(from, txn_commit);
+    to->txn_commit_slow_resolved += WT_STAT_READ(from, txn_commit_slow_resolved);
     to->txn_rollback += WT_STAT_READ(from, txn_rollback);
+    to->txn_rollback_slow_resolved += WT_STAT_READ(from, txn_rollback_slow_resolved);
     to->txn_update_conflict += WT_STAT_READ(from, txn_update_conflict);
 }
 
