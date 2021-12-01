@@ -28,13 +28,22 @@ assert.eq(0, collNames.length, tojson(collNames));
 // You cannot create a view that starts with 'system.'.
 assert.commandFailedWithCode(viewsDB.runCommand({create: "system.special", viewOn: "collection"}),
                              ErrorCodes.InvalidNamespace,
-                             "Created an illegal view named 'system.views'");
+                             "Created an illegal view named 'system.special'");
 
 // Collections that start with 'system.' that are not special to MongoDB fail with a different
 // error code.
 assert.commandFailedWithCode(viewsDB.runCommand({create: "system.foo", viewOn: "collection"}),
                              ErrorCodes.InvalidNamespace,
                              "Created an illegal view named 'system.foo'");
+
+// Attempting to create a view on a database's views collection namespace is specially handled
+// because it can deadlock.
+const errRes =
+    assert.commandFailedWithCode(viewsDB.runCommand({create: "system.views", viewOn: "collection"}),
+                                 ErrorCodes.InvalidNamespace,
+                                 "Created an illegal view named <db>.system.views");
+assert(errRes.errmsg.indexOf("Cannot create a view called") > -1,
+       "Unexpected errmsg: " + tojson(errRes));
 
 // Create a collection for test purposes.
 assert.commandWorked(viewsDB.runCommand({create: "collection"}));
