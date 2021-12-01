@@ -2,10 +2,10 @@
 # - https://bugzilla.mozilla.org/show_bug.cgi?id=1442583
 # - https://github.com/mozilla/gecko-dev/commit/7371a080accd8dfcaf0d24072b787e143846973a
 
-diff --git a/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp b/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp
+diff --git a/src/third_party/mozjs/extract/js/src/jit/ProcessExecutableMemory.cpp b/src/third_party/mozjs/extract/js/src/jit/ProcessExecutableMemory.cpp
 index e763a9d68d..8a6d50b6a7 100644
---- a/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp
-+++ b/src/third_party/mozjs-60/extract/js/src/jit/ProcessExecutableMemory.cpp
+--- a/src/third_party/mozjs/extract/js/src/jit/ProcessExecutableMemory.cpp
++++ b/src/third_party/mozjs/extract/js/src/jit/ProcessExecutableMemory.cpp
 @@ -20,6 +20,9 @@
  #include "jsutil.h"
  

@@ -1,7 +1,7 @@
-diff --git a/src/third_party/mozjs-60/extract/js/src/wasm/WasmSignalHandlers.cpp b/src/third_party/mozjs-60/extract/js/src/wasm/WasmSignalHandlers.cpp
+diff --git a/src/third_party/mozjs/extract/js/src/wasm/WasmSignalHandlers.cpp b/src/third_party/mozjs/extract/js/src/wasm/WasmSignalHandlers.cpp
 index b35461579c..0cd89e301d 100644
---- a/src/third_party/mozjs-60/extract/js/src/wasm/WasmSignalHandlers.cpp
-+++ b/src/third_party/mozjs-60/extract/js/src/wasm/WasmSignalHandlers.cpp
+--- a/src/third_party/mozjs/extract/js/src/wasm/WasmSignalHandlers.cpp
++++ b/src/third_party/mozjs/extract/js/src/wasm/WasmSignalHandlers.cpp
 @@ -263,6 +263,10 @@ struct AutoSignalHandler
  #  define EPC_sig(p) ((p)->uc_mcontext.mc_pc)
  #  define RFP_sig(p) ((p)->uc_mcontext.mc_regs[30])

@@ -1,8 +1,8 @@
 #adapted from https://hg.mozilla.org/mozilla-central/rev/da05e40ae372
-diff --git a/src/third_party/mozjs-60/extract/js/src/jsapi.cpp b/src/third_party/mozjs-60/extract/js/src/jsapi.cpp
+diff --git a/src/third_party/mozjs/extract/js/src/jsapi.cpp b/src/third_party/mozjs/extract/js/src/jsapi.cpp
 index d071cb1137..ede42f4bab 100644
---- a/src/third_party/mozjs-60/extract/js/src/jsapi.cpp
-+++ b/src/third_party/mozjs-60/extract/js/src/jsapi.cpp
+--- a/src/third_party/mozjs/extract/js/src/jsapi.cpp
++++ b/src/third_party/mozjs/extract/js/src/jsapi.cpp
 @@ -1556,16 +1556,14 @@ JS_GetGCParameter(JSContext* cx, JSGCParamKey key)
      return cx->runtime()->gc.getParameter(key, lock);
  }

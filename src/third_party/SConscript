@@ -12,7 +12,6 @@ snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
 zstdSuffix = '-1.4.4'
 pcreSuffix = "-8.42"
-mozjsSuffix = '-60'
 icuSuffix = '-57.1'
 timelibSuffix = '-2021.06'
 tomcryptSuffix = '-1.18.2'
@@ -141,9 +140,9 @@ if not use_system_version_of_library('google-benchmark'):
 if True:
     thirdPartyEnvironmentModifications['mozjs'] = {
         'CPPPATH' : [
-            '#/src/third_party/mozjs' + mozjsSuffix + '/include',
-            '#/src/third_party/mozjs' + mozjsSuffix + '/mongo_sources',
-            '#/src/third_party/mozjs' + mozjsSuffix + '/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
+            '#/src/third_party/mozjs/include',
+            '#/src/third_party/mozjs/mongo_sources',
+            '#/src/third_party/mozjs/platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + "/include",
         ],
         'FORCEINCLUDES' : [
             'js-config.h',
@@ -393,7 +392,7 @@ else:
         LIBDEPS_INTERFACE=[
             abseilDirectory + '/absl_container',
             abseilDirectory + '/absl_hash',
-            abseilDirectory + '/absl_numeric', 
+            abseilDirectory + '/absl_numeric',
         ])
 
 abseilEnv.ShimLibrary(name="abseil")
@@ -475,10 +474,10 @@ benchmarkEnv.ShimLibrary(name="benchmark")
 
 if usemozjs:
     mozjsEnv = env.Clone()
-    mozjsEnv.SConscript('mozjs' + mozjsSuffix + '/SConscript', exports={'env' : mozjsEnv })
+    mozjsEnv.SConscript('mozjs/SConscript', exports={'env' : mozjsEnv })
     mozjsEnv = mozjsEnv.Clone(
         LIBDEPS_INTERFACE=[
-            'mozjs' + mozjsSuffix + '/mozjs',
+            'mozjs/mozjs',
             'shim_zlib',
         ])
 

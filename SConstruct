@@ -2178,7 +2178,7 @@ elif env.TargetOSIs('windows'):
         "/wd4251",
     ])
 
-    # mozjs-60 requires the following
+    # mozjs requires the following
     #  'declaration' : no matching operator delete found; memory will not be freed if
     #  initialization throws an exception
     env.Append( CCFLAGS=["/wd4291"] )

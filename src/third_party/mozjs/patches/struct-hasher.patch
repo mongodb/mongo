@@ -1,8 +1,8 @@
 # Adapted from https://phabricator.services.mozilla.com/D63781
-diff --git a/src/third_party/mozjs-60/extract/js/src/gc/StoreBuffer.h b/src/third_party/mozjs-60/extract/js/src/gc/StoreBuffer.h
+diff --git a/src/third_party/mozjs/extract/js/src/gc/StoreBuffer.h b/src/third_party/mozjs/extract/js/src/gc/StoreBuffer.h
 index 303a438cb70..7db019a2647 100644
---- a/src/third_party/mozjs-60/extract/js/src/gc/StoreBuffer.h
-+++ b/src/third_party/mozjs-60/extract/js/src/gc/StoreBuffer.h
+--- a/src/third_party/mozjs/extract/js/src/gc/StoreBuffer.h
++++ b/src/third_party/mozjs/extract/js/src/gc/StoreBuffer.h
 @@ -341,7 +341,7 @@ class StoreBuffer
  
          explicit operator bool() const { return objectAndKind_ != 0; }

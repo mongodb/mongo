@@ -1,9 +1,9 @@
 # Cobbled together from various comments in https://bugzilla.mozilla.org/show_bug.cgi?id=1488552
 # Fix the broken big-endian support in some of these types that are castable to eachother
-diff --git b/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h a/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h
+diff --git b/src/third_party/mozjs/extract/js/src/gc/Marking-inl.h a/src/third_party/mozjs/extract/js/src/gc/Marking-inl.h
 index 83580bee97..7760d97dd8 100644
---- b/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h
-+++ a/src/third_party/mozjs-60/extract/js/src/gc/Marking-inl.h
+--- b/src/third_party/mozjs/extract/js/src/gc/Marking-inl.h
++++ a/src/third_party/mozjs/extract/js/src/gc/Marking-inl.h
 @@ -92,12 +92,12 @@ RelocationOverlay::forwardTo(Cell* cell)
      MOZ_ASSERT(!isForwarded());
      // The location of magic_ is important because it must never be valid to see
@@ -23,10 +23,10 @@ index 83580bee97..7760d97dd8 100644
      magic_ = Relocated;
      newLocation_ = cell;
  }
-diff --git b/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h a/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h
+diff --git b/src/third_party/mozjs/extract/js/src/gc/RelocationOverlay.h a/src/third_party/mozjs/extract/js/src/gc/RelocationOverlay.h
 index c6339f6cd4..722826f7f2 100644
---- b/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h
-+++ a/src/third_party/mozjs-60/extract/js/src/gc/RelocationOverlay.h
+--- b/src/third_party/mozjs/extract/js/src/gc/RelocationOverlay.h
++++ a/src/third_party/mozjs/extract/js/src/gc/RelocationOverlay.h
 @@ -34,14 +34,26 @@ class RelocationOverlay
      /* See comment in js/public/HeapAPI.h. */
      static const uint32_t Relocated = js::gc::Relocated;
@@ -55,10 +55,10 @@ index c6339f6cd4..722826f7f2 100644
  
      /* The location |this| was moved to. */
      Cell* newLocation_;
-diff --git b/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h a/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h
+diff --git b/src/third_party/mozjs/extract/js/src/jsfriendapi.h a/src/third_party/mozjs/extract/js/src/jsfriendapi.h
 index 54d592513b..e218fb8372 100644
---- b/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h
-+++ a/src/third_party/mozjs-60/extract/js/src/jsfriendapi.h
+--- b/src/third_party/mozjs/extract/js/src/jsfriendapi.h
++++ a/src/third_party/mozjs/extract/js/src/jsfriendapi.h
 @@ -9,6 +9,7 @@
  
  #include "mozilla/Atomics.h"
@@ -81,10 +81,10 @@ index 54d592513b..e218fb8372 100644
      union {
          const JS::Latin1Char* nonInlineCharsLatin1;
          const char16_t* nonInlineCharsTwoByte;
-diff --git b/src/third_party/mozjs-60/extract/js/src/vm/StringType.h a/src/third_party/mozjs-60/extract/js/src/vm/StringType.h
+diff --git b/src/third_party/mozjs/extract/js/src/vm/StringType.h a/src/third_party/mozjs/extract/js/src/vm/StringType.h
 index f2fe4f4abf..88d28c5a36 100644
---- b/src/third_party/mozjs-60/extract/js/src/vm/StringType.h
-+++ a/src/third_party/mozjs-60/extract/js/src/vm/StringType.h
+--- b/src/third_party/mozjs/extract/js/src/vm/StringType.h
++++ a/src/third_party/mozjs/extract/js/src/vm/StringType.h
 @@ -10,6 +10,7 @@
  #include "mozilla/MemoryReporting.h"
  #include "mozilla/PodOperations.h"
@@ -147,10 +147,10 @@ index f2fe4f4abf..88d28c5a36 100644
          static_assert(NON_ATOM_BIT == String::NON_ATOM_BIT,
                        "shadow::String::NON_ATOM_BIT must match JSString::NON_ATOM_BIT");
          static_assert(LINEAR_BIT == String::LINEAR_BIT,
-diff --git b/src/third_party/mozjs-60/include/jsfriendapi.h a/src/third_party/mozjs-60/include/jsfriendapi.h
+diff --git b/src/third_party/mozjs/include/jsfriendapi.h a/src/third_party/mozjs/include/jsfriendapi.h
 index 54d592513b..e218fb8372 100644
---- b/src/third_party/mozjs-60/include/jsfriendapi.h
-+++ a/src/third_party/mozjs-60/include/jsfriendapi.h
+--- b/src/third_party/mozjs/include/jsfriendapi.h
++++ a/src/third_party/mozjs/include/jsfriendapi.h
 @@ -9,6 +9,7 @@
  
  #include "mozilla/Atomics.h"

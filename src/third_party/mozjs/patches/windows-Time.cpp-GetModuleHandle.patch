@@ -1,9 +1,9 @@
 # We compile MongoDB with UNICODE but Mozilla does not so we need to explicitly select the ANSI
 # version of GetModuleHandle
-diff --git b/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp a/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
+diff --git b/src/third_party/mozjs/extract/js/src/vm/Time.cpp a/src/third_party/mozjs/extract/js/src/vm/Time.cpp
 index da690fe0b5..9762232f62 100644
---- b/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
-+++ a/src/third_party/mozjs-60/extract/js/src/vm/Time.cpp
+--- b/src/third_party/mozjs/extract/js/src/vm/Time.cpp
++++ a/src/third_party/mozjs/extract/js/src/vm/Time.cpp
 @@ -27,8 +27,6 @@
  #include <mmsystem.h> /* for timeBegin/EndPeriod */
  #include <stdlib.h>   /* for _set_invalid_parameter_handler */

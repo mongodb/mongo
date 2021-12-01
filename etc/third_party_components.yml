@@ -205,7 +205,7 @@ components:
     homepage_url: https://www.mozilla.org/en-US/firefox/organizations/
     open_hub_url: https://www.openhub.net/p/firefox
     release_monitoring_id: 16838
-    local_directory_path: src/third_party/mozjs-60
+    local_directory_path: src/third_party/mozjs
     team_owner: "Query"
     vulnerability_suppression: TODO SERVER-42427
     upgrade_suppression: TODO SERVER-42427
