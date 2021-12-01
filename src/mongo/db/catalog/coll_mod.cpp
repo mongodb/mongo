@@ -102,9 +102,6 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
 }
 
 struct ParsedCollModRequest {
-    // Internal fields of this 'cmdObj' are referenced by BSONElement fields here
-    // and ParsedCollModIndexRequest.
-    BSONObj cmdObj;  // owned
     ParsedCollModIndexRequest indexRequest;
     std::string viewOn = {};
     boost::optional<Collection::Validator> collValidator;
@@ -127,15 +124,17 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
 
     ParsedCollModRequest cmr;
 
-    cmr.cmdObj = cmd.toBSON(BSONObj());
-    for (const auto& e : cmr.cmdObj) {
+    auto cmdObj = cmd.toBSON(BSONObj());
+    for (const auto& e : cmdObj) {
         const auto fieldName = e.fieldNameStringData();
         if (isGenericArgument(fieldName)) {
             continue;  // Don't add to oplog builder.
         } else if (fieldName == "collMod") {
             // no-op
         } else if (fieldName == "index" && !isView) {
-            BSONObj indexObj = e.Obj();
+            auto cmrIndex = &cmr.indexRequest;
+            cmrIndex->indexObj = e.Obj().getOwned();
+            const auto& indexObj = cmrIndex->indexObj;
             StringData indexName;
             BSONObj keyPattern;
 
@@ -175,7 +174,6 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 keyPattern = keyPatternElem.embeddedObject();
             }
 
-            auto cmrIndex = &cmr.indexRequest;
             cmrIndex->indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
             cmrIndex->indexHidden = indexObj["hidden"];
             cmrIndex->indexUnique = indexObj["unique"];
