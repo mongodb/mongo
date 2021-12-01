@@ -413,7 +413,8 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
+    std::unique_ptr<RecordStore> rs =
+        harnessHelper->newNonCappedRecordStore(ns, options, KeyFormat::String);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
@@ -519,7 +520,8 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs = harnessHelper->newNonCappedRecordStore(ns, options);
+    std::unique_ptr<RecordStore> rs =
+        harnessHelper->newNonCappedRecordStore(ns, options, KeyFormat::String);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
@@ -581,5 +583,26 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
         ASSERT_EQ(records[i].id, rec->id);
     }
 }
+
+TEST(RecordStoreTestHarness, ClusteredRecordMismatchedKeyFormat) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "test.system.buckets.a";
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
+    // Cannot create a clustered record store without KeyFormat::String.
+    bool failAsExpected = false;
+    try {
+        auto rs = harnessHelper->newNonCappedRecordStore(ns, options);
+    } catch (DBException& e) {
+        // 6144101: WiredTiger-specific error code
+        // 6144102: Ephemeral For Test-specific error code
+        ASSERT_GTE(e.toStatus().code(), 6144101);
+        ASSERT_LTE(e.toStatus().code(), 6144102);
+        failAsExpected = true;
+    }
+
+    ASSERT_EQ(failAsExpected, true);
+}
+
 }  // namespace
 }  // namespace mongo

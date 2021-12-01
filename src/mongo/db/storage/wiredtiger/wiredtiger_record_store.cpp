@@ -764,7 +764,9 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     StringData ns,
     StringData ident,
     const CollectionOptions& options,
-    StringData extraStrings) {
+    StringData extraStrings,
+    KeyFormat keyFormat) {
+
     // Separate out a prefix and suffix in the default string. User configuration will
     // override values in the prefix, but not values in the suffix.
     str::stream ss;
@@ -826,6 +828,14 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
     if (options.clusteredIndex) {
+        // A clustered collection requires both CollectionOptions.clusteredIndex and
+        // KeyFormat::String. For a clustered record store that is not associated with a clustered
+        // collection KeyFormat::String is sufficient.
+        uassert(6144101,
+                "RecordStore with CollectionOptions.clusteredIndex requires KeyFormat::String",
+                keyFormat == KeyFormat::String);
+    }
+    if (keyFormat == KeyFormat::String) {
         // If the RecordId format is a String, assume a byte array key format.
         ss << "key_format=u";
     } else {
@@ -880,6 +890,16 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine) {
     invariant(getIdent().size() > 0);
+
+    if (kDebugBuild && _keyFormat == KeyFormat::String) {
+        // This is a clustered record store. Its WiredTiger table requires key_format='u' for
+        // correct operation.
+        const std::string wtTableConfig =
+            uassertStatusOK(WiredTigerUtil::getMetadataCreate(ctx, _uri));
+        const bool wtTableConfigMatchesStringKeyFormat =
+            wtTableConfig.find("key_format=u") != string::npos;
+        invariant(wtTableConfigMatchesStringKeyFormat);
+    }
 
     if (_oplogMaxSize) {
         invariant(_isOplog, str::stream() << "Namespace " << params.ns);

@@ -113,6 +113,32 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     ASSERT(!collectionExists(opCtx.get(), collNs));
 }
 
+TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
+    auto opCtx = cc().makeOperationContext();
+
+    Lock::GlobalLock lk(&*opCtx, MODE_IS);
+
+    const auto trs = makeTemporaryClustered(opCtx.get());
+    ASSERT(trs.get());
+    const auto rs = trs->rs();
+    ASSERT(identExists(opCtx.get(), rs->getIdent()));
+
+    // Insert record with RecordId of KeyFormat::String.
+    const auto id = StringData{"1"};
+    const auto rid = RecordId(id.rawData(), id.size());
+    const auto data = "data";
+    WriteUnitOfWork wuow(opCtx.get());
+    StatusWith<RecordId> s = rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
+    ASSERT_TRUE(s.isOK());
+    ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+    wuow.commit();
+
+    // Read the record back.
+    RecordData rd;
+    ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &rd));
+    ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
+}
+
 TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
     auto opCtx = cc().makeOperationContext();
 

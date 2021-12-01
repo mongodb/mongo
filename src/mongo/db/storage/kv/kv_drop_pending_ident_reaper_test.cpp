@@ -72,7 +72,8 @@ public:
     Status createRecordStore(OperationContext* opCtx,
                              StringData ns,
                              StringData ident,
-                             const CollectionOptions& options) override {
+                             const CollectionOptions& options,
+                             KeyFormat keyFormat) override {
         return Status::OK();
     }
     std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,

@@ -38,6 +38,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
@@ -1069,6 +1070,75 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
         ASSERT(cursor->seekExact(rid1));
         ASSERT_TRUE(ru->isActive());
     }
+}
+
+// Verify clustered record stores.
+// This test case complements StorageEngineTest:TemporaryRecordStoreClustered which verifies
+// clustered temporary record stores.
+TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
+    const unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
+    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+    ASSERT(opCtx.get());
+    const std::string ns = "testRecordStore";
+    const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
+    const StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+        kWiredTigerEngineName, ns, "", CollectionOptions(), "", KeyFormat::String);
+    ASSERT_TRUE(result.isOK());
+    const std::string config = result.getValue();
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        WiredTigerRecoveryUnit* ru =
+            checked_cast<WiredTigerRecoveryUnit*>(opCtx.get()->recoveryUnit());
+        WT_SESSION* s = ru->getSession()->getSession();
+        invariantWTOK(s->create(s, uri.c_str(), config.c_str()));
+        uow.commit();
+    }
+
+    WiredTigerRecordStore::Params params;
+    params.ns = ns;
+    params.ident = ns;
+    params.engineName = kWiredTigerEngineName;
+    params.isCapped = false;
+    params.keyFormat = KeyFormat::String;
+    params.overwrite = false;
+    params.isEphemeral = false;
+    params.cappedCallback = nullptr;
+    params.sizeStorer = nullptr;
+    params.tracksSizeAdjustments = true;
+    params.isReadOnly = false;
+    params.forceUpdateWithFullDocument = false;
+
+    const auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
+    auto rs = std::make_unique<StandardWiredTigerRecordStore>(wtKvEngine, opCtx.get(), params);
+    rs->postConstructorInit(opCtx.get());
+
+    const auto id = StringData{"1"};
+    const auto rid = RecordId(id.rawData(), id.size());
+    const auto data = "data";
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        StatusWith<RecordId> s =
+            rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
+        ASSERT_TRUE(s.isOK());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        wuow.commit();
+    }
+    // Read the record back.
+    RecordData rd;
+    ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &rd));
+    ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
+    // Update the record.
+    const auto dataUpdated = "updated";
+    {
+        WriteUnitOfWork wuow(opCtx.get());
+        ASSERT_OK(rs->updateRecord(opCtx.get(), rid, dataUpdated, strlen(dataUpdated)));
+        ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
+        wuow.commit();
+    }
+    ASSERT_TRUE(rs->findRecord(opCtx.get(), rid, &rd));
+    ASSERT_EQ(0, memcmp(dataUpdated, rd.data(), strlen(dataUpdated)));
 }
 
 }  // namespace

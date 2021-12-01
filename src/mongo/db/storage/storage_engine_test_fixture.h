@@ -94,6 +94,10 @@ public:
         return _storageEngine->makeTemporaryRecordStore(opCtx, KeyFormat::Long);
     }
 
+    std::unique_ptr<TemporaryRecordStore> makeTemporaryClustered(OperationContext* opCtx) {
+        return _storageEngine->makeTemporaryRecordStore(opCtx, KeyFormat::String);
+    }
+
     /**
      * Create a collection table in the KVEngine not reflected in the DurableCatalog.
      */

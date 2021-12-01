@@ -52,7 +52,9 @@ public:
     }
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
-        const std::string& ns, const CollectionOptions& options) = 0;
+        const std::string& ns,
+        const CollectionOptions& options,
+        KeyFormat keyFormat = KeyFormat::Long) = 0;
 
     virtual std::unique_ptr<RecordStore> newOplogRecordStore() = 0;
 

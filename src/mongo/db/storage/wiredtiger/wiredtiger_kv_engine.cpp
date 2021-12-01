@@ -73,6 +73,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/journal_listener.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -1370,12 +1371,23 @@ void WiredTigerKVEngine::setSortedDataInterfaceExtraOptions(const std::string& o
 Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
                                              StringData ns,
                                              StringData ident,
-                                             const CollectionOptions& options) {
+                                             const CollectionOptions& options,
+                                             KeyFormat keyFormat) {
     _ensureIdentPath(ident);
     WiredTigerSession session(_conn);
 
-    StatusWith<std::string> result =
-        WiredTigerRecordStore::generateCreateString(_canonicalName, ns, ident, options, _rsOptions);
+    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
+        _canonicalName, ns, ident, options, _rsOptions, keyFormat);
+
+    if (options.clusteredIndex) {
+        // A clustered collection requires both CollectionOptions.clusteredIndex and
+        // KeyFormat::String. For a clustered record store that is not associated with a clustered
+        // collection KeyFormat::String is sufficient.
+        uassert(6144100,
+                "RecordStore with CollectionOptions.clusteredIndex requires KeyFormat::String",
+                keyFormat == KeyFormat::String);
+    }
+
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -1628,9 +1640,8 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     _ensureIdentPath(ident);
     WiredTigerSession wtSession(_conn);
 
-    CollectionOptions noOptions;
     StatusWith<std::string> swConfig = WiredTigerRecordStore::generateCreateString(
-        _canonicalName, "" /* internal table */, ident, noOptions, _rsOptions);
+        _canonicalName, "" /* internal table */, ident, CollectionOptions(), _rsOptions, keyFormat);
     uassertStatusOK(swConfig.getStatus());
 
     std::string config = swConfig.getValue();

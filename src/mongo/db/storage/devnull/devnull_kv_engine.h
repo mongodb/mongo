@@ -52,7 +52,8 @@ public:
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options) {
+                                     const CollectionOptions& options,
+                                     KeyFormat keyFormat = KeyFormat::Long) {
         return Status::OK();
     }
 

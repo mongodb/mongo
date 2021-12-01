@@ -646,7 +646,17 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
         return swEntry.getStatus();
     Entry& entry = swEntry.getValue();
 
-    Status status = _engine->getEngine()->createRecordStore(opCtx, nss.ns(), entry.ident, options);
+    const auto keyFormat = [&] {
+        // Clustered collections require KeyFormat::String, but the opposite is not necessarily
+        // true: a clustered record store that is not associated with a collection has
+        // KeyFormat::String and and no CollectionOptions.
+        if (options.clusteredIndex) {
+            return KeyFormat::String;
+        }
+        return KeyFormat::Long;
+    }();
+    Status status =
+        _engine->getEngine()->createRecordStore(opCtx, nss.ns(), entry.ident, options, keyFormat);
     if (!status.isOK())
         return status;
 

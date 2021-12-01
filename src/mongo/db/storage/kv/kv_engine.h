@@ -97,7 +97,8 @@ public:
     virtual Status createRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options) = 0;
+                                     const CollectionOptions& options,
+                                     KeyFormat keyFormat = KeyFormat::Long) = 0;
 
     virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                   StringData ident,

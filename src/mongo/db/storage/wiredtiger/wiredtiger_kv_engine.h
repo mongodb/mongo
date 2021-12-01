@@ -133,7 +133,8 @@ public:
     Status createRecordStore(OperationContext* opCtx,
                              StringData ns,
                              StringData ident,
-                             const CollectionOptions& options) override;
+                             const CollectionOptions& options,
+                             KeyFormat keyFormat = KeyFormat::Long) override;
 
     std::unique_ptr<RecordStore> getRecordStore(OperationContext* opCtx,
                                                 StringData ns,

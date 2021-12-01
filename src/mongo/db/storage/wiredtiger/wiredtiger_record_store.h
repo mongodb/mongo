@@ -98,7 +98,8 @@ public:
                                                         StringData ns,
                                                         StringData ident,
                                                         const CollectionOptions& options,
-                                                        StringData extraStrings);
+                                                        StringData extraStrings,
+                                                        KeyFormat keyFormat);
 
     struct Params {
         StringData ns;

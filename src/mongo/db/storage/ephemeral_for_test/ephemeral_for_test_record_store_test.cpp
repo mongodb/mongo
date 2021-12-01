@@ -56,7 +56,18 @@ public:
     }
 
     virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(
-        const std::string& ns, const CollectionOptions& collOptions) {
+        const std::string& ns,
+        const CollectionOptions& collOptions,
+        KeyFormat keyFormat = KeyFormat::Long) {
+        if (collOptions.clusteredIndex) {
+            // A clustered collection requires both CollectionOptions.clusteredIndex and
+            // KeyFormat::String. For a clustered record store that is not associated with a
+            // clustered collection KeyFormat::String is sufficient.
+            uassert(6144102,
+                    "RecordStore with CollectionOptions.clusteredIndex requires KeyFormat::String",
+                    keyFormat == KeyFormat::String);
+        }
+
         return std::make_unique<RecordStore>(ns,
                                              "ident"_sd /* ident */,
                                              collOptions.clusteredIndex ? KeyFormat::String
