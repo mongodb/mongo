@@ -39,6 +39,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
+#include <pcrecpp.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -636,6 +637,51 @@ Status parseProcDiskStatsFile(StringData filename,
     }
 
     return parseProcDiskStats(disks, swString.getValue(), builder);
+}
+
+Status parseProcSelfMountStatsImpl(
+    StringData data,
+    BSONObjBuilder* builder,
+    boost::filesystem::space_info (*getSpace)(const boost::filesystem::path&,
+                                              boost::system::error_code&)) {
+    invariant(getSpace);
+    std::istringstream iss(data.toString());
+    for (std::string line; std::getline(iss, line);) {
+        // As described in the /proc/[pid]/mountinfo section of `man 5 proc`:
+        //
+        // 36 35 98:0 /mnt1 /mnt2 rw,noatime master:1 - ext3 /dev/root rw,errors=continue
+        // |  |  |    |     |     |          |          |      |     |
+        // (1)(2)(3:4)(5)   (6)   (7)        (8)        (9)   (10)   (11)
+        static const pcrecpp::RE kRe(R"re(\d+ \d+ \d+:\d+ \S+ (\S+))re");
+        std::string mountPoint;
+        if (kRe.PartialMatch(line, &mountPoint)) {
+            boost::filesystem::path p(mountPoint);
+            boost::system::error_code ec;
+            boost::filesystem::space_info spaceInfo = getSpace(p, ec);
+            if (!ec.failed() && spaceInfo.capacity) {
+                BSONObjBuilder bob(builder->subobjStart(mountPoint));
+                bob.appendNumber("capacity", static_cast<long long>(spaceInfo.capacity));
+                bob.appendNumber("available", static_cast<long long>(spaceInfo.available));
+                bob.appendNumber("free", static_cast<long long>(spaceInfo.free));
+                bob.doneFast();
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
+Status parseProcSelfMountStats(StringData data, BSONObjBuilder* builder) {
+    return parseProcSelfMountStatsImpl(data, builder, &boost::filesystem::space);
+}
+
+Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    return parseProcSelfMountStats(swString.getValue(), builder);
 }
 
 namespace {

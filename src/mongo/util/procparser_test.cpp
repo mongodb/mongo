@@ -43,6 +43,14 @@
 
 namespace mongo {
 
+namespace procparser {
+Status parseProcSelfMountStatsImpl(StringData data,
+                                   BSONObjBuilder* builder,
+                                   boost::filesystem::space_info (*getSpace)(
+                                       const boost::filesystem::path&, boost::system::error_code&));
+}
+
+
 namespace {
 using StringMap = std::map<std::string, uint64_t>;
 
@@ -96,6 +104,10 @@ StringMap toNestedStringMap(BSONObj& obj) {
     ASSERT_OK(procparser::parseProcDiskStats(_disks, _x, &builder)); \
     auto obj = builder.obj();                                        \
     auto stringMap = toNestedStringMap(obj);
+#define ASSERT_PARSE_MOUNTSTAT(x)                                                   \
+    BSONObjBuilder builder;                                                         \
+    ASSERT_OK(procparser::parseProcSelfMountStatsImpl(x, &builder, &mockGetSpace)); \
+    auto obj = builder.obj();
 #define ASSERT_PARSE_VMSTAT(_keys, _x)                           \
     BSONObjBuilder builder;                                      \
     ASSERT_OK(procparser::parseProcVMStat(_keys, _x, &builder)); \
@@ -654,6 +666,148 @@ TEST(FTDCProcDiskStats, TestLocalDiskStats) {
     }
 }
 
+boost::filesystem::space_info mockGetSpace(const boost::filesystem::path& p,
+                                           boost::system::error_code& ec) {
+    ec = boost::system::error_code();
+    boost::filesystem::space_info result;
+    if (p.string() == "/") {
+        result.available = 11213234231;
+        result.capacity = 23432543255;
+        result.free = 12387912837;
+    } else if (p.string() == "/boot") {
+        result.available = result.free = 777;
+        result.capacity = 888;
+    } else if (p.string() == "/home/ubuntu") {
+        result.available = result.free = 0;
+        result.capacity = 999;
+    } else if (p.string() == "/opt") {
+        result.available = result.free = result.capacity = 0;
+    } else if (p.string() == "/var") {
+        ec.assign(1, ec.category());
+    }
+    return result;
+}
+
+TEST(FTDCProcMountStats, TestMountStatsHappyPath) {
+    // clang-format off
+    ASSERT_PARSE_MOUNTSTAT("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
+        "26 30 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw\n"
+        "27 30 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=8033308k,nr_inodes=2008327,mode=755\n"
+        "28 27 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000\n"
+        "29 30 0:25 / /run rw,nosuid,noexec,relatime shared:5 - tmpfs tmpfs rw,size=1609528k,mode=755\n"
+        "30 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p1 rw,discard\n"
+        "31 25 0:7 / /sys/kernel/security rw,nosuid,nodev,noexec,relatime shared:8 - securityfs securityfs rw\n"
+        "32 27 0:26 / /dev/shm rw,nosuid,nodev shared:4 - tmpfs tmpfs rw\n"
+        "33 29 0:27 / /run/lock rw,nosuid,nodev,noexec,relatime shared:6 - tmpfs tmpfs rw,size=5120k\n"
+        "34 25 0:28 / /sys/fs/cgroup ro,nosuid,nodev,noexec shared:9 - tmpfs tmpfs ro,mode=755\n"
+        "35 34 0:29 / /sys/fs/cgroup/unified rw,nosuid,nodev,noexec,relatime shared:10 - cgroup2 cgroup rw\n"
+        "36 34 0:30 / /sys/fs/cgroup/systemd rw,nosuid,nodev,noexec,relatime shared:11 - cgroup cgroup rw,xattr,name=systemd\n"
+        "37 25 0:31 / /sys/fs/pstore rw,nosuid,nodev,noexec,relatime shared:12 - pstore pstore rw\n"
+        "38 34 0:32 / /sys/fs/cgroup/rdma rw,nosuid,nodev,noexec,relatime shared:14 - cgroup cgroup rw,rdma\n"
+        "39 34 0:33 / /sys/fs/cgroup/net_cls,net_prio rw,nosuid,nodev,noexec,relatime shared:15 - cgroup cgroup rw,net_cls,net_prio\n"
+        "40 34 0:34 / /sys/fs/cgroup/perf_event rw,nosuid,nodev,noexec,relatime shared:16 - cgroup cgroup rw,perf_event\n"
+        "41 34 0:35 / /sys/fs/cgroup/cpu,cpuacct rw,nosuid,nodev,noexec,relatime shared:17 - cgroup cgroup rw,cpu,cpuacct\n"
+        "42 34 0:36 / /sys/fs/cgroup/freezer rw,nosuid,nodev,noexec,relatime shared:18 - cgroup cgroup rw,freezer\n"
+        "43 34 0:37 / /sys/fs/cgroup/cpuset rw,nosuid,nodev,noexec,relatime shared:19 - cgroup cgroup rw,cpuset\n"
+        "44 34 0:38 / /sys/fs/cgroup/devices rw,nosuid,nodev,noexec,relatime shared:20 - cgroup cgroup rw,devices\n"
+        "45 34 0:39 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:21 - cgroup cgroup rw,memory\n"
+        "46 34 0:40 / /sys/fs/cgroup/pids rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,pids\n"
+        "47 34 0:41 / /sys/fs/cgroup/blkio rw,nosuid,nodev,noexec,relatime shared:23 - cgroup cgroup rw,blkio\n"
+        "48 34 0:42 / /sys/fs/cgroup/hugetlb rw,nosuid,nodev,noexec,relatime shared:24 - cgroup cgroup rw,hugetlb\n"
+        "49 27 0:21 / /dev/mqueue rw,relatime shared:25 - mqueue mqueue rw\n"
+        "50 26 0:43 / /proc/sys/fs/binfmt_misc rw,relatime shared:26 - autofs systemd-1 rw,fd=32,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=3379\n"
+        "51 27 0:44 / /dev/hugepages rw,relatime shared:27 - hugetlbfs hugetlbfs rw,pagesize=2M\n"
+        "52 29 0:45 / /run/rpc_pipefs rw,relatime shared:28 - rpc_pipefs sunrpc rw\n"
+        "53 25 0:8 / /sys/kernel/debug rw,relatime shared:29 - debugfs debugfs rw\n"
+        "54 25 0:46 / /sys/fs/fuse/connections rw,relatime shared:30 - fusectl fusectl rw\n"
+        "55 25 0:22 / /sys/kernel/config rw,relatime shared:31 - configfs configfs rw\n"
+        "90 30 7:2 / /snap/core18/2128 ro,nodev,relatime shared:33 - squashfs /dev/loop2 ro\n"
+        "94 30 259:0 / /home/ubuntu rw,noatime shared:35 - xfs /dev/nvme1n1 rw,attr2,inode64,logbufs=8,logbsize=32k,noquota\n"
+        "96 50 0:47 / /proc/sys/fs/binfmt_misc rw,relatime shared:36 - binfmt_misc binfmt_misc rw\n"
+        "192 30 7:3 / /snap/amazon-ssm-agent/3552 ro,nodev,relatime shared:38 - squashfs /dev/loop3 ro\n"
+        "196 30 7:5 / /snap/amazon-ssm-agent/4046 ro,nodev,relatime shared:39 - squashfs /dev/loop5 ro\n"
+        "435 30 0:53 / /var/lib/lxcfs rw,nosuid,nodev,relatime shared:248 - fuse.lxcfs lxcfs rw,user_id=0,group_id=0,allow_other\n"
+        "379 30 7:6 / /snap/snapd/13270 ro,nodev,relatime shared:194 - squashfs /dev/loop6 ro\n"
+        "387 30 7:4 / /snap/snapd/13640 ro,nodev,relatime shared:198 - squashfs /dev/loop4 ro\n"
+        "92 30 7:1 / /snap/core18/2246 ro,nodev,relatime shared:34 - squashfs /dev/loop1 ro\n"
+        "88 29 0:51 / /run/user/1000 rw,nosuid,nodev,relatime shared:32 - tmpfs tmpfs rw,size=1609524k,mode=700,uid=1000,gid=1000\n");
+    // clang-format on
+    ASSERT(obj["/"]["capacity"].isNumber());
+    ASSERT(obj["/"]["capacity"].number() == 23432543255);
+    ASSERT(obj["/"]["available"].isNumber());
+    ASSERT(obj["/"]["available"].number() == 11213234231);
+    ASSERT(obj["/"]["free"].isNumber());
+    ASSERT(obj["/"]["free"].number() == 12387912837);
+    ASSERT(obj["/home/ubuntu"]["capacity"].isNumber());
+    ASSERT(obj["/home/ubuntu"]["capacity"].number() == 999);
+    ASSERT(obj["/home/ubuntu"]["available"].isNumber());
+    ASSERT(obj["/home/ubuntu"]["available"].number() == 0);
+    ASSERT(obj["/home/ubuntu"]["free"].isNumber());
+    ASSERT(obj["/home/ubuntu"]["free"].number() == 0);
+}
+
+TEST(FTDCProcMountStats, TestMountStatsZeroCapacity) {
+    // clang-format off
+    ASSERT_PARSE_MOUNTSTAT("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
+        "26 30 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw\n"
+        "27 30 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=8033308k,nr_inodes=2008327,mode=755\n"
+        "28 27 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000\n"
+        "29 30 0:25 / /run rw,nosuid,noexec,relatime shared:5 - tmpfs tmpfs rw,size=1609528k,mode=755\n"
+        "30 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p1 rw,discard\n"
+        "31 25 0:7 / /opt rw,nosuid,nodev,noexec,relatime shared:8 - ext4 /dev/nvme0n1p2 rw,discard\n"
+        "88 29 0:51 / /run/user/1000 rw,nosuid,nodev,relatime shared:32 - tmpfs tmpfs rw,size=1609524k,mode=700,uid=1000,gid=1000\n");
+    // clang-format on
+    ASSERT(!obj.hasElement("/opt"));
+}
+
+TEST(FTDCProcMountStats, TestMountStatsError) {
+    // clang-format off
+    ASSERT_PARSE_MOUNTSTAT("25 30 0:23 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw\n"
+        "26 30 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw\n"
+        "27 30 0:6 / /dev rw,nosuid,relatime shared:2 - devtmpfs udev rw,size=8033308k,nr_inodes=2008327,mode=755\n"
+        "28 27 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000\n"
+        "29 30 0:25 / /run rw,nosuid,noexec,relatime shared:5 - tmpfs tmpfs rw,size=1609528k,mode=755\n"
+        "30 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p1 rw,discard\n"
+        "31 25 0:7 / /var rw,nosuid,nodev,noexec,relatime shared:8 - ext4 /dev/nvme0n1p2 rw,discard\n"
+        "88 29 0:51 / /run/user/1000 rw,nosuid,nodev,relatime shared:32 - tmpfs tmpfs rw,size=1609524k,mode=700,uid=1000,gid=1000\n");
+    // clang-format on
+    ASSERT(!obj.hasElement("/var"));
+}
+
+TEST(FTDCProcMountStats, TestMountStatsGarbageInput) {
+    ASSERT_PARSE_MOUNTSTAT(
+        "sadjlkyfgs odyfg\x01$fgeairsufg oireasfgrysudvfbg \n\n\t\t\t34756gusf\r342");
+}
+
+TEST(FTDCProcMountStats, TestMountStatsSomewhatGarbageInput) {
+    // clang-format off
+    ASSERT_PARSE_MOUNTSTAT("11 11 11 11 11 11 11 11 11 11 11 11 11\n"
+        "\n"
+        "            \n"
+        "asidhsif gsys gfuwe esuf usfg 755\n"
+        "28 27 754\t\x01\n"
+        "29 30 0:25 / /run sdfget3 354t89 re89y3q9t q9ty fg\n"
+        "30 1 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p1 rw,discard\n"
+        "31 25 0:7 / /boot rw,nosuid,nodev,noexec,relatime shared:8 - ext4 /dev/nvme0n1p2 rw,discard\n"
+        "88 29 0:51 / /run/user/1000 rw,nosuid,nodev,relatime shared:32 - tmpfs tmpfs rw,size=1609524k,mode=700,uid=1000,gid=1000");
+    // clang-format on
+    ASSERT(obj.hasElement("/boot"));
+    ASSERT(obj["/boot"]["capacity"].isNumber());
+    ASSERT(obj["/boot"]["capacity"].number() == 888);
+    ASSERT(obj["/boot"]["available"].isNumber());
+    ASSERT(obj["/boot"]["available"].number() == 777);
+    ASSERT(obj["/boot"]["free"].isNumber());
+    ASSERT(obj["/boot"]["free"].number() == 777);
+}
+
+// Test we can parse the /proc/self/mountinfo on this machine.
+// This tests is designed to exercise our parsing code on various Linuxes and never fail
+TEST(FTDCProcMountStats, TestLocalMountStats) {
+    BSONObjBuilder bb;
+    ASSERT_OK(procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo", &bb));
+    auto obj = bb.obj();
+    ASSERT(obj.hasElement("/"));
+}
 
 TEST(FTDCProcVMStat, TestVMStat) {
 

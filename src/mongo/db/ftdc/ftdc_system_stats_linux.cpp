@@ -141,6 +141,14 @@ public:
         }
 
         {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("mounts"_sd));
+            processStatusErrors(
+                procparser::parseProcSelfMountStatsFile("/proc/self/mountinfo"_sd, &subObjBuilder),
+                &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
+
+        {
             BSONObjBuilder subObjBuilder(builder.subobjStart("vmstat"_sd));
             processStatusErrors(
                 procparser::parseProcVMStatFile("/proc/vmstat"_sd, kVMKeys, &subObjBuilder),

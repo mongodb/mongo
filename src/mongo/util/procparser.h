@@ -129,6 +129,11 @@ Status parseProcDiskStatsFile(StringData filename,
                               BSONObjBuilder* builder);
 
 /**
+ * Read from file, and write the used/free space data for available mounts.
+ */
+Status parseProcSelfMountStatsFile(StringData filename, BSONObjBuilder* builder);
+
+/**
  * Get a vector of disks to monitor by enumerating the specified directory.
  *
  * If the directory does not exist, or otherwise permission is denied, returns an empty vector.
