@@ -32,7 +32,6 @@
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
@@ -48,14 +47,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(pauseSubmissionsFailPoint);
 MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
 
-Status processRemoteResponse(OperationContext* opCtx,
-                             const executor::RemoteCommandResponse& remoteResponse) {
-    // Since requests are executed by a separate thread, the related operationTime needs to be
-    // explicitly retrieved and set on the original context of the requestor to ensure
-    // it will be propagated back to the router.
-    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-    replClient.setLastOpToSystemLastOpTime(opCtx);
-
+Status processRemoteResponse(const executor::RemoteCommandResponse& remoteResponse) {
     if (!remoteResponse.status.isOK()) {
         return remoteResponse.status;
     }
@@ -151,8 +143,8 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveChunk(
                                                               std::move(externalClientInfo));
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
-            return processRemoteResponse(opCtx, remoteResponse);
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
         })
         .semi();
 }
@@ -167,8 +159,8 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationCont
         nss, shardId, chunkRange.getMin(), chunkRange.getMax(), version);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
-            return processRemoteResponse(opCtx, remoteResponse);
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
         })
         .semi();
 }
@@ -184,9 +176,9 @@ SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestAutoSplit
     auto commandInfo = std::make_shared<AutoSplitVectorCommandInfo>(
         nss, shardId, keyPattern, minKey, maxKey, maxChunkSizeBytes);
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse)
+        .then([](const executor::RemoteCommandResponse& remoteResponse)
                   -> StatusWith<std::vector<BSONObj>> {
-            auto responseStatus = processRemoteResponse(opCtx, remoteResponse);
+            auto responseStatus = processRemoteResponse(remoteResponse);
             if (!responseStatus.isOK()) {
                 return responseStatus;
             }
@@ -211,8 +203,8 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestSplitChunk(
         nss, shardId, keyPattern.toBSON(), minKey, maxKey, collectionVersion, splitPoints);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse) {
-            return processRemoteResponse(opCtx, remoteResponse);
+        .then([](const executor::RemoteCommandResponse& remoteResponse) {
+            return processRemoteResponse(remoteResponse);
         })
         .semi();
 }
@@ -234,9 +226,9 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
                                                              version);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([opCtx](const executor::RemoteCommandResponse& remoteResponse)
+        .then([](const executor::RemoteCommandResponse& remoteResponse)
                   -> StatusWith<DataSizeResponse> {
-            auto responseStatus = processRemoteResponse(opCtx, remoteResponse);
+            auto responseStatus = processRemoteResponse(remoteResponse);
             if (!responseStatus.isOK()) {
                 return responseStatus;
             }

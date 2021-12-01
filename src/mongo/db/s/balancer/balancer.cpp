@@ -45,6 +45,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/balancer_chunk_merger_impl.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
@@ -169,6 +170,12 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      const ShardId& destination,
                                      Status outcome) {
+    // Since the commands scheduler uses a separate thread to remotely execute a
+    // request, the resulting clusterTime needs to be explicitly retrieved and set on the
+    // original context of the requestor to ensure it will be propagated back to the router.
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    replClient.setLastOpToSystemLastOpTime(opCtx);
+
     if (outcome.isOK()) {
         return outcome;
     }
