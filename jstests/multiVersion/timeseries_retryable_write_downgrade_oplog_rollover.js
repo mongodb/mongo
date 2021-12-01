@@ -57,7 +57,7 @@ assert.eq(configTransactions.find().toArray().length, 1);
 
 replTest.upgradeSet({binVersion: 'last-lts'});
 replTest.awaitNodesAgreeOnPrimary();
-if (replTest.getPrimary() !== primary) {
+if (replTest.getPrimary().port !== primary.port) {
     replTest.stepUp(replTest.getSecondary());
 }
 
