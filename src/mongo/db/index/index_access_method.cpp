@@ -144,8 +144,7 @@ Status AbstractIndexAccessMethod::insert(OperationContext* opCtx,
             keys.get(),
             multikeyMetadataKeys.get(),
             multikeyPaths.get(),
-            loc,
-            kNoopOnSuppressedErrorFn);
+            loc);
 
     return insertKeysAndUpdateMultikeyPaths(opCtx,
                                             coll,
@@ -312,8 +311,7 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
                     keys.get(),
                     multikeyMetadataKeys,
                     multikeyPaths,
-                    boost::none,  // loc
-                    kNoopOnSuppressedErrorFn);
+                    boost::none /* loc */);
             invariant(keys->size() == 1);
             return *keys->begin();
         } else {
@@ -434,8 +432,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                 &ticket->oldKeys,
                 nullptr,
                 nullptr,
-                record,
-                kNoopOnSuppressedErrorFn);
+                record);
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
@@ -448,8 +445,7 @@ void AbstractIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                 &ticket->newKeys,
                 &ticket->newMultikeyMetadataKeys,
                 &ticket->newMultikeyPaths,
-                record,
-                kNoopOnSuppressedErrorFn);
+                record);
     }
 
     ticket->loc = record;
@@ -897,17 +893,6 @@ void AbstractIndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx,
     _indexCatalogEntry->setMultikey(opCtx, collection, multikeyMetadataKeys, paths);
 }
 
-IndexAccessMethod::OnSuppressedErrorFn IndexAccessMethod::kNoopOnSuppressedErrorFn =
-    [](Status status, const BSONObj& obj, boost::optional<RecordId> loc) {
-        LOGV2_DEBUG(
-            20686,
-            1,
-            "Suppressed key generation error: {error} when getting index keys for {loc}: {obj}",
-            "error"_attr = redact(status),
-            "loc"_attr = loc,
-            "obj"_attr = redact(obj));
-    };
-
 void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
                                         const CollectionPtr& collection,
                                         SharedBufferFragmentBuilder& pooledBufferBuilder,
@@ -918,7 +903,7 @@ void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
                                         KeyStringSet* multikeyMetadataKeys,
                                         MultikeyPaths* multikeyPaths,
                                         boost::optional<RecordId> id,
-                                        OnSuppressedErrorFn onSuppressedError) const {
+                                        OnSuppressedErrorFn&& onSuppressedError) const {
     invariant(!id || _newInterface->rsKeyFormat() != KeyFormat::String || id->isStr(),
               fmt::format("RecordId is not in the same string format as its RecordStore; id: {}",
                           id->toString()));
@@ -960,7 +945,16 @@ void AbstractIndexAccessMethod::getKeys(OperationContext* opCtx,
             throw;
         }
 
-        onSuppressedError(ex.toStatus(), obj, id);
+        if (onSuppressedError) {
+            onSuppressedError(ex.toStatus(), obj, id);
+        } else {
+            LOGV2_DEBUG(20686,
+                        1,
+                        "Suppressed key generation error",
+                        "error"_attr = redact(ex.toStatus()),
+                        "loc"_attr = id,
+                        "obj"_attr = redact(obj));
+        }
     }
 }
 

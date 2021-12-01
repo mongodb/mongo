@@ -602,8 +602,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                          keys.get(),
                          multikeyMetadataKeys,
                          multikeyPaths,
-                         nextRecord.id,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         nextRecord.id);
 
             return keys->count(*keyString);
         }

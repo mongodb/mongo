@@ -953,6 +953,11 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
             if (multikeyPaths) {
                 indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.get());
             }
+
+            multikeyPaths = interceptor->getSkippedRecordTracker()->getMultikeyPaths();
+            if (multikeyPaths) {
+                indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.get());
+            }
         }
 
         _indexes[i].block->success(opCtx, collection);

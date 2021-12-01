@@ -80,6 +80,10 @@ public:
                                     : boost::none;
     }
 
+    boost::optional<MultikeyPaths> getMultikeyPaths() const {
+        return _multikeyPaths;
+    }
+
 private:
     IndexCatalogEntry* _indexCatalogEntry;
 
@@ -87,6 +91,8 @@ private:
     std::unique_ptr<TemporaryRecordStore> _skippedRecordsTable;
 
     AtomicWord<std::uint32_t> _skippedRecordCounter{0};
+
+    boost::optional<MultikeyPaths> _multikeyPaths;
 };
 
 }  // namespace mongo

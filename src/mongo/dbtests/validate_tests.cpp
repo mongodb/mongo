@@ -871,8 +871,7 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         id1,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         id1);
 
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, id1, options, &numDeleted);
@@ -1276,8 +1275,7 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         rid);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -1661,8 +1659,7 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         rid);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -2009,8 +2006,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             swRecordId.getValue(),
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             swRecordId.getValue());
                 ASSERT_EQ(1, keys.size());
 
                 {
@@ -2060,8 +2056,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             rid,
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             rid);
                 auto removeStatus =
                     iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -2199,8 +2194,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             id1,
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             id1);
                 ASSERT_EQ(keys.size(), 1);
 
                 int64_t numDeleted;
@@ -2405,8 +2399,7 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         rid);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -2444,8 +2437,7 @@ public:
                          &keys,
                          nullptr,
                          nullptr,
-                         rid,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         rid);
             auto removeStatus =
                 iam->removeKeys(&_opCtx, {keys.begin(), keys.end()}, rid, options, &numDeleted);
 
@@ -2560,8 +2552,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             swRecordId.getValue(),
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             swRecordId.getValue());
                 ASSERT_EQ(1, keys.size());
 
                 {
@@ -2607,8 +2598,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             swRecordId.getValue(),
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             swRecordId.getValue());
                 ASSERT_EQ(1, keys.size());
 
                 {
@@ -2953,8 +2943,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             id1,
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             id1);
                 ASSERT_EQ(keys.size(), 1);
 
                 int64_t numDeleted;
@@ -2989,8 +2978,7 @@ public:
                              &keys,
                              nullptr,
                              &multikeyPaths,
-                             id1,
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             id1);
                 ASSERT_EQ(keys.size(), 2);
                 ASSERT_EQ(multikeyPaths.size(), 1);
 
@@ -3182,8 +3170,7 @@ public:
                              &keys,
                              nullptr,
                              &oldMultikeyPaths,
-                             id1,
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             id1);
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numDeleted;
@@ -3219,8 +3206,7 @@ public:
                              &keys,
                              nullptr,
                              nullptr,
-                             id1,
-                             IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                             id1);
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numInserted;

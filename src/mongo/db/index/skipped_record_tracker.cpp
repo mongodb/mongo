@@ -35,6 +35,8 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/storage/execution_context.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -134,6 +136,8 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     }
 
     SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    auto& executionCtx = StorageExecutionContext::get(opCtx);
+
     auto recordStore = _skippedRecordsTable->rs();
     auto cursor = recordStore->getCursor(opCtx);
     int resolved = 0;
@@ -155,23 +159,53 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                         "skippedRecordId"_attr = skippedRecordId,
                         "skippedDoc"_attr = skippedDoc);
 
+            auto keys = executionCtx.keys();
+            auto multikeyMetadataKeys = executionCtx.multikeyMetadataKeys();
+            auto multikeyPaths = executionCtx.multikeyPaths();
+
             try {
                 // Because constraint enforcement is set, this will throw if there are any indexing
                 // errors, instead of writing back to the skipped records table, which would
                 // normally happen if constraints were relaxed.
-                auto status = _indexCatalogEntry->accessMethod()->insert(opCtx,
-                                                                         pooledBuilder,
-                                                                         collection,
-                                                                         skippedDoc,
-                                                                         skippedRecordId,
-                                                                         options,
-                                                                         nullptr,
-                                                                         nullptr);
+                _indexCatalogEntry->accessMethod()->getKeys(
+                    opCtx,
+                    collection,
+                    pooledBuilder,
+                    skippedDoc,
+                    options.getKeysMode,
+                    IndexAccessMethod::GetKeysContext::kAddingKeys,
+                    keys.get(),
+                    multikeyMetadataKeys.get(),
+                    multikeyPaths.get(),
+                    skippedRecordId);
+
+                auto status = _indexCatalogEntry->accessMethod()->insertKeys(
+                    opCtx, collection, *keys, skippedRecordId, options, nullptr, nullptr);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                status = _indexCatalogEntry->accessMethod()->insertKeys(opCtx,
+                                                                        collection,
+                                                                        *multikeyMetadataKeys,
+                                                                        skippedRecordId,
+                                                                        options,
+                                                                        nullptr,
+                                                                        nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
             } catch (const DBException& ex) {
                 return ex.toStatus();
+            }
+
+            if (_indexCatalogEntry->accessMethod()->shouldMarkIndexAsMultikey(
+                    keys->size(), *multikeyMetadataKeys, *multikeyPaths)) {
+                if (!_multikeyPaths) {
+                    _multikeyPaths = *multikeyPaths;
+                }
+
+                MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.get(), *multikeyPaths);
             }
         }
 
@@ -190,11 +224,9 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     int logLevel = (resolved > 0) ? 0 : 1;
     LOGV2_DEBUG(23883,
                 logLevel,
-                "index build: reapplied {resolved} skipped records for index: "
-                "{indexCatalogEntry_descriptor_indexName}",
-                "resolved"_attr = resolved,
-                "indexCatalogEntry_descriptor_indexName"_attr =
-                    _indexCatalogEntry->descriptor()->indexName());
+                "Index build: reapplied skipped records",
+                "index"_attr = _indexCatalogEntry->descriptor()->indexName(),
+                "numResolved"_attr = resolved);
     return Status::OK();
 }
 

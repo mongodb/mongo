@@ -155,8 +155,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                          keys.get(),
                          multikeyMetadataKeys,
                          multikeyPaths,
-                         member->recordId,
-                         IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                         member->recordId);
             KeyString::HeapBuilder keyString(iam->getSortedDataInterface()->getKeyStringVersion(),
                                              memberKey.keyData,
                                              iam->getSortedDataInterface()->getOrdering(),

@@ -146,8 +146,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                      documentKeySet.get(),
                      multikeyMetadataKeys.get(),
                      documentMultikeyPaths.get(),
-                     recordId,
-                     IndexAccessMethod::kNoopOnSuppressedErrorFn);
+                     recordId);
 
         bool shouldBeMultikey = iam->shouldMarkIndexAsMultikey(
             documentKeySet->size(),
