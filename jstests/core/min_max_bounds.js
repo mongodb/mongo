@@ -10,7 +10,9 @@
 load('jstests/libs/fixture_helpers.js');      // For FixtureHelpers.
 load('jstests/aggregation/extras/utils.js');  // For resultsEq.
 
-var coll = db.query_bound_inclusion;
+const collNamePrefix = 'query_bound_inclusion_';
+let collCount = 0;
+let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 2, b: 2}));
@@ -18,7 +20,7 @@ assert.commandWorked(coll.insert({a: 3, b: 3}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 
-var res = coll.find().sort({a: 1}).toArray();
+let res = coll.find().sort({a: 1}).toArray();
 assert.eq(res.length, 3);
 assert.eq(res[0].a, 1);
 assert.eq(res[1].a, 2);
@@ -78,9 +80,10 @@ assert.eq(res[1].b, 3);
 
 // Bug SERVER-54552.
 const testBoundsInclusivity = (indexDirection) => {
+    coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
-    coll.createIndex({i: indexDirection});
-    coll.insertMany([{i: 'a'}, {i: 'b'}, {i: 'c'}, {i: 'd'}, {i: 'd'}, {i: 'e'}]);
+    assert.commandWorked(coll.createIndex({i: indexDirection}));
+    assert.commandWorked(coll.insert([{i: 'a'}, {i: 'b'}, {i: 'c'}, {i: 'd'}, {i: 'd'}, {i: 'e'}]));
 
     // Test for all the posible ranges.
     [['$gte', '$lte', 4], ['$gt', '$lte', 3], ['$gte', '$lt', 2], ['$gt', '$lt', 1]].forEach(
@@ -105,10 +108,12 @@ testBoundsInclusivity(-1);
 // Tests inclusivity correctness with all sort directions on an index with a given direction
 // for range queries that can use a 2 property compound index.
 const testBoundsInclusivityCompound = (lIndexDirection, nIndexDirection) => {
+    coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
-    coll.createIndex({l: lIndexDirection, n: nIndexDirection});
-    ['a', 'b', 'c', 'd', 'e'].forEach(
-        (l) => [1, 2, 3, 4, 5].forEach((n) => coll.insertOne({l, n})));
+    assert.commandWorked(coll.createIndex({l: lIndexDirection, n: nIndexDirection}));
+    let docs = [];
+    ['a', 'b', 'c', 'd', 'e'].forEach((l) => [1, 2, 3, 4, 5].forEach((n) => docs.push({l, n})));
+    assert.commandWorked(coll.insert(docs));
 
     // The eq variants of the operators add one more document to the result.
     const opExtra = {'$lt': 0, '$lte': 1, '$gt': 0, '$gte': 1};
