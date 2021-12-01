@@ -9782,7 +9782,6 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: selinux_rhel8_org
   - name: .publish
     distros:
     - rhel80-small
