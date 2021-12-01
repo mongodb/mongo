@@ -273,7 +273,7 @@ Status verifyFieldNameNotReserved(StringData s) {
 }  // namespace
 
 StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
-    if (spec["textIndexVersion"].numberInt() == TEXT_INDEX_VERSION_1) {
+    if (spec["textIndexVersion"].safeNumberInt() == TEXT_INDEX_VERSION_1) {
         return _fixSpecV1(spec);
     }
 
