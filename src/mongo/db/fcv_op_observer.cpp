@@ -65,7 +65,6 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         prevVersion = serverGlobalParams.featureCompatibility.getVersion();
     }
     serverGlobalParams.mutableFeatureCompatibility.setVersion(newVersion);
-    FeatureCompatibilityVersion::logFCVWithContext("setFCV"_sd);
     FeatureCompatibilityVersion::updateMinWireVersion();
 
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.

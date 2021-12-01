@@ -124,13 +124,6 @@ public:
      * Also used in rare cases when the replication coordinator majority snapshot is cleared.
      */
     static void clearLastFCVUpdateTimestamp();
-
-    /**
-     * Logs the current FCV global state.
-     * context: the context in which this function was called, to differentiate logs (e.g.
-     * startup, log rotation).
-     */
-    static void logFCVWithContext(StringData context);
 };
 
 /**

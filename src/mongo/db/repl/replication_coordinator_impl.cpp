@@ -4417,7 +4417,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         serverGlobalParams.mutableFeatureCompatibility.setVersion(
             multiversion::GenericFCV::kLatest);
-        FeatureCompatibilityVersion::logFCVWithContext("arbiter"_sd);
+        LOGV2(5853302,
+              "Update featureCompatibilityVersion because arbiters do not receive the replicated "
+              "version",
+              "featureCompatibilityVersion"_attr =
+                  multiversion::toString(serverGlobalParams.featureCompatibility.getVersion()));
     }
 
     _memberState = newState;
