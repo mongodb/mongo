@@ -117,7 +117,7 @@ assert.soon(
         twoPhaseCommitCoordinatorServerStatus =
             txnCoordinator.getDB(dbName).serverStatus().twoPhaseCommitCoordinator;
         const {deletingCoordinatorDoc, waitingForDecisionAcks, writingDecision} =
-            twoPhaseCommitCoordinatorServerStatus;
+            twoPhaseCommitCoordinatorServerStatus.currentInSteps;
         return deletingCoordinatorDoc.toNumber() === 1 || waitingForDecisionAcks.toNumber() === 1 ||
             writingDecision.toNumber() === 1;
     },
