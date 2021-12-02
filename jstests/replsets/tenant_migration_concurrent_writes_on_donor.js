@@ -28,17 +28,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),
-    sharedOptions: {
-        setParameter: {
-            // set ttlMonitorSleepSecs and tenantMigrationGarbageCollectionDelayMS to low values
-            // to speed up cleanup between tests for shard merge
-            ttlMonitorSleepSecs: 1,
-            tenantMigrationGarbageCollectionDelayMS: 500,
-
-            // Allow non-timestamped reads on donor after migration completes for testing.
-            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'})
-        }
-    }
+    quickGarbageCollection: true,
 });
 
 const donorRst = tenantMigrationTest.getDonorRst();

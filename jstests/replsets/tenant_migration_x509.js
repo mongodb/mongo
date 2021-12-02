@@ -22,7 +22,15 @@ function makeTestNs(tenantId) {
     return {dbName: tenantId + "_testDb", collName: "testColl"};
 }
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+function setup() {
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+    return {
+        tenantMigrationTest,
+        teardown: function() {
+            tenantMigrationTest.stop();
+        }
+    };
+}
 
 const kDonorCertificateAndPrivateKey =
     TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem");
@@ -31,6 +39,7 @@ const kRecipientCertificateAndPrivateKey =
 
 (() => {
     jsTest.log("Test valid donor and recipient certificates");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "validCertificates";
     const migrationOpts = {
@@ -45,10 +54,12 @@ const kRecipientCertificateAndPrivateKey =
     TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, true /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid donor certificate, no header and trailer");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidDonorCertificateNoHeaderAndTrailer";
     const migrationOpts = {
@@ -67,10 +78,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid donor certificate, use private key as certificate");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidDonorCertificatePrivateKeyAsCertificate";
     const migrationOpts = {
@@ -89,10 +102,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid donor private key, no header and trailer");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidDonorPrivateKeyNoHeaderAndTrailer";
     const migrationOpts = {
@@ -111,10 +126,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid donor private key, use certificate as private key");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidDonorPrivateKeyCertificateAsPrivateKey";
     const migrationOpts = {
@@ -133,10 +150,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid donor certificate and private key pair");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidDonorCertificatePrivateKeyPair";
     const migrationOpts = {
@@ -155,10 +174,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test expired donor certificate and key");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "expiredDonorCertificate";
     const migrationOpts = {
@@ -175,10 +196,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid recipient certificate, no header and trailer");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidRecipientCertificateNoHeaderAndTrailer";
     const migrationOpts = {
@@ -197,10 +220,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid recipient certificate, use private key as certificate");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidRecipientCertificatePrivateKeyAsCertificate";
     const migrationOpts = {
@@ -219,10 +244,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid recipient private key, no header and trailer");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidRecipientPrivateKeyNoHeaderAndTrailer";
     const migrationOpts = {
@@ -241,10 +268,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid recipient private key, use certificate as private key");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidRecipientPrivateKeyCertificateAsPrivateKey";
     const migrationOpts = {
@@ -263,10 +292,12 @@ const kRecipientCertificateAndPrivateKey =
                                  ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test expired recipient certificate and key");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "expiredRecipientCertificate";
     const migrationOpts = {
@@ -283,10 +314,12 @@ const kRecipientCertificateAndPrivateKey =
                                       ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test invalid recipient certificate and private key pair");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "invalidRecipientCertificatePrivateKeyPair";
     const migrationOpts = {
@@ -305,16 +338,17 @@ const kRecipientCertificateAndPrivateKey =
                                       ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 if (!TestData.auth) {
     jsTestLog("Skipping testing authorization since auth is not enabled");
-    tenantMigrationTest.stop();
     return;
 }
 
 (() => {
     jsTest.log("Test donor certificate without the required privileges");
+    const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
     const tenantId = "donorCertificateInsufficientPrivileges";
     const migrationOpts = {
@@ -331,9 +365,11 @@ if (!TestData.auth) {
                                       ErrorCodes.Unauthorized);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
 
 (() => {
+    const {tenantMigrationTest, teardown} = setup();
     jsTest.log("Test recipient certificate without the required privileges");
     const migrationId = UUID();
     const tenantId = "recipientCertificateInsufficientPrivileges";
@@ -351,7 +387,6 @@ if (!TestData.auth) {
                                       ErrorCodes.Unauthorized);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
+    teardown();
 })();
-
-tenantMigrationTest.stop();
 })();

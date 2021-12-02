@@ -20,16 +20,17 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kTenantIdPrefix = "testTenantId";
 
-const tenantMigrationTest = new TenantMigrationTest({
-    name: jsTestName(),
-    sharedOptions: {setParameter: {tenantMigrationGarbageCollectionDelayMS: 0}}
-});
-
 /**
  * Starts a migration and forces the write to insert the donor's state doc to abort on the first few
  * tries. Asserts that the migration still completes successfully.
  */
-function testAbortInitialState(donorRst) {
+function testAbortInitialState() {
+    const tenantMigrationTest = new TenantMigrationTest({
+        name: jsTestName(),
+        quickGarbageCollection: true,
+    });
+    const donorRst = tenantMigrationTest.getDonorRst();
+
     const donorPrimary = donorRst.getPrimary();
 
     // Force the storage transaction for the insert to abort prior to inserting the WiredTiger
@@ -66,6 +67,7 @@ function testAbortInitialState(donorRst) {
         donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kCommitted);
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.stop();
 }
 
 /**
@@ -74,9 +76,13 @@ function testAbortInitialState(donorRst) {
  * reaching 'pauseFailPoint' to abort on the first few tries. Asserts that the migration still
  * completes successfully.
  */
-function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nextState) {
+function testAbortStateTransition(pauseFailPoint, setUpFailPoints, nextState) {
     jsTest.log(`Test aborting the write to transition to state "${
         nextState}" after reaching failpoint "${pauseFailPoint}"`);
+
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
+    const donorRst = tenantMigrationTest.getDonorRst();
 
     const donorPrimary = donorRst.getPrimary();
     const tenantId = `${kTenantIdPrefix}-${nextState}`;
@@ -123,11 +129,11 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
     });
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.stop();
 }
 
-const donorRst = tenantMigrationTest.getDonorRst();
 jsTest.log("Test aborting donor's state doc insert");
-testAbortInitialState(donorRst);
+testAbortInitialState();
 
 jsTest.log("Test aborting donor's state doc update");
 [{
@@ -143,8 +149,6 @@ jsTest.log("Test aborting donor's state doc update");
      setUpFailPoints: ["abortTenantMigrationBeforeLeavingBlockingState"],
      nextState: TenantMigrationTest.DonorState.kAborted
  }].forEach(({pauseFailPoint, setUpFailPoints = [], nextState}) => {
-    testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nextState);
+    testAbortStateTransition(pauseFailPoint, setUpFailPoints, nextState);
 });
-
-tenantMigrationTest.stop();
 }());

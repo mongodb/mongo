@@ -40,6 +40,7 @@
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -315,7 +316,25 @@ void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
     OperationContext* opCtx,
     BSONObj initialStateDoc,
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
-    // TODO (SERVER-59786): check for conflicts here, not RecipientSyncDataCmd::typedRun.
+    auto tenantId = initialStateDoc["tenantId"].valueStringData();
+
+    for (auto& instance : existingInstances) {
+        auto existingTypedInstance =
+            checked_cast<const TenantMigrationRecipientService::Instance*>(instance);
+        auto existingState = existingTypedInstance->getState();
+        auto isDone = existingState.getState() == TenantMigrationRecipientStateEnum::kDone &&
+            existingState.getExpireAt();
+
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "an existing shard merge is in progress",
+                isDone ||
+                    (existingTypedInstance->getProtocol() != MigrationProtocolEnum::kShardMerge &&
+                     existingState.getProtocol() != MigrationProtocolEnum::kShardMerge));
+
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "tenant " << tenantId << " is already migrating",
+                isDone || existingTypedInstance->getTenantId() != tenantId);
+    }
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
@@ -2668,6 +2687,11 @@ const std::string& TenantMigrationRecipientService::Instance::getTenantId() cons
 
 const MigrationProtocolEnum& TenantMigrationRecipientService::Instance::getProtocol() const {
     return _protocol;
+}
+
+const TenantMigrationRecipientDocument TenantMigrationRecipientService::Instance::getState() const {
+    stdx::lock_guard lk(_mutex);
+    return _stateDoc;
 }
 
 }  // namespace repl

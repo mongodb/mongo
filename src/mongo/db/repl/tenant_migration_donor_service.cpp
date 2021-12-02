@@ -34,6 +34,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
+#include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -148,20 +149,32 @@ void TenantMigrationDonorService::checkIfConflictsWithOtherInstances(
     OperationContext* opCtx,
     BSONObj initialState,
     const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
-    auto tenantId = initialState["tenantId"].valueStringData();
-    // Any existing migration for this tenant must be aborted and garbage-collectable.
-    for (auto& instance : existingInstances) {
-        auto typedInstance = checked_cast<const TenantMigrationDonorService::Instance*>(instance);
-        auto durableState = typedInstance->getDurableState();
+    auto stateDoc = tenant_migration_access_blocker::parseDonorStateDocument(initialState);
+    auto isNewShardMerge = stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge;
 
-        if (typedInstance->getTenantId() == tenantId) {
-            // If a migration with the same tenantId exists, it needs to be already in kAborted
-            // state
+    for (auto& instance : existingInstances) {
+        auto existingTypedInstance =
+            checked_cast<const TenantMigrationDonorService::Instance*>(instance);
+        auto existingState = existingTypedInstance->getDurableState();
+        auto existingIsAborted = existingState &&
+            existingState->state == TenantMigrationDonorStateEnum::kAborted &&
+            existingState->expireAt;
+
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Cannot start a shard merge with existing migrations in progress",
+                !isNewShardMerge || existingIsAborted);
+
+        uassert(
+            ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Cannot start a migration with an existing shard merge in progress",
+            existingTypedInstance->getProtocol() != MigrationProtocolEnum::kShardMerge ||
+                existingIsAborted);
+
+        // Any existing migration for this tenant must be aborted and garbage-collectable.
+        if (existingTypedInstance->getTenantId() == stateDoc.getTenantId()) {
             uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream() << "tenant " << tenantId << " is already migrating",
-                    durableState &&
-                        durableState->state == TenantMigrationDonorStateEnum::kAborted &&
-                        durableState->expireAt);
+                    str::stream() << "tenant " << stateDoc.getTenantId() << " is already migrating",
+                    existingIsAborted);
         }
     }
 }

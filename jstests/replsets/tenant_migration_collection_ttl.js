@@ -147,6 +147,8 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     assertTTLDeleteExpiredDocs(dbName, donorPrimary);
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
+                                                          migrationOpts.tenantId);
 })();
 
 // Tests that:
@@ -211,6 +213,9 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
     // After the tenant migration is aborted, the TTL cleanup is restored.
     assertTTLDeleteExpiredDocs(dbName, recipientPrimary);
     assertTTLDeleteExpiredDocs(dbName, donorPrimary);
+
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
+                                                          migrationOpts.tenantId);
 })();
 
 tenantMigrationTest.stop();

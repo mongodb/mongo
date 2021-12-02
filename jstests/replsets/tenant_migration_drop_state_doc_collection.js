@@ -162,19 +162,14 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
     }
 }
 
-const tenantMigrationTest = new TenantMigrationTest({
-    name: jsTestName(),
-    sharedOptions: {
-        setParameter: {
-            tenantMigrationGarbageCollectionDelayMS: 1,
-            ttlMonitorSleepSecs: 1,
-        }
-    },
-    initiateRstWithHighElectionTimeout: false
-});
-
 jsTest.log("Test dropping donor and recipient state doc collections during a migration.");
 kMigrationFpNames.forEach(fpName => {
+    const tenantMigrationTest = new TenantMigrationTest({
+        name: jsTestName(),
+        quickGarbageCollection: true,
+        initiateRstWithHighElectionTimeout: false
+    });
+
     testDroppingStateDocCollections(
         tenantMigrationTest, fpName, {dropDonorsCollection: true, dropRecipientsCollection: true});
 
@@ -219,7 +214,6 @@ kMigrationFpNames.forEach(fpName => {
         expectedForgetMigrationError:
             originalMigrationStartedOnRecipient ? ErrorCodes.ConflictingOperationInProgress : null
     });
+    tenantMigrationTest.stop();
 });
-
-tenantMigrationTest.stop();
 })();

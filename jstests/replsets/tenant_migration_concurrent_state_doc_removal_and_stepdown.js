@@ -20,16 +20,8 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({
-    name: jsTestName(),
-    sharedOptions: {
-        setParameter: {
-            tenantMigrationGarbageCollectionDelayMS: 1,
-            ttlMonitorSleepSecs: 1,
-        }
-    },
-    initiateRstWithHighElectionTimeout: false
-});
+const tenantMigrationTest = new TenantMigrationTest(
+    {name: jsTestName(), quickGarbageCollection: true, initiateRstWithHighElectionTimeout: false});
 
 const kTenantId = "testTenantId";
 

@@ -70,40 +70,52 @@ function runAfterClusterTimeRead(dbName, collName, operationTime, clusterTime, e
     }
 }
 
-const donorRst = new ReplSetTest({
-    nodes: 3,
-    name: "donor",
-    settings: {chainingAllowed: false},
-    nodeOptions: Object.assign(migrationX509Options.donor, {
-        setParameter: {
-            // To allow after test hooks to run without errors.
-            "failpoint.tenantMigrationDonorAllowsNonTimestampedReads": tojson({mode: "alwaysOn"}),
-        }
-    })
-});
-donorRst.startSet();
-donorRst.initiate();
+function setup() {
+    const donorRst = new ReplSetTest({
+        nodes: 3,
+        name: "donor",
+        settings: {chainingAllowed: false},
+        nodeOptions: Object.assign(migrationX509Options.donor, {
+            setParameter: {
+                // To allow after test hooks to run without errors.
+                "failpoint.tenantMigrationDonorAllowsNonTimestampedReads":
+                    tojson({mode: "alwaysOn"}),
+            }
+        })
+    });
+    donorRst.startSet();
+    donorRst.initiate();
 
-const recipientRst = new ReplSetTest({
-    nodes: 3,
-    name: "recipient",
-    settings: {chainingAllowed: false},
-    nodeOptions: migrationX509Options.recipient
-});
-recipientRst.startSet();
-recipientRst.initiate();
+    const recipientRst = new ReplSetTest({
+        nodes: 3,
+        name: "recipient",
+        settings: {chainingAllowed: false},
+        nodeOptions: migrationX509Options.recipient
+    });
+    recipientRst.startSet();
+    recipientRst.initiate();
 
-const tmt = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    const tmt = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
 
-const donorPrimary = tmt.getDonorPrimary();
-const recipientPrimary = tmt.getRecipientPrimary();
+    return {
+        tmt,
+        teardown: function() {
+            donorRst.stopSet();
+            recipientRst.stopSet();
+            tmt.stop();
+        },
+    };
+}
 
 {
     jsTestLog("Testing noops on the recipient");
 
+    const {tmt, teardown} = setup();
+
     const [tenantId, migrationId, migrationOpts, tenantDbName] = makeTestParams();
     const laggedRecipientSecondary = tmt.getRecipientRst().getSecondary();
-    const fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
+    const fp =
+        configureFailPoint(tmt.getDonorPrimary(), "pauseTenantMigrationBeforeLeavingBlockingState");
 
     //
     // Run a migration, pausing after selecting a block timestamp to advance cluster time beyond it
@@ -120,14 +132,15 @@ const recipientPrimary = tmt.getRecipientPrimary();
     // already been replicated by this point.
     stopServerReplication(laggedRecipientSecondary);
 
-    advanceClusterTime(donorPrimary, kUnrelatedDbName, collName);
+    advanceClusterTime(tmt.getDonorPrimary(), kUnrelatedDbName, collName);
 
-    const donorRes =
-        assert.commandWorked(donorPrimary.getDB(tenantDbName).runCommand({find: collName}));
+    const donorRes = assert.commandWorked(
+        tmt.getDonorPrimary().getDB(tenantDbName).runCommand({find: collName}));
     assert(donorRes.operationTime, tojson(donorRes));
-    assert.eq(timestampCmp(donorRes.operationTime, getBlockTimestamp(donorPrimary, tenantId)),
-              1,
-              tojson(donorRes));
+    assert.eq(
+        timestampCmp(donorRes.operationTime, getBlockTimestamp(tmt.getDonorPrimary(), tenantId)),
+        1,
+        tojson(donorRes));
 
     fp.off();
     TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(
@@ -140,7 +153,7 @@ const recipientPrimary = tmt.getRecipientPrimary();
     // profiled so we use a fail point to detect it.
     //
 
-    const hangInNoopFp = configureFailPoint(recipientPrimary, "hangInAppendOplogNote");
+    const hangInNoopFp = configureFailPoint(tmt.getRecipientPrimary(), "hangInAppendOplogNote");
     const awaitReadOnRecipient = startParallelShell(funWithArgs(runAfterClusterTimeRead,
                                                                 tenantDbName,
                                                                 collName,
@@ -153,14 +166,18 @@ const recipientPrimary = tmt.getRecipientPrimary();
 
     restartServerReplication(laggedRecipientSecondary);
     awaitReadOnRecipient();
+    teardown();
 }
 
 {
     jsTestLog("Testing noops on the donor");
 
+    const {tmt, teardown} = setup();
+
     const [tenantId, migrationId, migrationOpts, tenantDbName] = makeTestParams();
     const laggedDonorSecondary = tmt.getDonorRst().getSecondary();
-    const fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
+    const fp =
+        configureFailPoint(tmt.getDonorPrimary(), "pauseTenantMigrationBeforeLeavingBlockingState");
 
     //
     // Commit a normal migration, but disable replication on a donor secondary before the commit so
@@ -182,12 +199,13 @@ const recipientPrimary = tmt.getRecipientPrimary();
     // Advance cluster time on the recipient beyond the block timestamp.
     //
 
-    advanceClusterTime(recipientPrimary, kUnrelatedDbName, collName);
+    advanceClusterTime(tmt.getRecipientPrimary(), kUnrelatedDbName, collName);
 
-    const recipientRes =
-        assert.commandWorked(recipientPrimary.getDB(tenantDbName).runCommand({find: collName}));
+    const recipientRes = assert.commandWorked(
+        tmt.getRecipientPrimary().getDB(tenantDbName).runCommand({find: collName}));
     assert(recipientRes.operationTime, tojson(recipientRes));
-    assert.eq(timestampCmp(recipientRes.operationTime, getBlockTimestamp(donorPrimary, tenantId)),
+    assert.eq(timestampCmp(recipientRes.operationTime,
+                           getBlockTimestamp(tmt.getDonorPrimary(), tenantId)),
               1,
               tojson(recipientRes));
 
@@ -199,7 +217,7 @@ const recipientPrimary = tmt.getRecipientPrimary();
     // necessary to unblock tenant operations waiting for a cluster time > the block timestamp.
     //
 
-    const hangInNoopFp = configureFailPoint(donorPrimary, "hangInAppendOplogNote");
+    const hangInNoopFp = configureFailPoint(tmt.getDonorPrimary(), "hangInAppendOplogNote");
     const awaitReadOnDonor = startParallelShell(funWithArgs(runAfterClusterTimeRead,
                                                             tenantDbName,
                                                             collName,
@@ -213,9 +231,6 @@ const recipientPrimary = tmt.getRecipientPrimary();
 
     restartServerReplication(laggedDonorSecondary);
     awaitReadOnDonor();
+    teardown();
 }
-
-donorRst.stopSet();
-recipientRst.stopSet();
-tmt.stop();
 })();

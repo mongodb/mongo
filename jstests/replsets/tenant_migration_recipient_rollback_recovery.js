@@ -30,20 +30,6 @@ const kGarbageCollectionDelayMS = 30 * 1000;
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
-const donorRst = new ReplSetTest({
-    name: "donorRst",
-    nodes: 1,
-    nodeOptions: Object.assign({}, migrationX509Options.donor, {
-        setParameter: {
-            tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
-            ttlMonitorSleepSecs: 1,
-        }
-    })
-});
-donorRst.startSet();
-donorRst.initiate();
-const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
-
 function makeMigrationOpts(tenantMigrationTest, migrationId, tenantId) {
     return {
         migrationIdString: extractUUIDFromObject(migrationId),
@@ -61,6 +47,21 @@ function makeMigrationOpts(tenantMigrationTest, migrationId, tenantId) {
  * replication steady state.
  */
 function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
+    const donorRst = new ReplSetTest({
+        name: "donorRst",
+        nodes: 1,
+        nodeOptions: Object.assign({}, migrationX509Options.donor, {
+            setParameter: {
+                tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
+                ttlMonitorSleepSecs: 1,
+            }
+        })
+    });
+    donorRst.startSet();
+    donorRst.initiate();
+
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
     const recipientRst = new ReplSetTest({
         name: "recipientRst",
         nodes: 3,
@@ -106,6 +107,7 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
 
     steadyStateFunc(tenantMigrationTest);
 
+    donorRst.stopSet();
     recipientRst.stopSet();
 }
 
@@ -333,6 +335,4 @@ testRollBackMarkingStateGarbageCollectable();
 
 jsTest.log("Test roll back random");
 testRollBackRandom();
-
-donorRst.stopSet();
 }());

@@ -28,7 +28,7 @@ const kGarbageCollectionParams = {
 };
 
 const tenantMigrationTest = new TenantMigrationTest(
-    {name: jsTestName(), sharedOptions: {nodes: 1, setParameter: kGarbageCollectionParams}});
+    {name: jsTestName(), sharedOptions: {nodes: 1}, quickGarbageCollection: true});
 
 const kTenantId = "testTenantId";
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");

@@ -37,8 +37,6 @@ function makeTenantId() {
     return kTenantIdPrefix + testNum++;
 }
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-
 {
     // This section tests behavior in the middle of a tenant migration.
     let fpNames = [
@@ -50,6 +48,8 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
         jsTestLog("Setting failpoint \"" + fpName +
                   "\" to test that the migration will retry the " +
                   "operation at the failpoint if a killOp is issued.");
+
+        const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
         const migrationOpts = {
             migrationIdString: extractUUIDFromObject(UUID()),
@@ -82,6 +82,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
         TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+        tenantMigrationTest.stop();
     }
 }
 
@@ -92,6 +93,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
         "pauseTenantMigrationBeforeCreatingExternalKeysTTLIndex"
     ];
     for (let fpName of fpNames) {
+        const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
         tenantMigrationTest.getDonorRst().stopSet();
         tenantMigrationTest.getDonorRst().startSet(Object.assign({}, migrationX509Options.donor, {
             setParameter: {['failpoint.' + fpName]: tojson({mode: 'alwaysOn'})}
@@ -137,30 +139,32 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
         TenantMigrationTest.assertCommitted(runMigrationThread.returnData());
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+        tenantMigrationTest.stop();
     }
 }
 
 {
-    // This section is testing behavior during garbage collection.
-    tenantMigrationTest.getDonorRst().stopSet();
-    tenantMigrationTest.getDonorRst().startSet(
-        Object.assign({}, migrationX509Options.donor, {setParameter: garbageCollectionOpts}));
-    tenantMigrationTest.getDonorRst().initiate();
-    TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(
-        tenantMigrationTest.getDonorRst());
-
-    tenantMigrationTest.getRecipientRst().stopSet();
-    tenantMigrationTest.getRecipientRst().startSet(
-        Object.assign({}, migrationX509Options.recipient, {setParameter: garbageCollectionOpts}));
-    tenantMigrationTest.getRecipientRst().initiate();
-    TenantMigrationUtil.createTenantMigrationDonorRoleIfNotExist(
-        tenantMigrationTest.getRecipientRst());
-
     let fpNames = [
         "pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable",
         "pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable"
     ];
     for (let fpName of fpNames) {
+        const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+        // This section is testing behavior during garbage collection.
+        tenantMigrationTest.getDonorRst().stopSet();
+        tenantMigrationTest.getDonorRst().startSet(
+            Object.assign({}, migrationX509Options.donor, {setParameter: garbageCollectionOpts}));
+        tenantMigrationTest.getDonorRst().initiate();
+        TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(
+            tenantMigrationTest.getDonorRst());
+
+        tenantMigrationTest.getRecipientRst().stopSet();
+        tenantMigrationTest.getRecipientRst().startSet(Object.assign(
+            {}, migrationX509Options.recipient, {setParameter: garbageCollectionOpts}));
+        tenantMigrationTest.getRecipientRst().initiate();
+        TenantMigrationUtil.createTenantMigrationDonorRoleIfNotExist(
+            tenantMigrationTest.getRecipientRst());
+
         jsTestLog(
             "Setting failpoint \"" + fpName +
             "\" during migration garbage collection to test that the migration will retry the " +
@@ -201,7 +205,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
         fp.off();
         forgetMigrationThread.join();
         tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, tenantId);
+        tenantMigrationTest.stop();
     }
 }
-tenantMigrationTest.stop();
 })();

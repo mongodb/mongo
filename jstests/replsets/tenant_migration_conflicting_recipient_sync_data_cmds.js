@@ -4,6 +4,7 @@
  * @tags: [
  *   incompatible_with_eft,
  *   incompatible_with_macos,
+ *   requires_fcv_52,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -123,24 +124,24 @@ assert.commandWorked(primary.adminCommand({
     recipientSyncDataThread0.start();
     recipientSyncDataThread1.start();
 
-    jsTestLog("Waiting until both conflicting instances get started and hit the failPoint.");
+    jsTestLog("Waiting until one gets started and hits the failPoint.");
     assert.commandWorked(primary.adminCommand({
         waitForFailPoint: "pauseBeforeRunTenantMigrationRecipientInstance",
-        timesEntered: fpPauseBeforeRunTenantMigrationRecipientInstance.timesEntered + 2,
+        timesEntered: fpPauseBeforeRunTenantMigrationRecipientInstance.timesEntered + 1,
         maxTimeMS: kDefaultWaitForFailPointTimeout
     }));
 
-    // Two instances are expected as the tenantId conflict is still unresolved.
+    // One instance is expected as the tenantId conflict is still unresolved.
     jsTestLog("Fetching current operations before conflict is resolved.");
     const currentOpEntriesBeforeInsert = getTenantMigrationRecipientCurrentOpEntries(
         primary, {desc: "tenant recipient migration", tenantId});
-    assert.eq(2, currentOpEntriesBeforeInsert.length, tojson(currentOpEntriesBeforeInsert));
+    assert.eq(1, currentOpEntriesBeforeInsert.length, tojson(currentOpEntriesBeforeInsert));
 
     jsTestLog("Unblocking the tenant migration instance from persisting the state doc.");
     fpPauseBeforeRunTenantMigrationRecipientInstance.off();
 
-    // Wait for both the conflicting instances to complete. Although both will "complete", one will
-    // return with ErrorCodes.ConflictingOperationInProgress, and the other with a
+    // Check responses for both commands. One will return with
+    // ErrorCodes.ConflictingOperationInProgress, and the other with a
     // TestData.stopFailPointErrorCode (a failpoint indicating that we have persisted the document).
     const res0 = assert.commandFailed(recipientSyncDataThread0.returnData());
     const res1 = assert.commandFailed(recipientSyncDataThread1.returnData());

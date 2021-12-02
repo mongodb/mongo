@@ -17,16 +17,8 @@ load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kGarbageCollectionParams = {
-    // Set the delay to 30s so that we can see the document vanish.
-    tenantMigrationGarbageCollectionDelayMS: 30 * 1000,
-
-    // Set the TTL monitor to run at a smaller interval to speed up the test.
-    ttlMonitorSleepSecs: 1
-};
-
-const tenantMigrationTest = new TenantMigrationTest(
-    {name: jsTestName(), sharedOptions: {setParameter: kGarbageCollectionParams}});
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
 
 const kRecipientTTLIndexName = "TenantMigrationRecipientTTLIndex";
 

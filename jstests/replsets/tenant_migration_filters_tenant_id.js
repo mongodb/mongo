@@ -17,8 +17,6 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-
 const tenantIdPrefix = "tenantId";
 const baseDBName = "testDB";
 const collName = "testColl";
@@ -30,6 +28,8 @@ const makeBaseTenantId = () => {
 
 const runTest = (baseTenantId, dbName, shouldMatch) => {
     jsTestLog(`Running tenant migration with dbName ${dbName} and tenantId ${baseTenantId}`);
+
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
     assert.eq(shouldMatch, TenantMigrationUtil.isNamespaceForTenant(baseTenantId, dbName));
     tenantMigrationTest.insertDonorDB(dbName, collName);
@@ -45,6 +45,7 @@ const runTest = (baseTenantId, dbName, shouldMatch) => {
     // migrated, so we can directly call it here.
     tenantMigrationTest.verifyRecipientDB(baseTenantId, dbName, collName);
     tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
+    tenantMigrationTest.stop();
 };
 
 const testCases = [
@@ -64,6 +65,4 @@ for (const {makeTenantId, shouldMatch} of testCases) {
     const tenantId = makeTenantId(baseTenantId);
     runTest(baseTenantId, `${tenantId}_${baseDBName}`, shouldMatch);
 }
-
-tenantMigrationTest.stop();
 })();

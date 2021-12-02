@@ -29,7 +29,8 @@ function makeTenantId() {
     return kTenantIdPrefix + testNum++;
 }
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
 
 (() => {
     const migrationId1 = extractUUIDFromObject(UUID());
@@ -60,6 +61,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
               migrationId2 + ", tenantId: " + tenantId);
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.runMigration({migrationIdString: migrationId2, tenantId: tenantId}));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationId2, tenantId);
 })();
 
 (() => {
@@ -111,6 +113,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
               migrationId2 + ", tenantId: " + tenantId);
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.runMigration({migrationIdString: migrationId2, tenantId: tenantId}));
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationId2, tenantId);
 })();
 
 tenantMigrationTest.stop();

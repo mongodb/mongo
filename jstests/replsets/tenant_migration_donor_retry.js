@@ -31,20 +31,27 @@ const garbageCollectionOpts = {
     ttlMonitorSleepSecs: 1
 };
 
-const donorRst = new ReplSetTest({
-    name: "donorRst",
-    nodes: 1,
-    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor,
-                               {setParameter: garbageCollectionOpts})
-});
+function setup() {
+    const donorRst = new ReplSetTest({
+        name: "donorRst",
+        nodes: 1,
+        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor,
+                                   {setParameter: garbageCollectionOpts})
+    });
 
-donorRst.startSet();
-donorRst.initiate();
+    donorRst.startSet();
+    donorRst.initiate();
 
-const tenantMigrationTest = new TenantMigrationTest(
-    {name: jsTestName(), donorRst: donorRst, sharedOptions: {setParameter: garbageCollectionOpts}});
-const donorPrimary = tenantMigrationTest.getDonorPrimary();
-const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+    const tenantMigrationTest = new TenantMigrationTest(
+        {name: jsTestName(), donorRst: donorRst, quickGarbageCollection: true});
+    return {
+        tenantMigrationTest,
+        teardown: function() {
+            donorRst.stopSet();
+            tenantMigrationTest.stop();
+        },
+    };
+}
 
 function makeTenantId() {
     return kTenantIdPrefix + testNum++;
@@ -55,7 +62,7 @@ function makeTenantId() {
  * recipientSyncData command to fail with the given 'errorCode', and asserts the donor retries on
  * that error and is able to commit.
  */
-function testDonorRetryRecipientSyncDataCmdOnError(errorCode, failMode) {
+function testDonorRetryRecipientSyncDataCmdOnError(tenantMigrationTest, errorCode, failMode) {
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     const tenantId = makeTenantId();
 
@@ -95,7 +102,7 @@ function testDonorRetryRecipientSyncDataCmdOnError(errorCode, failMode) {
  * recipientForgetMigration command to fail with the given 'errorCode', and asserts the donor
  * retries on that error and commits.
  */
-function testDonorRetryRecipientForgetMigrationCmdOnError(errorCode) {
+function testDonorRetryRecipientForgetMigrationCmdOnError(tenantMigrationTest, errorCode) {
     const tenantId = makeTenantId();
     const migrationId = UUID();
     const migrationOpts = {
@@ -127,68 +134,88 @@ function testDonorRetryRecipientForgetMigrationCmdOnError(errorCode) {
 (() => {
     jsTest.log(
         "Test that the donor retries recipientSyncData (to make the recipient start cloning) on recipient stepdown errors");
+    const {tenantMigrationTest, teardown} = setup();
 
-    const migrationId =
-        testDonorRetryRecipientSyncDataCmdOnError(ErrorCodes.NotWritablePrimary, {times: 1});
+    const migrationId = testDonorRetryRecipientSyncDataCmdOnError(
+        tenantMigrationTest, ErrorCodes.NotWritablePrimary, {times: 1});
 
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    const configDonorsColl =
+        tenantMigrationTest.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
     assert.eq(TenantMigrationTest.DonorState.kCommitted,
               configDonorsColl.findOne({_id: migrationId}).state);
+    teardown();
 })();
 
 (() => {
     jsTest.log(
         "Test that the donor retries recipientSyncData (to make the recipient start cloning) on recipient shutdown errors");
+    const {tenantMigrationTest, teardown} = setup();
 
-    const migrationId =
-        testDonorRetryRecipientSyncDataCmdOnError(ErrorCodes.ShutdownInProgress, {times: 1});
+    const migrationId = testDonorRetryRecipientSyncDataCmdOnError(
+        tenantMigrationTest, ErrorCodes.ShutdownInProgress, {times: 1});
 
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    const configDonorsColl =
+        tenantMigrationTest.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
     assert.eq(TenantMigrationTest.DonorState.kCommitted,
               configDonorsColl.findOne({_id: migrationId}).state);
+    teardown();
 })();
 
 (() => {
     jsTest.log(
         "Test that the donor retries recipientSyncData (with returnAfterReachingDonorTimestamp) on stepdown errors");
+    const {tenantMigrationTest, teardown} = setup();
 
-    const migrationId =
-        testDonorRetryRecipientSyncDataCmdOnError(ErrorCodes.NotWritablePrimary, {skip: 1});
+    const migrationId = testDonorRetryRecipientSyncDataCmdOnError(
+        tenantMigrationTest, ErrorCodes.NotWritablePrimary, {skip: 1});
 
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    const configDonorsColl =
+        tenantMigrationTest.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
     assert.eq(TenantMigrationTest.DonorState.kCommitted,
               configDonorsColl.findOne({_id: migrationId}).state);
+    teardown();
 })();
 
 (() => {
     jsTest.log(
         "Test that the donor retries recipientSyncData (with returnAfterReachingDonorTimestamp) on recipient shutdown errors");
+    const {tenantMigrationTest, teardown} = setup();
 
-    const migrationId =
-        testDonorRetryRecipientSyncDataCmdOnError(ErrorCodes.ShutdownInProgress, {skip: 1});
+    const migrationId = testDonorRetryRecipientSyncDataCmdOnError(
+        tenantMigrationTest, ErrorCodes.ShutdownInProgress, {skip: 1});
 
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    const configDonorsColl =
+        tenantMigrationTest.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
     assert.eq(TenantMigrationTest.DonorState.kCommitted,
               configDonorsColl.findOne({_id: migrationId}).state);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test that the donor retries recipientForgetMigration on stepdown errors");
-    testDonorRetryRecipientForgetMigrationCmdOnError(ErrorCodes.NotWritablePrimary);
+    const {tenantMigrationTest, teardown} = setup();
+    testDonorRetryRecipientForgetMigrationCmdOnError(tenantMigrationTest,
+                                                     ErrorCodes.NotWritablePrimary);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test that the donor retries recipientForgetMigration on shutdown errors");
-    testDonorRetryRecipientForgetMigrationCmdOnError(ErrorCodes.ShutdownInProgress);
+    const {tenantMigrationTest, teardown} = setup();
+    testDonorRetryRecipientForgetMigrationCmdOnError(tenantMigrationTest,
+                                                     ErrorCodes.ShutdownInProgress);
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test that the donor retries recipientForgetMigration on interruption errors");
+    const {tenantMigrationTest, teardown} = setup();
     // Test an error code that is in the 'Interruption' category but not in the 'isRetriable'
     // category.
     const interruptionErrorCode = ErrorCodes.MaxTimeMSExpired;
     assert(ErrorCodes.isInterruption(interruptionErrorCode));
-    testDonorRetryRecipientForgetMigrationCmdOnError(interruptionErrorCode);
+    testDonorRetryRecipientForgetMigrationCmdOnError(tenantMigrationTest, interruptionErrorCode);
+    teardown();
 })();
 
 // Each donor state doc is updated three times throughout the lifetime of a tenant migration:
@@ -201,6 +228,7 @@ const kWriteErrorTimeMS = 50;
 (() => {
     jsTest.log("Test that the donor retries state doc insert on retriable errors");
 
+    const {tenantMigrationTest, teardown} = setup();
     const tenantId = makeTenantId();
 
     const migrationId = UUID();
@@ -210,7 +238,7 @@ const kWriteErrorTimeMS = 50;
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 
-    let fp = configureFailPoint(donorPrimary, "failCollectionInserts", {
+    let fp = configureFailPoint(tenantMigrationTest.getDonorPrimary(), "failCollectionInserts", {
         collectionNS: TenantMigrationTest.kConfigDonorsNS,
     });
 
@@ -230,15 +258,18 @@ const kWriteErrorTimeMS = 50;
     migrationThread.join();
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
 
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
+    const configDonorsColl =
+        tenantMigrationTest.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
     const donorStateDoc = configDonorsColl.findOne({_id: migrationId});
     assert.eq(TenantMigrationTest.DonorState.kCommitted, donorStateDoc.state);
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    teardown();
 })();
 
 (() => {
     jsTest.log("Test that the donor retries state doc update on retriable errors");
 
+    const {tenantMigrationTest, teardown} = setup();
     const tenantId = kTenantIdPrefix + "RetryOnStateDocUpdateError";
 
     const migrationId = UUID();
@@ -251,7 +282,7 @@ const kWriteErrorTimeMS = 50;
     const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 
     // Use a random number of skips to fail a random update to config.tenantMigrationDonors.
-    const fp = configureFailPoint(donorPrimary,
+    const fp = configureFailPoint(tenantMigrationTest.getDonorPrimary(),
                                   "failCollectionUpdates",
                                   {
                                       collectionNS: TenantMigrationTest.kConfigDonorsNS,
@@ -274,19 +305,17 @@ const kWriteErrorTimeMS = 50;
     fp.off();
     migrationThread.join();
 
-    const donorStateDoc =
-        donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({_id: migrationId});
+    const donorStateDoc = tenantMigrationTest.getDonorPrimary()
+                              .getCollection(TenantMigrationTest.kConfigDonorsNS)
+                              .findOne({_id: migrationId});
     assert.eq(donorStateDoc.state, TenantMigrationTest.DonorState.kCommitted);
     assert(donorStateDoc.expireAt);
 
     // Check that the recipient state doc is also correctly marked as garbage collectable.
-    const recipientStateDoc =
-        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-            _id: migrationId
-        });
+    const recipientStateDoc = tenantMigrationTest.getRecipientPrimary()
+                                  .getCollection(TenantMigrationTest.kConfigRecipientsNS)
+                                  .findOne({_id: migrationId});
     assert(recipientStateDoc.expireAt);
+    teardown();
 })();
-
-donorRst.stopSet();
-tenantMigrationTest.stop();
 })();

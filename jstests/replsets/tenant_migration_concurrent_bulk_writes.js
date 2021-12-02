@@ -37,40 +37,54 @@ const kBatchTypes = {
     remove: 3
 };
 
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
-const donorRst = new ReplSetTest({
-    nodes: 1,
-    name: 'donor',
-    nodeOptions: Object.assign(migrationX509Options.donor, {
-        setParameter: {
-            internalInsertMaxBatchSize:
-                kMaxBatchSize, /* Decrease internal max batch size so we can still show writes are
-                                 batched without inserting hundreds of documents. */
-            // Allow non-timestamped reads on donor after migration completes for testing.
-            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
+function setup() {
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const donorRst = new ReplSetTest({
+        nodes: 1,
+        name: 'donor',
+        nodeOptions: Object.assign(migrationX509Options.donor, {
+            setParameter: {
+                internalInsertMaxBatchSize:
+                    kMaxBatchSize, /* Decrease internal max batch size so we can still show writes
+                                     are batched without inserting hundreds of documents. */
+                // Allow non-timestamped reads on donor after migration completes for testing.
+                'failpoint.tenantMigrationDonorAllowsNonTimestampedReads':
+                    tojson({mode: 'alwaysOn'}),
+            }
+        })
+    });
+    donorRst.startSet();
+    donorRst.initiate();
+
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: 'recipient',
+        nodeOptions: Object.assign(migrationX509Options.recipient, {
+            setParameter: {
+                internalInsertMaxBatchSize:
+                    kMaxBatchSize /* Decrease internal max batch size so we can
+                                     still show writes are batched without
+                                     inserting hundreds of documents. */
+            },
+        })
+    });
+    recipientRst.startSet();
+    recipientRst.initiate();
+
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    return {
+        tenantMigrationTest,
+        donorRst,
+        recipientRst,
+        teardown: function() {
+            tenantMigrationTest.stop();
+            donorRst.stopSet();
+            recipientRst.stopSet();
         }
-    })
-});
-donorRst.startSet();
-donorRst.initiate();
-
-const recipientRst = new ReplSetTest({
-    nodes: 1,
-    name: 'recipient',
-    nodeOptions: Object.assign(migrationX509Options.recipient, {
-        setParameter: {
-            internalInsertMaxBatchSize: kMaxBatchSize /* Decrease internal max batch size so we can
-                                                         still show writes are batched without
-                                                         inserting hundreds of documents. */
-        },
-    })
-});
-recipientRst.startSet();
-recipientRst.initiate();
-
-const kRecipientConnString = recipientRst.getURL();
-
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    };
+}
 
 function bulkInsertDocsOrdered(primaryHost, dbName, collName, numDocs) {
     const primary = new Mongo(primaryHost);
@@ -159,6 +173,8 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
 (() => {
     jsTestLog("Testing unordered bulk insert against a tenant migration that commits.");
 
+    const {tenantMigrationTest, donorRst, teardown} = setup();
+
     const tenantId = "bulkUnorderedInserts-committed";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -201,16 +217,19 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
             assert(!err.errmsg);
         }
     });
+    teardown();
 })();
 
 (() => {
     jsTestLog(
         "Testing unordered bulk insert against a tenant migration that blocks a few inserts and commits.");
 
+    const {tenantMigrationTest, donorRst, recipientRst, teardown} = setup();
+
     const tenantId = "bulkUnorderedInserts-blocks-committed";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
+        recipientConnString: recipientRst.getURL(),
         tenantId,
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
@@ -264,10 +283,13 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
             assert.eq(err.errmsg, "");
         }
     });
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing unordered bulk insert against a tenant migration that aborts.");
+
+    const {tenantMigrationTest, donorRst, teardown} = setup();
 
     const tenantId = "bulkUnorderedInserts-aborted";
     const migrationOpts = {
@@ -332,10 +354,13 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
             assert(!err.errmsg);
         }
     });
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing ordered bulk inserts against a tenant migration that commits.");
+
+    const {tenantMigrationTest, donorRst, teardown} = setup();
 
     const tenantId = "bulkOrderedInserts-committed";
     const migrationOpts = {
@@ -373,11 +398,14 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
+    teardown();
 })();
 
 (() => {
     jsTestLog(
         "Testing ordered bulk insert against a tenant migration that blocks a few inserts and commits.");
+
+    const {tenantMigrationTest, donorRst, teardown} = setup();
 
     const tenantId = "bulkOrderedInserts-blocks-committed";
     const migrationOpts = {
@@ -428,10 +456,13 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing ordered bulk write against a tenant migration that aborts.");
+
+    const {tenantMigrationTest, donorRst, teardown} = setup();
 
     const tenantId = "bulkOrderedInserts-aborted";
     const migrationOpts = {
@@ -490,15 +521,18 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationAborted);
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing unordered bulk multi update that blocks.");
 
+    const {tenantMigrationTest, donorRst, recipientRst, teardown} = setup();
+
     const tenantId = "bulkUnorderedMultiUpdates-blocks";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
+        recipientConnString: recipientRst.getURL(),
         tenantId,
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
@@ -540,15 +574,18 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         bulkWriteRes.res.errmsg,
         "Operation interrupted by an internal data migration and could not be automatically retried",
         tojson(bulkWriteRes));
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing ordered bulk multi update that blocks.");
 
+    const {tenantMigrationTest, donorRst, recipientRst, teardown} = setup();
+
     const tenantId = "bulkOrderedMultiUpdates-blocks";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
+        recipientConnString: recipientRst.getURL(),
         tenantId,
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
@@ -590,10 +627,13 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         bulkWriteRes.res.errmsg,
         "Operation interrupted by an internal data migration and could not be automatically retried",
         tojson(bulkWriteRes));
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing unordered multi updates against a tenant migration that has completed.");
+
+    const {tenantMigrationTest, donorRst, teardown} = setup();
 
     const tenantId = "bulkUnorderedMultiUpdates-completed";
     const migrationOpts = {
@@ -626,10 +666,13 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         bulkWriteRes.res.errmsg,
         "Operation interrupted by an internal data migration and could not be automatically retried",
         tojson(bulkWriteRes));
+    teardown();
 })();
 
 (() => {
     jsTestLog("Testing ordered multi updates against a tenant migration that has completed.");
+
+    const {tenantMigrationTest, donorRst, teardown} = setup();
 
     const tenantId = "bulkOrderedMultiUpdates-completed";
     const migrationOpts = {
@@ -662,9 +705,6 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         bulkWriteRes.res.errmsg,
         "Operation interrupted by an internal data migration and could not be automatically retried",
         tojson(bulkWriteRes));
+    teardown();
 })();
-
-tenantMigrationTest.stop();
-donorRst.stopSet();
-recipientRst.stopSet();
 })();

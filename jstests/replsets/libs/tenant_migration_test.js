@@ -33,7 +33,8 @@ function TenantMigrationTest({
     sharedOptions = {},
     // Default this to true so it is easier for data consistency checks.
     allowStaleReadsOnDonor = true,
-    initiateRstWithHighElectionTimeout = true
+    initiateRstWithHighElectionTimeout = true,
+    quickGarbageCollection = false,
 }) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
@@ -42,7 +43,11 @@ function TenantMigrationTest({
     const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
     const nodes = sharedOptions.nodes || 2;
-    let setParameterOpts = sharedOptions.setParameter || {};
+    const setParameterOpts = sharedOptions.setParameter || {};
+    if (quickGarbageCollection) {
+        setParameterOpts.tenantMigrationGarbageCollectionDelayMS = 3 * 1000;
+        setParameterOpts.ttlMonitorSleepSecs = 3;
+    }
 
     donorRst = donorPassedIn ? donorRst : performSetUp(true /* isDonor */);
     recipientRst = recipientPassedIn ? recipientRst : performSetUp(false /* isDonor */);

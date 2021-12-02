@@ -20,7 +20,8 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest =
+    new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
 
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = donorRst.getPrimary();
@@ -82,6 +83,9 @@ const kTenantId = "testTenantId";
 
     // Write after the migration is forgotten.
     assert.commandWorked(tenantCollOnRecipient.remove({_id: 1}));
+
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
+                                                          migrationOpts.tenantId);
 })();
 
 (() => {
@@ -115,6 +119,9 @@ const kTenantId = "testTenantId";
 
     // Write after the migration is forgotten.
     assert.commandWorked(tenantCollOnRecipient.remove({_id: 1}));
+
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
+                                                          migrationOpts.tenantId);
 })();
 
 (() => {
@@ -146,6 +153,9 @@ const kTenantId = "testTenantId";
 
     // Write after the migration is forgotten.
     assert.commandWorked(tenantCollOnRecipient.remove({_id: 1}));
+
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString,
+                                                          migrationOpts.tenantId);
 })();
 
 tenantMigrationTest.stop();

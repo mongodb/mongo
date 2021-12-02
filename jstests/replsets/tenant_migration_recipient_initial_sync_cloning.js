@@ -21,18 +21,6 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load('jstests/replsets/rslib.js');  // for waitForNewlyAddedRemovalForNodeToBeCommitted
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
-const donorRst = new ReplSetTest({
-    name: "donorRst",
-    nodes: 1,
-    nodeOptions: Object.assign(migrationX509Options.donor, {
-        setParameter: {
-            // Allow non-timestamped reads on donor after migration completes for testing.
-            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
-        }
-    })
-});
-donorRst.startSet();
-donorRst.initiate();
 
 const testDBName = 'testDB';
 const testCollName = 'testColl';
@@ -143,9 +131,23 @@ function restartNodeAndCheckStateDuringOplogApplication(
 // 5. Steps up the restarted node as the recipient primary, lifts the recipient failpoint, and
 //    allows the migration to complete.
 function runTestCase(tenantId, recipientFailpoint, checkMtab, restartNodeAndCheckStateFunction) {
+    const donorRst = new ReplSetTest({
+        name: "donorRst",
+        nodes: 1,
+        nodeOptions: Object.assign(migrationX509Options.donor, {
+            setParameter: {
+                // Allow non-timestamped reads on donor after migration completes for testing.
+                'failpoint.tenantMigrationDonorAllowsNonTimestampedReads':
+                    tojson({mode: 'alwaysOn'}),
+            }
+        })
+    });
+    donorRst.startSet();
+    donorRst.initiate();
+
     const tenantMigrationTest = new TenantMigrationTest({
         name: jsTestName(),
-        donorRst: donorRst,
+        donorRst,
         sharedOptions: {setParameter: {tenantApplierBatchSizeOps: 2}}
     });
 
@@ -171,6 +173,7 @@ function runTestCase(tenantId, recipientFailpoint, checkMtab, restartNodeAndChec
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     tenantMigrationTest.stop();
+    donorRst.stopSet();
 }
 
 // These two test cases are for before the mtab is created, and before the oplog applier has been
@@ -196,6 +199,4 @@ runTestCase('tenantId4',
             "fpAfterWaitForRejectReadsBeforeTimestamp",
             true /* checkMtab */,
             restartNodeAndCheckStateWithoutOplogApplication);
-
-donorRst.stopSet();
 })();
