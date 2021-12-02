@@ -145,12 +145,12 @@ public:
             return old;
         }
 
-        bool operator==(const radix_iterator& other) {
+        bool operator==(const radix_iterator& other) const {
             repositionIfChanged();
             return _current == other._current;
         }
 
-        bool operator!=(const radix_iterator& other) {
+        bool operator!=(const radix_iterator& other) const {
             repositionIfChanged();
             return _current != other._current;
         }
@@ -173,7 +173,7 @@ public:
          * possible that no next node is available, so at that point the cursor is exhausted and
          * points to the end.
          */
-        void repositionIfChanged() {
+        void repositionIfChanged() const {
             if (!_current || !_root->_nextVersion)
                 return;
 
@@ -275,7 +275,7 @@ public:
             } while (!_current->_data);
         }
 
-        void updateTreeView(bool stopIfMultipleCursors = false) {
+        void updateTreeView(bool stopIfMultipleCursors = false) const {
             while (_root && _root->_nextVersion) {
                 if (stopIfMultipleCursors && _root->refCount() > 1)
                     return;
@@ -288,12 +288,12 @@ public:
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        head_ptr _root;
+        mutable head_ptr _root;
 
         // "_current" is the node that the iterator is currently on. _current->_data will never be
         // boost::none (unless it is within the process of tree traversal), and _current will be
         // become a nullptr once there are no more nodes left to iterate.
-        Node* _current;
+        mutable Node* _current;
     };
 
     using iterator = radix_iterator<pointer, value_type&>;
@@ -376,12 +376,12 @@ public:
             return old;
         }
 
-        bool operator==(const reverse_radix_iterator& other) {
+        bool operator==(const reverse_radix_iterator& other) const {
             repositionIfChanged();
             return _current == other._current;
         }
 
-        bool operator!=(const reverse_radix_iterator& other) {
+        bool operator!=(const reverse_radix_iterator& other) const {
             repositionIfChanged();
             return _current != other._current;
         }
@@ -404,7 +404,7 @@ public:
          * possible that no next node is available, so at that point the cursor is exhausted and
          * points to the end.
          */
-        void repositionIfChanged() {
+        void repositionIfChanged() const {
             if (!_current || !_root->_nextVersion)
                 return;
 
@@ -450,7 +450,7 @@ public:
         reverse_radix_iterator(const head_ptr& root, Node* current)
             : _root(root), _current(current) {}
 
-        void _findNextReverse() {
+        void _findNextReverse() const {
             // Reverse find iterates through the tree to find the "next" node containing data,
             // searching from right to left. Normally a pre-order traversal is used, but for
             // reverse, the ordering is to visit child nodes from right to left, then 'visit'
@@ -496,7 +496,7 @@ public:
             }
         }
 
-        void _traverseRightSubtree() {
+        void _traverseRightSubtree() const {
             // This function traverses the given tree to the right most leaf of the subtree where
             // 'current' is the root.
             do {
@@ -507,7 +507,7 @@ public:
             } while (!_current->isLeaf());
         }
 
-        void updateTreeView(bool stopIfMultipleCursors = false) {
+        void updateTreeView(bool stopIfMultipleCursors = false) const {
             while (_root && _root->_nextVersion) {
                 if (stopIfMultipleCursors && _root->refCount() > 1)
                     return;
@@ -520,12 +520,12 @@ public:
         }
 
         // "_root" is a pointer to the root of the tree over which this is iterating.
-        head_ptr _root;
+        mutable head_ptr _root;
 
         // "_current" is a the node that the iterator is currently on. _current->_data will never be
         // boost::none, and _current will be become a nullptr once there are no more nodes left to
         // iterate.
-        Node* _current;
+        mutable Node* _current;
     };
 
     using reverse_iterator = reverse_radix_iterator<pointer, value_type&>;
