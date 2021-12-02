@@ -116,11 +116,12 @@ assert.soon(
     () => {
         twoPhaseCommitCoordinatorServerStatus =
             txnCoordinator.getDB(dbName).serverStatus().twoPhaseCommitCoordinator;
-        const deletingCoordinatorDoc =
-            twoPhaseCommitCoordinatorServerStatus.currentInSteps.deletingCoordinatorDoc;
-        return deletingCoordinatorDoc.toNumber() === 1;
+        const {deletingCoordinatorDoc, waitingForDecisionAcks, writingDecision} =
+            twoPhaseCommitCoordinatorServerStatus;
+        return deletingCoordinatorDoc.toNumber() === 1 || waitingForDecisionAcks.toNumber() === 1 ||
+            writingDecision.toNumber() === 1;
     },
-    () => `Failed to find 1 total transactions in the deletingCoordinatorDoc state: ${
+    () => `Failed to find 1 total transactions in a state past kWaitingForVotes: ${
         tojson(twoPhaseCommitCoordinatorServerStatus)}`);
 
 hangWithLockDuringBatchRemoveFp.off();
