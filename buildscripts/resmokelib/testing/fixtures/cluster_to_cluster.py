@@ -6,7 +6,7 @@ import os.path
 import buildscripts.resmokelib.testing.fixtures.interface as interface
 
 
-class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
+class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides two clusters to perform a cluster to cluster replication."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
@@ -14,7 +14,8 @@ class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-in
             dbpath_prefix=None, preserve_dbpath=False):
         """Initialize with different options for the clusters."""
 
-        interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
+        interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib,
+                                               dbpath_prefix=dbpath_prefix)
 
         self.clusters = []
         self.both_cluster_options = []
@@ -55,6 +56,9 @@ class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-in
             self.logger.info(f"Cluster{i} configured with settings: {cluster_options}")
 
         self.both_cluster_options = parsed_options
+
+        # The cluster that starts off with the data.
+        self.source_cluster_index = 0
 
     def setup(self):
         """Set up the cluster to cluster fixture according to the options provided."""
@@ -126,14 +130,10 @@ class ClusterToClusterFixture(interface.Fixture):  # pylint: disable=too-many-in
             raise ValueError("Must call setup() before calling get_internal_connection_string")
         return self.clusters[0].get_internal_connection_string()
 
-    def get_cluster0_connection_string(self):
-        """Return the connection string of cluster 0."""
-        if not self.clusters:
-            raise ValueError("Must call setup() before calling get_cluster0_connection_string")
-        return self.clusters[0].get_internal_connection_string()
+    def get_independent_clusters(self):
+        """Return the clusters involved in cluster to cluster replication."""
+        return self.clusters.copy()
 
-    def get_cluster1_connection_string(self):
-        """Return the connection string of cluster 1."""
-        if not self.clusters:
-            raise ValueError("Must call setup() before calling get_cluster1_connection_string")
-        return self.clusters[1].get_internal_connection_string()
+    def reverse_replication_direction(self):
+        """Swap the source and destination clusters."""
+        self.source_cluster_index = 1 - self.source_cluster_index

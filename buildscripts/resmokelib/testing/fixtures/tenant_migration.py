@@ -6,7 +6,7 @@ import buildscripts.resmokelib.testing.fixtures.interface as interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 
-class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
+class TenantMigrationFixture(interface.MultiClusterFixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides JSTests with a set of replica sets to run tenant migration against."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
@@ -19,7 +19,8 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
             default_read_concern=None, default_write_concern=None):
         """Initialize TenantMigrationFixture with different options for the replica set processes."""
 
-        interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
+        interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib,
+                                               dbpath_prefix=dbpath_prefix)
 
         self.common_mongod_options = self.fixturelib.default_if_none(common_mongod_options, {})
         self.per_mongod_options = self.fixturelib.default_if_none(per_mongod_options, {})
@@ -150,6 +151,10 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
         for replica_set in self.replica_sets:
             output += replica_set.get_node_info()
         return output
+
+    def get_independent_clusters(self):
+        """Return the replica sets involved in the tenant migration."""
+        return self.replica_sets.copy()
 
     def _create_tenant_migration_donor_and_recipient_roles(self, rs):
         """Create a role for tenant migration donor and recipient."""

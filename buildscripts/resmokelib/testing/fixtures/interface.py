@@ -206,6 +206,23 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         return "%r(%r, %r)" % (self.__class__.__name__, self.logger, self.job_num)
 
 
+class MultiClusterFixture(Fixture):
+    """
+    Base class for fixtures that may consist of multiple independent participant clusters.
+
+    The participant clusters can function independently without coordination, but are bound together
+    only for some duration as they participate in some process such as a migration. The participant
+    clusters are fixtures themselves.
+    """
+
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
+
+    def get_independent_clusters(self):
+        """Return a list of the independent clusters (fixtures) that participate in this fixture."""
+        raise NotImplementedError(
+            "get_independent_clusters must be implemented by MultiClusterFixture subclasses")
+
+
 class ReplFixture(Fixture):
     """Base class for all fixtures that support replication."""
 

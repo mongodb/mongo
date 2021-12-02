@@ -5,7 +5,7 @@ import os.path
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 
-class CheckReplDBHash(jsfile.DataConsistencyHook):
+class CheckReplDBHash(jsfile.PerClusterDataConsistencyHook):
     """Check if the dbhashes match.
 
     This includes dbhashes for all non-local databases and non-replicated system collections that
