@@ -1,18 +1,21 @@
 /**
- * dbcheck.js
- *
  * Test the dbCheck command.
+ *
+ * @tags: [
+ *   # We need persistence as we temporarily restart nodes as standalones.
+ *   requires_persistence,
+ *   assumes_against_mongod_not_mongos,
+ * ]
  */
 
 (function() {
 "use strict";
 
-// TODO(SERVER-31323): Re-enable when existing dbCheck issues are fixed.
-if (true)
-    return;
+// This test injects inconsistencies between replica set members; do not fail because of expected
+// dbHash differences.
+TestData.skipCheckDBHashes = true;
 
-let nodeCount = 3;
-let replSet = new ReplSetTest({name: "dbCheckSet", nodes: nodeCount});
+let replSet = new ReplSetTest({name: "dbCheckSet", nodes: 2});
 
 replSet.startSet();
 replSet.initiate();
@@ -50,17 +53,44 @@ function dbCheckCompleted(db) {
     return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
 }
 
+// Wait for DeferredWriter writes to local.system.healthlog to eventually complete.
+// Requires clearLog() before the test case is run.
+// TODO SERVER-61765 remove this function altoghether when healthlogging becomes
+// synchronous.
+function dbCheckHealthLogCompleted(db, coll, maxKey, maxSize, maxCount) {
+    let query = {"namespace": coll.getFullName(), "operation": "dbCheckBatch"};
+    if (maxSize === undefined && maxCount === undefined && maxKey === undefined) {
+        query['data.maxKey'] = {"$type": "maxKey"};
+    }
+    if (maxCount !== undefined) {
+        query['data.count'] = maxCount;
+    } else {
+        if (maxSize !== undefined) {
+            query['data.bytes'] = maxSize;
+        } else {
+            if (maxKey !== undefined) {
+                query['data.maxKey'] = maxKey;
+            }
+        }
+    }
+    return db.getSiblingDB("local").system.healthlog.find(query).itcount() === 1;
+}
+
 // Wait for dbCheck to complete (on both primaries and secondaries).  Fails an assertion if
 // dbCheck takes longer than maxMs.
-function awaitDbCheckCompletion(db) {
+function awaitDbCheckCompletion(db, collName, maxKey, maxSize, maxCount) {
     let start = Date.now();
 
     assert.soon(() => dbCheckCompleted(db), "dbCheck timed out");
     replSet.awaitSecondaryNodes();
     replSet.awaitReplication();
 
-    // Give the health log buffers some time to flush.
-    sleep(100);
+    forEachNode(function(node) {
+        const nodeDB = node.getDB(db);
+        const nodeColl = node.getDB(db)[collName];
+        assert.soon(() => dbCheckHealthLogCompleted(nodeDB, nodeColl, maxKey, maxSize, maxCount),
+                    "dbCheck wait for health log timed out");
+    });
 }
 
 // Check that everything in the health log shows a successful and complete check with no found
@@ -158,7 +188,7 @@ function simpleTestConsistent() {
     let db = primary.getDB(dbName);
     assert.commandWorked(db.runCommand({"dbCheck": multiBatchSimpleCollName}));
 
-    awaitDbCheckCompletion(db);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName);
 
     checkLogAllConsistent(primary);
     checkTotalCounts(primary, db[multiBatchSimpleCollName]);
@@ -188,7 +218,7 @@ function concurrentTestConsistent() {
         coll.deleteOne({});
     }
 
-    awaitDbCheckCompletion(db);
+    awaitDbCheckCompletion(db, collName);
 
     checkLogAllConsistent(primary);
     // Omit check for total counts, which might have changed with concurrent updates.
@@ -239,7 +269,7 @@ function testDbCheckParameters() {
     assert.commandWorked(
         db.runCommand({dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end}));
 
-    awaitDbCheckCompletion(db);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName, end);
 
     checkEntryBounds(start, end);
 
@@ -253,7 +283,7 @@ function testDbCheckParameters() {
         {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxCount: maxCount}));
 
     // We expect it to reach the count limit before reaching maxKey.
-    awaitDbCheckCompletion(db);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName, undefined, undefined, maxCount);
     checkEntryBounds(start, start + maxCount);
 
     // Finally, do the same with a size constraint.
@@ -261,7 +291,7 @@ function testDbCheckParameters() {
     let maxSize = maxCount * docSize;
     assert.commandWorked(db.runCommand(
         {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxSize: maxSize}));
-    awaitDbCheckCompletion(db);
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName, end, maxSize);
     checkEntryBounds(start, start + maxCount);
 }
 
@@ -332,110 +362,96 @@ function testSucceedsOnStepdown() {
 
 testSucceedsOnStepdown();
 
-function collectionUuid(db, collName) {
-    return db.getCollectionInfos().filter(coll => coll.name === collName)[0].info.uuid;
-}
+// Temporarily restart the secondary as a standalone, inject an inconsistency and
+// restart it back as a secondary.
+function injectInconsistencyOnSecondary(cmd) {
+    const secondaryConn = replSet.getSecondary();
+    const secondaryNodeId = replSet.getNodeId(secondaryConn);
+    replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
 
-function getDummyOplogEntry() {
-    let primary = replSet.getPrimary();
-    let coll = primary.getDB(dbName)[collName];
+    const standaloneConn = MongoRunner.runMongod({
+        dbpath: secondaryConn.dbpath,
+        noCleanData: true,
+    });
 
-    let replSetStatus =
-        assert.commandWorked(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
-    let connStatus = replSetStatus.members.filter(m => m.self)[0];
-    let lastOpTime = connStatus.optime;
+    const standaloneDB = standaloneConn.getDB(dbName);
+    assert.commandWorked(standaloneDB.runCommand(cmd));
 
-    let entry = primary.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
-    entry["ui"] = collectionUuid(primary.getDB(dbName), collName);
-    entry["ns"] = coll.stats().ns;
-    entry["ts"] = new Timestamp();
-
-    return entry;
-}
-
-// Create various inconsistencies, and check that dbCheck spots them.
-function insertOnSecondaries(doc) {
-    let primary = replSet.getPrimary();
-    let entry = getDummyOplogEntry();
-    entry["op"] = "i";
-    entry["o"] = doc;
-
-    primary.getDB("local").oplog.rs.insertOne(entry);
-}
-
-// Run an apply-ops-ish command on a secondary.
-function runCommandOnSecondaries(doc, ns) {
-    let primary = replSet.getPrimary();
-    let entry = getDummyOplogEntry();
-    entry["op"] = "c";
-    entry["o"] = doc;
-
-    if (ns !== undefined) {
-        entry["ns"] = ns;
-    }
-
-    primary.getDB("local").oplog.rs.insertOne(entry);
-}
-
-// And on a primary.
-function runCommandOnPrimary(doc) {
-    let primary = replSet.getPrimary();
-    let entry = getDummyOplogEntry();
-    entry["op"] = "c";
-    entry["o"] = doc;
-
-    primary.getDB("admin").runCommand({applyOps: [entry]});
+    // Shut down the secondary and restart it as a member of the replica set.
+    MongoRunner.stopMongod(standaloneConn);
+    replSet.start(secondaryNodeId, {}, true /*restart*/);
+    replSet.awaitNodesAgreeOnPrimaryNoAuth();
 }
 
 // Just add an extra document, and test that it catches it.
 function simpleTestCatchesExtra() {
-    let primary = replSet.getPrimary();
-    let db = primary.getDB(dbName);
+    {
+        const primary = replSet.getPrimary();
+        const db = primary.getDB(dbName);
+        db[collName].drop();
+        clearLog();
 
-    clearLog();
+        // Create the collection on the primary.
+        db.createCollection(collName, {validationLevel: "off"});
+    }
 
-    insertOnSecondaries({_id: 12390290});
+    replSet.awaitReplication();
+    injectInconsistencyOnSecondary({insert: collName, documents: [{}]});
+    replSet.awaitReplication();
 
-    assert.commandWorked(db.runCommand({dbCheck: collName}));
-    awaitDbCheckCompletion(db);
+    {
+        const primary = replSet.getPrimary();
+        const db = primary.getDB(dbName);
 
-    let nErrors = replSet.getSecondary()
-                      .getDB("local")
-                      .system.healthlog.find({operation: /dbCheck.*/, severity: "error"})
-                      .count();
+        assert.commandWorked(db.runCommand({dbCheck: collName}));
+        awaitDbCheckCompletion(db, collName);
+    }
+    const errors = replSet.getSecondary().getDB("local").system.healthlog.find(
+        {operation: /dbCheck.*/, severity: "error"});
 
-    assert.neq(nErrors, 0, "dbCheck found no errors after insertion on secondaries");
-    assert.eq(nErrors, 1, "dbCheck found too many errors after single inconsistent insertion");
+    assert.eq(errors.count(),
+              1,
+              "expected exactly 1 inconsistency after single inconsistent insertion, found: " +
+                  JSON.stringify(errors.toArray()));
 }
 
-// Test that dbCheck catches changing various pieces of collection metadata.
+// Test that dbCheck catches an extra index on the secondary.
 function testCollectionMetadataChanges() {
-    let primary = replSet.getPrimary();
-    let db = primary.getDB(dbName);
-    db[collName].drop();
-    clearLog();
+    {
+        const primary = replSet.getPrimary();
+        const db = primary.getDB(dbName);
+        db[collName].drop();
+        clearLog();
 
-    // Create the collection on the primary.
-    db.createCollection(collName, {validationLevel: "off"});
+        // Create the collection on the primary.
+        db.createCollection(collName, {validationLevel: "off"});
+    }
 
-    // Add an index on the secondaries.
-    runCommandOnSecondaries({createIndexes: collName, v: 2, key: {"foo": 1}, name: "foo_1"},
-                            dbName + ".$cmd");
+    replSet.awaitReplication();
+    injectInconsistencyOnSecondary(
+        {createIndexes: collName, indexes: [{key: {whatever: 1}, name: "whatever"}]});
+    replSet.awaitReplication();
 
-    assert.commandWorked(db.runCommand({dbCheck: collName}));
-    awaitDbCheckCompletion(db);
+    {
+        const primary = replSet.getPrimary();
+        const db = primary.getDB(dbName);
+        assert.commandWorked(db.runCommand({dbCheck: collName}));
+        awaitDbCheckCompletion(db, collName);
+    }
 
-    let nErrors = replSet.getSecondary()
-                      .getDB("local")
-                      .system.healthlog
-                      .find({"operation": /dbCheck.*/, "severity": "error", "data.success": true})
-                      .count();
+    const errors = replSet.getSecondary().getDB("local").system.healthlog.find(
+        {"operation": /dbCheck.*/, "severity": "error", "data.success": true});
 
-    assert.eq(nErrors, 1, "dbCheck found wrong number of errors after inconsistent `create`");
+    assert.eq(errors.count(),
+              1,
+              "expected exactly 1 inconsistency after single inconsistent index creation, found: " +
+                  JSON.stringify(errors.toArray()));
 
     clearLog();
 }
 
 simpleTestCatchesExtra();
 testCollectionMetadataChanges();
+
+replSet.stopSet();
 })();
