@@ -438,7 +438,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
     uint64_t oldest_id, saved_pinned_id, time_start, time_stop;
     uint32_t flags, rec_flags;
-    bool dirty, internal_cleanup, is_hs, timer, tried_eviction;
+    bool dirty, internal_cleanup, is_hs, tried_eviction;
 
     conn = S2C(session);
     btree = S2BT(session);
@@ -446,7 +446,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     memset(&ref_list, 0, sizeof(ref_list));
     txn = session->txn;
     tried_eviction = false;
-    time_start = time_stop = 0;
 
     /* Don't bump page read generations. */
     flags = WT_READ_NO_GEN;
@@ -463,9 +462,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
     internal_bytes = leaf_bytes = 0;
     internal_pages = leaf_pages = 0;
     saved_pinned_id = WT_SESSION_TXN_SHARED(session)->pinned_id;
-    timer = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT);
-    if (timer)
-        time_start = __wt_clock(session);
+    time_start = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT) ? __wt_clock(session) : 0;
 
     switch (syncop) {
     case WT_SYNC_WRITE_LEAVES:
@@ -679,7 +676,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         break;
     }
 
-    if (timer) {
+    if (time_start != 0) {
         time_stop = __wt_clock(session);
         __wt_verbose(session, WT_VERB_CHECKPOINT,
           "__sync_file WT_SYNC_%s wrote: %" PRIu64 " leaf pages (%" PRIu64 "B), %" PRIu64

@@ -367,10 +367,13 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
         tracked = true;
     }
 
-    /* Make sure the column group is referenced from the table. */
+    /*
+     * Make sure the column group is referenced from the table, converting not-found errors to
+     * EINVAL for the application.
+     */
     if (cgname != NULL && (ret = __wt_config_subgets(session, &table->cgconf, cgname, &cval)) != 0)
-        WT_ERR_MSG(session, EINVAL, "Column group '%s' not found in table '%.*s'", cgname,
-          (int)tlen, tablename);
+        WT_ERR_MSG(session, ret == WT_NOTFOUND ? EINVAL : ret,
+          "Column group '%s' not found in table '%.*s'", cgname, (int)tlen, tablename);
 
     /* Check if the column group already exists. */
     if ((ret = __wt_metadata_search(session, name, &origconf)) == 0) {
@@ -582,9 +585,13 @@ __create_index(WT_SESSION_IMPL *session, const char *name, bool exclusive, const
 
     if (__wt_config_getones_none(session, config, "extractor", &cval) == 0 && cval.len != 0) {
         have_extractor = true;
-        /* Custom extractors must supply a key format. */
+        /*
+         * Custom extractors must supply a key format; convert not-found errors to EINVAL for the
+         * application.
+         */
         if ((ret = __wt_config_getones(session, config, "key_format", &kval)) != 0)
-            WT_ERR_MSG(session, EINVAL, "%s: custom extractors require a key_format", name);
+            WT_ERR_MSG(session, ret == WT_NOTFOUND ? EINVAL : 0,
+              "%s: custom extractors require a key_format", name);
     }
 
     /* Calculate the key/value formats. */

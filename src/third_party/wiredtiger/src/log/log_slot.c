@@ -524,7 +524,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT
 
     conn = S2C(session);
     log = conn->log;
-    time_start = time_stop = 0;
+    time_start = 0;
 
     WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
     WT_ASSERT(session, mysize != 0);

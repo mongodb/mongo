@@ -366,7 +366,7 @@ __curindex_close(WT_CURSOR *cursor)
     JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 err:
 
-    if ((cp = cindex->cg_cursors) != NULL)
+    if (cindex->cg_cursors != NULL)
         for (i = 0, cp = cindex->cg_cursors; i < WT_COLGROUPS(cindex->table); i++, cp++)
             if (*cp != NULL) {
                 WT_TRET((*cp)->close(*cp));

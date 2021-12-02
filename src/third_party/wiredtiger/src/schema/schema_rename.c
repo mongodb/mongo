@@ -144,8 +144,10 @@ __rename_tree(WT_SESSION_IMPL *session, WT_TABLE *table, const char *newuri, con
     else
         WT_ERR(__wt_schema_index_source(session, table, suffix, value, ns));
 
+    /* Convert not-found errors to EINVAL for the application. */
     if ((ret = __wt_config_getones(session, value, "source", &cval)) != 0)
-        WT_ERR_MSG(session, EINVAL, "index or column group has no data source: %s", value);
+        WT_ERR_MSG(session, ret == WT_NOTFOUND ? EINVAL : ret,
+          "index or column group has no data source: %s", value);
 
     /* Take a copy of the old data source. */
     WT_ERR(__wt_scr_alloc(session, 0, &os));

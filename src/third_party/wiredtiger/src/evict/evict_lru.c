@@ -2274,16 +2274,14 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     uint64_t time_start, time_stop;
     uint32_t flags;
     uint8_t previous_state;
-    bool app_timer;
 
     WT_TRACK_OP_INIT(session);
 
     WT_RET_TRACK(__evict_get_ref(session, is_server, &btree, &ref, &previous_state));
     WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
-    app_timer = false;
     cache = S2C(session)->cache;
-    time_start = time_stop = 0;
+    time_start = 0;
 
     flags = 0;
 
@@ -2299,10 +2297,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
             WT_STAT_CONN_INCR(session, cache_eviction_app_dirty);
         WT_STAT_CONN_INCR(session, cache_eviction_app);
         cache->app_evicts++;
-        if (WT_STAT_ENABLED(session)) {
-            app_timer = true;
-            time_start = __wt_clock(session);
-        }
+        time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     }
 
     /*
@@ -2318,7 +2313,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 
     (void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
-    if (app_timer) {
+    if (time_start != 0) {
         time_stop = __wt_clock(session);
         WT_STAT_CONN_INCRV(session, application_evict_time, WT_CLOCKDIFF_US(time_stop, time_start));
     }
@@ -2346,10 +2341,9 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
 
     WT_TRACK_OP_INIT(session);
 
-    app_thread = false;
     conn = S2C(session);
     cache = conn->cache;
-    time_start = time_stop = 0;
+    time_start = 0;
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
@@ -2444,7 +2438,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
             goto err;
         }
         /* Stop if we've exceeded the time out. */
-        if (app_thread && cache_max_wait_us != 0) {
+        if (time_start != 0 && cache_max_wait_us != 0) {
             time_stop = __wt_clock(session);
             if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) > cache_max_wait_us)
                 goto err;
@@ -2452,7 +2446,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     }
 
 err:
-    if (app_thread) {
+    if (time_start != 0) {
         time_stop = __wt_clock(session);
         elapsed = WT_CLOCKDIFF_US(time_stop, time_start);
         WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);

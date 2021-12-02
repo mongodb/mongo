@@ -813,7 +813,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     txn = session->txn;
     txn_global = &conn->txn_global;
     saved_isolation = session->isolation;
-    full = idle = logging = tracking = use_timestamp = false;
+    full = idle = tracking = use_timestamp = false;
 
     /* Avoid doing work if possible. */
     WT_RET(__txn_checkpoint_can_skip(session, cfg, &full, &use_timestamp, &can_skip));

@@ -22,7 +22,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
     uint64_t dsk_size, gen_gap, gen_gap_max, gen_gap_sum, max_pagesize;
     uint64_t min_written_size, num_memory, num_not_queueable, num_queued;
     uint64_t num_smaller_allocsz, pages_clean, pages_dirty, pages_internal;
-    uint64_t pages_leaf, seen_count, size, visited_count;
+    uint64_t pages_leaf, seen_count, visited_count;
     uint64_t visited_age_gap_sum, unvisited_count, unvisited_age_gap_sum;
     uint64_t walk_count, written_size_cnt, written_size_sum;
 
@@ -31,7 +31,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
     gen_gap_max = gen_gap_sum = max_pagesize = 0;
     num_memory = num_not_queueable = num_queued = 0;
     num_smaller_allocsz = pages_clean = pages_dirty = pages_internal = 0;
-    pages_leaf = seen_count = size = visited_count = 0;
+    pages_leaf = seen_count = visited_count = 0;
     visited_age_gap_sum = unvisited_count = unvisited_age_gap_sum = 0;
     walk_count = written_size_cnt = written_size_sum = 0;
     min_written_size = UINT64_MAX;
@@ -42,7 +42,8 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
       next_walk != NULL) {
         ++seen_count;
         page = next_walk->page;
-        size = page->memory_footprint;
+        if (page->memory_footprint > max_pagesize)
+            max_pagesize = page->memory_footprint;
 
         if (__wt_page_is_modified(page))
             ++pages_dirty;
@@ -54,9 +55,6 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 
         if (F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU))
             ++num_queued;
-
-        if (size > max_pagesize)
-            max_pagesize = size;
 
         dsk_size = page->dsk != NULL ? page->dsk->mem_size : 0;
         if (dsk_size != 0) {

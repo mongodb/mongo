@@ -323,7 +323,7 @@ __wt_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref, WT_SESSION_IMPL **sessi
      * started our check.
      */
     WT_ORDERED_READ(session_cnt, conn->session_cnt);
-    for (s = conn->sessions, i = j = max = walk_cnt = 0; i < session_cnt; ++s, ++i) {
+    for (s = conn->sessions, i = max = walk_cnt = 0; i < session_cnt; ++s, ++i) {
         if (!s->active)
             continue;
 

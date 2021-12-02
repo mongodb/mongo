@@ -410,7 +410,7 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
     bool locked;
     char **p;
 
-    cnt = locked = 0;
+    cnt = 0;
 
     /*
      * Walk the list of LSM trees, checking for a match on the set of sources.

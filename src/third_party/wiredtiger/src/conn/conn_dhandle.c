@@ -645,7 +645,6 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
     bool skip;
 
     conn = S2C(session);
-    time_start = time_stop = 0;
 
     /* Always apply the name function, if supplied. */
     skip = false;
@@ -663,11 +662,10 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
     if ((ret = __wt_session_get_dhandle(session, dhandle->name, dhandle->checkpoint, NULL, 0)) != 0)
         return (ret == EBUSY ? 0 : ret);
 
-    if (WT_SESSION_IS_CHECKPOINT(session))
-        time_start = __wt_clock(session);
+    time_start = WT_SESSION_IS_CHECKPOINT(session) ? __wt_clock(session) : 0;
     WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
     /* We need to gather this information before releasing the dhandle. */
-    if (WT_SESSION_IS_CHECKPOINT(session)) {
+    if (time_start != 0) {
         time_stop = __wt_clock(session);
         time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
         if (F_ISSET(S2BT(session), WT_BTREE_SKIP_CKPT)) {
@@ -698,7 +696,6 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
     uint64_t time_diff, time_start, time_stop;
 
     conn = S2C(session);
-    time_start = time_stop = 0;
     /*
      * If we're given a URI, then we walk only the hash list for that name. If we don't have a URI
      * we walk the entire dhandle list.
@@ -718,10 +715,11 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
             WT_ERR(__conn_btree_apply_internal(session, dhandle, file_func, name_func, cfg));
         }
     } else {
+        time_start = 0;
         if (WT_SESSION_IS_CHECKPOINT(session)) {
+            time_start = __wt_clock(session);
             conn->ckpt_apply = conn->ckpt_skip = 0;
             conn->ckpt_apply_time = conn->ckpt_skip_time = 0;
-            time_start = __wt_clock(session);
             F_SET(conn, WT_CONN_CKPT_GATHER);
         }
         for (dhandle = NULL;;) {
@@ -736,7 +734,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
             WT_ERR(__conn_btree_apply_internal(session, dhandle, file_func, name_func, cfg));
         }
 done:
-        if (WT_SESSION_IS_CHECKPOINT(session)) {
+        if (time_start != 0) {
             F_CLR(conn, WT_CONN_CKPT_GATHER);
             time_stop = __wt_clock(session);
             time_diff = WT_CLOCKDIFF_US(time_stop, time_start);

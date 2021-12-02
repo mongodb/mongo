@@ -270,7 +270,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
          * Read the start of a possible page and get a block length from it. Move to the next
          * allocation sized boundary, we'll never consider this one again.
          */
-        if ((ret = __wt_read(session, fh, offset, (size_t)WT_BTREE_MIN_ALLOC_SIZE, tmp->mem)) != 0)
+        if (__wt_read(session, fh, offset, (size_t)WT_BTREE_MIN_ALLOC_SIZE, tmp->mem) != 0)
             break;
         blk = WT_BLOCK_HEADER_REF(tmp->mem);
         __wt_block_header_byteswap(blk);

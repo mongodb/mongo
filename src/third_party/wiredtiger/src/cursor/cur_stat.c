@@ -632,7 +632,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
      */
     if (!WT_STAT_ENABLED(session))
         goto config_err;
-    if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
+    ret = __wt_config_gets(session, cfg, "statistics", &cval);
+    WT_ERR_NOTFOUND_OK(ret, true);
+    if (ret == 0) {
         if ((ret = __wt_config_subgets(session, &cval, "all", &sval)) == 0 && sval.val != 0) {
             if (!FLD_ISSET(conn->stat_flags, WT_STAT_TYPE_ALL))
                 goto config_err;

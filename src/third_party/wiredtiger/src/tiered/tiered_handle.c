@@ -132,6 +132,7 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
             WT_ERR(__wt_buf_catfmt(
               session, build, "%.*s=%.*s,", (int)ck.len, ck.str, (int)cv.len, cv.str));
     }
+    WT_ERR_NOTFOUND_OK(ret, false);
     __wt_free(session, config);
     WT_ERR(__wt_strndup(session, build->data, build->size, &config));
 

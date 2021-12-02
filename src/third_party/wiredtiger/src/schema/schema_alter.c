@@ -113,9 +113,10 @@ __alter_tree(WT_SESSION_IMPL *session, const char *name, const char *newcfg[])
     /* Read the schema value. */
     WT_ERR(__wt_metadata_search(session, name, &value));
 
-    /* Get the data source URI. */
+    /* Get the data source URI, converting not-found errors to EINVAL for the application. */
     if ((ret = __wt_config_getones(session, value, "source", &cval)) != 0)
-        WT_ERR_MSG(session, EINVAL, "index or column group has no data source: %s", value);
+        WT_ERR_MSG(session, ret == WT_NOTFOUND ? EINVAL : ret,
+          "index or column group has no data source: %s", value);
 
     WT_ERR(__wt_scr_alloc(session, 0, &data_source));
     WT_ERR(__wt_buf_fmt(session, data_source, "%.*s", (int)cval.len, cval.str));

@@ -169,6 +169,7 @@ function(get_clang_base_flags flags)
         list(APPEND clang_flags "-Wno-unused-command-line-argument")
     endif()
 
+    # FIXME-WT-8052: Figure out whether we want to disable these or change the code.
     if(${cmake_compiler_version} VERSION_GREATER_EQUAL 10)
         # Clang 10+ has added additional on-by-default diagnostics that isn't
         # compatible with some of the code patterns in WiredTiger.

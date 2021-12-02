@@ -102,7 +102,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     force_evict_hs = false;
     local_gen = false;
-    time_start = time_stop = 0; /* [-Werror=maybe-uninitialized] */
 
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -124,6 +123,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
      * Track how long forcible eviction took. Immediately increment the forcible eviction counter,
      * we might do an in-memory split and not an eviction, which skips the other statistics.
      */
+    time_start = 0;
     if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
         time_start = __wt_clock(session);
         WT_STAT_CONN_INCR(session, cache_eviction_force);
@@ -205,7 +205,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     else
         WT_ERR(__evict_page_dirty_update(session, ref, flags));
 
-    if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
+    if (time_start != 0) {
         time_stop = __wt_clock(session);
         if (force_evict_hs)
             WT_STAT_CONN_INCR(session, cache_eviction_force_hs_success);
@@ -233,7 +233,7 @@ err:
         if (!closing)
             __evict_exclusive_clear(session, ref, previous_state);
 
-        if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
+        if (time_start != 0) {
             time_stop = __wt_clock(session);
             if (force_evict_hs)
                 WT_STAT_CONN_INCR(session, cache_eviction_force_hs_fail);
