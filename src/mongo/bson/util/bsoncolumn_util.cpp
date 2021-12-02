@@ -31,7 +31,7 @@
 
 namespace mongo::bsoncolumn {
 bool usesDeltaOfDelta(BSONType type) {
-    return type == bsonTimestamp;
+    return type == jstOID || type == Date || type == bsonTimestamp;
 }
 
 bool uses128bit(BSONType type) {

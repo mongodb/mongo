@@ -527,10 +527,7 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
                     break;
                 }
                 case bsonTimestamp: {
-                    int64_t currTimestampDelta =
-                        calcDelta(elem.timestampValue(), previous.timestampValue());
-                    value = calcDelta(currTimestampDelta, _prevDelta);
-                    _prevDelta = currTimestampDelta;
+                    value = calcDelta(elem.timestampValue(), previous.timestampValue());
                     break;
                 }
                 case Date:
@@ -555,6 +552,11 @@ void BSONColumnBuilder::EncodingState::append(BSONElement elem) {
                 default:
                     MONGO_UNREACHABLE;
             };
+            if (usesDeltaOfDelta(type)) {
+                int64_t currentDelta = value;
+                value = calcDelta(currentDelta, _prevDelta);
+                _prevDelta = currentDelta;
+            }
             if (encodingPossible) {
                 compressed = _simple8bBuilder64.append(Simple8bTypeUtil::encodeInt64(value));
             }

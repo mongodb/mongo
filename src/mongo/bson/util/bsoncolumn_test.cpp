@@ -228,19 +228,33 @@ public:
         return b.append(val);
     }
 
-    static uint64_t deltaObjectId(BSONElement val, BSONElement prev) {
+    static uint64_t deltaOfDelta(int64_t delta, int64_t prevDelta) {
+        return Simple8bTypeUtil::encodeInt64(delta - prevDelta);
+    }
+
+    static uint64_t deltaOfDeltaObjectId(BSONElement val, BSONElement prev, BSONElement prevprev) {
         ASSERT_EQ(memcmp(val.OID().getInstanceUnique().bytes,
                          prev.OID().getInstanceUnique().bytes,
                          OID::kInstanceUniqueSize),
                   0);
-        return Simple8bTypeUtil::encodeInt64(Simple8bTypeUtil::encodeObjectId(val.OID()) -
-                                             Simple8bTypeUtil::encodeObjectId(prev.OID()));
+
+        ASSERT_EQ(memcmp(prevprev.OID().getInstanceUnique().bytes,
+                         prev.OID().getInstanceUnique().bytes,
+                         OID::kInstanceUniqueSize),
+                  0);
+
+        int64_t delta = Simple8bTypeUtil::encodeObjectId(val.OID()) -
+            Simple8bTypeUtil::encodeObjectId(prev.OID());
+        int64_t prevDelta = Simple8bTypeUtil::encodeObjectId(prev.OID()) -
+            Simple8bTypeUtil::encodeObjectId(prevprev.OID());
+        return deltaOfDelta(delta, prevDelta);
     }
 
     static uint128_t deltaDecimal128(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt128(Simple8bTypeUtil::encodeDecimal128(val.Decimal()) -
                                               Simple8bTypeUtil::encodeDecimal128(prev.Decimal()));
     }
+
 
     uint64_t deltaOfDeltaTimestamp(BSONElement val, BSONElement prev) {
         return Simple8bTypeUtil::encodeInt64(val.timestamp().asULL() - prev.timestamp().asULL());
@@ -249,7 +263,7 @@ public:
     static uint64_t deltaOfDeltaTimestamp(BSONElement val, BSONElement prev, BSONElement prevprev) {
         int64_t prevTimestampDelta = prev.timestamp().asULL() - prevprev.timestamp().asULL();
         int64_t currTimestampDelta = val.timestamp().asULL() - prev.timestamp().asULL();
-        return Simple8bTypeUtil::encodeInt64(currTimestampDelta - prevTimestampDelta);
+        return deltaOfDelta(currTimestampDelta, prevTimestampDelta);
     }
 
     template <typename It>
@@ -283,9 +297,10 @@ public:
         return Simple8bTypeUtil::encodeInt64(val.Bool() - prev.Bool());
     }
 
-    static uint64_t deltaDate(BSONElement val, BSONElement prev) {
-        return Simple8bTypeUtil::encodeInt64(val.Date().toMillisSinceEpoch() -
-                                             prev.Date().toMillisSinceEpoch());
+    static uint64_t deltaOfDeltaDate(BSONElement val, BSONElement prev, BSONElement prevprev) {
+        int64_t delta = val.Date().toMillisSinceEpoch() - prev.Date().toMillisSinceEpoch();
+        int64_t prevDelta = prev.Date().toMillisSinceEpoch() - prevprev.Date().toMillisSinceEpoch();
+        return deltaOfDelta(delta, prevDelta);
     }
 
     static void appendLiteral(BufBuilder& builder, BSONElement elem) {
@@ -1380,7 +1395,9 @@ TEST_F(BSONColumnTest, BasicObjectId) {
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
     std::vector<boost::optional<uint64_t>> expectedDeltas{
-        deltaObjectId(second, first), deltaObjectId(second, second), deltaObjectId(third, second)};
+        deltaOfDeltaObjectId(second, first, first),
+        deltaOfDeltaObjectId(second, second, first),
+        deltaOfDeltaObjectId(third, second, second)};
     appendSimple8bBlocks64(expected, expectedDeltas, 1);
     appendEOO(expected);
 
@@ -1425,13 +1442,13 @@ TEST_F(BSONColumnTest, ObjectIdAfterChangeBack) {
     BufBuilder expected;
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock64(expected, deltaObjectId(second, first));
+    appendSimple8bBlock64(expected, deltaOfDeltaObjectId(second, first, first));
 
     appendLiteral(expected, elemInt32);
 
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    appendSimple8bBlock64(expected, deltaObjectId(second, first));
+    appendSimple8bBlock64(expected, deltaOfDeltaObjectId(second, first, first));
 
     appendEOO(expected);
 
@@ -1580,8 +1597,8 @@ TEST_F(BSONColumnTest, DateBasic) {
     BufBuilder expected;
     appendLiteral(expected, first);
     appendSimple8bControl(expected, 0b1000, 0b0000);
-    std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{deltaDate(second, first),
-                                                                 deltaDate(second, second)};
+    std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{
+        deltaOfDeltaDate(second, first, first), deltaOfDeltaDate(second, second, first)};
     _appendSimple8bBlocks(expected, expectedDeltaOfDeltas, 1);
     appendEOO(expected);
 

@@ -525,7 +525,8 @@ BSONColumn::Iterator BSONColumn::Iterator::moveTo(BSONColumn& column) {
 }
 
 void BSONColumn::Iterator::DecodingState::_loadLiteral(const BSONElement& elem) {
-    switch (elem.type()) {
+    auto type = elem.type();
+    switch (type) {
         case String:
         case Code:
             _lastEncodedValue128 =
@@ -553,8 +554,7 @@ void BSONColumn::Iterator::DecodingState::_loadLiteral(const BSONElement& elem) 
             _lastEncodedValue64 = elem._numberLong();
             break;
         case bsonTimestamp:
-            _lastEncodedValue64 = 0;
-            _lastEncodedValueForDeltaOfDelta = elem.timestampValue();
+            _lastEncodedValue64 = elem.timestampValue();
             break;
         case NumberDecimal:
             _lastEncodedValue128 = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());
@@ -562,6 +562,10 @@ void BSONColumn::Iterator::DecodingState::_loadLiteral(const BSONElement& elem) 
         default:
             break;
     };
+    if (usesDeltaOfDelta(type)) {
+        _lastEncodedValueForDeltaOfDelta = _lastEncodedValue64;
+        _lastEncodedValue64 = 0;
+    }
     _lastValue = elem;
 }
 
@@ -656,28 +660,29 @@ BSONElement BSONColumn::Iterator::DecodingState::_loadDelta(BSONColumn& column,
         type, _lastValue.fieldNameStringData(), _lastValue.valuesize());
 
     // Write value depending on type
+    int64_t valueToWrite = deltaOfDelta ? _lastEncodedValueForDeltaOfDelta : _lastEncodedValue64;
     switch (type) {
         case NumberDouble:
             DataView(elem.value())
                 .write<LittleEndian<double>>(
-                    Simple8bTypeUtil::decodeDouble(_lastEncodedValue64, _scaleIndex));
+                    Simple8bTypeUtil::decodeDouble(valueToWrite, _scaleIndex));
             break;
         case jstOID: {
             Simple8bTypeUtil::decodeObjectIdInto(
-                elem.value(), _lastEncodedValue64, _lastValue.__oid().getInstanceUnique());
+                elem.value(), valueToWrite, _lastValue.__oid().getInstanceUnique());
         } break;
         case Date:
         case NumberLong:
-            DataView(elem.value()).write<LittleEndian<long long>>(_lastEncodedValue64);
+            DataView(elem.value()).write<LittleEndian<long long>>(valueToWrite);
             break;
         case Bool:
-            DataView(elem.value()).write<LittleEndian<char>>(_lastEncodedValue64);
+            DataView(elem.value()).write<LittleEndian<char>>(valueToWrite);
             break;
         case NumberInt:
-            DataView(elem.value()).write<LittleEndian<int>>(_lastEncodedValue64);
+            DataView(elem.value()).write<LittleEndian<int>>(valueToWrite);
             break;
         case bsonTimestamp: {
-            DataView(elem.value()).write<LittleEndian<long long>>(_lastEncodedValueForDeltaOfDelta);
+            DataView(elem.value()).write<LittleEndian<long long>>(valueToWrite);
         } break;
         default:
             // No other types use int64 and need to allocate value storage
