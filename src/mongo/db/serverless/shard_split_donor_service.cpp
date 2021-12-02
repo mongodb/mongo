@@ -84,6 +84,22 @@ void ShardSplitDonorService::DonorStateMachine::tryAbort() {
     }
 }
 
+Status ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
+    const ShardSplitDonorDocument& stateDoc) const {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(stateDoc.getId() == _stateDoc.getId());
+
+    if (_stateDoc.getTenantIds() == stateDoc.getTenantIds() &&
+        _stateDoc.getRecipientConnectionString() == stateDoc.getRecipientConnectionString()) {
+        return Status::OK();
+    }
+
+    return Status(ErrorCodes::ConflictingOperationInProgress,
+                  str::stream() << "Found active migration for migrationId \""
+                                << _stateDoc.getId().toBSON() << "\" with different options "
+                                << _stateDoc.toBSON());
+}
+
 SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     ScopedTaskExecutorPtr executor, const CancellationToken& primaryToken) noexcept {
 

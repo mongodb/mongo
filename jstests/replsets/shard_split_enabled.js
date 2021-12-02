@@ -15,7 +15,7 @@ function makeShardSplitTest() {
         function commitShardSplitCmd() {
             return {
                 commitShardSplit: 1,
-                tenantId: "foo",
+                tenantIds: ["foo"],
                 migrationId: UUID(),
                 recipientConnectionString: kDummyConnStr
             };

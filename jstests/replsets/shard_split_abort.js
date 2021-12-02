@@ -17,8 +17,8 @@ function assertDocumentState(primary, uuid, state) {
     assert.eq(migrationDoc.state, state);
 }
 
-function startReplica(numNodes) {
-    const replTest = new ReplSetTest({name: 'testSet', nodes: numNodes});
+function startReplica(name, numNodes) {
+    const replTest = new ReplSetTest({name, nodes: numNodes});
 
     jsTestLog("Starting replica set for test");
     const donorNodes = replTest.startSet();
@@ -27,16 +27,16 @@ function startReplica(numNodes) {
     return replTest;
 }
 
-function runSuccess() {
+function runAbort() {
     "use strict";
 
-    jsTestLog("Starting runSuccess");
+    jsTestLog("Starting runAbort");
 
     // Skip db hash check because secondary is left with a different config.
     TestData.skipCheckDBHashes = true;
 
-    const replTest = startReplica(3);
-    const primary = replTest.getPrimary();
+    const donorSet = startReplica("donorSet", 3);
+    const primary = donorSet.getPrimary();
     const adminDb = primary.getDB("admin");
     const migrationId = UUID();
 
@@ -49,7 +49,43 @@ function runSuccess() {
     jsTestLog("Asserting state document exist after command");
     assertDocumentState(primary, migrationId, "aborted");
 
-    replTest.stopSet();
+    donorSet.stopSet();
 }
 
-runSuccess();
+function runStart() {
+    "use strict";
+
+    jsTestLog("Starting runStart");
+
+    // Skip db hash check because secondary is left with a different config.
+    TestData.skipCheckDBHashes = true;
+
+    const donorSet = startReplica("donorSet", 3);
+    const recipientSet = startReplica("recipientSet", 3);
+    const primary = donorSet.getPrimary();
+    const adminDb = primary.getDB("admin");
+    const migrationId = UUID();
+
+    const tenantId1 = "test_tenant_1";
+    const tenantId2 = "test_tenant_2";
+
+    jsTestLog("Asserting no state document exist before command");
+    assert.isnull(findMigration(primary, migrationId));
+
+    jsTestLog("Running commitShardSplit command");
+    assert.commandWorked(adminDb.runCommand({
+        commitShardSplit: 1,
+        migrationId: migrationId,
+        recipientConnectionString: recipientSet.getURL(),
+        "tenantIds": [tenantId1, tenantId2]
+    }));
+
+    jsTestLog("Asserting state document exist after command");
+    assertDocumentState(primary, migrationId, "data sync");
+
+    donorSet.stopSet();
+    recipientSet.stopSet();
+}
+
+runAbort();
+runStart();

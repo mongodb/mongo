@@ -340,8 +340,12 @@ let testCases = {
         checkWriteConcern: false,
     },
     donorAbortMigration: {skip: "does not accept read or write concern"},
+    // TODO : remove overrides once possible SERVER-61845
+    donorAbortSplit: {skip: "has been removed from the server"},
     donorForgetMigration: {skip: "does not accept read or write concern"},
+    donorForgetSplit: {skip: "has been removed from the server"},
     donorStartMigration: {skip: "does not accept read or write concern"},
+    donorStartSplit: {skip: "has been removed from the server"},
     donorWaitForMigrationToCommit: {skip: "does not accept read or write concern"},
     abortShardSplit: {skip: "does not accept read or write concern"},
     commitShardSplit: {skip: "does not accept read or write concern"},
