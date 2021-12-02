@@ -97,10 +97,6 @@ Status LogicalSessionCacheImpl::startSession(OperationContext* opCtx,
 Status LogicalSessionCacheImpl::vivify(OperationContext* opCtx, const LogicalSessionId& lsid) {
     auto parentLsid = getParentSessionId(lsid);
     if (parentLsid) {
-        uassert(ErrorCodes::InternalTransactionNotSupported,
-                "Internal transactions are not enabled",
-                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                    serverGlobalParams.featureCompatibility));
         uassert(ErrorCodes::InvalidOptions,
                 "Internal transactions are only supported in sharded clusters",
                 isMongos() || serverGlobalParams.clusterRole != ClusterRole::None);

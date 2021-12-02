@@ -77,10 +77,6 @@ SessionCatalog* SessionCatalog::get(ServiceContext* service) {
 
 SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithParentSession(
     OperationContext* opCtx, const LogicalSessionId& lsid, boost::optional<KillToken> killToken) {
-    uassert(ErrorCodes::InternalTransactionNotSupported,
-            "Internal transactions are not enabled",
-            feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                serverGlobalParams.featureCompatibility));
     uassert(ErrorCodes::InvalidOptions,
             "Internal transactions are only supported in sharded clusters",
             isMongos() || serverGlobalParams.clusterRole != ClusterRole::None);

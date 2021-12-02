@@ -203,17 +203,6 @@ TEST_F(LogicalSessionCacheTest, VivifyUpdatesLastUseOfParentSession) {
             makeLogicalSessionIdWithTxnUUIDForTest(parentLsid));
 }
 
-TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfFeatureFlagIsNotEnabled) {
-    RAIIServerParameterControllerForTest controller{"featureFlagInternalTransactions", false};
-    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberAndUUIDForTest()),
-                       DBException,
-                       ErrorCodes::InternalTransactionNotSupported);
-    ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnUUIDForTest()),
-                       DBException,
-                       ErrorCodes::InternalTransactionNotSupported);
-    ASSERT_EQ(0UL, cache()->size());
-}
-
 TEST_F(LogicalSessionCacheTest, CannotVivifySessionWithParentSessionIfNotRunningInShardedCluster) {
     serverGlobalParams.clusterRole = ClusterRole::None;
     ASSERT_THROWS_CODE(cache()->vivify(opCtx(), makeLogicalSessionIdWithTxnNumberAndUUIDForTest()),

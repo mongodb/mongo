@@ -97,10 +97,6 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         }
 
         if (getParentSessionId(lsid)) {
-            uassert(ErrorCodes::InternalTransactionNotSupported,
-                    "Internal sessions are not enabled",
-                    feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::InvalidOptions,
                     "Internal sessions are not supported outside of transactions",
                     osi.getTxnNumber() && osi.getAutocommit() && !osi.getAutocommit().value());

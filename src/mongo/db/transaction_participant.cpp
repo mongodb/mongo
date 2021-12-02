@@ -661,6 +661,13 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     boost::optional<bool> startTransaction) {
+    if (getParentSessionId(_sessionId()) && startTransaction) {
+        uassert(ErrorCodes::InternalTransactionNotSupported,
+                "Internal transactions are not enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+    }
+
     // Make sure we are still a primary. We need to hold on to the RSTL through the end of this
     // method, as we otherwise risk stepping down in the interim and incorrectly updating the
     // transaction number, which can abort active transactions.
