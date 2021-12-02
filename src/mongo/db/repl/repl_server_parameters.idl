@@ -567,9 +567,8 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: fileBasedInitialSyncMaxLagSec
-        # TODO (SERVER-59729): determine the best default value.
         default: 
-                expr: 5 * 60 * 60
+                expr: 5 * 60
         validator:
             gte: 0
     
@@ -581,8 +580,7 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: fileBasedInitialSyncMaxCyclesWithoutProgress
-        # TODO (SERVER-59729): determine the best default value.
-        default: 5
+        default: 3
         validator:
             gte: 1
     
