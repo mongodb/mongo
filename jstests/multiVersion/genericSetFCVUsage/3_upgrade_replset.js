@@ -5,7 +5,8 @@
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
 
-for (let oldVersion of ["last-lts", "last-continuous"]) {
+{
+    let oldVersion = "last-lts";
     jsTest.log("Testing upgrade/downgrade with " + oldVersion);
 
     var nodes = {

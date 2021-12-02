@@ -12,7 +12,3 @@ let newSecondaryVersion = "latest";
 var testName = "multiversion_initial_sync_latest_from_last_lts";
 jsTestLog("Testing that initial sync succeeds when latest syncs from last-lts");
 multversionInitialSyncTest(testName, "last-lts", newSecondaryVersion, {}, lastLTSFCV);
-
-testName = "multiversion_initial_sync_latest_from_last_continuous";
-jsTestLog("Testing that initial sync succeeds when latest syncs from last-continuous");
-multversionInitialSyncTest(testName, "last-continuous", newSecondaryVersion, {}, lastContinuousFCV);

@@ -574,10 +574,4 @@ function runShardingTest(downgradeVersion) {
 runStandaloneTest('last-lts');
 runReplicaSetTest('last-lts');
 runShardingTest('last-lts');
-
-if (lastLTSFCV != lastContinuousFCV) {
-    runStandaloneTest('last-continuous');
-    runReplicaSetTest('last-continuous');
-    runShardingTest('last-continuous');
-}
 })();

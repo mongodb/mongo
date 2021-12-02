@@ -357,16 +357,12 @@ let replicaSetTest = function(nodeOptions, downgradeVersion, numNodes = 3) {
 };
 
 // Do tests for regular standalones and replica sets.
-standaloneTest({}, 'last-continuous');
 standaloneTest({}, 'last-lts');
-replicaSetTest({}, 'last-continuous');
 replicaSetTest({}, 'last-lts');
 
 // Do tests for replica sets started with --shardsvr.
-replicaSetTest({shardsvr: ""}, 'last-continuous');
 replicaSetTest({shardsvr: ""}, 'last-lts');
 
 // Do tests for replica sets started with --configsvr.
-replicaSetTest({configsvr: ""}, 'last-continuous');
 replicaSetTest({configsvr: ""}, 'last-lts');
 })();

@@ -101,6 +101,5 @@ function runTest(downgradeVersion) {
     rst.stopSet();
 }
 
-runTest("last-continuous");
 runTest("last-lts");
 }());

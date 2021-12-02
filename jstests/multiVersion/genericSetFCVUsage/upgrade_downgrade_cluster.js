@@ -34,8 +34,9 @@ var testCRUDAndAgg = function(db) {
     assert.eq(null, db.foo.findOne());
 };
 
-// Test upgrade/downgrade between "latest" and "last-lts"/"last-continuous".
-for (let oldVersion of ["last-lts", "last-continuous"]) {
+// Test upgrade/downgrade between "latest" and "last-lts".
+{
+    let oldVersion = "last-lts";
     var st = new ShardingTest({
         shards: 2,
         mongos: 1,

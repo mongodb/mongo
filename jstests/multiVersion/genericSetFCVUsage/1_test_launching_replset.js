@@ -4,7 +4,7 @@
 
 load('./jstests/multiVersion/libs/verify_versions.js');
 
-for (let version of ["last-lts", "last-continuous", "latest"]) {
+for (let version of ["last-lts", "latest"]) {
     jsTestLog("Testing single version: " + version);
 
     // Set up a single-version replica set
@@ -21,7 +21,8 @@ for (let version of ["last-lts", "last-continuous", "latest"]) {
     rst.stopSet();
 }
 
-for (let versions of [["last-lts", "latest"], ["last-continuous", "latest"]]) {
+{
+    let versions = ["last-lts", "latest"];
     jsTestLog("Testing mixed versions: " + tojson(versions));
 
     // Set up a multi-version replica set

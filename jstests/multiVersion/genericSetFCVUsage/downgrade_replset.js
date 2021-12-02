@@ -70,5 +70,4 @@ function runDowngradeTest(downgradeVersion) {
     rst.stopSet();
 }
 
-runDowngradeTest('last-continuous');
 runDowngradeTest('last-lts');

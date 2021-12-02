@@ -297,13 +297,6 @@ function runTests(downgradeVersion) {
     resumeStreamsOnDowngradedVersion(changeStreamsToBeValidated);
 }
 
-// Test resuming change streams after downgrading the cluster to 'last-continuous'.
-runTests('last-continuous');
-
-// Upgrade the entire cluster back to the latest version.
-st.upgradeCluster('latest', {waitUntilStable: true});
-assert.commandWorked(st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
 // Test resuming change streams after downgrading the cluster to 'last-lts'.
 runTests('last-lts');
 st.stop();

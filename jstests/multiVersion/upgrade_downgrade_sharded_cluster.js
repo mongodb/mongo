@@ -2,7 +2,7 @@
  * The goal of this test is to verify that some metadata is properly updated when
  *upgrading/downgrading a sharded cluster. More specifically:
  *
- *	1. We create a sharded cluster running and old binary version (lastLTSFCV or lastContinuousFCV)
+ *	1. We create a sharded cluster running and old binary version (lastLTSFCV)
  *	2. We run some operations that involve the creation of some metadata
  *	3. We upgrade the binaries of the sharded cluster to the latest version + set FCV to latestFCV
  *	4. We verify that the metadata has been properly upgraded
@@ -261,7 +261,8 @@ function runChecksAfterFCVDowngrade(oldVersion) {
 function runChecksAfterBinDowngrade() {
 }
 
-for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
+{
+    let oldVersion = lastLTSFCV;
     var st = new ShardingTest({
         shards: 2,
         mongos: 1,

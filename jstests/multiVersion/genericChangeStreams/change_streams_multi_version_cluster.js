@@ -123,6 +123,5 @@ function runTest(downgradeVersion) {
     st.stop();
 }
 
-runTest("last-continuous");
 runTest("last-lts");
 }());

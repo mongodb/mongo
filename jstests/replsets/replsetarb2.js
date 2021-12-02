@@ -1,5 +1,4 @@
 // Election when primary fails and remaining nodes are an arbiter and a secondary.
-// @tags: [multiversion_incompatible]
 
 (function() {
 "use strict";

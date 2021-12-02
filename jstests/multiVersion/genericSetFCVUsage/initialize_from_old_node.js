@@ -6,8 +6,9 @@
 (function() {
 "use strict";
 var name = "initialize_from_old";
-// Test old version with both "last-lts" and "last-continuous".
-for (let oldVersion of ["last-lts", "last-continuous"]) {
+// Test old version with "last-lts".
+{
+    let oldVersion = "last-lts";
     jsTestLog("Testing replSetInitiate with " + oldVersion);
     var newVersion = 'latest';
     var nodes = {
