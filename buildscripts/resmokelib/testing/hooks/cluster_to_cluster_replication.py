@@ -18,11 +18,11 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
     DESCRIPTION = ("Continuous cluster to cluster replications")
 
     IS_BACKGROUND = True
-    # By default, we check the consistency only at the end of the suite to accommodate for the dummy
-    # replicator which has no pause / resume functionality.
+    # By default, we pause / stop the replicator at the end of the suite and then perform data
+    # consistency checks.
     DEFAULT_TESTS_PER_CYCLE = math.inf
 
-    def __init__(self, hook_logger, fixture, shell_options,
+    def __init__(self, hook_logger, fixture, shell_options, restart_every_cycle=None,
                  tests_per_cycle=DEFAULT_TESTS_PER_CYCLE):
         """Initialize the ClusterToClusterReplication.
 
@@ -53,6 +53,15 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
         self._replicator = cluster_to_cluster_dummy_replicator.DummyReplicator(hook_logger, fixture)
 
+        self._before_cycle_replicator_action = self._replicator.resume
+        self._after_cycle_replicator_action = self._replicator.pause
+
+        # When 'True', stops and starts the replicator every cycle instead of pausing and resuming.
+        self._restart_every_cycle = False if restart_every_cycle is None else restart_every_cycle
+        if self._restart_every_cycle:
+            self._before_cycle_replicator_action = self._replicator.start
+            self._after_cycle_replicator_action = self._replicator.stop
+
     def before_suite(self, test_report):
         """Before suite."""
         if not self._fixture:
@@ -77,21 +86,13 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
     def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
-        # If the total number of tests was not an exact multiple of the number run per cycle, then
-        # pause the replicator first.
-        if self._test_num % self._tests_per_cycle != 0:
-            # Pause the dummy replicator first.
-            self.logger.info("Pausing replicator before stopping.")
-            self._run_replicator_action(test_report, self._replicator.pause)
-            self.logger.info("Finished pausing the replicator.")
-
-        self.logger.info("Stopping the cluster to cluster replicator.")
-        stop_options = {
-            "test": self._last_test, "test_report": test_report,
-            "shell_options": self._shell_options
-        }
-        self._run_replicator_action(test_report, self._replicator.stop, stop_options)
-        self.logger.info("Stopped the cluster to cluster replicator.")
+        # Stop the replicator only if it hasn't been stopped already.
+        if self._test_num % self._tests_per_cycle != 0 or not self._restart_every_cycle:
+            stop_options = {
+                "test": self._last_test, "test_report": test_report,
+                "shell_options": self._shell_options
+            }
+            self._run_replicator_action(test_report, self._replicator.stop, stop_options)
 
         self._run_data_consistency_check(self._last_test, test_report)
         self._run_check_repl_db_hash(self._last_test, test_report)
@@ -99,28 +100,24 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
     def before_test(self, test, test_report):
         """Before test."""
         if self._test_num == 0:
-            self.logger.info("Starting the replicator.")
             self._run_replicator_action(test_report, self._replicator.start)
-            self.logger.info("Started the replicator.")
             return
 
         if self._test_num % self._tests_per_cycle == 0:
             # The replicator should be told to start running once again.
-            self.logger.info("Resuming the cluster to cluster replicator.")
-            self._run_replicator_action(test_report, self._replicator.resume)
-            self.logger.info("Resumed the cluster to cluster replicator.")
+            self._run_replicator_action(test_report, self._before_cycle_replicator_action)
 
     def after_test(self, test, test_report):
         """After test."""
         self._test_num += 1
         self._last_test = test
 
-        # Every 'n' tests, the replicator should be paused after allowing it to finish synchronizing
-        # data across the clusters, so that a data consistency check can be performed.
+        # Every 'n' tests, the replicator should be pause / stop the replicator and perform data
+        # consistency checks.
         if self._test_num % self._tests_per_cycle == 0:
-            self.logger.info("Pausing the cluster to cluster replicator.")
-            self._run_replicator_action(test_report, self._replicator.pause)
-            self.logger.info("Paused the cluster to cluster replicator.")
+            action_options = self._make_after_cycle_options(test, test_report)
+            self._run_replicator_action(test_report, self._after_cycle_replicator_action,
+                                        action_options)
 
             self._run_data_consistency_check(test, test_report)
             self._run_check_repl_db_hash(test, test_report)
@@ -143,9 +140,21 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         check_db_hash.after_suite(test_report)
 
     def _run_replicator_action(self, test_report, action, action_options=None):
+        self.logger.info(f"Running replicator action: {action.__name__}")
         replicator_action_case = _ReplicatorActionTestCase(self.logger, self._last_test, self,
                                                            action, action_options)
         replicator_action_case.run_dynamic_test(test_report)
+        self.logger.info(f"Ran replicator action: {action.__name__}")
+
+    def _make_after_cycle_options(self, test, test_report):
+        # If the replicator is to be restarted, make the options appropriate for stopping it.
+        after_cycle_options = None
+        if self._restart_every_cycle:
+            after_cycle_options = {
+                "test": test, "test_report": test_report, "shell_options": self._shell_options
+            }
+
+        return after_cycle_options
 
 
 class _ReplicatorActionTestCase(interface.DynamicTestCase):
