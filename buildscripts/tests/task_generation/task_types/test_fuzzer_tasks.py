@@ -95,7 +95,6 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
         self.assertEqual(len(sub_task.commands), 6)
-        self.assertNotEqual(sub_task.commands[-1].as_dict()["func"], "minimize jstestfuzz")
 
     def test_sub_task_should_be_built_correct_with_minimize_command(self):
         mock_params = build_mock_fuzzer_params(npm_command="agg-fuzzer")
@@ -105,7 +104,6 @@ class TestBuildFuzzerSubTask(unittest.TestCase):
 
         self.assertEqual(sub_task.name, f"{mock_params.task_name}_3_{mock_params.variant}")
         self.assertEqual(len(sub_task.commands), 7)
-        self.assertEqual(sub_task.commands[-1].as_dict()["func"], "minimize jstestfuzz")
 
     def test_sub_task_should_include_timeout_info(self):
         mock_params = build_mock_fuzzer_params()

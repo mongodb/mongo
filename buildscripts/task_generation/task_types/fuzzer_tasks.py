@@ -10,8 +10,6 @@ from buildscripts.task_generation.task_types.multiversion_decorator import Multi
     MultiversionDecoratorParams
 from buildscripts.util import taskname
 
-_MINIMIZABLE_FUZZERS = ["agg-fuzzer", "query-fuzzer"]
-
 
 class FuzzerTask(NamedTuple):
     """
@@ -61,11 +59,6 @@ class FuzzerGenTaskParams(NamedTuple):
     use_large_distro: Optional[bool]
     large_distro_name: Optional[str]
     config_location: str
-
-    @property
-    def is_minimizable(self) -> bool:
-        """Return whether this fuzzer in minimizable."""
-        return self.npm_command in _MINIMIZABLE_FUZZERS
 
     def jstestfuzz_params(self) -> Dict[str, str]:
         """Build a dictionary of parameters to pass to jstestfuzz."""
@@ -144,7 +137,5 @@ class FuzzerGenTaskService:
             FunctionCall("run jstestfuzz", params.jstestfuzz_params()),
             FunctionCall(RUN_GENERATED_TESTS, run_tests_vars)
         ]
-        if params.is_minimizable:
-            commands.append(FunctionCall("minimize jstestfuzz", params.jstestfuzz_params()))
 
         return Task(sub_task_name, commands, {TaskDependency(ARCHIVE_DIST_TEST_DEBUG_TASK)})

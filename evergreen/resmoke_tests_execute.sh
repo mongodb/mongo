@@ -170,6 +170,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   elif [ $resmoke_exit_code != 0 ]; then
     # On failure save the resmoke exit code.
     echo $resmoke_exit_code > resmoke_error_code
+    exit 0
   elif [ $resmoke_exit_code = 0 ]; then
     # On success delete core files.
     core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
