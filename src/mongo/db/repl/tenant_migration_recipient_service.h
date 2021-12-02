@@ -445,6 +445,14 @@ public:
         Future<void> _startTenantAllDatabaseCloner(WithLock lk);
 
         /*
+         * Advances the stableTimestamp to be >= startApplyingDonorOpTime by:
+         * 1. Advancing the clusterTime to startApplyingDonorOpTime
+         * 2. Writing a no-op oplog entry with ts > startApplyingDonorOpTime
+         * 3. Waiting for the majority commit timestamp to be the time of the no-op write
+         */
+        SemiFuture<void> _advanceStableTimestampToStartApplyingDonorOpTime();
+
+        /*
          * Gets called when the cloner completes cloning data successfully.
          * And, it is responsible to populate the 'dataConsistentStopDonorOpTime'
          * and 'cloneFinishedRecipientOpTime' fields in the state doc.

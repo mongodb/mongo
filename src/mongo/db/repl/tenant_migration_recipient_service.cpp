@@ -177,6 +177,7 @@ MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingOplogBufferCollection);
 MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(fpAfterFetchingCommittedTransactions);
 MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
+MONGO_FAIL_POINT_DEFINE(fpBeforeAdvancingStableTimestamp);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -1619,6 +1620,72 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
     return std::move(startClonerFuture);
 }
 
+SemiFuture<void>
+TenantMigrationRecipientService::Instance::_advanceStableTimestampToStartApplyingDonorOpTime() {
+    Timestamp startApplyingDonorTimestamp;
+    {
+        stdx::lock_guard lk(_mutex);
+
+        if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
+            return SemiFuture<void>::makeReady();
+        }
+
+        auto opCtx = cc().makeOperationContext();
+
+        invariant(_stateDoc.getStartApplyingDonorOpTime());
+        startApplyingDonorTimestamp = _stateDoc.getStartApplyingDonorOpTime()->getTimestamp();
+        if (opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() >=
+            startApplyingDonorTimestamp) {
+            return SemiFuture<void>::makeReady();
+        }
+    }
+
+    LOGV2(6114000,
+          "Advancing recipient's stable timestamp to be at least the startApplyingDonorOpTime",
+          "migrationId"_attr = getMigrationUUID(),
+          "tenantId"_attr = getTenantId(),
+          "startApplyingDonorOpTime"_attr = startApplyingDonorTimestamp.toString());
+
+    return ExecutorFuture(**_scopedExecutor)
+        .then([this, self = shared_from_this(), startApplyingDonorTimestamp] {
+            auto opCtx = cc().makeOperationContext();
+
+            _stopOrHangOnFailPoint(&fpBeforeAdvancingStableTimestamp, opCtx.get());
+
+            // Advance the cluster time to the startApplyingDonorTimestamp so that we ensure we
+            // write the no-op entry below at ts > startApplyingDonorTimestamp.
+            VectorClockMutable::get(_serviceContext)
+                ->tickClusterTimeTo(LogicalTime(startApplyingDonorTimestamp));
+
+            writeConflictRetry(
+                opCtx.get(),
+                "mergeRecipientWriteNoopToAdvanceStableTimestamp",
+                NamespaceString::kRsOplogNamespace.ns(),
+                [&] {
+                    AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+
+                    WriteUnitOfWork wuow(opCtx.get());
+
+                    const std::string msg = str::stream()
+                        << "Merge recipient advancing stable timestamp";
+                    opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
+                        opCtx.get(), BSON("msg" << msg));
+
+                    wuow.commit();
+                });
+
+            // Get the timestamp of the no-op. This will have ts > startApplyingDonorTimestamp.
+            auto noOpTs = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+            // We do not have a mechanism to wait on the stableTimestamp reaching a specific ts, so
+            // we wait on the majority commit point instead.
+            // TODO SERVER-61731 Retry importing donor collections on failure
+            return WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajority(noOpTs, CancellationToken::uncancelable());
+        })
+        .semi();
+}
+
 SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
     stdx::lock_guard lk(_mutex);
     // PrimaryOnlyService::onStepUp() before starting instance makes sure that the state doc
@@ -2345,6 +2412,9 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                    })
                    .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
                    .then([this, self = shared_from_this()] { return _rollbackToStable(); })
+                   .then([this, self = shared_from_this()] {
+                       return _advanceStableTimestampToStartApplyingDonorOpTime();
+                   })
                    .then([this, self = shared_from_this()] {
                        {
                            auto opCtx = cc().makeOperationContext();
