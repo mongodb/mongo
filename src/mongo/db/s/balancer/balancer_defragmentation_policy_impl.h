@@ -48,14 +48,19 @@ public:
         return _defragmentationStates.contains(uuid);
     }
 
-    SemiFuture<DefragmentationAction> getNextStreamingAction() override;
+    SemiFuture<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
 
-    void acknowledgeMergeResult(MergeInfo action, const Status& result) override;
+    void acknowledgeMergeResult(OperationContext* opCtx,
+                                MergeInfo action,
+                                const Status& result) override;
 
-    void acknowledgeAutoSplitVectorResult(AutoSplitVectorInfo action,
+    void acknowledgeAutoSplitVectorResult(OperationContext* opCtx,
+                                          AutoSplitVectorInfo action,
                                           const StatusWith<std::vector<BSONObj>>& result) override;
 
-    void acknowledgeSplitResult(SplitInfoWithKeyPattern action, const Status& result) override;
+    void acknowledgeSplitResult(OperationContext* opCtx,
+                                SplitInfoWithKeyPattern action,
+                                const Status& result) override;
 
     void acknowledgeDataSizeResult(OperationContext* opCtx,
                                    DataSizeInfo action,
@@ -63,25 +68,48 @@ public:
 
     void closeActionStream() override;
 
-    void beginNewCollection(OperationContext* opCtx, const UUID& uuid) override;
-
-    void removeCollection(OperationContext* opCtx, const UUID& uuid) override;
+    void refreshCollectionDefragmentationStatus(OperationContext* opCtx,
+                                                const CollectionType& coll) override;
 
 private:
     static constexpr int kMaxConcurrentOperations = 50;
 
     // Data structures used to keep track of the defragmentation state.
     struct CollectionDefragmentationState {
+        DefragmentationAction popFromActionQueue() {
+            auto action = queuedActions.front();
+            queuedActions.pop();
+            outstandingActions++;
+            return action;
+        };
+
         NamespaceString nss;
         DefragmentationPhaseEnum phase;
         int64_t maxChunkSizeBytes;
         BSONObj collectionShardKey;
         std::queue<DefragmentationAction> queuedActions;
+        unsigned outstandingActions{0};
         std::vector<ChunkType> chunkList;
         ZoneInfo zones;
     };
 
-    boost::optional<DefragmentationAction> _nextStreamingAction();
+    /**
+     * Returns the next action from any collection in phase 1 or 3 or boost::none if there are no
+     * actions to perform.
+     * Must be called while holding the _streamingMutex.
+     */
+    boost::optional<DefragmentationAction> _nextStreamingAction(OperationContext* opCtx);
+
+    /**
+     * Adds next action to the collection's action queue if there is one. If there are no further
+     * actions, the queue is empty, and there are no outstanding actions for this collection, this
+     * will call _transitionPhases. Returns true if there is a new action for the collection and
+     * false otherwise.
+     * Must be called while holding the _streamingMutex.
+     */
+    bool _queueNextAction(OperationContext* opCtx,
+                          const UUID& uuid,
+                          CollectionDefragmentationState& collectionData);
 
     /**
      * Returns next phase 1 merge action for the collection if there is one and boost::none
@@ -102,14 +130,24 @@ private:
     }
 
     /**
+     * Move to the next phase and persist the phase change. This will end defragmentation if the
+     * current phase is the last phase.
+     * Must be called while holding the _streamingMutex.
+     */
+    void _transitionPhases(OperationContext* opCtx,
+                           const UUID& uuid,
+                           CollectionDefragmentationState& collectionInfo);
+
+    /**
      * Build the shardToChunk map for the namespace. Requires a scan of the config.chunks
      * collection.
      */
-    void _initializeCollectionState(OperationContext* opCtx, const UUID& uuid);
+    void _initializeCollectionState(WithLock, OperationContext* opCtx, const CollectionType& coll);
 
     /**
      * Write the new phase to the defragmentationPhase field in config.collections. If phase is not
      * set, the field will be removed.
+     * Must be called while holding the _streamingMutex.
      */
     void _persistPhaseUpdate(OperationContext* opCtx,
                              boost::optional<DefragmentationPhaseEnum> phase,
@@ -117,10 +155,12 @@ private:
 
     /**
      * Remove all datasize fields from config.chunks for the given namespace.
+     * Must be called while holding the _streamingMutex.
      */
     void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
 
     void _processEndOfAction(WithLock,
+                             OperationContext* opCtx,
                              const UUID& uuid,
                              const boost::optional<DefragmentationAction>& nextActionOnNamespace);
 

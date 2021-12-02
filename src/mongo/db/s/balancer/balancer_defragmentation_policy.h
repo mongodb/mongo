@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
 /**
@@ -44,16 +45,12 @@ public:
     virtual ~BalancerDefragmentationPolicy() {}
 
     /**
-     * Sets the "begin of defragmentation" state on the specified collection. New actions concerning
-     * the collection will be included in the stream.
+     * Checks if the collection should be running defragmentation. If a new defragmentation should
+     * be started, this will initialize the defragmentation. If defragmentation has been turned off
+     * on a collection, this will stop the defragmentation.
      */
-    virtual void beginNewCollection(OperationContext* opCtx, const UUID& uuid) = 0;
-
-    /**
-     * Removes the specified collection from the list of namespaces to be defragmented. Actions
-     * concerning the collection will stop appearing in the stream.
-     */
-    virtual void removeCollection(OperationContext* opCtx, const UUID& uuid) = 0;
+    virtual void refreshCollectionDefragmentationStatus(OperationContext* opCtx,
+                                                        const CollectionType& coll) = 0;
 
     /**
      * Returns true if the specified collection is currently being defragmented.
@@ -72,7 +69,7 @@ public:
      * or when there are too many outstanding actions (too many calls to getStreamingAction() that
      * have not been acknowledged).
      */
-    virtual SemiFuture<DefragmentationAction> getNextStreamingAction() = 0;
+    virtual SemiFuture<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) = 0;
 
     /**
      * Stops the generation of new actions: any new call to (or currently blocked ones on)
@@ -81,12 +78,18 @@ public:
      */
     virtual void closeActionStream() = 0;
 
-    virtual void acknowledgeMergeResult(MergeInfo action, const Status& result) = 0;
+    virtual void acknowledgeMergeResult(OperationContext* opCtx,
+                                        MergeInfo action,
+                                        const Status& result) = 0;
 
     virtual void acknowledgeAutoSplitVectorResult(
-        AutoSplitVectorInfo action, const StatusWith<std::vector<BSONObj>>& result) = 0;
+        OperationContext* opCtx,
+        AutoSplitVectorInfo action,
+        const StatusWith<std::vector<BSONObj>>& result) = 0;
 
-    virtual void acknowledgeSplitResult(SplitInfoWithKeyPattern action, const Status& result) = 0;
+    virtual void acknowledgeSplitResult(OperationContext* opCtx,
+                                        SplitInfoWithKeyPattern action,
+                                        const Status& result) = 0;
 
     virtual void acknowledgeDataSizeResult(OperationContext* opCtx,
                                            DataSizeInfo action,

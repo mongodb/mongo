@@ -51,11 +51,13 @@ protected:
           _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
           _defragmentationPolicy(_clusterStats.get()) {}
 
-    void makeConfigCollectionEntry() {
+    CollectionType makeConfigCollectionEntry() {
         CollectionType shardedCollection(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid);
         shardedCollection.setKeyPattern(kShardKeyPattern);
+        shardedCollection.setBalancerShouldMergeChunks(true);
         ASSERT_OK(insertToConfigCollection(
             operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
+        return shardedCollection;
     }
 
     void makeConfigChunkEntry() {
@@ -81,8 +83,9 @@ protected:
 };
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAddCollection) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     // Test for persistence
     auto configDoc = findOneOnConfigCollection(operationContext(),
                                                CollectionType::ConfigNS,
@@ -91,14 +94,12 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAddCollection) {
     auto storedDefragmentationPhase = DefragmentationPhase_parse(
         IDLParserErrorContext("BalancerDefragmentationPolicyTest"),
         configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
-    ASSERT_TRUE(storedDefragmentationPhase == DefragmentationPhaseEnum::kNotStarted);
+    ASSERT_TRUE(storedDefragmentationPhase == DefragmentationPhaseEnum::kMergeChunks);
 }
 
-TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollection) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    _defragmentationPolicy.removeCollection(operationContext(), kUuid);
-    // Test for persistence removal
+TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionNoActions) {
+    auto coll = makeConfigCollectionEntry();
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     auto configDoc = findOneOnConfigCollection(operationContext(),
                                                CollectionType::ConfigNS,
                                                BSON(CollectionType::kUuidFieldName << kUuid))
@@ -107,25 +108,29 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollection) {
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestIsDefragmentingCollection) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(kUuid));
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(UUID::gen()));
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestGetNextActionNoReadyActions) {
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future.isReady());
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedMergeResult) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto mergeInfo =
         MergeInfo(kShardId, kNss, kUuid, kCollectionVersion, ChunkRange(kMinKey, kMaxKey));
     _defragmentationPolicy.acknowledgeMergeResult(
-        mergeInfo, Status(ErrorCodes::NetworkTimeout, "Testing error response"));
+        operationContext(),
+        mergeInfo,
+        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
     ASSERT_TRUE(future.isReady());
     DefragmentationAction streamingAction = future.get();
     MergeInfo mergeAction = stdx::get<MergeInfo>(streamingAction);
@@ -133,35 +138,42 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedMergeResult) {
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedSplitVectorResponse) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto splitVectorInfo = AutoSplitVectorInfo(
         kShardId, kNss, kUuid, kCollectionVersion, BSONObj(), kMinKey, kMaxKey, 120);
     _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
-        splitVectorInfo, Status(ErrorCodes::NetworkTimeout, "Testing error response"));
+        operationContext(),
+        splitVectorInfo,
+        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
     ASSERT_TRUE(future.isReady());
     AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(future.get());
     ASSERT_EQ(splitVectorInfo.nss, splitVectorAction.nss);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedSplitAction) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto splitInfo = SplitInfoWithKeyPattern(
         kShardId, kNss, kCollectionVersion, kMinKey, kMaxKey, {}, kUuid, kShardKeyPattern.toBSON());
     _defragmentationPolicy.acknowledgeSplitResult(
-        splitInfo, Status(ErrorCodes::NetworkTimeout, "Testing error response"));
+        operationContext(),
+        splitInfo,
+        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
     ASSERT_TRUE(future.isReady());
     SplitInfoWithKeyPattern splitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
     ASSERT_EQ(splitInfo.info.nss, splitAction.info.nss);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedDataSizeAction) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto dataSizeInfo = DataSizeInfo(kShardId,
                                      kNss,
                                      kUuid,
@@ -179,12 +191,13 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedDataSizeAction) {
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulMergeAction) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto mergeInfo =
         MergeInfo(kShardId, kNss, kUuid, kCollectionVersion, ChunkRange(kMinKey, kMaxKey));
-    _defragmentationPolicy.acknowledgeMergeResult(mergeInfo, Status::OK());
+    _defragmentationPolicy.acknowledgeMergeResult(operationContext(), mergeInfo, Status::OK());
     ASSERT_TRUE(future.isReady());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
     ASSERT_EQ(mergeInfo.nss, dataSizeAction.nss);
@@ -194,9 +207,10 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulMergeAction) 
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulAutoSplitVectorAction) {
     std::vector<BSONObj> splitPoints = {BSON("x" << 4)};
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto splitVectorInfo = AutoSplitVectorInfo(kShardId,
                                                kNss,
                                                kUuid,
@@ -205,8 +219,9 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulAutoSplitVect
                                                kMinKey,
                                                kMaxKey,
                                                2048);
-    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(splitVectorInfo,
-                                                            StatusWith(splitPoints));
+
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(), splitVectorInfo, StatusWith(splitPoints));
     ASSERT_TRUE(future.isReady());
     SplitInfoWithKeyPattern splitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
     ASSERT_EQ(splitVectorInfo.nss, splitAction.info.nss);
@@ -216,9 +231,10 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulAutoSplitVect
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulSplitAction) {
     std::vector<BSONObj> splitPoints = {BSON("x" << 4)};
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto splitInfo = SplitInfoWithKeyPattern(kShardId,
                                              kNss,
                                              kCollectionVersion,
@@ -227,15 +243,16 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulSplitAction) 
                                              splitPoints,
                                              kUuid,
                                              kShardKeyPattern.toBSON());
-    _defragmentationPolicy.acknowledgeSplitResult(splitInfo, Status::OK());
+    _defragmentationPolicy.acknowledgeSplitResult(operationContext(), splitInfo, Status::OK());
     ASSERT_FALSE(future.isReady());
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulDataSizeAction) {
-    makeConfigCollectionEntry();
-    _defragmentationPolicy.beginNewCollection(operationContext(), kUuid);
+    auto coll = makeConfigCollectionEntry();
+    FailPointEnableBlock failpoint("skipPhaseTransition");
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
-    auto future = _defragmentationPolicy.getNextStreamingAction();
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto dataSizeInfo = DataSizeInfo(kShardId,
                                      kNss,
                                      kUuid,

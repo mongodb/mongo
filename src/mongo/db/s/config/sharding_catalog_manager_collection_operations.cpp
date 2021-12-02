@@ -631,6 +631,8 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
         {std::make_move_iterator(shardsIds.begin()), std::make_move_iterator(shardsIds.end())},
         nss,
         executor);
+
+    Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged();
 }
 
 void ShardingCatalogManager::renameShardedMetadata(

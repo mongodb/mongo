@@ -98,6 +98,7 @@ public:
     using CollectionTypeBase::kUpdatedAtFieldName;
 
     // Make getters and setters accessible.
+    using CollectionTypeBase::getDefragmentationPhase;
     using CollectionTypeBase::getMaxChunkSizeBytes;
     using CollectionTypeBase::getNss;
     using CollectionTypeBase::getReshardingFields;
@@ -105,6 +106,8 @@ public:
     using CollectionTypeBase::getTimestamp;
     using CollectionTypeBase::getUnique;
     using CollectionTypeBase::getUpdatedAt;
+    using CollectionTypeBase::setBalancerShouldMergeChunks;
+    using CollectionTypeBase::setDefragmentationPhase;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
     using CollectionTypeBase::setTimeseriesFields;

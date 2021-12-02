@@ -258,6 +258,12 @@ private:
     bool _checkOIDs(OperationContext* opCtx);
 
     /**
+     * Queries config.collections for all collections that should be running defragmentation and
+     * passes this information to the defragmentation policy.
+     */
+    void _initializeDefragmentations(OperationContext* opCtx);
+
+    /**
      * Iterates through all chunks in all collections. If the collection is the sessions collection,
      * checks if the number of chunks is greater than or equal to the configured minimum number of
      * chunks for the sessions collection (minNumChunksForSessionsCollection). If it isn't,

@@ -36,50 +36,55 @@
 #include "mongo/s/grid.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(skipPhaseTransition);
 
-void BalancerDefragmentationPolicyImpl::beginNewCollection(OperationContext* opCtx,
-                                                           const UUID& uuid) {
-    _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kNotStarted, uuid);
-    _initializeCollectionState(opCtx, uuid);
+void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
+    OperationContext* opCtx, const CollectionType& coll) {
+    stdx::lock_guard<Latch> lk(_streamingMutex);
+    const auto& uuid = coll.getUuid();
+    if (coll.getBalancerShouldMergeChunks() && !_defragmentationStates.contains(uuid)) {
+        _initializeCollectionState(lk, opCtx, coll);
+
+        // Load first action, this will trigger move to phase 2 if there are no phase 1 actions
+        _queueNextAction(opCtx, uuid, _defragmentationStates[uuid]);
+        // Fulfill promise if needed
+        if (_nextStreamingActionPromise) {
+            auto nextStreamingAction = _nextStreamingAction(opCtx);
+            if (nextStreamingAction) {
+                _concurrentStreamingOps++;
+                _nextStreamingActionPromise.get().setWith([&] { return *nextStreamingAction; });
+                _nextStreamingActionPromise = boost::none;
+                return;
+            }
+        }
+    } else if (!coll.getBalancerShouldMergeChunks() && _defragmentationStates.contains(uuid)) {
+        _clearDataSizeInformation(opCtx, uuid);
+        _defragmentationStates.erase(uuid);
+        _persistPhaseUpdate(opCtx, boost::none, uuid);
+    }
 }
 
-void BalancerDefragmentationPolicyImpl::removeCollection(OperationContext* opCtx,
-                                                         const UUID& uuid) {
-    _persistPhaseUpdate(opCtx, boost::none, uuid);
-    _clearDataSizeInformation(opCtx, uuid);
-    _defragmentationStates.erase(uuid);
-}
-
-SemiFuture<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction() {
+SemiFuture<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction(
+    OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_streamingMutex);
     if (_concurrentStreamingOps < kMaxConcurrentOperations) {
-        _concurrentStreamingOps++;
-        if (auto action = _nextStreamingAction()) {
+        if (auto action = _nextStreamingAction(opCtx)) {
+            _concurrentStreamingOps++;
             return SemiFuture<DefragmentationAction>::makeReady(*action);
         }
     }
-    auto&& [promise, future] = makePromiseFuture<DefragmentationAction>();
+    auto [promise, future] = makePromiseFuture<DefragmentationAction>();
     _nextStreamingActionPromise = std::move(promise);
     return std::move(future).semi();
 }
 
-boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextStreamingAction() {
+boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextStreamingAction(
+    OperationContext* opCtx) {
     // TODO (SERVER-61635) validate fairness through collections
     for (auto& [uuid, collectionData] : _defragmentationStates) {
-        if (!collectionData.queuedActions.empty()) {
-            auto action = collectionData.queuedActions.front();
-            collectionData.queuedActions.pop();
-            return action;
-        }
-        if (collectionData.phase == DefragmentationPhaseEnum::kMergeChunks) {
-            if (auto mergeAction = _getCollectionMergeAction(collectionData)) {
-                return boost::optional<DefragmentationAction>(*mergeAction);
-            }
-        }
-        if (collectionData.phase == DefragmentationPhaseEnum::kSplitChunks) {
-            if (auto splitAction = _getCollectionSplitAction(collectionData)) {
-                return boost::optional<DefragmentationAction>(*splitAction);
-            }
+        if (!collectionData.queuedActions.empty() ||
+            _queueNextAction(opCtx, uuid, collectionData)) {
+            return collectionData.popFromActionQueue();
         }
     }
     boost::optional<DefragmentationAction> noAction = boost::none;
@@ -89,9 +94,43 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextS
     return noAction;
 }
 
-void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(MergeInfo action,
+bool BalancerDefragmentationPolicyImpl::_queueNextAction(
+    OperationContext* opCtx, const UUID& uuid, CollectionDefragmentationState& collectionData) {
+    // get next action within the current phase
+    switch (collectionData.phase) {
+        case DefragmentationPhaseEnum::kMergeChunks:
+            if (auto mergeAction = _getCollectionMergeAction(collectionData)) {
+                collectionData.queuedActions.push(*mergeAction);
+                return true;
+            }
+            break;
+        case DefragmentationPhaseEnum::kSplitChunks:
+            if (auto splitAction = _getCollectionSplitAction(collectionData)) {
+                collectionData.queuedActions.push(*splitAction);
+                return true;
+            }
+            break;
+        default:
+            uasserted(ErrorCodes::BadValue, "Unsupported phase type");
+    }
+    // If no action for the current phase is available, check the conditions for transitioning to
+    // the next phase
+    if (collectionData.queuedActions.empty() && collectionData.outstandingActions == 0) {
+        _transitionPhases(opCtx, uuid, collectionData);
+    }
+    return false;
+}
+
+void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext* opCtx,
+                                                               MergeInfo action,
                                                                const Status& result) {
     stdx::lock_guard<Latch> lk(_streamingMutex);
+    // Check if collection defragmentation has been canceled
+    if (!_defragmentationStates.contains(action.uuid)) {
+        return;
+    }
+    if (result.isOK())
+        _defragmentationStates[action.uuid].outstandingActions--;
     boost::optional<DefragmentationAction> nextActionOnNamespace = result.isOK()
         ? boost::optional<DefragmentationAction>(
               DataSizeInfo(action.shardId,
@@ -102,13 +141,18 @@ void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(MergeInfo action,
                            _defragmentationStates.at(action.uuid).collectionShardKey,
                            false))
         : boost::optional<DefragmentationAction>(action);
-    _processEndOfAction(lk, action.uuid, nextActionOnNamespace);
+    _processEndOfAction(lk, opCtx, action.uuid, nextActionOnNamespace);
 }
 
 void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
     OperationContext* opCtx, DataSizeInfo action, const StatusWith<DataSizeResponse>& result) {
     stdx::lock_guard<Latch> lk(_streamingMutex);
+    // Check if collection defragmentation has been canceled
+    if (!_defragmentationStates.contains(action.uuid)) {
+        return;
+    }
     if (result.isOK()) {
+        _defragmentationStates[action.uuid].outstandingActions--;
         ChunkType chunk(action.uuid, action.chunkRange, action.version, action.shardId);
         ShardingCatalogManager* catalogManager = ShardingCatalogManager::get(opCtx);
         catalogManager->setChunkEstimatedSize(opCtx,
@@ -118,12 +162,20 @@ void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
     }
     boost::optional<DefragmentationAction> nextActionOnNamespace =
         result.isOK() ? boost::none : boost::optional<DefragmentationAction>(action);
-    _processEndOfAction(lk, action.uuid, nextActionOnNamespace);
+    _processEndOfAction(lk, opCtx, action.uuid, nextActionOnNamespace);
 }
 
 void BalancerDefragmentationPolicyImpl::acknowledgeAutoSplitVectorResult(
-    AutoSplitVectorInfo action, const StatusWith<std::vector<BSONObj>>& result) {
+    OperationContext* opCtx,
+    AutoSplitVectorInfo action,
+    const StatusWith<std::vector<BSONObj>>& result) {
     stdx::lock_guard<Latch> lk(_streamingMutex);
+    // Check if collection defragmentation has been canceled
+    if (!_defragmentationStates.contains(action.uuid)) {
+        return;
+    }
+    if (result.isOK())
+        _defragmentationStates[action.uuid].outstandingActions--;
     boost::optional<DefragmentationAction> nextActionOnNamespace = result.isOK()
         ? boost::optional<DefragmentationAction>(SplitInfoWithKeyPattern(action.shardId,
                                                                          action.nss,
@@ -134,15 +186,22 @@ void BalancerDefragmentationPolicyImpl::acknowledgeAutoSplitVectorResult(
                                                                          action.uuid,
                                                                          action.keyPattern))
         : boost::optional<DefragmentationAction>(action);
-    _processEndOfAction(lk, action.uuid, nextActionOnNamespace);
+    _processEndOfAction(lk, opCtx, action.uuid, nextActionOnNamespace);
 }
 
-void BalancerDefragmentationPolicyImpl::acknowledgeSplitResult(SplitInfoWithKeyPattern action,
+void BalancerDefragmentationPolicyImpl::acknowledgeSplitResult(OperationContext* opCtx,
+                                                               SplitInfoWithKeyPattern action,
                                                                const Status& result) {
     stdx::lock_guard<Latch> lk(_streamingMutex);
+    // Check if collection defragmentation has been canceled
+    if (!_defragmentationStates.contains(action.uuid)) {
+        return;
+    }
+    if (result.isOK())
+        _defragmentationStates[action.uuid].outstandingActions--;
     boost::optional<DefragmentationAction> nextActionOnNamespace =
         result.isOK() ? boost::none : boost::optional<DefragmentationAction>(action);
-    _processEndOfAction(lk, action.uuid, nextActionOnNamespace);
+    _processEndOfAction(lk, opCtx, action.uuid, nextActionOnNamespace);
 }
 
 void BalancerDefragmentationPolicyImpl::closeActionStream() {
@@ -157,20 +216,21 @@ void BalancerDefragmentationPolicyImpl::closeActionStream() {
 
 void BalancerDefragmentationPolicyImpl::_processEndOfAction(
     WithLock,
+    OperationContext* opCtx,
     const UUID& uuid,
     const boost::optional<DefragmentationAction>& nextActionOnNamespace) {
-    // If the end of the current action implies a next step and the related collection is still
-    // being defragmented, store it
+
+    // If the end of the current action implies a next step, store it
     if (nextActionOnNamespace) {
-        auto collectionDefragmentationStateIt = _defragmentationStates.find(uuid);
-        if (collectionDefragmentationStateIt != _defragmentationStates.end()) {
-            collectionDefragmentationStateIt->second.queuedActions.push(*nextActionOnNamespace);
-        }
+        _defragmentationStates.at(uuid).queuedActions.push(*nextActionOnNamespace);
     }
 
-    // If there is a client blocked on the stream, serve it now with a new action...
+    // Load next action, this will trigger phase change if needed
+    _queueNextAction(opCtx, uuid, _defragmentationStates[uuid]);
+
+    // Fulfill promise if needed
     if (_nextStreamingActionPromise) {
-        auto nextStreamingAction = _nextStreamingAction();
+        auto nextStreamingAction = _nextStreamingAction(opCtx);
         if (nextStreamingAction) {
             _nextStreamingActionPromise.get().setWith([&] { return *nextStreamingAction; });
             _nextStreamingActionPromise = boost::none;
@@ -181,14 +241,53 @@ void BalancerDefragmentationPolicyImpl::_processEndOfAction(
     --_concurrentStreamingOps;
 }
 
-void BalancerDefragmentationPolicyImpl::_initializeCollectionState(OperationContext* opCtx,
-                                                                   const UUID& uuid) {
+void BalancerDefragmentationPolicyImpl::_transitionPhases(
+    OperationContext* opCtx, const UUID& uuid, CollectionDefragmentationState& collectionInfo) {
+    boost::optional<DefragmentationPhaseEnum> nextPhase;
+    switch (collectionInfo.phase) {
+        case DefragmentationPhaseEnum::kMergeChunks:
+            if (MONGO_unlikely(skipPhaseTransition.shouldFail())) {
+                nextPhase = DefragmentationPhaseEnum::kMergeChunks;
+                break;
+            }
+            // TODO (SERVER-60459) Change to kMoveAndMergeChunks
+            nextPhase = boost::none;
+            break;
+        case DefragmentationPhaseEnum::kMoveAndMergeChunks:
+            // TODO (SERVER-60479) Change to kSplitChunks
+            nextPhase = boost::none;
+            break;
+        case DefragmentationPhaseEnum::kSplitChunks:
+            nextPhase = boost::none;
+            break;
+    }
+    if (nextPhase) {
+        collectionInfo.phase = nextPhase.get();
+    } else {
+        _clearDataSizeInformation(opCtx, uuid);
+        _defragmentationStates.erase(uuid);
+    }
+    _persistPhaseUpdate(opCtx, nextPhase, uuid);
+}
+
+void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
+                                                                   OperationContext* opCtx,
+                                                                   const CollectionType& coll) {
     try {
-        _defragmentationStates[uuid].phase = DefragmentationPhaseEnum::kNotStarted;
+        CollectionDefragmentationState newState;
+        newState.nss = coll.getNss();
+        newState.phase = coll.getDefragmentationPhase() ? coll.getDefragmentationPhase().get()
+                                                        : DefragmentationPhaseEnum::kMergeChunks;
+        newState.collectionShardKey = coll.getKeyPattern().toBSON();
+        _persistPhaseUpdate(opCtx, newState.phase, coll.getUuid());
+        auto [_, inserted] =
+            _defragmentationStates.insert_or_assign(coll.getUuid(), std::move(newState));
+        dassert(inserted);
     } catch (const DBException& e) {
         LOGV2_ERROR(6153101,
                     "Error while starting defragmentation on collection",
-                    "uuid"_attr = uuid,
+                    "namespace"_attr = coll.getNss(),
+                    "uuid"_attr = coll.getUuid(),
                     "error"_attr = e);
     }
 }
@@ -205,8 +304,9 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(
                 BSON("$set" << BSON(CollectionType::kDefragmentationPhaseFieldName
                                     << DefragmentationPhase_serializer(*phase)))));
         } else {
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-                BSON("$unset" << BSON(CollectionType::kDefragmentationPhaseFieldName << ""))));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                "$unset" << BSON(CollectionType::kBalancerShouldMergeChunksFieldName
+                                 << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
         }
         return entry;
     }()});

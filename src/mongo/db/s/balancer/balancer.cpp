@@ -379,22 +379,24 @@ void Balancer::_consumeActionStreamLoop() {
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
     while (!_stopRequested()) {
         // Blocking call
-        DefragmentationAction action = _defragmentationPolicy->getNextStreamingAction().get();
+        DefragmentationAction action =
+            _defragmentationPolicy->getNextStreamingAction(opCtx.get()).get();
         // Non-blocking call, assumes the requests are returning a SemiFuture<>
         stdx::visit(
             visit_helper::Overloaded{
                 [&](MergeInfo mergeAction) {
-                    auto result =
-                        _commandScheduler
-                            ->requestMergeChunks(opCtx.get(),
-                                                 mergeAction.nss,
-                                                 mergeAction.shardId,
-                                                 mergeAction.chunkRange,
-                                                 mergeAction.collectionVersion)
-                            .thenRunOn(*executor)
-                            .onCompletion([this, mergeAction](const Status& status) {
-                                _defragmentationPolicy->acknowledgeMergeResult(mergeAction, status);
-                            });
+                    auto result = _commandScheduler
+                                      ->requestMergeChunks(opCtx.get(),
+                                                           mergeAction.nss,
+                                                           mergeAction.shardId,
+                                                           mergeAction.chunkRange,
+                                                           mergeAction.collectionVersion)
+                                      .thenRunOn(*executor)
+                                      .onCompletion([this, mergeAction](const Status& status) {
+                                          auto opCtx = cc().makeOperationContext();
+                                          _defragmentationPolicy->acknowledgeMergeResult(
+                                              opCtx.get(), mergeAction, status);
+                                      });
                 },
                 [&](DataSizeInfo dataSizeAction) {
                     auto result =
@@ -407,8 +409,9 @@ void Balancer::_consumeActionStreamLoop() {
                                               dataSizeAction.keyPattern,
                                               dataSizeAction.estimatedValue)
                             .thenRunOn(*executor)
-                            .onCompletion([this, dataSizeAction, &opCtx](
+                            .onCompletion([this, dataSizeAction](
                                               const StatusWith<DataSizeResponse>& swDataSize) {
+                                auto opCtx = cc().makeOperationContext();
                                 _defragmentationPolicy->acknowledgeDataSizeResult(
                                     opCtx.get(), dataSizeAction, swDataSize);
                             });
@@ -427,25 +430,27 @@ void Balancer::_consumeActionStreamLoop() {
                             .onCompletion(
                                 [this, splitVectorAction](
                                     const StatusWith<std::vector<BSONObj>>& swSplitPoints) {
+                                    auto opCtx = cc().makeOperationContext();
                                     _defragmentationPolicy->acknowledgeAutoSplitVectorResult(
-                                        splitVectorAction, swSplitPoints);
+                                        opCtx.get(), splitVectorAction, swSplitPoints);
                                 });
                 },
                 [&](SplitInfoWithKeyPattern splitAction) {
-                    auto result =
-                        _commandScheduler
-                            ->requestSplitChunk(opCtx.get(),
-                                                splitAction.info.nss,
-                                                splitAction.info.shardId,
-                                                splitAction.info.collectionVersion,
-                                                splitAction.keyPattern,
-                                                splitAction.info.minKey,
-                                                splitAction.info.maxKey,
-                                                splitAction.info.splitKeys)
-                            .thenRunOn(*executor)
-                            .onCompletion([this, splitAction](const Status& status) {
-                                _defragmentationPolicy->acknowledgeSplitResult(splitAction, status);
-                            });
+                    auto result = _commandScheduler
+                                      ->requestSplitChunk(opCtx.get(),
+                                                          splitAction.info.nss,
+                                                          splitAction.info.shardId,
+                                                          splitAction.info.collectionVersion,
+                                                          splitAction.keyPattern,
+                                                          splitAction.info.minKey,
+                                                          splitAction.info.maxKey,
+                                                          splitAction.info.splitKeys)
+                                      .thenRunOn(*executor)
+                                      .onCompletion([this, splitAction](const Status& status) {
+                                          auto opCtx = cc().makeOperationContext();
+                                          _defragmentationPolicy->acknowledgeSplitResult(
+                                              opCtx.get(), splitAction, status);
+                                      });
                 },
                 [](EndOfActionStream eoa) {}},
             action);
@@ -543,6 +548,8 @@ void Balancer::_mainThread() {
                 if (sampler.tick()) {
                     warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
                 }
+
+                _initializeDefragmentations(opCtx.get());
 
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
@@ -749,6 +756,13 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
     return true;
 }
 
+void Balancer::_initializeDefragmentations(OperationContext* opCtx) {
+    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
+    for (const auto& coll : collections) {
+        _defragmentationPolicy->refreshCollectionDefragmentationStatus(opCtx, coll);
+    }
+}
+
 Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
     auto chunksToSplitStatus = _chunkSelectionPolicy->selectChunksToSplit(opCtx);
     if (!chunksToSplitStatus.isOK()) {
@@ -867,10 +881,15 @@ void Balancer::notifyPersistedBalancerSettingsChanged() {
 
 Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
                                                           const NamespaceString& ns) {
-    const auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, ns);
-    bool isMerging = uuid && _defragmentationPolicy->isDefragmentingCollection(*uuid);
-    if (isMerging) {
-        return {false, kBalancerPolicyStatusChunksMerging.toString()};
+    // TODO (SERVER-61727) update this with phase 2
+    try {
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
+        bool isMerging = _defragmentationPolicy->isDefragmentingCollection(coll.getUuid());
+        if (isMerging) {
+            return {false, kBalancerPolicyStatusChunksMerging.toString()};
+        }
+    } catch (DBException&) {
+        // Catch exceptions to keep consistency with errors thrown before defragmentation
     }
 
     auto splitChunks = uassertStatusOK(_chunkSelectionPolicy->selectChunksToSplit(opCtx, ns));
