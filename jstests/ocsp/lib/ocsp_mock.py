@@ -42,6 +42,10 @@ def main():
 
     parser.add_argument('--response_delay_seconds', type=int, default=0, help="Delays the response by this number of seconds")
 
+    parser.add_argument('--include_extraneous_status', action='store_true', help="Include status of extraneous certificates in the response")
+
+    parser.add_argument('--issuer_hash_algorithm', type=str, default='sha1', help="Algorithm to use when hashing issuer name and key")
+
     args = parser.parse_args()
 
     level=logging.DEBUG if args.verbose else logging.INFO
@@ -49,7 +53,10 @@ def main():
     logging.Formatter.converter = time.gmtime
 
     logger.info('Initializing OCSP Responder')
-    mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds, response_delay_seconds=args.response_delay_seconds)
+    mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert,
+        responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds,
+        response_delay_seconds=args.response_delay_seconds, include_extraneous_status=args.include_extraneous_status,
+        issuer_hash_algorithm=args.issuer_hash_algorithm)
 
     logger.debug('Mock OCSP Responder will be started on port %s' % (str(args.port)))
     mock_ocsp_responder.init(port=args.port, debug=args.verbose, host=args.bind_ip)
