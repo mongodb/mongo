@@ -326,8 +326,8 @@ err:
  *     Report a message to an event handler.
  */
 static int
-__eventv(WT_SESSION_IMPL *session, bool msg_event, bool is_json, int error, const char *func,
-  int line, WT_VERBOSE_CATEGORY category, WT_VERBOSE_LEVEL level, const char *fmt, va_list ap)
+__eventv(WT_SESSION_IMPL *session, bool is_json, int error, const char *func, int line,
+  WT_VERBOSE_CATEGORY category, WT_VERBOSE_LEVEL level, const char *fmt, va_list ap)
   WT_GCC_FUNC_ATTRIBUTE((cold))
 {
     WT_DECL_RET;
@@ -379,7 +379,7 @@ __eventv(WT_SESSION_IMPL *session, bool msg_event, bool is_json, int error, cons
      */
     wt_session = (WT_SESSION *)session;
     handler = session->event_handler;
-    if (msg_event) {
+    if (level != WT_VERBOSE_ERROR) {
         ret = handler->handle_message(handler, wt_session, s);
         if (ret != 0)
             __handler_failure(session, ret, "message", false);
@@ -430,7 +430,7 @@ __wt_err_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * return.
      */
     va_start(ap, fmt);
-    WT_IGNORE_RET(__eventv(session, false,
+    WT_IGNORE_RET(__eventv(session,
       session ? FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_ERROR) : false, error, func,
       line, category, WT_VERBOSE_ERROR, fmt, ap));
     va_end(ap);
@@ -452,7 +452,7 @@ __wt_errx_func(WT_SESSION_IMPL *session, const char *func, int line, WT_VERBOSE_
      * return.
      */
     va_start(ap, fmt);
-    WT_IGNORE_RET(__eventv(session, false,
+    WT_IGNORE_RET(__eventv(session,
       session ? FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_ERROR) : false, 0, func, line,
       category, WT_VERBOSE_ERROR, fmt, ap));
     va_end(ap);
@@ -478,8 +478,8 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      */
     va_start(ap, fmt);
     WT_IGNORE_RET(
-      __eventv(session, false, session ? FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR) : false,
-        error, func, line, category, WT_VERBOSE_ERROR, fmt, ap));
+      __eventv(session, session ? FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR) : false, error,
+        func, line, category, WT_VERBOSE_ERROR, fmt, ap));
     va_end(ap);
 
     /*
@@ -498,8 +498,8 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * I'm not confident of underlying support for a NULL.
      */
     va_start(ap, fmt);
-    WT_IGNORE_RET(__eventv(session, false, FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR),
-      WT_PANIC, func, line, category, WT_VERBOSE_ERROR, "the process must exit and restart", ap));
+    WT_IGNORE_RET(__eventv(session, FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR), WT_PANIC,
+      func, line, category, WT_VERBOSE_ERROR, "the process must exit and restart", ap));
     va_end(ap);
 
 #if defined(HAVE_DIAGNOSTIC)
@@ -561,7 +561,7 @@ __wt_ext_err_printf(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char
         session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
     va_start(ap, fmt);
-    ret = __eventv(session, false,
+    ret = __eventv(session,
       session ? FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_ERROR) : false, 0, NULL, 0,
       WT_VERB_EXTENSION, WT_VERBOSE_ERROR, fmt, ap);
     va_end(ap);
@@ -604,7 +604,7 @@ __wt_verbose_worker(WT_SESSION_IMPL *session, WT_VERBOSE_CATEGORY category, WT_V
     va_list ap;
 
     va_start(ap, fmt);
-    WT_IGNORE_RET(__eventv(session, true,
+    WT_IGNORE_RET(__eventv(session,
       session ? FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_MESSAGE) : false, 0, NULL, 0,
       category, level, fmt, ap));
     va_end(ap);
