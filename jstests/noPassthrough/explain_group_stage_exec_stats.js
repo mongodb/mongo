@@ -6,11 +6,22 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStage().
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');
 const coll = testDB.explain_group_stage_exec_stats;
 coll.drop();
+
+if (checkSBEEnabled(testDB, ["featureFlagSBEGroupPushdown"])) {
+    // When the SBE $group pushdown feature is enabled, a $group alone is pushed down and the
+    // memory usage tracking isn't on a per-accumulator basis so this test is exercising
+    // spilling behavior of the classic DocumentSourceGroup stage.
+    jsTest.log("Skipping test since SBE $group pushdown has different memory tracking behavior");
+    MongoRunner.stopMongod(conn);
+    return;
+}
+
 const bigStr = Array(1025).toString();  // 1KB of ','
 const maxMemoryLimitForGroupStage = 1024 * 300;
 const debugBuild = testDB.adminCommand('buildInfo').debug;

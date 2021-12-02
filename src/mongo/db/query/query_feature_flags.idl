@@ -51,7 +51,8 @@ feature_flags:
     featureFlagSBEGroupPushdown:
       description: "Feature flag for allowing SBE $group pushdown"
       cpp_varname: gFeatureFlagSBEGroupPushdown
-      default: false
+      default: true
+      version: 5.2
 
     featureFlagExactTopNAccumulator:
       description: "Feature flag for allowing use of topN family of accumulators"

@@ -27,7 +27,11 @@ let assertGroupPushdown = function(coll, pipeline, expectedResults, expectedGrou
     const explain = coll.explain().aggregate(pipeline);
     // When $group is pushed down it will never be present as a stage in the 'winningPlan' of
     // $cursor.
-    assert.eq(expectedGroupCountInExplain, getAggPlanStages(explain, "GROUP").length, explain);
+    if (expectedGroupCountInExplain > 1) {
+        assert.eq(expectedGroupCountInExplain, getAggPlanStages(explain, "GROUP").length, explain);
+    } else {
+        assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
+    }
 
     let results = coll.aggregate(pipeline).toArray();
     assert.sameMembers(results, expectedResults);
@@ -234,6 +238,16 @@ assertResultsMatchWithAndWithoutPushdown(
 // enable $mergeObject or document id expression. As of now we don't have a way to produce valid
 // subdocuments from a $group stage.
 
+// Run a group with a supported $stdDevSamp accumultor and check that it gets pushed down.
+assertGroupPushdown(coll,
+                    [{$group: {_id: "$item", s: {$stdDevSamp: "$quantity"}}}],
+                    [
+                        {"_id": "a", "s": 2.1213203435596424},
+                        {"_id": "b", "s": 6.363961030678928},
+                        {"_id": "c", "s": null}
+                    ],
+                    1);
+
 // Run a simple group with $sum and object _id, check if it doesn't get pushed down.
 assertNoGroupPushdown(coll,
                       [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}],
@@ -251,7 +265,7 @@ assertGroupPushdown(coll,
                     [{"_id": "a"}],
                     1);
 
-// Make sure the DISTINCT_SCAN case where the sort is proided by an index still works and is not
+// Make sure the DISTINCT_SCAN case where the sort is provided by an index still works and is not
 // executed in SBE.
 assert.commandWorked(coll.createIndex({item: 1}));
 let explain = coll.explain().aggregate([{$sort: {item: 1}}, {$group: {_id: "$item"}}]);
@@ -294,6 +308,21 @@ assertGroupPushdown(coll,
 assert.commandWorked(coll.dropIndex({price: 1}));
 assert.commandWorked(coll.dropIndex({quantity: 1}));
 
+// Supported group and then a group with unsupported accumulators. JS accumulators are not
+// currently pushed down.
+explain = coll.explain().aggregate([
+    {$group: {_id: "$item", s: {$sum: "$price"}}},
+    {
+        $group: {
+            _id: "$quantity",
+            c: {$_internalJsReduce: {data: {k: "$word", v: "$val"}, eval: "null"}}
+        }
+    }
+]);
+
+assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
+assert(explain.stages[1].hasOwnProperty("$group"));
+
 // Another case of supported group and then a group with no supported accumulators. A boolean
 // expression may be translated to an internal expression $coerceToBool which is not supported by
 // SBE.
@@ -304,6 +333,11 @@ explain = coll.explain().aggregate([
 
 assert.neq(null, getAggPlanStage(explain, "GROUP"), explain);
 assert(explain.stages[1].hasOwnProperty("$group"));
+
+// A group with one supported and one unsupported accumulators.
+explain = coll.explain().aggregate(
+    [{$group: {_id: "$item", s: {$sum: "$price"}, stdev: {$stdDevPop: "$price"}}}]);
+assert.neq(null, getAggPlanStage(explain, "GROUP", true), explain);
 
 // $group cannot be pushed down to SBE when there's $match with $or due to an issue with
 // subplanning even though $group alone can be pushed down.
