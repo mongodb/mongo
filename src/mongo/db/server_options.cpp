@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 
@@ -43,6 +47,14 @@ ServerGlobalParams serverGlobalParams;
 
 std::string ServerGlobalParams::getPortSettingHelpText() {
     return str::stream() << "Specify port number - " << serverGlobalParams.port << " by default";
+}
+
+void ServerGlobalParams::FeatureCompatibility::logFCVWithContext(StringData context) const {
+    LOGV2_OPTIONS(5853300,
+                  {logv2::LogComponent::kReplication},
+                  "current featureCompatibilityVersion value",
+                  "featureCompatibilityVersion"_attr = multiversion::toString(_version.load()),
+                  "context"_attr = context);
 }
 
 }  // namespace mongo

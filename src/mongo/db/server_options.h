@@ -229,6 +229,13 @@ struct ServerGlobalParams {
             return _version.store(version);
         }
 
+        /**
+         * Logs the current FCV global state.
+         * context: the context in which this function was called, to differentiate logs (e.g.
+         * startup, log rotation).
+         */
+        void logFCVWithContext(StringData context) const;
+
     private:
         AtomicWord<FCV> _version{FCV::kUnsetDefaultLastLTSBehavior};
 

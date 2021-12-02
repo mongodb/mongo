@@ -421,7 +421,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     invariant(opCtx->lockState()->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
     if (!featureCompatibilityVersion) {
-        LOGV2(5853303, "featureCompatibilityVersion document missing at startup");
+        serverGlobalParams.featureCompatibility.logFCVWithContext("startup"_sd);
         return;
     }
 
@@ -448,10 +448,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
     FeatureCompatibilityVersion::updateMinWireVersion();
 
-    LOGV2(5853300,
-          "Intializing featureCompatibilityVersion at startup",
-          "featureCompatibilityVersion"_attr =
-              multiversion::toString(serverGlobalParams.featureCompatibility.getVersion()));
+    serverGlobalParams.featureCompatibility.logFCVWithContext("startup"_sd);
 
     // On startup, if the version is in an upgrading or downgrading state, print a warning.
     if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
