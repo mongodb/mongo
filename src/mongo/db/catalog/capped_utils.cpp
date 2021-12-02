@@ -50,6 +50,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/scopeguard.h"
@@ -267,6 +268,7 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     StringData shortSource = ns.coll();
 
     AutoGetCollection coll(opCtx, ns, MODE_X);
+    CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
