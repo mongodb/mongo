@@ -157,14 +157,25 @@ structs:
                 optional: true
                 unstable: false
             #
-            # An index build in progress appears with these two fields. They're required, but marked
+            # Depending on the values of includeIndexBuildInfo and includeBuildUUIDs, indexes may
+            # appear with a combination of these three fields. Specifically, if includeIndexBuildInfo 
+            # is set, completed index builds will appear with spec, and in-progress index builds will
+            # appear with both spec and indexBuildInfo, while if includeBuildUUIDs is set, in-progress
+            # index builds will appear with both spec and buildUUID. They're required, but marked
             # optional to permit the built index format using the fields above instead.
             #
+            indexBuildInfo:
+                description: "Contains information about the build. Included if includeIndexBuildInfo is set and the index is currently building."
+                type: object_owned
+                optional: true
+                unstable: true
             buildUUID:
+                description: "The UUID of a two-phase index build. Included if includeBuildUUIDs is set and the index is currently building."
                 type: uuid
                 optional: true
                 unstable: false
             spec:
+                description: "Contains the index spec. If includeIndexBuildInfo is set, always included. If includeBuildUUIDs is set, included if the index is currently building."
                 type: NewIndexSpec
                 optional: true
                 unstable: false
@@ -218,6 +229,11 @@ commands:
                 optional: true
                 unstable: false
             includeBuildUUIDs:
+                type: safeBool
+                optional: true
+                unstable: true
+            includeIndexBuildInfo:
+                description: "If true, the reply will include information about the build status for each index."
                 type: safeBool
                 optional: true
                 unstable: true

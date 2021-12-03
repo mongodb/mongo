@@ -38,17 +38,23 @@
 namespace mongo {
 
 /**
+ * Corresponds to flags passed to listIndexes which specify additional information to be returned
+ * for each index. BuildUUID = includeBuildUUIDs flag IndexBuildInfo = includeIndexBuildInfo flag
+ */
+enum ListIndexesInclude { Nothing, BuildUUID, IndexBuildInfo };
+
+/**
  * Return a list of the indexes on the given collection.
  */
 StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
-                                           boost::optional<bool> includeBuildUUIDs);
+                                           ListIndexesInclude additionalInclude);
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
-                                     boost::optional<bool> includeBuildUUIDs);
+                                     ListIndexesInclude additionalInclude);
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
-                                                 boost::optional<bool> includeBuildUUIDs);
+                                                 ListIndexesInclude additionalInclude);
 
 }  // namespace mongo

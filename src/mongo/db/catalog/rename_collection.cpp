@@ -765,7 +765,7 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                 originalCollectionOptions.removeField("uuid") == collectionOptions));
 
     auto currentIndexes =
-        listIndexesEmptyListIfMissing(opCtx, targetNs, false /* includeBuildUUIDs */);
+        listIndexesEmptyListIfMissing(opCtx, targetNs, ListIndexesInclude::Nothing);
 
     UnorderedFieldsBSONObjComparator comparator;
     uassert(

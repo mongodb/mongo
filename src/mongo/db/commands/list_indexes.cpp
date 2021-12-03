@@ -71,6 +71,13 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
                                                                const ListIndexes& cmd) {
     const auto& origNssOrUUID = cmd.getNamespaceOrUUID();
 
+    bool buildUUID = cmd.getIncludeBuildUUIDs().value_or(false);
+    bool indexBuildInfo = cmd.getIncludeIndexBuildInfo().value_or(false);
+    invariant(!(buildUUID && indexBuildInfo));
+    ListIndexesInclude additionalInclude = buildUUID
+        ? ListIndexesInclude::BuildUUID
+        : indexBuildInfo ? ListIndexesInclude::IndexBuildInfo : ListIndexesInclude::Nothing;
+
     // Since time-series collections don't have UUIDs, we skip the time-series lookup
     // if the target collection is specified as a UUID.
     if (const auto& origNss = origNssOrUUID.nss()) {
@@ -91,7 +98,7 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
             return std::make_pair(
                 timeseries::createTimeseriesIndexesFromBucketsIndexes(
                     *timeseriesOptions,
-                    listIndexesInLock(opCtx, coll, bucketsNss, cmd.getIncludeBuildUUIDs())),
+                    listIndexesInLock(opCtx, coll, bucketsNss, additionalInclude)),
                 bucketsNss.getTimeseriesViewNamespace());
         }
     }
@@ -103,18 +110,22 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
     uassert(
         ErrorCodes::NamespaceNotFound, str::stream() << "ns does not exist: " << nss.ns(), coll);
 
-    return std::make_pair(listIndexesInLock(opCtx, coll, nss, cmd.getIncludeBuildUUIDs()), nss);
+    return std::make_pair(listIndexesInLock(opCtx, coll, nss, additionalInclude), nss);
 }
 
 /**
  * Lists the indexes for a given collection.
  * If 'includeBuildUUIDs' is true, then the index build uuid is also returned alongside the index
  * spec for in-progress index builds only.
+ * If 'includeIndexBuildInfo' is true, then the index spec is returned in the spec subdocument, and
+ * index build info is returned alongside the index spec for in-progress index builds only.
+ * includeBuildUUIDs and includeIndexBuildInfo cannot both be set to true.
  *
  * Format:
  * {
  *   listIndexes: <collection name>,
  *   includeBuildUUIDs: <boolean>,
+ *   includeIndexBuildInfo: <boolean>
  * }
  *
  * Return format:
@@ -131,6 +142,19 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
  * {
  *   spec: <index spec>,
  *   buildUUID: <index build uuid>
+ * }
+ *
+ * If 'includeIndexBuildInfo' is true, then for in-progress indexes, <index> has the following
+ * format:
+ * {
+ *   spec: <index spec>,
+ *   indexBuildInfo: {
+ *     buildUUID: <index build uuid>
+ *   }
+ * }
+ * And for complete (not in-progress) indexes:
+ * {
+ *   spec: <index spec>
  * }
  */
 
@@ -192,7 +216,14 @@ public:
 
         ListIndexesReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-            auto indexSpecsWithNss = getIndexSpecsWithNamespaceString(opCtx, request());
+            const auto& cmd = request();
+            bool buildUUID = cmd.getIncludeBuildUUIDs().value_or(false);
+            bool indexBuildInfo = cmd.getIncludeIndexBuildInfo().value_or(false);
+            uassert(ErrorCodes::InvalidOptions,
+                    "The includeBuildUUIDs flag and includeBuildIndexInfo flag cannot both be set "
+                    "to true",
+                    !(buildUUID && indexBuildInfo));
+            auto indexSpecsWithNss = getIndexSpecsWithNamespaceString(opCtx, cmd);
             const auto& indexList = indexSpecsWithNss.first;
             const auto& nss = indexSpecsWithNss.second;
             return ListIndexesReply(_makeCursor(opCtx, indexList, nss));

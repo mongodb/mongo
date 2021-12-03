@@ -54,7 +54,7 @@ namespace mongo {
 
 StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& ns,
-                                           boost::optional<bool> includeBuildUUIDs) {
+                                           ListIndexesInclude additionalInclude) {
     AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, ns);
     auto nss = collection.getNss();
     if (!collection) {
@@ -63,13 +63,13 @@ StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
                                                             << collection.getNss().ns());
     }
     return StatusWith<std::list<BSONObj>>(
-        listIndexesInLock(opCtx, collection.getCollection(), nss, includeBuildUUIDs));
+        listIndexesInLock(opCtx, collection.getCollection(), nss, additionalInclude));
 }
 
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
-                                     boost::optional<bool> includeBuildUUIDs) {
+                                     ListIndexesInclude additionalInclude) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, nss);
 
@@ -79,34 +79,53 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
         collection->getAllIndexes(&indexNames);
 
         if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
-            indexSpecs.push_back(clustered_util::formatClusterKeyForListIndexes(
-                collection->getClusteredInfo().get()));
+            auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
+                collection->getClusteredInfo().get());
+            if (additionalInclude == ListIndexesInclude::IndexBuildInfo) {
+                indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
+            } else {
+                indexSpecs.push_back(clusteredSpec);
+            }
         }
         for (size_t i = 0; i < indexNames.size(); i++) {
-            if (!includeBuildUUIDs.value_or(false) || collection->isIndexReady(indexNames[i])) {
-                indexSpecs.push_back(collection->getIndexSpec(indexNames[i]));
-                continue;
-            }
+            auto spec = collection->getIndexSpec(indexNames[i]);
+            auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
             // The durable catalog will not have a build UUID for the given index name if it was
-            // not being built with two-phase.
-            const auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
-            if (!durableBuildUUID) {
-                indexSpecs.push_back(collection->getIndexSpec(indexNames[i]));
-                continue;
+            // not being built with two-phase -- in this case we have no relevant index build info
+            bool inProgressInformationExists =
+                !collection->isIndexReady(indexNames[i]) && durableBuildUUID;
+            switch (additionalInclude) {
+                case ListIndexesInclude::Nothing:
+                    indexSpecs.push_back(spec);
+                    break;
+                case ListIndexesInclude::BuildUUID:
+                    if (inProgressInformationExists) {
+                        indexSpecs.push_back(
+                            BSON("spec"_sd << spec << "buildUUID"_sd << *durableBuildUUID));
+                    } else {
+                        indexSpecs.push_back(spec);
+                    }
+                    break;
+                case ListIndexesInclude::IndexBuildInfo:
+                    if (inProgressInformationExists) {
+                        indexSpecs.push_back(BSON("spec"_sd
+                                                  << spec << "indexBuildInfo"_sd
+                                                  << BSON("buildUUID"_sd << *durableBuildUUID)));
+                    } else {
+                        indexSpecs.push_back(BSON("spec"_sd << spec));
+                    }
+                    break;
+                default:
+                    MONGO_UNREACHABLE;
             }
-
-            BSONObjBuilder builder;
-            builder.append("spec"_sd, collection->getIndexSpec(indexNames[i]));
-            durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
-            indexSpecs.push_back(builder.obj());
         }
         return indexSpecs;
     });
 }
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
-                                                 boost::optional<bool> includeBuildUUIDs) {
-    auto listStatus = listIndexes(opCtx, nss, includeBuildUUIDs);
+                                                 ListIndexesInclude additionalInclude) {
+    auto listStatus = listIndexes(opCtx, nss, additionalInclude);
     return listStatus.isOK() ? listStatus.getValue() : std::list<BSONObj>();
 }
 }  // namespace mongo

@@ -55,7 +55,8 @@ NonShardServerProcessInterface::attachCursorSourceToPipeline(
 std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                                  const NamespaceString& ns,
                                                                  bool includeBuildUUIDs) {
-    return listIndexesEmptyListIfMissing(opCtx, ns, includeBuildUUIDs);
+    return listIndexesEmptyListIfMissing(
+        opCtx, ns, includeBuildUUIDs ? ListIndexesInclude::BuildUUID : ListIndexesInclude::Nothing);
 }
 
 std::pair<std::vector<FieldPath>, bool>
