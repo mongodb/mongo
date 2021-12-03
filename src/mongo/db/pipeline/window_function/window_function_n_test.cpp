@@ -36,7 +36,6 @@
 
 namespace mongo {
 namespace {
-// TODO SERVER-57886: Add test cases for $top/$bottom/$topN/$bottomN window functions.
 class WindowFunctionMinMaxNTest : public AggregationContextFixture {
 public:
     static constexpr auto kNarg = 3LL;

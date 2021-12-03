@@ -45,37 +45,64 @@
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
+#include "mongo/db/pipeline/window_function/window_function_n_traits.h"
+#include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
 
 namespace mongo::window_function {
 using namespace std::string_literals;
+using namespace window_function_n_traits;
 REGISTER_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
 REGISTER_WINDOW_FUNCTION(first, ExpressionFirst::parse);
 REGISTER_WINDOW_FUNCTION(last, ExpressionLast::parse);
 
+// TODO SERVER-59327 Consider moving ExpressionN implementations and register calls into its own cpp
+// file.
 // Register macros for the various accumulators/expressions in this file. Note that we check
 // 'isEnabledAndIgnoreFCV()' because the feature flag is a property set at startup, while FCV can
 // change while the server is running.
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     minN,
-    ExpressionN<WindowFunctionMinN>::parse,
+    (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     maxN,
-    ExpressionN<WindowFunctionMaxN>::parse,
+    (ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     firstN,
-    ExpressionN<WindowFunctionFirstN>::parse,
+    (ExpressionN<WindowFunctionFirstN, AccumulatorFirstN>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     lastN,
-    ExpressionN<WindowFunctionLastN>::parse,
+    (ExpressionN<WindowFunctionLastN, AccumulatorLastN>::parse),
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
+    topN,
+    (ExpressionN<WindowFunctionTopN, AccumulatorTopBottomN<TopBottomSense::kTop, false>>::parse),
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
+    bottomN,
+    (ExpressionN<WindowFunctionBottomN,
+                 AccumulatorTopBottomN<TopBottomSense::kBottom, false>>::parse),
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
+    top,
+    (ExpressionN<WindowFunctionTop, AccumulatorTopBottomN<TopBottomSense::kTop, true>>::parse),
+    feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
+    feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
+REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
+    bottom,
+    (ExpressionN<WindowFunctionBottom,
+                 AccumulatorTopBottomN<TopBottomSense::kBottom, true>>::parse),
     feature_flags::gFeatureFlagExactTopNAccumulator.getVersion(),
     feature_flags::gFeatureFlagExactTopNAccumulator.isEnabledAndIgnoreFCV());
 
@@ -254,14 +281,11 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
     }
 }
 
-template <typename WindowFunctionN>
-Value ExpressionN<WindowFunctionN>::serialize(
+template <typename WindowFunctionN, typename AccumulatorNType>
+Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    MutableDocument result;
-
-    MutableDocument exprSpec;
-    AccumulatorN::serializeHelper(nExpr, _input, static_cast<bool>(explain), exprSpec);
-    result[_accumulatorName] = exprSpec.freezeToValue();
+    auto acc = buildAccumulatorOnly();
+    MutableDocument result(acc->serialize(nExpr, _input, static_cast<bool>(explain)));
 
     MutableDocument windowField;
     _bounds.serialize(windowField);
@@ -269,42 +293,61 @@ Value ExpressionN<WindowFunctionN>::serialize(
     return result.freezeToValue();
 }
 
-template <typename WindowFunctionN>
-boost::intrusive_ptr<AccumulatorState> ExpressionN<WindowFunctionN>::buildAccumulatorOnly() const {
+template <typename WindowFunctionN, typename AccumulatorNType>
+boost::intrusive_ptr<AccumulatorState>
+ExpressionN<WindowFunctionN, AccumulatorNType>::buildAccumulatorOnly() const {
+    static_assert(isWindowFunctionN<WindowFunctionN>::value,
+                  "tried to use ExpressionN with an unsupported window function");
     boost::intrusive_ptr<AccumulatorState> acc;
-    if constexpr (std::is_same_v<WindowFunctionN, WindowFunctionMinN>) {
-        acc = AccumulatorMinN::create(_expCtx);
-    } else if constexpr (std::is_same_v<WindowFunctionN, WindowFunctionMaxN>) {
-        acc = AccumulatorMaxN::create(_expCtx);
-    } else if constexpr (std::is_same_v<WindowFunctionN, WindowFunctionFirstN>) {
-        acc = AccumulatorFirstN::create(_expCtx);
-    } else if constexpr (std::is_same_v<WindowFunctionN, WindowFunctionLastN>) {
-        acc = AccumulatorLastN::create(_expCtx);
+    if constexpr (!needsSortBy<WindowFunctionN>::value) {
+        tassert(5788606,
+                str::stream() << AccumulatorNType::getName()
+                              << " should not have recieved a 'sortBy' but did!",
+                !sortPattern);
+
+        acc = AccumulatorNType::create(_expCtx);
     } else {
-        tasserted(5788401, "Attempting to create accumulator of unknown type");
+        tassert(5788601,
+                str::stream() << AccumulatorNType::getName()
+                              << " should have recieved a 'sortBy' but did not!",
+                sortPattern);
+        acc = AccumulatorNType::create(_expCtx, *sortPattern);
     }
 
-    // Initialize 'n' for our accumulator. Note that 'n' must be a constant.
+    // Initialize 'n' for our accumulator. At this point we don't have any user defined variables
+    // so you physically can't reference the partition key in 'n'. It will evaluate to MISSING and
+    // fail validation done in startNewGroup().
     auto nVal = nExpr->evaluate({}, &_expCtx->variables);
-    uassert(5788501,
-            str::stream() << "Expression for 'n' " << nExpr->serialize(false).toString()
-                          << " must evaluate to a numeric constant when used in $setWindowFields",
-            nVal.numeric());
     acc->startNewGroup(nVal);
     return acc;
 }
 
-template <typename WindowFunctionN>
-std::unique_ptr<WindowFunctionState> ExpressionN<WindowFunctionN>::buildRemovable() const {
-    return WindowFunctionN::create(
-        _expCtx, AccumulatorN::validateN(nExpr->evaluate({}, &_expCtx->variables)));
+template <typename WindowFunctionN, typename AccumulatorNType>
+std::unique_ptr<WindowFunctionState>
+ExpressionN<WindowFunctionN, AccumulatorNType>::buildRemovable() const {
+    if constexpr (needsSortBy<WindowFunctionN>::value) {
+        tassert(5788602,
+                str::stream() << AccumulatorNType::getName()
+                              << " should have recieved a 'sortBy' but did not!",
+                sortPattern);
+        return WindowFunctionN::create(
+            _expCtx,
+            *sortPattern,
+            AccumulatorN::validateN(nExpr->evaluate({}, &_expCtx->variables)));
+    } else {
+        return WindowFunctionN::create(
+            _expCtx, AccumulatorN::validateN(nExpr->evaluate({}, &_expCtx->variables)));
+    }
 }
 
-template <typename WindowFunctionN>
-boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN>::parse(
+template <typename WindowFunctionN, typename AccumulatorNType>
+boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN, AccumulatorNType>::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
-    auto name = WindowFunctionN::getName();
+    auto name = AccumulatorNType::getName();
 
+    // This is for the sortBy to this specific window function if we are parsing
+    // top/bottom/topN/bottomN, not the sortBy parameter to $setWindowFields.
+    boost::optional<SortPattern> innerSortPattern;
     boost::intrusive_ptr<::mongo::Expression> nExpr;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;
     boost::optional<WindowBounds> bounds;
@@ -318,6 +361,17 @@ boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN>::parse(
             auto accExpr = WindowFunctionN::parse(expCtx, elem, expCtx->variablesParseState);
             nExpr = std::move(accExpr.initializer);
             outputExpr = std::move(accExpr.argument);
+            // For top/bottom/topN/bottomN we also need a sortPattern. It was already validated when
+            // we called parse, so here we just grab it again for constructing future instances.
+            if constexpr (needsSortBy<WindowFunctionN>::value) {
+                auto innerSortByBson = elem[AccumulatorN::kFieldNameSortBy];
+                tassert(5788604,
+                        str::stream()
+                            << "expected 'sortBy' to already be an object in the arguments to "
+                            << AccumulatorNType::getName(),
+                        innerSortByBson.type() == BSONType::Object);
+                innerSortPattern.emplace(innerSortByBson.embeddedObject(), expCtx);
+            }
         } else if (fieldName == kWindowArg) {
             uassert(ErrorCodes::FailedToParse,
                     "'window' field must be an object",
@@ -339,8 +393,13 @@ boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN>::parse(
     tassert(5788403,
             str::stream() << "missing accumulator specification for " << name,
             nExpr && outputExpr);
-    return make_intrusive<ExpressionN<WindowFunctionN>>(
-        expCtx, std::move(outputExpr), name, *bounds, std::move(nExpr));
+    return make_intrusive<ExpressionN<WindowFunctionN, AccumulatorNType>>(
+        expCtx,
+        std::move(outputExpr),
+        std::string(name),
+        *bounds,
+        std::move(nExpr),
+        std::move(innerSortPattern));
 }
 
 MONGO_INITIALIZER_GROUP(BeginWindowFunctionRegistration,

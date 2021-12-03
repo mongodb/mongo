@@ -145,9 +145,6 @@ struct AccumulationExpression {
     // An expression evaluated once per input document, and passed to AccumulatorState::process.
     boost::intrusive_ptr<Expression> argument;
 
-    // Constructs an AccumulatorState to do actual accumulation.
-    boost::intrusive_ptr<AccumulatorState> makeAccumulator() const;
-
     // A no argument function object that can be called to create an AccumulatorState.
     const AccumulatorState::Factory factory;
 

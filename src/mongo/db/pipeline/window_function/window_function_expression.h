@@ -807,9 +807,10 @@ public:
 /**
  * Describes a window function expression that accepts 'n' as a parameter. Templated by
  * 'WindowFunctionN', which corresponds to the 'WindowFunctionState' removable type associated
- * with this expression.
+ * with this expression. It is also templated by AccumulatorType which is the AccumulatorState
+ * associated with this expression.
  */
-template <typename WindowFunctionN>
+template <typename WindowFunctionN, typename AcumulatorNType>
 class ExpressionN : public Expression {
 public:
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
@@ -820,9 +821,11 @@ public:
                 boost::intrusive_ptr<::mongo::Expression> input,
                 std::string name,
                 WindowBounds bounds,
-                boost::intrusive_ptr<::mongo::Expression> nExpr)
+                boost::intrusive_ptr<::mongo::Expression> nExpr,
+                boost::optional<SortPattern> sortPattern)
         : Expression(expCtx, std::move(name), std::move(input), std::move(bounds)),
-          nExpr(std::move(nExpr)) {}
+          nExpr(std::move(nExpr)),
+          sortPattern(std::move(sortPattern)) {}
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
@@ -830,6 +833,8 @@ public:
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final;
 
+    // TODO SERVER-59327 make these members private
     boost::intrusive_ptr<::mongo::Expression> nExpr;
+    boost::optional<SortPattern> sortPattern;
 };
 }  // namespace mongo::window_function

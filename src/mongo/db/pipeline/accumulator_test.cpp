@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
@@ -1066,6 +1067,400 @@ TEST(Accumulators, TopBottomSingle) {
         throw;
     }
     testSingle<TopBottomSense::kTop>(bottomDescTopAscCases, expCtx.get(), ascSort);
+}
+
+template <typename T>
+struct TopBottomNRemoveTest : public AggregationContextFixture {
+    void init(boost::optional<int> n, BSONObj sortBy) {
+        auto expCtx = getExpCtxRaw();
+        expCtx->setCollator(std::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kToLowerString));
+        auto accState = T::create(expCtx, sortBy, /* isRemovable */ true);
+        _acc = boost::dynamic_pointer_cast<T>(accState);
+        _acc->startNewGroup(Value(n.value_or(1)));
+    }
+
+    void add(int sortKey, int output) {
+        auto v =
+            Value(BSON(AccumulatorN::kFieldNameOutput
+                       << output << AccumulatorN::kFieldNameSortFields << BSON_ARRAY(sortKey)));
+        _acc->process(v, false);
+        _q.push(v);
+    }
+
+    void add(const char* sortKey, int output) {
+        auto v =
+            Value(BSON(AccumulatorN::kFieldNameOutput
+                       << output << AccumulatorN::kFieldNameSortFields << BSON_ARRAY(sortKey)));
+        _acc->process(v, false);
+        _q.push(v);
+    }
+
+    void remove() {
+        _acc->remove(_q.front());
+        _q.pop();
+    }
+
+    void assertExpected(std::vector<Value> vec) {
+        ASSERT_VALUE_EQ(Value(vec), _acc->getValue(false));
+    }
+
+    void assertExpectedSingle(int expected) {
+        ASSERT_VALUE_EQ(Value(expected), _acc->getValue(false));
+    }
+
+    void assertNull() {
+        ASSERT_VALUE_EQ(Value(BSONNULL), _acc->getValue(false));
+    }
+
+    intrusive_ptr<T> _acc = nullptr;
+    std::queue<Value> _q;
+};
+
+using TopNRemoveTest = TopBottomNRemoveTest<AccumulatorTopBottomN<TopBottomSense::kTop, false>>;
+TEST_F(TopNRemoveTest, TopNRemove) {
+    // Test accumulator {$topN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    // Basic remove test.
+    add(1, 1);
+    add(2, 2);
+    assertExpected({Value(1), Value(2)});
+
+    remove();  // 1, 1
+    assertExpected({Value(2)});
+
+    // Add some elements with equal keys.
+    add(2, 3);
+    add(2, 4);
+    add(3, 5);
+    add(1, 1);
+    assertExpected({Value(1), Value(2), Value(3)});  // 4, 5 not shown.
+
+    remove();                                        // 2, 2
+    assertExpected({Value(1), Value(3), Value(4)});  // 5 not shown.
+
+    // Add value back but its at the end of the queue so it's not included in results.
+    add(2, 2);
+    assertExpected({Value(1), Value(3), Value(4)});  // 2, 5 not shown.
+
+    remove();                                        // 2, 3
+    assertExpected({Value(1), Value(4), Value(2)});  // 5 not shown.
+
+    remove();  // 2, 4
+    assertExpected({Value(1), Value(2), Value(5)});
+
+    // Add value after and then pop front value.
+    add(3, 6);
+    assertExpected({Value(1), Value(2), Value(5)});  // 6 not shown.
+
+    remove();  // 3, 5
+    assertExpected({Value(1), Value(2), Value(6)});
+    remove();  // 1, 1
+    assertExpected({Value(2), Value(6)});
+    remove();  // 2, 2
+    assertExpected({Value(6)});
+    remove();  // Cleared.
+    assertExpected({});
+}
+
+TEST_F(TopNRemoveTest, TopNRemoveRoundRobin) {
+    // Test accumulator {$topN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    // Mostly round robin insert and remove.
+    add(1, 1);
+    add(1, 2);
+    add(2, 4);
+    add(3, 7);
+    add(1, 3);
+    add(2, 5);
+    add(3, 8);
+    add(2, 6);
+    add(3, 9);
+
+    // 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9]
+    assertExpected({Value(1), Value(2), Value(3)});
+    remove();
+    // 1: [2, 3], 2: [4, 5, 6], 3: [7, 8, 9]
+    assertExpected({Value(2), Value(3), Value(4)});
+    remove();
+    // 1: [3], 2: [4, 5, 6], 3: [7, 8, 9]
+    assertExpected({Value(3), Value(4), Value(5)});
+    remove();
+    // 1: [3], 2: [5, 6], 3: [7, 8, 9]
+    assertExpected({Value(3), Value(5), Value(6)});
+    remove();
+    // 1: [3], 2: [5, 6], 3: [8, 9]
+    assertExpected({Value(3), Value(5), Value(6)});
+    remove();
+    // 2: [5, 6], 3: [8, 9]
+    assertExpected({Value(5), Value(6), Value(8)});
+    remove();
+    // 2: [6], 3: [8, 9]
+    assertExpected({Value(6), Value(8), Value(9)});
+    remove();
+    // 2: [6], 3: [9]
+    assertExpected({Value(6), Value(9)});
+}
+
+TEST_F(TopNRemoveTest, TopNRemoveCollator) {
+    // Test accumulator {$topN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    add("FOO", 1);
+    add("foo", 2);
+    add("fOo", 3);
+    assertExpected({Value(1), Value(2), Value(3)});
+    remove();
+    assertExpected({Value(2), Value(3)});
+    add("foO", 4);
+    assertExpected({Value(2), Value(3), Value(4)});
+    remove();
+    assertExpected({Value(3), Value(4)});
+    remove();
+    assertExpected({Value(4)});
+}
+
+using BottomNRemoveTest =
+    TopBottomNRemoveTest<AccumulatorTopBottomN<TopBottomSense::kBottom, false>>;
+TEST_F(BottomNRemoveTest, BottomNRemove) {
+    // Test accumulator {$bottomN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    // Mostly round robin insert and remove.
+    add(3, 1);
+    add(3, 2);
+    add(2, 4);
+    add(1, 7);
+    add(3, 3);
+    add(2, 5);
+    add(1, 8);
+    add(2, 6);
+    add(1, 9);
+
+    // 1: [7, 8, 9], 2: [4, 5, 6], 3: [1, 2, 3]
+    assertExpected({Value(1), Value(2), Value(3)});
+    remove();
+    // 1: [7, 8, 9], 2: [4, 5, 6], 3: [2, 3]
+    assertExpected({Value(6), Value(2), Value(3)});
+    remove();
+    // 1: [7, 8, 9], 2: [4, 5, 6], 3: [3]
+    assertExpected({Value(5), Value(6), Value(3)});
+    remove();
+    // 1: [7, 8, 9], 2: [5, 6], 3: [3]
+    assertExpected({Value(5), Value(6), Value(3)});
+    remove();
+    // 1: [8, 9], 2: [5, 6], 3: [3]
+    assertExpected({Value(5), Value(6), Value(3)});
+    remove();
+    // 1: [8, 9], 2: [5, 6]
+    assertExpected({Value(9), Value(5), Value(6)});
+    remove();
+    // 1: [8, 9], 2: [6]
+    assertExpected({Value(8), Value(9), Value(6)});
+    remove();
+    // 2: [9], 3: [6]
+    assertExpected({Value(9), Value(6)});
+    remove();
+    // 2: [9]
+    assertExpected({Value(9)});
+    remove();  // Empty.
+    assertExpected({});
+}
+
+TEST_F(BottomNRemoveTest, BottomNRemoveDesc) {
+    // Test accumulator {$bottomN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << -1));
+
+    // Mostly round robin insert and remove.
+    add(1, 1);
+    add(1, 2);
+    add(2, 4);
+    add(3, 7);
+    add(1, 3);
+    add(2, 5);
+    add(3, 8);
+    add(2, 6);
+    add(3, 9);
+
+    // 3: [7, 8, 9], 2: [4, 5, 6], 1: [1, 2, 3]
+    assertExpected({Value(1), Value(2), Value(3)});
+    remove();
+    // 3: [7, 8, 9], 2: [4, 5, 6], 1: [2, 3]
+    assertExpected({Value(6), Value(2), Value(3)});
+    remove();
+    // 3: [7, 8, 9], 2: [4, 5, 6], 1: [3]
+    assertExpected({Value(5), Value(6), Value(3)});
+    remove();
+    // 3: [7, 8, 9], 2: [5, 6], 1: [3]
+    assertExpected({Value(5), Value(6), Value(3)});
+    remove();
+    // 3: [8, 9], 2: [5, 6], 1: [3]
+    assertExpected({Value(5), Value(6), Value(3)});
+    remove();
+    // 3: [8, 9], 2: [5, 6]
+    assertExpected({Value(9), Value(5), Value(6)});
+    remove();
+    // 3: [8, 9], 2: [6]
+    assertExpected({Value(8), Value(9), Value(6)});
+    remove();
+    // 2: [9], 3: [6]
+    assertExpected({Value(9), Value(6)});
+    remove();
+    // 2: [9]
+    assertExpected({Value(9)});
+    remove();  // Empty.
+    assertExpected({});
+}
+
+TEST_F(BottomNRemoveTest, BottomNAddRemove) {
+    // Test accumulator {$bottomN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    assertExpected({});
+    add(1, 1);
+    assertExpected({Value(1)});
+    add(1, 2);
+    add(1, 3);
+    remove();
+    assertExpected({Value(2), Value(3)});
+}
+
+TEST_F(BottomNRemoveTest, BottomNRemoveCollator) {
+    // Test accumulator {$bottomN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    add("FOO", 1);
+    add("foo", 2);
+    add("fOo", 3);
+    assertExpected({Value(1), Value(2), Value(3)});
+    remove();
+    assertExpected({Value(2), Value(3)});
+    add("foO", 4);
+    assertExpected({Value(2), Value(3), Value(4)});
+    remove();
+    assertExpected({Value(3), Value(4)});
+    remove();
+    assertExpected({Value(4)});
+}
+
+using TopRemoveTest = TopBottomNRemoveTest<AccumulatorTopBottomN<TopBottomSense::kTop, true>>;
+TEST_F(TopRemoveTest, TopRemove) {
+    // Test accumulator {$top: {output: "$output", sortBy: {sortKey: 1}}}
+    init(boost::none, BSON("sortKey" << 1));
+
+    // Mostly round robin insert and remove.
+    add(1, 1);
+    add(1, 2);
+    add(2, 4);
+    add(3, 7);
+    add(1, 3);
+    add(2, 5);
+    add(3, 8);
+    add(2, 6);
+    add(3, 9);
+
+    // 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9]
+    assertExpectedSingle(1);
+    remove();
+    // 1: [2, 3], 2: [4, 5, 6], 3: [7, 8, 9]
+    assertExpectedSingle(2);
+    remove();
+    // 1: [3], 2: [4, 5, 6], 3: [7, 8, 9]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [3], 2: [5, 6], 3: [7, 8, 9]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [3], 2: [5, 6], 3: [8, 9]
+    assertExpectedSingle(3);
+    remove();
+    // 2: [5, 6], 3: [8, 9]
+    assertExpectedSingle(5);
+    remove();
+    // 2: [6], 3: [8, 9]
+    assertExpectedSingle(6);
+    remove();
+    // 2: [6], 3: [9]
+    assertExpectedSingle(6);
+    remove();
+    // 2: [9]
+    assertExpectedSingle(9);
+    remove();
+    assertNull();
+}
+
+TEST_F(TopRemoveTest, TopAddRemove) {
+    // Test accumulator {$top: {output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+
+    assertNull();
+    add(1, 1);
+    assertExpectedSingle(1);
+    add(1, 2);
+    add(1, 3);
+    remove();
+    assertExpectedSingle(2);
+}
+
+using BottomRemoveTest = TopBottomNRemoveTest<AccumulatorTopBottomN<TopBottomSense::kBottom, true>>;
+TEST_F(BottomRemoveTest, BottomRemove) {
+    // Test accumulator {$bottom: {output: "$output", sortBy: {sortKey: 1}}}
+    init(boost::none, BSON("sortKey" << 1));
+
+    // Mostly round robin insert and remove.
+    add(3, 1);
+    add(3, 2);
+    add(2, 4);
+    add(1, 7);
+    add(3, 3);
+    add(2, 5);
+    add(1, 8);
+    add(2, 6);
+    add(1, 9);
+
+    // 1: [7, 8, 9], 2: [4, 5, 6], 3: [1, 2, 3]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [7, 8, 9], 2: [4, 5, 6], 3: [2, 3]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [7, 8, 9], 2: [4, 5, 6], 3: [3]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [7, 8, 9], 2: [5, 6], 3: [3]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [8, 9], 2: [5, 6], 3: [3]
+    assertExpectedSingle(3);
+    remove();
+    // 1: [8, 9], 2: [5, 6]
+    assertExpectedSingle(6);
+    remove();
+    // 1: [8, 9], 2: [6]
+    assertExpectedSingle(6);
+    remove();
+    // 2: [9], 3: [6]
+    assertExpectedSingle(6);
+    remove();
+    // 2: [9]
+    assertExpectedSingle(9);
+    remove();  // Empty.
+    assertNull();
+}
+
+TEST_F(BottomRemoveTest, BottomAddRemove) {
+    // Test accumulator {$bottom: {output: "$output", sortBy: {sortKey: 1}}}
+    init(boost::none, BSON("sortKey" << 1));
+
+    // Concurrent add/delete.
+    add(1, 1);
+    assertExpectedSingle(1);
+    add(1, 2);
+    add(1, 3);
+    remove();
+    assertExpectedSingle(3);
 }
 
 TEST(Accumulators, Rank) {

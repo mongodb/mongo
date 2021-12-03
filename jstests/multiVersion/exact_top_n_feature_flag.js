@@ -81,9 +81,7 @@ function runTest(downgradeVersion) {
         }
 
         // Window functions.
-        // TODO SERVER-57886 Change 'false' to 'true' below once $top/$topN/$bottom/$bottomN are
-        //  available as window functions.
-        for (const wfExpr of buildOperatorList(false)) {
+        for (const wfExpr of buildOperatorList(true)) {
             const wfArg = Object.assign({window: {documents: [-1, 1]}}, wfExpr);
             createView(
                 [{

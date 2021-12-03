@@ -258,10 +258,13 @@ public:
     // pair of (sortKey, output) for storing in AccumulatorTopBottomN's internal multimap.
     using KeyOutPair = std::pair<Value, Value>;
 
-    AccumulatorTopBottomN(ExpressionContext* expCtx, SortPattern sp);
+    AccumulatorTopBottomN(ExpressionContext* expCtx, SortPattern sp, bool isRemovable);
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         BSONObj sortPattern);
+                                                         BSONObj sortPattern,
+                                                         bool isRemovable = false);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
+                                                         SortPattern sortPattern);
 
     /**
      * Verifies that 'elem' is an object, delegates argument parsing to 'accumulatorNParseArgs',
@@ -290,7 +293,10 @@ public:
 
     void processInternal(const Value& input, bool merging) final;
 
-    Value getValue(bool toBeMerged) final;
+    Value getValueConst(bool toBeMerged) const;
+    Value getValue(bool toBeMerged) final {
+        return getValueConst(toBeMerged);
+    };
 
     const char* getOpName() const final;
 
@@ -304,9 +310,20 @@ public:
         return true;
     }
 
+    /**
+     * Used for removable version of this operator as a window function.
+     */
+    void remove(const Value& val);
+
 private:
-    // top/bottom/topN/bottomN do NOT ignore null values.
+    // top/bottom/topN/bottomN do NOT ignore null values, but MISSING values will be promoted to
+    // null so the users see them.
     void _processValue(const Value& val);
+
+    std::pair<Value, Value> _genKeyOutPair(const Value& val);
+
+    // Set to true if we are allowed to call remove().
+    bool _isRemovable;
 
     SortPattern _sortPattern;
     // internalSortPattern needs to be computed based on _sortPattern before the following can be
