@@ -40,34 +40,17 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
-
-/**
- * If the specified status is not OK logs a warning and throws a DBException corresponding to the
- * specified status.
- */
-void uassertStatusOKWithWarning(const Status& status) {
-    if (!status.isOK()) {
-        LOGV2_WARNING(23777,
-                      "Chunk move failed with {error}",
-                      "Error while doing moveChunk",
-                      "error"_attr = redact(status));
-        uassertStatusOK(status);
-    }
-}
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // Note: Even though we're setting UNSET here,
@@ -77,14 +60,6 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // in the ReplSetConfig.
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kWriteConcernTimeoutSharding);
-
-// Tests can pause and resume moveChunk's progress at each step by enabling/disabling each failpoint
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
 
 class MoveChunkCommand : public BasicCommand {
 public:
@@ -167,17 +142,15 @@ public:
                             status = Status::OK();
                         } catch (const DBException& e) {
                             status = e.toStatus();
+                            LOGV2_WARNING(23777,
+                                          "Chunk move failed with {error}",
+                                          "Error while doing moveChunk",
+                                          "error"_attr = redact(status));
+
                             if (status.code() == ErrorCodes::LockTimeout) {
                                 ShardingStatistics::get(opCtx)
                                     .countDonorMoveChunkLockTimeout.addAndFetch(1);
                             }
-                        } catch (const std::exception& e) {
-                            scopedMigrationLocal.signalComplete(
-                                {ErrorCodes::InternalError,
-                                 str::stream()
-                                     << "Severe error occurred while running moveChunk command: "
-                                     << e.what()});
-                            throw;
                         }
 
                         scopedMigrationLocal.signalComplete(status);
@@ -214,9 +187,10 @@ public:
 
 private:
     static void _runImpl(OperationContext* opCtx, const MoveChunkRequest& moveChunkRequest) {
-        const auto writeConcernForRangeDeleter =
-            uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
-                opCtx, moveChunkRequest.getSecondaryThrottle()));
+        if (moveChunkRequest.getFromShardId() == moveChunkRequest.getToShardId()) {
+            // TODO: SERVER-46669 handle wait for delete.
+            return;
+        }
 
         // Resolve the donor and recipient shards and their connection string
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -232,47 +206,14 @@ private:
                 opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         }());
 
-        std::string unusedErrMsg;
-        MoveTimingHelper moveTimingHelper(opCtx,
-                                          "from",
-                                          moveChunkRequest.getNss().ns(),
-                                          moveChunkRequest.getMinKey(),
-                                          moveChunkRequest.getMaxKey(),
-                                          6,  // Total number of steps
-                                          &unusedErrMsg,
-                                          moveChunkRequest.getToShardId(),
-                                          moveChunkRequest.getFromShardId());
-
-        moveTimingHelper.done(1);
-        moveChunkHangAtStep1.pauseWhileSet();
-
-        if (moveChunkRequest.getFromShardId() == moveChunkRequest.getToShardId()) {
-            // TODO: SERVER-46669 handle wait for delete.
-            return;
-        }
-
         MigrationSourceManager migrationSourceManager(
             opCtx, moveChunkRequest, donorConnStr, recipientHost);
 
-        moveTimingHelper.done(2);
-        moveChunkHangAtStep2.pauseWhileSet();
-
-        uassertStatusOKWithWarning(migrationSourceManager.startClone());
-        moveTimingHelper.done(3);
-        moveChunkHangAtStep3.pauseWhileSet();
-
-        uassertStatusOKWithWarning(migrationSourceManager.awaitToCatchUp());
-        moveTimingHelper.done(4);
-        moveChunkHangAtStep4.pauseWhileSet();
-
-        uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection());
-        uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient());
-        moveTimingHelper.done(5);
-        moveChunkHangAtStep5.pauseWhileSet();
-
-        uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig());
-        moveTimingHelper.done(6);
-        moveChunkHangAtStep6.pauseWhileSet();
+        migrationSourceManager.startClone();
+        migrationSourceManager.awaitToCatchUp();
+        migrationSourceManager.enterCriticalSection();
+        migrationSourceManager.commitChunkOnRecipient();
+        migrationSourceManager.commitChunkMetadataOnConfig();
     }
 
 private:

@@ -34,6 +34,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_coordinator.h"
+#include "mongo/db/s/move_timing_helper.h"
 #include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/util/timer.h"
 
@@ -103,7 +104,7 @@ public:
      * Expected state: kCreated
      * Resulting state: kCloning on success, kDone on failure
      */
-    Status startClone();
+    void startClone();
 
     /**
      * Waits for the cloning to catch up sufficiently so we won't have to stay in the critical
@@ -113,7 +114,7 @@ public:
      * Expected state: kCloning
      * Resulting state: kCloneCaughtUp on success, kDone on failure
      */
-    Status awaitToCatchUp();
+    void awaitToCatchUp();
 
     /**
      * Waits for the active clone operation to catch up and enters critical section. Once this call
@@ -124,7 +125,7 @@ public:
      * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
-    Status enterCriticalSection();
+    void enterCriticalSection();
 
     /**
      * Tells the recipient of the chunk to commit the chunk contents, which it received.
@@ -132,7 +133,7 @@ public:
      * Expected state: kCriticalSection
      * Resulting state: kCloneCompleted on success, kDone on failure
      */
-    Status commitChunkOnRecipient();
+    void commitChunkOnRecipient();
 
     /**
      * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
@@ -146,7 +147,7 @@ public:
      * Expected state: kCloneCompleted
      * Resulting state: kDone
      */
-    Status commitChunkMetadataOnConfig();
+    void commitChunkMetadataOnConfig();
 
     /**
      * Aborts the migration after observing a concurrent index operation by marking its operation
@@ -235,6 +236,9 @@ private:
     // Times the entire moveChunk operation
     const Timer _entireOpTimer;
 
+    // Utility for constructing detailed logs for the steps of the chunk migration
+    MoveTimingHelper _moveTimingHelper;
+
     // Starts counting from creation time and is used to time various parts from the lifetime of the
     // move chunk sequence
     Timer _cloneAndCommitTimer;
@@ -266,7 +270,7 @@ private:
     boost::optional<CollectionCriticalSection> _critSec;
 
     // The statistics about a chunk migration to be included in moveChunk.commit
-    BSONObj _recipientCloneCounts;
+    boost::optional<BSONObj> _recipientCloneCounts;
 
     // Optional future that is populated if the migration succeeds and range deletion is scheduled
     // on this node. The future is set when the range deletion completes. Used if the moveChunk was

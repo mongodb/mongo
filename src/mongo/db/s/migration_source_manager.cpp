@@ -83,6 +83,8 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kWriteConcernTimeoutMigration);
 
+std::string kEmptyErrMsgForMoveTimingHelper;
+
 /**
  * Best-effort attempt to ensure the recipient shard has refreshed its routing table to
  * 'newCollVersion'. Fires and forgets an asychronous remote setShardVersion command.
@@ -105,6 +107,13 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
     auto noOp = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
     executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }
+
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
 
 }  // namespace
 
@@ -133,7 +142,16 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                           << "fromShard" << _args.getFromShardId() << "toShard"
                           << _args.getToShardId())),
       _acquireCSOnRecipient(feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-          serverGlobalParams.featureCompatibility)) {
+          serverGlobalParams.featureCompatibility)),
+      _moveTimingHelper(_opCtx,
+                        "from",
+                        _args.getNss().ns(),
+                        _args.getMinKey(),
+                        _args.getMaxKey(),
+                        6,  // Total number of steps
+                        &kEmptyErrMsgForMoveTimingHelper,
+                        _args.getToShardId(),
+                        _args.getFromShardId()) {
     invariant(!_opCtx->lockState()->isLocked());
 
     LOGV2(22016,
@@ -142,6 +160,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
           "Starting chunk migration donation",
           "requestParameters"_attr = redact(_args.toString()),
           "collectionEpoch"_attr = _args.getVersionEpoch());
+
+    _moveTimingHelper.done(1);
+    moveChunkHangAtStep1.pauseWhileSet();
 
     // Make sure the latest shard version is recovered as of the time of the invocation of the
     // command.
@@ -204,6 +225,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     _chunkVersion = collectionMetadata.getChunkManager()
                         ->findIntersectingChunkWithSimpleCollation(_args.getMinKey())
                         .getLastmod();
+
+    _moveTimingHelper.done(2);
+    moveChunkHangAtStep2.pauseWhileSet();
 }
 
 MigrationSourceManager::~MigrationSourceManager() {
@@ -211,22 +235,19 @@ MigrationSourceManager::~MigrationSourceManager() {
     _stats.totalDonorMoveChunkTimeMillis.addAndFetch(_entireOpTimer.millis());
 }
 
-Status MigrationSourceManager::startClone() {
+void MigrationSourceManager::startClone() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCreated);
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
     _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
-    const Status logStatus = ShardingLogging::get(_opCtx)->logChangeChecked(
+    uassertStatusOK(ShardingLogging::get(_opCtx)->logChangeChecked(
         _opCtx,
         "moveChunk.start",
         _args.getNss().ns(),
         BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
                    << _args.getFromShardId() << "to" << _args.getToShardId()),
-        ShardingCatalogClient::kMajorityWriteConcern);
-    if (logStatus != Status::OK()) {
-        return logStatus;
-    }
+        ShardingCatalogClient::kMajorityWriteConcern));
 
     _cloneAndCommitTimer.reset();
 
@@ -269,31 +290,25 @@ Status MigrationSourceManager::startClone() {
     if (replEnabled) {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
+        uassertStatusOK(waitForReadConcern(_opCtx, readConcernArgs, StringData(), false));
 
-        auto waitForReadConcernStatus =
-            waitForReadConcern(_opCtx, readConcernArgs, StringData(), false);
-        if (!waitForReadConcernStatus.isOK()) {
-            return waitForReadConcernStatus;
-        }
         setPrepareConflictBehaviorForReadConcern(
             _opCtx, readConcernArgs, PrepareConflictBehavior::kEnforce);
     }
 
     _coordinator->startMigration(_opCtx);
 
-    Status startCloneStatus = _cloneDriver->startClone(_opCtx,
-                                                       _coordinator->getMigrationId(),
-                                                       _coordinator->getLsid(),
-                                                       _coordinator->getTxnNumber());
-    if (!startCloneStatus.isOK()) {
-        return startCloneStatus;
-    }
+    uassertStatusOK(_cloneDriver->startClone(_opCtx,
+                                             _coordinator->getMigrationId(),
+                                             _coordinator->getLsid(),
+                                             _coordinator->getTxnNumber()));
 
+    _moveTimingHelper.done(3);
+    moveChunkHangAtStep3.pauseWhileSet();
     scopedGuard.dismiss();
-    return Status::OK();
 }
 
-Status MigrationSourceManager::awaitToCatchUp() {
+void MigrationSourceManager::awaitToCatchUp() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloning);
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
@@ -301,18 +316,16 @@ Status MigrationSourceManager::awaitToCatchUp() {
     _cloneAndCommitTimer.reset();
 
     // Block until the cloner deems it appropriate to enter the critical section.
-    Status catchUpStatus = _cloneDriver->awaitUntilCriticalSectionIsAppropriate(
-        _opCtx, kMaxWaitToEnterCriticalSectionTimeout);
-    if (!catchUpStatus.isOK()) {
-        return catchUpStatus;
-    }
+    uassertStatusOK(_cloneDriver->awaitUntilCriticalSectionIsAppropriate(
+        _opCtx, kMaxWaitToEnterCriticalSectionTimeout));
 
     _state = kCloneCaughtUp;
+    _moveTimingHelper.done(4);
+    moveChunkHangAtStep4.pauseWhileSet();
     scopedGuard.dismiss();
-    return Status::OK();
 }
 
-Status MigrationSourceManager::enterCriticalSection() {
+void MigrationSourceManager::enterCriticalSection() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
@@ -326,10 +339,7 @@ Status MigrationSourceManager::enterCriticalSection() {
     // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
     // '_notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its local
     // write to majority committed.
-    Status status = ShardingStateRecovery::startMetadataOp(_opCtx);
-    if (!status.isOK()) {
-        return status;
-    }
+    uassertStatusOK(ShardingStateRecovery::startMetadataOp(_opCtx));
 
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
@@ -353,10 +363,10 @@ Status MigrationSourceManager::enterCriticalSection() {
         BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
         false /*upsert*/);
     if (!signalStatus.isOK()) {
-        return {
+        uasserted(
             ErrorCodes::OperationFailed,
             str::stream() << "Failed to persist critical section signal for secondaries due to: "
-                          << signalStatus.toString()};
+                          << signalStatus.toString());
     }
 
     LOGV2(22017,
@@ -364,10 +374,9 @@ Status MigrationSourceManager::enterCriticalSection() {
           "migrationId"_attr = _coordinator->getMigrationId());
 
     scopedGuard.dismiss();
-    return Status::OK();
 }
 
-Status MigrationSourceManager::commitChunkOnRecipient() {
+void MigrationSourceManager::commitChunkOnRecipient() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCriticalSection);
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
@@ -380,18 +389,16 @@ Status MigrationSourceManager::commitChunkOnRecipient() {
                              "Failing _recvChunkCommit due to failpoint."};
     }
 
-    if (!commitCloneStatus.isOK()) {
-        return commitCloneStatus.getStatus().withContext("commit clone failed");
-    }
-
+    uassertStatusOKWithContext(commitCloneStatus, "commit clone failed");
     _recipientCloneCounts = commitCloneStatus.getValue()["counts"].Obj().getOwned();
 
     _state = kCloneCompleted;
+    _moveTimingHelper.done(5);
+    moveChunkHangAtStep5.pauseWhileSet();
     scopedGuard.dismiss();
-    return Status::OK();
 }
 
-Status MigrationSourceManager::commitChunkMetadataOnConfig() {
+void MigrationSourceManager::commitChunkMetadataOnConfig() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloneCompleted);
     ScopeGuard scopedGuard([&] { _cleanupOnError(); });
@@ -460,7 +467,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         _cleanup(false);
         // Best-effort recover of the shard version.
         onShardVersionMismatchNoExcept(_opCtx, _args.getNss(), boost::none).ignore();
-        return migrationCommitStatus;
+        uassertStatusOK(migrationCommitStatus);
     }
 
     hangBeforePostMigrationCommitRefresh.pauseWhileSet();
@@ -495,7 +502,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         _cleanup(false);
         // Best-effort recover of the shard version.
         onShardVersionMismatchNoExcept(_opCtx, _args.getNss(), boost::none).ignore();
-        return ex.toStatus();
+        throw;
     }
 
     // Migration succeeded
@@ -533,7 +540,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
         _args.getNss().ns(),
         BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
                    << _args.getFromShardId() << "to" << _args.getToShardId() << "counts"
-                   << _recipientCloneCounts),
+                   << *_recipientCloneCounts),
         ShardingCatalogClient::kMajorityWriteConcern);
 
     const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
@@ -564,12 +571,13 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig() {
                      "Not honouring the 'waitForDelete' request because migration coordinator "
                      "cleanup didn't succeed");
         if (!deleteStatus.isOK()) {
-            return {ErrorCodes::OrphanedRangeCleanUpFailed,
-                    orphanedRangeCleanUpErrMsg + redact(deleteStatus)};
+            uasserted(ErrorCodes::OrphanedRangeCleanUpFailed,
+                      orphanedRangeCleanUpErrMsg + redact(deleteStatus));
         }
     }
 
-    return Status::OK();
+    _moveTimingHelper.done(6);
+    moveChunkHangAtStep6.pauseWhileSet();
 }
 
 void MigrationSourceManager::_cleanupOnError() {

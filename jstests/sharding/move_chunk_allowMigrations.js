@@ -18,28 +18,97 @@ load("jstests/sharding/libs/shard_versioning_util.js");
 
 const st = new ShardingTest({shards: 2});
 const configDB = st.s.getDB("config");
-const dbName = 'AllowMigrations';
 
 // Resets database dbName and enables sharding and establishes shard0 as primary, test case agnostic
-const setUpDb = function setUpDatabaseAndEnableSharding() {
+function setUpDatabaseAndEnableSharding(dbName) {
     assert.commandWorked(st.s.getDB(dbName).dropDatabase());
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
-};
+
+    return dbName;
+}
+
+// Test the _configsvrSetAllowMigrations internal command directly
+(function testConfigsvrSetAllowMigrationsCommand() {
+    jsTestLog('Running ConfigsvrSetAllowMigrationsCommand');
+
+    const dbName = setUpDatabaseAndEnableSharding('ConfigsvrSetAllowMigrationsCommand');
+
+    const collName = "foo";
+    const ns = dbName + "." + collName;
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
+
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 0));
+
+    // Use _configsvrSetAllowMigrations to forbid migrations from happening
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}));
+
+    // Check that allowMigrations has been set to 'false' on the configsvr config.collections.
+    assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
+
+    // Check that the collection version has been bumped and the shard has refreshed.
+    // TODO SERVER-59053: Re-enable the following assert:
+    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 1));
+
+    // Use _configsvrSetAllowMigrations to allow migrations to happen
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {_configsvrSetAllowMigrations: ns, allowMigrations: true, writeConcern: {w: "majority"}}));
+
+    // Check that allowMigrations has been unset (that implies migrations are allowed) on the
+    // configsvr config.collections.
+    assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
+
+    // Check that the collection version has been bumped and the shard has refreshed.
+    // TODO SERVER-59053: Re-enable the following assert:
+    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
+
+    // Check that _configsvrSetAllowMigrations validates the 'collectionUUID' parameter if passed
+    const collectionUUID = configDB.collections.findOne({_id: ns}).uuid;
+    const anotherUUID = UUID();
+
+    assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
+        _configsvrSetAllowMigrations: ns,
+        allowMigrations: false,
+        collectionUUID: anotherUUID,
+        writeConcern: {w: "majority"}
+    }),
+                                 ErrorCodes.InvalidUUID);
+    assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
+
+    // Check that the collection version has not changed.
+    // TODO SERVER-59053: Re-enable the following assert:
+    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
+
+    // Check that _configsvrSetAllowMigrations validates the 'collectionUUID' parameter if passed
+    assert.commandWorked(st.configRS.getPrimary().adminCommand({
+        _configsvrSetAllowMigrations: ns,
+        allowMigrations: false,
+        collectionUUID: collectionUUID,
+        writeConcern: {w: "majority"}
+    }));
+    assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
+
+    // Check that the collection version has been bumped and the shard has refreshed.
+    // TODO SERVER-59053: Re-enable the following assert:
+    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 3));
+})();
 
 // Tests that moveChunk does not succeed when {allowMigrations: false}
 (function testAllowMigrationsFalsePreventsMoveChunk() {
-    setUpDb();
+    jsTestLog('Running AllowMigrationsFalsePreventsMoveChunk');
+
+    const dbName = setUpDatabaseAndEnableSharding('AllowMigrationsFalsePreventsMoveChunk');
 
     const collName = "collA";
     const ns = dbName + "." + collName;
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 0}));
     assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
     // Confirm that an inProgress moveChunk fails once {allowMigrations: false}
-    const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep4");
+    const fp = configureFailPoint(st.shard1, "migrateThreadHangAtStep4");
     const awaitResult = startParallelShell(
         funWithArgs(function(ns, toShardName) {
             assert.commandFailedWithCode(
@@ -66,9 +135,11 @@ const setUpDb = function setUpDatabaseAndEnableSharding() {
 // for collA.
 //
 // collBSetParams specify the field(s) that will be set on the collB in config.collections.
-const testBalancer = function testAllowMigrationsFalseDisablesBalancer(allowMigrations,
-                                                                       collBSetNoBalanceParam) {
-    setUpDb();
+function testAllowMigrationsFalseDisablesBalancer(allowMigrations, collBSetNoBalanceParam) {
+    jsTestLog(`Running AllowMigrationsFalseDisablesBalancer(${allowMigrations}, ${
+        tojson(collBSetNoBalanceParam)})`);
+
+    const dbName = setUpDatabaseAndEnableSharding('AllowMigrationsFalseDisablesBalancer');
 
     const collAName = "collA";
     const collBName = "collB";
@@ -101,8 +172,6 @@ const testBalancer = function testAllowMigrationsFalseDisablesBalancer(allowMigr
                       .count());
     }
 
-    jsTestLog(`Disabling balancing of ${collB.getFullName()} with allowMigrations ${
-        allowMigrations} and parameters ${tojson(collBSetNoBalanceParam)}`);
     assert.commandWorked(
         configDB.collections.update({_id: collB.getFullName()}, {$set: collBSetNoBalanceParam}));
     assert.commandWorked(st.configRS.getPrimary().adminCommand({
@@ -140,74 +209,12 @@ const testBalancer = function testAllowMigrationsFalseDisablesBalancer(allowMigr
         4,
         findChunksUtil.findChunksByNs(configDB, collB.getFullName(), {shard: st.shard0.shardName})
             .count());
-};
-
-const testConfigsvrSetAllowMigrationsCommand = function() {
-    setUpDb();
-
-    const collName = "foo";
-    const ns = dbName + "." + collName;
-
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-
-    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 0));
-
-    // Use _configsvrSetAllowMigrations to forbid migrations from happening
-    assert.commandWorked(st.configRS.getPrimary().adminCommand(
-        {_configsvrSetAllowMigrations: ns, allowMigrations: false, writeConcern: {w: "majority"}}));
-
-    // Check that allowMigrations has been set to 'false' on the configsvr config.collections.
-    assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
-
-    // Check that the collection version has been bumped and the shard has refreshed.
-    // TODO SERVER-59053 re-enable the following assert
-    // ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 1));
-
-    // Use _configsvrSetAllowMigrations to allow migrations to happen
-    assert.commandWorked(st.configRS.getPrimary().adminCommand(
-        {_configsvrSetAllowMigrations: ns, allowMigrations: true, writeConcern: {w: "majority"}}));
-
-    // Check that allowMigrations has been unset (that implies migrations are allowed) on the
-    // configsvr config.collections.
-    assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
-
-    // Check that the collection version has been bumped and the shard has refreshed.
-    // TODO SERVER-59053 re-enable the following assert
-    // ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
-
-    // Check that _configsvrSetAllowMigrations validates the 'collectionUUID' parameter if passed
-    const collectionUUID = configDB.collections.findOne({_id: ns}).uuid;
-    const anotherUUID = UUID();
-
-    assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
-        _configsvrSetAllowMigrations: ns,
-        allowMigrations: false,
-        collectionUUID: anotherUUID,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.InvalidUUID);
-    assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
-    // TODO SERVER-59053 re-enable the following assert
-    // ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
-
-    assert.commandWorked(st.configRS.getPrimary().adminCommand({
-        _configsvrSetAllowMigrations: ns,
-        allowMigrations: false,
-        collectionUUID: collectionUUID,
-        writeConcern: {w: "majority"}
-    }));
-    assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
-    // TODO SERVER-59053 re-enable the following assert
-    // ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 3));
-};
+}
 
 // Test cases that should disable the balancer.
-testBalancer(false /* allowMigrations */, {});
-testBalancer(false /* allowMigrations */, {noBalance: false});
-testBalancer(false /* allowMigrations */, {noBalance: true});
-
-// Test the _configsvrSetAllowMigrations internal command
-testConfigsvrSetAllowMigrationsCommand();
+testAllowMigrationsFalseDisablesBalancer(false /* allowMigrations */, {});
+testAllowMigrationsFalseDisablesBalancer(false /* allowMigrations */, {noBalance: false});
+testAllowMigrationsFalseDisablesBalancer(false /* allowMigrations */, {noBalance: true});
 
 st.stop();
 })();
