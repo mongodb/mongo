@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/serverless/serverless_test.js");
+load("jstests/serverless/serverlesstest.js");
 
 let st = new ServerlessTest();
 

@@ -21,16 +21,6 @@ class ServerlessTest {
             this.configRS.stopSet();
         };
 
-        /**
-         * Helper method for setting primary shard of a database and making sure that it was
-         * successful. Note: first mongoq needs to be up.
-         */
-        this.ensurePrimaryShard = (dbName, shardName) => {
-            var db = this.q.getDB('admin');
-            var res = db.adminCommand({movePrimary: dbName, to: shardName});
-            assert(res.ok || res.errmsg == "it is already the primary", tojson(res));
-        };
-
         jsTest.log("Going to create and start config server.");
         this.configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
         this.configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
@@ -68,5 +58,29 @@ class ServerlessTest {
 
         this.q0 = this.q;
         jsTest.log("DefaultServerlessTest is created.");
+    }
+
+    /**
+     * Helper method for setting primary shard of a database and making sure that it was
+     * successful. Note: first mongoq needs to be up.
+     */
+    ensurePrimaryShard(dbName, shardName) {
+        var db = this.q.getDB('admin');
+        var res = db.adminCommand({movePrimary: dbName, to: shardName});
+        assert(res.ok || res.errmsg == "it is already the primary", tojson(res));
+    }
+
+    addTenant(tenantId, shardId) {
+        return assert.commandWorked(
+            this.configRS.getPrimary()
+                .getCollection('config.tenants')
+                .insert({_id: tenantId, shardId: shardId}, {writeConcern: {w: "majority"}}));
+    }
+
+    removeTenant(tenantId) {
+        return assert.commandWorked(
+            this.configRS.getPrimary().getCollection('config.tenants').remove({_id: tenantId}, {
+                writeConcern: {w: "majority"}
+            }));
     }
 }

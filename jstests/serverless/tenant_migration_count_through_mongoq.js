@@ -8,7 +8,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/serverless_test.js");
+load("jstests/serverless/serverlesstest.js");
 
 function donorStartMigrationCmd(tenantID, realConnUrl) {
     return {
