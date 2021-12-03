@@ -465,6 +465,7 @@ env.Library(
         'capped_utils.cpp',
         'coll_mod.cpp',
         'coll_mod_index.cpp',
+        'coll_mod_op_observer.cpp',
         'coll_mod_write_ops_tracker.cpp',
         "collection_compact.cpp",
         'create_collection.cpp',
