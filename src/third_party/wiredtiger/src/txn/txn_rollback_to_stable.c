@@ -8,8 +8,9 @@
 
 #include "wt_internal.h"
 
-#define WT_CHECK_RECOVERY_FLAG_TXNID(session, txnid) \
-    (F_ISSET(S2C(session), WT_CONN_RECOVERING) && (txnid) >= S2C(session)->recovery_ckpt_snap_min)
+#define WT_CHECK_RECOVERY_FLAG_TXNID(session, txnid)                                           \
+    (F_ISSET(S2C(session), WT_CONN_RECOVERING) && S2C(session)->recovery_ckpt_snap_min != 0 && \
+      (txnid) >= S2C(session)->recovery_ckpt_snap_min)
 
 /* Enable rollback to stable verbose messaging during recovery. */
 #define WT_VERB_RECOVERY_RTS(session)                                                              \
