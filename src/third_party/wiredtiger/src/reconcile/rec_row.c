@@ -871,7 +871,7 @@ __wt_rec_row_leaf(
                     /* Fail 0.01% of the time. */
                     if (F_ISSET(r, WT_REC_EVICT) &&
                       __wt_failpoint(
-                        session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 0.01))
+                        session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 1))
                         WT_ERR(EBUSY);
                     WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
                     WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);

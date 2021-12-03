@@ -569,31 +569,6 @@ __wt_ext_err_printf(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char
 }
 
 /*
- * __wt_failpoint --
- *     A generic failpoint function, it will return true if the failpoint triggers. Takes a double
- *     representing the probability of the failpoint occurring. Supports percentages with two
- *     decimal places.
- */
-bool
-__wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, double probability)
-{
-    WT_CONNECTION_IMPL *conn;
-    uint32_t ratio;
-
-    conn = S2C(session);
-    /* To support two decimal places we multiply the percent change of occurring by 100. */
-    ratio = (uint32_t)(probability * 100);
-
-    WT_ASSERT(session, probability >= 0 && probability <= 100);
-
-    if (FLD_ISSET(conn->timing_stress_flags, conn_flag)) {
-        if (__wt_random(&session->rnd) % 10000 <= ratio)
-            return (true);
-    }
-    return (false);
-}
-
-/*
  * __wt_verbose_worker --
  *     Verbose message.
  */

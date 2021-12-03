@@ -222,6 +222,27 @@ __wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
 }
 
 /*
+ * __wt_failpoint --
+ *     A generic failpoint function, it will return true if the failpoint triggers. Takes an
+ *     unsigned integer from 0 to 10000 representing an X in 10000 chance of occurring.
+ */
+static inline bool
+__wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
+{
+    WT_CONNECTION_IMPL *conn;
+
+    conn = S2C(session);
+
+    if (!FLD_ISSET(conn->timing_stress_flags, conn_flag))
+        return (false);
+
+    /* Assert that the given probability is sane. */
+    WT_ASSERT(session, probability <= 10000);
+
+    return (__wt_random(&session->rnd) % 10000 <= probability);
+}
+
+/*
  * The hardware-accelerated checksum code that originally shipped on Windows did not correctly
  * handle memory that wasn't 8B aligned and a multiple of 8B. It's likely that calculations were
  * always 8B aligned, but there's some risk.
