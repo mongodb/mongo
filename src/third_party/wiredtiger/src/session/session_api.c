@@ -169,7 +169,7 @@ __wt_session_release_resources(WT_SESSION_IMPL *session)
 
     /* Reconciliation cleanup */
     if (session->reconcile_cleanup != NULL)
-        session->reconcile_cleanup(session);
+        WT_TRET(session->reconcile_cleanup(session));
 
     /* Stashed memory. */
     __wt_stash_discard(session);

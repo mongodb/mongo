@@ -216,7 +216,8 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
     page = ref->page;
     cursor = &cbt->iface;
 
-    if (page->type == WT_PAGE_ROW_LEAF) {
+    switch (page->type) {
+    case WT_PAGE_ROW_LEAF:
         rip = &page->pg_row[cbt->slot];
 
         /*
@@ -234,27 +235,28 @@ __wt_value_return_buf(WT_CURSOR_BTREE *cbt, WT_REF *ref, WT_ITEM *buf, WT_TIME_W
         if (tw != NULL)
             WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
-    }
 
-    if (page->type == WT_PAGE_COL_VAR) {
+    case WT_PAGE_COL_VAR:
         /* Take the value from the original page cell. */
         cell = WT_COL_PTR(page, &page->pg_var[cbt->slot]);
         __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
         if (tw != NULL)
             WT_TIME_WINDOW_COPY(tw, &unpack.tw);
         return (__wt_page_cell_data_ref(session, page, &unpack, buf));
+
+    case WT_PAGE_COL_FIX:
+        /* Take the value from the original page. */
+        if (tw != NULL) {
+            found = __wt_col_fix_get_time_window(session, ref, cbt->recno, tw);
+            if (!found)
+                WT_TIME_WINDOW_INIT(tw);
+        }
+        v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
+        return (__wt_buf_set(session, buf, &v, 1));
     }
 
-    /*
-     * WT_PAGE_COL_FIX: Take the value from the original page.
-     */
-    if (tw != NULL) {
-        found = __wt_col_fix_get_time_window(session, ref, cbt->recno, tw);
-        if (!found)
-            WT_TIME_WINDOW_INIT(tw);
-    }
-    v = __bit_getv_recno(ref, cursor->recno, btree->bitcnt);
-    return (__wt_buf_set(session, buf, &v, 1));
+    /* Compilers can't in general tell that other values of page->type aren't valid here. */
+    return (__wt_illegal_value(session, page->type));
 }
 
 /*

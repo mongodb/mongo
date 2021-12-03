@@ -8,9 +8,9 @@
 
 #include "wt_internal.h"
 
-static void __rec_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *);
-static void __rec_destroy(WT_SESSION_IMPL *, void *);
-static void __rec_destroy_session(WT_SESSION_IMPL *);
+static int __rec_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int __rec_destroy(WT_SESSION_IMPL *, void *);
+static int __rec_destroy_session(WT_SESSION_IMPL *);
 static int __rec_init(WT_SESSION_IMPL *, WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
 static int __rec_hs_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int __rec_root_write(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -149,6 +149,68 @@ __reconcile_save_evict_state(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t fla
 }
 
 /*
+ * __reconcile_post_wrapup --
+ *     Do the last things necessary after wrapping up the reconciliation. Called whether or not the
+ *     reconciliation fails, with different error-path behavior in the parent.
+ */
+static int
+__reconcile_post_wrapup(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page, uint32_t flags, bool *page_lockedp)
+{
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
+    /* Release the reconciliation lock. */
+    *page_lockedp = false;
+    WT_PAGE_UNLOCK(session, page);
+
+    /* Update statistics. */
+    WT_STAT_CONN_INCR(session, rec_pages);
+    WT_STAT_DATA_INCR(session, rec_pages);
+    if (LF_ISSET(WT_REC_EVICT))
+        WT_STAT_CONN_DATA_INCR(session, rec_pages_eviction);
+    if (r->cache_write_hs)
+        WT_STAT_CONN_DATA_INCR(session, cache_write_hs);
+    if (r->cache_write_restore)
+        WT_STAT_CONN_DATA_INCR(session, cache_write_restore);
+    if (!WT_IS_HS(btree->dhandle)) {
+        if (r->rec_page_cell_with_txn_id)
+            WT_STAT_CONN_INCR(session, rec_pages_with_txn);
+        if (r->rec_page_cell_with_ts)
+            WT_STAT_CONN_INCR(session, rec_pages_with_ts);
+        if (r->rec_page_cell_with_prepared_txn)
+            WT_STAT_CONN_INCR(session, rec_pages_with_prepare);
+    }
+    if (r->multi_next > btree->rec_multiblock_max)
+        btree->rec_multiblock_max = r->multi_next;
+
+    /* Clean up the reconciliation structure. */
+    WT_RET(__rec_cleanup(session, r));
+
+    /*
+     * When threads perform eviction, don't cache block manager structures (even across calls), we
+     * can have a significant number of threads doing eviction at the same time with large items.
+     * Ignore checkpoints, once the checkpoint completes, all unnecessary session resources will be
+     * discarded.
+     */
+    if (!WT_SESSION_IS_CHECKPOINT(session)) {
+        /*
+         * Clean up the underlying block manager memory too: it's not reconciliation, but threads
+         * discarding reconciliation structures want to clean up the block manager's structures as
+         * well, and there's no obvious place to do that.
+         */
+        if (session->block_manager_cleanup != NULL) {
+            WT_RET(session->block_manager_cleanup(session));
+        }
+
+        WT_RET(__rec_destroy_session(session));
+    }
+
+    return (0);
+}
+
+/*
  * __reconcile --
  *     Reconcile an in-memory page into its on-disk format, and write it.
  */
@@ -197,6 +259,10 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     }
 
     /*
+     * If we failed, don't bail out yet; we still need to update stats and tidy up.
+     */
+
+    /*
      * Update the global history store score. Only use observations during eviction, not checkpoints
      * and don't count eviction of the history store table itself.
      */
@@ -230,67 +296,19 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     if (ret != 0) {
         /* Make sure that reconciliation doesn't free the page that has been written to disk. */
         WT_ASSERT(session, addr == NULL || ref->addr != NULL);
-        WT_TRET(__rec_write_err(session, r, page));
-    } else {
-        /* Wrap up the page reconciliation. Panic on failure. */
-        if ((ret = __rec_write_wrapup(session, r, page)) != 0)
-            goto panic;
-        __rec_write_page_status(session, r);
-    }
-
-    /* Release the reconciliation lock. */
-    *page_lockedp = false;
-    WT_PAGE_UNLOCK(session, page);
-
-    /* Update statistics. */
-    WT_STAT_CONN_INCR(session, rec_pages);
-    WT_STAT_DATA_INCR(session, rec_pages);
-    if (LF_ISSET(WT_REC_EVICT))
-        WT_STAT_CONN_DATA_INCR(session, rec_pages_eviction);
-    if (r->cache_write_hs)
-        WT_STAT_CONN_DATA_INCR(session, cache_write_hs);
-    if (r->cache_write_restore)
-        WT_STAT_CONN_DATA_INCR(session, cache_write_restore);
-    if (!WT_IS_HS(btree->dhandle)) {
-        if (r->rec_page_cell_with_txn_id)
-            WT_STAT_CONN_INCR(session, rec_pages_with_txn);
-        if (r->rec_page_cell_with_ts)
-            WT_STAT_CONN_INCR(session, rec_pages_with_ts);
-        if (r->rec_page_cell_with_prepared_txn)
-            WT_STAT_CONN_INCR(session, rec_pages_with_prepare);
-    }
-    if (r->multi_next > btree->rec_multiblock_max)
-        btree->rec_multiblock_max = r->multi_next;
-
-    /* Clean up the reconciliation structure. */
-    __rec_cleanup(session, r);
-
-    /*
-     * When threads perform eviction, don't cache block manager structures (even across calls), we
-     * can have a significant number of threads doing eviction at the same time with large items.
-     * Ignore checkpoints, once the checkpoint completes, all unnecessary session resources will be
-     * discarded.
-     */
-    if (!WT_SESSION_IS_CHECKPOINT(session)) {
+        WT_IGNORE_RET(__rec_write_err(session, r, page));
+        WT_IGNORE_RET(__reconcile_post_wrapup(session, r, page, flags, page_lockedp));
         /*
-         * Clean up the underlying block manager memory too: it's not reconciliation, but threads
-         * discarding reconciliation structures want to clean up the block manager's structures as
-         * well, and there's no obvious place to do that.
+         * This return statement covers non-panic error scenarios; any failure beyond this point is
+         * a panic. Conversely, no return prior to this point should use the "err" label.
          */
-        if (session->block_manager_cleanup != NULL) {
-            if (ret == 0 && (ret = session->block_manager_cleanup(session)) != 0) {
-                goto panic;
-            } else
-                WT_TRET(session->block_manager_cleanup(session));
-        }
-
-        __rec_destroy_session(session);
+        return (ret);
     }
-    /*
-     * This return statement covers non-panic error scenarios, any failure beyond this point is a
-     * panic.
-     */
-    WT_RET(ret);
+
+    /* Wrap up the page reconciliation. Panic on failure. */
+    WT_ERR(__rec_write_wrapup(session, r, page));
+    __rec_write_page_status(session, r);
+    WT_ERR(__reconcile_post_wrapup(session, r, page, flags, page_lockedp));
 
     /*
      * Root pages are special, splits have to be done, we can't put it off as the parent's problem
@@ -299,7 +317,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     if (__wt_ref_is_root(ref)) {
         WT_WITH_PAGE_INDEX(session, ret = __rec_root_write(session, page, flags));
         if (ret != 0)
-            goto panic;
+            goto err;
         return (0);
     }
 
@@ -308,11 +326,12 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
      * in service of a checkpoint, it's cleared the tree's dirty flag, and we don't want to set it
      * again as part of that walk.
      */
-    if ((ret = __wt_page_parent_modify_set(session, ref, true)) == 0)
-        return (0);
+    WT_ERR(__wt_page_parent_modify_set(session, ref, true));
 
-panic:
-    WT_RET_PANIC(session, ret, "reconciliation failed after building the disk image");
+err:
+    if (ret != 0)
+        WT_RET_PANIC(session, ret, "reconciliation failed after building the disk image");
+    return (ret);
 }
 
 /*
@@ -666,6 +685,22 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->rec_page_cell_with_txn_id = false;
     r->rec_page_cell_with_prepared_txn = false;
 
+    /*
+     * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
+     * history store contents associated with that key. It's safe to do even if we fail
+     * reconciliation after the removal, the history store content must be obsolete in order for us
+     * to consider removing the key.
+     *
+     * Ignore if this is metadata, as metadata doesn't have any history.
+     *
+     * Some code paths, such as schema removal, involve deleting keys in metadata and assert that
+     * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
+     * store content, so we can skip this.
+     */
+    r->hs_clear_on_tombstone = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
+      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
+      !WT_IS_METADATA(btree->dhandle);
+
 /*
  * If we allocated the reconciliation structure and there was an error, clean up. If our caller
  * passed in a structure, they own it.
@@ -675,8 +710,8 @@ err:
         if (ret == 0)
             *(WT_RECONCILE **)reconcilep = r;
         else {
-            __rec_cleanup(session, r);
-            __rec_destroy(session, &r);
+            WT_TRET(__rec_cleanup(session, r));
+            WT_TRET(__rec_destroy(session, &r));
         }
     }
 
@@ -687,7 +722,7 @@ err:
  * __rec_cleanup --
  *     Clean up after a reconciliation run, except for structures cached across runs.
  */
-static void
+static int
 __rec_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     WT_BTREE *btree;
@@ -695,6 +730,9 @@ __rec_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
     uint32_t i;
 
     btree = S2BT(session);
+
+    if (r->hs_cursor != NULL)
+        WT_RET(r->hs_cursor->reset(r->hs_cursor));
 
     if (btree->type == BTREE_ROW)
         for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
@@ -708,19 +746,25 @@ __rec_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
     /* Reconciliation is not re-entrant, make sure that doesn't happen. */
     r->ref = NULL;
+
+    return (0);
 }
 
 /*
  * __rec_destroy --
  *     Clean up the reconciliation structure.
  */
-static void
+static int
 __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 {
     WT_RECONCILE *r;
 
     if ((r = *(WT_RECONCILE **)reconcilep) == NULL)
-        return;
+        return (0);
+
+    if (r->hs_cursor != NULL)
+        WT_RET(r->hs_cursor->close(r->hs_cursor));
+
     *(WT_RECONCILE **)reconcilep = NULL;
 
     __wt_buf_free(session, &r->chunk_A.key);
@@ -743,16 +787,18 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
     __wt_buf_free(session, &r->update_modify_cbt._upd_value.buf);
 
     __wt_free(session, r);
+
+    return (0);
 }
 
 /*
  * __rec_destroy_session --
  *     Clean up the reconciliation structure, session version.
  */
-static void
+static int
 __rec_destroy_session(WT_SESSION_IMPL *session)
 {
-    __rec_destroy(session, &session->reconcile);
+    return (__rec_destroy(session, &session->reconcile));
 }
 
 /*
@@ -2116,8 +2162,8 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     __wt_page_modify_set(session, parent);
 
 err:
-    __rec_cleanup(session, r);
-    __rec_destroy(session, &cbulk->reconcile);
+    WT_TRET(__rec_cleanup(session, r));
+    WT_TRET(__rec_destroy(session, &cbulk->reconcile));
 
     return (ret);
 }
@@ -2537,4 +2583,56 @@ __wt_rec_cell_build_ovfl(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *k
 err:
     __wt_scr_free(session, &tmp);
     return (ret);
+}
+
+/*
+ * __wt_rec_hs_clear_on_tombstone --
+ *     When removing a key due to a tombstone with a durable timestamp of "none", also remove the
+ *     history store contents associated with that key.
+ */
+int
+__wt_rec_hs_clear_on_tombstone(
+  WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t recno, WT_ITEM *rowkey)
+{
+    WT_BTREE *btree;
+    WT_ITEM hs_recno_key, *key;
+    uint8_t hs_recno_key_buf[WT_INTPACK64_MAXSIZE], *p;
+
+    btree = S2BT(session);
+
+    /* We should be passed a recno or a row-store key, but not both. */
+    WT_ASSERT(session, (recno == WT_RECNO_OOB) != (rowkey == NULL));
+
+    if (rowkey != NULL)
+        key = rowkey;
+    else {
+        p = hs_recno_key_buf;
+        WT_RET(__wt_vpack_uint(&p, 0, recno));
+        hs_recno_key.data = hs_recno_key_buf;
+        hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
+        key = &hs_recno_key;
+    }
+
+    /* Open a history store cursor if we don't yet have one. */
+    if (r->hs_cursor == NULL)
+        WT_RET(__wt_curhs_open(session, NULL, &r->hs_cursor));
+
+    /*
+     * From WT_TS_NONE delete all the history store content of the key. This path will never be
+     * taken for a mixed-mode deletion being evicted and with a checkpoint that started prior to the
+     * eviction starting its reconciliation as previous checks done while selecting an update will
+     * detect that.
+     */
+    WT_RET(
+      __wt_hs_delete_key_from_ts(session, r->hs_cursor, btree->id, key, WT_TS_NONE, false, false));
+
+    /* Fail 0.01% of the time. */
+    if (F_ISSET(r, WT_REC_EVICT) &&
+      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 1))
+        return (EBUSY);
+
+    WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
+    WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
+
+    return (0);
 }

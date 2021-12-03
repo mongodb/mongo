@@ -460,17 +460,14 @@ __wt_rec_col_fix(
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
-    WT_CURSOR *hs_cursor;
     WT_DECL_RET;
     WT_INSERT *ins;
-    WT_ITEM hs_recno_key;
     WT_PAGE *page;
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
     uint64_t curstartrecno, i, rawbitmapsize, origstartrecno, recno;
     uint32_t auxspace, bitmapsize, entry, maxrecs, nrecs, numtws, tw;
-    uint8_t hs_recno_key_buf[WT_INTPACK64_MAXSIZE], *p, val;
-    bool hs_clear;
+    uint8_t val;
 
     btree = S2BT(session);
     /*
@@ -485,23 +482,6 @@ __wt_rec_col_fix(
     curstartrecno = pageref->ref_recno;
     /* Also check where the disk image starts, which might be different in salvage. */
     origstartrecno = page->dsk == NULL ? WT_RECNO_OOB : page->dsk->recno;
-
-    /*
-     * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
-     * history store contents associated with that key. It's safe to do even if we fail
-     * reconciliation after the removal, the history store content must be obsolete in order for us
-     * to consider removing the key.
-     *
-     * Ignore if this is metadata, as metadata doesn't have any history.
-     *
-     * Some code paths, such as schema removal, involve deleting keys in metadata and assert that
-     * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
-     * store content, so we can skip this.
-     */
-    hs_cursor = NULL;
-    hs_clear = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
-      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_METADATA(btree->dhandle);
 
     /*
      * The configured max leaf page size is the size of the bitmap data on the page, not including
@@ -774,23 +754,8 @@ __wt_rec_col_fix(
              * When removing a key due to a tombstone with a durable timestamp of "none", also
              * remove the history store contents associated with that key.
              */
-            if (upd_select.tw.durable_stop_ts == WT_TS_NONE && hs_clear) {
-                p = hs_recno_key_buf;
-                WT_ERR(__wt_vpack_uint(&p, 0, recno));
-                hs_recno_key.data = hs_recno_key_buf;
-                hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
-
-                /* Open a history store cursor if we don't yet have one. */
-                if (hs_cursor == NULL)
-                    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
-
-                /* From WT_TS_NONE to delete all the history store content of the key. */
-                WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id, &hs_recno_key,
-                  WT_TS_NONE, false, F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)));
-
-                WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-                WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
-            }
+            if (upd_select.tw.durable_stop_ts == WT_TS_NONE && r->hs_clear_on_tombstone)
+                WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, recno, NULL));
 
             val = 0;
         } else {
@@ -976,9 +941,6 @@ __wt_rec_col_fix(
     WT_ERR(__wt_rec_split_finish(session, r));
 
 err:
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
-
     return (ret);
 }
 
@@ -1182,20 +1144,17 @@ __wt_rec_col_var(
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_COL *cip;
-    WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(orig);
     WT_DECL_RET;
     WT_INSERT *ins;
-    WT_ITEM hs_recno_key;
     WT_PAGE *page;
     WT_TIME_WINDOW clear_tw, *twp;
     WT_UPDATE *upd;
     WT_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
-    uint8_t *p, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
-    bool deleted, hs_clear, orig_deleted, update_no_copy;
+    bool deleted, orig_deleted, update_no_copy;
     const void *data;
 
     btree = S2BT(session);
@@ -1214,23 +1173,6 @@ __wt_rec_col_var(
     last.value = r->last;
     WT_TIME_WINDOW_INIT(&last.tw);
     last.deleted = false;
-
-    /*
-     * When removing a key due to a tombstone with a durable timestamp of "none", also remove the
-     * history store contents associated with that key. It's safe to do even if we fail
-     * reconciliation after the removal, the history store content must be obsolete in order for us
-     * to consider removing the key.
-     *
-     * Ignore if this is metadata, as metadata doesn't have any history.
-     *
-     * Some code paths, such as schema removal, involve deleting keys in metadata and assert that
-     * they shouldn't open new dhandles. In those cases we won't ever need to blow away history
-     * store content, so we can skip this.
-     */
-    hs_cursor = NULL;
-    hs_clear = F_ISSET(S2C(session), WT_CONN_HS_OPEN) &&
-      !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES) && !WT_IS_HS(btree->dhandle) &&
-      !WT_IS_METADATA(btree->dhandle);
 
     WT_RET(
       __wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp, 0));
@@ -1425,35 +1367,8 @@ record_loop:
                      * When removing a key due to a tombstone with a durable timestamp of "none",
                      * also remove the history store contents associated with that key.
                      */
-                    if (twp->durable_stop_ts == WT_TS_NONE && hs_clear) {
-                        p = hs_recno_key_buf;
-                        WT_ERR(__wt_vpack_uint(&p, 0, src_recno));
-                        hs_recno_key.data = hs_recno_key_buf;
-                        hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
-
-                        /* Open a history store cursor if we don't yet have one. */
-                        if (hs_cursor == NULL)
-                            WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
-
-                        /*
-                         * From WT_TS_NONE delete all the history store content of the key. This
-                         * path will never be taken for a mixed-mode deletion being evicted and with
-                         * a checkpoint that started prior to the eviction starting its
-                         * reconciliation as previous checks done while selecting an update will
-                         * detect that.
-                         */
-                        WT_ERR(__wt_hs_delete_key_from_ts(
-                          session, hs_cursor, btree->id, &hs_recno_key, WT_TS_NONE, false, false));
-
-                        /* Fail 0.01% of the time. */
-                        if (F_ISSET(r, WT_REC_EVICT) &&
-                          __wt_failpoint(session,
-                            WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS, 1))
-                            WT_ERR(EBUSY);
-
-                        WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
-                        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
-                    }
+                    if (twp->durable_stop_ts == WT_TS_NONE && r->hs_clear_on_tombstone)
+                        WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, src_recno, NULL));
 
                     deleted = true;
                     twp = &clear_tw;
@@ -1680,8 +1595,6 @@ next:
     ret = __wt_rec_split_finish(session, r);
 
 err:
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
     __wt_scr_free(session, &orig);
     return (ret);
 }

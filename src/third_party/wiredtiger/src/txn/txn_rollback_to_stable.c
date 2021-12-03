@@ -892,9 +892,6 @@ stop:
     if ((inshead = WT_COL_APPEND(page)) != NULL)
         WT_RET(__rollback_abort_insert_list(session, page, inshead, rollback_timestamp, NULL));
 
-    /* Mark the page as dirty to reconcile the page. */
-    if (page->modify)
-        __wt_page_modify_set(session, page);
     return (0);
 }
 
@@ -995,9 +992,6 @@ __rollback_abort_col_fix(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     if ((inshead = WT_COL_APPEND(page)) != NULL)
         WT_RET(__rollback_abort_insert_list(session, page, inshead, rollback_timestamp, NULL));
 
-    /* Mark the page as dirty to reconcile the page. */
-    if (page->modify)
-        __wt_page_modify_set(session, page);
     return (0);
 }
 
@@ -1055,10 +1049,6 @@ __rollback_abort_row_leaf(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
               session, ref, rip, 0, have_key ? key : NULL, vpack, rollback_timestamp, NULL));
         }
     }
-
-    /* Mark the page as dirty to reconcile the page. */
-    if (page->modify)
-        __wt_page_modify_set(session, page);
 
 err:
     __wt_scr_free(session, &key);
@@ -1192,21 +1182,21 @@ __rollback_abort_updates(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     case WT_PAGE_COL_VAR:
         WT_RET(__rollback_abort_col_var(session, ref, rollback_timestamp));
         break;
-    case WT_PAGE_COL_INT:
-    case WT_PAGE_ROW_INT:
-        /*
-         * There is nothing to do for internal pages, since we aren't rolling back far enough to
-         * potentially include reconciled changes - and thus won't need to roll back structure
-         * changes on internal pages.
-         */
-        break;
     case WT_PAGE_ROW_LEAF:
         WT_RET(__rollback_abort_row_leaf(session, ref, rollback_timestamp));
         break;
+    case WT_PAGE_COL_INT:
+    case WT_PAGE_ROW_INT:
+        /* This function is not called for internal pages. */
+        WT_ASSERT(session, false);
+        /* Fall through. */
     default:
         WT_RET(__wt_illegal_value(session, page->type));
     }
 
+    /* Mark the page as dirty to reconcile the page. */
+    if (page->modify)
+        __wt_page_modify_set(session, page);
     return (0);
 }
 

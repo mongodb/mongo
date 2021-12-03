@@ -178,12 +178,14 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
     WT_COL *cip;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
+    WT_UPDATE *upd;
 
     *valid = false;
 
     btree = CUR2BT(cbt);
     page = cbt->ref->page;
     session = CUR2S(cbt);
+    upd = NULL;
 
     /*
      * We may be pointing to an insert object, and we may have a page with
@@ -255,18 +257,13 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
             return (0);
 
         /*
-         * Check for an update ondisk or in the history store. For column store, an insert object
-         * can have the same key as an on-page or history store object.
+         * Check for an update. For column store, modifications are handled with insert lists, so an
+         * insert can have the same key as an on-page or history store object.
          *
-         * Note: do not replace tombstones with zero here; it skips cases in other code below that
-         * expect to handle it themselves, and then doesn't work.
+         * Note: we do not want to replace tombstones with zero here; it skips cases in other code
+         * below that expect to handle it themselves, and then doesn't work.
          */
-        WT_RET(__wt_txn_read(session, cbt, key, recno, cbt->ins ? cbt->ins->upd : NULL));
-        if (cbt->upd_value->type != WT_UPDATE_INVALID) {
-            if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-                return (0);
-            *valid = true;
-        }
+        upd = cbt->ins ? cbt->ins->upd : NULL;
         break;
     case BTREE_COL_VAR:
         /* The search function doesn't check for empty pages. */
@@ -297,15 +294,10 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
             return (0);
 
         /*
-         * Check for an update ondisk or in the history store. For column store, an insert object
-         * can have the same key as an on-page or history store object.
+         * Check for an update. For column store, modifications are handled with insert lists, so an
+         * insert can have the same key as an on-page or history store object.
          */
-        WT_RET(__wt_txn_read(session, cbt, key, recno, cbt->ins ? cbt->ins->upd : NULL));
-        if (cbt->upd_value->type != WT_UPDATE_INVALID) {
-            if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-                return (0);
-            *valid = true;
-        }
+        upd = cbt->ins ? cbt->ins->upd : NULL;
         break;
     case BTREE_ROW:
         /* The search function doesn't check for empty pages. */
@@ -324,17 +316,22 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
         if (cbt->ins != NULL)
             return (0);
 
+        /* Paranoia. */
+        WT_ASSERT(session, recno == WT_RECNO_OOB);
+
         /* Check for an update. */
-        WT_RET(__wt_txn_read(session, cbt, key, WT_RECNO_OOB,
-          (page->modify != NULL && page->modify->mod_row_update != NULL) ?
-            page->modify->mod_row_update[cbt->slot] :
-            NULL));
-        if (cbt->upd_value->type != WT_UPDATE_INVALID) {
-            if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
-                return (0);
-            *valid = true;
-        }
+        upd = (page->modify != NULL && page->modify->mod_row_update != NULL) ?
+          page->modify->mod_row_update[cbt->slot] :
+          NULL;
         break;
+    }
+
+    /* Check for a value on disk or in the history store. Pass in any update. */
+    WT_RET(__wt_txn_read(session, cbt, key, recno, upd));
+    if (cbt->upd_value->type != WT_UPDATE_INVALID) {
+        if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
+            return (0);
+        *valid = true;
     }
     return (0);
 }

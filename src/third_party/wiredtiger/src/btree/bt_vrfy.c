@@ -487,20 +487,25 @@ __verify_tree(
         break;
     }
 
-    /* Check page content, additionally updating the column-store record count. */
-    switch (page->type) {
-    case WT_PAGE_COL_FIX:
-        WT_RET(__verify_page_content_fix(session, ref, addr_unpack, vs));
-        break;
-    case WT_PAGE_COL_INT:
-    case WT_PAGE_ROW_INT:
-        WT_RET(__verify_page_content_int(session, ref, addr_unpack, vs));
-        break;
-    case WT_PAGE_COL_VAR:
-    case WT_PAGE_ROW_LEAF:
-        WT_RET(__verify_page_content_leaf(session, ref, addr_unpack, vs));
-        break;
-    }
+    /*
+     * Check page content, additionally updating the column-store record count. If a tree is empty
+     * (just created), it won't have a disk image; if there is no disk image, there is no page
+     * content to check.
+     */
+    if (page->dsk != NULL)
+        switch (page->type) {
+        case WT_PAGE_COL_FIX:
+            WT_RET(__verify_page_content_fix(session, ref, addr_unpack, vs));
+            break;
+        case WT_PAGE_COL_INT:
+        case WT_PAGE_ROW_INT:
+            WT_RET(__verify_page_content_int(session, ref, addr_unpack, vs));
+            break;
+        case WT_PAGE_COL_VAR:
+        case WT_PAGE_ROW_LEAF:
+            WT_RET(__verify_page_content_leaf(session, ref, addr_unpack, vs));
+            break;
+        }
 
     /* Compare the address type against the page type. */
     switch (page->type) {
@@ -850,14 +855,8 @@ __verify_page_content_int(
     uint32_t cell_num;
 
     page = ref->page;
+    dsk = page->dsk;
     ta = &unpack.ta;
-
-    /*
-     * If a tree is empty (just created), it won't have a disk image; if there is no disk image,
-     * we're done.
-     */
-    if ((dsk = page->dsk) == NULL)
-        return (0);
 
     /* Walk the page, verifying overflow pages and validating timestamps. */
     cell_num = 0;
@@ -920,15 +919,6 @@ __verify_page_content_fix(
     uint8_t *p;
 
     page = ref->page;
-
-    /*
-     * If a tree is empty (just created), it won't have a disk image; if there is no disk image,
-     * we're done.
-     */
-    if (page->dsk == NULL) {
-        WT_ASSERT(session, page->entries == 0);
-        return (0);
-    }
 
     /* Count the keys. */
     vs->records_so_far += page->entries;
@@ -1012,17 +1002,11 @@ __verify_page_content_leaf(
     bool found_ovfl;
 
     page = ref->page;
+    dsk = page->dsk;
     rip = page->pg_row;
     tw = &unpack.tw;
     recno = ref->ref_recno;
     found_ovfl = false;
-
-    /*
-     * If a tree is empty (just created), it won't have a disk image; if there is no disk image,
-     * we're done.
-     */
-    if ((dsk = page->dsk) == NULL)
-        return (0);
 
     /* Walk the page, tracking timestamps and verifying overflow pages. */
     cell_num = 0;
