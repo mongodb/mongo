@@ -45,14 +45,6 @@ server_parameters:
             gte: 1
         default: 10
 
-    isChangeStreamExpiredPreImageRemovalJobReplicating:
-        description: >-
-            Specifies if the expired pre-images removal job is replicating the delete operations.
-        set_at: [ startup ]
-        cpp_vartype: AtomicWord<bool>
-        cpp_varname: gIsChangeStreamExpiredPreImageRemovalJobReplicating
-        default: true
-
 structs:
     ChangeStreamPreImageId:
         description: Uniquely identifies a pre-image for a given node or replica set.
