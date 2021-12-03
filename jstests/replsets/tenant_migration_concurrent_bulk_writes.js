@@ -10,8 +10,6 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # TODO SERVER-59090: Remove this tag.
- *   backport_required_multiversion,
  * ]
  */
 (function() {
