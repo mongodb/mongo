@@ -92,7 +92,10 @@ function startShellWithOp(comment) {
 
 // Test that the currentOp server command truncates long operations with a warning logged.
 const serverCommandTest = startShellWithOp("currentOp_server");
-res = db.adminCommand({currentOp: true, "ns": "test.currentOp_cursor"});
+res = db.adminCommand({
+    currentOp: true,
+    $and: [{"ns": "test.currentOp_cursor"}, {"command.comment": "currentOp_server"}]
+});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     // Assert currentOp truncation behavior for each shard in the cluster.
@@ -119,7 +122,7 @@ serverCommandTest();
 
 // Test that the db.currentOp() shell helper does not truncate ops.
 const shellHelperTest = startShellWithOp("currentOp_shell");
-res = db.currentOp({"ns": "test.currentOp_cursor"});
+res = db.currentOp({"ns": "test.currentOp_cursor", "command.comment": "currentOp_shell"});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     assert(res.inprog.length >= 1);
