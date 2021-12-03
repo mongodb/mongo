@@ -40,4 +40,7 @@ while kill -STOP $pid ; do
 	./t -t r -D -v -h $recovery || exit 1
 done
 
+# Clean the home directory once the test is completed. Note that once we fail to send the signal to
+# stop the test, it means that it is completed.
+rm -rf $home $home.out
 exit 0

@@ -60,6 +60,7 @@ for i in $(seq $num_iter); do
     if [[ $err -ne 0 ]]
     then
       echo "iteration $i of parallel command $t failed with $err error code"
+      tail -n 100 nohup.out.$t
       exit $err
     fi
   done
