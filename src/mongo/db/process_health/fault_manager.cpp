@@ -39,11 +39,11 @@
 #include "mongo/db/process_health/health_monitoring_gen.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit_code.h"
 
 namespace mongo {
@@ -52,15 +52,20 @@ namespace process_health {
 
 namespace {
 
-const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
+static constexpr int kMaxThreadPoolSize = 20;
 
+const auto sFaultManager = ServiceContext::declareDecoration<std::unique_ptr<FaultManager>>();
 
 ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
     "FaultManagerRegisterer", [](ServiceContext* svcCtx) {
         // construct task executor
         std::shared_ptr<executor::NetworkInterface> networkInterface =
             executor::makeNetworkInterface("FaultManager-TaskExecutor");
-        auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
+        ThreadPool::Options threadPoolOptions;
+        threadPoolOptions.maxThreads = kMaxThreadPoolSize;
+        threadPoolOptions.threadNamePrefix = "FaultManager-";
+        threadPoolOptions.poolName = "FaultManagerThreadPool";
+        auto pool = std::make_unique<ThreadPool>(threadPoolOptions);
         auto taskExecutor =
             std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
 
@@ -184,6 +189,7 @@ FaultManager::~FaultManager() {
 void FaultManager::startPeriodicHealthChecks() {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
             serverGlobalParams.featureCompatibility)) {
+        LOGV2_DEBUG(6187201, 1, "Health checks disabled by feature flag");
         return;
     }
 
