@@ -103,10 +103,10 @@ rst.waitForState(rst.nodes[0], ReplSetTest.State.ROLLBACK);
 
 // We take a stable checkpoint at the end of rollback so we need the checkpointer to be running.
 jsTestLog("Reenabling checkpointer so rollback can complete");
-assert.commandWorked(
-    rst.nodes[0].adminCommand({configureFailPoint: 'pauseCheckpointThread', mode: 'off'}));
 
 assert.soonNoExcept(function() {
+    assert.commandWorked(
+        rst.nodes[0].adminCommand({configureFailPoint: 'pauseCheckpointThread', mode: 'off'}));
     const rbid = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
     return rbid > lastRBID;
 }, "rbid did not update", ReplSetTest.kDefaultTimeoutMS);
