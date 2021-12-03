@@ -74,14 +74,25 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
         nss,
         "SessionsCollectionConfigServer::_generateIndexesIfNeeded",
         [&] {
-            auto routingInfo = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            const ChunkManager cm = [&]() {
+                // (SERVER-61214) wait for the catalog cache to acknowledge that the sessions
+                // collection is sharded in order to be sure to get a valid routing table
+                while (true) {
+                    auto cm = uassertStatusOK(
+                        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                              nss));
+
+                    if (cm.isSharded()) {
+                        return cm;
+                    }
+                }
+            }();
 
             scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.db(),
                 nss,
-                routingInfo,
+                cm,
                 SessionsCollection::generateCreateIndexesCmd(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry,
