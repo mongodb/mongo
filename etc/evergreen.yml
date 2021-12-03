@@ -491,6 +491,7 @@ functions:
         - "src/evergreen/functions/add_git_tag.sh"
       env:
         future_git_tag: ${future_git_tag}
+        bv_future_git_tag: ${bv_future_git_tag}
 
   "git get project and add git tag":
     - *f_expansions_write
@@ -3147,7 +3148,7 @@ tasks:
 ## Standalone generational fuzzer for multiversion aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
-  tags: ["aggfuzzer", "common", "multiversion", "require_npm", "random_name"]
+  tags: ["aggfuzzer", "common", "multiversion", "require_npm", "random_name", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -9706,6 +9707,37 @@ buildvariants:
     test_flags: >-
       --runAllFeatureFlagsNoTests
       --excludeWithAnyTags=incompatible_with_shard_merge
+
+- name: enterprise-rhel-80-64-bit-future-git-tag-multiversion
+  display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
+  cron: "0 12 * * *" # Every day starting at 12:00
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions:
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      MONGO_DISTMOD=rhel80
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    large_distro_name: rhel80-medium
+    resmoke_jobs_factor: 0.25
+    bv_future_git_tag: r100.0.0-9999
+    test_flags: >-
+      --excludeWithAnyTags=future_git_tag_incompatible
+  tasks:
+    - name: compile_test_and_package_serial_TG
+      distros:
+      - rhel80-xlarge
+    - name: build_variant_gen
+    - name: .multiversion !.future_git_tag_incompatible
 
 - name: rhel-80-64-bit-nossl
   display_name: "RHEL 8.0 Shared Library (No SSL)"

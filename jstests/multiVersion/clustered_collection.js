@@ -6,6 +6,9 @@
  * exceeds 127 bytes return an error code on access. While there isn't a known use case for
  * large binary string RecordId encoding on time series collection, this test case is useful for
  * validating the RecordId KeyString encoding behaviour across versions.
+ *
+ * @tags: [future_git_tag_incompatible]
+ *
  */
 
 (function() {

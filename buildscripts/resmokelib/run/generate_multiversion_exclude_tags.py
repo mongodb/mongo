@@ -114,12 +114,12 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
         if change_backported:
             _always_exclude = diff(backports_required_latest[version_key]["all"],
                                    backports_required_old[version_key]["all"])
-            _suites_old: defaultdict = defaultdict(list,
-                                                   backports_required_old[version_key]["suites"])
+            _suites_old: defaultdict = defaultdict(
+                list, backports_required_old[version_key]["suites"] or {})
         else:
             _always_exclude = diff(backports_required_latest[version_key]["all"],
                                    backports_required_old["all"])
-            _suites_old: defaultdict = defaultdict(list, backports_required_old["suites"])
+            _suites_old: defaultdict = defaultdict(list, backports_required_old["suites"] or {})
 
         return _suites_latest, _suites_old, _always_exclude
 

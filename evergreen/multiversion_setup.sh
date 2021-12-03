@@ -83,4 +83,4 @@ $python buildscripts/resmoke.py setup-multiversion \
   --architecture $architecture \
   --useLatest \
   $last_lts_arg \
-  $last_continuous_arg 4.4
+  $last_continuous_arg 4.4 5.1

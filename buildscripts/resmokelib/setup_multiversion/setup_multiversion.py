@@ -75,8 +75,8 @@ def get_merge_base_commit(version: str) -> Optional[str]:
     cmd = ["git", "merge-base", "origin/master", f"origin/v{version}"]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
     if result.returncode:
-        LOGGER.error("Git merge-base command failed. Falling back to latest master", cmd=cmd,
-                     error=result.stderr.decode("utf-8").strip())
+        LOGGER.warning("Git merge-base command failed. Falling back to latest master", cmd=cmd,
+                       error=result.stderr.decode("utf-8").strip())
         return None
     commit_hash = result.stdout.decode("utf-8").strip()
     LOGGER.info("Found merge-base commit.", cmd=cmd, commit=commit_hash)
@@ -194,16 +194,16 @@ class SetupMultiversion(Subcommand):
             try:
                 self.platform = infer_platform(self.edition,
                                                version) if self.inferred_platform else self.platform
-                urls_info = None
+                urls_info = EvgURLInfo()
                 if self.use_latest:
                     urls_info = self.get_latest_urls(version)
-                if self.use_latest and not urls_info:
+                if self.use_latest and not urls_info.urls:
                     LOGGER.warning("Latest URL is not available, falling back"
                                    " to getting the URL from 'mongodb-mongo-master'"
                                    " project preceding the merge-base commit.")
                     merge_base_revision = get_merge_base_commit(version)
                     urls_info = self.get_latest_urls("master", merge_base_revision)
-                if not urls_info:
+                if not urls_info.urls:
                     LOGGER.warning("Latest URL is not available or not requested,"
                                    " falling back to getting the URL for a specific"
                                    " version.")

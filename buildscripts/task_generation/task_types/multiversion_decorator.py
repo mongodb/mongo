@@ -12,6 +12,7 @@ from buildscripts.task_generation.constants import DO_MULTIVERSION_SETUP, CONFIG
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
 from buildscripts.task_generation.task_types.models.resmoke_task_model import ResmokeTask
 from buildscripts.util import taskname
+from buildscripts.util.teststats import normalize_test_name
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -100,6 +101,12 @@ class MultiversionGenTaskDecorator:
                     # Decorate the suite name
                     resmoke_suite_name = self._build_name(sub_task.resmoke_suite_name, old_version,
                                                           mixed_bin_versions)
+                    all_tests = [
+                        normalize_test_name(test)
+                        for test in self.resmoke_proxy.list_tests(resmoke_suite_name)
+                    ]
+                    test_list = [test for test in sub_task.test_list if test in all_tests]
+                    excludes = [test for test in sub_task.excludes if test in all_tests]
                     execution_task_suite_name = taskname.name_generated_task(
                         resmoke_suite_name, index, params.num_tasks)
                     execution_task_suite_yaml_dir = os.path.dirname(
@@ -120,7 +127,7 @@ class MultiversionGenTaskDecorator:
                         ResmokeTask(shrub_task=shrub_task, resmoke_suite_name=resmoke_suite_name,
                                     execution_task_suite_yaml_name=execution_task_suite_yaml_file,
                                     execution_task_suite_yaml_path=execution_task_suite_yaml_path,
-                                    test_list=sub_task.test_list, excludes=sub_task.excludes))
+                                    test_list=test_list, excludes=excludes))
 
         return decorated_tasks
 
