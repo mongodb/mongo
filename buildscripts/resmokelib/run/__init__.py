@@ -159,7 +159,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         """
         tag_docs = {}
         out_tag_names = []
-        for suite_name, suite_file in get_suite_files():
+        for suite_name, suite_file in get_suite_files().items():
             # Matrix suites are ignored.
             tags_blocks = list_tags.get_tags_blocks(suite_file)
 

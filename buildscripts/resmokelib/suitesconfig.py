@@ -37,9 +37,10 @@ def get_named_suites() -> List[SuiteName]:
     return _NAMED_SUITES
 
 
-def get_suite_files() -> List[str]:
+def get_suite_files() -> Dict[str, str]:
     """Get the physical files defining these suites for parsing comments."""
-    return ExplicitSuiteConfig.get_suite_files() + MatrixSuiteConfig.get_suite_files()
+    return MatrixSuiteConfig.merge_dicts(ExplicitSuiteConfig.get_suite_files(),
+                                         MatrixSuiteConfig.get_suite_files())
 
 
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
@@ -187,22 +188,20 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     _all_mappings = {}
     _all_overrides = {}
 
-    @staticmethod
-    def get_all_yamls(target_dir):
+    @classmethod
+    def get_suite_files(cls):
+        """Get the suite files."""
+        mappings_dir = os.path.join(cls._get_suites_dir(), "mappings")
+        return cls.__get_suite_files_in_dir(mappings_dir)
+
+    @classmethod
+    def get_all_yamls(cls, target_dir):
         """Get all YAML files in the given directory."""
-        all_files = {}
-        root = os.path.abspath(target_dir)
-        files = os.listdir(root)
-
-        for filename in files:
-            (short_name, ext) = os.path.splitext(filename)
-            if ext in (".yml", ".yaml"):
-                pathname = os.path.join(root, filename)
-
-                if not fs.is_yaml_file(pathname) or not os.path.isfile(pathname):
-                    raise ValueError("Expected a suite YAML config, but got '%s'" % pathname)
-                all_files[short_name] = load_yaml_file(pathname)
-        return all_files
+        return {
+            short_name: load_yaml_file(path)
+            for short_name, path in cls.__get_suite_files_in_dir(os.path.abspath(
+                target_dir)).items()
+        }
 
     @staticmethod
     def _get_suites_dir():
@@ -276,12 +275,6 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return list(all_mappings.keys())
 
     @classmethod
-    def get_suite_files(cls):
-        """Get the physical files defining these suites for parsing comments."""
-        mappings_dir = os.path.join(cls._get_suites_dir(), "mappings")
-        return cls.get_all_yamls(mappings_dir)
-
-    @classmethod
     def get_all_mappings(cls, suites_dir) -> Dict[str, str]:
         """Get a dictionary of all suite mapping files keyed by the suite name."""
         if not cls._all_mappings:
@@ -310,6 +303,19 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             else:
                 dict1[k] = dict2[k]
         return dict1
+
+    @classmethod
+    def __get_suite_files_in_dir(cls, target_dir):
+        """Get the physical files defining these suites for parsing comments."""
+        root = os.path.abspath(target_dir)
+        files = os.listdir(root)
+        all_files = {}
+        for filename in files:
+            (short_name, ext) = os.path.splitext(filename)
+            if ext in (".yml", ".yaml"):
+                all_files[short_name] = os.path.join(root, filename)
+
+        return all_files
 
 
 class SuiteFinder(object):
