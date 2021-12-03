@@ -658,41 +658,18 @@ __wt_ext_strerror(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, int error)
  *     Progress message.
  */
 int
-__wt_progress(WT_SESSION_IMPL *session, WT_VERBOSE_CATEGORY category, const char *s, uint64_t v)
+__wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 {
     WT_DECL_RET;
     WT_EVENT_HANDLER *handler;
     WT_SESSION *wt_session;
-    size_t remain;
-    char operation[1024];
-    const char *msg;
-    bool is_json;
 
     wt_session = (WT_SESSION *)session;
-
     handler = session->event_handler;
-    is_json = FLD_ISSET(S2C(session)->json_output, WT_JSON_OUTPUT_PROGRESS);
-    msg = s == NULL ? session->name : s;
-    remain = sizeof(operation);
-
-    /* Generate message. */
-    WT_RET(__eventv_gen_msg(
-      session, operation, &remain, is_json, 0, NULL, 0, category, WT_VERBOSE_NOTICE, msg));
-
-    /* Write message. */
     if (handler != NULL && handler->handle_progress != NULL)
-        if ((ret = handler->handle_progress(handler, wt_session, operation, v)) != 0)
+        if ((ret = handler->handle_progress(
+               handler, wt_session, s == NULL ? session->name : s, v)) != 0)
             __handler_failure(session, ret, "progress", false);
-
-    /*
-     * The buffer is fixed sized, complain if we overflow. (The test is for no more bytes remaining
-     * in the buffer, so technically we might have filled it exactly.) Be cautious changing this
-     * code, it's a recursive call.
-     */
-    if (ret == 0 && remain == 0)
-        __wt_err(
-          session, ENOMEM, "error or message truncated: internal WiredTiger buffer too small");
-
     return (0);
 }
 

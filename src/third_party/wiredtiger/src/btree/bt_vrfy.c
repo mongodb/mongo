@@ -454,7 +454,7 @@ __verify_tree(
      * Report progress occasionally.
      */
     if (++vs->fcnt % WT_VERIFY_PROGRESS_INTERVAL == 0)
-        WT_RET(__wt_progress(session, WT_VERB_VERIFY_PROGRESS, NULL, vs->fcnt));
+        WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */

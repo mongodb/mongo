@@ -445,7 +445,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 /* Report progress occasionally. */
 #define WT_SALVAGE_PROGRESS_INTERVAL 100
         if (++ss->fcnt % WT_SALVAGE_PROGRESS_INTERVAL == 0)
-            WT_ERR(__wt_progress(session, WT_VERB_SALVAGE_PROGRESS, NULL, ss->fcnt));
+            WT_ERR(__wt_progress(session, NULL, ss->fcnt));
 
         /*
          * Read (and potentially decompress) the block; the underlying block manager might return

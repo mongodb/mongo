@@ -760,9 +760,7 @@ connection_runtime_config = [
         'error' represents the messages from the WT_EVENT_HANDLER::handle_error method.''',
         type='list', choices=[
             'error',
-            'message',
-            'progress'
-            ]),
+            'message']),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.

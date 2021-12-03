@@ -45,7 +45,6 @@
     gen(WT_VERB_RECOVERY_PROGRESS)     \
     gen(WT_VERB_RTS)                   \
     gen(WT_VERB_SALVAGE)               \
-    gen(WT_VERB_SALVAGE_PROGRESS)      \
     gen(WT_VERB_SHARED_CACHE)          \
     gen(WT_VERB_SPLIT)                 \
     gen(WT_VERB_TEMPORARY)             \
@@ -53,9 +52,7 @@
     gen(WT_VERB_TIERED)                \
     gen(WT_VERB_TIMESTAMP)             \
     gen(WT_VERB_TRANSACTION)           \
-    gen(WT_VERB_UPGRADE_PROGRESS)      \
     gen(WT_VERB_VERIFY)                \
-    gen(WT_VERB_VERIFY_PROGRESS)       \
     gen(WT_VERB_VERSION)               \
     gen(WT_VERB_WRITE)
 /* clang-format on */

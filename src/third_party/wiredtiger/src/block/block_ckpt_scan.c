@@ -264,7 +264,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
 /* Report progress occasionally. */
 #define WT_CHECKPOINT_LIST_PROGRESS_INTERVAL 100
         if (++nblocks % WT_CHECKPOINT_LIST_PROGRESS_INTERVAL == 0)
-            WT_ERR(__wt_progress(session, WT_VERB_CHECKPOINT_PROGRESS, NULL, nblocks));
+            WT_ERR(__wt_progress(session, NULL, nblocks));
 
         /*
          * Read the start of a possible page and get a block length from it. Move to the next

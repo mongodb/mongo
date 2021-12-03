@@ -2007,8 +2007,8 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"thread_group", WT_VERB_THREAD_GROUP}, {"timestamp", WT_VERB_TIMESTAMP},
       {"tiered", WT_VERB_TIERED}, {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
       {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE}, {NULL, 0}};
-    static const WT_NAME_FLAG jsontypes[] = {{"error", WT_JSON_OUTPUT_ERROR},
-      {"message", WT_JSON_OUTPUT_MESSAGE}, {"progress", WT_JSON_OUTPUT_PROGRESS}, {NULL, 0}};
+    static const WT_NAME_FLAG jsontypes[] = {
+      {"error", WT_JSON_OUTPUT_ERROR}, {"message", WT_JSON_OUTPUT_MESSAGE}, {NULL, 0}};
 
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
