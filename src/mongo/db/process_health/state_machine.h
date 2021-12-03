@@ -82,10 +82,20 @@ public:
         return *this;
     }
 
+    void tassertNotStarted() const {
+        tassert(
+            5936505, "operation cannot be performed after the state machine is started", !_started);
+    }
+
+    void tassertStarted() const {
+        tassert(
+            5936508, "operation cannot be performed before the state machine is started", _started);
+    }
+
     // Transitions the state machine into the initial state.
     // Can only be called once.
     void start() {
-        invariant(!_started, "cannot call start twice");
+        tassertNotStarted();
         _started = true;
 
         auto& initialState = getContextOrFatal(_initial);
@@ -97,7 +107,7 @@ public:
     // Define a valid transition.
     // Must be called prior to starting the state machine.
     void validTransition(State from, State to) noexcept {
-        invariant(!_started, "operation cannot be performed after the state machine is started");
+        tassertNotStarted();
         auto& context = _states[from];
         context.validTransitions.insert(to);
     }
@@ -114,7 +124,7 @@ public:
 
     // Accept message m, transition the state machine, and return the resulting state.
     State accept(const InputMessage& m) {
-        invariant(_started, "operation cannot be performed before the state machine is started");
+        tassertStarted();
         auto& handler = _current->stateHandler;
         auto result = handler->accept(m);
         if (result) {
@@ -125,7 +135,7 @@ public:
 
     // Return the current state.
     State state() const {
-        invariant(_started, "operation cannot be performed before the state machine is started");
+        tassertStarted();
         invariant(_current);
         return _current->state();
     }
@@ -203,14 +213,14 @@ public:
     };
 
     StateEventRegistryPtr registerHandler(StateHandlerPtr handler) {
-        invariant(!_started, "operation cannot be performed after the state machine is started");
+        tassertNotStarted();
         auto& context = _states[handler->state()];
         context.stateHandler = std::move(handler);
         return context.stateHandler.get();
     }
 
     StateEventRegistryPtr registerHandler(State s, MessageHandler&& handler) {
-        invariant(!_started, "operation cannot be performed after the state machine is started");
+        tassertNotStarted();
         auto& context = _states[s];
         context.stateHandler = std::make_unique<LambdaStateHandler>(s, std::move(handler));
         return context.stateHandler.get();
@@ -228,14 +238,18 @@ protected:
     using StateContexts = stdx::unordered_map<State, StateContext>;
 
     void setState(State s, const OptionalMessageType& message) {
-        invariant(_started, "operation cannot be performed before the state machine is started");
+        tassertStarted();
 
         invariant(_current);
         auto& previousContext = *_current;
 
         auto& transitions = previousContext.validTransitions;
         auto it = transitions.find(s);
-        invariant(it != transitions.end(), "invalid state transition");
+        tassert(5936506, "invalid state transition", it != transitions.end());
+
+        // in production, an illegal transition is a noop
+        if (it == transitions.end())
+            return;
 
         // switch to new state
         _current = &getContextOrFatal(s);
@@ -263,7 +277,7 @@ protected:
     }
 
     StateEventRegistryPtr on(State s) {
-        invariant(!_started, "operation cannot be performed after the state machine is started");
+        tassertNotStarted();
         return getHandlerOrFatal(s);
     }
 
