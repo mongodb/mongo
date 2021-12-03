@@ -67,10 +67,11 @@ const applyOpsCmd = {
 // Conversion should fail when there are existing duplicates.
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
-const duplicateKeyError =
-    assert.commandFailedWithCode(db.adminCommand(applyOpsCmd), ErrorCodes.DuplicateKey);
-jsTestLog('Duplicate key error from failed conversion: ' + tojson(duplicateKeyError));
-assert.eq(1, duplicateKeyError.applied, tojson(duplicateKeyError));
+const cannotEnableIndexConstraintError = assert.commandFailedWithCode(
+    db.adminCommand(applyOpsCmd), ErrorCodes.CannotEnableIndexConstraint);
+jsTestLog('Cannot enable index constraint error from failed conversion: ' +
+          tojson(cannotEnableIndexConstraintError));
+assert.eq(1, cannotEnableIndexConstraintError.applied, tojson(cannotEnableIndexConstraintError));
 assert.commandWorked(coll.remove({_id: 2}));
 
 // Dry run mode is not supported for running collMod through applyOps.

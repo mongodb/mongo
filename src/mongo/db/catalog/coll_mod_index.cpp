@@ -234,23 +234,37 @@ void scanIndexForDuplicates(OperationContext* opCtx,
     dataThrottle.turnThrottlingOff();
     SortedDataInterfaceThrottleCursor indexCursor(opCtx, accessMethod, &dataThrottle);
     boost::optional<KeyStringEntry> prevIndexEntry;
+    BSONArrayBuilder violations;
+    bool lastDocViolated = false;
+    BSONArrayBuilder lastViolatingIDs;
     for (auto indexEntry = indexCursor.seekForKeyString(opCtx, firstKeyString); indexEntry;
          indexEntry = indexCursor.nextKeyString(opCtx)) {
-
         if (prevIndexEntry &&
             indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString) == 0) {
-            auto dupKeyErrorStatus =
-                buildDupKeyErrorStatus(opCtx, indexEntry->keyString, entry->ordering(), idx);
-            auto firstDoc = collection->docFor(opCtx, prevIndexEntry->loc);
-            auto secondDoc = collection->docFor(opCtx, indexEntry->loc);
-            uassertStatusOK(dupKeyErrorStatus.withContext(
-                str::stream() << "Failed to convert index to unique. firstRecordId: "
-                              << prevIndexEntry->loc << "; firstDoc: " << firstDoc.value()
-                              << "; secondRecordId" << indexEntry->loc << "; secondDoc: "
-                              << secondDoc.value() << "; collectionUUID: " << collection->uuid()));
+            auto currentEntry = collection->docFor(opCtx, indexEntry->loc).value();
+            if (!lastDocViolated) {
+                auto prevEntry = collection->docFor(opCtx, prevIndexEntry->loc).value();
+                invariant(lastViolatingIDs.arrSize() == 0);
+                lastViolatingIDs.append(std::move(prevEntry["_id"]));
+                lastDocViolated = true;
+            }
+            lastViolatingIDs.append(std::move(currentEntry["_id"]));
+        } else {
+            if (lastDocViolated) {
+                violations.append(BSON("ids"_sd << lastViolatingIDs.arr()));
+                // Destruct and reconstruct lastViolatingIDs so we can reuse it
+                lastViolatingIDs.~BSONArrayBuilder();
+                new (&lastViolatingIDs) BSONArrayBuilder();
+            }
+            lastDocViolated = false;
         }
-
         prevIndexEntry = indexEntry;
+    }
+    if (lastDocViolated) {
+        violations.append(BSON("ids"_sd << lastViolatingIDs.arr()));
+    }
+    if (violations.arrSize() != 0) {
+        uassertStatusOK(buildEnableConstraintErrorStatus("unique", violations.arr()));
     }
 }
 
