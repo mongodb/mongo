@@ -71,6 +71,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
+MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueSideWriteTracker);
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     Lock::DBLock dblock(opCtx, nss.db(), MODE_IS);
@@ -560,6 +561,12 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
     const auto& cmr = statusW.getValue();
     auto idx = cmr.indexRequest.idx;
     scanIndexForDuplicates(opCtx, collection, idx);
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueSideWriteTracker,
+                                                     opCtx,
+                                                     "hangAfterCollModIndexUniqueSideWriteTracker",
+                                                     []() {},
+                                                     nss);
 
     return std::move(writeOpsToken);
 }
