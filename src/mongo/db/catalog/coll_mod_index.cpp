@@ -44,6 +44,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
@@ -99,6 +100,29 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
 }
 
 /**
+ * Returns set of keys for a document in an index.
+ */
+void getKeysForIndex(OperationContext* opCtx,
+                     const CollectionPtr& collection,
+                     const IndexAccessMethod* accessMethod,
+                     const BSONObj& doc,
+                     KeyStringSet* keys) {
+    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+
+    accessMethod->getKeys(opCtx,
+                          collection,
+                          pooledBuilder,
+                          doc,
+                          IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                          IndexAccessMethod::GetKeysContext::kAddingKeys,
+                          keys,
+                          nullptr,       //  multikeyMetadataKeys
+                          nullptr,       //  multikeyPaths
+                          boost::none);  // loc
+}
+
+
+/**
  * Adjusts unique setting on an index.
  * An index can be converted to unique but removing the uniqueness property is not allowed.
  */
@@ -116,7 +140,38 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
 
     // Checks for duplicates on the primary or for the 'applyOps' command.
     // TODO(SERVER-61356): revisit this condition for tenant migration, which uses kInitialSync.
-    if (!mode || *mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+    if (!mode) {
+        const auto& collection = autoColl->getCollection();
+        auto entry = idx->getEntry();
+        auto accessMethod = entry->accessMethod();
+
+        invariant(docsForUniqueIndex,
+                  fmt::format("Unique index conversion requires valid set of changed docs from "
+                              "side write tracker: {} {} {}",
+                              collection->ns().toString(),
+                              idx->indexName(),
+                              collection->uuid().toString()));
+
+
+        // Gather the keys for all the side write activity in a single set of unique keys.
+        KeyStringSet keys;
+        for (const auto& doc : *docsForUniqueIndex) {
+            // The OpObserver records CRUD events in transactions that are about to be committed.
+            // We should not assume that inserts/updates can be conflated with deletes.
+            // TODO(SERVER-61913): Investigate recording delete operations.
+            getKeysForIndex(opCtx, collection, accessMethod, doc, &keys);
+        }
+
+        // Search the index for duplicates using keys derived from side write documents.
+        for (const auto& keyString : keys) {
+            // Inserts and updates should generally refer to existing index entries, but since we
+            // are recording uncommitted CRUD events, we should not always assume that searching
+            // for 'keyString' in the index must return a a valid index entry.
+            scanIndexForDuplicates(opCtx, collection, idx, keyString, /*limit=*/2);
+        }
+    } else if (*mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
+        // We do not need to observe side writes under applyOps because applyOps runs under global
+        // write access.
         scanIndexForDuplicates(opCtx, autoColl->getCollection(), idx);
     }
 
