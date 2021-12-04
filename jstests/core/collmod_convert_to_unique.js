@@ -54,6 +54,13 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.BadValue);
 
+// Tries to modify a non-existent collection.
+assert.commandFailedWithCode(db.runCommand({
+    collMod: collName + '_missing',
+    index: {keyPattern: {a: 1}, unique: true},
+}),
+                             ErrorCodes.NamespaceNotFound);
+
 // Conversion should fail when there are existing duplicates.
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
