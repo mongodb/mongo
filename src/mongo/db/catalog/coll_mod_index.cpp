@@ -217,15 +217,21 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
 void scanIndexForDuplicates(OperationContext* opCtx,
                             const CollectionPtr& collection,
-                            const IndexDescriptor* idx) {
+                            const IndexDescriptor* idx,
+                            boost::optional<KeyString::Value> firstKeyString,
+                            boost::optional<int64_t> limit) {
     auto entry = idx->getEntry();
     auto accessMethod = entry->accessMethod();
 
     // Starting point of index traversal.
-    auto keyStringVersion = accessMethod->getSortedDataInterface()->getKeyStringVersion();
-    KeyString::Builder firstKeyStringBuilder(
-        keyStringVersion, BSONObj(), entry->ordering(), KeyString::Discriminator::kExclusiveBefore);
-    KeyString::Value firstKeyString = firstKeyStringBuilder.getValueCopy();
+    if (!firstKeyString) {
+        auto keyStringVersion = accessMethod->getSortedDataInterface()->getKeyStringVersion();
+        KeyString::Builder firstKeyStringBuilder(keyStringVersion,
+                                                 BSONObj(),
+                                                 entry->ordering(),
+                                                 KeyString::Discriminator::kExclusiveBefore);
+        firstKeyString = firstKeyStringBuilder.getValueCopy();
+    }
 
     // Scan index for duplicates, comparing consecutive index entries.
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are
@@ -237,7 +243,8 @@ void scanIndexForDuplicates(OperationContext* opCtx,
     BSONArrayBuilder violations;
     bool lastDocViolated = false;
     BSONArrayBuilder lastViolatingIDs;
-    for (auto indexEntry = indexCursor.seekForKeyString(opCtx, firstKeyString); indexEntry;
+    int64_t i = 0;
+    for (auto indexEntry = indexCursor.seekForKeyString(opCtx, *firstKeyString); indexEntry;
          indexEntry = indexCursor.nextKeyString(opCtx)) {
         if (prevIndexEntry &&
             indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString) == 0) {
@@ -259,6 +266,10 @@ void scanIndexForDuplicates(OperationContext* opCtx,
             lastDocViolated = false;
         }
         prevIndexEntry = indexEntry;
+
+        if (limit && ++i >= *limit) {
+            break;
+        }
     }
     if (lastDocViolated) {
         violations.append(BSON("ids"_sd << lastViolatingIDs.arr()));

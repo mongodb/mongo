@@ -34,6 +34,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo {
 
@@ -72,7 +73,9 @@ void processCollModIndexRequest(OperationContext* opCtx,
  */
 void scanIndexForDuplicates(OperationContext* opCtx,
                             const CollectionPtr& collection,
-                            const IndexDescriptor* idx);
+                            const IndexDescriptor* idx,
+                            boost::optional<KeyString::Value> firstKeyString = {},
+                            boost::optional<int64_t> limit = {});
 
 /**
  * Returns the formatted error status for not being able to enable the index constraint.
