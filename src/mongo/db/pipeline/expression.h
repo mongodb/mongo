@@ -2894,9 +2894,7 @@ public:
     ExpressionSortArray(ExpressionContext* const expCtx,
                         boost::intrusive_ptr<Expression> input,
                         const PatternValueCmp& sortBy)
-        : Expression(expCtx, {std::move(input)}), _input(_children[0]), _sortBy(sortBy) {
-        expCtx->sbeCompatible = false;
-    }
+        : Expression(expCtx, {std::move(input)}), _input(_children[0]), _sortBy(sortBy) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     boost::intrusive_ptr<Expression> optimize() final;
@@ -2915,12 +2913,15 @@ public:
 
     const char* getOpName() const;
 
+    BSONObj getSortPattern() const {
+        return _sortBy.sortPattern;
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
     boost::intrusive_ptr<Expression>& _input;
-
     PatternValueCmp _sortBy;
 };
 

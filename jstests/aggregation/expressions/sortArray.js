@@ -26,6 +26,8 @@ assert.commandWorked(coll.insert({
     mismatchedTypes: [1, [1], {a: 1}, "1"],
     moreMismatchedTypes: [2, 1, "hello", {a: 6}, {a: "hello"}, {a: -1}, null],
     mismatchedNumberTypes: [[NumberDecimal(4)], [1, 9, 8]],
+    collatorTestField: ["2", "10"],
+    collatorObjectTestField: [{a: "2"}, {a: "10"}],
 
 }));
 
@@ -190,4 +192,35 @@ assertDBOutputEquals([null, 1, 2, "hello", {a: -1}, {a: 6}, {a: "hello"}], coll.
 assertDBOutputEquals([[1, 9, 8], [NumberDecimal(4)]], coll.aggregate([
     {$project: {sorted: {$sortArray: {input: "$mismatchedNumberTypes", sortBy: 1}}}}
 ]));
+
+/* ------------------------ Collator Tests ------------------------ */
+
+assertDBOutputEquals(
+    ["10", "2"],
+    coll.aggregate([{$project: {sorted: {$sortArray: {input: "$collatorTestField", sortBy: 1}}}}]));
+
+assertDBOutputEquals(
+    ["2", "10"],
+    coll.aggregate([{$project: {sorted: {$sortArray: {input: "$collatorTestField", sortBy: 1}}}}],
+                   {collation: {locale: "en", numericOrdering: true}}));
+
+assertDBOutputEquals([{a: "10"}, {a: "2"}], coll.aggregate([
+    {$project: {sorted: {$sortArray: {input: "$collatorObjectTestField", sortBy: 1}}}}
+]));
+
+assertDBOutputEquals(
+    [{a: "2"}, {a: "10"}],
+    coll.aggregate(
+        [{$project: {sorted: {$sortArray: {input: "$collatorObjectTestField", sortBy: 1}}}}],
+        {collation: {locale: "en", numericOrdering: true}}));
+
+assertDBOutputEquals([{a: "10"}, {a: "2"}], coll.aggregate([
+    {$project: {sorted: {$sortArray: {input: "$collatorObjectTestField", sortBy: {a: 1}}}}}
+]));
+
+assertDBOutputEquals(
+    [{a: "2"}, {a: "10"}],
+    coll.aggregate(
+        [{$project: {sorted: {$sortArray: {input: "$collatorObjectTestField", sortBy: {a: 1}}}}}],
+        {collation: {locale: "en", numericOrdering: true}}));
 }());

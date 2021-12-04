@@ -56,6 +56,7 @@ sbeEnv.Library(
         'stages/unique.cpp',
         'stages/unwind.cpp',
         'util/debug_print.cpp',
+        'values/sbe_pattern_value_cmp.cpp',
         'values/slot.cpp',
         'vm/arith.cpp',
         'vm/datetime.cpp',
@@ -79,6 +80,7 @@ sbeEnv.Library(
         'query_sbe_values',
         ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
          ]
     )
@@ -171,6 +173,7 @@ env.CppUnitTest(
         'sbe_test.cpp',
         'sbe_trial_run_tracker_test.cpp',
         'sbe_unique_test.cpp',
+        'values/sbe_pattern_value_cmp_test.cpp',
         'values/value_serialization_test.cpp',
         "values/value_test.cpp",
         'values/write_value_to_stream_test.cpp'

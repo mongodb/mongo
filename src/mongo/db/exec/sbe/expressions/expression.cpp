@@ -480,6 +480,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2 || n == 3; }, vm::Builtin::extractSubArray, false}},
     {"isArrayEmpty", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isArrayEmpty, false}},
     {"reverseArray", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::reverseArray, false}},
+    {"sortArray",
+     BuiltinFn{[](size_t n) { return n == 2 || n == 3; }, vm::Builtin::sortArray, false}},
     {"dateAdd", BuiltinFn{[](size_t n) { return n == 5; }, vm::Builtin::dateAdd, false}},
     {"hasNullBytes", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::hasNullBytes, false}},
     {"hash", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::hash, false}},

@@ -41,6 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
@@ -601,7 +602,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::Type
     }
 
     if (arrTag == value::TypeTags::Array) {
-        // If `arr` is an SBE array, use Array::getAt() to retrieve the element at index `idx`.
+        // If 'arr' is an SBE array, use Array::getAt() to retrieve the element at index 'idx'.
         auto arrayView = value::getArrayView(arrValue);
 
         size_t convertedIdx = idx;
@@ -624,7 +625,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::Type
                 i++;
                 enumerator.advance();
             }
-            // If the array didn't have an element at index `idx`, return Nothing.
+            // If the array didn't have an element at index 'idx', return Nothing.
             if (enumerator.atEnd()) {
                 return {false, value::TypeTags::Nothing, 0};
             }
@@ -662,7 +663,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::Type
         auto [tag, val] = windowEndEnumerator.getViewOfValue();
         return {false, tag, val};
     } else {
-        // Earlier in this function we bailed out if the `arrTag` wasn't Array, ArraySet or
+        // Earlier in this function we bailed out if the 'arrTag' wasn't Array, ArraySet or
         // bsonArray, so it should be impossible to reach this point.
         MONGO_UNREACHABLE
     }
@@ -3518,7 +3519,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(Ar
         value::ArrayEnumerator enumerator(arrayType, arrayValue);
         return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(enumerator.atEnd())};
     } else {
-        // Earlier in this function we bailed out if the `arrayType` wasn't Array, ArraySet or
+        // Earlier in this function we bailed out if the 'arrayType' wasn't Array, ArraySet or
         // bsonArray, so it should be impossible to reach this point.
         MONGO_UNREACHABLE
     }
@@ -3651,7 +3652,98 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ar
         resultGuard.reset();
         return {true, resultTag, resultVal};
     } else {
-        // Earlier in this function we bailed out if the `inputType` wasn't
+        // Earlier in this function we bailed out if the 'inputType' wasn't
+        // Array, ArraySet or bsonArray, so it should be impossible to reach
+        // this point.
+        MONGO_UNREACHABLE;
+    }
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityType arity) {
+    invariant(arity == 2 || arity == 3);
+    auto [inputOwned, inputType, inputVal] = getFromStack(0);
+
+    if (!value::isArray(inputType)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [specOwned, specTag, specVal] = getFromStack(1);
+
+    if (!value::isObject(specTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    CollatorInterface* collator = nullptr;
+    if (arity == 3) {
+        auto [collatorOwned, collatorType, collatorVal] = getFromStack(2);
+
+        if (collatorType == value::TypeTags::collator) {
+            collator = value::getCollatorView(collatorVal);
+        } else {
+            // If a third parameter was supplied but it is not a Collator, return Nothing.
+            return {false, value::TypeTags::Nothing, 0};
+        }
+    }
+
+    auto cmp = value::SbePatternValueCmp(specTag, specVal, collator);
+
+    auto [resultTag, resultVal] = value::makeNewArray();
+    auto resultView = value::getArrayView(resultVal);
+    value::ValueGuard resultGuard{resultTag, resultVal};
+
+    if (inputType == value::TypeTags::Array) {
+        auto inputView = value::getArrayView(inputVal);
+        size_t inputSize = inputView->size();
+        if (inputSize) {
+            resultView->reserve(inputSize);
+            std::vector<std::pair<value::TypeTags, value::Value>> sortVector;
+            for (size_t i = 0; i < inputSize; i++) {
+                sortVector.push_back(inputView->getAt(i));
+            }
+            std::sort(sortVector.begin(), sortVector.end(), cmp);
+
+            for (size_t i = 0; i < inputSize; i++) {
+                auto [tag, val] = sortVector[i];
+                auto [copyTag, copyVal] = copyValue(tag, val);
+                resultView->push_back(copyTag, copyVal);
+            }
+        }
+
+        resultGuard.reset();
+        return {true, resultTag, resultVal};
+    } else if (inputType == value::TypeTags::bsonArray || inputType == value::TypeTags::ArraySet) {
+        value::ArrayEnumerator enumerator{inputType, inputVal};
+
+        // Using intermediate vector since bsonArray and ArraySet don't
+        // support reverse iteration.
+        std::vector<std::pair<value::TypeTags, value::Value>> inputContents;
+
+        if (inputType == value::TypeTags::ArraySet) {
+            // Reserve space to avoid resizing on push_back calls.
+            auto arraySetView = value::getArraySetView(inputVal);
+            inputContents.reserve(arraySetView->size());
+        }
+
+        while (!enumerator.atEnd()) {
+            inputContents.push_back(enumerator.getViewOfValue());
+            enumerator.advance();
+        }
+
+        std::sort(inputContents.begin(), inputContents.end(), cmp);
+
+        if (inputContents.size()) {
+            resultView->reserve(inputContents.size());
+
+            for (auto it = inputContents.begin(); it != inputContents.end(); ++it) {
+                auto [copyTag, copyVal] = copyValue(it->first, it->second);
+                resultView->push_back(copyTag, copyVal);
+            }
+        }
+
+        resultGuard.reset();
+        return {true, resultTag, resultVal};
+    } else {
+        // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
         // this point.
         MONGO_UNREACHABLE;
@@ -3932,6 +4024,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIsArrayEmpty(arity);
         case Builtin::reverseArray:
             return builtinReverseArray(arity);
+        case Builtin::sortArray:
+            return builtinSortArray(arity);
         case Builtin::dateAdd:
             return builtinDateAdd(arity);
         case Builtin::hasNullBytes:
