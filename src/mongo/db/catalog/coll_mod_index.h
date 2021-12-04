@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/coll_mod_write_ops_tracker.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -59,11 +60,17 @@ struct ParsedCollModIndexRequest {
  *
  * The appropriate collection locks should be acquired before calling this function.
  *
+ * 'docsForUniqueIndex' contains documents captured by the side writes tracker for unique index
+ * conversion.
+ * If no side writes tracker was installed (because a unique index conversion was not requested),
+ * 'docsForUniqueIndex' will be null.
+ *
  * Used by collMod implementation only.
  */
 void processCollModIndexRequest(OperationContext* opCtx,
                                 AutoGetCollection* autoColl,
                                 const ParsedCollModIndexRequest& collModIndexRequest,
+                                const CollModWriteOpsTracker::Docs* docsForUniqueIndex,
                                 boost::optional<IndexCollModInfo>* indexCollModInfo,
                                 BSONObjBuilder* result,
                                 boost::optional<repl::OplogApplication::Mode> mode);

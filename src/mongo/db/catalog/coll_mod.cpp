@@ -38,6 +38,7 @@
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod_index.h"
+#include "mongo/db/catalog/coll_mod_write_ops_tracker.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -535,6 +536,34 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     return Status::OK();
 }
 
+StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUnique(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID, const CollMod& cmd) {
+    AutoGetCollection coll(opCtx, nsOrUUID, MODE_IS);
+    auto nss = coll.getNss();
+
+    const auto& collection = coll.getCollection();
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "ns does not exist for unique index conversion: " << nss);
+    }
+
+    // Install side write tracker.
+    auto opsTracker = CollModWriteOpsTracker::get(opCtx->getServiceContext());
+    auto writeOpsToken = opsTracker->startTracking(collection->uuid());
+
+    // Scan index for duplicates without exclusive access.
+    BSONObjBuilder unused;
+    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd, &unused);
+    if (!statusW.isOK()) {
+        return statusW.getStatus();
+    }
+    const auto& cmr = statusW.getValue();
+    auto idx = cmr.indexRequest.idx;
+    scanIndexForDuplicates(opCtx, collection, idx);
+
+    return std::move(writeOpsToken);
+}
+
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceStringOrUUID& nsOrUUID,
                         const CollMod& cmd,
@@ -542,6 +571,19 @@ Status _collModInternal(OperationContext* opCtx,
                         boost::optional<repl::OplogApplication::Mode> mode) {
     if (cmd.getDryRun().value_or(false)) {
         return _processCollModDryRunMode(opCtx, nsOrUUID, cmd, result, mode);
+    }
+
+    // Before acquiring exclusive access to the collection for unique index conversion, we will
+    // track concurrent writes while performing a preliminary index scan here. After we obtain
+    // exclusive access for the actual conversion, we will reconcile the concurrent writes with
+    // the state of the index before updating the catalog.
+    std::unique_ptr<CollModWriteOpsTracker::Token> writeOpsToken;
+    if (cmd.getIndex() && cmd.getIndex()->getUnique().value_or(false) && !mode) {
+        auto statusW = _setUpCollModIndexUnique(opCtx, nsOrUUID, cmd);
+        if (!statusW.isOK()) {
+            return statusW.getStatus();
+        }
+        writeOpsToken = std::move(statusW.getValue());
     }
 
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
@@ -621,6 +663,16 @@ Status _collModInternal(OperationContext* opCtx,
         createChangeStreamPreImagesCollection(opCtx);
     }
 
+    // With exclusive access to the collection, we can take ownership of the modified docs observed
+    // by the side write tracker if a unique index conversion is requested.
+    // This step releases the resources associated with the token and therefore should not be
+    // performed inside the write conflict retry loop.
+    std::unique_ptr<CollModWriteOpsTracker::Docs> docsForUniqueIndex;
+    if (writeOpsToken) {
+        auto opsTracker = CollModWriteOpsTracker::get(opCtx->getServiceContext());
+        docsForUniqueIndex = opsTracker->stopTracking(std::move(writeOpsToken));
+    }
+
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
 
@@ -679,8 +731,13 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         // Handle index modifications.
-        processCollModIndexRequest(
-            opCtx, &coll, cmrNew.indexRequest, &indexCollModInfo, result, mode);
+        processCollModIndexRequest(opCtx,
+                                   &coll,
+                                   cmrNew.indexRequest,
+                                   docsForUniqueIndex.get(),
+                                   &indexCollModInfo,
+                                   result,
+                                   mode);
 
         if (cmrNew.collValidator) {
             coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);
