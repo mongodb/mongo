@@ -1021,14 +1021,6 @@ functions:
       args:
         - "./src/evergreen/extract_generated_test_configuration.sh"
 
-  "minimize jstestfuzz": &minimize_jstestfuzz
-    command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-        - "./src/evergreen/jstestfuzz_minimize.sh"
-
   "generate selected tests":
     - *f_expansions_write
     - *configure_evergreen_api_credentials
@@ -1169,7 +1161,6 @@ functions:
       args:
         - "./src/evergreen/implicit_multiversions_tasks_generate.sh"
   - *execute_resmoke_tests
-  - *minimize_jstestfuzz
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
     # directly actionable. We use type=setup rather than type=system or type=test for this command
     # because we don't intend for any human to look at this failure.
@@ -1179,12 +1170,6 @@ functions:
       binary: bash
       args:
         - "./src/evergreen/check_run_tests_infrastructure_failure.sh"
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-        - "./src/evergreen/check_resmoke_failure.sh"
 
   "run tests":
     - *f_expansions_write
@@ -1441,7 +1426,14 @@ functions:
         content_type: application/gzip
         display_name: npm logs - Execution ${execution}
 
-  "upload jstestfuzz minimized output":
+  "minimize jstestfuzz":
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/jstestfuzz_minimize.sh"
     - command: s3.put
       params:
         optional: true
@@ -1466,16 +1458,6 @@ functions:
         visibility: signed
         content_type: text/javascript
         display_name: Minimized jstestfuzz Test - Execution ${execution}
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/wiki_page_minimized_agg_query_fuzzer.sh"
-    - command: attach.artifacts
-      params:
-        files:
-          - wiki_page_running_minimized_test_location.json
 
   "run idl tests":
     - *f_expansions_write
@@ -2046,6 +2028,18 @@ functions:
         files:
           - wiki_page_location.json
 
+  "attach running minimized tests wiki page":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/wiki_page_minimized_agg_query_fuzzer.sh"
+    - command: attach.artifacts
+      params:
+        files:
+          - wiki_page_running_minimized_test_location.json
+
 
 # Pre task steps
 pre:
@@ -2060,7 +2054,7 @@ post:
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
   - func: "attach wiki page"
-  - func: "upload jstestfuzz minimized output"
+  - func: "attach running minimized tests wiki page"
   - func: "kill processes"
   - func: "save local client logs"
   - func: "save code coverage data"
