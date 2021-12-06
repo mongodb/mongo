@@ -9,8 +9,11 @@
 const t = db.bench_test2;
 t.drop();
 
-for (let i = 0; i < 100; i++)
-    assert.commandWorked(t.insert({_id: i, x: 0}));
+let docs = [];
+for (let i = 0; i < 100; i++) {
+    docs.push({_id: i, x: 0});
+}
+assert.commandWorked(t.insert(docs));
 
 const benchArgs = {
     ops: [{
