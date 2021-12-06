@@ -61,7 +61,9 @@ public:
         : _type(type), _severity(0), _description("resolved"_sd) {}
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
-    HealthCheckStatus& operator=(const HealthCheckStatus&) = delete;
+    HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
+    HealthCheckStatus(HealthCheckStatus&&) = default;
+    HealthCheckStatus& operator=(HealthCheckStatus&&) = default;
 
     /**
      * @return FaultFacetType of this status.
@@ -101,16 +103,20 @@ public:
 
     static bool isActiveFault(double severity) {
         // Range is inclusive.
-        return severity >= kActiveFaultSeverity - kActiveFaultSeverityEpsilon;
+        return severity >= 1.0;
+    }
+
+    bool isActiveFault() const {
+        return isActiveFault(getSeverity());
     }
 
 private:
     friend std::ostream& operator<<(std::ostream&, const HealthCheckStatus&);
     friend StringBuilder& operator<<(StringBuilder& s, const HealthCheckStatus& hcs);
 
-    const FaultFacetType _type;
-    const double _severity;
-    const std::string _description;
+    FaultFacetType _type;
+    double _severity;
+    std::string _description;
 };
 
 inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {

@@ -58,19 +58,28 @@ protected:
 
     Future<HealthCheckStatus> periodicCheckImpl(
         PeriodicHealthCheckContext&& periodicCheckContext) override {
-        // Detects mocked severity and handles it.
-        const double severity = _getSeverityCallback();
 
         auto completionPf = makePromiseFuture<HealthCheckStatus>();
-        if (HealthCheckStatus::isResolved(severity)) {
-            LOGV2(5936603, "Mock health observer returns a resolved severity");
-            completionPf.promise.emplaceValue(HealthCheckStatus(getType()));
-        } else {
-            LOGV2(5936604,
-                  "Mock health observer returns a fault severity",
-                  "severity"_attr = severity);
-            completionPf.promise.emplaceValue(HealthCheckStatus(getType(), severity, "failed"));
-        }
+
+        auto cbHandle = periodicCheckContext.taskExecutor->scheduleWork(
+            [this, promise = std::move(completionPf.promise)](
+                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+                try {
+                    auto severity = _getSeverityCallback();
+                    if (HealthCheckStatus::isResolved(severity)) {
+                        LOGV2(5936603, "Mock health observer returns a resolved severity");
+                        promise.emplaceValue(HealthCheckStatus(getType()));
+                    } else {
+                        LOGV2(5936604,
+                              "Mock health observer returns a fault severity",
+                              "severity"_attr = severity);
+                        promise.emplaceValue(HealthCheckStatus(getType(), severity, "failed"));
+                    }
+                } catch (const DBException& e) {
+                    promise.setError(e.toStatus());
+                }
+            });
+
         return std::move(completionPf.future);
     }
 

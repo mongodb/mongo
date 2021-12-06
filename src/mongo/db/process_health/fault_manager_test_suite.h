@@ -80,24 +80,20 @@ public:
                                  "cause"_attr = cause);
                        }) {}
 
-    void transitionStateTest(FaultState newState) {
-        transitionToState(newState);
+    void healthCheckTest(HealthObserver* observer, std::shared_ptr<AtomicWord<bool>> token) {
+        healthCheck(observer, token);
     }
 
-    void healthCheckTest() {
-        healthCheck();
+    void healthCheckTest(HealthObserver* observer) {
+        healthCheck(observer, std::make_shared<AtomicWord<bool>>());
+    }
+
+    void schedulePeriodicHealthCheckThreadTest() {
+        schedulePeriodicHealthCheckThread();
     }
 
     std::vector<HealthObserver*> getHealthObserversTest() {
         return getHealthObservers();
-    }
-
-    void processFaultExistsEventTest() {
-        processFaultExistsEvent();
-    }
-
-    void processFaultIsResolvedEventTest() {
-        return processFaultIsResolvedEvent();
     }
 
     FaultFacetsContainerPtr getOrCreateFaultFacetsContainerTest() {
@@ -116,6 +112,10 @@ public:
 
     FaultManagerConfig getConfigTest() {
         return getConfig();
+    }
+
+    FaultState acceptTest(const HealthCheckStatus& message) {
+        return accept(message);
     }
 };
 
@@ -159,6 +159,11 @@ public:
     }
 
     void constructTaskExecutor() {
+        if (_executor) {
+            _executor->shutdown();
+            _executor->join();
+        }
+
         auto network = std::shared_ptr<executor::NetworkInterface>(
             executor::makeNetworkInterface("FaultManagerTest").release());
         ThreadPool::Options options;
@@ -166,7 +171,6 @@ public:
 
         _executor =
             std::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(network));
-        _executor->startup();
     }
 
     void resetManager(std::unique_ptr<FaultManagerConfig> config = nullptr) {
@@ -230,16 +234,6 @@ public:
         tickSource().advance(d);
     }
 
-    void assertInvalidStateTransition(FaultState newState) {
-        try {
-            manager().transitionStateTest(newState);
-            ASSERT(false);
-        } catch (const DBException& ex) {
-            ASSERT(ex.code() == ErrorCodes::BadValue);
-            // expected exception
-        }
-    }
-
     static inline const Seconds kWaitTimeout{30};
     static inline const Milliseconds kSleepTime{1};
     void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTimeout) {
@@ -260,7 +254,7 @@ public:
                 return true;
             else {
                 advanceTime(kCheckTimeIncrement);
-                manager().healthCheckTest();
+                manager().schedulePeriodicHealthCheckThreadTest();
                 return false;
             }
         };
