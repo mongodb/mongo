@@ -56,7 +56,8 @@ void HealthObserverRegistration::registerObserverFactory(
 std::vector<std::unique_ptr<HealthObserver>> HealthObserverRegistration::instantiateAllObservers(
     ServiceContext* svcCtx) {
     std::vector<std::unique_ptr<HealthObserver>> result;
-    for (auto& cb : *getObserverFactories()) {
+    auto factories = *getObserverFactories();
+    for (auto& cb : factories) {
         result.push_back(cb(svcCtx));
     }
     return result;

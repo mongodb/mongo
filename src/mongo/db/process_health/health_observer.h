@@ -83,9 +83,10 @@ public:
      *
      * @param factory Interface to get or create the factory of facets container.
      */
-    virtual void periodicCheck(FaultFacetsContainerFactory& factory,
-                               std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                               CancellationToken token) = 0;
+    virtual SharedSemiFuture<HealthCheckStatus> periodicCheck(
+        FaultFacetsContainerFactory& factory,
+        std::shared_ptr<executor::TaskExecutor> taskExecutor,
+        CancellationToken token) = 0;
 
     virtual HealthObserverLivenessStats getStats() const = 0;
 };

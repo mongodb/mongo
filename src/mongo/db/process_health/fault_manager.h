@@ -37,6 +37,7 @@
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/process_health/health_observer.h"
 #include "mongo/db/process_health/progress_monitor.h"
+#include "mongo/db/process_health/state_machine.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
@@ -55,7 +56,8 @@ namespace process_health {
  *
  * If an active fault state persists, FaultManager will terminate the server process.
  */
-class FaultManager : protected FaultFacetsContainerFactory {
+class FaultManager : protected StateMachine<HealthCheckStatus, FaultState>,
+                     protected FaultFacetsContainerFactory {
     FaultManager(const FaultManager&) = delete;
     FaultManager& operator=(const FaultManager&) = delete;
 
@@ -71,12 +73,25 @@ public:
                  std::function<void(std::string cause)> crashCb);
     virtual ~FaultManager();
 
+    void setupStateMachine();
+
+    boost::optional<FaultState> handleStartupCheck(const OptionalMessageType& message);
+    boost::optional<FaultState> handleOk(const OptionalMessageType& message);
+    boost::optional<FaultState> handleTransientFault(const OptionalMessageType& message);
+    boost::optional<FaultState> handleActiveFault(const OptionalMessageType& message);
+
+    void setInitialHealthCheckComplete(FaultState, FaultState, const OptionalMessageType&);
+    void logCurrentState(FaultState, FaultState, const OptionalMessageType&);
+    void logMessageReceived(FaultState state, const HealthCheckStatus& status);
+    void setTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&);
+    void clearTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&);
+
     // Start periodic health checks, invoke it once during server startup.
     // It is unsafe to start health checks immediately during ServiceContext creation
     // because some ServiceContext fields might not be initialized yet.
     // Health checks cannot be stopped but could be effectively disabled with health-checker
     // specific flags.
-    void startPeriodicHealthChecks();
+    SharedSemiFuture<void> startPeriodicHealthChecks();
 
     static FaultManager* get(ServiceContext* svcCtx);
 
@@ -101,9 +116,12 @@ public:
     Date_t getLastTransitionTime() const;
 
 protected:
-    // Starts the health check sequence and updates the internal state on completion.
-    // This is invoked by the internal timer.
-    virtual void healthCheck();
+    // Returns all health observers not configured as Off
+    std::vector<HealthObserver*> getActiveHealthObservers();
+
+    // Runs a particular health observer.  Then attempts to transition states. Then schedules next
+    // run.
+    virtual void healthCheck(HealthObserver* observer, CancellationToken token);
 
     // Protected interface FaultFacetsContainerFactory implementation.
 
@@ -114,19 +132,7 @@ protected:
 
     void updateWithCheckStatus(HealthCheckStatus&& checkStatus) override;
 
-    // State machine related.
-
-    void checkForStateTransition();  // Invoked by periodic thread.
-
-    // Methods that represent particular events that trigger state transition.
-    void processFaultExistsEvent();
-    void processFaultIsResolvedEvent();
-
-    // Makes a valid state transition or returns an error.
-    // State transition should be triggered by events above.
-    void transitionToState(FaultState newState);
-
-    void schedulePeriodicHealthCheckThread(bool immediately = false);
+    void schedulePeriodicHealthCheckThread();
 
     // TODO: move this into fault class; refactor to remove FaultInternal
     bool hasCriticalFacet(const FaultInternal* fault) const;
@@ -135,7 +141,7 @@ protected:
 
 private:
     // One time init.
-    void _firstTimeInitIfNeeded();
+    void _init();
 
     std::unique_ptr<FaultManagerConfig> _config;
     ServiceContext* const _svcCtx;
@@ -147,20 +153,16 @@ private:
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManager::_mutex");
 
     std::shared_ptr<FaultInternal> _fault;
-    // We lazily init all health observers.
-    AtomicWord<bool> _firstTimeInitExecuted{false};
     // This source is canceled before the _taskExecutor shutdown(). It
     // can be used to check for the start of the shutdown sequence.
     CancellationSource _managerShuttingDownCancellationSource;
     // Manager owns all observer instances.
     std::vector<std::unique_ptr<HealthObserver>> _observers;
-    boost::optional<executor::TaskExecutor::CallbackHandle> _periodicHealthCheckCbHandle;
     SharedPromise<void> _initialHealthCheckCompletedPromise;
 
     // Protects the state below.
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
-    FaultState _currentState = FaultState::kStartupCheck;
 
     Date_t _lastTransitionTime;
 
@@ -184,6 +186,16 @@ private:
     std::unique_ptr<TransientFaultDeadline> _transientFaultDeadline;
 
     std::unique_ptr<ProgressMonitor> _progressMonitor;
+    stdx::unordered_set<FaultFacetType> _healthyObservations;
+    struct HealthCheckContext {
+        std::unique_ptr<ExecutorFuture<HealthCheckStatus>> result;
+        boost::optional<executor::TaskExecutor::CallbackHandle> resultStatus;
+        HealthCheckContext(std::unique_ptr<ExecutorFuture<HealthCheckStatus>> future,
+                           boost::optional<executor::TaskExecutor::CallbackHandle> cbHandle)
+            : result(std::move(future)), resultStatus(cbHandle){};
+    };
+
+    stdx::unordered_map<FaultFacetType, HealthCheckContext> _healthCheckContexts;
 };
 
 }  // namespace process_health

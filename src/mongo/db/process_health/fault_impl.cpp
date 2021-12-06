@@ -116,7 +116,13 @@ void FaultImpl::garbageCollectResolvedFacets() {
                   _facets.end());
 }
 
-void FaultImpl::appendDescription(BSONObjBuilder* builder) const {}
+void FaultImpl::appendDescription(BSONObjBuilder* builder) const {
+    builder->append("id", getId().toBSON());
+    builder->append("severity", getSeverity());
+    builder->append("duration", getDuration().toBSON());
+    // TODO (SERVER-61914): Add fault facet details
+    builder->append("facets", static_cast<int>(_facets.size()));
+}
 
 }  // namespace process_health
 }  // namespace mongo

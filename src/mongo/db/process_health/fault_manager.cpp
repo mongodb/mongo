@@ -91,15 +91,16 @@ FaultManager::TransientFaultDeadline::TransientFaultDeadline(
     std::shared_ptr<executor::TaskExecutor> executor,
     Milliseconds timeout)
     : cancelActiveFaultTransition(CancellationSource()),
-      activeFaultTransition(
-          executor->sleepFor(timeout, cancelActiveFaultTransition.token())
-              .thenRunOn(executor)
-              .then([faultManager]() { faultManager->transitionToState(FaultState::kActiveFault); })
-              .onError([](Status status) {
-                  LOGV2_WARNING(5937001,
-                                "The Fault Manager transient fault deadline was disabled.",
-                                "status"_attr = status);
-              })) {}
+      activeFaultTransition(executor->sleepFor(timeout, cancelActiveFaultTransition.token())
+                                .thenRunOn(executor)
+                                .then([faultManager]() { faultManager->accept(boost::none); })
+                                .onError([](Status status) {
+                                    LOGV2_DEBUG(
+                                        5937001,
+                                        1,
+                                        "The Fault Manager transient fault deadline was disabled.",
+                                        "status"_attr = status);
+                                })) {}
 
 FaultManager::TransientFaultDeadline::~TransientFaultDeadline() {
     if (!cancelActiveFaultTransition.token().isCanceled()) {
@@ -110,7 +111,8 @@ FaultManager::TransientFaultDeadline::~TransientFaultDeadline() {
 FaultManager::FaultManager(ServiceContext* svcCtx,
                            std::shared_ptr<executor::TaskExecutor> taskExecutor,
                            std::unique_ptr<FaultManagerConfig> config)
-    : _config(std::move(config)),
+    : StateMachine(FaultState::kStartupCheck),
+      _config(std::move(config)),
       _svcCtx(svcCtx),
       _taskExecutor(taskExecutor),
       _crashCb([](std::string cause) {
@@ -124,41 +126,206 @@ FaultManager::FaultManager(ServiceContext* svcCtx,
     invariant(_svcCtx->getFastClockSource());
     invariant(_svcCtx->getPreciseClockSource());
     _lastTransitionTime = _svcCtx->getFastClockSource()->now();
+    setupStateMachine();
 }
 
 FaultManager::FaultManager(ServiceContext* svcCtx,
                            std::shared_ptr<executor::TaskExecutor> taskExecutor,
                            std::unique_ptr<FaultManagerConfig> config,
                            std::function<void(std::string cause)> crashCb)
-    : _config(std::move(config)), _svcCtx(svcCtx), _taskExecutor(taskExecutor), _crashCb(crashCb) {
+    : StateMachine(FaultState::kStartupCheck),
+      _config(std::move(config)),
+      _svcCtx(svcCtx),
+      _taskExecutor(taskExecutor),
+      _crashCb(crashCb) {
     _lastTransitionTime = _svcCtx->getFastClockSource()->now();
+    setupStateMachine();
 }
 
-void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
+void FaultManager::setupStateMachine() {
+    validTransitions({
+        {FaultState::kStartupCheck, {FaultState::kOk, FaultState::kActiveFault}},
+        {FaultState::kOk, {FaultState::kTransientFault}},
+        {FaultState::kTransientFault, {FaultState::kOk, FaultState::kActiveFault}},
+        {FaultState::kActiveFault, {}},
+    });
+
+    auto bindThis = [&](auto&& pmf) { return [=](auto&&... a) { return (this->*pmf)(a...); }; };
+
+    registerHandler(FaultState::kStartupCheck, bindThis(&FaultManager::handleStartupCheck))
+        ->enter(bindThis(&FaultManager::logCurrentState))
+        ->exit(bindThis(&FaultManager::setInitialHealthCheckComplete));
+
+    registerHandler(FaultState::kOk, bindThis(&FaultManager::handleOk))
+        ->enter(bindThis(&FaultManager::clearTransientFaultDeadline))
+        ->enter(bindThis(&FaultManager::logCurrentState));
+
+    registerHandler(FaultState::kTransientFault, bindThis(&FaultManager::handleTransientFault))
+        ->enter(bindThis(&FaultManager::setTransientFaultDeadline))
+        ->enter(bindThis(&FaultManager::logCurrentState));
+
+    registerHandler(FaultState::kActiveFault,
+                    bindThis(&FaultManager::handleActiveFault),
+                    true /* transient state */)
+        ->enter(bindThis(&FaultManager::logCurrentState));
+
+    start();
+}
+
+boost::optional<FaultState> FaultManager::handleStartupCheck(const OptionalMessageType& message) {
+    if (!message) {
+        return FaultState::kActiveFault;
+    }
+
+    HealthCheckStatus status = message.get();
+
+    auto activeObservers = getActiveHealthObservers();
+    stdx::unordered_set<FaultFacetType> activeObserversTypes;
+    std::for_each(activeObservers.begin(),
+                  activeObservers.end(),
+                  [&activeObserversTypes](HealthObserver* observer) {
+                      activeObserversTypes.insert(observer->getType());
+                  });
+
+
+    auto lk = stdx::lock_guard(_stateMutex);
+    logMessageReceived(state(), status);
+
+    if (status.isActiveFault()) {
+        _healthyObservations.erase(status.getType());
+    } else {
+        _healthyObservations.insert(status.getType());
+    }
+
+    updateWithCheckStatus(HealthCheckStatus(status));
+    auto optionalActiveFault = getFaultFacetsContainer();
+    if (optionalActiveFault) {
+        optionalActiveFault->garbageCollectResolvedFacets();
+    }
+
+    if (optionalActiveFault && hasCriticalFacet(_fault.get()) && !_transientFaultDeadline) {
+        setTransientFaultDeadline(
+            FaultState::kStartupCheck, FaultState::kStartupCheck, boost::none);
+    }
+
+    // If the whole fault becomes resolved, garbage collect it
+    // with proper locking.
+    std::shared_ptr<FaultInternal> faultToDelete;
+    {
+        auto lk = stdx::lock_guard(_mutex);
+        if (_fault && _fault->getFacets().empty()) {
+            faultToDelete.swap(_fault);
+        }
+    }
+
+    if (activeObserversTypes == _healthyObservations) {
+        return FaultState::kOk;
+    }
+    return boost::none;
+}
+
+boost::optional<FaultState> FaultManager::handleOk(const OptionalMessageType& message) {
+    invariant(message);
+
+    HealthCheckStatus status = message.get();
+    auto lk = stdx::lock_guard(_stateMutex);
+    logMessageReceived(state(), status);
+
+    if (_config->getHealthObserverIntensity(status.getType()) ==
+        HealthObserverIntensityEnum::kOff) {
+        return boost::none;
+    }
+
+    updateWithCheckStatus(HealthCheckStatus(status));
+
+    if (!HealthCheckStatus::isResolved(status.getSeverity())) {
+        return FaultState::kTransientFault;
+    }
+
+    return boost::none;
+}
+
+boost::optional<FaultState> FaultManager::handleTransientFault(const OptionalMessageType& message) {
+    if (!message) {
+        return FaultState::kActiveFault;
+    }
+
+    HealthCheckStatus status = message.get();
+    auto lk = stdx::lock_guard(_stateMutex);
+    logMessageReceived(state(), status);
+
+    updateWithCheckStatus(HealthCheckStatus(status));
+
+    auto optionalActiveFault = getFaultFacetsContainer();
+    if (optionalActiveFault) {
+        optionalActiveFault->garbageCollectResolvedFacets();
+    }
+
+    // If the whole fault becomes resolved, garbage collect it
+    // with proper locking.
+    if (_fault && _fault->getFacets().empty()) {
+        _fault.reset();
+        return FaultState::kOk;
+    }
+    return boost::none;
+}
+
+boost::optional<FaultState> FaultManager::handleActiveFault(const OptionalMessageType& message) {
+    LOGV2_FATAL(5936509, "Fault manager received active fault");
+    return boost::none;
+}
+
+void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus& status) {
+    LOGV2_DEBUG(5936504,
+                1,
+                "Fault manager recieved health check result",
+                "state"_attr = (str::stream() << state),
+                "result"_attr = status,
+                "passed"_attr = (!status.isActiveFault(status.getSeverity())));
+}
+
+void FaultManager::logCurrentState(FaultState, FaultState newState, const OptionalMessageType&) {
+    LOGV2(5936503, "Fault manager changed state ", "state"_attr = (str::stream() << newState));
+}
+
+void FaultManager::setTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
+    _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
+        this, _taskExecutor, _config->getActiveFaultDuration());
+}
+
+void FaultManager::clearTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
+    _transientFaultDeadline = nullptr;
+}
+
+void FaultManager::setInitialHealthCheckComplete(FaultState,
+                                                 FaultState newState,
+                                                 const OptionalMessageType&) {
+    LOGV2_DEBUG(5936502,
+                0,
+                "The fault manager initial health checks have completed",
+                "state"_attr = (str::stream() << newState));
+    _initialHealthCheckCompletedPromise.emplaceValue();
+}
+
+void FaultManager::schedulePeriodicHealthCheckThread() {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility) ||
+        _config->periodicChecksDisabledForTests()) {
         return;
     }
 
-    const auto kPeriodicHealthCheckInterval = getConfig().getPeriodicHealthCheckInterval();
-    auto lk = stdx::lock_guard(_mutex);
+    auto observers = getHealthObservers();
+    for (auto observer : observers) {
+        LOGV2_DEBUG(
+            59365, 1, "starting health observer", "observerType"_attr = observer->getType());
 
-    const auto cb = [this](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
-        if (!cbData.status.isOK()) {
-            return;
+        // TODO (SERVER-59368): The system should properly handle a health checker being turned
+        // on/off
+        auto token = _managerShuttingDownCancellationSource.token();
+        if (_config->isHealthObserverEnabled(observer->getType())) {
+            healthCheck(observer, token);
         }
-
-        healthCheck();
-    };
-
-    auto periodicThreadCbHandleStatus = immediately
-        ? _taskExecutor->scheduleWork(cb)
-        : _taskExecutor->scheduleWorkAt(_taskExecutor->now() + kPeriodicHealthCheckInterval, cb);
-
-    uassert(5936101,
-            "Failed to initialize periodic health check work.",
-            periodicThreadCbHandleStatus.isOK());
-    _periodicHealthCheckCbHandle = periodicThreadCbHandleStatus.getValue();
+    }
 }
 
 FaultManager::~FaultManager() {
@@ -166,8 +333,11 @@ FaultManager::~FaultManager() {
     _taskExecutor->shutdown();
 
     LOGV2(5936601, "Shutting down periodic health checks");
-    if (_periodicHealthCheckCbHandle) {
-        _taskExecutor->cancel(*_periodicHealthCheckCbHandle);
+    for (auto& pair : _healthCheckContexts) {
+        auto cbHandle = pair.second.resultStatus;
+        if (cbHandle) {
+            _taskExecutor->cancel(cbHandle.get());
+        }
     }
 
     // All health checks must use the _taskExecutor, joining it
@@ -181,32 +351,37 @@ FaultManager::~FaultManager() {
     }
 
     if (!_initialHealthCheckCompletedPromise.getFuture().isReady()) {
-        _initialHealthCheckCompletedPromise.emplaceValue();
+        _initialHealthCheckCompletedPromise.setError(
+            {ErrorCodes::CommandFailed, "Fault manager failed initial health check"});
     }
     LOGV2_DEBUG(6136801, 1, "Done shutting down periodic health checks");
 }
 
-void FaultManager::startPeriodicHealthChecks() {
+SharedSemiFuture<void> FaultManager::startPeriodicHealthChecks() {
     if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         LOGV2_DEBUG(6187201, 1, "Health checks disabled by feature flag");
-        return;
+        return Future<void>::makeReady();
     }
 
     _taskExecutor->startup();
-    invariant(getFaultState() == FaultState::kStartupCheck);
-    {
-        auto lk = stdx::lock_guard(_mutex);
-        invariant(!_periodicHealthCheckCbHandle);
-    }
-    schedulePeriodicHealthCheckThread(true /* immediately */);
+    invariant(state() == FaultState::kStartupCheck);
 
-    _initialHealthCheckCompletedPromise.getFuture().get();
+    _init();
+
+    if (getActiveHealthObservers().size() == 0) {
+        LOGV2_DEBUG(5936511, 2, "No active health observers are configured.");
+        setState(FaultState::kOk, HealthCheckStatus(FaultFacetType::kSystem));
+    } else {
+        schedulePeriodicHealthCheckThread();
+    }
+
+    return _initialHealthCheckCompletedPromise.getFuture();
 }
 
 FaultState FaultManager::getFaultState() const {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    return _currentState;
+    return state();
 }
 
 Date_t FaultManager::getLastTransitionTime() const {
@@ -233,46 +408,72 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
     return std::static_pointer_cast<FaultFacetsContainer>(_fault);
 }
 
-void FaultManager::healthCheck() {
-    // One time init.
-    _firstTimeInitIfNeeded();
+void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token) {
+    auto schedulerCb = [this, observer, token] {
+        auto periodicThreadCbHandleStatus = this->_taskExecutor->scheduleWorkAt(
+            _taskExecutor->now() + this->_config->kPeriodicHealthCheckInterval,
+            [this, observer, token](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                if (!cbData.status.isOK()) {
+                    return;
+                }
+                healthCheck(observer, token);
+            });
 
-    ON_BLOCK_EXIT([this] {
-        if (!_config->periodicChecksDisabledForTests()) {
-            schedulePeriodicHealthCheckThread();
+        if (!periodicThreadCbHandleStatus.isOK()) {
+            if (ErrorCodes::isA<ErrorCategory::ShutdownError>(
+                    periodicThreadCbHandleStatus.getStatus().code())) {
+                return;
+            }
+
+            uassert(5936101,
+                    fmt::format("Failed to initialize periodic health check work. Reason: {}",
+                                periodicThreadCbHandleStatus.getStatus().codeString()),
+                    periodicThreadCbHandleStatus.isOK());
         }
-    });
 
-    std::vector<HealthObserver*> observers = FaultManager::getHealthObservers();
+        _healthCheckContexts.at(observer->getType()).resultStatus =
+            std::move(periodicThreadCbHandleStatus.getValue());
+    };
 
-    // Start checks outside of lock.
-    auto token = _managerShuttingDownCancellationSource.token();
-    for (auto observer : observers) {
-        // TODO: SERVER-59368, fix bug where health observer is turned off when in transient fault
-        // state
-        if (_config->getHealthObserverIntensity(observer->getType()) !=
-            HealthObserverIntensityEnum::kOff)
-            observer->periodicCheck(*this, _taskExecutor, token);
+    auto acceptNotOKStatus = [this, observer](Status s) {
+        auto healthCheckStatus = HealthCheckStatus(observer->getType(), 1.0, s.reason());
+        LOGV2_ERROR(
+            6007901, "Unexpected failure during health check", "status"_attr = healthCheckStatus);
+        this->accept(healthCheckStatus);
+        return healthCheckStatus;
+    };
+
+    // If health observer is disabled, then do nothing and schedule another run (health observer may
+    // become enabled).
+    // TODO (SERVER-59368): The system should properly handle a health checker being turned on/off
+    if (!_config->isHealthObserverEnabled(observer->getType())) {
+        schedulerCb();
+        return;
     }
 
-    // Garbage collect all resolved fault facets.
-    auto optionalActiveFault = getFaultFacetsContainer();
-    if (optionalActiveFault) {
-        optionalActiveFault->garbageCollectResolvedFacets();
-    }
+    _healthCheckContexts.insert({observer->getType(), HealthCheckContext(nullptr, boost::none)});
+    // Run asynchronous health check.  When complete, check for state transition (and perform if
+    // necessary). Then schedule the next run.
+    auto healthCheckFuture = observer->periodicCheck(*this, _taskExecutor, token)
+                                 .thenRunOn(_taskExecutor)
+                                 .onCompletion([this, acceptNotOKStatus, schedulerCb](
+                                                   StatusWith<HealthCheckStatus> status) {
+                                     ON_BLOCK_EXIT([this, schedulerCb]() {
+                                         if (!_config->periodicChecksDisabledForTests()) {
+                                             schedulerCb();
+                                         }
+                                     });
 
-    // If the whole fault becomes resolved, garbage collect it
-    // with proper locking.
-    std::shared_ptr<FaultInternal> faultToDelete;
-    {
-        auto lk = stdx::lock_guard(_mutex);
-        if (_fault && _fault->getFacets().empty()) {
-            faultToDelete.swap(_fault);
-        }
-    }
+                                     if (!status.isOK()) {
+                                         return acceptNotOKStatus(status.getStatus());
+                                     }
 
-    // Actions above can result in a state change.
-    checkForStateTransition();
+                                     this->accept(status.getValue());
+                                     return status.getValue();
+                                 });
+    auto futurePtr =
+        std::make_unique<ExecutorFuture<HealthCheckStatus>>(std::move(healthCheckFuture));
+    _healthCheckContexts.at(observer->getType()).result = std::move(futurePtr);
 }
 
 void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
@@ -281,6 +482,7 @@ void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
         if (container) {
             container->updateWithSuppliedFacet(checkStatus.getType(), nullptr);
         }
+
         return;
     }
 
@@ -293,15 +495,6 @@ void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
         container->updateWithSuppliedFacet(type, FaultFacetPtr(newFacet));
     } else {
         facet->update(std::move(checkStatus));
-    }
-}
-
-void FaultManager::checkForStateTransition() {
-    FaultConstPtr fault = currentFault();
-    if (fault && !HealthCheckStatus::isResolved(fault->getSeverity())) {
-        processFaultExistsEvent();
-    } else if (!fault || HealthCheckStatus::isResolved(fault->getSeverity())) {
-        processFaultIsResolvedEvent();
     }
 }
 
@@ -322,93 +515,8 @@ FaultManagerConfig FaultManager::getConfig() const {
     return *_config;
 }
 
-void FaultManager::processFaultExistsEvent() {
-    FaultState currentState = getFaultState();
-
-    switch (currentState) {
-        case FaultState::kStartupCheck:
-        case FaultState::kOk: {
-            transitionToState(FaultState::kTransientFault);
-            if (hasCriticalFacet(_fault.get())) {
-                // This will transition the FaultManager to ActiveFault state after the timeout
-                // occurs.
-                _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
-                    this, _taskExecutor, _config->getActiveFaultDuration());
-            }
-            break;
-        }
-        case FaultState::kTransientFault:
-        case FaultState::kActiveFault:
-            // NOP.
-            break;
-        default:
-            MONGO_UNREACHABLE;
-            break;
-    }
-}
-
-void FaultManager::processFaultIsResolvedEvent() {
-    FaultState currentState = getFaultState();
-
-    switch (currentState) {
-        case FaultState::kOk:
-            // NOP.
-            break;
-        case FaultState::kStartupCheck:
-            transitionToState(FaultState::kOk);
-            _initialHealthCheckCompletedPromise.emplaceValue();
-            break;
-        case FaultState::kTransientFault:
-            // Clear the transient fault deadline timer.
-            _transientFaultDeadline.reset();
-            transitionToState(FaultState::kOk);
-            break;
-        case FaultState::kActiveFault:
-            // Too late, this state cannot be resolved to Ok.
-            break;
-        default:
-            MONGO_UNREACHABLE;
-            break;
-    }
-}
-
-void FaultManager::transitionToState(FaultState newState) {
-    // Maps currentState to valid newStates
-    static const stdx::unordered_map<FaultState, std::vector<FaultState>> validTransitions = {
-        {FaultState::kStartupCheck, {FaultState::kOk, FaultState::kTransientFault}},
-        {FaultState::kOk, {FaultState::kTransientFault}},
-        {FaultState::kTransientFault, {FaultState::kOk, FaultState::kActiveFault}},
-        {FaultState::kActiveFault, {}},
-    };
-
-    stdx::lock_guard<Latch> lk(_stateMutex);
-    const auto& validStates = validTransitions.at(_currentState);
-    auto validIt = std::find(validStates.begin(), validStates.end(), newState);
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Invalid fault manager transition from " << _currentState << " to "
-                          << newState,
-            validIt != validStates.end());
-
-    LOGV2(5936201,
-          "Transitioned fault manager state",
-          "newState"_attr = str::stream() << newState,
-          "oldState"_attr = str::stream() << _currentState);
-
-    _lastTransitionTime = _svcCtx->getFastClockSource()->now();
-    _currentState = newState;
-}
-
-void FaultManager::_firstTimeInitIfNeeded() {
-    if (_firstTimeInitExecuted.load()) {
-        return;
-    }
-
+void FaultManager::_init() {
     auto lk = stdx::lock_guard(_mutex);
-    // One more time under lock to avoid race.
-    if (_firstTimeInitExecuted.load()) {
-        return;
-    }
-    _firstTimeInitExecuted.store(true);
 
     _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx);
 
@@ -425,7 +533,7 @@ void FaultManager::_firstTimeInitIfNeeded() {
     auto lk2 = stdx::lock_guard(_stateMutex);
     LOGV2(5956701,
           "Instantiated health observers, periodic health checking starts",
-          "managerState"_attr = _currentState,
+          "managerState"_attr = state(),
           "observersCount"_attr = _observers.size());
 }
 
@@ -437,6 +545,19 @@ std::vector<HealthObserver*> FaultManager::getHealthObservers() {
                    _observers.cend(),
                    std::back_inserter(result),
                    [](const std::unique_ptr<HealthObserver>& value) { return value.get(); });
+    return result;
+}
+
+std::vector<HealthObserver*> FaultManager::getActiveHealthObservers() {
+    auto allObservers = getHealthObservers();
+    std::vector<HealthObserver*> result;
+    result.reserve(allObservers.size());
+    for (auto observer : allObservers) {
+        if (_config->getHealthObserverIntensity(observer->getType()) !=
+            HealthObserverIntensityEnum::kOff) {
+            result.push_back(observer);
+        }
+    }
     return result;
 }
 

@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/functional.h"
@@ -52,7 +53,7 @@ public:
     using StateCallback = unique_function<void(State, State, const OptionalMessageType&)>;
 
     // State machine accepts InputMessage and optionally transitions to state in the return value
-    using MessageHandler = unique_function<boost::optional<State>(InputMessage)>;
+    using MessageHandler = unique_function<boost::optional<State>(const OptionalMessageType&)>;
 
     using TransitionsContainer = stdx::unordered_map<State, std::vector<State>>;
 
@@ -101,7 +102,8 @@ public:
         auto& initialState = getContextOrFatal(_initial);
         _current = &initialState;
         auto& handler = initialState.stateHandler;
-        handler->fireEnter(_current->state(), boost::none);
+        if (handler)
+            handler->fireEnter(_current->state(), boost::none);
     }
 
     // Define a valid transition.
@@ -123,9 +125,19 @@ public:
     }
 
     // Accept message m, transition the state machine, and return the resulting state.
-    State accept(const InputMessage& m) {
+    // Upon the transition to the new state the state machine will call any registered hooks.
+    //
+    // In order to avoid deadlock while calling this function, authors should ensure
+    // that:
+    //	1. A recursive call only occurs from the current thread; or
+    //	2. For any hooks run as a result of accepting this message, no blocking calls are made
+    // involving shared resources with another thread that may call this function.
+    State accept(const OptionalMessageType& m) {
         tassertStarted();
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+
         auto& handler = _current->stateHandler;
+
         auto result = handler->accept(m);
         if (result) {
             setState(*result, m);
@@ -160,7 +172,7 @@ public:
         // Accepts input message m when state machine is in state _state. Optionally, the
         // state machine transitions to the state specified in the return value. Entry and exit
         // hooks will not fire if this method returns boost::none.
-        virtual boost::optional<State> accept(const InputMessage& m) noexcept = 0;
+        virtual boost::optional<State> accept(const OptionalMessageType& message) noexcept = 0;
 
         // The state this handler is defined for
         State state() const {
@@ -187,6 +199,8 @@ public:
                 cb(_state, newState, message);
         }
 
+        bool _isTransient = false;
+
     protected:
         // The state we are handling
         const State _state;
@@ -204,7 +218,7 @@ public:
             : StateHandler(state), _messageHandler(std::move(m)) {}
         ~LambdaStateHandler() override {}
 
-        boost::optional<State> accept(const InputMessage& m) noexcept override {
+        boost::optional<State> accept(const OptionalMessageType& m) noexcept override {
             return _messageHandler(m);
         }
 
@@ -219,11 +233,20 @@ public:
         return context.stateHandler.get();
     }
 
-    StateEventRegistryPtr registerHandler(State s, MessageHandler&& handler) {
+    StateEventRegistryPtr registerHandler(State s, MessageHandler&& handler, bool isTransient) {
         tassertNotStarted();
+
         auto& context = _states[s];
         context.stateHandler = std::make_unique<LambdaStateHandler>(s, std::move(handler));
+        if (isTransient) {
+            context.stateHandler->_isTransient = true;
+        }
+
         return context.stateHandler.get();
+    }
+
+    StateEventRegistryPtr registerHandler(State s, MessageHandler&& handler) {
+        return registerHandler(s, std::move(handler), false);
     }
 
 protected:
@@ -259,6 +282,10 @@ protected:
 
         // fire entry hooks for new state
         _current->stateHandler->fireEnter(previousContext.state(), message);
+
+        if (_current->stateHandler->_isTransient) {
+            accept(message);
+        }
     }
 
     StateHandler* getHandlerOrFatal(State s) {
@@ -281,6 +308,7 @@ protected:
         return getHandlerOrFatal(s);
     }
 
+    stdx::recursive_mutex _mutex;
     bool _started;
     State _initial;
     StateContext* _current = nullptr;

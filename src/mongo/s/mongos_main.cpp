@@ -758,7 +758,15 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     PeriodicTask::startRunningPeriodicTasks();
 
-    process_health::FaultManager::get(serviceContext)->startPeriodicHealthChecks();
+    status =
+        process_health::FaultManager::get(serviceContext)->startPeriodicHealthChecks().getNoThrow();
+    if (!status.isOK()) {
+        LOGV2_ERROR(5936510,
+                    "Error completing initial health check: {error}",
+                    "Error completing initial health check",
+                    "error"_attr = redact(status));
+        return EXIT_PROCESS_HEALTH_CHECK;
+    }
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));

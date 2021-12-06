@@ -58,8 +58,8 @@ public:
     public:
         using StateMachineTest::StateHandler::StateHandler;
 
-        boost::optional<MachineState> accept(const Message& m) noexcept override {
-            return m.nextState;
+        boost::optional<MachineState> accept(const SM::OptionalMessageType& m) noexcept override {
+            return m->nextState;
         }
     };
 
@@ -95,7 +95,8 @@ TEST_F(StateMachineTestFixture, RegistersMessageHandlerAndStateHooksFluently) {
     };
 
     subject()
-        ->registerHandler(MachineState::B, [](const Message& m) { return m.nextState; })
+        ->registerHandler(MachineState::B,
+                          [](const SM::OptionalMessageType& m) { return m->nextState; })
         // hooks registerd for state B
         ->enter(hook())
         ->exit(hook());

@@ -39,58 +39,46 @@ namespace process_health {
 
 HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
 
-void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
-                                       std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                                       CancellationToken token) {
+SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
+    FaultFacetsContainerFactory& factory,
+    std::shared_ptr<executor::TaskExecutor> taskExecutor,
+    CancellationToken token) {
     // If we have reached here, the intensity of this health observer must not be off
     {
         auto lk = stdx::lock_guard(_mutex);
         if (_currentlyRunningHealthCheck) {
-            return;
+            return _periodicCheckPromise->getFuture();
         }
-
-        const auto now = _svcCtx->getPreciseClockSource()->now();
-        if (now - _lastTimeTheCheckWasRun < minimalCheckInterval()) {
-            LOGV2_DEBUG(6136802,
-                        3,
-                        "Safety interval prevented new health check",
-                        "observerType"_attr = getType());
-            return;
-        }
-        _lastTimeTheCheckWasRun = now;
 
         LOGV2_DEBUG(6007902, 2, "Start periodic health check", "observerType"_attr = getType());
-
+        const auto now = _svcCtx->getPreciseClockSource()->now();
+        _lastTimeTheCheckWasRun = now;
         _currentlyRunningHealthCheck = true;
+        _periodicCheckPromise = std::make_unique<SharedPromise<HealthCheckStatus>>();
     }
 
-    // Do the health check.
-    taskExecutor->schedule([this, &factory, token, taskExecutor](Status status) {
+    _periodicCheckPromise->setFrom(
         periodicCheckImpl({token, taskExecutor})
-            .then([this, &factory](HealthCheckStatus&& checkStatus) mutable {
-                const auto severity = checkStatus.getSeverity();
-                factory.updateWithCheckStatus(std::move(checkStatus));
-
-                auto lk = stdx::lock_guard(_mutex);
-                ++_completedChecksCount;
-                if (!HealthCheckStatus::isResolved(severity)) {
-                    ++_completedChecksWithFaultCount;
-                }
-            })
-            .onCompletion([this](Status status) {
+            .onCompletion([this](StatusWith<HealthCheckStatus> status) {
                 if (!status.isOK()) {
-                    // Health checkers should not throw, they should return FaultFacetPtr.
-                    LOGV2_ERROR(
-                        6007901, "Unexpected failure during health check", "status"_attr = status);
+                    return status;
                 }
+
+                auto healthStatus = status.getValue();
+
                 const auto now = _svcCtx->getPreciseClockSource()->now();
                 auto lk = stdx::lock_guard(_mutex);
+                ++_completedChecksCount;
                 invariant(_currentlyRunningHealthCheck);
+                if (!HealthCheckStatus::isResolved(healthStatus.getSeverity())) {
+                    ++_completedChecksWithFaultCount;
+                }
                 _currentlyRunningHealthCheck = false;
                 _lastTimeCheckCompleted = now;
-            })
-            .getAsync([this](Status status) {});
-    });
+                return status;
+            }));
+
+    return _periodicCheckPromise->getFuture();
 }
 
 HealthCheckStatus HealthObserverBase::makeHealthyStatus() const {

@@ -42,10 +42,10 @@ namespace process_health {
  * Current fault state of the server in a simple actionable form.
  */
 enum class FaultState {
-    kOk = 0,
-
     // The manager conducts startup checks, new connections should be refused.
-    kStartupCheck,
+    kStartupCheck = 0,
+
+    kOk,
 
     // The manager detected a fault, however the fault is either not severe
     // enough or is not observed for sufficiently long period of time.
@@ -63,7 +63,7 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state);
 /**
  * Types of health observers available.
  */
-enum class FaultFacetType { kMock1 = 0, kMock2, kLdap, kDns };
+enum class FaultFacetType { kSystem, kMock1, kMock2, kLdap, kDns };
 
 
 class FaultManagerConfig {
@@ -77,8 +77,13 @@ public:
                 return intensities->_data->getLdap();
             case FaultFacetType::kDns:
                 return intensities->_data->getDns();
-            // TODO: update this function with additional fault facets when they are added
+                // TODO: update this function with additional fault facets when they are added
+            case FaultFacetType::kSystem:
+                return HealthObserverIntensityEnum::kCritical;
             case FaultFacetType::kMock1:
+                if (_facetToIntensityMapForTest.contains(type)) {
+                    return _facetToIntensityMapForTest.at(type);
+                }
                 return HealthObserverIntensityEnum::kCritical;
             case FaultFacetType::kMock2:
                 return HealthObserverIntensityEnum::kCritical;
@@ -89,6 +94,10 @@ public:
 
     bool isHealthObserverEnabled(FaultFacetType type) {
         return getHealthObserverIntensity(type) != HealthObserverIntensityEnum::kOff;
+    }
+
+    void setIntensityForType(FaultFacetType type, HealthObserverIntensityEnum intensity) {
+        _facetToIntensityMapForTest.insert({type, intensity});
     }
 
     Milliseconds getActiveFaultDuration() const {
@@ -135,6 +144,8 @@ private:
 
     bool _periodicChecksDisabledForTests = false;
     Milliseconds _activeFaultDuration = kActiveFaultDuration;
+
+    stdx::unordered_map<FaultFacetType, HealthObserverIntensityEnum> _facetToIntensityMapForTest;
 };
 
 }  // namespace process_health

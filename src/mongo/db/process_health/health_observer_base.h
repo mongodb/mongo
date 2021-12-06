@@ -66,9 +66,13 @@ public:
 
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
-    void periodicCheck(FaultFacetsContainerFactory& factory,
-                       std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                       CancellationToken token) override;
+    SharedSemiFuture<HealthCheckStatus> periodicCheck(
+        FaultFacetsContainerFactory& factory,
+        std::shared_ptr<executor::TaskExecutor> taskExecutor,
+        CancellationToken token) override;
+
+    HealthCheckStatus makeHealthyStatus() const;
+    HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;
 
     HealthObserverLivenessStats getStats() const override;
 
@@ -88,12 +92,6 @@ protected:
     virtual Future<HealthCheckStatus> periodicCheckImpl(
         PeriodicHealthCheckContext&& periodicCheckContext) = 0;
 
-    // Helper method to create a status without errors.
-    HealthCheckStatus makeHealthyStatus() const;
-
-    // Make a generic error status.
-    HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;
-
     HealthObserverLivenessStats getStatsLocked(WithLock) const;
 
     ServiceContext* const _svcCtx;
@@ -103,6 +101,7 @@ protected:
 
     // Indicates if there any check running to prevent running checks concurrently.
     bool _currentlyRunningHealthCheck = false;
+    std::unique_ptr<SharedPromise<HealthCheckStatus>> _periodicCheckPromise;
     // Enforces the safety interval.
     Date_t _lastTimeTheCheckWasRun;
     Date_t _lastTimeCheckCompleted;

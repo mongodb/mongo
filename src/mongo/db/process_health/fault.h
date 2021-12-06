@@ -73,6 +73,12 @@ public:
      * Describes the current fault.
      */
     virtual void appendDescription(BSONObjBuilder* builder) const = 0;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        appendDescription(&builder);
+        return builder.obj();
+    }
 };
 
 using FaultConstPtr = std::shared_ptr<const Fault>;
