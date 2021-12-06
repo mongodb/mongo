@@ -32,12 +32,19 @@ def main():
 
     parser.add_argument('--next_update_seconds', type=int, default=32400, help="Specify how long the OCSP response should be valid for")
 
+    parser.add_argument('--include_extraneous_status', action='store_true', help="Include status of extraneous certificates in the response")
+
+    parser.add_argument('--issuer_hash_algorithm', type=str, default='sha1', help="Algorithm to use when hashing issuer name and key")
+
     args = parser.parse_args()
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG)
 
     print('Initializing OCSP Responder')
-    mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds)
+    mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert,
+        responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds,
+        include_extraneous_status=args.include_extraneous_status,
+        issuer_hash_algorithm=args.issuer_hash_algorithm)
 
     mock_ocsp_responder.init(port=args.port, debug=args.verbose, host=args.bind_ip)
 
