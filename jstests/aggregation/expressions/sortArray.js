@@ -37,20 +37,6 @@ let assertDBOutputEquals = (expected, output) => {
     assert.eq(expected, output[0].sorted);
 };
 
-const isSortArrayEnabled =
-    db.adminCommand({getParameter: 1, featureFlagSortArray: 1}).featureFlagSortArray.value;
-
-if (!isSortArrayEnabled) {
-    // Verify that $sortArray cannot be used if the feature flag is set to false and ignore the
-    // rest of the test.
-    assert.commandFailedWithCode(coll.runCommand("aggregate", {
-        pipeline: [{$project: {sorted: {$sortArray: {sortBy: 1, input: {$literal: [1, 2]}}}}}],
-        cursor: {}
-    }),
-                                 31325);
-    return;
-}
-
 assertErrorCode(coll, [{$project: {sorted: {$sortArray: 1}}}], 2942500);
 assertErrorCode(coll, [{$project: {sorted: {$sortArray: "$num"}}}], 2942500);
 

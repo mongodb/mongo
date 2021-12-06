@@ -265,8 +265,6 @@ TEST(ExpressionReverseArrayTest, ReturnsNullWithNullishInput) {
 /* ------------------------ ExpressionSortArray -------------------- */
 
 TEST(ExpressionSortArrayTest, SortsNormalArrayForwards) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
-
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ 2, 1, 3 ] }, sortBy: 1 } }");
 
@@ -280,8 +278,6 @@ TEST(ExpressionSortArrayTest, SortsNormalArrayForwards) {
 
 
 TEST(ExpressionSortArrayTest, SortsNormalArrayBackwards) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
-
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ 2, 1, 3 ] }, sortBy: -1 } }");
 
@@ -294,8 +290,6 @@ TEST(ExpressionSortArrayTest, SortsNormalArrayBackwards) {
 }
 
 TEST(ExpressionSortArrayTest, SortsEmptyArray) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
-
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ ] }, sortBy: -1 } }");
 
@@ -308,8 +302,6 @@ TEST(ExpressionSortArrayTest, SortsEmptyArray) {
 }
 
 TEST(ExpressionSortArrayTest, SortsOneElementArray) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
-
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{ $sortArray: { input: { $literal: [ 1 ] }, sortBy: -1 } }");
 
@@ -322,8 +314,6 @@ TEST(ExpressionSortArrayTest, SortsOneElementArray) {
 }
 
 TEST(ExpressionSortArrayTest, ReturnsNullWithNullInput) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
-
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{ $sortArray: { input: { $literal: null }, sortBy: -1 } }");
 
@@ -335,8 +325,6 @@ TEST(ExpressionSortArrayTest, ReturnsNullWithNullInput) {
 }
 
 TEST(ExpressionSortArrayTest, ReturnsNullWithUndefinedInput) {
-    RAIIServerParameterControllerForTest _controller{"featureFlagSortArray", true};
-
     auto expCtx = ExpressionContextForTest{};
     BSONObj expr = fromjson("{ $sortArray: { input: { $literal: undefined }, sortBy: -1 } }");
 

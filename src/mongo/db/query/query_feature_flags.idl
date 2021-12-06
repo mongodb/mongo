@@ -92,4 +92,5 @@ feature_flags:
     featureFlagSortArray:
         description: "Feature flag for allowing use of the $sortArray aggregation expression"
         cpp_varname: gFeatureFlagSortArray
-        default: false
+        default: true
+        version: 5.2
