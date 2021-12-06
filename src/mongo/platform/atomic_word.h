@@ -125,8 +125,12 @@ public:
     }
 
 protected:
+    // At least with GCC 10, this assertion fails for small types like bool.
+#if !defined(__riscv)
     MONGO_STATIC_ASSERT(std::atomic<WordType>::is_always_lock_free);  // NOLINT
-    std::atomic<WordType> _value;                                     // NOLINT
+#endif
+
+    std::atomic<WordType> _value;  // NOLINT
 };
 
 /**

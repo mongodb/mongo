@@ -154,6 +154,7 @@ condition_map = {
 
     'ARM64_HOST'   : env['TARGET_ARCH'] == 'aarch64',
     'POWERPC_HOST' : env['TARGET_ARCH'] == 'ppc64le',
+    'RISCV64_HOST' : env['TARGET_ARCH'] == 'riscv64',
     'X86_HOST'     : env['TARGET_ARCH'] == 'x86_64',
     'ZSERIES_HOST' : env['TARGET_ARCH'] == 's390x',
 }

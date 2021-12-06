@@ -1350,26 +1350,17 @@ endian = get_option( "endian" )
 if endian == "auto":
     endian = sys.byteorder
 
-# These preprocessor macros came from
-# http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
-#
-# NOTE: Remember to add a trailing comma to form any required one
-# element tuples, or your configure checks will fail in strange ways.
 processor_macros = {
-    'arm'        : { 'endian': 'little', 'defines': ('__arm__',) },
-    'aarch64'    : { 'endian': 'little', 'defines': ('__arm64__', '__aarch64__')},
-    'i386'       : { 'endian': 'little', 'defines': ('__i386', '_M_IX86')},
-    'ppc64le'    : { 'endian': 'little', 'defines': ('__powerpc64__',)},
-    's390x'      : { 'endian': 'big',    'defines': ('__s390x__',)},
-    'sparc'      : { 'endian': 'big',    'defines': ('__sparc',)},
-    'x86_64'     : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
-    'emscripten' : { 'endian': 'little', 'defines': ('__EMSCRIPTEN__', )},
+    'aarch64'    : { 'endian': 'little', 'check': '(defined(__arm64__) || defined(__aarch64__))' },
+    'emscripten' : { 'endian': 'little', 'check': '(defined(__EMSCRIPTEN__))' },
+    'ppc64le'    : { 'endian': 'little', 'check': '(defined(__powerpc64__))' },
+    'riscv64'    : { 'endian': 'little', 'check': '(defined(__riscv)) && (__riscv_xlen == 64)' },
+    's390x'      : { 'endian': 'big',    'check': '(defined(__s390x__))' },
+    'x86_64'     : { 'endian': 'little', 'check': '(defined(__x86_64) || defined(_M_AMD64))' },
 }
 
 def CheckForProcessor(context, which_arch):
     def run_compile_check(arch):
-        full_macros = " || ".join([ "defined(%s)" % (v) for v in processor_macros[arch]['defines']])
-
         if not endian == processor_macros[arch]['endian']:
             return False
 
@@ -1379,7 +1370,7 @@ def CheckForProcessor(context, which_arch):
         #else
         #error not {1}
         #endif
-        """.format(full_macros, arch)
+        """.format(processor_macros[arch]['check'], arch)
 
         return context.TryCompile(textwrap.dedent(test_body), ".c")
 
