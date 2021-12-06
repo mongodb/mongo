@@ -1370,17 +1370,26 @@ public:
     }
 
     void visit(const ExistsMatchExpression* expr) final {
-        auto makePredicate = [](sbe::value::SlotId inputSlot,
-                                EvalStage inputStage) -> EvalExprStagePair {
-            return {sbe::makeE<sbe::EFunction>("exists",
-                                               sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
-                    std::move(inputStage)};
+        const auto traversalMode = LeafTraversalMode::kDoNotTraverseLeaf;
+
+        auto makePredicate = [expr, context = _context](sbe::value::SlotId inputSlot,
+                                                        EvalStage inputStage) -> EvalExprStagePair {
+            auto resultExpr = sbe::makeE<sbe::EFunction>(
+                "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot)));
+
+            // $exists is always applied to the leaf of the field path. For kDoNotTraverseLeaf mode,
+            // generatePredicate() does not convert the predicate value to state when generating
+            // traversal for leaf nodes of field path. For this reason, we need to perform this
+            // conversion manually.
+            if (expr->fieldRef() && !expr->fieldRef()->empty() &&
+                context->evalStack.topFrame().data().inputSlot) {
+                resultExpr = context->stateHelper.makeState(std::move(resultExpr));
+            }
+
+            return {std::move(resultExpr), std::move(inputStage)};
         };
 
-        generatePredicate(_context,
-                          expr->fieldRef(),
-                          std::move(makePredicate),
-                          LeafTraversalMode::kDoNotTraverseLeaf);
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate), traversalMode);
     }
 
     void visit(const ExprMatchExpression* matchExpr) final {
@@ -1743,17 +1752,30 @@ public:
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
 
     void visit(const TypeMatchExpression* expr) final {
-        auto makePredicate = [expr](sbe::value::SlotId inputSlot,
-                                    EvalStage inputStage) -> EvalExprStagePair {
-            const MatcherTypeSet& ts = expr->typeSet();
-            auto resultExpr = makeFillEmptyFalse(
-                sbe::makeE<sbe::ETypeMatch>(makeVariable(inputSlot), ts.getBSONTypeMask()));
-            return {std::move(resultExpr), std::move(inputStage)};
-        };
-
         const auto traversalMode = expr->typeSet().hasType(BSONType::Array)
             ? LeafTraversalMode::kDoNotTraverseLeaf
             : LeafTraversalMode::kArrayElementsOnly;
+
+        auto makePredicate =
+            [expr, traversalMode, context = _context](sbe::value::SlotId inputSlot,
+                                                      EvalStage inputStage) -> EvalExprStagePair {
+            const MatcherTypeSet& ts = expr->typeSet();
+            auto resultExpr = makeFillEmptyFalse(
+                sbe::makeE<sbe::ETypeMatch>(makeVariable(inputSlot), ts.getBSONTypeMask()));
+
+            // $type is always applied to the leaf of the field path. For kDoNotTraverseLeaf mode,
+            // generatePredicate() does not convert the predicate value to state when generating
+            // traversal for leaf nodes of field path. For this reason, we need to perform this
+            // conversion manually.
+            if (expr->fieldRef() && !expr->fieldRef()->empty() &&
+                context->evalStack.topFrame().data().inputSlot &&
+                traversalMode == LeafTraversalMode::kDoNotTraverseLeaf) {
+                resultExpr = context->stateHelper.makeState(std::move(resultExpr));
+            }
+
+            return {std::move(resultExpr), std::move(inputStage)};
+        };
+
         generatePredicate(_context, expr->fieldRef(), std::move(makePredicate), traversalMode);
     }
 

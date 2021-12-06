@@ -181,6 +181,18 @@ testSingleDocument(
 testSingleDocument({a: {$in: [2, 3]}}, {'b.$': 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [5]});
 testSingleDocument({$or: [{a: 2}, {a: 3}]}, {'b.$': 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [5]});
 
+// SERVER-61839: Test out some cases involving $exists and $type where we've had bugs in the past.
+testSingleDocument(
+    {a: {$elemMatch: {y: {$exists: true}}}}, {"a.$": 1}, {a: [{y: 1}, {y: 2}]}, {a: [{y: 1}]});
+
+testSingleDocument(
+    {a: {$elemMatch: {y: {$type: ["array"]}}}}, {"a.$": 1}, {a: [{y: 1}, {y: []}]}, {a: [{y: []}]});
+
+testSingleDocument({a: {$elemMatch: {y: {$type: ["array", "double"]}}}},
+                   {"a.$": 1},
+                   {a: [{y: 1}, {y: []}]},
+                   {a: [{y: 1}]});
+
 // Tests involving getMore. Test the $-positional operator across multiple batches.
 assert.commandWorked(coll.insert([
     {
