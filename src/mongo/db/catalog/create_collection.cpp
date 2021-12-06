@@ -477,7 +477,7 @@ Status _createCollection(OperationContext* opCtx,
                                   << nss);
             }
 
-            if ((nss.isTimeseriesBucketsCollection()) != (clusteredIndex->getLegacyFormat())) {
+            if (clustered_util::requiresLegacyFormat(nss) != clusteredIndex->getLegacyFormat()) {
                 return Status(ErrorCodes::Error(5979703),
                               "The 'clusteredIndex' legacy format {clusteredIndex: <bool>} is only "
                               "supported for specific internal collections and vice versa");
@@ -576,16 +576,6 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create system collection " << ns
                               << " within a transaction.",
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        if (options.changeStreamPreAndPostImagesOptions.getEnabled()) {
-            tassert(5868500,
-                    "ChangeStreamPreAndPostImages feature flag must be enabled",
-                    feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
-            // Create preimages collection if it doesn't already exist.
-            createChangeStreamPreImagesCollection(opCtx);
-        }
-
         return _createCollection(opCtx, ns, std::move(options), idIndex);
     }
 }
@@ -659,16 +649,13 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
     uassert(5868501,
             "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
             !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
-    tassert(5882500,
-            "Failed to create the pre-images collection: clustered indexes feature is not enabled",
-            feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility));
 
     const auto nss = NamespaceString::kChangeStreamPreImagesNamespace;
     CollectionOptions preImagesCollectionOptions;
 
     // Make the collection clustered by _id.
     preImagesCollectionOptions.clusteredIndex.emplace(
-        clustered_util::makeDefaultClusteredIdIndex());
+        clustered_util::makeCanonicalClusteredInfoForLegacyFormat());
     const auto status =
         _createCollection(opCtx, nss, std::move(preImagesCollectionOptions), BSONObj());
     uassert(status.code(),

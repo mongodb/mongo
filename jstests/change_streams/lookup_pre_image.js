@@ -14,11 +14,11 @@
 "use strict";
 
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
-                                                   // canRecordPreImagesInConfigDatabase.
+                                                   // isChangeStreamPreAndPostImagesEnabled.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
-const canRecordPreImagesInConfigDb = canRecordPreImagesInConfigDatabase(db);
+const canRecordPreImagesInConfigDb = isChangeStreamPreAndPostImagesEnabled(db);
 
 if (!canRecordPreImagesInConfigDb && FixtureHelpers.isMongos(db)) {
     jsTestLog("Skipping test as pre image lookup is not supported in sharded cluster with feature" +

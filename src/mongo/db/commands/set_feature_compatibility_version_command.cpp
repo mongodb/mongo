@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -398,6 +399,7 @@ private:
                      mongo::multiversion::FeatureCompatibilityVersion originalVersion,
                      const SetFeatureCompatibilityVersion& request,
                      boost::optional<Timestamp> changeTimestamp) {
+        const auto requestedVersion = request.getCommandParameter();
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
@@ -480,7 +482,6 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO: Remove once FCV 6.0 becomes last-lts
-            const auto requestedVersion = request.getCommandParameter();
             if (!feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
                     originalVersion) &&
                 feature_flags::gFeatureFlagLongCollectionNames.isEnabledOnVersion(
@@ -494,6 +495,13 @@ private:
             abortAllReshardCollection(opCtx);
         }
 
+        // Create the pre-images collection if the feature flag is enabled on the requested version.
+        // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
+        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
+                requestedVersion)) {
+            createChangeStreamPreImagesCollection(opCtx);
+        }
+
         hangWhileUpgrading.pauseWhileSet(opCtx);
     }
 
@@ -502,6 +510,9 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
+        const bool preImagesFeatureFlagDisabledOnDowngradeVersion =
+            !feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
+                requestedVersion);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
@@ -537,6 +548,16 @@ private:
                     dbName,
                     MODE_X,
                     [&](const CollectionPtr& collection) {
+                        // Fail to downgrade if there exists a collection with
+                        // 'changeStreamPreAndPostImages' enabled.
+                        // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
+                        uassert(ErrorCodes::CannotDowngrade,
+                                str::stream() << "Cannot downgrade the cluster as collection "
+                                              << collection->ns()
+                                              << " has 'changeStreamPreAndPostImages' enabled",
+                                preImagesFeatureFlagDisabledOnDowngradeVersion &&
+                                    !collection->isChangeStreamPreAndPostImagesEnabled());
+
                         invariant(collection->getTimeseriesOptions());
 
                         auto indexCatalog = collection->getIndexCatalog();
@@ -608,8 +629,29 @@ private:
                         return true;
                     },
                     [&](const CollectionPtr& collection) {
-                        return collection->getTimeseriesOptions() != boost::none;
+                        // TODO SERVER-61770: Remove 'changeStreamPreAndPostImages' check once
+                        // FCV 6.0 becomes last-lts.
+                        return collection->getTimeseriesOptions() != boost::none ||
+                            (preImagesFeatureFlagDisabledOnDowngradeVersion &&
+                             collection->isChangeStreamPreAndPostImagesEnabled());
                     });
+            }
+
+            // Drop the pre-images collection if 'changeStreamPreAndPostImages' feature flag is not
+            // enabled on the downgrade version.
+            // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
+            if (preImagesFeatureFlagDisabledOnDowngradeVersion) {
+                DropReply dropReply;
+                const auto deletionStatus =
+                    dropCollection(opCtx,
+                                   NamespaceString::kChangeStreamPreImagesNamespace,
+                                   &dropReply,
+                                   DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+                uassert(6023700,
+                        str::stream() << "Failed to drop the change stream pre-images collection"
+                                      << causedBy(deletionStatus.reason()),
+                        deletionStatus.isOK() ||
+                            deletionStatus.code() == ErrorCodes::NamespaceNotFound);
             }
         }
 

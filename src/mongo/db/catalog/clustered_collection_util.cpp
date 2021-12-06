@@ -87,7 +87,7 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
 }
 
 bool requiresLegacyFormat(const NamespaceString& nss) {
-    return nss.isTimeseriesBucketsCollection();
+    return nss.isTimeseriesBucketsCollection() || nss.isChangeStreamPreImagesCollection();
 }
 
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo) {

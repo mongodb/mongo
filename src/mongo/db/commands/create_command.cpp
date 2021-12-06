@@ -285,12 +285,19 @@ public:
                 cmd.setIdIndex(idIndexSpec);
             }
 
+            const auto isChangeStreamPreAndPostImagesEnabled =
+                (cmd.getChangeStreamPreAndPostImages() &&
+                 cmd.getChangeStreamPreAndPostImages()->getEnabled());
+
+            // Acquire shared lock on FCV if 'changeStreamPreAndPostImages' is enabled.
+            boost::optional<FixedFCVRegion> fcvRegion;
+            if (isChangeStreamPreAndPostImagesEnabled) {
+                fcvRegion.emplace(opCtx);
+            }
+
             if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 const auto isRecordPreImagesEnabled = cmd.getRecordPreImages().get_value_or(false);
-                const auto isChangeStreamPreAndPostImagesEnabled =
-                    (cmd.getChangeStreamPreAndPostImages() &&
-                     cmd.getChangeStreamPreAndPostImages()->getEnabled());
                 uassert(ErrorCodes::InvalidOptions,
                         "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be "
                         "set to true simultaneously",

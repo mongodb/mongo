@@ -664,12 +664,6 @@ Status _collModInternal(OperationContext* opCtx,
         LOGV2(5324200, "CMD: collMod", "cmdObj"_attr = cmd.toBSON(BSONObj()));
     }
 
-    if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
-        cmrNew.changeStreamPreAndPostImagesOptions->getEnabled()) {
-        // Create pre-images collection if it doesn't already exist.
-        createChangeStreamPreImagesCollection(opCtx);
-    }
-
     // With exclusive access to the collection, we can take ownership of the modified docs observed
     // by the side write tracker if a unique index conversion is requested.
     // This step releases the resources associated with the token and therefore should not be

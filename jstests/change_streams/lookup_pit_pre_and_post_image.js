@@ -9,12 +9,12 @@
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/change_stream_util.js");        // For canRecordPreImagesInConfigDatabase.
+load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPostImagesEnabled.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "test";
 
-if (!canRecordPreImagesInConfigDatabase(testDB)) {
+if (!isChangeStreamPreAndPostImagesEnabled(testDB)) {
     const coll = assertDropAndRecreateCollection(testDB, collName);
 
     // If feature flag is off, creating changeStream with new fullDocument arguments should throw.

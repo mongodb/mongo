@@ -29,7 +29,7 @@ function checkUniqueIndexFormatVersion(adminDB) {
 
             let currentCollection = currentDatabase.getCollection(c.name);
             currentCollection.getIndexes().forEach(function(index) {
-                if (index.unique) {
+                if (index.unique && !index.clustered) {
                     let ifv = currentCollection.aggregate({$collStats: {storageStats: {}}})
                                   .next()
                                   .storageStats.indexDetails[index.name]

@@ -55,7 +55,7 @@ assert.commandFailedWithCode(db.runCommand({"collMod": collName, "recordPreImage
 assert.commandFailedWithCode(
     db.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: true}}), [
         ErrorCodes.InvalidOptions,
-        // TODO SERVER-52282: remove the error code.
+        // TODO SERVER-58584: remove the error code.
         5846901
     ]);
 

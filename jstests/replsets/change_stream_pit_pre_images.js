@@ -9,8 +9,6 @@
  * requires_wiredtiger,
  * requires_fcv_52,
  * featureFlagChangeStreamPreAndPostImages,
- * # Clustered index support is required for change stream pre-images collection.
- * featureFlagClusteredIndexes,
  * ]
  */
 (function() {

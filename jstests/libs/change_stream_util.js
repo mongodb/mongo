@@ -45,18 +45,6 @@ function isChangeStreamsRewriteEnabled(db) {
 }
 
 /**
- * Returns true if pre-images can be recorded in 'system.preimages' collection, false otherwise.
- */
-function canRecordPreImagesInConfigDatabase(db) {
-    // Clustered index feature must be enabled to record pre-images in 'system.preimages'
-    // collection.
-    const getParam = db.adminCommand({getParameter: 1, featureFlagClusteredIndexes: 1});
-    return isChangeStreamPreAndPostImagesEnabled(db) &&
-        getParam.hasOwnProperty("featureFlagClusteredIndexes") &&
-        getParam.featureFlagClusteredIndexes.value;
-}
-
-/**
  * Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
  * the same as calling db.runCommand. If a passthrough is active and has defined a function
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual
@@ -577,4 +565,35 @@ function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collNam
 function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName) {
     const collectionInfos = db.getCollectionInfos({name: collName});
     assert(!collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages"));
+}
+
+function findPreImagesCollectionDescriptions(db) {
+    return db.getSiblingDB("config").runCommand("listCollections",
+                                                {filter: {name: "system.preimages"}});
+}
+
+/**
+ * Asserts that pre-images collection is absent in configDB.
+ */
+function assertPreImagesCollectionIsAbsent(db) {
+    const result = findPreImagesCollectionDescriptions(db);
+    assert.eq(result.cursor.firstBatch.length, 0);
+}
+
+/**
+ * Asserts that pre-images collection is created in the configDB and has clustered index on _id.
+ */
+function assertPreImagesCollectionExists(db) {
+    const collectionInfos = findPreImagesCollectionDescriptions(db);
+    assert.eq(collectionInfos.cursor.firstBatch.length, 1, collectionInfos);
+    const preImagesCollectionDescription = collectionInfos.cursor.firstBatch[0];
+    assert.eq(preImagesCollectionDescription.name, "system.preimages");
+
+    // Verifies that the pre-images collection is clustered by _id.
+    assert(preImagesCollectionDescription.hasOwnProperty("options"),
+           preImagesCollectionDescription);
+    assert(preImagesCollectionDescription.options.hasOwnProperty("clusteredIndex"),
+           preImagesCollectionDescription);
+    const clusteredIndexDescription = preImagesCollectionDescription.options.clusteredIndex;
+    assert(clusteredIndexDescription, preImagesCollectionDescription);
 }

@@ -4,7 +4,6 @@
  *
  *  @tags: [
  *    featureFlagChangeStreamPreAndPostImages,
- *    featureFlagClusteredIndexes,
  *    multiversion_incompatible,
  *    requires_sharding,
  *    uses_change_streams,

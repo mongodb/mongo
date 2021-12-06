@@ -99,7 +99,7 @@ var config = mongos.getDB("config");
 var configCopy = standalone.getDB("configCopy");
 config.getCollectionInfos().forEach(function(c) {
     // It's illegal to copy the system collections.
-    if (c.name == "system.indexBuilds") {
+    if (["system.indexBuilds", "system.preimages"].includes(c.name)) {
         return;
     }
 

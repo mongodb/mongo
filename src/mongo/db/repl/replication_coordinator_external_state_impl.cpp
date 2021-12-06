@@ -42,6 +42,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -60,6 +61,7 @@
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -581,6 +583,12 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
             fassert(50877, verifySystemIndexes(opCtx));
         }
     });
+
+    // Create the pre-images collection if it doesn't exist yet.
+    if (::mongo::feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        createChangeStreamPreImagesCollection(opCtx);
+    }
 
     serverGlobalParams.validateFeaturesAsPrimary.store(true);
 
