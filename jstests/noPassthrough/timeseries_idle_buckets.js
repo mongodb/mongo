@@ -1,18 +1,16 @@
 /**
  * Tests that idle buckets are removed when the bucket catalog's memory threshold is reached.
+ *
+ * @tags: [
+ *  # Replication requires journaling support so this tag also implies exclusion from
+ *  # --nojournal test configurations.
+ *  requires_replication,
+ * ]
  */
 (function() {
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-
-// Skip this test if running with --nojournal and WiredTiger.
-if (jsTest.options().noJournal &&
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
-    print("Skipping test because running WiredTiger without journaling isn't a valid" +
-          " replica set configuration");
-    return;
-}
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet({setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600}});
