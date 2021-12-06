@@ -120,8 +120,8 @@ void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRec
 }
 
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
-    _oplogBatcher =
-        std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor, _resumeBatchingTs);
+    _oplogBatcher = std::make_shared<TenantOplogBatcher>(
+        _tenantId, _oplogBuffer, _executor, _resumeBatchingTs, _beginApplyingAfterOpTime);
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
         return status;
