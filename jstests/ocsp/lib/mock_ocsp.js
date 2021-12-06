@@ -43,7 +43,9 @@ class MockOCSPServer {
     constructor(fault_type,
                 next_update_secs,
                 responder_certificate_set = OCSP_DELEGATE_RESPONDER,
-                response_delay_secs = 0) {
+                response_delay_secs = 0,
+                include_extraneous_status = false,
+                issuer_hash_algorithm = "") {
         this.python = "python3";
         this.fault_type = fault_type;
 
@@ -61,6 +63,8 @@ class MockOCSPServer {
         this.port = 8100;
         this.next_update_secs = next_update_secs;
         this.response_delay_secs = response_delay_secs;
+        this.include_extraneous_status = include_extraneous_status;
+        this.issuer_hash_algorithm = issuer_hash_algorithm;
     }
 
     start() {
@@ -86,6 +90,14 @@ class MockOCSPServer {
 
         if (this.response_delay_secs) {
             args.push("--response_delay_seconds=" + this.response_delay_secs);
+        }
+
+        if (this.include_extraneous_status) {
+            args.push("--include_extraneous_status");
+        }
+
+        if (this.issuer_hash_algorithm) {
+            args.push("--issuer_hash_algorithm=" + this.issuer_hash_algorithm);
         }
 
         clearRawMongoProgramOutput();
