@@ -118,7 +118,8 @@ class RollbackIndexBuildsTest {
                         indexBuilds.push(IndexBuildTest.startIndexBuild(
                             primary, collection.getFullName(), indexSpec, {}, errcodes, 0));
 
-                        IndexBuildTest.waitForIndexBuildToStart(primaryDB, collName, "a_1");
+                        IndexBuildTest.waitForIndexBuildToScanCollection(
+                            primaryDB, collName, "a_1");
                         break;
                     case "commit":
                         IndexBuildTest.resumeIndexBuilds(primary);
