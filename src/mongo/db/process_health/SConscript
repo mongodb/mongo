@@ -28,6 +28,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/process_health_feature_flag',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
 )
 
