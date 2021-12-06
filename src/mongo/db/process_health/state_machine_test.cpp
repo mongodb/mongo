@@ -226,7 +226,7 @@ TEST_F(StateMachineTestFixture, MoveWorks) {
     ASSERT_TRUE(MachineState::B == stateMachine2.state());
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashIfHooksAreRegisteredAfterStart, "5936505") {
+DEATH_TEST_F(StateMachineTestFixture, CrashIfHooksAreRegisteredAfterStart, "invariant") {
     auto hook = []() {
         return
             [](MachineState oldState, MachineState newState, const SM::OptionalMessageType& m) {};
@@ -235,7 +235,7 @@ DEATH_TEST_F(StateMachineTestFixture, CrashIfHooksAreRegisteredAfterStart, "5936
     subject()->on(MachineState::B)->enter(hook())->exit(hook());
 }
 
-DEATH_TEST_F(StateMachineTestFixture, CrashOnInvalidTransition, "5936506") {
+DEATH_TEST_F(StateMachineTestFixture, CrashOnInvalidTransition, "invariant") {
     subject()->start();
     subject()->accept(Message{MachineState::C});
 }

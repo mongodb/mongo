@@ -33,6 +33,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -83,13 +84,11 @@ public:
     }
 
     void tassertNotStarted() const {
-        tassert(
-            5936505, "operation cannot be performed after the state machine is started", !_started);
+        invariant(!_started, "operation cannot be performed after the state machine is started");
     }
 
     void tassertStarted() const {
-        tassert(
-            5936508, "operation cannot be performed before the state machine is started", _started);
+        invariant(_started, "operation cannot be performed before the state machine is started");
     }
 
     // Transitions the state machine into the initial state.
@@ -245,7 +244,7 @@ protected:
 
         auto& transitions = previousContext.validTransitions;
         auto it = transitions.find(s);
-        tassert(5936506, "invalid state transition", it != transitions.end());
+        invariant(it != transitions.end(), "invalid state transition");
 
         // in production, an illegal transition is a noop
         if (it == transitions.end())
