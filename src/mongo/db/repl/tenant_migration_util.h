@@ -186,6 +186,22 @@ inline Status protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& pr
     return Status::OK();
 }
 
+inline void protocolStorageOptionsCompatibilityCheck(OperationContext* opCtx,
+                                                     const MigrationProtocolEnum& protocol) {
+    if (protocol != MigrationProtocolEnum::kShardMerge)
+        return;
+
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "protocol '" << MigrationProtocol_serializer(protocol)
+                          << "' is not allowed when storage option 'directoryPerDb' is enabled",
+            !storageGlobalParams.directoryperdb);
+    uassert(
+        ErrorCodes::InvalidOptions,
+        str::stream() << "protocol '" << MigrationProtocol_serializer(protocol)
+                      << "' is not allowed when storage option 'directoryForIndexes' is enabled",
+        !opCtx->getServiceContext()->getStorageEngine()->isUsingDirectoryForIndexes());
+}
+
 /*
  * Creates an ExternalKeysCollectionDocument representing an config.external_validation_keys
  * document from the given the admin.system.keys document BSONObj.

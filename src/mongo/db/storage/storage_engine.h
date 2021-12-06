@@ -643,6 +643,8 @@ public:
 
     virtual bool isUsingDirectoryPerDb() const = 0;
 
+    virtual bool isUsingDirectoryForIndexes() const = 0;
+
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;
     virtual DurableCatalog* getCatalog() = 0;
