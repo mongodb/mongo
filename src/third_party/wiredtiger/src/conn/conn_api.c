@@ -2834,6 +2834,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_connection_open(conn, cfg));
     session = conn->default_session;
 
+#ifndef WT_STANDALONE_BUILD
+    /* Explicitly set the flag to indicate whether the database that was not shutdown cleanly. */
+    conn->unclean_shutdown = false;
+#endif
+
     /*
      * This function expects the cache to be created so parse this after the rest of the connection
      * is set up.

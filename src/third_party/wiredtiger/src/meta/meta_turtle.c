@@ -153,7 +153,7 @@ int
 __wt_turtle_validate_version(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
-    uint32_t major, minor;
+    uint32_t major, minor, patch;
     char *version_string;
 
     WT_WITH_TURTLE_LOCK(
@@ -162,7 +162,7 @@ __wt_turtle_validate_version(WT_SESSION_IMPL *session)
     if (ret != 0)
         WT_ERR_MSG(session, ret, "Unable to read version string from turtle file");
 
-    if ((ret = sscanf(version_string, "major=%u,minor=%u", &major, &minor)) != 2)
+    if ((ret = sscanf(version_string, "major=%u,minor=%u,patch=%u", &major, &minor, &patch)) != 3)
         WT_ERR_MSG(session, ret, "Unable to parse turtle file version string");
 
     ret = 0;
@@ -170,6 +170,10 @@ __wt_turtle_validate_version(WT_SESSION_IMPL *session)
     if (major < WT_MIN_STARTUP_VERSION_MAJOR ||
       (major == WT_MIN_STARTUP_VERSION_MAJOR && minor < WT_MIN_STARTUP_VERSION_MINOR))
         WT_ERR_MSG(session, WT_ERROR, "WiredTiger version incompatible with current binary");
+
+    S2C(session)->recovery_major = major;
+    S2C(session)->recovery_minor = minor;
+    S2C(session)->recovery_patch = patch;
 
 err:
     __wt_free(session, version_string);
