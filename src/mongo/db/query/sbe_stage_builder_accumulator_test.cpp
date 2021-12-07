@@ -419,6 +419,19 @@ TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationStringsReverseStringCo
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
 }
 
+TEST_F(SbeStageBuilderGroupTest, MinAccumulatorTranslationNaN) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 42ll)),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<double>::quiet_NaN()))};
+    // The collator doesn't affect comparison of numbers but until SERVER-61868 just providing a
+    // collator used to trigger a different codepath, so let's throw it in for a good measure.
+    runGroupAggregationTest(
+        "{_id: null, x: {$min: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << std::numeric_limits<double>::quiet_NaN())),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+}
+
 TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationBasic) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 100ll)),
                                        BSON_ARRAY(BSON("a" << 1 << "b" << Decimal128(10.0))),
@@ -500,6 +513,19 @@ TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationStringsReverseStringCo
         docs,
         BSON_ARRAY(BSON("_id" << BSONNULL << "x"
                               << "az")),
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
+}
+
+TEST_F(SbeStageBuilderGroupTest, MaxAccumulatorTranslationNaN) {
+    auto docs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 42ll)),
+        BSON_ARRAY(BSON("a" << 1 << "b" << std::numeric_limits<double>::quiet_NaN()))};
+    // The collator doesn't affect comparison of numbers but until SERVER-61868 just providing a
+    // collator used to trigger a different codepath, so let's throw it in for a good measure.
+    runGroupAggregationTest(
+        "{_id: null, x: {$max: '$b'}}",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSONNULL << "x" << 42ll)),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
 }
 

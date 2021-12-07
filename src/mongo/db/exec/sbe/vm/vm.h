@@ -851,12 +851,14 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> aggMin(value::TypeTags accTag,
                                                            value::Value accValue,
                                                            value::TypeTags fieldTag,
-                                                           value::Value fieldValue);
+                                                           value::Value fieldValue,
+                                                           CollatorInterface* collator = nullptr);
 
     std::tuple<bool, value::TypeTags, value::Value> aggMax(value::TypeTags accTag,
                                                            value::Value accValue,
                                                            value::TypeTags fieldTag,
-                                                           value::Value fieldValue);
+                                                           value::Value fieldValue,
+                                                           CollatorInterface* collator = nullptr);
 
     std::tuple<bool, value::TypeTags, value::Value> aggFirst(value::TypeTags accTag,
                                                              value::Value accValue,
@@ -867,20 +869,6 @@ private:
                                                             value::Value accValue,
                                                             value::TypeTags fieldTag,
                                                             value::Value fieldValue);
-
-    std::tuple<bool, value::TypeTags, value::Value> aggCollMin(value::TypeTags accTag,
-                                                               value::Value accValue,
-                                                               value::TypeTags collTag,
-                                                               value::Value collValue,
-                                                               value::TypeTags fieldTag,
-                                                               value::Value fieldValue);
-
-    std::tuple<bool, value::TypeTags, value::Value> aggCollMax(value::TypeTags accTag,
-                                                               value::Value accValue,
-                                                               value::TypeTags collTag,
-                                                               value::Value collValue,
-                                                               value::TypeTags fieldTag,
-                                                               value::Value fieldValue);
 
     std::tuple<bool, value::TypeTags, value::Value> genericAcos(value::TypeTags operandTag,
                                                                 value::Value operandValue);
