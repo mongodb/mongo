@@ -51,30 +51,35 @@ assert.commandFailedWithCode(buildAndRunCommand({
                              }),
                              6050204);
 
-// TODO SERVER-60500 Add a test that "linearFill" fails without a sortBy field.
+// Fail if linearFill does not receive a sortBy field.
+assert.commandFailedWithCode(
+    buildAndRunCommand({
+        $fill:
+            {output: {test: {method: "linear"}}, partitionBy: {part: "$part", partTwo: "$partTwo"}}
+    }),
+    605001);
 
 // Test that we desugar correctly.
 // Format is [[$fill spec], [Desugared pipeline], [field list that contains UUIDs]]
 // Not all test cases have a spec that generates UUIDs, the third array will be empty for those
 // tests.
-// TODO SERVER-60500 Enable tests that reference 'linear'
 let testCases = [
     [
         {$fill: {output: {val: {method: "locf"}}}},
         [{"$_internalSetWindowFields": {"output": {"val": {"$locf": "$val"}}}}],
         []
     ],  // 0
-    // TODO SERVER-60500: Enable
-    // [{$fill: {output: {val: {method: "linear"}}}}, [{
-    //  		"$_internalSetWindowFields" : {
-    //  			"output" : {
-    //  				"val" : {
-    //  					"$linear" : "$val"
-    //  				}
-    //  			}
-    //  		}
-    //  	}], []
-    // ], // 1
+    [
+        {$fill: {sortBy: {key: 1}, output: {val: {method: "linear"}}}},
+        [
+            {"$sort": {"sortKey": {"key": 1}}},
+            {
+                "$_internalSetWindowFields":
+                    {"sortBy": {"key": 1}, "output": {"val": {"$linearFill": "$val"}}}
+            }
+        ],
+        []
+    ],                                                                                     // 1
     [{$fill: {output: {val: {value: 5}}}}, [{"$addFields": {"val": {"$const": 5}}}], []],  // 2
     [{$fill: {output: {val: {value: "$test"}}}}, [{"$addFields": {"val": "$test"}}], []],  // 3
     [

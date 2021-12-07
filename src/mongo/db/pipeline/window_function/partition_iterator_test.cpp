@@ -62,6 +62,15 @@ public:
         return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kEndpoints);
     }
 
+    auto makeManualAccessor(
+        boost::intrusive_ptr<DocumentSourceMock> mock,
+        boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
+        if (!_iter)
+            _iter = std::make_unique<PartitionIterator>(
+                getExpCtx().get(), mock.get(), &_tracker, partExpr, boost::none);
+        return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kManual);
+    }
+
     auto advance() {
         invariant(_iter);
         return _iter->advance();
@@ -493,7 +502,9 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForDocumentIteratorCache) {
     size_t initialDocSize = docs[0].getDocument().getApproximateSize();
 
     // Pull in the first document, and verify the reported size of the iterator is roughly double
-    // the size of the document.
+    // the size of the document. The size of the iterator is double the size of the document because
+    // we greedily fill the cache, so each internal document in memory stores two copies of
+    // largeStr.
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
     ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
     ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 500);
@@ -595,6 +606,39 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
     ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
     ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
+}
+
+TEST_F(PartitionIteratorTest, ManualPolicy) {
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document{{"key", 1}, {"a", 1}},
+                                                  Document{{"key", 2}, {"a", BSONNULL}},
+                                                  Document{{"key", 3}, {"a", 3}},
+                                                  Document{{"key", 4}, {"a", 8}},
+                                                  Document{{"key", 6}, {"a", 3}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto accessor = makeManualAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+
+    ASSERT_DOCUMENT_EQ(*accessor[0], docs[0].getDocument());
+    // The documents in this test are so small we will not see the effects of greedy caching that we
+    // can see in the above tests. We can therefore expect our advances to increase the size of our
+    // iterator by one doc uniformly each time.
+    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize * 1);
+    advance();
+    // Confirm nothing has been released after advancing.
+    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    advance();
+    // Confirm nothing has been released after advancing.
+    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[2].getDocument());
+
+    // Expire the third document and everything behind it.
+    accessor.manualExpireUpTo(0);
+    // Advance the iterator which frees the manually expired documents.
+    advance();
+    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize * 1);
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[3].getDocument());
 }
 
 }  // namespace

@@ -739,6 +739,71 @@ public:
     }
 };
 
+class ExpressionLinearFill : public Expression {
+public:
+    ExpressionLinearFill(ExpressionContext* expCtx,
+                         std::string accumulatorName,
+                         boost::intrusive_ptr<::mongo::Expression> input,
+                         WindowBounds bounds)
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx) {
+        boost::optional<StringData> accumulatorName;
+        WindowBounds bounds = WindowBounds::defaultBounds();
+        boost::intrusive_ptr<::mongo::Expression> input;
+
+        std::vector<std::pair<std::string, boost::intrusive_ptr<mongo::Expression>>> linearFillVec;
+        bool windowFieldMissing = true;
+        for (const auto& arg : obj) {
+            auto argName = arg.fieldNameStringData();
+            if (argName == kWindowArg) {
+                windowFieldMissing = false;
+            } else if (isFunction(argName)) {
+                uassert(ErrorCodes::FailedToParse,
+                        "Cannot specify two functions in window function spec",
+                        !accumulatorName);
+                accumulatorName = argName;
+                input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
+            } else {
+                uasserted(ErrorCodes::FailedToParse,
+                          str::stream()
+                              << "Window function found an unknown argument: " << argName);
+            }
+        }
+
+        uassert(ErrorCodes::FailedToParse,
+                "Must specify a window function in output field",
+                accumulatorName);
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'window' field is not allowed in " << accumulatorName,
+                windowFieldMissing);
+
+        uassert(
+            605001,
+            str::stream()
+                << accumulatorName
+                << " must be specified with a top level sortBy expression with exactly one element",
+            sortBy && sortBy->isSingleElementKey());
+
+        return make_intrusive<ExpressionLinearFill>(
+            expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
+    }
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        MONGO_UNREACHABLE_TASSERT(5490701);
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        MONGO_UNREACHABLE_TASSERT(5490702);
+    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        MutableDocument args;
+        args.addField(_accumulatorName, Value(_input->serialize(static_cast<bool>(explain))));
+        return args.freezeToValue();
+    }
+};
 
 class ExpressionFirstLast : public Expression {
 public:

@@ -89,7 +89,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
                     str::stream() << "Method must be either " << kLocfMethod << " or "
                                   << kLinearInterpolateMethod,
                     methodStr == kLocfMethod || methodStr == kLinearInterpolateMethod);
-            setWindowFieldsOutputSpec.append(fieldName, BSON("$" + methodStr << "$" + fieldName));
+            auto&& fullMethodStr =
+                methodStr == kLinearInterpolateMethod ? "$" + methodStr + "Fill" : "$" + methodStr;
+            setWindowFieldsOutputSpec.append(fieldName, BSON(fullMethodStr << "$" + fieldName));
             needSetWindowFields = true;
         }
         if (auto&& unparsedValueExpr = parsedSpec.getValue()) {

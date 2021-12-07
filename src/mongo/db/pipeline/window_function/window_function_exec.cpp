@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_linear_fill.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
@@ -133,6 +134,12 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
                    dynamic_cast<window_function::ExpressionShift*>(functionStmt.expr.get())) {
         return std::make_unique<WindowFunctionExecFirst>(
             iter, expr->input(), expr->bounds(), expr->defaultVal(), &functionMemTracker);
+    } else if (auto expr =
+                   dynamic_cast<window_function::ExpressionLinearFill*>(functionStmt.expr.get())) {
+        auto sortByExpr = ExpressionFieldPath::createPathFromString(
+            expCtx, sortBy->begin()->fieldPath->fullPath(), expCtx->variablesParseState);
+        return std::make_unique<WindowFunctionExecLinearFill>(
+            iter, expr->input(), std::move(sortByExpr), expr->bounds(), &functionMemTracker);
     }
 
     WindowBounds bounds = functionStmt.expr->bounds();

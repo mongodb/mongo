@@ -326,6 +326,9 @@ public:
         // This policy means the caller only looks at how the right endpoint changes.
         // The caller may look at documents between the most recent two right endpoints.
         kRightEndpoint,
+        // This policy allows the window function executor to manually release expired documents
+        // after evaluating values in the accessed documents.
+        kManual,
     };
     PartitionAccessor(PartitionIterator* iter, Policy policy)
         : _iter(iter), _slot(iter->newSlot()), _policy(policy) {}
@@ -338,6 +341,8 @@ public:
                 break;
             case Policy::kEndpoints:
             case Policy::kRightEndpoint:
+                break;
+            case Policy::kManual:
                 break;
         }
         return ret;
@@ -373,9 +378,19 @@ public:
                     _iter->expireUpTo(_slot, endpoints->second - 1);
                 }
                 break;
+            case Policy::kManual:
+                break;
         }
         return endpoints;
     }
+    void manualExpireUpTo(int offset) {
+        tassert(
+            6050002,
+            "Documents can only be manually expired by a PartitionIterator with a manual policy ",
+            _policy == Policy::kManual);
+        _iter->expireUpTo(_slot, offset);
+    }
+
 
 private:
     PartitionIterator* _iter;

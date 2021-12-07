@@ -321,6 +321,7 @@ pipelineEnv.Library(
         'window_function/window_function_exec_derivative.cpp',
         'window_function/window_function_exec_removable_document.cpp',
         'window_function/window_function_exec_removable_range.cpp',
+        'window_function/window_function_exec_linear_fill.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
