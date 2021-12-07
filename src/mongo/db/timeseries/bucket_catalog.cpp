@@ -1132,6 +1132,11 @@ bool BucketCatalog::BucketAccess::schemaIncompatible(
     const BSONObj& input,
     boost::optional<StringData> metaField,
     const StringData::ComparatorInterface* comparator) {
+    // TODO (SERVER-60911): Update once latest is 5.3
+    if (!serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
+        return false;
+    }
+
     auto result = _bucket->_schema.update(input, metaField, comparator);
     return (result == timeseries::Schema::UpdateStatus::Failed);
 }
