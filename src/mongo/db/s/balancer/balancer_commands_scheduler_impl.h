@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/s/balancer/balancer_command_document_gen.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/balancer_dist_locks.h"
+#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -72,6 +72,10 @@ public:
     virtual BSONObj serialise() const = 0;
 
     virtual bool requiresRecoveryOnCrash() const {
+        return false;
+    }
+
+    virtual bool requiresRecoveryCleanupOnCompletion() const {
         return false;
     }
 
@@ -120,7 +124,8 @@ public:
                          bool waitForDelete,
                          MoveChunkRequest::ForceJumbo forceJumbo,
                          const ChunkVersion& version,
-                         boost::optional<ExternalClientInfo>&& clientInfo)
+                         boost::optional<ExternalClientInfo>&& clientInfo,
+                         bool requiresRecoveryOnCrash = true)
         : CommandInfo(origin, nss, std::move(clientInfo)),
           _chunkBoundaries(lowerBoundKey, upperBoundKey),
           _recipient(recipient),
@@ -128,7 +133,24 @@ public:
           _maxChunkSizeBytes(maxChunkSizeBytes),
           _secondaryThrottle(secondaryThrottle),
           _waitForDelete(waitForDelete),
-          _forceJumbo(forceJumbo) {}
+          _forceJumbo(forceJumbo),
+          _requiresRecoveryOnCrash(requiresRecoveryOnCrash) {}
+
+    static std::shared_ptr<MoveChunkCommandInfo> recoverFrom(
+        const MigrationType& migrationType, const MigrationsRecoveryConfiguration& configuration) {
+        return std::make_shared<MoveChunkCommandInfo>(migrationType.getNss(),
+                                                      migrationType.getSource(),
+                                                      migrationType.getDestination(),
+                                                      migrationType.getMinKey(),
+                                                      migrationType.getMaxKey(),
+                                                      configuration.maxChunkSizeBytes,
+                                                      configuration.secondaryThrottle,
+                                                      migrationType.getWaitForDelete(),
+                                                      migrationType.getForceJumbo(),
+                                                      migrationType.getChunkVersion(),
+                                                      boost::none /* clientInfo */,
+                                                      false /* requiresRecoveryOnCrash */);
+    }
 
     BSONObj serialise() const override {
         BSONObjBuilder commandBuilder;
@@ -147,12 +169,38 @@ public:
     }
 
     bool requiresRecoveryOnCrash() const override {
+        return _requiresRecoveryOnCrash;
+    }
+
+    bool requiresRecoveryCleanupOnCompletion() const override {
         return true;
     }
 
     bool requiresDistributedLock() const override {
         return true;
     }
+
+    MigrationType asMigrationType() const {
+        return MigrationType(getNameSpace(),
+                             _chunkBoundaries.getMin(),
+                             _chunkBoundaries.getMax(),
+                             getTarget(),
+                             _recipient,
+                             _version,
+                             _waitForDelete,
+                             _forceJumbo);
+    }
+
+    BSONObj getRecoveryDocumentIdentifier() const {
+        // Use the config.migration index to identify the recovery info document: It is expected
+        // that only commands that are functionally equivalent can match such value
+        // (@see persistRecoveryInfo() in balancer_commands_scheduler_impl.cpp for details).
+        BSONObjBuilder builder;
+        builder.append(MigrationType::ns.name(), getNameSpace().ns());
+        builder.append(MigrationType::min.name(), _chunkBoundaries.getMin());
+        return builder.obj();
+    }
+
 
 private:
     ChunkRange _chunkBoundaries;
@@ -162,6 +210,7 @@ private:
     MigrationSecondaryThrottleOptions _secondaryThrottle;
     bool _waitForDelete;
     MoveChunkRequest::ForceJumbo _forceJumbo;
+    bool _requiresRecoveryOnCrash;
 };
 
 class MergeChunksCommandInfo : public CommandInfo {
@@ -321,30 +370,6 @@ private:
     static const std::string kSplitKeys;
 };
 
-class RecoveryCommandInfo : public CommandInfo {
-public:
-    RecoveryCommandInfo(const PersistedBalancerCommand& persistedCommand)
-        : CommandInfo(persistedCommand.getTarget(), persistedCommand.getNss(), boost::none),
-          _serialisedCommand(persistedCommand.getRemoteCommand()),
-          _requiresDistributedLock(persistedCommand.getRequiresDistributedLock()) {}
-
-    BSONObj serialise() const override {
-        return _serialisedCommand;
-    }
-
-    bool requiresRecoveryOnCrash() const override {
-        return true;
-    }
-
-    bool requiresDistributedLock() const override {
-        return _requiresDistributedLock;
-    }
-
-private:
-    BSONObj _serialisedCommand;
-    bool _requiresDistributedLock;
-};
-
 /**
  * Helper data structure for submitting the remote command associated to a BalancerCommandsScheduler
  * Request.
@@ -434,6 +459,10 @@ public:
         return _executionContext;
     }
 
+    const CommandInfo& getCommandInfo() const {
+        return *_commandInfo;
+    }
+
     const NamespaceString& getNamespace() const {
         return _commandInfo->getNameSpace();
     }
@@ -442,8 +471,8 @@ public:
         return _holdingDistLock;
     }
 
-    bool isRecoverable() const {
-        return _commandInfo->requiresRecoveryOnCrash();
+    bool requiresRecoveryCleanupOnCompletion() const {
+        return _commandInfo->requiresRecoveryCleanupOnCompletion();
     }
 
     Future<executor::RemoteCommandResponse> getOutcomeFuture() {
@@ -483,7 +512,8 @@ public:
 
     ~BalancerCommandsSchedulerImpl();
 
-    void start(OperationContext* opCtx) override;
+    void start(OperationContext* opCtx,
+               const MigrationsRecoveryConfiguration& configuration) override;
 
     void stop() override;
 
@@ -583,8 +613,6 @@ private:
     void _applySubmissionResult(WithLock, CommandSubmissionResult&& submissionResult);
 
     void _applyCommandResponse(UUID requestId, const executor::RemoteCommandResponse& response);
-
-    std::vector<RequestData> _loadRequestsToRecover(OperationContext* opCtx);
 
     void _workerThread();
 };

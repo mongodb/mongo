@@ -37,11 +37,6 @@
 #include "mongo/s/grid.h"
 
 namespace mongo {
-namespace {
-
-const StringData kChunkVersion = "chunkVersion"_sd;
-
-}  // namespace
 
 const NamespaceString MigrationType::ConfigNS("config.migrations");
 
@@ -52,8 +47,26 @@ const BSONField<std::string> MigrationType::fromShard("fromShard");
 const BSONField<std::string> MigrationType::toShard("toShard");
 const BSONField<bool> MigrationType::waitForDelete("waitForDelete");
 const BSONField<std::string> MigrationType::forceJumbo("forceJumbo");
+const BSONField<std::string> MigrationType::chunkVersion("chunkVersion");
 
 MigrationType::MigrationType() = default;
+
+MigrationType::MigrationType(const NamespaceString& nss,
+                             const BSONObj& min,
+                             const BSONObj& max,
+                             const ShardId& fromShard,
+                             const ShardId& toShard,
+                             const ChunkVersion& chunkVersion,
+                             bool waitForDelete,
+                             MoveChunkRequest::ForceJumbo forceJumbo)
+    : _nss(nss),
+      _min(min),
+      _max(max),
+      _fromShard(fromShard),
+      _toShard(toShard),
+      _chunkVersion(chunkVersion),
+      _waitForDelete(waitForDelete),
+      _forceJumbo(MoveChunkRequest::forceJumboToString(forceJumbo)) {}
 
 MigrationType::MigrationType(const MigrateInfo& info, bool waitForDelete)
     : _nss(info.nss),
@@ -103,7 +116,7 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     }
 
     {
-        auto chunkVersionStatus = ChunkVersion::parseWithField(source, kChunkVersion);
+        auto chunkVersionStatus = ChunkVersion::parseWithField(source, chunkVersion.name());
         if (!chunkVersionStatus.isOK())
             return chunkVersionStatus.getStatus();
         migrationType._chunkVersion = chunkVersionStatus.getValue();
@@ -147,7 +160,7 @@ BSONObj MigrationType::toBSON() const {
     builder.append(fromShard.name(), _fromShard.toString());
     builder.append(toShard.name(), _toShard.toString());
 
-    _chunkVersion.appendWithField(&builder, kChunkVersion);
+    _chunkVersion.appendWithField(&builder, chunkVersion.name());
 
     builder.append(waitForDelete.name(), _waitForDelete);
     builder.append(forceJumbo.name(), _forceJumbo);

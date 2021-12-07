@@ -42,6 +42,18 @@ class KeyPattern;
 class MigrationSecondaryThrottleOptions;
 
 /**
+ * Configuration be applied on every MoveChunkRequest that the Scheduler might recover from a prior
+ * step-down or crash as part of its self-initialisation
+ */
+struct MigrationsRecoveryConfiguration {
+    MigrationsRecoveryConfiguration(int64_t maxChunkSizeBytes,
+                                    const MigrationSecondaryThrottleOptions& secondaryThrottle)
+        : maxChunkSizeBytes(maxChunkSizeBytes), secondaryThrottle(secondaryThrottle) {}
+    int64_t maxChunkSizeBytes;
+    MigrationSecondaryThrottleOptions secondaryThrottle;
+};
+
+/**
  * Set of command-specific aggregations of submission settings
  */
 struct MoveChunkSettings {
@@ -94,7 +106,8 @@ public:
      * Triggers an asynchronous self-initialisation of the component,
      * which will start accepting request<Command>() invocations.
      */
-    virtual void start(OperationContext* opCtx) = 0;
+    virtual void start(OperationContext* opCtx,
+                       const MigrationsRecoveryConfiguration& configuration) = 0;
 
     /**
      * Stops the scheduler and the processing of any outstanding and incoming request

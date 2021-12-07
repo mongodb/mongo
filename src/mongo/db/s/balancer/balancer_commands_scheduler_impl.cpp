@@ -59,6 +59,86 @@ Status processRemoteResponse(const executor::RemoteCommandResponse& remoteRespon
                                << causedBy(remoteStatus));
 }
 
+Status persistRecoveryInfo(OperationContext* opCtx, const CommandInfo& command) {
+    const auto& migrationCommand = checked_cast<const MoveChunkCommandInfo&>(command);
+    auto migrationType = migrationCommand.asMigrationType();
+    DBDirectClient dbClient(opCtx);
+    std::vector<BSONObj> recoveryDocument;
+    recoveryDocument.emplace_back(migrationType.toBSON());
+
+    auto reply = dbClient.insertAcknowledged(
+        MigrationType::ConfigNS.ns(), recoveryDocument, true, WriteConcernOptions::Majority);
+    auto insertStatus = getStatusFromWriteCommandReply(reply);
+    if (insertStatus != ErrorCodes::DuplicateKey) {
+        return insertStatus;
+    }
+
+    // If the error has been caused by a duplicate command that is/was still active,
+    // skip the insertion and go ahead - the execution of the two requests will eventually join.
+    auto conflictingDoc =
+        dbClient.findOne(MigrationType::ConfigNS, migrationCommand.getRecoveryDocumentIdentifier());
+    if (conflictingDoc.isEmpty()) {
+        return Status::OK();
+    }
+    auto swConflictingMigration = MigrationType::fromBSON(conflictingDoc);
+    Status conflictConfirmedStatus(ErrorCodes::ConflictingOperationInProgress,
+                                   "Conflict detected while persisting recovery info");
+    if (!swConflictingMigration.isOK()) {
+        LOGV2_ERROR(5847211,
+                    "Parse error detected while processing duplicate recovery info",
+                    "error"_attr = swConflictingMigration.getStatus(),
+                    "recoveryInfo"_attr = redact(conflictingDoc));
+        return conflictConfirmedStatus;
+    }
+    auto conflictingMigrationType = swConflictingMigration.getValue();
+    return conflictingMigrationType.getSource() == migrationType.getSource() &&
+            conflictingMigrationType.getDestination() == conflictingMigrationType.getDestination()
+        ? Status::OK()
+        : conflictConfirmedStatus;
+}
+
+std::vector<RequestData> rebuildRequestsFromRecoveryInfo(
+    OperationContext* opCtx, const MigrationsRecoveryConfiguration& configuration) {
+    std::vector<RequestData> rebuiltRequests;
+    auto documentProcessor = [&rebuiltRequests, &configuration](const BSONObj& recoveryDoc) {
+        auto swTypeMigration = MigrationType::fromBSON(recoveryDoc);
+        if (swTypeMigration.isOK()) {
+            auto requestId = UUID::gen();
+            auto recoveredMigrationCommand =
+                MoveChunkCommandInfo::recoverFrom(swTypeMigration.getValue(), configuration);
+            LOGV2_DEBUG(5847210,
+                        1,
+                        "Command request recovered and set for rescheduling",
+                        "reqId"_attr = requestId,
+                        "command"_attr = redact(recoveredMigrationCommand->serialise()));
+            rebuiltRequests.emplace_back(requestId, std::move(recoveredMigrationCommand));
+        } else {
+            LOGV2_ERROR(5847209,
+                        "Failed to parse recovery info",
+                        "error"_attr = swTypeMigration.getStatus(),
+                        "recoveryInfo"_attr = redact(recoveryDoc));
+        }
+    };
+    DBDirectClient dbClient(opCtx);
+    try {
+        dbClient.query(documentProcessor, MigrationType::ConfigNS, BSONObj());
+    } catch (const DBException& e) {
+        LOGV2_ERROR(5847215, "Failed to load requests to recover", "error"_attr = redact(e));
+    }
+
+    return rebuiltRequests;
+}
+
+void deletePersistedRecoveryInfo(DBDirectClient& dbClient, const CommandInfo& command) {
+    const auto& migrationCommand = checked_cast<const MoveChunkCommandInfo&>(command);
+    auto recoveryDocId = migrationCommand.getRecoveryDocumentIdentifier();
+    try {
+        dbClient.remove(MigrationType::ConfigNS.ns(), recoveryDocId, false /*removeMany*/);
+    } catch (const DBException& e) {
+        LOGV2_ERROR(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
+    }
+}
+
 }  // namespace
 
 const std::string MergeChunksCommandInfo::kCommandName = "mergeChunks";
@@ -86,14 +166,15 @@ BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
     stop();
 }
 
-void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
+void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
+                                          const MigrationsRecoveryConfiguration& configuration) {
     LOGV2(5847200, "Balancer command scheduler start requested");
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_workerThreadHandle.joinable());
     if (!_executor) {
         _executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     }
-    auto requestsToRecover = _loadRequestsToRecover(opCtx);
+    auto requestsToRecover = rebuildRequestsFromRecoveryInfo(opCtx, configuration);
     _numRequestsToRecover = requestsToRecover.size();
     _state = _numRequestsToRecover == 0 ? SchedulerState::Running : SchedulerState::Recovering;
 
@@ -249,30 +330,6 @@ Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAnd
                 "command"_attr = redact(commandInfo->serialise().toString()),
                 "recoveryDocRequired"_attr = commandInfo->requiresRecoveryOnCrash());
 
-    if (commandInfo->requiresRecoveryOnCrash()) {
-        DBDirectClient dbClient(opCtx);
-        PersistedBalancerCommand recoveryDoc(newRequestId,
-                                             commandInfo->serialise(),
-                                             commandInfo->getTarget(),
-                                             commandInfo->getNameSpace(),
-                                             commandInfo->requiresDistributedLock());
-        std::vector<BSONObj> serialisedRecoveryInfo;
-        serialisedRecoveryInfo.emplace_back(recoveryDoc.toBSON());
-        auto reply = dbClient.insertAcknowledged(
-            NamespaceString::kConfigBalancerCommandsNamespace.toString(),
-            serialisedRecoveryInfo,
-            true,
-            WriteConcernOptions::Majority);
-
-        if (auto writeStatus = getStatusFromWriteCommandReply(reply); !writeStatus.isOK()) {
-            LOGV2_WARNING(5847210,
-                          "Failed to persist request command document",
-                          "reqId"_attr = newRequestId,
-                          "error"_attr = writeStatus);
-            return Future<executor::RemoteCommandResponse>::makeReady(writeStatus);
-        }
-    }
-
     RequestData pendingRequest(newRequestId, std::move(commandInfo));
 
     stdx::unique_lock<Latch> ul(_mutex);
@@ -315,6 +372,13 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
         opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!shardHostWithStatus.isOK()) {
         return CommandSubmissionResult(params.id, distLockTaken, shardHostWithStatus.getStatus());
+    }
+
+    if (params.commandInfo->requiresRecoveryOnCrash()) {
+        auto writeStatus = persistRecoveryInfo(opCtx, *(params.commandInfo));
+        if (!writeStatus.isOK()) {
+            return CommandSubmissionResult(params.id, distLockTaken, writeStatus);
+        }
     }
 
     const executor::RemoteCommandRequest remoteCommand(shardHostWithStatus.getValue(),
@@ -387,63 +451,20 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
                 "response"_attr = response);
 }
 
-std::vector<RequestData> BalancerCommandsSchedulerImpl::_loadRequestsToRecover(
-    OperationContext* opCtx) {
-    std::vector<RequestData> requestsToRecover;
-    auto documentProcessor = [&requestsToRecover, opCtx](const BSONObj& commandToRecoverDoc) {
-        auto originalCommand = PersistedBalancerCommand::parse(
-            IDLParserErrorContext("BalancerCommandsScheduler"), commandToRecoverDoc);
-        auto recoveryCommand = std::make_shared<RecoveryCommandInfo>(originalCommand);
-        LOGV2_DEBUG(5847212,
-                    1,
-                    "Command request recovered and set for rescheduling",
-                    "reqId"_attr = originalCommand.getRequestId(),
-                    "command"_attr = redact(recoveryCommand->serialise()));
-        requestsToRecover.emplace_back(originalCommand.getRequestId(), std::move(recoveryCommand));
-    };
-    DBDirectClient dbClient(opCtx);
-    try {
-        dbClient.query(
-            documentProcessor, NamespaceString::kConfigBalancerCommandsNamespace, BSONObj());
-    } catch (const DBException& e) {
-        LOGV2_ERROR(5847215, "Failed to load requests to recover", "error"_attr = redact(e));
-    }
-
-    return requestsToRecover;
-}
-
 void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
     OperationContext* opCtx, std::vector<RequestData>&& requestsHoldingResources) {
-    std::vector<UUID> persistedRequestsIds;
+    DBDirectClient dbClient(opCtx);
     for (const auto& request : requestsHoldingResources) {
         if (request.holdsDistributedLock()) {
             _distributedLocks.releaseFor(opCtx, request.getNamespace());
         }
-        if (request.isRecoverable()) {
-            persistedRequestsIds.emplace_back(request.getId());
+        if (request.requiresRecoveryCleanupOnCompletion()) {
+            deletePersistedRecoveryInfo(dbClient, request.getCommandInfo());
         }
     }
-
-    if (persistedRequestsIds.empty()) {
-        return;
+    if (!requestsHoldingResources.empty()) {
+        deferredCleanupCompletedCheckpoint.pauseWhileSet();
     }
-    BSONArrayBuilder idsToRemoveBuilder;
-    for (const auto& requestId : persistedRequestsIds) {
-        requestId.appendToArrayBuilder(&idsToRemoveBuilder);
-    }
-    BSONObjBuilder queryBuilder;
-    queryBuilder.append(PersistedBalancerCommand::kRequestIdFieldName,
-                        BSON("$in" << idsToRemoveBuilder.arr()));
-
-    auto query = queryBuilder.obj();
-    DBDirectClient dbClient(opCtx);
-    try {
-        dbClient.remove(NamespaceString::kConfigBalancerCommandsNamespace.toString(), query);
-    } catch (const DBException& e) {
-        LOGV2_ERROR(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
-    }
-
-    deferredCleanupCompletedCheckpoint.pauseWhileSet();
 }
 
 void BalancerCommandsSchedulerImpl::_workerThread() {

@@ -55,6 +55,16 @@ public:
     static const BSONField<std::string> toShard;
     static const BSONField<bool> waitForDelete;
     static const BSONField<std::string> forceJumbo;
+    static const BSONField<std::string> chunkVersion;
+
+    MigrationType(const NamespaceString& nss,
+                  const BSONObj& min,
+                  const BSONObj& max,
+                  const ShardId& fromShard,
+                  const ShardId& toShard,
+                  const ChunkVersion& chunkVersion,
+                  bool waitForDelete,
+                  MoveChunkRequest::ForceJumbo forceJumbo);
 
     /**
      * The Balancer encapsulates migration information in MigrateInfo objects, so this facilitates
@@ -80,6 +90,22 @@ public:
 
     const NamespaceString& getNss() const {
         return _nss;
+    }
+
+    const BSONObj& getMinKey() const {
+        return _min;
+    }
+    const BSONObj& getMaxKey() const {
+        return _max;
+    }
+    const ShardId& getSource() const {
+        return _fromShard;
+    }
+    const ShardId& getDestination() const {
+        return _toShard;
+    }
+    const ChunkVersion& getChunkVersion() const {
+        return _chunkVersion;
     }
 
     bool getWaitForDelete() const {

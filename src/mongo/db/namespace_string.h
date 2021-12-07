@@ -175,9 +175,6 @@ public:
     // Namespace for balancer settings and default read and write concerns.
     static const NamespaceString kConfigSettingsNamespace;
 
-    // Namespace with information on commands sent by the balancer (thru BalancerCommandsScheduler).
-    static const NamespaceString kConfigBalancerCommandsNamespace;
-
     // Namespace for vector clock state.
     static const NamespaceString kVectorClockNamespace;
 

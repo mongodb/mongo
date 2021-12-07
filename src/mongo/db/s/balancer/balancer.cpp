@@ -501,7 +501,10 @@ void Balancer::_mainThread() {
 
     LOGV2(6036605, "Starting command scheduler");
 
-    _commandScheduler->start(opCtx.get());
+    _commandScheduler->start(
+        opCtx.get(),
+        MigrationsRecoveryConfiguration(balancerConfig->getMaxChunkSizeBytes(),
+                                        balancerConfig->getSecondaryThrottle()));
 
     _actionStreamConsumerThread = stdx::thread([&] { _consumeActionStreamLoop(); });
 
