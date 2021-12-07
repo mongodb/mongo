@@ -60,6 +60,13 @@ function test({pipeline, expectedCodes, canSpillToDisk}) {
     }
 }
 
+assert.commandWorked(db.adminCommand({
+    setParameter: 1,
+    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1024
+}));
+assert.commandWorked(db.adminCommand(
+    {setParameter: 1, internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate: 1.0}));
+
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
@@ -73,6 +80,7 @@ test({
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
+
 test({
     pipeline: [{$sort: {bigStr: 1}}],  // big key and value
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
@@ -92,11 +100,13 @@ test({
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
+
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: -1}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true
 });
+
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {random: 1}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
@@ -158,5 +168,5 @@ for (const op of ['$firstN', '$lastN', '$minN', '$maxN', '$topN', '$bottomN']) {
 }
 
 // don't leave large collection laying around
-assert(coll.drop());
+coll.drop();
 })();

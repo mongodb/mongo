@@ -455,6 +455,7 @@ EvalStage makeHashAgg(EvalStage stage,
                       sbe::value::SlotVector gbs,
                       sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs,
                       boost::optional<sbe::value::SlotId> collatorSlot,
+                      bool allowDiskUse,
                       PlanNodeId planNodeId) {
     stage.outSlots = gbs;
     for (auto& [slot, _] : aggs) {
@@ -466,6 +467,7 @@ EvalStage makeHashAgg(EvalStage stage,
                                                 sbe::makeSV(),
                                                 true /* optimized close */,
                                                 collatorSlot,
+                                                allowDiskUse,
                                                 planNodeId);
     return stage;
 }

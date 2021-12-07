@@ -41,12 +41,6 @@
 
 namespace mongo::sbe {
 
-PlanStageTestFixture::PlanStageTestFixture() {
-    auto service = getServiceContext();
-    service->registerClientObserver(
-        std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
-}
-
 void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
                                              value::Value lhsVal,
                                              value::TypeTags rhsTag,

@@ -132,7 +132,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
 
     if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        cq->getForceClassicEngine() || expCtx->allowDiskUse || queryNeedsSubplanning) {
+        cq->getForceClassicEngine() || queryNeedsSubplanning) {
         return {};
     }
 

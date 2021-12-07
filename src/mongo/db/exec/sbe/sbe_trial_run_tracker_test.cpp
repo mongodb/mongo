@@ -148,6 +148,7 @@ TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
         makeSV(),  // Seek slot
         true,
         boost::none,
+        false /* allowDiskUse */,
         kEmptyPlanNodeId);
 
     auto tracker = std::make_unique<TrialRunTracker>(numResultsLimit, size_t{0});
@@ -216,6 +217,7 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
         makeSV(),  // Seek slot
         true,
         boost::none,
+        false /* allowDiskUse */,
         kEmptyPlanNodeId);
 
     hashAggStage->prepare(*ctx);
@@ -282,6 +284,7 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
             makeSV(),  // Seek slot
             true,
             boost::none,
+            false /* allowDiskUse */,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));

@@ -1193,6 +1193,7 @@ public:
                         sbe::makeSV(),
                         sbe::makeEM(finalGroupSlot, std::move(finalAddToArrayExpr)),
                         collatorSlot,
+                        _context->state.allowDiskUse,
                         _context->planNodeId);
 
         // Returns true if any of our input expressions return null.

@@ -360,6 +360,7 @@ protected:
                 sbe::makeSV(),
                 true,
                 boost::none, /* optional collator slot */
+                true,        /* allowDiskUse */
                 planNodeId),
             // GROUP with a collator slot.
             sbe::makeS<sbe::HashAggStage>(
@@ -374,6 +375,7 @@ protected:
                 sbe::makeSV(),
                 true,
                 sbe::value::SlotId{4}, /* optional collator slot */
+                true,                  /* allowDiskUse */
                 planNodeId),
             // LIMIT
             sbe::makeS<sbe::LimitSkipStage>(
