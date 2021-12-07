@@ -1104,7 +1104,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinStdDevSampFinal
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags accTag,
                                                                  value::Value accValue,
                                                                  value::TypeTags fieldTag,
-                                                                 value::Value fieldValue) {
+                                                                 value::Value fieldValue,
+                                                                 CollatorInterface* collator) {
     // Skip aggregation step if we don't have the input.
     if (fieldTag == value::TypeTags::Nothing) {
         auto [tag, val] = value::copyValue(accTag, accValue);
@@ -1117,7 +1118,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags
         return {true, tag, val};
     }
 
-    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue);
+    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue, collator);
 
     if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) < 0) {
         auto [tag, val] = value::copyValue(accTag, accValue);
@@ -1128,42 +1129,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags
     }
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggCollMin(value::TypeTags accTag,
-                                                                     value::Value accValue,
-                                                                     value::TypeTags collTag,
-                                                                     value::Value collValue,
-                                                                     value::TypeTags fieldTag,
-                                                                     value::Value fieldValue) {
-    // Skip aggregation step if we don't have the input or if the collation is Nothing or an
-    // unexpected type.
-    if (fieldTag == value::TypeTags::Nothing || collTag != value::TypeTags::collator) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
-    }
-
-    // Initialize the accumulator.
-    if (accTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
-    }
-
-    auto collator = value::getCollatorView(collValue);
-
-    auto [tag, val] = genericCompare<std::less<>>(accTag, accValue, fieldTag, fieldValue, collator);
-
-    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
-    } else {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
-    }
-}
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags accTag,
                                                                  value::Value accValue,
                                                                  value::TypeTags fieldTag,
-                                                                 value::Value fieldValue) {
+                                                                 value::Value fieldValue,
+                                                                 CollatorInterface* collator) {
     // Skip aggregation step if we don't have the input.
     if (fieldTag == value::TypeTags::Nothing) {
         auto [tag, val] = value::copyValue(accTag, accValue);
@@ -1176,42 +1147,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags
         return {true, tag, val};
     }
 
-    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue);
+    auto [tag, val] = compare3way(accTag, accValue, fieldTag, fieldValue, collator);
 
     if (tag == value::TypeTags::NumberInt32 && value::bitcastTo<int>(val) > 0) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
-    } else {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
-    }
-}
-
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggCollMax(value::TypeTags accTag,
-                                                                     value::Value accValue,
-                                                                     value::TypeTags collTag,
-                                                                     value::Value collValue,
-                                                                     value::TypeTags fieldTag,
-                                                                     value::Value fieldValue) {
-    // Skip aggregation step if we don't have the input or if the collation is Nothing or an
-    // unexpected type.
-    if (fieldTag == value::TypeTags::Nothing || collTag != value::TypeTags::collator) {
-        auto [tag, val] = value::copyValue(accTag, accValue);
-        return {true, tag, val};
-    }
-
-    // Initialize the accumulator.
-    if (accTag == value::TypeTags::Nothing) {
-        auto [tag, val] = value::copyValue(fieldTag, fieldValue);
-        return {true, tag, val};
-    }
-
-    auto collator = value::getCollatorView(collValue);
-
-    auto [tag, val] =
-        genericCompare<std::greater<>>(accTag, accValue, fieldTag, fieldValue, collator);
-
-    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
     } else {
@@ -4735,133 +4673,147 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     break;
                 }
                 case Instruction::aggSum: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] = aggSum(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
                 case Instruction::aggMin: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] = aggMin(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
                 case Instruction::aggCollMin: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
                     auto [collOwned, collTag, collVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] =
-                        aggCollMin(lhsTag, lhsVal, collTag, collVal, rhsTag, rhsVal);
+                    // Skip aggregation step if the collation is Nothing or an unexpected type.
+                    if (collTag != value::TypeTags::collator) {
+                        auto [tag, val] = value::copyValue(accTag, accVal);
+                        topStack(true, tag, val);
+                        break;
+                    }
+                    auto collator = value::getCollatorView(collVal);
+
+                    auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal, collator);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
                     if (collOwned) {
                         value::releaseValue(collTag, collVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
                 case Instruction::aggMax: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] = aggMax(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
                 case Instruction::aggCollMax: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
                     auto [collOwned, collTag, collVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] =
-                        aggCollMax(lhsTag, lhsVal, collTag, collVal, rhsTag, rhsVal);
+                    // Skip aggregation step if the collation is Nothing or an unexpected type.
+                    if (collTag != value::TypeTags::collator) {
+                        auto [tag, val] = value::copyValue(accTag, accVal);
+                        topStack(true, tag, val);
+                        break;
+                    }
+                    auto collator = value::getCollatorView(collVal);
+
+                    auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal, collator);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
                     if (collOwned) {
                         value::releaseValue(collTag, collVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
                 case Instruction::aggFirst: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] = aggFirst(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [owned, tag, val] = aggFirst(accTag, accVal, fieldTag, fieldVal);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
                 case Instruction::aggLast: {
-                    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
+                    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
                     popStack();
-                    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+                    auto [accOwned, accTag, accVal] = getFromStack(0);
 
-                    auto [owned, tag, val] = aggLast(lhsTag, lhsVal, rhsTag, rhsVal);
+                    auto [owned, tag, val] = aggLast(accTag, accVal, fieldTag, fieldVal);
 
                     topStack(owned, tag, val);
 
-                    if (rhsOwned) {
-                        value::releaseValue(rhsTag, rhsVal);
+                    if (fieldOwned) {
+                        value::releaseValue(fieldTag, fieldVal);
                     }
-                    if (lhsOwned) {
-                        value::releaseValue(lhsTag, lhsVal);
+                    if (accOwned) {
+                        value::releaseValue(accTag, accVal);
                     }
                     break;
                 }
