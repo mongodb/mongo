@@ -99,8 +99,8 @@ bool BalancerDefragmentationPolicyImpl::_queueNextAction(
     // get next action within the current phase
     switch (collectionData.phase) {
         case DefragmentationPhaseEnum::kMergeChunks:
-            if (auto mergeAction = _getCollectionMergeAction(collectionData)) {
-                collectionData.queuedActions.push(*mergeAction);
+            if (auto phase1Action = _getCollectionPhase1Action(opCtx, uuid, collectionData)) {
+                collectionData.queuedActions.push(*phase1Action);
                 return true;
             }
             break;
@@ -121,6 +121,88 @@ bool BalancerDefragmentationPolicyImpl::_queueNextAction(
     return false;
 }
 
+ChunkVersion _getShardVersion(OperationContext* opCtx, const ShardId& shardId, const UUID& uuid) {
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, uuid);
+
+    auto chunkVector =
+        Grid::get(opCtx)
+            ->catalogClient()
+            ->getChunks(opCtx,
+                        BSON(ChunkType::collectionUUID()
+                             << coll.getUuid() << ChunkType::shard(shardId.toString())) /*query*/,
+                        BSON(ChunkType::lastmod << -1) /*sort*/,
+                        1 /*limit*/,
+                        nullptr /*opTime*/,
+                        coll.getEpoch(),
+                        coll.getTimestamp(),
+                        repl::ReadConcernLevel::kLocalReadConcern,
+                        boost::none)
+            .getValue();
+    return chunkVector.front().getVersion();
+}
+
+boost::optional<DefragmentationAction>
+BalancerDefragmentationPolicyImpl::_getCollectionPhase1Action(
+    OperationContext* opCtx, const UUID& uuid, CollectionDefragmentationState& collectionInfo) {
+    auto isConsecutive = [&](const ChunkType& firstChunk, const ChunkType& secondChunk) -> bool {
+        return SimpleBSONObjComparator::kInstance.evaluate(firstChunk.getMax() ==
+                                                           secondChunk.getMin()) &&
+            collectionInfo.zones.getZoneForChunk(firstChunk.getRange()) ==
+            collectionInfo.zones.getZoneForChunk(secondChunk.getRange());
+    };
+
+    auto getActionFromRange =
+        [&](std::vector<ChunkType>& chunks) -> boost::optional<DefragmentationAction> {
+        ChunkVersion shardVersion = _getShardVersion(opCtx, chunks.front().getShard(), uuid);
+        if (chunks.size() == 1) {
+            auto currentChunk = chunks.front();
+            if (currentChunk.getEstimatedSizeBytes()) {
+                return boost::none;
+            } else {
+                return boost::optional<DefragmentationAction>(
+                    DataSizeInfo(currentChunk.getShard(),
+                                 collectionInfo.nss,
+                                 uuid,
+                                 currentChunk.getRange(),
+                                 shardVersion,
+                                 collectionInfo.collectionShardKey,
+                                 false));
+            }
+        } else {
+            return boost::optional<DefragmentationAction>(
+                MergeInfo(chunks.front().getShard(),
+                          collectionInfo.nss,
+                          uuid,
+                          shardVersion,
+                          ChunkRange(chunks.front().getMin(), chunks.back().getMax())));
+        }
+    };
+
+    while (collectionInfo.chunkList.size() > 0) {
+        auto& currentChunk = collectionInfo.chunkList.back();
+        auto& currentMergeList = collectionInfo.shardToChunkMap[currentChunk.getShard()];
+        boost::optional<DefragmentationAction> nextAction = boost::none;
+        if (!currentMergeList.empty() && !isConsecutive(currentMergeList.back(), currentChunk)) {
+            nextAction = getActionFromRange(currentMergeList);
+            currentMergeList.clear();
+        }
+        currentMergeList.push_back(std::move(currentChunk));
+        collectionInfo.chunkList.pop_back();
+        if (nextAction) {
+            return nextAction;
+        }
+    }
+    auto it = collectionInfo.shardToChunkMap.begin();
+    if (it != collectionInfo.shardToChunkMap.end()) {
+        boost::optional<DefragmentationAction> nextAction = getActionFromRange(it->second);
+        collectionInfo.shardToChunkMap.erase(it);
+        if (nextAction) {
+            return nextAction;
+        }
+    }
+    return boost::none;
+}
+
 void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext* opCtx,
                                                                MergeInfo action,
                                                                const Status& result) {
@@ -137,10 +219,15 @@ void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext*
                            action.nss,
                            action.uuid,
                            action.chunkRange,
-                           action.collectionVersion,
+                           _getShardVersion(opCtx, action.shardId, action.uuid),
                            _defragmentationStates.at(action.uuid).collectionShardKey,
                            false))
-        : boost::optional<DefragmentationAction>(action);
+        : boost::optional<DefragmentationAction>(
+              MergeInfo(action.shardId,
+                        action.nss,
+                        action.uuid,
+                        _getShardVersion(opCtx, action.shardId, action.uuid),
+                        action.chunkRange));
     _processEndOfAction(lk, opCtx, action.uuid, nextActionOnNamespace);
 }
 
@@ -160,8 +247,16 @@ void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
                                               result.getValue().sizeBytes,
                                               ShardingCatalogClient::kMajorityWriteConcern);
     }
-    boost::optional<DefragmentationAction> nextActionOnNamespace =
-        result.isOK() ? boost::none : boost::optional<DefragmentationAction>(action);
+    boost::optional<DefragmentationAction> nextActionOnNamespace = result.isOK()
+        ? boost::none
+        : boost::optional<DefragmentationAction>(
+              DataSizeInfo(action.shardId,
+                           action.nss,
+                           action.uuid,
+                           action.chunkRange,
+                           _getShardVersion(opCtx, action.shardId, action.uuid),
+                           action.keyPattern,
+                           false));
     _processEndOfAction(lk, opCtx, action.uuid, nextActionOnNamespace);
 }
 
@@ -223,10 +318,10 @@ void BalancerDefragmentationPolicyImpl::_processEndOfAction(
     // If the end of the current action implies a next step, store it
     if (nextActionOnNamespace) {
         _defragmentationStates.at(uuid).queuedActions.push(*nextActionOnNamespace);
+    } else {
+        // Load next action, this will trigger phase change if needed
+        _queueNextAction(opCtx, uuid, _defragmentationStates[uuid]);
     }
-
-    // Load next action, this will trigger phase change if needed
-    _queueNextAction(opCtx, uuid, _defragmentationStates[uuid]);
 
     // Fulfill promise if needed
     if (_nextStreamingActionPromise) {
@@ -279,6 +374,21 @@ void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
         newState.phase = coll.getDefragmentationPhase() ? coll.getDefragmentationPhase().get()
                                                         : DefragmentationPhaseEnum::kMergeChunks;
         newState.collectionShardKey = coll.getKeyPattern().toBSON();
+        newState.chunkList =
+            Grid::get(opCtx)
+                ->catalogClient()
+                ->getChunks(opCtx,
+                            BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
+                            BSON(ChunkType::max() << -1) /*sort*/,
+                            boost::none /*limit*/,
+                            nullptr /*opTime*/,
+                            coll.getEpoch(),
+                            coll.getTimestamp(),
+                            repl::ReadConcernLevel::kLocalReadConcern,
+                            boost::none)
+                .getValue();
+        uassertStatusOK(ZoneInfo::addTagsFromCatalog(
+            opCtx, coll.getNss(), coll.getKeyPattern(), newState.zones));
         _persistPhaseUpdate(opCtx, newState.phase, coll.getUuid());
         auto [_, inserted] =
             _defragmentationStates.insert_or_assign(coll.getUuid(), std::move(newState));

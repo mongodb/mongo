@@ -385,18 +385,23 @@ void Balancer::_consumeActionStreamLoop() {
         stdx::visit(
             visit_helper::Overloaded{
                 [&](MergeInfo mergeAction) {
-                    auto result = _commandScheduler
-                                      ->requestMergeChunks(opCtx.get(),
-                                                           mergeAction.nss,
-                                                           mergeAction.shardId,
-                                                           mergeAction.chunkRange,
-                                                           mergeAction.collectionVersion)
-                                      .thenRunOn(*executor)
-                                      .onCompletion([this, mergeAction](const Status& status) {
-                                          auto opCtx = cc().makeOperationContext();
-                                          _defragmentationPolicy->acknowledgeMergeResult(
-                                              opCtx.get(), mergeAction, status);
-                                      });
+                    auto result =
+                        _commandScheduler
+                            ->requestMergeChunks(opCtx.get(),
+                                                 mergeAction.nss,
+                                                 mergeAction.shardId,
+                                                 mergeAction.chunkRange,
+                                                 mergeAction.collectionVersion)
+                            .thenRunOn(*executor)
+                            .onCompletion([this, mergeAction](const Status& status) {
+                                // TODO (SERVER-61880) Remove this ThreadClient
+                                ThreadClient tc(
+                                    "BalancerDefragmentationPolicy::acknowledgeMergeResult",
+                                    getGlobalServiceContext());
+                                auto opCtx = tc->makeOperationContext();
+                                _defragmentationPolicy->acknowledgeMergeResult(
+                                    opCtx.get(), mergeAction, status);
+                            });
                 },
                 [&](DataSizeInfo dataSizeAction) {
                     auto result =
@@ -411,7 +416,11 @@ void Balancer::_consumeActionStreamLoop() {
                             .thenRunOn(*executor)
                             .onCompletion([this, dataSizeAction](
                                               const StatusWith<DataSizeResponse>& swDataSize) {
-                                auto opCtx = cc().makeOperationContext();
+                                // TODO (SERVER-61880) Remove this ThreadClient
+                                ThreadClient tc(
+                                    "BalancerDefragmentationPolicy::acknowledgeDataSizeResult",
+                                    getGlobalServiceContext());
+                                auto opCtx = tc->makeOperationContext();
                                 _defragmentationPolicy->acknowledgeDataSizeResult(
                                     opCtx.get(), dataSizeAction, swDataSize);
                             });

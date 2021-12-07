@@ -600,10 +600,10 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
 
+    const auto update = updateCmd.obj();
+
     withTransaction(
         opCtx, CollectionType::ConfigNS, [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            const auto update = updateCmd.obj();
-
             const auto query = BSON(CollectionType::kNssFieldName
                                     << nss.ns() << CollectionType::kUuidFieldName << uuid);
             const auto res = writeToConfigDocumentInTxn(

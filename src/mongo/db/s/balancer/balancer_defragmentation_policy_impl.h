@@ -89,6 +89,7 @@ private:
         BSONObj collectionShardKey;
         std::queue<DefragmentationAction> queuedActions;
         unsigned outstandingActions{0};
+        ShardToChunksMap shardToChunkMap;
         std::vector<ChunkType> chunkList;
         ZoneInfo zones;
     };
@@ -112,13 +113,11 @@ private:
                           CollectionDefragmentationState& collectionData);
 
     /**
-     * Returns next phase 1 merge action for the collection if there is one and boost::none
-     * otherwise.
+     * Returns next phase 1 merge or datasize action for the collection if there is one and
+     * boost::none otherwise.
      */
-    boost::optional<MergeInfo> _getCollectionMergeAction(
-        CollectionDefragmentationState& collectionInfo) {
-        return boost::none;
-    }
+    boost::optional<DefragmentationAction> _getCollectionPhase1Action(
+        OperationContext* opCtx, const UUID& uuid, CollectionDefragmentationState& collectionInfo);
 
     /**
      * Returns next phase 3 split action for the collection if there is one and boost::none

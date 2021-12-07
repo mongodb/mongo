@@ -12,9 +12,18 @@
 
 load("jstests/libs/fail_point_util.js");
 load('jstests/sharding/autosplit_include.js');
+load("jstests/sharding/libs/find_chunks_util.js");
 
-var st = new ShardingTest(
-    {mongos: 1, shards: 3, config: 1, other: {enableBalancer: true, enableAutoSplit: true}});
+var st = new ShardingTest({
+    mongos: 1,
+    shards: 3,
+    config: 1,
+    other: {
+        enableBalancer: true,
+        enableAutoSplit: true,
+        configOptions: {setParameter: {logComponentVerbosity: tojson({sharding: {verbosity: 2}})}},
+    }
+});
 
 // setup the database for the test
 assert.commandWorked(st.s.adminCommand({enableSharding: 'db'}));
@@ -23,27 +32,32 @@ var coll = db['test'];
 var fullNs = coll.getFullName();
 var configPrimary = st.configRS.getPrimary();
 
-const defaultChunkSize = 2 * 1024 * 1024;
+const defaultChunkSize = 2;
 const bigString = "X".repeat(32 * 1024);  // 32 KB
 assert.commandWorked(st.s.adminCommand({shardCollection: fullNs, key: {key: 1}}));
 
+// TODO (SERVER-61848) remove this once the chunk size setting works
+let configDB = st.s.getDB('config');
+assert.commandWorked(configDB["settings"].insertOne({_id: "chunksize", value: 1}));
+
 var bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < 32 * 128; i++) {
+for (let i = 0; i < 12 * 128; i++) {
     bulk.insert({key: i, str: bigString});
 }
 assert.commandWorked(bulk.execute());
 waitForOngoingChunkSplits(st);
+const numChunksPrev = findChunksUtil.countChunksForNs(st.config, fullNs);
+jsTest.log("Number of chunks before merging " + numChunksPrev);
 
 jsTest.log("Balance cluster before beginning defragmentation");
 
 function waitForBalanced() {
     assert.soon(function() {
         st.awaitBalancerRound();
-        balancerStatus =
+        var balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
         return balancerStatus.balancerCompliant;
     });
-    jsTest.log("Balancer status of " + fullNs + " : \n" + tojson(balancerStatus));
 }
 
 waitForBalanced();
@@ -127,14 +141,27 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
 
 jsTest.log("Balancer on, begin defragmentation and let it complete");
 {
+    // Reset collection before starting
     st.startBalancer();
+    waitForBalanced();
+    const numChunksPrev = findChunksUtil.countChunksForNs(st.config, fullNs);
+    jsTest.log("Number of chunks before merging " + numChunksPrev);
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: fullNs,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
         defaultChunkSize: defaultChunkSize,
     }));
-    waitForBalanced();
+    assert.soon(function() {
+        st.awaitBalancerRound();
+        var balancerStatus =
+            assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+        return balancerStatus.firstComplianceViolation != 'chunksMerging';
+    });
+    st.stopBalancer();
+    const numChunksPost = findChunksUtil.countChunksForNs(st.config, fullNs);
+    jsTest.log("Number of chunks after merging " + numChunksPost);
+    assert.lt(numChunksPost, numChunksPrev);
 }
 
 st.stop();

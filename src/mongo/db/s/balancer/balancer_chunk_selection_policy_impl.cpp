@@ -347,15 +347,16 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     for (const auto& coll : collections) {
         const NamespaceString& nss(coll.getNss());
 
-        if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations()) {
-            LOGV2_DEBUG(21851,
+        if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
+            coll.getBalancerShouldMergeChunks()) {
+            LOGV2_DEBUG(5966401,
                         1,
-                        "Not balancing collection {namespace}; explicitly disabled.",
                         "Not balancing explicitly disabled collection",
                         "namespace"_attr = nss,
                         "allowBalance"_attr = coll.getAllowBalance(),
                         "allowMigrations"_attr = coll.getAllowMigrations(),
-                        "timeseriesFields"_attr = coll.getTimeseriesFields());
+                        "permitMigrations"_attr = coll.getPermitMigrations(),
+                        "balancerShouldMergeChunks"_attr = coll.getBalancerShouldMergeChunks());
             continue;
         }
 
