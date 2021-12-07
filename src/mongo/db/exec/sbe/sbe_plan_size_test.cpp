@@ -143,6 +143,7 @@ TEST_F(PlanSizeTest, HashAgg) {
                                      makeSV(),
                                      true,
                                      generateSlotId(),
+                                     false,
                                      kEmptyPlanNodeId);
     assertPlanSize(*stage);
 }

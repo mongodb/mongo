@@ -42,7 +42,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
@@ -80,20 +80,20 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
  * observe 1 output slot, use runTest(). For unittests where the PlanStage has multiple input slots
  * and/or where the test needs to observe multiple output slots, use runTestMulti().
  */
-class PlanStageTestFixture : public ServiceContextTest {
+class PlanStageTestFixture : public ServiceContextMongoDTest {
 public:
-    PlanStageTestFixture();
+    PlanStageTestFixture() = default;
 
     void setUp() override {
-        ServiceContextTest::setUp();
-        _opCtx = makeOperationContext();
+        ServiceContextMongoDTest::setUp();
+        _opCtx = cc().makeOperationContext();
         _slotIdGenerator.reset(new value::SlotIdGenerator());
     }
 
     void tearDown() override {
         _slotIdGenerator.reset();
         _opCtx.reset();
-        ServiceContextTest::tearDown();
+        ServiceContextMongoDTest::tearDown();
     }
 
     OperationContext* opCtx() {

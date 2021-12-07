@@ -657,7 +657,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              &_slotIdGenerator,
              &_frameIdGenerator,
              &_spoolIdGenerator,
-             _cq.getExpCtx()->needsMerge) {
+             _cq.getExpCtx()->needsMerge,
+             _cq.getExpCtx()->allowDiskUse) {
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
@@ -2432,6 +2433,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                       {groupBySlot},
                                       std::move(accSlotToExprMap),
                                       _state.env->getSlotIfExists("collator"_sd),
+                                      _cq.getExpCtx()->allowDiskUse,
                                       nodeId);
 
     tassert(

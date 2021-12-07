@@ -74,6 +74,7 @@ public:
                  value::SlotVector seekKeysSlots,
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
+                 bool allowDiskUse,
                  PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -90,12 +91,16 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 protected:
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) override;
+    void doDetachFromOperationContext() override;
+    void doAttachToOperationContext(OperationContext* opCtx) override;
     void doDetachFromTrialRunTracker() override;
     TrialRunTrackerAttachResultMask doAttachToTrialRunTracker(
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
-    void makeTemporaryRecordStore();
+    boost::optional<value::MaterializedRow> getFromRecordStore(const RecordId& rid);
 
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,
@@ -105,9 +110,32 @@ private:
     using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
     using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
 
+    void makeTemporaryRecordStore();
+
+    /**
+     * Spills a key and value pair to the '_recordStore' where the semantics are insert or update
+     * depending on the 'update' flag. When the 'update' flag is true this method already expects
+     * the 'key' to be inserted into the '_recordStore', otherwise the 'key' and 'val' pair are
+     * fresh.
+     *
+     * This method expects the key to be seralized into a KeyString::Value so that the key is
+     * memcmp-able and lookups can be done to update the 'val' in the '_recordStore'. Note that the
+     * 'typeBits' are needed to reconstruct the spilled 'key' when calling 'getNext' to deserialize
+     * the 'key' to a MaterializedRow. Since the '_recordStore' only stores the memcmp-able part of
+     * the KeyString we need to carry the 'typeBits' separately, and we do this by appending the
+     * 'typeBits' to the end of the serialized 'val' buffer and store them at the leaves of the
+     * backing B-tree of the '_recordStore'. used as the RecordId.
+     */
+    void spillValueToDisk(const RecordId& key,
+                          const value::MaterializedRow& val,
+                          const KeyString::TypeBits& typeBits,
+                          bool update);
+
+
     const value::SlotVector _gbs;
     const value::SlotMap<std::unique_ptr<EExpression>> _aggs;
     const boost::optional<value::SlotId> _collatorSlot;
+    const bool _allowDiskUse;
     const value::SlotVector _seekKeysSlots;
     // When this operator does not expect to be reopened (almost always) then it can close the child
     // early.
@@ -122,12 +150,25 @@ private:
 
     value::SlotAccessorMap _outAccessors;
     std::vector<value::SlotAccessor*> _inKeyAccessors;
-    std::vector<std::unique_ptr<HashKeyAccessor>> _outKeyAccessors;
+
+    // Accesors for the key stored in '_ht', a SwitchAccessor is used so we can produce the key from
+    // either the '_ht' or the '_recordStore'.
+    std::vector<std::unique_ptr<HashKeyAccessor>> _outHashKeyAccessors;
+    std::vector<std::unique_ptr<value::SwitchAccessor>> _outKeyAccessors;
+
+    // Accessor for the agg state value stored in the '_recordStore' when data is spilled to disk.
+    value::MaterializedRow _aggKeyRecordStore{0};
+    value::MaterializedRow _aggValueRecordStore{0};
+    std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreKeyAccessors;
+    std::vector<std::unique_ptr<value::MaterializedSingleRowAccessor>> _outRecordStoreAggAccessors;
 
     std::vector<value::SlotAccessor*> _seekKeysAccessors;
     value::MaterializedRow _seekKeys;
 
-    std::vector<std::unique_ptr<HashAggAccessor>> _outAggAccessors;
+    // Accesors for the agg state in '_ht', a SwitchAccessor is used so we can produce the agg state
+    // from either the '_ht' or the '_recordStore' when draining the HashAgg stage.
+    std::vector<std::unique_ptr<value::SwitchAccessor>> _outAggAccessors;
+    std::vector<std::unique_ptr<HashAggAccessor>> _outHashAggAccessors;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
     // Only set if collator slot provided on construction.
@@ -143,6 +184,8 @@ private:
 
     // Used when spilling to disk.
     std::unique_ptr<TemporaryRecordStore> _recordStore;
+    bool _drainingRecordStore{false};
+    std::unique_ptr<SeekableRecordCursor> _rsCursor;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
