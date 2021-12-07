@@ -94,3 +94,8 @@ feature_flags:
         cpp_varname: gFeatureFlagSortArray
         default: true
         version: 5.2
+
+    featureFlagChangeStreamsVisibility:
+      description: "Feature flag for enabling improved change streams visibility"
+      cpp_varname: gFeatureFlagChangeStreamsVisibility
+      default: false
