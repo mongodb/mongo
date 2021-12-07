@@ -115,17 +115,25 @@ MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
 
-}  // namespace
-
 MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
 MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 MONGO_FAIL_POINT_DEFINE(hangBeforePostMigrationCommitRefresh);
 
+}  // namespace
+
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingRuntime* csr,
                                                     CollectionShardingRuntime::CSRLock& csrLock) {
     return msmForCsr(csr);
+}
+
+std::shared_ptr<MigrationChunkClonerSource> MigrationSourceManager::getCurrentCloner(
+    CollectionShardingRuntime* csr, CollectionShardingRuntime::CSRLock& csrLock) {
+    auto msm = get(csr, csrLock);
+    if (!msm)
+        return nullptr;
+    return msm->_cloneDriver;
 }
 
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
@@ -178,8 +186,10 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         UUID collectionUUID = autoColl.getCollection()->uuid();
 
-        auto optMetadata =
-            CollectionShardingRuntime::get(_opCtx, _args.getNss())->getCurrentMetadataIfKnown();
+        auto* const csr = CollectionShardingRuntime::get(_opCtx, _args.getNss());
+        const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+
+        auto optMetadata = csr->getCurrentMetadataIfKnown();
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "The collection's sharding state was cleared by a concurrent operation",
                 optMetadata);
@@ -188,9 +198,16 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         uassert(ErrorCodes::IncompatibleShardingMetadata,
                 "Cannot move chunks for an unsharded collection",
                 metadata.isSharded());
+
+        // Atomically (still under the CSR lock held above) check whether migrations are allowed and
+        // register the MigrationSourceManager on the CSR. This ensures that interruption due to the
+        // change of allowMigrations to false will properly serialise and not allow any new MSMs to
+        // be running after the change.
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "Collection is undergoing changes so moveChunk is not allowed.",
                 metadata.allowMigrations());
+
+        _scopedRegisterer.emplace(this, csr, csrLock);
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
     }();
@@ -257,13 +274,6 @@ void MigrationSourceManager::startClone() {
     {
         const auto metadata = _getCurrentMetadataAndCheckEpoch();
 
-        // Having the metadata manager registered on the collection sharding state is what indicates
-        // that a chunk on that collection is being migrated. With an active migration, write
-        // operations require the cloner to be present in order to track changes to the chunk which
-        // needs to be transmitted to the recipient.
-        _cloneDriver = std::make_unique<MigrationChunkClonerSourceLegacy>(
-            _args, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
-
         AutoGetCollection autoColl(_opCtx,
                                    _args.getNss(),
                                    replEnabled ? MODE_IX : MODE_X,
@@ -271,9 +281,15 @@ void MigrationSourceManager::startClone() {
                                    _opCtx->getServiceContext()->getPreciseClockSource()->now() +
                                        Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
-        auto csr = CollectionShardingRuntime::get(_opCtx, _args.getNss());
-        auto lockedCsr = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-        invariant(nullptr == std::exchange(msmForCsr(csr), this));
+        auto* const csr = CollectionShardingRuntime::get(_opCtx, _args.getNss());
+        const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+
+        // Having the metadata manager registered on the collection sharding state is what indicates
+        // that a chunk on that collection is being migrated to the OpObservers. With an active
+        // migration, write operations require the cloner to be present in order to track changes to
+        // the chunk which needs to be transmitted to the recipient.
+        _cloneDriver = std::make_shared<MigrationChunkClonerSourceLegacy>(
+            _args, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
 
         _coordinator.emplace(_cloneDriver->getSessionId(),
                              _args.getFromShardId(),
@@ -670,18 +686,10 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, _args.getNss(), MODE_IX);
         auto* const csr = CollectionShardingRuntime::get(_opCtx, _args.getNss());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+        const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
 
         if (_state != kCreated) {
-            invariant(msmForCsr(csr));
             invariant(_cloneDriver);
-        }
-
-        // While we are in kCreated, the MigrationSourceManager may or may not be already be
-        // installed on the CollectionShardingRuntime.
-        if (_state != kCreated || (_state == kCreated && msmForCsr(csr))) {
-            auto oldMsmOnCsr = std::exchange(msmForCsr(csr), nullptr);
-            invariant(this == oldMsmOnCsr);
         }
 
         _critSec.reset();
@@ -773,6 +781,22 @@ BSONObj MigrationSourceManager::getMigrationStatusReport() const {
                                                       true,
                                                       _args.getMinKey(),
                                                       _args.getMaxKey());
+}
+
+MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(
+    MigrationSourceManager* msm,
+    CollectionShardingRuntime* csr,
+    const CollectionShardingRuntime::CSRLock& csrLock)
+    : _msm(msm) {
+    invariant(nullptr == std::exchange(msmForCsr(csr), msm));
+}
+
+MigrationSourceManager::ScopedRegisterer::~ScopedRegisterer() {
+    UninterruptibleLockGuard noInterrupt(_msm->_opCtx->lockState());
+    AutoGetCollection autoColl(_msm->_opCtx, _msm->_args.getNss(), MODE_IX);
+    auto csr = CollectionShardingRuntime::get(_msm->_opCtx, _msm->_args.getNss());
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_msm->_opCtx, csr);
+    invariant(_msm == std::exchange(msmForCsr(csr), nullptr));
 }
 
 }  // namespace mongo

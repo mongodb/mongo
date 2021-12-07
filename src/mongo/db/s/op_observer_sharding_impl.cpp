@@ -73,8 +73,8 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
 bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
                             CollectionShardingRuntime::CSRLock& csrLock,
                             BSONObj const& docToDelete) {
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    return msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete);
+    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+    return cloner && cloner->isDocumentInMigratingChunk(docToDelete);
 }
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
@@ -151,9 +151,9 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
     }
 
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    if (msm) {
-        msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
+    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+    if (cloner) {
+        cloner->onInsertOp(opCtx, insertedDoc, opTime);
     }
 }
 
@@ -188,9 +188,9 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
     }
 
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
-    if (msm) {
-        msm->getCloner()->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
+    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+    if (cloner) {
+        cloner->onUpdateOp(opCtx, preImageDoc, postImageDoc, opTime, prePostImageOpTime);
     }
 }
 
@@ -224,10 +224,10 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
     }
 
     auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-    auto msm = MigrationSourceManager::get(csr, csrLock);
+    auto cloner = MigrationSourceManager::getCurrentCloner(csr, csrLock);
 
-    if (msm && getIsMigrating(opCtx)) {
-        msm->getCloner()->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
+    if (cloner && getIsMigrating(opCtx)) {
+        cloner->onDeleteOp(opCtx, documentKey, opTime, preImageOpTime);
     }
 }
 

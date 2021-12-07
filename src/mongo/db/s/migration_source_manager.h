@@ -80,6 +80,15 @@ public:
                                        CollectionShardingRuntime::CSRLock& csrLock);
 
     /**
+     * If the currently installed migration has reached the cloning stage (i.e., after startClone),
+     * returns the cloner currently in use.
+     *
+     * Must be called with a both a collection lock and the CSRLock.
+     */
+    static std::shared_ptr<MigrationChunkClonerSource> getCurrentCloner(
+        CollectionShardingRuntime* csr, CollectionShardingRuntime::CSRLock& csrLock);
+
+    /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be
      * called with the distributed lock acquired in advance (not asserted).
      *
@@ -154,17 +163,6 @@ public:
      * context as killed.
      */
     void abortDueToConflictingIndexOperation(OperationContext* opCtx);
-
-    /**
-     * Returns the cloner which is being used for this migration. This value is available only if
-     * the migration source manager is currently in the clone phase (i.e. the previous call to
-     * startClone has succeeded).
-     *
-     * Must be called with a both a collection lock and the CSRLock.
-     */
-    std::shared_ptr<MigrationChunkClonerSource> getCloner() const {
-        return _cloneDriver;
-    }
 
     /**
      * Returns a report on the active migration.
@@ -246,6 +244,20 @@ private:
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
+    // Responsible for registering and unregistering the MigrationSourceManager from the collection
+    // sharding runtime for the collection
+    class ScopedRegisterer {
+    public:
+        ScopedRegisterer(MigrationSourceManager* msm,
+                         CollectionShardingRuntime* csr,
+                         const CollectionShardingRuntime::CSRLock& csrLock);
+        ~ScopedRegisterer();
+
+    private:
+        MigrationSourceManager* const _msm;
+    };
+    boost::optional<ScopedRegisterer> _scopedRegisterer;
+
     // The epoch of the collection being migrated and its UUID, as of the time the migration
     // started. Values are boost::optional only up until the constructor runs, because UUID doesn't
     // have a default constructor.
@@ -255,15 +267,15 @@ private:
     // The version of the chunk at the time the migration started.
     boost::optional<ChunkVersion> _chunkVersion;
 
-    // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
-    // correctly updated based on whether the migration committed or aborted.
-    boost::optional<migrationutil::MigrationCoordinator> _coordinator;
-
     // The chunk cloner source. Only available if there is an active migration going on. To set and
     // remove it, a collection lock and the CSRLock need to be acquired first in order to block all
     // logOp calls and then the mutex. To access it, only the mutex is necessary. Available after
     // cloning stage has completed.
     std::shared_ptr<MigrationChunkClonerSource> _cloneDriver;
+
+    // Contains logic for ensuring the donor's and recipient's config.rangeDeletions entries are
+    // correctly updated based on whether the migration committed or aborted.
+    boost::optional<migrationutil::MigrationCoordinator> _coordinator;
 
     // Holds the in-memory critical section for the collection. Only set when migration has reached
     // the critical section phase.

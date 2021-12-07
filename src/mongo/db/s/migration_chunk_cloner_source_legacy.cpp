@@ -172,12 +172,11 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-        auto msm = MigrationSourceManager::get(csr, csrLock);
-        if (!msm) {
+        const auto clonerPtr = MigrationSourceManager::getCurrentCloner(csr, csrLock);
+        if (!clonerPtr) {
             continue;
         }
-
-        auto cloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(msm->getCloner().get());
+        auto* const cloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(clonerPtr.get());
 
         auto opType = stmt.getOpType();
         auto documentKey = getDocumentKeyFromReplOperation(stmt, opType);
