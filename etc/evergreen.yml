@@ -247,7 +247,6 @@ variables:
   - func: "get buildnumber"
   - func: "f_expansions_write"
   - func: "set up credentials"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "set up win mount script"
   - func: "generate compile expansions"
   - func: "f_expansions_write"
@@ -364,7 +363,6 @@ variables:
   - enterprise-windows-debug-unoptimized
   - enterprise-windows-inmem
   - enterprise-windows-required
-  - enterprise-windows-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite-required
@@ -473,7 +471,6 @@ functions:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
-        wtdevelop: ${wtdevelop_rev}
 
   # Get get the mongo repo, no modules. Useful for inspecting the commit history with the
   # `git` Python tool.
@@ -641,7 +638,7 @@ functions:
   "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v5.2"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
@@ -731,14 +728,6 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
-
-  "use WiredTiger develop":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/wiredtiger_develop_use.sh"
 
   "shared scons cache pruning":
     - *f_expansions_write
@@ -2756,7 +2745,6 @@ tasks:
     - func: "get buildnumber"
     - func: "f_expansions_write"
     - func: "set up credentials"
-    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "set up win mount script"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
@@ -7168,12 +7156,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
-
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
+  branch: v5.2
 
 #######################################
 #            Buildvariants            #
@@ -7245,19 +7228,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-large
-
-- <<: *linux-64-debug-required-template
-  name: linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
-  modules:
-  - wtdevelop
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on
-    scons_cache_mode: nolinked
-    test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -8561,17 +8531,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .benchmarks
-
-- <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  cron: "0 */4 * * *" # Every 4 hours starting at midnight
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    use_wt_develop: true
 
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
