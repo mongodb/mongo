@@ -114,6 +114,8 @@ last-continuous:
       test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
     - ticket: SERVER-60682
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-60685
+      test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -388,6 +390,8 @@ last-lts:
       test_file: jstests/replsets/replSetGetStatus_member_wall_times.js
     - ticket: SERVER-60682
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-60685
+      test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

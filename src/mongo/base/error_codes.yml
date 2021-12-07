@@ -327,7 +327,7 @@ error_codes:
 
     # TransactionCoordinatorSteppingDown gets converted to InterruptedDueToReplStateChange
     - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption,InternalOnly]}
-    - {code: 282,name: TransactionCoordinatorReachedAbortDecision,categories: [InternalOnly]}
+    - {code: 282,name: TransactionCoordinatorReachedAbortDecision,categories: [Interruption,InternalOnly]}
 
     - {code: 283,name: WouldChangeOwningShard,extra: WouldChangeOwningShardInfo}
     - {code: 284,name: ForTestingErrorExtraInfoWithExtraInfoInNamespace,
