@@ -68,7 +68,13 @@ enum class FaultFacetType { kSystem, kMock1, kMock2, kLdap, kDns };
 
 class FaultManagerConfig {
 public:
-    static auto inline constexpr kPeriodicHealthCheckInterval{Milliseconds(50)};
+    /* Default value of time between health checks
+     * TODO SERVER-61947 make this a property of health observers
+     */
+    static auto inline constexpr kPeriodicHealthCheckInterval{Milliseconds(1000)};
+
+    /* Maximum possible jitter added to the time between health checks */
+    static auto inline constexpr kPeriodicHealthCheckMaxJitter{Milliseconds{100}};
 
     HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) {
         auto intensities = getHealthObserverIntensities();

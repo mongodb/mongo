@@ -37,7 +37,8 @@
 namespace mongo {
 namespace process_health {
 
-HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx) {}
+HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx)
+    : _svcCtx(svcCtx), _rand(PseudoRandom(SecureRandom().nextInt64())) {}
 
 SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
     FaultFacetsContainerFactory& factory,
@@ -114,6 +115,10 @@ HealthObserverLivenessStats HealthObserverBase::getStatsLocked(WithLock) const {
     stats.completedChecksCount = _completedChecksCount;
     stats.completedChecksWithFaultCount = _completedChecksWithFaultCount;
     return stats;
+}
+
+Milliseconds HealthObserverBase::healthCheckJitter() const {
+    return randDuration(FaultManagerConfig::kPeriodicHealthCheckMaxJitter);
 }
 
 }  // namespace process_health
