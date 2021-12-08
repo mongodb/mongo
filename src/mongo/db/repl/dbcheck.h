@@ -49,7 +49,16 @@ class OpTime;
 }
 
 /**
- * Get an error message if the check fails.
+ * Logs an entry into 'local.system.healthLog'.
+ */
+std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss,
+                                                      SeverityEnum severity,
+                                                      const std::string& msg,
+                                                      OplogEntriesEnum operation,
+                                                      const BSONObj& data);
+
+/**
+ * Logs an error into 'local.system.healthLog'.
  */
 std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString& nss,
                                                            const std::string& msg,
@@ -59,14 +68,16 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
-std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(const NamespaceString& nss,
-                                                  int64_t count,
-                                                  int64_t bytes,
-                                                  const std::string& expectedHash,
-                                                  const std::string& foundHash,
-                                                  const BSONKey& minKey,
-                                                  const BSONKey& maxKey,
-                                                  const repl::OpTime& optime);
+std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
+    const NamespaceString& nss,
+    int64_t count,
+    int64_t bytes,
+    const std::string& expectedHash,
+    const std::string& foundHash,
+    const BSONKey& minKey,
+    const BSONKey& maxKey,
+    const repl::OpTime& optime,
+    const boost::optional<CollectionOptions>& options = boost::none);
 
 /**
  * The collection metadata dbCheck sends between nodes.
@@ -165,51 +176,6 @@ private:
     int64_t _maxBytes = 0;
     int64_t _bytesSeen = 0;
 };
-
-/**
- * Get the given database in MODE_S, while also blocking stepdown (SERVER-28544) and allowing writes
- * to "local".
- */
-class AutoGetDbForDbCheck {
-public:
-    AutoGetDbForDbCheck(OperationContext* opCtx, const NamespaceString& nss);
-
-    Database* getDb(void) {
-        return agd.getDb();
-    }
-
-private:
-    Lock::DBLock localLock;
-    AutoGetDb agd;
-};
-
-/**
- * Get the given collection in MODE_S, except that if the collection is missing it will report that
- * to the health log, and it takes an IX lock on "local" as a workaround to SERVER-28544.
- */
-class AutoGetCollectionForDbCheck {
-public:
-    AutoGetCollectionForDbCheck(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const OplogEntriesEnum& type);
-    explicit operator bool() const {
-        return static_cast<bool>(getCollection());
-    }
-
-    const Collection* operator->() const {
-        return getCollection().get();
-    }
-
-    const CollectionPtr& getCollection() const {
-        return _collection;
-    }
-
-private:
-    AutoGetDbForDbCheck _agd;
-    Lock::CollectionLock _collLock;
-    CollectionPtr _collection;
-};
-
 
 /**
  * Gather the index information for a collection.

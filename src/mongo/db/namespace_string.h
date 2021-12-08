@@ -379,6 +379,11 @@ public:
     bool isChangeStreamPreImagesCollection() const;
 
     /**
+     * Returns whether the specified namespace is config.image_collection.
+     */
+    bool isConfigImagesCollection() const;
+
+    /**
      * Returns the time-series buckets namespace for this view.
      */
     NamespaceString makeTimeseriesBucketsNamespace() const;

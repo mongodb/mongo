@@ -342,6 +342,10 @@ bool NamespaceString::isChangeStreamPreImagesCollection() const {
     return ns() == kChangeStreamPreImagesNamespace.ns();
 }
 
+bool NamespaceString::isConfigImagesCollection() const {
+    return ns() == kConfigImagesNamespace.ns();
+}
+
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
     return {db(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
