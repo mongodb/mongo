@@ -108,11 +108,9 @@ PatternValueCmp::PatternValueCmp(const BSONObj& pattern,
 bool PatternValueCmp::operator()(const Value& lhs, const Value& rhs) const {
     namespace dps = ::mongo::dotted_path_support;
     if (useWholeValue) {
-        const bool ascending = ValueComparator(collator).getLessThan()(lhs, rhs);
-
-        const bool reversed = (sortPattern.firstElement().number() < 0);
-
-        return (reversed ? !ascending : ascending);
+        const bool descending = (sortPattern.firstElement().number() < 0);
+        return (descending ? ValueComparator(collator).getLessThan()(rhs, lhs)
+                           : ValueComparator(collator).getLessThan()(lhs, rhs));
     } else {
         BSONObj lhsObj = lhs.isObject() ? lhs.getDocument().toBson() : lhs.wrap("");
         BSONObj rhsObj = rhs.isObject() ? rhs.getDocument().toBson() : rhs.wrap("");
