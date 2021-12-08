@@ -245,9 +245,13 @@ class SetupMultiversion(Subcommand):
         download_symbols_url = None
 
         if self.download_symbols:
-            download_symbols_url = urls.get(" mongo-debugsymbols.tgz", None)
-            if not download_symbols_url:
-                download_symbols_url = urls.get(" mongo-debugsymbols.zip", None)
+            for name in [
+                    " mongo-debugsymbols.tgz", " mongo-debugsymbols.zip", "mongo-debugsymbols.tgz",
+                    "mongo-debugsymbols.zip"
+            ]:
+                download_symbols_url = urls.get(name, None)
+                if download_symbols_url:
+                    break
 
         if self.download_symbols and not download_symbols_url:
             raise download.DownloadError("Symbols download requested but not URL available")
