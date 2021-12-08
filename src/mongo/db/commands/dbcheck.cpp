@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/command_generic_argument.h"
@@ -73,31 +74,6 @@ struct DbCheckCollectionInfo {
  */
 using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 
-/**
- * Check if dbCheck can run on the given namespace.
- */
-bool canRunDbCheckOn(const NamespaceString& nss) {
-    if (nss.isLocal()) {
-        return false;
-    }
-
-    // TODO: SERVER-30826.
-    const std::set<StringData> replicatedSystemCollections{"system.backup_users",
-                                                           "system.js",
-                                                           "system.new_users",
-                                                           "system.roles",
-                                                           "system.users",
-                                                           "system.version",
-                                                           "system.views"};
-    if (nss.isSystem()) {
-        if (replicatedSystemCollections.count(nss.coll()) == 0) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const std::string& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
@@ -110,7 +86,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 
     uassert(40619,
             "Cannot run dbCheck on " + nss.toString() + " because it is not replicated",
-            canRunDbCheckOn(nss));
+            nss.isReplicated());
 
     auto start = invocation.getMinKey();
     auto end = invocation.getMaxKey();
@@ -129,25 +105,18 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     uassert(
         ErrorCodes::InvalidNamespace, "Cannot run dbCheck on local database", dbName != "local");
 
-    // Read the list of collections in a database-level lock.
-    AutoGetDb agd(opCtx, StringData(dbName), MODE_S);
-    auto db = agd.getDb();
-    auto result = std::make_unique<DbCheckRun>();
-
+    AutoGetDb agd(opCtx, StringData(dbName), MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName + " not found", agd.getDb());
 
-    int64_t max = std::numeric_limits<int64_t>::max();
-    auto rate = invocation.getMaxCountPerSecond();
-
-    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
-        auto coll = *collIt;
-        if (!coll) {
-            break;
-        }
-
+    const int64_t max = std::numeric_limits<int64_t>::max();
+    const auto rate = invocation.getMaxCountPerSecond();
+    auto result = std::make_unique<DbCheckRun>();
+    auto perCollectionWork = [&](const Collection* coll) {
         DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate};
         result->push_back(info);
-    }
+        return true;
+    };
+    mongo::catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);
 
     return result;
 }
@@ -320,9 +289,8 @@ private:
         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
-        // While we get the prev/next UUID information, we need a database-level lock, plus a global
-        // IX lock (see SERVER-28544).
-        AutoGetDbForDbCheck agd(opCtx, info.nss);
+        // While we get the prev/next UUID information, we need a database-level lock.
+        AutoGetDb agd(opCtx, info.nss.db(), MODE_S);
 
         if (_stepdownHasOccurred(opCtx, info.nss)) {
             _done = true;
@@ -386,18 +354,23 @@ private:
         auto opCtx = uniqueOpCtx.get();
         DbCheckOplogBatch batch;
 
-        // Find the relevant collection.
-        AutoGetCollectionForDbCheck agc(opCtx, info.nss, OplogEntriesEnum::Batch);
-
+        // Acquire collection lock in S mode.
+        AutoGetCollection coll(opCtx, info.nss, MODE_S);
+        const auto& collection = coll.getCollection();
         if (_stepdownHasOccurred(opCtx, info.nss)) {
             _done = true;
             return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
         }
 
-        auto collection = agc.getCollection();
-
         if (!collection) {
-            return {ErrorCodes::NamespaceNotFound, "dbCheck collection no longer exists"};
+            const auto msg = "Collection under dbCheck no longer exists";
+            auto entry = dbCheckHealthLogEntry(info.nss,
+                                               SeverityEnum::Info,
+                                               "dbCheck failed",
+                                               OplogEntriesEnum::Batch,
+                                               BSON("success" << false << "error" << msg));
+            HealthLog::get(opCtx).log(*entry);
+            return {ErrorCodes::NamespaceNotFound, msg};
         }
 
         boost::optional<DbCheckHasher> hasher;
@@ -467,6 +440,7 @@ private:
         oplogEntry.setNss(nss);
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(obj);
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
         return writeConflictRetry(
             opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
                 auto const clockSource = opCtx->getServiceContext()->getFastClockSource();

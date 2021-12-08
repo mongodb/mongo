@@ -78,6 +78,8 @@ const NamespaceString NamespaceString::kSystemKeysNamespace(NamespaceString::kAd
 const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::kLocalDb,
                                                                "system.replset");
+const NamespaceString NamespaceString::kChangeStreamPreImagesNamespace(NamespaceString::kConfigDb,
+                                                                       "system.preimages");
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
                                                                  "system.indexBuilds");
 const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::kConfigDb,
@@ -240,6 +242,14 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
         return true;
 
     return false;
+}
+
+bool NamespaceString::isChangeStreamPreImagesCollection() const {
+    return ns() == kChangeStreamPreImagesNamespace.ns();
+}
+
+bool NamespaceString::isConfigImagesCollection() const {
+    return ns() == kConfigImagesNamespace.ns();
 }
 
 bool NamespaceString::isReplicated() const {

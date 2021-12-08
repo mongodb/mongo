@@ -105,6 +105,9 @@ public:
     // Namespace for replica set configuration settings.
     static const NamespaceString kSystemReplSetNamespace;
 
+    // Namespace for change stream pre-images collection.
+    static const NamespaceString kChangeStreamPreImagesNamespace;
+
     // Namespace for index build entries.
     static const NamespaceString kIndexBuildEntryNamespace;
 
@@ -265,6 +268,16 @@ public:
      * never be marked as anything other than UNSHARDED.
      */
     bool isNamespaceAlwaysUnsharded() const;
+
+    /**
+     * Returns whether the specified namespace is config.system.preimages.
+     */
+    bool isChangeStreamPreImagesCollection() const;
+
+    /**
+     * Returns whether the specified namespace is config.image_collection.
+     */
+    bool isConfigImagesCollection() const;
 
     /**
      * Returns whether a namespace is replicated, based only on its string value. One notable
