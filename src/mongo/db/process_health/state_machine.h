@@ -95,6 +95,7 @@ public:
     // Transitions the state machine into the initial state.
     // Can only be called once.
     void start() {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
         tassertNotStarted();
         _started = true;
 
@@ -108,6 +109,7 @@ public:
     // Define a valid transition.
     // Must be called prior to starting the state machine.
     void validTransition(State from, State to) noexcept {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
         tassertNotStarted();
         auto& context = _states[from];
         context.validTransitions.insert(to);
@@ -132,8 +134,8 @@ public:
     //	2. For any hooks run as a result of accepting this message, no blocking calls are made
     // involving shared resources with another thread that may call this function.
     State accept(const OptionalMessageType& m) {
-        tassertStarted();
         stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+        tassertStarted();
 
         auto& handler = _current->stateHandler;
 
@@ -146,6 +148,7 @@ public:
 
     // Return the current state.
     State state() const {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
         tassertStarted();
         invariant(_current);
         return _current->state();
@@ -226,6 +229,7 @@ public:
     };
 
     StateEventRegistryPtr registerHandler(StateHandlerPtr handler) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
         tassertNotStarted();
         auto& context = _states[handler->state()];
         context.stateHandler = std::move(handler);
@@ -233,6 +237,7 @@ public:
     }
 
     StateEventRegistryPtr registerHandler(State s, MessageHandler&& handler, bool isTransient) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
         tassertNotStarted();
 
         auto& context = _states[s];
@@ -307,7 +312,7 @@ protected:
         return getHandlerOrFatal(s);
     }
 
-    stdx::recursive_mutex _mutex;
+    mutable stdx::recursive_mutex _mutex;
     bool _started;
     State _initial;
     StateContext* _current = nullptr;
