@@ -278,6 +278,11 @@ Status UpdateDriver::update(OperationContext* opCtx,
     // The supplied 'modifiedPaths' must be an empty set.
     invariant(!modifiedPaths || modifiedPaths->empty());
 
+    if (!opCtx->isEnforcingConstraints()) {
+        applyParams.skipDotsDollarsCheck = true;
+        applyParams.validateForStorage = false;
+    }
+
     if (_logOp && logOpRec) {
         applyParams.logMode = internalQueryEnableLoggingV2OplogEntries.load()
             ? ApplyParams::LogMode::kGenerateOplogEntry
