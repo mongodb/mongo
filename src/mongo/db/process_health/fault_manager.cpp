@@ -33,6 +33,8 @@
 
 #include "mongo/db/process_health/fault_manager.h"
 
+#include <algorithm>
+
 #include "mongo/db/process_health/fault_facet_impl.h"
 #include "mongo/db/process_health/fault_impl.h"
 #include "mongo/db/process_health/fault_manager_config.h"
@@ -276,7 +278,7 @@ boost::optional<FaultState> FaultManager::handleTransientFault(const OptionalMes
 }
 
 boost::optional<FaultState> FaultManager::handleActiveFault(const OptionalMessageType& message) {
-    LOGV2_FATAL(5936509, "Fault manager received active fault");
+    LOGV2_FATAL(5936509, "Halting Process due to ongoing fault", "fault"_attr = *_fault);
     return boost::none;
 }
 
@@ -290,7 +292,14 @@ void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus&
 }
 
 void FaultManager::logCurrentState(FaultState, FaultState newState, const OptionalMessageType&) {
-    LOGV2(5936503, "Fault manager changed state ", "state"_attr = (str::stream() << newState));
+    if (_fault) {
+        LOGV2(5939703,
+              "Fault manager changed state ",
+              "state"_attr = (str::stream() << newState),
+              "fault"_attr = *_fault);
+    } else {
+        LOGV2(5936503, "Fault manager changed state ", "state"_attr = (str::stream() << newState));
+    }
 }
 
 void FaultManager::setTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
@@ -412,11 +421,27 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
 
 void FaultManager::healthCheck(HealthObserver* observer, std::shared_ptr<AtomicWord<bool>> token) {
     auto schedulerCb = [this, observer, token] {
-        auto periodicThreadCbHandleStatus = this->_taskExecutor->scheduleWorkAt(
-            _taskExecutor->now() + this->_config->kPeriodicHealthCheckInterval,
+        auto scheduledTime = _taskExecutor->now() + _config->kPeriodicHealthCheckInterval +
+            std::min(observer->healthCheckJitter(),
+                     FaultManagerConfig::kPeriodicHealthCheckMaxJitter);
+        LOGV2_DEBUG(5939701,
+                    2,
+                    "Schedule next health check",
+                    "observerType"_attr = str::stream() << observer->getType(),
+                    "scheduledTime"_attr = scheduledTime);
+
+        auto periodicThreadCbHandleStatus = _taskExecutor->scheduleWorkAt(
+            scheduledTime,
             [this, observer, token](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
                 if (!cbData.status.isOK()) {
-                    return;
+                    LOGV2_DEBUG(5939702,
+                                1,
+                                "Fault manager received an error",
+                                "status"_attr = cbData.status);
+                    if (ErrorCodes::isA<ErrorCategory::CancellationError>(cbData.status.code())) {
+                        return;
+                    }
+                    // continue health checking otherwise
                 }
                 healthCheck(observer, token);
             });
@@ -441,7 +466,7 @@ void FaultManager::healthCheck(HealthObserver* observer, std::shared_ptr<AtomicW
         auto healthCheckStatus = HealthCheckStatus(observer->getType(), 1.0, s.reason());
         LOGV2_ERROR(
             6007901, "Unexpected failure during health check", "status"_attr = healthCheckStatus);
-        this->accept(healthCheckStatus);
+        accept(healthCheckStatus);
         return healthCheckStatus;
     };
 
@@ -470,7 +495,7 @@ void FaultManager::healthCheck(HealthObserver* observer, std::shared_ptr<AtomicW
                                          return acceptNotOKStatus(status.getStatus());
                                      }
 
-                                     this->accept(status.getValue());
+                                     accept(status.getValue());
                                      return status.getValue();
                                  });
     auto futurePtr =
