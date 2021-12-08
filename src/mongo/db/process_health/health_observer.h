@@ -57,8 +57,6 @@ struct HealthObserverLivenessStats {
 
 /**
  * Interface to conduct periodic health checks.
- * Every instance of health observer is wired internally to update the state of the FaultManager
- * when a problem is detected.
  */
 class HealthObserver {
 public:
@@ -73,13 +71,8 @@ public:
     virtual FaultFacetType getType() const = 0;
 
     /**
-     * Triggers health check.
-     * It should be safe to invoke this method arbitrary often, the implementation
-     * should prorate the invocations to avoid DoS.
-     * The implementation may or may not block for the completion of the check, this remains
-     * unspecified.
-     * Note: no methods in this class should return any check results, the proper way to
-     * get result is to check facets in the FaultManager.
+     * Triggers health check. The implementation should not block to wait for the completion
+     * of this check.
      *
      * @param factory Interface to get or create the factory of facets container.
      */
@@ -89,6 +82,11 @@ public:
         CancellationToken token) = 0;
 
     virtual HealthObserverLivenessStats getStats() const = 0;
+
+    /**
+     * Value used to introduce jitter between health check invocations.
+     */
+    virtual Milliseconds healthCheckJitter() const = 0;
 };
 
 }  // namespace process_health

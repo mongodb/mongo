@@ -57,12 +57,6 @@ public:
         return _svcCtx;
     }
 
-    /**
-     * @return Milliseconds the shortest interval it is safe to repeat this check on.
-     */
-    virtual Milliseconds minimalCheckInterval() const {
-        return Milliseconds(10);
-    }
 
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
@@ -75,6 +69,7 @@ public:
     HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;
 
     HealthObserverLivenessStats getStats() const override;
+    Milliseconds healthCheckJitter() const override;
 
     // Common params for every health check.
     struct PeriodicHealthCheckContext {
@@ -94,6 +89,14 @@ protected:
 
     HealthObserverLivenessStats getStatsLocked(WithLock) const;
 
+    template <typename T>
+    T randDuration(T upperBound) const {
+        auto upperCount = durationCount<T>(upperBound);
+        stdx::lock_guard lock(_mutex);
+        auto resultCount = _rand.nextInt64(upperCount);
+        return T(resultCount);
+    }
+
     ServiceContext* const _svcCtx;
 
     mutable Mutex _mutex =
@@ -107,6 +110,8 @@ protected:
     Date_t _lastTimeCheckCompleted;
     int _completedChecksCount = 0;
     int _completedChecksWithFaultCount = 0;
+
+    mutable PseudoRandom _rand;
 };
 
 }  // namespace process_health
