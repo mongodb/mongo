@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
@@ -343,10 +344,16 @@ public:
                     "The 'readOnce' option is not supported within a transaction.",
                     !txnParticipant || !opCtx->inMultiDocumentTransaction() || !qr->isReadOnce());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "The '$_internalReadAtClusterTime' option is only supported when testing"
+            if (qr->getReadAtClusterTime()) {
+                AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+                const bool authorized = authSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::applyOps);
+                uassert(
+                    ErrorCodes::Unauthorized,
+                    "The '$_internalReadAtClusterTime' option requires authorization unless testing"
                     " commands are enabled",
-                    !qr->getReadAtClusterTime() || getTestCommandsEnabled());
+                    authorized || getTestCommandsEnabled());
+            }
 
             uassert(
                 ErrorCodes::OperationNotSupportedInTransaction,

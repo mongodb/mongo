@@ -115,34 +115,101 @@ session.endSession();
 rst.stopSet();
 
 // readConcern with 'atClusterTime' should succeed regardless of value of 'enableTestCommands'.
-{
-    TestData.enableTestCommands = false;
-    let rst = new ReplSetTest({nodes: 1});
+// So should $_internalReadAtClusterTime.
+function testClusterTime() {
+    let rst = new ReplSetTest({nodes: 2});
     rst.startSet();
-    rst.initiate();
+    rst.initiateWithHighElectionTimeout();
+    let db = rst.getPrimary().getDB(dbName);
+    let secondaryDb = rst.getSecondary().getDB(dbName);
+    assert.commandWorked(db.runCommand({create: collName}));
     let session =
         rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     let sessionDb = session.getDatabase(dbName);
-    session.startTransaction(
-        {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
+    let clusterTime = _getClusterTime(rst);
+    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTime}});
     assert.commandWorked(sessionDb.runCommand({find: collName}));
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
-    rst.stopSet();
 
-    TestData.enableTestCommands = true;
-    rst = new ReplSetTest({nodes: 1});
-    rst.startSet();
-    rst.initiate();
-    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    session.startTransaction(
-        {readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)}});
-    assert.commandWorked(sessionDb.runCommand({find: collName}));
-    assert.commandWorked(session.commitTransaction_forTesting());
-    session.endSession();
+    assert.commandWorked(db[collName].insert({_id: 1}));
+    rst.awaitReplication();
+    let res = assert.commandWorked(
+        db.runCommand({find: collName, "$_internalReadAtClusterTime": clusterTime}));
+    assert.eq(res.cursor.firstBatch, []);
+    let secondaryRes = assert.commandWorked(
+        secondaryDb.runCommand({find: collName, "$_internalReadAtClusterTime": clusterTime}));
+    assert.eq(secondaryRes.cursor.firstBatch, []);
+    // Advance cluster time to see data.
+    clusterTime = _getClusterTime(rst);
+    res = assert.commandWorked(
+        db.runCommand({find: collName, "$_internalReadAtClusterTime": clusterTime}));
+    assert.eq(res.cursor.firstBatch, [{_id: 1}]);
+    secondaryRes = assert.commandWorked(
+        secondaryDb.runCommand({find: collName, "$_internalReadAtClusterTime": clusterTime}));
+    assert.eq(secondaryRes.cursor.firstBatch, [{_id: 1}]);
+
+    // Make sure getMore also works
+    assert.commandWorked(db[collName].insert([{_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}]));
+    rst.awaitReplication();
+    clusterTime = _getClusterTime(rst);
+    assert.commandWorked(db[collName].insert({_id: 6}));
+    rst.awaitReplication();
+    res = assert.commandWorked(db.runCommand({
+        find: collName,
+        batchSize: 3,
+        sort: {_id: 1},
+        "$_internalReadAtClusterTime": clusterTime
+    }));
+    secondaryRes = assert.commandWorked(secondaryDb.runCommand({
+        find: collName,
+        batchSize: 3,
+        sort: {_id: 1},
+        "$_internalReadAtClusterTime": clusterTime
+    }));
+    assert.eq(secondaryRes.cursor.firstBatch, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    res = assert.commandWorked(
+        db.runCommand({getMore: res.cursor.id, collection: collName, batchSize: 3}));
+    assert.eq(res.cursor.nextBatch, [{_id: 4}, {_id: 5}]);
+    assert.eq(res.cursor.id, 0);
+    secondaryRes = assert.commandWorked(secondaryDb.runCommand(
+        {getMore: secondaryRes.cursor.id, collection: collName, batchSize: 3}));
+    assert.eq(secondaryRes.cursor.nextBatch, [{_id: 4}, {_id: 5}]);
+    assert.eq(secondaryRes.cursor.id, 0);
+
+    // Advance the cluster time, now we should see _id: 6 (but not 7 and 8)
+    clusterTime = _getClusterTime(rst);
+    assert.commandWorked(db[collName].insert([{_id: 7}, {_id: 8}]));
+    rst.awaitReplication();
+    res = assert.commandWorked(db.runCommand({
+        find: collName,
+        batchSize: 3,
+        sort: {_id: 1},
+        "$_internalReadAtClusterTime": clusterTime
+    }));
+    assert.eq(res.cursor.firstBatch, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    secondaryRes = assert.commandWorked(secondaryDb.runCommand({
+        find: collName,
+        batchSize: 3,
+        sort: {_id: 1},
+        "$_internalReadAtClusterTime": clusterTime
+    }));
+    assert.eq(secondaryRes.cursor.firstBatch, [{_id: 1}, {_id: 2}, {_id: 3}]);
+    res = assert.commandWorked(
+        db.runCommand({getMore: res.cursor.id, collection: collName, batchSize: 5}));
+    assert.eq(res.cursor.nextBatch, [{_id: 4}, {_id: 5}, {_id: 6}]);
+    assert.eq(res.cursor.id, 0);
+    secondaryRes = assert.commandWorked(secondaryDb.runCommand(
+        {getMore: secondaryRes.cursor.id, collection: collName, batchSize: 5}));
+    assert.eq(secondaryRes.cursor.nextBatch, [{_id: 4}, {_id: 5}, {_id: 6}]);
+    assert.eq(secondaryRes.cursor.id, 0);
     rst.stopSet();
 }
+
+TestData.enableTestCommands = false;
+testClusterTime();
+TestData.enableTestCommands = true;
+testClusterTime();
 
 // readConcern with 'atClusterTime' is not allowed when enableMajorityReadConcern=false.
 {
