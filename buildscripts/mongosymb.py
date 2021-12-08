@@ -321,7 +321,7 @@ class PathResolver(object):
                     return None
                 else:
                     data = response.json().get('data', {})
-                    path, binary_name = data.get('debug_symbols_url'), data.get('binary_name')
+                    path, binary_name = data.get('debug_symbols_url'), data.get('file_name')
             except Exception as err:  # noqa pylint: disable=broad-except
                 sys.stderr.write(f"Error occurred while trying to get response from server "
                                  f"for buildId({build_id}): {err}\n")
@@ -344,7 +344,14 @@ class PathResolver(object):
                 path = self.unpack(dl_path)
         except Exception as err:  # noqa pylint: disable=broad-except
             sys.stderr.write(f"Failed to download & unpack file: {err}\n")
-        return os.path.join(path, f'{binary_name}.debug')
+        # we may have '<name>.debug', '<name>.so' or just executable binary file which may not have file 'extension'.
+        # if file has extension, it is good. if not, we should append .debug, because those without extension are
+        # from release builds, and their debug symbol files contain .debug extension.
+        # we need to map those 2 different file names ('<name>' becomes '<name>.debug').
+        if not binary_name.endswith('.debug') and not binary_name.endswith('.so'):
+            binary_name = f'{binary_name}.debug'
+
+        return os.path.join(path, binary_name)
 
 
 def parse_input(trace_doc, dbg_path_resolver):

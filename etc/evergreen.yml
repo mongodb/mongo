@@ -6921,6 +6921,22 @@ tasks:
       content_type: text/plain
       display_name: Last Push Date (seconds since epoch)
 
+- name: generate_buildid_to_debug_symbols_mapping
+  tags: ["symbolizer"]
+  stepback: false
+  patchable: true
+  depends_on:
+    - archive_dist_test_debug
+  commands:
+    - *f_expansions_write
+    - func: "do setup"
+    - func: "configure evergreen api credentials"
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
+
 #######################################
 #             Task Groups             #
 #######################################
@@ -7184,6 +7200,7 @@ buildvariants:
 ###########################################
 #         Linux buildvariants             #
 ###########################################
+
 - &linux-64-debug-required-template
   name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
@@ -7245,6 +7262,7 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-large
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *linux-64-debug-required-template
   name: linux-64-debug-wtdevelop
@@ -7290,6 +7308,7 @@ buildvariants:
   - name: failpoints_auth
   - name: .jscore .common !.sharding !.decimal !.txns
   - name: .jstestfuzz .common !.sharding !.repl
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804
   display_name: Ubuntu 18.04
@@ -7348,6 +7367,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu1804-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
@@ -7421,6 +7441,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu1804-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: tla-plus
   display_name: TLA+
@@ -7486,6 +7507,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu1804-test
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-arm64
   display_name: Ubuntu 18.04 arm64
@@ -7522,6 +7544,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu1804-test
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004
   display_name: Ubuntu 20.04
@@ -7574,6 +7597,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu2004-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
@@ -7627,6 +7651,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu2004-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
@@ -7680,6 +7705,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu2004-test
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004-arm64
   display_name: Ubuntu 20.04 arm64
@@ -7715,6 +7741,7 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu2004-test
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
@@ -8035,6 +8062,7 @@ buildvariants:
   - name: .publish
     distros:
     - amazon1-2018-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon
   display_name: Amazon Linux
@@ -8090,6 +8118,7 @@ buildvariants:
   - name: .publish
     distros:
     - amazon1-2018-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
@@ -8147,6 +8176,7 @@ buildvariants:
   - name: .publish
     distros:
     - amazon2-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2
   display_name: Amazon Linux 2
@@ -8202,6 +8232,7 @@ buildvariants:
   - name: .publish
     distros:
     - amazon2-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
@@ -8259,6 +8290,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2-arm64
   display_name: Amazon Linux 2 arm64
@@ -8309,6 +8341,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: stm-daily-cron
   modules:
@@ -9168,6 +9201,7 @@ buildvariants:
     - ubuntu2004-package
   - name: selinux_rhel8_enterprise
   - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel-80-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-required
@@ -9615,6 +9649,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
     distros:
     - rhel80-medium
+  - name: generate_buildid_to_debug_symbols_mapping
 
 # This build variant is used to run multiversion tests as part of burn_in_tags as these tests are
 # currently only run on our daily builders.
@@ -9756,6 +9791,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel70-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubi8
   display_name: "UBI 8"
@@ -9839,6 +9875,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
@@ -9894,6 +9931,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 # This variant is to intentionally test uncommon features nightly
 - <<: *enterprise-rhel-70-64-bit-template
@@ -10077,6 +10115,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel70-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -10129,6 +10168,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel-82-arm64
   display_name: RHEL 8.2 arm64
@@ -10178,6 +10218,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel80-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
@@ -10246,6 +10287,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel70-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x-compile
   display_name: Enterprise RHEL 7.2 s390x Compile
@@ -10276,6 +10318,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -10327,6 +10370,7 @@ buildvariants:
   - name: .publish
     distros:
     - rhel70-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x-all-feature-flags
   display_name: Enterprise RHEL 7.2 s390x (all feature flags)
@@ -10361,7 +10405,7 @@ buildvariants:
   - name: build_variant_gen
   - name: jsCore
   - name: replica_sets_jscore_passthrough
-
+  - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -10439,6 +10483,7 @@ buildvariants:
   - name: .publish
     distros:
     - suse12-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse12
   display_name: SUSE 12
@@ -10490,6 +10535,7 @@ buildvariants:
   - name: .publish
     distros:
     - suse12-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
@@ -10532,6 +10578,7 @@ buildvariants:
   - name: .publish
     distros:
     - suse15-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse15
   display_name: SUSE 15
@@ -10582,6 +10629,7 @@ buildvariants:
   - name: .publish
     distros:
     - suse15-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
 #          Debian buildvariants           #
@@ -10635,6 +10683,7 @@ buildvariants:
   - name: .publish
     distros:
     - debian92-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian92
   display_name: Debian 9.2
@@ -10688,6 +10737,7 @@ buildvariants:
   - name: .publish
     distros:
     - debian92-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
@@ -10741,6 +10791,7 @@ buildvariants:
   - name: .publish
     distros:
     - debian10-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian10
   display_name: Debian 10
@@ -10795,6 +10846,7 @@ buildvariants:
   - name: .publish
     distros:
     - debian10-small
+  - name: generate_buildid_to_debug_symbols_mapping
 
 ################################
 # storage engine buildvariants #
