@@ -95,6 +95,15 @@ assertDBOutputEquals(
 
 /* ------------------------ Object Array Tests ------------------------ */
 
+// Test that we handle the case of satisfying "Compare" requirements with -1 sort (SERVER-61941).
+assertDBOutputEquals([[], [], {}], coll.aggregate([
+    {$project: {sorted: {$sortArray: {input: {$literal: [{}, [], []]}, sortBy: -1}}}}
+]));
+
+assertDBOutputEquals([{}, {}], coll.aggregate([
+    {$project: {sorted: {$sortArray: {input: {$literal: [{}, {}]}, sortBy: -1}}}}
+]));
+
 assertDBOutputEquals([{a: 1}, {a: 2}, {a: 3}], coll.aggregate([
     {$project: {sorted: {$sortArray: {input: "$normalSingleObjs", sortBy: {a: 1}}}}}
 ]));
