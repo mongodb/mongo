@@ -2434,12 +2434,7 @@ var ReplSetTest = function(opts) {
 
                 const dbHashes = rst.getHashes(dbName, secondaries);
                 const primaryDBHash = dbHashes.primary;
-                // The `config.preimages` is not necessarily consistent at any time, but it is
-                // guaranteed to be eventually consistent.
-                // TODO SERVER-61564: remove "system.preimages" exception according to the decision
-                // made if deletes of pre-images are explicitly replicated.
-                const primaryCollections =
-                    Object.keys(primaryDBHash.collections).filter((x) => x !== "system.preimages");
+                const primaryCollections = Object.keys(primaryDBHash.collections);
                 assert.commandWorked(primaryDBHash);
 
                 // Filter only collections that were retrieved by the dbhash. listCollections
