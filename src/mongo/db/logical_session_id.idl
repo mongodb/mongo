@@ -72,10 +72,12 @@ structs:
         description: "Used for internal sessions only."
         type: TxnNumber
         optional: true
+        unstable: false
       txnUUID:
         description: "Used for internal sessions only."
         type: uuid
         optional: true
+        unstable: false
 
   LogicalSessionId:
     description: "A struct representing a LogicalSessionId"

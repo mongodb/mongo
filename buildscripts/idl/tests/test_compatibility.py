@@ -92,7 +92,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"], ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertEqual(error_collection.count(), 176)
+        self.assertEqual(error_collection.count(), 182)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -1293,6 +1293,47 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(added_new_parameter_missing_unstable_field_error),
             "addedNewParameterMissingUnstableField")
+
+        chained_struct_incompatible_error = error_collection.get_error_by_command_name(
+            "chainedStructIncompatible")
+        self.assertTrue(chained_struct_incompatible_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(str(chained_struct_incompatible_error), "chainedStructIncompatible")
+
+        reply_with_incompatible_chained_struct_error = error_collection.get_error_by_command_name(
+            "replyWithIncompatibleChainedStruct")
+        self.assertTrue(reply_with_incompatible_chained_struct_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET)
+        self.assertRegex(
+            str(reply_with_incompatible_chained_struct_error), "replyWithIncompatibleChainedStruct")
+
+        type_with_incompatible_chained_struct_error = error_collection.get_error_by_command_name(
+            "typeWithIncompatibleChainedStruct")
+        self.assertTrue(
+            type_with_incompatible_chained_struct_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(type_with_incompatible_chained_struct_error), "typeWithIncompatibleChainedStruct")
+
+        incompatible_chained_type_error = error_collection.get_error_by_command_name(
+            "incompatibleChainedType")
+        self.assertTrue(incompatible_chained_type_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(str(incompatible_chained_type_error), "incompatibleChainedType")
+
+        new_parameter_removed_chained_type_error = error_collection.get_error_by_command_name(
+            "newParameterRemovedChainedType")
+        self.assertTrue(
+            new_parameter_removed_chained_type_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_parameter_removed_chained_type_error), "newParameterRemovedChainedType")
+
+        new_reply_added_chained_type_error = error_collection.get_error_by_command_name(
+            "newReplyAddedChainedType")
+        self.assertTrue(new_reply_added_chained_type_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET)
+        self.assertRegex(str(new_reply_added_chained_type_error), "newReplyAddedChainedType")
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""

@@ -75,18 +75,22 @@ structs:
                               For delete: number of documents deleted."
                 type: int
                 default: 0
+                unstable: false
             electionId:
                 description: "Replication coordinator election id."
                 type: objectid
                 optional: true
+                unstable: false
             opTime:
                 description: "Operation time for the command."
                 type: write_cmd_optime
                 optional: true
+                unstable: false
             writeErrors:
                 description: "Contains all the errors encoutered."
                 type: array<object_owned>
                 optional: true
+                unstable: false
 
     InsertCommandReply:
         description: "Contains information related to insert command reply."
@@ -172,8 +176,9 @@ structs:
                 description: "This flag is set to true when the write command was originally sent
                               to the time-series view, but got rewritten to target time-series
                               buckets namespace."
-                type: optionalBool
+                type: bool
                 unstable: false
+                optional: true
 
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
