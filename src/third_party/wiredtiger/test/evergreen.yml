@@ -3669,7 +3669,6 @@ tasks:
           perf-test-name: checkpoint-stress.wtperf
 
   - name: many-dhandle-stress
-    commands:
     depends_on:
       - name: compile
     commands:
