@@ -121,7 +121,6 @@ void getKeysForIndex(OperationContext* opCtx,
                           boost::none);  // loc
 }
 
-
 /**
  * Adjusts unique setting on an index.
  * An index can be converted to unique but removing the uniqueness property is not allowed.
@@ -137,11 +136,12 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     if (idx->infoObj().getField("unique").trueValue()) {
         return;
     }
+    const auto& collection = autoColl->getCollection();
 
     // Checks for duplicates on the primary or for the 'applyOps' command.
     // TODO(SERVER-61356): revisit this condition for tenant migration, which uses kInitialSync.
+    std::list<std::set<RecordId>> duplicateRecordsList;
     if (!mode) {
-        const auto& collection = autoColl->getCollection();
         auto entry = idx->getEntry();
         auto accessMethod = entry->accessMethod();
 
@@ -167,12 +167,17 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
             // Inserts and updates should generally refer to existing index entries, but since we
             // are recording uncommitted CRUD events, we should not always assume that searching
             // for 'keyString' in the index must return a a valid index entry.
-            scanIndexForDuplicates(opCtx, collection, idx, keyString, /*limit=*/2);
+            duplicateRecordsList.splice(duplicateRecordsList.end(),
+                                        scanIndexForDuplicates(opCtx, collection, idx, keyString));
         }
     } else if (*mode == repl::OplogApplication::Mode::kApplyOpsCmd) {
         // We do not need to observe side writes under applyOps because applyOps runs under global
         // write access.
-        scanIndexForDuplicates(opCtx, autoColl->getCollection(), idx);
+        duplicateRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
+    }
+    if (!duplicateRecordsList.empty()) {
+        uassertStatusOK(buildEnableConstraintErrorStatus(
+            "unique", buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
     }
 
     *newUnique = indexUnique;
@@ -273,13 +278,15 @@ void processCollModIndexRequest(OperationContext* opCtx,
     }
 }
 
-void scanIndexForDuplicates(OperationContext* opCtx,
-                            const CollectionPtr& collection,
-                            const IndexDescriptor* idx,
-                            boost::optional<KeyString::Value> firstKeyString,
-                            boost::optional<int64_t> limit) {
+std::list<std::set<RecordId>> scanIndexForDuplicates(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexDescriptor* idx,
+    boost::optional<KeyString::Value> firstKeyString) {
     auto entry = idx->getEntry();
     auto accessMethod = entry->accessMethod();
+    // Only scans for the duplicates on one key if 'firstKeyString' is provided.
+    bool scanOneKey = static_cast<bool>(firstKeyString);
 
     // Starting point of index traversal.
     if (!firstKeyString) {
@@ -291,50 +298,54 @@ void scanIndexForDuplicates(OperationContext* opCtx,
         firstKeyString = firstKeyStringBuilder.getValueCopy();
     }
 
-    // Scan index for duplicates, comparing consecutive index entries.
+    // Scans index for duplicates, comparing consecutive index entries.
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are
     // in the format (Key, RID), and all RecordIDs are unique.
     DataThrottle dataThrottle(opCtx);
     dataThrottle.turnThrottlingOff();
     SortedDataInterfaceThrottleCursor indexCursor(opCtx, accessMethod, &dataThrottle);
     boost::optional<KeyStringEntry> prevIndexEntry;
-    BSONArrayBuilder violations;
-    bool lastDocViolated = false;
-    BSONArrayBuilder lastViolatingIDs;
-    int64_t i = 0;
+    std::list<std::set<RecordId>> duplicateRecordsList;
+    std::set<RecordId> duplicateRecords;
     for (auto indexEntry = indexCursor.seekForKeyString(opCtx, *firstKeyString); indexEntry;
          indexEntry = indexCursor.nextKeyString(opCtx)) {
         if (prevIndexEntry &&
             indexEntry->keyString.compareWithoutRecordIdLong(prevIndexEntry->keyString) == 0) {
-            auto currentEntry = collection->docFor(opCtx, indexEntry->loc).value();
-            if (!lastDocViolated) {
-                auto prevEntry = collection->docFor(opCtx, prevIndexEntry->loc).value();
-                invariant(lastViolatingIDs.arrSize() == 0);
-                lastViolatingIDs.append(std::move(prevEntry["_id"]));
-                lastDocViolated = true;
+            if (duplicateRecords.empty()) {
+                duplicateRecords.insert(prevIndexEntry->loc);
             }
-            lastViolatingIDs.append(std::move(currentEntry["_id"]));
+            duplicateRecords.insert(indexEntry->loc);
         } else {
-            if (lastDocViolated) {
-                violations.append(BSON("ids"_sd << lastViolatingIDs.arr()));
-                // Destruct and reconstruct lastViolatingIDs so we can reuse it
-                lastViolatingIDs.~BSONArrayBuilder();
-                new (&lastViolatingIDs) BSONArrayBuilder();
+            if (!duplicateRecords.empty()) {
+                // Adds the current group of violations with the same duplicate value.
+                duplicateRecordsList.push_back(duplicateRecords);
+                duplicateRecords.clear();
+                if (scanOneKey) {
+                    break;
+                }
             }
-            lastDocViolated = false;
         }
         prevIndexEntry = indexEntry;
+    }
+    if (!duplicateRecords.empty()) {
+        duplicateRecordsList.push_back(duplicateRecords);
+    }
+    return duplicateRecordsList;
+}
 
-        if (limit && ++i >= *limit) {
-            break;
+BSONArray buildDuplicateViolations(OperationContext* opCtx,
+                                   const CollectionPtr& collection,
+                                   const std::list<std::set<RecordId>>& duplicateRecordsList) {
+    BSONArrayBuilder duplicateViolations;
+    for (const auto& duplicateRecords : duplicateRecordsList) {
+        BSONArrayBuilder currViolatingIds;
+        for (const auto& recordId : duplicateRecords) {
+            auto doc = collection->docFor(opCtx, recordId).value();
+            currViolatingIds.append(doc["_id"]);
         }
+        duplicateViolations.append(BSON("ids" << currViolatingIds.arr()));
     }
-    if (lastDocViolated) {
-        violations.append(BSON("ids"_sd << lastViolatingIDs.arr()));
-    }
-    if (violations.arrSize() != 0) {
-        uassertStatusOK(buildEnableConstraintErrorStatus("unique", violations.arr()));
-    }
+    return duplicateViolations.arr();
 }
 
 Status buildEnableConstraintErrorStatus(const std::string& indexType, const BSONArray& violations) {

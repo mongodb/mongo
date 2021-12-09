@@ -1,5 +1,5 @@
 /**
- * Test that the collMod command allows concurrent writes while converting regular indexes to
+ * Tests that the collMod command allows concurrent writes while converting regular indexes to
  * unique indexes.
  *
  * @tags: [
@@ -52,7 +52,7 @@ const countUnique = function(coll, key) {
  * While the 'collMod' command in paused, runs 'doCrudOpsFunc' before resuming the
  * conversion process. Confirms expected 'collMod' behavior.
  */
-const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expectSuccess) {
+const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expectedViolations) {
     const testDB = primary.getDB('test');
     const collName = collPrefix + collCount++;
     const coll = testDB.getCollection(collName);
@@ -64,7 +64,7 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
     assert.commandWorked(coll.createIndex({a: 1}));
 
     // Initial documents. If the conversion is expected to be successful, we
-    // can check the uniquenes contraint using the values 'a' in these seed
+    // can check the uniqueness constraint using the values 'a' in these seed
     // documents.
     const docs = [
         {_id: 1, a: 100},
@@ -77,20 +77,26 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
     const failPoint = configureFailPoint(
         primary, 'hangAfterCollModIndexUniqueSideWriteTracker', {nss: coll.getFullName()});
     try {
-        // Start collMod unique index conversion.
-        if (expectSuccess) {
+        // Starts collMod unique index conversion.
+        if (!expectedViolations) {
             awaitCollMod = assertCommandWorkedInParallelShell(
                 primary, testDB, {collMod: collName, index: {keyPattern: {a: 1}, unique: true}});
         } else {
-            awaitCollMod = assertCommandFailedWithCodeInParallelShell(
-                primary,
-                testDB,
-                {collMod: collName, index: {keyPattern: {a: 1}, unique: true}},
-                ErrorCodes.CannotEnableIndexConstraint);
+            awaitCollMod = startParallelShell(
+                funWithArgs(function(dbName, collName, expectedViolations) {
+                    const testDB = db.getSiblingDB(dbName);
+                    const result = testDB.runCommand(
+                        {collMod: collName, index: {keyPattern: {a: 1}, unique: true}});
+                    assert.commandFailedWithCode(result, ErrorCodes.CannotEnableIndexConstraint);
+                    assert.eq(bsonWoCompare(result.violations, expectedViolations),
+                              0,
+                              "expectedViolations: " + tojson(expectedViolations) +
+                                  "; result.violations: " + tojson(result.violations));
+                }, testDB.getName(), collName, expectedViolations), primary.port);
         }
         failPoint.wait();
 
-        // Check locks held by collMod while waiting on fail point.
+        // Checks locks held by collMod while waiting on fail point.
         const currentOpResult = testDB.getSiblingDB("admin")
                                     .aggregate(
                                         [
@@ -132,21 +138,21 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
         awaitCollMod();
     }
 
-    if (expectSuccess) {
+    if (!expectedViolations) {
         assert.eq(countUnique(coll, {a: 1}),
                   1,
                   'index should be unique now: ' + tojson(coll.getIndexes()));
 
-        // Test uniqueness constraint.
+        // Tests uniqueness constraint.
         assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);
     } else {
         assert.eq(
             countUnique(coll, {a: 1}), 0, 'index should not unique: ' + tojson(coll.getIndexes()));
 
-        // Check that uniquenesss constraint is not enforceed.
+        // Checks that uniqueness constraint is not enforced.
         assert.commandWorked(coll.insert({_id: 100, a: 100}));
     }
-    jsTestLog('Successsfully completed test on collection: ' + coll.getFullName());
+    jsTestLog('Successfully completed test on collection: ' + coll.getFullName());
 };
 
 // Checks successful conversion with non-conflicting documents inserted during collMod.
@@ -160,7 +166,7 @@ testCollModConvertUniqueWithSideWrites((coll) => {
     assert.commandWorked(coll.insert(docs));
     jsTestLog('Successfully inserted documents. Resuming collMod index conversion: ' +
               tojson(docs));
-}, true /* expectSuccess */);
+});
 
 // Confirms that conversion fails with a conflicting document inserted during collMod.
 testCollModConvertUniqueWithSideWrites((coll) => {
@@ -171,52 +177,67 @@ testCollModConvertUniqueWithSideWrites((coll) => {
     assert.commandWorked(coll.insert(docs));
     jsTestLog('Successfully inserted documents. Resuming collMod index conversion: ' +
               tojson(docs));
-}, false /* expectSuccess */);
+}, [{ids: [1, 1000]}] /* expectedViolations */);
 
 // Confirms that conversion fails if an update during collMod leads to a conflict.
 testCollModConvertUniqueWithSideWrites((coll) => {
     jsTestLog('Updating single document after collMod completed index scan.');
     assert.commandWorked(coll.update({_id: 1}, {a: 200}));
     jsTestLog('Successfully updated document. Resuming collMod index conversion.');
-}, false /* expectSuccess */);
+}, [{ids: [1, 2]}] /* expectedViolations */);
 
-// Inserting and deleting a conflicting document before collMod obtains exclusive access to the
+// Inserts and deletes a conflicting document before collMod obtains exclusive access to the
 // collection to complete the conversion should result in a successful conversion.
 testCollModConvertUniqueWithSideWrites((coll) => {
     jsTestLog('Inserting and removing a conflicting document after collMod completed index scan.');
     assert.commandWorked(coll.insert({_id: 101, a: 100}));
     assert.commandWorked(coll.remove({_id: 101}));
     jsTestLog('Successfully inserted and removed document. Resuming collMod index conversion.');
-}, true /* expectSuccess */);
+});
 
-// Inserting a non-conflicting document containing an unindexed field should not affect conversion.
+// Inserts a non-conflicting document containing an unindexed field should not affect conversion.
 testCollModConvertUniqueWithSideWrites((coll) => {
     jsTestLog('Inserting a non-conflicting document containing an unindexed field.');
     assert.commandWorked(coll.insert({_id: 7, a: 700, b: 2222}));
     jsTestLog('Successfully inserted a non-conflicting document containing an unindexed field. ' +
               'Resuming collMod index conversion.');
-}, true /* expectSuccess */);
+});
 
-// Removing the last entry in the index should not throw off the index scan.
+// Removes the last entry in the index should not throw off the index scan.
 testCollModConvertUniqueWithSideWrites((coll) => {
     jsTestLog('Removing the last index entry');
     assert.commandWorked(coll.remove({_id: 3}));
     jsTestLog('Successfully the last index entry. Resuming collMod index conversion.');
-}, true /* expectSuccess */);
+});
 
-// Make the index multikey with a non-conflicting document.
+// Makes the index multikey with a non-conflicting document.
 testCollModConvertUniqueWithSideWrites((coll) => {
     jsTestLog('Converting the index to multikey with non-conflicting document');
     assert.commandWorked(coll.insert({_id: 8, a: [400, 500]}));
     jsTestLog('Successfully converted the index to multikey with non-conflicting document');
-}, true /* expectSuccess */);
+});
 
-// Make the index multikey with a conflicting document.
+// Makes the index multikey with a conflicting document.
 testCollModConvertUniqueWithSideWrites((coll) => {
     jsTestLog('Converting the index to multikey with conflicting document');
     assert.commandWorked(coll.insert({_id: 9, a: [900, 100]}));
     jsTestLog('Successfully converted the index to multikey with conflicting document');
-}, false /* expectSuccess */);
+}, [{ids: [1, 9]}] /* expectedViolations */);
+
+// Confirms that conversion fails with a conflicting documents inserted during collMod and returns
+// all violations.
+testCollModConvertUniqueWithSideWrites((coll) => {
+    const docs = [
+        {_id: 1000, a: 100},
+        {_id: 1001, a: 100},
+        {_id: 1002, a: 200},
+        {_id: 1003, a: 200},
+    ];
+    jsTestLog('Inserting additional documents after collMod completed index scan: ' + tojson(docs));
+    assert.commandWorked(coll.insert(docs));
+    jsTestLog('Successfully inserted documents. Resuming collMod index conversion: ' +
+              tojson(docs));
+}, [{ids: [1, 1000, 1001]}, {ids: [2, 1002, 1003]}] /* expectedViolations */);
 
 rst.stopSet();
 })();

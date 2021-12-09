@@ -514,11 +514,12 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     // We do not need write access in dry run mode.
     AutoGetCollection coll(opCtx, nsOrUUID, MODE_IS);
     auto nss = coll.getNss();
+    const auto& collection = coll.getCollection();
 
     // Validate collMod request and look up index descriptor for checking duplicates.
     BSONObjBuilder oplogEntryBuilderWeDontCareAbout;
-    auto statusW = parseCollModRequest(
-        opCtx, nss, coll.getCollection(), cmd, &oplogEntryBuilderWeDontCareAbout);
+    auto statusW =
+        parseCollModRequest(opCtx, nss, collection, cmd, &oplogEntryBuilderWeDontCareAbout);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -532,7 +533,11 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     }
 
     // Throws exception if index contains duplicates.
-    scanIndexForDuplicates(opCtx, coll.getCollection(), cmr.indexRequest.idx);
+    auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, cmr.indexRequest.idx);
+    if (!violatingRecordsList.empty()) {
+        uassertStatusOK(buildEnableConstraintErrorStatus(
+            "unique", buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+    }
 
     return Status::OK();
 }
@@ -560,7 +565,11 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
     }
     const auto& cmr = statusW.getValue();
     auto idx = cmr.indexRequest.idx;
-    scanIndexForDuplicates(opCtx, collection, idx);
+    auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
+    if (!violatingRecordsList.empty()) {
+        uassertStatusOK(buildEnableConstraintErrorStatus(
+            "unique", buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+    }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueSideWriteTracker,
                                                      opCtx,
