@@ -121,6 +121,9 @@ ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL = "ID0076"
 ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE = "ID0077"
 ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE = "ID0078"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE = "ID0079"
+ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET = "ID0080"
+ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET = "ID0081"
+ERROR_ID_NEW_COMMAND_CHAINED_TYPE_NOT_SUPERSET = "ID0082"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -612,6 +615,31 @@ class IDLCompatibilityContext(object):
                              "is in the old command types but not the new command types.") %
                             (command_name, variant_type_name), file)
 
+    def add_new_command_or_param_chained_type_not_superset_error(
+            self, command_name: str, chained_type_name: str, file: str, field_name: Optional[str],
+            is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """
+        Add an error about the new chained types not being a superset.
+
+        Add an error about the new command or parameter chained types not being a superset
+        of the old chained types.
+        """
+        if is_command_parameter:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET, command_name,
+                ("The '%s' command has field or sub-field '%s' of chained types that is not "
+                 "a superset of the corresponding old field chained types: "
+                 "The type '%s' is in the old field types but not the new field types.") %
+                (command_name, field_name, chained_type_name), file)
+        else:
+            self._add_error(ERROR_ID_NEW_COMMAND_CHAINED_TYPE_NOT_SUPERSET, command_name,
+                            ("'%s' or its sub-struct has chained types that is not a supserset "
+                             "of the corresponding"
+                             " old command chained types: The type '%s' "
+                             "is in the old command types but not the new command types.") %
+                            (command_name, chained_type_name), file)
+
     def add_new_namespace_incompatible_error(self, command_name: str, old_namespace: str,
                                              new_namespace: str, file: str) -> None:
         """Add an error about the new namespace being incompatible with the old namespace."""
@@ -758,6 +786,22 @@ class IDLCompatibilityContext(object):
              "not a subset of the corresponding "
              "old reply field types: The type '%s' is not in the old reply field types.") %
             (command_name, field_name, variant_type_name), file)
+
+    def add_new_reply_chained_type_not_subset_error(self, command_name: str, reply_name: str,
+                                                    chained_type_name: str, file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """
+        Add an error about the reply chained types not being a subset.
+
+        Add an error about the new reply chained types
+        not being a subset of the old chained types.
+        """
+        self._add_error(
+            ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET, command_name,
+            ("'%s' has a reply '%s' with chained types that is "
+             "not a subset of the corresponding "
+             "old reply chained types: The type '%s' is not in the old reply chained types.") %
+            (command_name, reply_name, chained_type_name), file)
 
     def add_old_command_or_param_type_bson_any_error(self, command_name: str, old_type: str,
                                                      file: str, field_name: Optional[str],

@@ -722,6 +722,24 @@ structs:
         description: "This struct contains an added field in the new command that is missing the
                       'unstable' field."
 
+    IncompatibleChainedStructReply:
+        description: "This reply contains an incompatible chained struct"
+        chained_structs:
+            NewVariantNotSubsetReply: NewVariantNotSubsetReply
+
+    IncompatibleChainedStructType:
+        description: "This struct type contains an incompatible chained struct"
+        chained_structs:
+            NewBsonSerializationTypeAnyUnstableStruct: NewBsonSerializationTypeAnyUnstableStruct
+
+    NewAddedChainedTypeReply:
+        description: "This reply contains an added chained type in the new version"
+
+    NewRemovedChainedTypeStruct:
+        description: "This reply contains an added chained type in the new version"
+        chained_types:
+            intStringToInt: intStringToInt
+
 commands:
     invalidAPIVersionOld:
         description: "old command fails because of invalid API version"
@@ -2721,3 +2739,69 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    chainedStructIncompatible:
+        description: "new command fails because it contains a chained struct that has incompatible
+                      fields"
+        command_name: chainedStructIncompatible
+        namespace: ignored
+        cpp_name: chainedStructIncompatible
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        chained_structs:
+            VariantStructRecursiveStructWithArray: VariantStructRecursiveStructWithArray
+
+    replyWithIncompatibleChainedStruct:
+        description: "new command fails because its reply contains a chained struct that has
+                      incompatible fields"
+        command_name: replyWithIncompatibleChainedStruct
+        namespace: ignored
+        cpp_name: replyWithIncompatibleChainedStruct
+        strict: true
+        api_version: "1"
+        reply_type: IncompatibleChainedStructReply
+
+    typeWithIncompatibleChainedStruct:
+        description: "new command fails because its type contains a chained struct that has
+                      incompatible fields"
+        command_name: typeWithIncompatibleChainedStruct
+        namespace: type
+        type: IncompatibleChainedStructType
+        cpp_name: typeWithIncompatibleChainedStruct
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    incompatibleChainedType:
+        description: "new command fails because its chained types are incompatible"
+        command_name: incompatibleChainedType
+        namespace: ignored
+        cpp_name: incompatibleChainedType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        chained_types:
+            intStringToInt: intStringToInt
+
+    newParameterRemovedChainedType:
+        description: "new command fails because its parameter has removed a chained type"
+        command_name: newParameterRemovedChainedType
+        namespace: ignored
+        cpp_name: newParameterRemovedChainedType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            NewRemovedChainedTypeParameter:
+                unstable: false
+                type: NewRemovedChainedTypeStruct
+
+    newReplyAddedChainedType:
+        description: "new command fails because its reply has added a chained type"
+        command_name: newReplyAddedChainedType
+        namespace: ignored
+        cpp_name: newReplyAddedChainedType
+        strict: true
+        api_version: "1"
+        reply_type: NewAddedChainedTypeReply

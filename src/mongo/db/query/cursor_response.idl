@@ -45,23 +45,29 @@ structs:
                 cpp_name: "cursorId"
                 description: "The cursor id of the cursor."
                 type: long
+                unstable: false
             ns:
                 description: "The namespace of the cursor."
                 type: namespacestring
+                unstable: false
             postBatchResumeToken:
                 description: "An optional resume token object."
                 type: object
                 optional: true
+                unstable: false
             atClusterTime:
                 description: "The time stamp at which the response is being returned."
                 type: timestamp
                 optional: true
+                unstable: false
             partialResultsReturned:
                 description: "Boolean represents whether partial results are being returned."
                 type: optionalBool
+                unstable: false
             invalidated:
                 description: "Boolean represents if the cursor has been invalidated."
                 type: optionalBool
+                unstable: false
 
     InitialResponseCursor:
         description: "A struct representing an initial response cursor."

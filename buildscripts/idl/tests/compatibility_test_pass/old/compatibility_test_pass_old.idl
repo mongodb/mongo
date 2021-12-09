@@ -443,6 +443,16 @@ structs:
             missingUnstableFieldNewField:
                 type: string
 
+    CompatibleChainedStructReply:
+        description: "This reply contains an compatible chained struct"
+        chained_structs:
+            StructFieldTypeRecursiveReplyTwo: StructFieldTypeRecursiveReplyTwo
+
+    CompatibleChainedStructType:
+        description: "This struct type contains an compatible chained struct"
+        chained_structs:
+            StructCommandParameterTypeRecursive: StructCommandParameterTypeRecursive
+
 commands:
     testCommand:
         description: "old passing test command"
@@ -1495,3 +1505,47 @@ commands:
             missingUnstableFieldOldParameter:
                 type: int
         reply_type: OkReply
+
+    chainedStructCompatible:
+        description: "new command passes because it contains a chained struct that has compatible
+                      fields"
+        command_name: chainedStructCompatible
+        namespace: ignored
+        cpp_name: chainedStructCompatible
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        chained_structs:
+            VariantStructRecursiveStruct: VariantStructRecursiveStruct
+
+    replyWithCompatibleChainedStruct:
+        description: "new command passes because its reply contains a chained struct that has
+                      compatible fields"
+        command_name: replyWithCompatibleChainedStruct
+        namespace: ignored
+        cpp_name: replyWithCompatibleChainedStruct
+        strict: true
+        api_version: "1"
+        reply_type: CompatibleChainedStructReply
+
+    typeWithCompatibleChainedStruct:
+        description: "new command passes because its type contains a chained struct that has
+                      compatible fields"
+        command_name: typeWithCompatibleChainedStruct
+        namespace: type
+        type: CompatibleChainedStructType
+        cpp_name: typeWithCompatibleChainedStruct
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    incompatibleChainedType:
+        description: "new command passes because its chained types are compatible"
+        command_name: incompatibleChainedType
+        namespace: ignored
+        cpp_name: incompatibleChainedType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        chained_types:
+            intToIntString: intToIntString
