@@ -120,8 +120,13 @@ void FaultImpl::appendDescription(BSONObjBuilder* builder) const {
     builder->append("id", getId().toBSON());
     builder->append("severity", getSeverity());
     builder->append("duration", getDuration().toBSON());
-    // TODO (SERVER-61914): Add fault facet details
-    builder->append("facets", static_cast<int>(_facets.size()));
+    BSONObjBuilder facetsBuilder;
+    for (auto& facet : _facets) {
+        facetsBuilder.append(FaultFacetType_serializer(facet->getType()), facet->toBSON());
+    }
+
+    builder->append("facets", facetsBuilder.obj());
+    builder->append("numFacets", static_cast<int>(_facets.size()));
 }
 
 }  // namespace process_health

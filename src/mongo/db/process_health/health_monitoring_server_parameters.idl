@@ -55,6 +55,10 @@ structs:
                 description: "Intensity of LDAP fault facet"
                 type: HealthObserverIntensity
                 default: kNonCritical
+            test:
+                description: "Intensity of test fault facet"
+                type: HealthObserverIntensity
+                default: kOff
 
 server_parameters:
     healthMonitoring:

@@ -126,7 +126,7 @@ inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {
         case FaultFacetType::kMock2:
             return s << "kMock2"_sd;
         default:
-            return s << "Uknown"_sd;
+            return s << "Unknown"_sd;
     }
 }
 

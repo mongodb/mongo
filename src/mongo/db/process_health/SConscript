@@ -17,6 +17,7 @@ env.Library(
         'health_observer_base.cpp',
         'health_observer_registration.cpp',
         'progress_monitor.cpp',
+        'test_health_observer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

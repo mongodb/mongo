@@ -67,6 +67,15 @@ public:
         return healthCheckStatus;
     }
 
+    Milliseconds getDuration() const override {
+        return std::max(Milliseconds(0), Milliseconds(_clockSource->now() - _startTime));
+    }
+
+    void appendDescription(BSONObjBuilder* builder) const override {
+        builder->append("type", FaultFacetType_serializer(getType()));
+        builder->append("duration", getDuration().toBSON());
+    };
+
     void update(HealthCheckStatus status) override {
         MONGO_UNREACHABLE;  // Don't use this in mock.
     }

@@ -26,50 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/db/process_health/fault_manager_config.h"
-#include "mongo/db/process_health/health_check_status.h"
+#include "mongo/db/process_health/test_health_observer.h"
+#include "mongo/db/process_health/health_observer_registration.h"
 
 namespace mongo {
 namespace process_health {
+MONGO_FAIL_POINT_DEFINE(hangTestHealthObserver);
+MONGO_FAIL_POINT_DEFINE(testHealthObserver);
+Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
+    PeriodicHealthCheckContext&& periodicCheckContext) {
+    hangTestHealthObserver.pauseWhileSet();
 
-/**
- * Tracks the state of one particular fault facet.
- * The instance is created and deleted by the fault observer when a fault
- * condition is detected or resolved.
- */
-class FaultFacet : public std::enable_shared_from_this<FaultFacet> {
-public:
-    virtual ~FaultFacet() = default;
+    auto result = Future<HealthCheckStatus>::makeReady(makeHealthyStatus());
 
-    virtual FaultFacetType getType() const = 0;
+    testHealthObserver.executeIf(
+        [this, &result](const BSONObj& data) {
+            auto code = data["code"].checkAndGetStringData();
+            auto msg = data["msg"].checkAndGetStringData();
+            result = Future<HealthCheckStatus>::makeReady(makeSimpleFailedStatus(
+                1.0, {Status(ErrorCodes::fromString(code.toString()), msg.toString())}));
+        },
+        [&](const BSONObj& data) { return !data.isEmpty(); });
 
-    /**
-     * The interface used to communicate with the Fault instance that
-     * owns all facets.
-     *
-     * @return HealthCheckStatus
-     */
-    virtual HealthCheckStatus getStatus() const = 0;
+    return result;
+}
 
-    virtual Milliseconds getDuration() const = 0;
-
-    /**
-     * Change the state of this Facet with health check result.
-     */
-    virtual void update(HealthCheckStatus status) = 0;
-
-    virtual void appendDescription(BSONObjBuilder* builder) const = 0;
-
-    BSONObj toBSON() const {
-        BSONObjBuilder builder;
-        appendDescription(&builder);
-        return builder.obj();
-    }
-};
-
-using FaultFacetPtr = std::shared_ptr<FaultFacet>;
-
+namespace {
+MONGO_INITIALIZER(TestHealthObserver)(InitializerContext*) {
+    HealthObserverRegistration::registerObserverFactory(
+        [](ServiceContext* svcCtx) { return std::make_unique<TestHealthObserver>(svcCtx); });
+}
+}  // namespace
 }  // namespace process_health
 }  // namespace mongo

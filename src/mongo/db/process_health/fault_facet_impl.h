@@ -50,7 +50,11 @@ public:
 
     HealthCheckStatus getStatus() const override;
 
+    Milliseconds getDuration() const override;
+
     void update(HealthCheckStatus status) override;
+
+    void appendDescription(BSONObjBuilder* builder) const override;
 
 private:
     const FaultFacetType _type;
