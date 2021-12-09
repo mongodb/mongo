@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 
@@ -78,6 +79,12 @@ private:
 
     const ShardId _recipientShardId;
     const ShardKeyPattern _reshardingKey;
+
+    // _tempReshardingChunkMgr is used to decide to which recipient shard that documents in the
+    // source collection should be routed. It is safe to cache this information for the duration of
+    // the aggregation pipeline because the ownership information for the temporary resharding
+    // collection is frozen for the duration of the resharding operation.
+    boost::optional<ChunkManager> _tempReshardingChunkMgr;
 };
 
 }  // namespace mongo
