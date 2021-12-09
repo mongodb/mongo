@@ -370,3 +370,51 @@ __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 		break;
 	}
 }
+
+/*
+ * __bit_clear_end --
+ *     Clear the leftover end bits of a fixed-length column store bitstring.
+ */
+static inline void
+__bit_clear_end(uint8_t *bitf, uint64_t numentries, uint8_t width)
+{
+	uint64_t byte, firstbit;
+        uint8_t mask;
+
+        /* Figure the first bit that's past the end of the data, and get its position. */
+	firstbit = numentries * width;
+        byte = __bit_byte(firstbit);
+        mask = (uint8_t)__bit_mask(firstbit);
+
+        /* If mask is the first bit of the byte, we fit evenly and don't need to do anything. */
+        if (mask == 0x01)
+            return;
+
+        /*
+         * We want to clear this bit and up in the byte. Convert first to the bits below this bit,
+         * then flip to get the bits to clear. That is, 0b00000100 -> 0b00000011 -> 0b11111100.
+         */
+        mask = ~(uint8_t)(mask - 1);
+        bitf[byte] &= ~mask;
+}
+
+/*
+ * __bit_end_is_clear --
+ *     Check the leftover end bits of a fixed-length column store bitstring.
+ */
+static inline bool
+__bit_end_is_clear(const uint8_t *bitf, uint64_t numentries, uint8_t width)
+{
+	uint64_t byte, firstbit;
+        uint8_t mask;
+
+	firstbit = numentries * width;
+        byte = __bit_byte(firstbit);
+        mask = (uint8_t)__bit_mask(firstbit);
+
+        if (mask == 0x01)
+            return (true);
+
+        mask = ~(uint8_t)(mask - 1);
+        return ((bitf[byte] & mask) == 0);
+}

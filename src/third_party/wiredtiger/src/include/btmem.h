@@ -1408,7 +1408,8 @@ struct __wt_insert_head {
  * 2^32 versions.
  *
  * This struct is the in-memory representation. The number of entries is the number of time windows
- * (there are twice as many cells) and the offset is from the beginning of the page.
+ * (there are twice as many cells) and the offsets is from the beginning of the page. The space
+ * between the empty offset and the data offset is not used and is expected to be zeroed.
  *
  * This structure is only used when handling on-disk pages; once the page is read in, one should
  * instead use the time window index in the page structure, which is a different type found above.
@@ -1416,7 +1417,8 @@ struct __wt_insert_head {
 struct __wt_col_fix_auxiliary_header {
     uint32_t version;
     uint32_t entries;
-    uint32_t offset;
+    uint32_t emptyoffset;
+    uint32_t dataoffset;
 };
 
 /*

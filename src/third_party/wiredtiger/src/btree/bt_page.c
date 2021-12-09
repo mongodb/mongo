@@ -490,7 +490,8 @@ __wt_col_fix_read_auxheader(
     if (auxheaderoffset >= dsk->mem_size || *(raw = (uint8_t *)dsk + auxheaderoffset) == 0) {
         auxhdr->version = WT_COL_FIX_VERSION_NIL;
         auxhdr->entries = 0;
-        auxhdr->offset = 0;
+        auxhdr->emptyoffset = 0;
+        auxhdr->dataoffset = 0;
         return (0);
     }
 
@@ -506,9 +507,10 @@ __wt_col_fix_read_auxheader(
     WT_RET(__wt_vunpack_uint(&raw, WT_PTRDIFF32(end, raw), &entries));
     WT_RET(__wt_vunpack_uint(&raw, WT_PTRDIFF32(end, raw), &dataoffset));
 
-    /* The returned offset is from the start of the page. */
+    /* The returned offsets are from the start of the page. */
     auxhdr->entries = (uint32_t)entries;
-    auxhdr->offset = auxheaderoffset + (uint32_t)dataoffset;
+    auxhdr->emptyoffset = WT_PTRDIFF32(raw, (uint8_t *)dsk);
+    auxhdr->dataoffset = auxheaderoffset + (uint32_t)dataoffset;
 
     return (0);
 }
@@ -538,7 +540,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp, size_t
     page->pg_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
 
     WT_RET(__wt_col_fix_read_auxheader(session, dsk, &auxhdr));
-    WT_ASSERT(session, auxhdr.offset <= dsk->mem_size);
+    WT_ASSERT(session, auxhdr.dataoffset <= dsk->mem_size);
 
     switch (auxhdr.version) {
     case WT_COL_FIX_VERSION_NIL:

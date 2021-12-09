@@ -728,7 +728,7 @@ __debug_dsk_col_fix(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
         WT_RET(ds->f(ds, "}\n"));
     }
 
-    if (auxhdr.offset > dsk->mem_size)
+    if (auxhdr.dataoffset > dsk->mem_size)
         /* Print something useful instead of crashing or failing. */
         WT_RET(ds->f(ds, "page is corrupt: offset to time windows is past end of page"));
     else if (auxhdr.version == WT_COL_FIX_VERSION_TS) {
