@@ -52,4 +52,36 @@ int128_t calcDelta(int128_t val, int128_t prev);
 int64_t expandDelta(int64_t prev, int64_t delta);
 int128_t expandDelta(int128_t prev, int128_t delta);
 
+inline bool usesDeltaOfDelta(BSONType type) {
+    return type == jstOID || type == Date || type == bsonTimestamp;
+}
+
+inline bool uses128bit(BSONType type) {
+    return type == NumberDecimal || type == BinData || type == String || type == Code;
+}
+
+inline int64_t calcDelta(int64_t val, int64_t prev) {
+    // Do the subtraction as unsigned and cast back to signed to get overflow defined to wrapped
+    // around instead of undefined behavior.
+    return static_cast<int64_t>(static_cast<uint64_t>(val) - static_cast<uint64_t>(prev));
+}
+
+inline int128_t calcDelta(int128_t val, int128_t prev) {
+    // Do the subtraction as unsigned and cast back to signed to get overflow defined to wrapped
+    // around instead of undefined behavior.
+    return static_cast<int128_t>(static_cast<uint128_t>(val) - static_cast<uint128_t>(prev));
+}
+
+inline int64_t expandDelta(int64_t prev, int64_t delta) {
+    // Do the addition as unsigned and cast back to signed to get overflow defined to wrapped around
+    // instead of undefined behavior.
+    return static_cast<int64_t>(static_cast<uint64_t>(prev) + static_cast<uint64_t>(delta));
+}
+
+inline int128_t expandDelta(int128_t prev, int128_t delta) {
+    // Do the addition as unsigned and cast back to signed to get overflow defined to wrapped around
+    // instead of undefined behavior.
+    return static_cast<int128_t>(static_cast<uint128_t>(prev) + static_cast<uint128_t>(delta));
+}
+
 }  // namespace mongo::bsoncolumn

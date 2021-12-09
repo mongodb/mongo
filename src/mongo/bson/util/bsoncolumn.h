@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/simple8b.h"
 
-#include <boost/container/small_vector.hpp>
 #include <deque>
 #include <memory>
 #include <vector>
@@ -194,30 +193,32 @@ public:
             boost::optional<Decoder<uint128_t>> _decoder128;
 
             // Last encoded values used to calculate delta and delta-of-delta
+            BSONType _lastType;
+            bool _deltaOfDelta;
+            BSONElement _lastValue;
             int64_t _lastEncodedValue64 = 0;
             int64_t _lastEncodedValueForDeltaOfDelta = 0;
             int128_t _lastEncodedValue128 = 0;
-
-            BSONElement _lastValue;
 
             // Current scale index
             uint8_t _scaleIndex;
         };
 
-        // Interleaved decoding states. When in regular mode we just have one.
-        boost::container::small_vector<DecodingState, 1> _states;
+        // Decoding states. Interleaved mode is active when '_states' is not empty. When in regular
+        // mode we use '_state'.
+        DecodingState _state;
+        std::vector<DecodingState> _states;
+
         // Interleaving reference object read when encountered the interleaving start control byte.
         // We setup a decoding state for each scalar field in this object. The object hierarchy is
         // used to re-construct with full objects with the correct hierachy to the user.
         BSONObj _interleavedReferenceObj;
-        // Boolean to indicate if we are in interleaved mode or not.
-        bool _interleaved = false;
     };
 
     /**
      * Forward iterator access.
      *
-     * Iterator value is EOO
+     * Iterator value is EOO when element is skipped.
      *
      * Iterators materialize compressed BSONElement as they iterate over the compressed binary.
      * It is NOT safe to do this from multiple threads concurrently.
@@ -380,7 +381,8 @@ private:
     };
 
     /**
-     * Initializes the BSONColumn. '_binary', '_size' and '_name' must be set before calling this.
+     * Validates the BSONColumn on init(). Should be the last call in the constructor when all
+     * members are initialized.
      */
     void _init();
 
@@ -391,8 +393,6 @@ private:
 
     const char* _binary;
     int _size;
-
-    uint32_t _elementCount;
 
     struct DecodingStartPosition {
         void setIfLarger(size_t index, const char* control);

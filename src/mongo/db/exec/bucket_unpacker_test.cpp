@@ -150,16 +150,18 @@ public:
                 }
 
                 BSONColumn col(dataElem);
-                int num = col.size() - 1;
+                int num = std::distance(col.begin(), col.end()) - 1;
                 ASSERT(num >= 0);
 
                 BSONColumnBuilder builder(fieldName);
+                auto it = col.begin();
                 for (int i = 0; i < num; ++i) {
-                    auto elem = *col[i];
+                    auto elem = *it;
                     if (!elem.eoo())
                         builder.append(elem);
                     else
                         builder.skip();
+                    ++it;
                 }
 
                 dataBuilder.append(fieldName, builder.finalize());
