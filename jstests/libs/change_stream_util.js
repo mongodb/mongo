@@ -567,6 +567,21 @@ function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName
     assert(!collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages"));
 }
 
+// Returns the pre-images written while performing the write operations.
+function preImagesForOps(db, writeOps) {
+    const preImagesColl = db.getSiblingDB('config').getCollection("system.preimages");
+    const numberOfPreImagesBefore = preImagesColl.find().itcount();
+
+    // Perform the write operations.
+    writeOps();
+
+    // Return only newly written pre-images.
+    return preImagesColl.find()
+        .sort({"_id.ts": 1, "_id.applyOpsIndex": 1})
+        .skip(numberOfPreImagesBefore)
+        .toArray();
+}
+
 function findPreImagesCollectionDescriptions(db) {
     return db.getSiblingDB("config").runCommand("listCollections",
                                                 {filter: {name: "system.preimages"}});

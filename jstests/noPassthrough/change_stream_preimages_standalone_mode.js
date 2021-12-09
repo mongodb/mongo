@@ -21,7 +21,8 @@
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load(
     "jstests/libs/change_stream_util.js");  // For
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled.
+                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
+                                            // preImagesForOps.
 
 // Fetches the collection with name 'collName' from database 'nodeDB'. Expects the collection to
 // exist.
@@ -42,10 +43,6 @@ function oplogEntriesForOps(db, writeOps) {
     // Perform the write operations.
     writeOps();
 
-    // Ensure that the last write with j:true write concern has reached the disk, and now fsync will
-    // checkpoint that data.
-    assert.commandWorked(db.adminCommand({fsync: 1}));
-
     // Check the number of oplog entries written.
     const numOplogEntriesAfter = oplogColl.find().itcount();
     const numberOfNewOplogEntries = numOplogEntriesAfter - numOplogEntriesBefore;
@@ -53,27 +50,6 @@ function oplogEntriesForOps(db, writeOps) {
         return [];
     }
     return oplogColl.find().sort({ts: -1}).limit(numberOfNewOplogEntries).toArray();
-}
-
-// Returns the pre-images written while performing the write operations.
-function preImagesForOps(db, writeOps) {
-    const preImagesColl = db.getSiblingDB('config').getCollection("system.preimages");
-    const numberOfPreImagesBefore = preImagesColl.find().itcount();
-
-    // Perform the write operations.
-    writeOps();
-
-    // Ensure that the last write with j:true write concern has reached the disk, and now fsync will
-    // checkpoint that data.
-    assert.commandWorked(db.adminCommand({fsync: 1}));
-
-    // Check the number of pre-images written.
-    const numberOfPreImagesAfter = preImagesColl.find().itcount();
-    const numberOfNewPreImages = numberOfPreImagesAfter - numberOfPreImagesBefore;
-    if (numberOfNewPreImages == 0) {
-        return [];
-    }
-    return preImagesColl.find().sort({operationTime: -1}).limit(numberOfNewPreImages).toArray();
 }
 
 /**
@@ -112,6 +88,10 @@ function testStandaloneMode({
         assert.commandWorked(testColl.update({a: 1}, {a: 2, b: 2}));
         assert.commandWorked(
             testColl.update({a: 2}, {a: 3, b: 3}, {writeConcern: {w: 1, j: true}}));
+
+        // Ensure that the last write with j:true write concern has reached the disk, and now fsync
+        // will checkpoint that data.
+        assert.commandWorked(testDB.adminCommand({fsync: 1}));
     };
     assertPreImagesRecordedFunc(testDB, writeOpsForReplSetMode);
 
