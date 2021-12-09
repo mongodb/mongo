@@ -63,8 +63,13 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state);
 /**
  * Types of health observers available.
  */
-enum class FaultFacetType { kSystem, kMock1, kMock2, kLdap, kDns };
+enum class FaultFacetType { kSystem, kMock1, kMock2, kTestObserver, kLdap, kDns };
+static const StringData FaultFacetTypeStrings[] = {
+    "kSystem", "kMock1", "kMock2", "kTestObserver", "kLdap", "kDns"};
 
+static const StringData FaultFacetType_serializer(const FaultFacetType value) {
+    return FaultFacetTypeStrings[static_cast<int>(value)];
+}
 
 class FaultManagerConfig {
 public:
@@ -84,6 +89,8 @@ public:
             case FaultFacetType::kDns:
                 return intensities->_data->getDns();
                 // TODO: update this function with additional fault facets when they are added
+            case FaultFacetType::kTestObserver:
+                return intensities->_data->getTest();
             case FaultFacetType::kSystem:
                 return HealthObserverIntensityEnum::kCritical;
             case FaultFacetType::kMock1:
