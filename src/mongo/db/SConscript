@@ -1263,7 +1263,7 @@ env.Library(
         'exec/collection_scan.cpp',
         'exec/count.cpp',
         'exec/count_scan.cpp',
-        'exec/delete.cpp',
+        'exec/delete_stage.cpp',
         'exec/distinct_scan.cpp',
         'exec/eof.cpp',
         'exec/fetch.cpp',

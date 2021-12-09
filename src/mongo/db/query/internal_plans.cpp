@@ -31,12 +31,9 @@
 
 #include "mongo/db/query/internal_plans.h"
 
-#include <memory>
-
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/idhack.h"

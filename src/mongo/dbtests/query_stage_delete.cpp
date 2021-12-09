@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-/**
- * This file tests db/exec/delete.cpp.
- */
-
 #include "mongo/platform/basic.h"
-
-#include <memory>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -42,16 +36,14 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"
 
+namespace mongo {
 namespace QueryStageDelete {
-
-using std::unique_ptr;
-using std::vector;
 
 static const NamespaceString nss("unittests.QueryStageDelete");
 
@@ -83,14 +75,14 @@ public:
 
     void getRecordIds(const CollectionPtr& collection,
                       CollectionScanParams::Direction direction,
-                      vector<RecordId>* out) {
+                      std::vector<RecordId>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -103,7 +95,7 @@ public:
         }
     }
 
-    unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
+    std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
@@ -137,7 +129,7 @@ public:
         ASSERT(coll);
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
+        std::vector<RecordId> recordIds;
         getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
         // Configure the scan.
@@ -199,10 +191,10 @@ public:
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
         const auto ws = std::make_unique<WorkingSet>();
-        const unique_ptr<CanonicalQuery> cq(canonicalize(query));
+        const std::unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
-        vector<RecordId> recordIds;
+        std::vector<RecordId> recordIds;
         getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
@@ -267,3 +259,4 @@ public:
 OldStyleSuiteInitializer<All> all;
 
 }  // namespace QueryStageDelete
+}  // namespace mongo

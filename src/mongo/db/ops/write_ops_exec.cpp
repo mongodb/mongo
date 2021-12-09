@@ -47,7 +47,7 @@
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/exec/delete.h"
+#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/matcher/extensions_callback_real.h"

@@ -31,9 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/delete.h"
-
-#include <memory>
+#include "mongo/db/exec/delete_stage.h"
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"

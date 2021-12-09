@@ -32,7 +32,6 @@
 #include "mongo/db/ops/delete.h"
 
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/exec/delete.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_client_info.h"
