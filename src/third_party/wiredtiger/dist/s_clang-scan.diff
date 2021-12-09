@@ -14,14 +14,6 @@ src/btree/bt_delete.c:411:5: warning: Null pointer passed to 1st parameter expec
 #define __wt_explicit_overwrite(p, size) memset(p, WT_DEBUG_BYTE, size)
                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/btree/bt_io.c:178:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
-    time_start = time_stop = 0;
-                 ^           ~
-1 warning generated.
-src/btree/bt_read.c:99:18: warning: Although the value stored to 'time_stop' is used in the enclosing expression, the value is never actually read from 'time_stop'
-    time_start = time_stop = 0;
-                 ^           ~
-1 warning generated.
 src/conn/conn_capacity.c:289:5: warning: Value stored to 'capacity' is never read
     capacity = steal_capacity = 0;
     ^          ~~~~~~~~~~~~~~~~~~

@@ -34,27 +34,6 @@ __blkcache_verbose(
 }
 
 /*
- * __blkcache_aggregate_metadata --
- *     Sum the metadata for all buckets and write it into the cache wide variables.
- */
-static void
-__blkcache_aggregate_metadata(WT_BLKCACHE *blkcache)
-{
-    uint64_t bytes_used, num_data_blocks;
-    u_int i;
-
-    bytes_used = num_data_blocks = 0;
-
-    for (i = 0; i < blkcache->hash_size; i++) {
-        bytes_used += blkcache->bucket_metadata[i].bucket_bytes_used;
-        num_data_blocks += blkcache->bucket_metadata[i].bucket_num_data_blocks;
-    }
-
-    blkcache->bytes_used = bytes_used;
-    blkcache->num_data_blocks = num_data_blocks;
-}
-
-/*
  * __blkcache_alloc --
  *     Allocate a block of memory in the cache.
  */
@@ -62,6 +41,8 @@ static int
 __blkcache_alloc(WT_SESSION_IMPL *session, size_t size, void **retp)
 {
     WT_BLKCACHE *blkcache;
+
+    *(void **)retp = NULL;
 
     blkcache = &S2C(session)->blkcache;
 
@@ -170,6 +151,10 @@ __blkcache_should_evict(WT_SESSION_IMPL *session, WT_BLKCACHE_ITEM *blkcache_ite
     blkcache = &S2C(session)->blkcache;
     *reason = BLKCACHE_EVICT_OTHER;
 
+    /* Blocks in use cannot be evicted. */
+    if (blkcache_item->ref_count != 0)
+        return (false);
+
     /*
      * Keep track of the smallest number of references for blocks that have not been recently
      * accessed.
@@ -183,10 +168,11 @@ __blkcache_should_evict(WT_SESSION_IMPL *session, WT_BLKCACHE_ITEM *blkcache_ite
         return (false);
 
     /*
-     * Don't evict if there is high overhead due to blocks being inserted/removed. Churn kills
-     * performance and evicting when churn is high will exacerbate the overhead.
+     * In an NVRAM cache, don't evict if there is high overhead due to blocks being
+     * inserted/removed. Churn kills performance and evicting when churn is high will exacerbate the
+     * overhead.
      */
-    if (__blkcache_high_overhead(session)) {
+    if (blkcache->type == BLKCACHE_NVRAM && __blkcache_high_overhead(session)) {
         WT_STAT_CONN_INCR(session, block_cache_not_evicted_overhead);
         return (false);
     }
@@ -199,10 +185,9 @@ __blkcache_should_evict(WT_SESSION_IMPL *session, WT_BLKCACHE_ITEM *blkcache_ite
     if (blkcache_item->freq_rec_counter < blkcache->evict_aggressive &&
       blkcache_item->num_references < (blkcache->min_num_references + BLKCACHE_MINREF_INCREMENT))
         return (true);
-    else {
-        *reason = BLKCACHE_NOT_EVICTION_CANDIDATE;
-        return (false);
-    }
+
+    *reason = BLKCACHE_NOT_EVICTION_CANDIDATE;
+    return (false);
 }
 
 /*
@@ -227,7 +212,6 @@ __blkcache_eviction_thread(void *arg)
       blkcache->evict_aggressive, blkcache->full_target);
 
     while (!blkcache->blkcache_exiting) {
-
         /*
          * Sweep the cache every second to ensure time-based decay of frequency/recency counters of
          * resident blocks.
@@ -236,10 +220,7 @@ __blkcache_eviction_thread(void *arg)
 
         /* Check if the cache is being destroyed */
         if (blkcache->blkcache_exiting)
-            return (0);
-
-        /* Aggregate per bucket metadata into cache wide variables. */
-        __blkcache_aggregate_metadata(blkcache);
+            return (WT_THREAD_RET_VALUE);
 
         /*
          * Walk the cache, gathering statistics and evicting blocks that are within our target. We
@@ -264,8 +245,7 @@ __blkcache_eviction_thread(void *arg)
                     TAILQ_REMOVE(&blkcache->hash[i], blkcache_item, hashq);
                     __blkcache_free(session, blkcache_item->data);
                     __blkcache_update_ref_histogram(session, blkcache_item, BLKCACHE_RM_EVICTION);
-                    blkcache->bucket_metadata[i].bucket_num_data_blocks--;
-                    blkcache->bucket_metadata[i].bucket_bytes_used -= blkcache_item->data_size;
+                    (void)__wt_atomic_sub64(&blkcache->bytes_used, blkcache_item->data_size);
 
                     /*
                      * Update the number of removals because it is used to estimate the overhead,
@@ -286,14 +266,14 @@ __blkcache_eviction_thread(void *arg)
             }
             __wt_spin_unlock(session, &blkcache->hash_locks[i]);
             if (blkcache->blkcache_exiting)
-                return (0);
+                return (WT_THREAD_RET_VALUE);
         }
         if (no_eviction_candidates)
             blkcache->min_num_references += BLKCACHE_MINREF_INCREMENT;
 
         WT_STAT_CONN_INCR(session, block_cache_eviction_passes);
     }
-    return (0);
+    return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -337,35 +317,40 @@ __blkcache_estimate_filesize(WT_SESSION_IMPL *session)
  * __wt_blkcache_get --
  *     Get a block from the cache.
  */
-int
-__wt_blkcache_get(WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, size_t addr_size,
-  bool *foundp, bool *skip_cachep)
+void
+__wt_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size,
+  WT_BLKCACHE_ITEM **blkcache_retp, bool *foundp, bool *skip_cache_putp)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;
-    WT_DECL_RET;
     uint64_t bucket, hash;
 
-    *foundp = *skip_cachep = false;
+    *foundp = *skip_cache_putp = false;
+    *blkcache_retp = NULL;
+
     blkcache = &S2C(session)->blkcache;
 
     WT_STAT_CONN_INCR(session, block_cache_lookups);
 
     /*
-     * We race to avoid using synchronization. We only care about an approximate value, so we accept
-     * inaccuracy for the sake of avoiding synchronization on the critical path.
+     * In an NVRAM cache, we track lookups to calculate the overhead of using the cache. We race to
+     * avoid using synchronization. We only care about an approximate value, so we accept inaccuracy
+     * for the sake of avoiding synchronization on the critical path.
      */
-    blkcache->lookups++;
+    if (blkcache->type == BLKCACHE_NVRAM)
+        blkcache->lookups++;
 
     /*
-     * If more than the configured fraction of all file objects is likely to fit in the OS buffer
-     * cache, don't use this cache.
+     * An NVRAM cache is slower than retrieving the block from the OS buffer cache, a DRAM cache is
+     * faster than the OS buffer cache. In the case of NVRAM, if more than the configured fraction
+     * of all file objects is likely to fit in the OS buffer cache, don't use the block cache.
      */
-    if ((__blkcache_estimate_filesize(session) * blkcache->percent_file_in_os_cache) / 100 <
-      blkcache->system_ram) {
+    if (blkcache->type == BLKCACHE_NVRAM &&
+      (__blkcache_estimate_filesize(session) * blkcache->percent_file_in_os_cache) / 100 <
+        blkcache->system_ram) {
+        *skip_cache_putp = true;
         WT_STAT_CONN_INCR(session, block_cache_bypass_get);
-        *skip_cachep = true;
-        return (0);
+        return;
     }
 
     hash = __wt_hash_city64(addr, addr_size);
@@ -374,29 +359,25 @@ __wt_blkcache_get(WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, 
     TAILQ_FOREACH (blkcache_item, &blkcache->hash[bucket], hashq) {
         if (blkcache_item->addr_size == addr_size && blkcache_item->fid == S2BT(session)->id &&
           memcmp(blkcache_item->addr, addr, addr_size) == 0) {
-            ret = __wt_buf_set(session, data, blkcache_item->data, blkcache_item->data_size);
-            if (ret == 0) {
-                blkcache_item->num_references++;
-                if (blkcache_item->freq_rec_counter < 0)
-                    blkcache_item->freq_rec_counter = 0;
-                blkcache_item->freq_rec_counter++;
-
-                *foundp = true;
-            }
+            blkcache_item->num_references++;
+            if (blkcache_item->freq_rec_counter < 0)
+                blkcache_item->freq_rec_counter = 0;
+            blkcache_item->freq_rec_counter++;
+            blkcache_item->ref_count++;
             break;
         }
     }
     __wt_spin_unlock(session, &blkcache->hash_locks[bucket]);
-    WT_RET(ret);
 
-    if (*foundp) {
+    if (blkcache_item != NULL) {
+        *blkcache_retp = blkcache_item;
+        *foundp = *skip_cache_putp = true;
         WT_STAT_CONN_INCR(session, block_cache_hits);
         __blkcache_verbose(session, "block found in cache", hash, addr, addr_size);
     } else {
         WT_STAT_CONN_INCR(session, block_cache_misses);
         __blkcache_verbose(session, "block not found in cache", hash, addr, addr_size);
     }
-    return (0);
 }
 
 /*
@@ -404,8 +385,8 @@ __wt_blkcache_get(WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, 
  *     Put a block into the cache.
  */
 int
-__wt_blkcache_put(WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, size_t addr_size,
-  bool checkpoint_io, bool write)
+__wt_blkcache_put(
+  WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, size_t addr_size, bool write)
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item, *blkcache_store;
@@ -415,43 +396,25 @@ __wt_blkcache_put(WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, 
 
     blkcache = &S2C(session)->blkcache;
     blkcache_store = NULL;
-    data_ptr = NULL;
-
-    /* Bypass on write if the no-write-allocate setting is on */
-    if (write && blkcache->cache_on_writes == false) {
-        WT_STAT_CONN_INCR(session, block_cache_bypass_writealloc);
-        return (0);
-    }
 
     /* Are we within cache size limits? */
-    if (blkcache->bytes_used >= blkcache->max_bytes)
+    if (blkcache->bytes_used > blkcache->max_bytes)
         return (0);
 
     /*
-     * If more than the configured fraction of the file is likely to fit into the OS buffer cache,
-     * don't use this cache.
+     * An NVRAM cache is slower than retrieving the block from the OS buffer cache, a DRAM cache is
+     * faster than the OS buffer cache. In the case of NVRAM, if more than the configured fraction
+     * of all file objects is likely to fit in the OS buffer cache, don't use the block cache.
      */
-    if ((__blkcache_estimate_filesize(session) * blkcache->percent_file_in_os_cache) / 100 <
-      blkcache->system_ram) {
+    if (blkcache->type == BLKCACHE_NVRAM &&
+      (__blkcache_estimate_filesize(session) * blkcache->percent_file_in_os_cache) / 100 <
+        blkcache->system_ram) {
         WT_STAT_CONN_INCR(session, block_cache_bypass_put);
         return (0);
     }
 
-    /*
-     * Do not write allocate if this block is written as part of checkpoint. Hot blocks get written
-     * and over-written a lot as part of checkpoint, so we don't want to cache them, because (a)
-     * they are in the DRAM cache anyway, and (b) they are likely to be overwritten anyway.
-     *
-     * Writes that are not part of checkpoint I/O are done in the service of eviction. Those are the
-     * blocks that the DRAM cache would like to keep but can't, and we definitely want to keep them.
-     */
-    if ((blkcache->cache_on_checkpoint == false) && checkpoint_io) {
-        WT_STAT_CONN_INCR(session, block_cache_bypass_chkpt);
-        return (0);
-    }
-
     /* Bypass on high overhead */
-    if (__blkcache_high_overhead(session) == true) {
+    if (blkcache->type == BLKCACHE_NVRAM && __blkcache_high_overhead(session)) {
         WT_STAT_CONN_INCR(session, block_cache_bypass_overhead_put);
         return (0);
     }
@@ -509,8 +472,7 @@ __wt_blkcache_put(WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, 
 
     TAILQ_INSERT_HEAD(&blkcache->hash[bucket], blkcache_store, hashq);
 
-    blkcache->bucket_metadata[bucket].bucket_num_data_blocks++;
-    blkcache->bucket_metadata[bucket].bucket_bytes_used += data->size;
+    (void)__wt_atomic_add64(&blkcache->bytes_used, data->size);
     blkcache->inserts++;
 
     __wt_spin_unlock(session, &blkcache->hash_locks[bucket]);
@@ -554,14 +516,14 @@ __wt_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
         if (blkcache_item->addr_size == addr_size && blkcache_item->fid == S2BT(session)->id &&
           memcmp(blkcache_item->addr, addr, addr_size) == 0) {
             TAILQ_REMOVE(&blkcache->hash[bucket], blkcache_item, hashq);
-            blkcache->bucket_metadata[bucket].bucket_num_data_blocks--;
-            blkcache->bucket_metadata[bucket].bucket_bytes_used -= blkcache_item->data_size;
             __blkcache_update_ref_histogram(session, blkcache_item, BLKCACHE_RM_FREE);
             __wt_spin_unlock(session, &blkcache->hash_locks[bucket]);
             WT_STAT_CONN_DECRV(session, block_cache_bytes, blkcache_item->data_size);
             WT_STAT_CONN_DECR(session, block_cache_blocks);
             WT_STAT_CONN_INCR(session, block_cache_blocks_removed);
+            (void)__wt_atomic_sub64(&blkcache->bytes_used, blkcache_item->data_size);
             blkcache->removals++;
+            WT_ASSERT(session, blkcache_item->ref_count == 0);
             __blkcache_free(session, blkcache_item->data);
             __wt_overwrite_and_free(session, blkcache_item);
             __blkcache_verbose(session, "block removed from cache", hash, addr, addr_size);
@@ -610,7 +572,6 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
 
     WT_RET(__wt_calloc_def(session, blkcache->hash_size, &blkcache->hash));
     WT_RET(__wt_calloc_def(session, blkcache->hash_size, &blkcache->hash_locks));
-    WT_RET(__wt_calloc_def(session, blkcache->hash_size, &blkcache->bucket_metadata));
 
     for (i = 0; i < blkcache->hash_size; i++) {
         TAILQ_INIT(&blkcache->hash[i]); /* Block cache hash lists */
@@ -657,32 +618,31 @@ __wt_block_cache_destroy(WT_SESSION_IMPL *session)
     WT_TRET(__wt_thread_join(session, &blkcache->evict_thread_tid));
     __wt_verbose(session, WT_VERB_BLKCACHE, "%s", "block cache eviction thread exited");
 
-    __blkcache_aggregate_metadata(blkcache);
-
-    if (blkcache->bytes_used == 0)
-        goto done;
-
     for (i = 0; i < blkcache->hash_size; i++) {
         __wt_spin_lock(session, &blkcache->hash_locks[i]);
         while (!TAILQ_EMPTY(&blkcache->hash[i])) {
             blkcache_item = TAILQ_FIRST(&blkcache->hash[i]);
             TAILQ_REMOVE(&blkcache->hash[i], blkcache_item, hashq);
+
+            /* Assert we never left a block pinned. */
+            if (blkcache_item->ref_count != 0)
+                __wt_err(session, EINVAL,
+                  "block cache reference count of %" PRIu32 " not zero on destroy",
+                  blkcache_item->ref_count);
+
             /*
              * Some workloads crash on freeing NVRAM arenas. If that occurs the call to free can be
              * removed and the library/OS will clean up for us once the process exits.
              */
             __blkcache_free(session, blkcache_item->data);
             __blkcache_update_ref_histogram(session, blkcache_item, BLKCACHE_RM_EXIT);
-            blkcache->bucket_metadata[i].bucket_num_data_blocks--;
-            blkcache->bucket_metadata[i].bucket_bytes_used -= blkcache_item->data_size;
+            (void)__wt_atomic_sub64(&blkcache->bytes_used, blkcache_item->data_size);
             __wt_free(session, blkcache_item);
         }
         __wt_spin_unlock(session, &blkcache->hash_locks[i]);
     }
-    __blkcache_aggregate_metadata(blkcache);
-    WT_ASSERT(session, blkcache->bytes_used == 0 && blkcache->num_data_blocks == 0);
+    WT_ASSERT(session, blkcache->bytes_used == 0);
 
-done:
     /* Print reference histograms */
     __blkcache_print_reference_hist(session, "All blocks", blkcache->cache_references);
     __blkcache_print_reference_hist(
@@ -698,7 +658,6 @@ done:
 #endif
     __wt_free(session, blkcache->hash);
     __wt_free(session, blkcache->hash_locks);
-    __wt_free(session, blkcache->bucket_metadata);
     /*
      * Zeroing the structure has the effect of setting the block cache type to unconfigured.
      */
@@ -794,7 +753,8 @@ __wt_block_cache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfi
         cache_type = BLKCACHE_NVRAM;
         WT_RET(__wt_config_gets(session, cfg, "block_cache.nvram_path", &cval));
         WT_RET(__wt_strndup(session, cval.str, cval.len, &nvram_device_path));
-        WT_ASSERT(session, __wt_absolute_path(nvram_device_path));
+        if (!__wt_absolute_path(nvram_device_path))
+            WT_RET_MSG(session, EINVAL, "NVRAM device path must be an absolute path");
 #else
         WT_RET_MSG(session, EINVAL, "NVRAM block cache requires libmemkind");
 #endif

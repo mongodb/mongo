@@ -91,12 +91,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     WT_DECL_RET;
     WT_ITEM tmp;
     WT_PAGE *notused;
-    uint64_t time_diff, time_start, time_stop;
     uint32_t page_flags;
     uint8_t previous_state;
-    bool prepare, timer;
-
-    time_start = time_stop = 0;
+    bool prepare;
 
     /*
      * Don't pass an allocated buffer to the underlying block read function, force allocation of new
@@ -135,17 +132,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
     /* There's an address, read the backing disk page and build an in-memory version of the page. */
-    timer = !F_ISSET(session, WT_SESSION_INTERNAL);
-    if (timer)
-        time_start = __wt_clock(session);
-    WT_ERR(__wt_bt_read(session, &tmp, addr.addr, addr.size));
-    if (timer) {
-        time_stop = __wt_clock(session);
-        time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
-        WT_STAT_CONN_INCR(session, cache_read_app_count);
-        WT_STAT_CONN_INCRV(session, cache_read_app_time, time_diff);
-        WT_STAT_SESSION_INCRV(session, read_time, time_diff);
-    }
+    WT_ERR(__wt_blkcache_read(session, &tmp, addr.addr, addr.size));
 
     /*
      * Build the in-memory version of the page. Clear our local reference to the allocated copy of

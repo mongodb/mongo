@@ -14,6 +14,7 @@ src/block/block_tiered.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/block_cache/block_cache.c
+src/block_cache/block_io.c
 src/block_cache/block_map.c
 src/block_cache/block_mgr.c
 src/bloom/bloom.c
@@ -27,7 +28,6 @@ src/btree/bt_discard.c
 src/btree/bt_handle.c
 src/btree/bt_huffman.c
 src/btree/bt_import.c
-src/btree/bt_io.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c

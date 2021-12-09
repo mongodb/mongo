@@ -81,16 +81,19 @@ __wt_blkcache_unmap(WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapped_regi
  *     Map address cookie referenced block into a buffer.
  */
 int
-__wt_blkcache_map_read(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr,
-  size_t addr_size, bool *foundp)
+__wt_blkcache_map_read(
+  WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size, bool *foundp)
 {
     WT_BLOCK *block;
+    WT_BM *bm;
     WT_FH *fh;
     WT_FILE_HANDLE *handle;
     wt_off_t offset;
     uint32_t checksum, objectid, size;
 
     *foundp = false;
+
+    bm = S2BT(session)->bm;
 
     /*
      * FIXME WT-7872: The WT_BLOCK.map test is wrong; tiered storage assumes object IDs translate to
