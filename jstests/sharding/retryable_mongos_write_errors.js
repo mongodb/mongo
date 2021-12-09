@@ -5,18 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallelTester.js');  // for ScopedThread.
-
-// Creates a new connection, uses it to get the database from the parameter name and inserts
-// multiple documents to the provided collection.
-function insertHandler(host, databaseName, collectionName) {
-    const conn = new Mongo(host);
-    const database = conn.getDB(databaseName);
-    // creates an array with 10 documents
-    const docs = Array.from(Array(10).keys()).map((i) => ({a: i, b: "retryable"}));
-    return database.runCommand({insert: collectionName, documents: docs});
-}
 
 const dbName = "test";
 const collName = "retryable_mongos_write_errors";
@@ -25,31 +14,53 @@ const ns = dbName + "." + collName;
 const st = new ShardingTest({config: 1, mongos: 1, shards: 1});
 const shard0Primary = st.rs0.getPrimary();
 
-const insertFailPoint =
-    configureFailPoint(shard0Primary, "hangAfterCollectionInserts", {collectionNS: ns});
+// Creates a new connection, uses it to get the database from the parameter name and inserts
+// multiple documents to the provided collection.
+function insertHandler(host, dbName, collName, testData) {
+    try {
+        TestData = testData;
+        const conn = new Mongo(host);
+        const database = conn.getDB(dbName);
+        // creates an array with 10 documents
+        const docs = Array.from(Array(10).keys()).map((i) => ({a: i, b: "retryable"}));
+        const commandResponse = database.runCommand({insert: collName, documents: docs});
+        // assert that retryableInsertRes failed with the HostUnreachableError or
+        // InterruptedAtShutdown error code
+        assert.commandFailedWithCode(commandResponse, ErrorCodes.InterruptedAtShutdown);
+        jsTest.log("Command Response: " + tojson(commandResponse) + "." + commandResponse.code);
+        return {ok: 1};
+    } catch (e) {
+        if (!isNetworkError(e)) {
+            return {ok: 0, error: e.toString(), stack: e.stack};
+        }
 
-const insertThread = new Thread(insertHandler, st.s.host, dbName, collName);
-jsTest.log("Starting To Insert Documents");
-insertThread.start();
-insertFailPoint.wait();
-MongoRunner.stopMongos(st.s);
-
-try {
-    const commandResponse = insertThread.returnData();
-    jsTest.log("Command Response: " + tojson(commandResponse) + "." + commandResponse.code);
-    // assert that retryableInsertRes failed with the HostUnreachableError or
-    // InterruptedAtShutdown error code
-    assert.eq(commandResponse.code, ErrorCodes.InterruptedAtShutdown, tojson(commandResponse));
-} catch (e) {
-    jsTest.log("Error ocurred: " + e);
-    if (!isNetworkError(e)) {
-        throw e;
+        return {ok: 1};
     }
 }
 
-jsTest.log("Finished Assertions, Turning Off Failpoint");
+const failpointName = 'hangAfterCollectionInserts';
+const executeFailPointCommand = (mode) => {
+    assert.commandWorked(shard0Primary.adminCommand(
+        {configureFailPoint: failpointName, mode, data: {collectionNS: ns}}));
+};
 
-insertFailPoint.off();
+executeFailPointCommand("alwaysOn");
+
+const insertThread = new ScopedThread(insertHandler, st.s.host, dbName, collName, TestData);
+jsTest.log("Starting To Insert Documents");
+insertThread.start();
+
+checkLog.contains(shard0Primary, `${failpointName} fail point enabled`);
+jsTest.log("Starting to shutdown MongoS.");
+MongoRunner.stopMongos(st.s);
+
+try {
+    assert.commandWorked(insertThread.returnData());
+} finally {
+    jsTest.log("Finished Assertions, Turning Off Failpoint");
+    executeFailPointCommand("off");
+}
+
 st.s = MongoRunner.runMongos(st.s);
 
 jsTest.log('Shutting down sharding test');
