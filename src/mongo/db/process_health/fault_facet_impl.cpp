@@ -48,11 +48,22 @@ HealthCheckStatus FaultFacetImpl::getStatus() const {
     return HealthCheckStatus(getType(), _severity, _description);
 }
 
+Milliseconds FaultFacetImpl::getDuration() const {
+    return std::max(Milliseconds(0), Milliseconds(_clockSource->now() - _startTime));
+}
+
 void FaultFacetImpl::update(HealthCheckStatus status) {
     auto lk = stdx::lock_guard(_mutex);
     _severity = status.getSeverity();
     _description = status.getShortDescription().toString();
 }
+
+void FaultFacetImpl::appendDescription(BSONObjBuilder* builder) const {
+    builder->append("type", FaultFacetType_serializer(getType()));
+    builder->append("severity", _severity);
+    builder->append("duration", getDuration().toBSON());
+    builder->append("description", _description);
+};
 
 }  // namespace process_health
 }  // namespace mongo

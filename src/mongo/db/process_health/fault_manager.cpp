@@ -327,6 +327,11 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
         return;
     }
 
+    if (getActiveHealthObservers().size() == 0) {
+        LOGV2_DEBUG(5936511, 2, "No active health observers are configured.");
+        setState(FaultState::kOk, HealthCheckStatus(FaultFacetType::kSystem));
+    }
+
     auto observers = getHealthObservers();
     for (auto observer : observers) {
         LOGV2_DEBUG(
@@ -334,9 +339,7 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
 
         // TODO (SERVER-59368): The system should properly handle a health checker being turned
         // on/off
-        if (_config->isHealthObserverEnabled(observer->getType())) {
-            healthCheck(observer, _managerShuttingDownCancellation);
-        }
+        healthCheck(observer, _managerShuttingDownCancellation);
     }
 }
 
@@ -379,13 +382,7 @@ SharedSemiFuture<void> FaultManager::startPeriodicHealthChecks() {
     invariant(state() == FaultState::kStartupCheck);
 
     _init();
-
-    if (getActiveHealthObservers().size() == 0) {
-        LOGV2_DEBUG(5936511, 2, "No active health observers are configured.");
-        setState(FaultState::kOk, HealthCheckStatus(FaultFacetType::kSystem));
-    } else {
-        schedulePeriodicHealthCheckThread();
-    }
+    schedulePeriodicHealthCheckThread();
 
     return _initialHealthCheckCompletedPromise.getFuture();
 }
@@ -472,6 +469,8 @@ void FaultManager::healthCheck(HealthObserver* observer, std::shared_ptr<AtomicW
         return healthCheckStatus;
     };
 
+    _healthCheckContexts.insert({observer->getType(), HealthCheckContext(nullptr, boost::none)});
+
     // If health observer is disabled, then do nothing and schedule another run (health observer may
     // become enabled).
     // TODO (SERVER-59368): The system should properly handle a health checker being turned on/off
@@ -480,7 +479,6 @@ void FaultManager::healthCheck(HealthObserver* observer, std::shared_ptr<AtomicW
         return;
     }
 
-    _healthCheckContexts.insert({observer->getType(), HealthCheckContext(nullptr, boost::none)});
     // Run asynchronous health check.  When complete, check for state transition (and perform if
     // necessary). Then schedule the next run.
     auto healthCheckFuture = observer->periodicCheck(*this, _taskExecutor, token)
