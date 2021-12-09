@@ -156,7 +156,10 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
 
         // Induce the coordinator primary to step down.
         assert.commandWorked(
-            coordPrimary.adminCommand({replSetStepDown: stepDownSecs, force: true}));
+            coordPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(coordPrimary.adminCommand({replSetFreeze: 0}));
+        assert.commandWorked(coordPrimary.adminCommand({replSetStepUp: 1}));
+
         assert.commandWorked(coordPrimary.adminCommand({
             configureFailPoint: failpointData.failpoint,
             mode: "off",
