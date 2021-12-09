@@ -225,12 +225,13 @@ public:
 
 private:
     struct ColumnStore {
-        ColumnStore(BSONElement elem) : column(elem), it(column.begin()) {}
+        ColumnStore(BSONElement elem) : column(elem), it(column.begin()), end(column.end()) {}
         ColumnStore(ColumnStore&& other)
-            : column(std::move(other.column)), it(other.it.moveTo(column)) {}
+            : column(std::move(other.column)), it(other.it.moveTo(column)), end(other.end) {}
 
         BSONColumn column;
         BSONColumn::Iterator it;
+        BSONColumn::Iterator end;
     };
 
     // Iterates the timestamp section of the bucket to drive the unpacking iteration.
@@ -265,11 +266,11 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
                                bool includeTimeField,
                                bool includeMetaField) {
     // Get element and increment iterator
-    const auto& timeElem = *(_timeColumn.it++);
-
+    const auto& timeElem = *_timeColumn.it;
     if (includeTimeField) {
         measurement.addField(spec.timeField, Value{timeElem});
     }
+    ++_timeColumn.it;
 
     // Includes metaField when we're instructed to do so and metaField value exists.
     if (includeMetaField && metaValue) {
@@ -279,15 +280,16 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
     for (auto& fieldColumn : _fieldColumns) {
         uassert(6067601,
                 "Bucket unexpectedly contained fewer values than count",
-                fieldColumn.it != fieldColumn.column.end());
-        const BSONElement& elem = *(fieldColumn.it++);
+                fieldColumn.it != fieldColumn.end);
+        const BSONElement& elem = *fieldColumn.it;
         // EOO represents missing field
         if (!elem.eoo()) {
             measurement.addField(fieldColumn.column.name(), Value{elem});
         }
+        ++fieldColumn.it;
     }
 
-    return _timeColumn.it != _timeColumn.column.end();
+    return _timeColumn.it != _timeColumn.end;
 }
 
 void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
@@ -512,6 +514,11 @@ int BucketUnpacker::computeMeasurementCount(const BSONObj& bucket, StringData ti
     if (version == 1) {
         return BucketUnpackerV1::computeElementCountFromTimestampObjSize(time.objsize());
     } else if (version == 2) {
+        auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
+        if (countField && isNumericBSONType(countField.type())) {
+            return static_cast<int>(countField.Number());
+        }
+
         return BSONColumn(time).size();
     } else {
         uasserted(5857901, "Invalid bucket version");
