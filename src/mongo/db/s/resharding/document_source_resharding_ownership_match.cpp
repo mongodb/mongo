@@ -113,18 +113,22 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingOwnershipMatch::getMod
 }
 
 DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext() {
-    // TODO: Actually propagate the temporary resharding namespace from the recipient.
-    auto tempReshardingNss = constructTemporaryReshardingNss(pExpCtx->ns.db(), *pExpCtx->uuid);
+    if (!_tempReshardingChunkMgr) {
+        // TODO: Actually propagate the temporary resharding namespace from the recipient.
+        auto tempReshardingNss = constructTemporaryReshardingNss(pExpCtx->ns.db(), *pExpCtx->uuid);
 
-    auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
-    auto cm = catalogCache->getShardedCollectionRoutingInfo(pExpCtx->opCtx, tempReshardingNss);
+        auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
+        _tempReshardingChunkMgr =
+            uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithRefresh(
+                pExpCtx->opCtx, tempReshardingNss));
+    }
 
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         auto shardKey =
             _reshardingKey.extractShardKeyFromDocThrows(nextInput.getDocument().toBson());
 
-        if (cm.keyBelongsToShard(shardKey, _recipientShardId)) {
+        if (_tempReshardingChunkMgr->keyBelongsToShard(shardKey, _recipientShardId)) {
             return nextInput;
         }
 
