@@ -736,6 +736,37 @@ bool OplogEntry::isSingleOplogEntryTransactionWithCommand() const {
     return _entry.isSingleOplogEntryTransactionWithCommand();
 }
 
+uint64_t OplogEntry::getApplyOpsIndex() const {
+    return _applyOpsIndex;
+}
+
+void OplogEntry::setApplyOpsIndex(uint64_t value) {
+    _applyOpsIndex = value;
+}
+
+const boost::optional<mongo::Timestamp>& OplogEntry::getApplyOpsTimestamp() const {
+    return _applyOpsTimestamp;
+}
+
+void OplogEntry::setApplyOpsTimestamp(boost::optional<mongo::Timestamp> value) {
+    _applyOpsTimestamp = value;
+}
+
+const boost::optional<mongo::Date_t>& OplogEntry::getApplyOpsWallClockTime() const {
+    return _applyOpsWallClockTime;
+}
+void OplogEntry::setApplyOpsWallClockTime(boost::optional<mongo::Date_t> value) {
+    _applyOpsWallClockTime = value;
+}
+
+mongo::Timestamp OplogEntry::getTimestampForPreImage() const {
+    return getApplyOpsTimestamp().get_value_or(getTimestamp());
+}
+
+mongo::Date_t OplogEntry::getWallClockTimeForPreImage() const {
+    return getApplyOpsWallClockTime().get_value_or(getWallClockTime());
+}
+
 bool OplogEntry::isCrudOpType() const {
     return _entry.isCrudOpType();
 }

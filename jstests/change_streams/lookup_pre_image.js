@@ -6,8 +6,6 @@
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   uses_multiple_connections,
- *   # TODO SERVER-58694: remove this tag.
- *   change_stream_does_not_expect_txns,
  * ]
  */
 (function() {

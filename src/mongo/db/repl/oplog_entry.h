@@ -68,6 +68,20 @@ constexpr auto kInitiatingSetMsg = "initiating set"_sd;
 
 class ReplOperation : public DurableReplOperation {
 public:
+    /**
+     * The way the change stream pre-images are recorded upon update/replace/delete operation.
+     */
+    enum class ChangeStreamPreImageRecordingMode {
+        // The pre-image is not recorded.
+        kOff,
+
+        // The pre-image is recorded in the change stream pre-images collection.
+        kPreImagesCollection,
+
+        // The pre-image is recorded in the oplog as a separate entry.
+        kOplog,
+    };
+
     static ReplOperation parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject) {
         ReplOperation o;
         o.parseProtected(ctxt, bsonObject);
@@ -109,6 +123,54 @@ public:
     }
 
     /**
+     * Returns the change stream pre-images recording mode applied for this operation.
+     */
+    ChangeStreamPreImageRecordingMode getChangeStreamPreImageRecordingMode() const {
+        return _preImageRecordingMode;
+    }
+
+    /**
+     * Sets the change stream pre-images recording mode to apply for this operation.
+     */
+    void setChangeStreamPreImageRecordingMode(ChangeStreamPreImageRecordingMode value) {
+        _preImageRecordingMode = value;
+    }
+
+    /**
+     * Returns true if the change stream pre-image is recorded in a dedicated oplog entry for this
+     * operation.
+     */
+    bool isChangeStreamPreImageRecordedInOplog() const {
+        return ReplOperation::ChangeStreamPreImageRecordingMode::kOplog ==
+            getChangeStreamPreImageRecordingMode();
+    }
+
+    /**
+     * Returns true if the change stream pre-image is recorded in the change stream pre-images
+     * collection for this operation.
+     */
+    bool isChangeStreamPreImageRecordedInPreImagesCollection() const {
+        return ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection ==
+            getChangeStreamPreImageRecordingMode();
+    }
+
+    /**
+     * Returns true if the operation is in a retryable internal transaction and pre-image must be
+     * recorded for the operation.
+     */
+    bool isPreImageRecordedForRetryableInternalTransaction() const {
+        return _preImageRecordedForRetryableInternalTransaction;
+    }
+
+    /**
+     * Sets whether the operation is in a retryable internal transaction and pre-image must be
+     * recorded for the operation.
+     */
+    void setPreImageRecordedForRetryableInternalTransaction(bool value = true) {
+        _preImageRecordedForRetryableInternalTransaction = value;
+    }
+
+    /**
      * Sets the statement ids for this ReplOperation to 'stmtIds' if it does not contain any
      * kUninitializedStmtId (i.e. placeholder statement id).
      */
@@ -134,6 +196,14 @@ private:
     // the images should be persisted.
     BSONObj _fullPreImage;
     BSONObj _fullPostImage;
+
+    // Change stream pre-image recording mode applied to this operation.
+    ChangeStreamPreImageRecordingMode _preImageRecordingMode{
+        ChangeStreamPreImageRecordingMode::kOff};
+
+    // Whether a pre-image must be recorded for this operation since it is in a retryable internal
+    // transaction.
+    bool _preImageRecordedForRetryableInternalTransaction{false};
 };
 
 /**
@@ -637,6 +707,46 @@ public:
     bool isTerminalApplyOps() const;
     bool isSingleOplogEntryTransaction() const;
     bool isSingleOplogEntryTransactionWithCommand() const;
+
+    /**
+     * Returns an index of this operation in the "applyOps" entry, if the operation is packed in the
+     * "applyOps" entry. Otherwise returns 0.
+     */
+    uint64_t getApplyOpsIndex() const;
+
+    void setApplyOpsIndex(uint64_t value);
+
+    /**
+     * Returns a timestamp of the "applyOps" entry, if this operation is packed in the "applyOps"
+     * entry. Otherwise returns boost::none.
+     */
+    const boost::optional<mongo::Timestamp>& getApplyOpsTimestamp() const;
+
+    void setApplyOpsTimestamp(boost::optional<mongo::Timestamp> value);
+
+    /**
+     * Returns wall clock time of the "applyOps" entry, if this operation is packed in the
+     * "applyOps" entry. Otherwise returns boost::none.
+     */
+    const boost::optional<mongo::Date_t>& getApplyOpsWallClockTime() const;
+
+    void setApplyOpsWallClockTime(boost::optional<mongo::Date_t> value);
+
+    /**
+     * Returns a timestamp to use for recording of a change stream pre-image in the change stream
+     * pre-images collection. Returns a timestamp of the "applyOps" entry, if this operation is
+     * packed in the "applyOps" entry. Otherwise returns a timestamp of this oplog entry.
+     */
+    mongo::Timestamp getTimestampForPreImage() const;
+
+    /**
+     * Returns a wall clock time to use for recording of a change stream pre-image in the change
+     * stream pre-images collection. Returns a wall clock time of the "applyOps" entry, if this
+     * operation is packed in the "applyOps" entry. Otherwise returns a wall clock time of this
+     * oplog entry.
+     */
+    mongo::Date_t getWallClockTimeForPreImage() const;
+
     bool isCrudOpType() const;
     bool isUpdateOrDelete() const;
     bool isIndexCommandType() const;
@@ -655,6 +765,18 @@ private:
     // so that OplogEntries are cheaper to copy.
     std::shared_ptr<DurableOplogEntry> _preImageOp;
     std::shared_ptr<DurableOplogEntry> _postImageOp;
+
+    // An index of this oplog entry in the associated "applyOps" oplog entry when this entry is
+    // extracted from an "applyOps" oplog entry. Otherwise, the index value must be 0.
+    uint64_t _applyOpsIndex{0};
+
+    // A timestamp of the associated "applyOps" oplog entry when this oplog entry is extracted from
+    // an "applyOps" oplog entry.
+    boost::optional<Timestamp> _applyOpsTimestamp{boost::none};
+
+    // Wall clock time of the associated "applyOps" oplog entry when this oplog entry is extracted
+    // from an "applyOps" oplog entry.
+    boost::optional<Date_t> _applyOpsWallClockTime{boost::none};
 
     bool _isForCappedCollection = false;
 

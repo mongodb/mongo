@@ -1677,7 +1677,10 @@ void TransactionParticipant::Participant::addTransactionOperation(
         repl::DurableOplogEntry::getDurableReplOperationSize(operation);
     if (!operation.getPreImage().isEmpty()) {
         p().transactionOperationBytes += operation.getPreImage().objsize();
-        ++p().numberOfPrePostImagesToWrite;
+        if (operation.isChangeStreamPreImageRecordedInOplog() ||
+            operation.isPreImageRecordedForRetryableInternalTransaction()) {
+            ++p().numberOfPrePostImagesToWrite;
+        }
     }
     if (!operation.getPostImage().isEmpty()) {
         p().transactionOperationBytes += operation.getPostImage().objsize();

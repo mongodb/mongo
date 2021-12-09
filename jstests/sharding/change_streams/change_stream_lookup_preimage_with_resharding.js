@@ -5,13 +5,8 @@
  *
  * @tags: [
  *   featureFlagChangeStreamPreAndPostImages,
- *   featureFlagClusteredIndexes,
- *   requires_fcv_52,
+ *   requires_fcv_53,
  *   uses_change_streams,
- *   # TODO SERVER-58694: remove this tag.
- *   change_stream_does_not_expect_txns,
- *   # TODO SERVER-60238: remove this tag.
- *   does_not_support_causal_consistency,
  *   assumes_unsharded_collection,
  *   assumes_read_preference_unchanged,
  * ]
@@ -30,10 +25,11 @@ reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
 const recipientShardNames = reshardingTest.recipientShardNames;
+const collectionName = "test.whileResharding";
 
 // Create a sharded collection with 'oldShardKey' as the shard key.
 const coll = reshardingTest.createShardedCollection({
-    ns: "test.whileResharding",
+    ns: collectionName,
     shardKeyPattern: {oldShardKey: 1},
     chunks: [
         {min: {oldShardKey: MinKey}, max: {oldShardKey: MaxKey}, shard: donorShardNames[0]},
@@ -82,7 +78,9 @@ assert.commandWorked(coll.getDB().runCommand(
 // Insert some documents before resharding the collection so that there is data to clone.
 assert.commandWorked(coll.insert([
     {_id: 0, annotation: "pre-resharding-insert", oldShardKey: 0, newShardKey: 2},
-    {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3}
+    {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3},
+    {_id: 2, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
+    {_id: 3, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
 ]));
 
 // Verify that 'insert' operations does not record any pre-images.
@@ -121,6 +119,23 @@ reshardingTest.withReshardingInBackground(
         assert.commandWorked(
             coll.update({_id: 1}, {$set: {annotation: "during-resharding-update"}}));
         assert.commandWorked(coll.remove({_id: 1}, {justOne: true}));
+
+        // Perform some operations in a transaction.
+        assert.retryNoExcept(
+            () => {
+                const session = coll.getDB().getMongo().startSession();
+                const sessionDB = session.getDatabase(coll.getDB().getName());
+                const sessionColl = sessionDB.getCollection(coll.getName());
+                session.startTransaction();
+                assert.commandWorked(sessionColl.update(
+                    {_id: 2}, {$set: {annotation: "during-resharding-txn-update"}}));
+                assert.commandWorked(sessionColl.remove({_id: 3}, {justOne: true}));
+                session.commitTransaction_forTesting();
+                return true;
+            },
+            "Failed to execute a transaction while resharding was in progress",
+            10 /*num_attempts*/,
+            100 /*intervalMS*/);
     });
 
 // Verify that after the resharding is complete, the pre-image collection exists on the recipient
@@ -142,7 +157,9 @@ verifyPreImages(donorConn, [
     {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3},
     {_id: 0, annotation: "pre-resharding-update", oldShardKey: 0, newShardKey: 2},
     {_id: 1, annotation: "pre-resharding-update", oldShardKey: 1, newShardKey: 3},
-    {_id: 1, annotation: "during-resharding-update", oldShardKey: 1, newShardKey: 3}
+    {_id: 1, annotation: "during-resharding-update", oldShardKey: 1, newShardKey: 3},
+    {_id: 2, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
+    {_id: 3, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
 ]);
 verifyPreImages(recipientConn,
                 [{_id: 0, annotation: "during-resharding-update", oldShardKey: 0, newShardKey: 2}]);
@@ -174,6 +191,13 @@ verifyChangeStreamEvents(csCursor, [
         curAnnotation: "during-resharding-update"
     },
     {opType: "delete", id: 1, prevAnnotation: "during-resharding-update"},
+    {
+        opType: "update",
+        id: 2,
+        prevAnnotation: "pre-resharding-txn",
+        curAnnotation: "during-resharding-txn-update"
+    },
+    {opType: "delete", id: 3, prevAnnotation: "pre-resharding-txn"},
     {
         opType: "update",
         id: 0,
