@@ -550,8 +550,13 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
     asio::io_context ioContext;
     Acceptor server{ioContext};
     Notification<bool> accepted;
+    Notification<bool> connected;
     Notification<boost::optional<std::error_code>> caught;
     server.setOnAccept([&](auto conn) {
+        // onAccept callbacks can run before the client-side connect() call returns,
+        // which means there's a race between this socket closing and connect()
+        // returning. We use the connected flag to prevent the race.
+        connected.get();
         conn->socket.set_option(asio::socket_base::linger(true, 0));
         conn->socket.close();
         sleepFor(Seconds{1});
@@ -562,6 +567,7 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
     JoinThread client{[&] {
         asio::ip::tcp::socket client{ioContext};
         client.connect(asio::ip::tcp::endpoint(asio::ip::address_v4::loopback(), server.port()));
+        connected.set(true);
         accepted.get();
         // Just set any option and see what happens.
         try {
