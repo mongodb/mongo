@@ -103,6 +103,11 @@ assert.eq(idxSpec.expireAfterSeconds, 10);
 // option is a no-op, the operation as a whole will NOT be a no-op - instead, it will generate an
 // oplog entry with only 'unique'. Ditto for the command result returned to the user.
 if (collModIndexUniqueEnabled) {
+    assert.commandFailedWithCode(primaryDB.runCommand({
+        "collMod": primaryColl.getName(),
+        "index": {"name": "c_1", "unique": false, "hidden": false},
+    }),
+                                 ErrorCodes.BadValue);
     result = assert.commandWorked(primaryDB.runCommand({
         "collMod": primaryColl.getName(),
         "index": {"name": "c_1", "unique": true, "hidden": false},

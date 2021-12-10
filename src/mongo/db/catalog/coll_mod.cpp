@@ -283,6 +283,13 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 }
             }
 
+            if (cmrIndex->indexUnique) {
+                cmr.numModifications++;
+                if (!cmrIndex->indexUnique.trueValue()) {
+                    return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
+                }
+            }
+
             if (cmrIndex->indexHidden) {
                 cmr.numModifications++;
                 // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
@@ -310,13 +317,6 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 // are critical to most collection operations.
                 if (cmrIndex->idx->isIdIndex()) {
                     return Status(ErrorCodes::BadValue, "can't hide _id index");
-                }
-            }
-
-            if (cmrIndex->indexUnique) {
-                cmr.numModifications++;
-                if (!cmrIndex->indexUnique.trueValue()) {
-                    return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
                 }
             }
         } else if (fieldName == "validator" && !isView && !isTimeseries) {
