@@ -230,7 +230,7 @@ public:
      * To be called with the wantedVersion returned by a targeted node in case of a
      * StaleDatabaseVersion response.
      *
-     * In the case the passed version is boost::none, nothing will be done.
+     * In the case the passed version is boost::none, invalidates the cache for the given database.
      */
     void onStaleDatabaseVersion(StringData dbName,
                                 const boost::optional<DatabaseVersion>& wantedVersion);
