@@ -2,10 +2,10 @@
  * Tests the behaviour of the 'fullDocumentBeforeChange' argument to the $changeStream stage.
  *
  * @tags: [
+ *   requires_fcv_52,
  *   assumes_unsharded_collection,
  *   do_not_wrap_aggregations_in_facets,
  *   uses_multiple_connections,
- *   multiversion_incompatible,
  *   # TODO SERVER-58694: remove this tag.
  *   change_stream_does_not_expect_txns,
  * ]
