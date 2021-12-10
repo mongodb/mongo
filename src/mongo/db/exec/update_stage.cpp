@@ -442,6 +442,23 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
+        {
+            BSONObj unownedOldDoc = member->doc.value().toBson();
+
+            if (!_params.request->explain() && _isUserInitiatedWrite &&
+                write_stage_common::skipWriteToOrphanDocument(
+                    opCtx(), collection()->ns(), unownedOldDoc)) {
+                LOGV2_DEBUG(5983200,
+                            1,
+                            "Abort update operation to orphan document to prevent a wrong change "
+                            "stream event",
+                            "namespace"_attr = collection()->ns(),
+                            "record"_attr = redact(unownedOldDoc));
+
+                return PlanStage::NEED_TIME;
+            }
+        }
+
         // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
         // is allowed to free the memory.
         member->makeObjOwnedIfNeeded();

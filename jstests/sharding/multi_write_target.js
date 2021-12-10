@@ -60,8 +60,7 @@ assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({x: 1}));
 // Put more on all shards
 assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: 0, skey: -1, x: 1}));
 assert.commandWorked(st.shard1.getCollection(coll.toString()).insert({_id: 1, skey: 1, x: 1}));
-// Data not in chunks
-assert.commandWorked(st.shard2.getCollection(coll.toString()).insert({_id: 0, x: 1}));
+assert.commandWorked(st.shard2.getCollection(coll.toString()).insert({_id: 0, skey: 100, x: 1}));
 
 assert.commandWorked(coll.remove({_id: 0}, {justOne: true}));
 

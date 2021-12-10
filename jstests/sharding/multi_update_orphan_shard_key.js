@@ -1,7 +1,9 @@
 /**
  * Tests it isn't possible to update an orphan document's shard key. Only multi=true updates skip
  * shard versioning. They are therefore the only case which skips ownership filtering.
- * @tags: [
+ *
+ *  @tags: [
+ *    requires_fcv_52
  * ]
  */
 (function() {
@@ -41,9 +43,18 @@ assert.eq(1, res.nModified, res);
 
 // Do a multi=true update that will target both shards but not update any documents on the shard
 // which owns the range [-1, MaxKey].
-res = assert.commandFailedWithCode(
-    collection.update({x: {$lte: 0}, y: {$exists: false}}, {$set: {x: -10, y: 2}}, {multi: true}),
-    31025);
+const clusterParams = st.configRS.getPrimary().adminCommand(
+    {getParameter: 1, featureFlagNoChangeStreamEventsDueToOrphans: 1});
+if (!clusterParams.hasOwnProperty("featureFlagNoChangeStreamEventsDueToOrphans") ||
+    !clusterParams.featureFlagNoChangeStreamEventsDueToOrphans.value) {
+    res = assert.commandFailedWithCode(
+        collection.update(
+            {x: {$lte: 0}, y: {$exists: false}}, {$set: {x: -10, y: 2}}, {multi: true}),
+        31025);
+} else {
+    res = assert.commandWorked(collection.update(
+        {x: {$lte: 0}, y: {$exists: false}}, {$set: {x: -10, y: 2}}, {multi: true}));
+}
 assert.eq(0, res.nMatched, res);
 assert.eq(0, res.nModified, res);
 assert.eq(0, res.nUpserted, res);

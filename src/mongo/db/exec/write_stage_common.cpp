@@ -35,8 +35,22 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/s/pm2423_feature_flags_gen.h"
 
 namespace mongo {
+
+namespace {
+
+bool isStandaloneOrPrimary(OperationContext* opCtx) {
+    const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
+    return replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
+        replCoord->getMemberState() == repl::MemberState::RS_PRIMARY;
+}
+
+}  // namespace
+
 namespace write_stage_common {
 
 bool ensureStillMatches(const CollectionPtr& collection,
@@ -66,6 +80,41 @@ bool ensureStillMatches(const CollectionPtr& collection,
         member->makeObjOwnedIfNeeded();
     }
     return true;
+}
+
+bool skipWriteToOrphanDocument(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& doc) {
+    if (!isStandaloneOrPrimary(opCtx)) {
+        // Secondaries do not apply any filtering logic as the primary already did.
+        return false;
+    }
+
+    if (!feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return false;
+    }
+
+    const auto css{CollectionShardingState::get(opCtx, nss)};
+    const auto collFilter{css->getOwnershipFilter(
+        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup)};
+
+    if (!collFilter.isSharded()) {
+        // NOTE: Sharded collections queried by direct writes are identified by CSS as unsharded
+        // collections. This behavior may be fine because direct writes to orphan documents are
+        // currently allowed, making subsequent check on the shard version useless.
+        return false;
+    }
+
+    if (!OperationShardingState::get(opCtx).getShardVersion(nss)) {
+        // Direct writes to shards (not forwarded by router) are allowed.
+        return false;
+    }
+
+    const ShardKeyPattern shardKeyPattern{collFilter.getKeyPattern()};
+    const auto shardKey{shardKeyPattern.extractShardKeyFromDocThrows(doc)};
+
+    return !collFilter.keyBelongsToMe(shardKey);
 }
 
 }  // namespace write_stage_common

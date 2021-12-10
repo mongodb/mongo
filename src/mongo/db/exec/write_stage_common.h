@@ -39,6 +39,8 @@ class CanonicalQuery;
 class Collection;
 class CollectionPtr;
 class OperationContext;
+class NamespaceString;
+class BSONObj;
 
 namespace write_stage_common {
 
@@ -55,5 +57,15 @@ bool ensureStillMatches(const CollectionPtr& collection,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq);
+
+/**
+ * Returns true if (1) the operation is configured to not modify orphan documents and (2) the
+ * document is an orphan. In these circumstances, write operations must be prevented in order to
+ * avoid wrong change stream events.
+ */
+bool skipWriteToOrphanDocument(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& doc);
+
 }  // namespace write_stage_common
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -165,6 +166,23 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
             throw WriteConflictException();
         }
         return PlanStage::NEED_TIME;
+    }
+
+    {
+        BSONObj unownedDoc = member->doc.value().toBson();
+
+        if (!_params->isExplain && !_params->fromMigrate &&
+            write_stage_common::skipWriteToOrphanDocument(
+                opCtx(), collection()->ns(), unownedDoc)) {
+            LOGV2_DEBUG(
+                5983201,
+                1,
+                "Abort delete operation to orphan document to prevent a wrong change stream event",
+                "namespace"_attr = collection()->ns(),
+                "record"_attr = redact(unownedDoc));
+
+            return NEED_TIME;
+        }
     }
 
     // Ensure that the BSONObj underlying the WSM is owned because saveState() is
