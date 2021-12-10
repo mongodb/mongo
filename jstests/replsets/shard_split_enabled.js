@@ -1,7 +1,7 @@
 /**
  *
  * Tests that the ShardSplit feature flag is enabled only in the proper FCV
- * @tags: [requires_fcv_51, featureFlagShardSplit]
+ * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
 (function() {
