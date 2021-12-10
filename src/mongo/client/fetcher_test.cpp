@@ -36,6 +36,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/util/future_test_utils.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -409,7 +410,7 @@ TEST_F(FetcherTest, CancelWithoutSchedule) {
 
 TEST_F(FetcherTest, WaitWithoutSchedule) {
     ASSERT_FALSE(fetcher->isActive());
-    fetcher->join();
+    ASSERT_OK(fetcher->join(Interruptible::notInterruptible()));
     ASSERT_FALSE(fetcher->isActive());
 }
 
@@ -445,6 +446,46 @@ TEST_F(FetcherTest, ScheduleAndCancel) {
     ASSERT_EQUALS(Fetcher::State::kComplete, fetcher->getState_forTest());
 }
 
+
+TEST_F(FetcherTest, ScheduleAndCancelDueToJoinInterruption) {
+    ASSERT_EQUALS(Fetcher::State::kPreStart, fetcher->getState_forTest());
+
+    ASSERT_OK(fetcher->schedule());
+    ASSERT_EQUALS(Fetcher::State::kRunning, fetcher->getState_forTest());
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        assertRemoteCommandNameEquals("find", net->scheduleSuccessfulResponse(BSON("ok" << 1)));
+    }
+
+    ASSERT_TRUE(fetcher->isActive());
+    ASSERT_EQUALS(Fetcher::State::kRunning, fetcher->getState_forTest());
+
+    DummyInterruptible interruptible;
+    ASSERT_EQ(fetcher->join(&interruptible), ErrorCodes::Interrupted);
+
+    // To make this test deterministic, we need the Fetcher to already be shut down so it doesn't
+    // attempt to process the scheduled response. Normally Fetcher::join() would be solely
+    // responsible for calling Fetcher::shutdown().
+    fetcher->shutdown();
+
+    // The finishProcessingNetworkResponseThread is needed to prevent the main test thread from
+    // blocking on the NetworkInterfaceMock.
+    stdx::thread finishProcessingNetworkResponseThread([&]() {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        getNet()->runReadyNetworkOperations();
+    });
+
+    // We destroy the Fetcher before shutting down the task executor to reflect what would
+    // ordinarily happen after Fetcher::join() returns an error Status from the Interruptible being
+    // interrupted.
+    fetcher.reset();
+    finishProcessingNetworkResponseThread.join();
+
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status.code());
+}
+
 TEST_F(FetcherTest, ScheduleButShutdown) {
     ASSERT_EQUALS(Fetcher::State::kPreStart, fetcher->getState_forTest());
 
@@ -464,7 +505,7 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
 
     getExecutor().shutdown();
 
-    fetcher->join();
+    ASSERT_OK(fetcher->join(Interruptible::notInterruptible()));
     ASSERT_FALSE(fetcher->isActive());
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status.code());

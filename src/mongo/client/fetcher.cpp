@@ -196,7 +196,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
 }
 
 Fetcher::~Fetcher() {
-    DESTRUCTOR_GUARD(shutdown(); join(););
+    DESTRUCTOR_GUARD(shutdown(); _join(););
 }
 
 HostAndPort Fetcher::getSource() const {
@@ -294,9 +294,19 @@ void Fetcher::shutdown() {
     }
 }
 
-void Fetcher::join() {
-    stdx::unique_lock<Latch> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_isActive_inlock(); });
+Status Fetcher::join(Interruptible* interruptible) {
+    try {
+        stdx::unique_lock<Latch> lk(_mutex);
+        interruptible->waitForConditionOrInterrupt(
+            _condition, lk, [this]() { return !_isActive_inlock(); });
+        return Status::OK();
+    } catch (const DBException&) {
+        return exceptionToStatus();
+    }
+}
+
+void Fetcher::_join() {
+    invariantStatusOK(join(Interruptible::notInterruptible()));
 }
 
 Fetcher::State Fetcher::getState_forTest() const {
