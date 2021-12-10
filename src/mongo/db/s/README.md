@@ -1092,7 +1092,7 @@ information for all chunks in the collection. That information is stored in an o
 key of each chunk to an entry that contains routing information for the chunk, such as chunk range,
 chunk version and chunk history. The chunk history contains the shard id for the shard that currently
 owns the chunk, and the shard id for any other shards that used to own the chunk in the past
-`minSnapshotHistoryWindowInSeconds` (defaults to 10 seconds). It corresponds to the chunk history in
+`minSnapshotHistoryWindowInSeconds` (defaults to 300 seconds). It corresponds to the chunk history in
 the `config.chunks` document for the chunk which gets updated whenever the chunk goes through an
 operation, such as merge or migration. The `ChunkManager` uses this information to determine the
 shards to target for a query. If the clusterTime is not provided, it will return the shards that
