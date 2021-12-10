@@ -36,7 +36,7 @@
 #include "mongo/s/grid.h"
 
 namespace mongo {
-MONGO_FAIL_POINT_DEFINE(skipPhaseTransition);
+MONGO_FAIL_POINT_DEFINE(skipDefragmentationPhaseTransition);
 
 void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     OperationContext* opCtx, const CollectionType& coll) {
@@ -338,13 +338,12 @@ void BalancerDefragmentationPolicyImpl::_processEndOfAction(
 
 void BalancerDefragmentationPolicyImpl::_transitionPhases(
     OperationContext* opCtx, const UUID& uuid, CollectionDefragmentationState& collectionInfo) {
+    if (MONGO_unlikely(skipDefragmentationPhaseTransition.shouldFail())) {
+        return;
+    }
     boost::optional<DefragmentationPhaseEnum> nextPhase;
     switch (collectionInfo.phase) {
         case DefragmentationPhaseEnum::kMergeChunks:
-            if (MONGO_unlikely(skipPhaseTransition.shouldFail())) {
-                nextPhase = DefragmentationPhaseEnum::kMergeChunks;
-                break;
-            }
             // TODO (SERVER-60459) Change to kMoveAndMergeChunks
             nextPhase = boost::none;
             break;

@@ -105,7 +105,7 @@ protected:
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAddCollection) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     // Test for persistence
     auto configDoc = findOneOnConfigCollection(operationContext(),
@@ -130,7 +130,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionNoActions) {
 
 TEST_F(BalancerDefragmentationPolicyTest, TestIsDefragmentingCollection) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(kUuid));
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(UUID::gen()));
@@ -143,7 +143,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestGetNextActionNoReadyActions) {
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedMergeResult) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -161,7 +161,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedMergeResult) {
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedSplitVectorResponse) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -178,7 +178,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedSplitVectorRespon
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedSplitAction) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -201,7 +201,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedSplitAction) {
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedDataSizeAction) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -223,7 +223,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFailedDataSizeAction) {
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulMergeAction) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -240,7 +240,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulMergeAction) 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulAutoSplitVectorAction) {
     std::vector<BSONObj> splitPoints = {BSON("x" << 4)};
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto splitVectorInfo = AutoSplitVectorInfo(kShardId0,
@@ -264,7 +264,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulAutoSplitVect
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulSplitAction) {
     std::vector<BSONObj> splitPoints = {BSON("x" << 4)};
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto splitInfo = SplitInfoWithKeyPattern(kShardId0,
@@ -281,7 +281,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulSplitAction) 
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeSuccessfulDataSizeAction) {
     auto coll = makeConfigCollectionEntry();
-    FailPointEnableBlock failpoint("skipPhaseTransition");
+    FailPointEnableBlock failpoint("skipDefragmentationPhaseTransition");
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
     makeConfigChunkEntry();
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());

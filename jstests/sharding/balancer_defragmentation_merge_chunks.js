@@ -17,7 +17,6 @@ load("jstests/sharding/libs/find_chunks_util.js");
 var st = new ShardingTest({
     mongos: 1,
     shards: 3,
-    config: 1,
     other: {
         enableBalancer: true,
         enableAutoSplit: true,
@@ -30,7 +29,15 @@ assert.commandWorked(st.s.adminCommand({enableSharding: 'db'}));
 var db = st.getDB('db');
 var coll = db['test'];
 var fullNs = coll.getFullName();
-var configPrimary = st.configRS.getPrimary();
+
+// Shorten time between balancer rounds for faster initial balancing
+st.forEachConfigServer((conn) => {
+    conn.adminCommand({
+        configureFailPoint: 'overrideBalanceRoundInterval',
+        mode: 'alwaysOn',
+        data: {intervalMs: 200}
+    });
+});
 
 const defaultChunkSize = 2;
 const bigString = "X".repeat(32 * 1024);  // 32 KB
@@ -54,9 +61,16 @@ jsTest.log("Balance cluster before beginning defragmentation");
 function waitForBalanced() {
     assert.soon(function() {
         st.awaitBalancerRound();
-        var balancerStatus =
+        let balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
         return balancerStatus.balancerCompliant;
+    });
+}
+
+function setFailPointOnConfigNodes(mode) {
+    st.forEachConfigServer((config) => {
+        assert.commandWorked(config.adminCommand(
+            {configureFailPoint: "skipDefragmentationPhaseTransition", mode: mode}));
     });
 }
 
@@ -71,26 +85,23 @@ jsTest.log("Begin and end defragmentation with balancer off.");
         balancerShouldMergeChunks: true,
         defaultChunkSize: defaultChunkSize,
     }));
-    // Defragmentation should not start with the balancer stopped
-    var balancerStatus =
-        assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
-    assert.eq(balancerStatus.balancerCompliant, true);
+    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+    assert.eq(beforeStatus.balancerCompliant, false);
+    assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: fullNs,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: false,
         defaultChunkSize: defaultChunkSize,
     }));
-    st.startBalancer();
-    st.awaitBalancerRound();
-    assert.eq(balancerStatus.balancerCompliant, true);
-    st.stopBalancer();
+    let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+    assert.eq(afterStatus.balancerCompliant, true);
 }
 
 jsTest.log("Begin and end defragmentation with balancer on");
 {
     st.startBalancer();
-    var phaseTransitionFailpoint = configureFailPoint(configPrimary, "skipPhaseTransition");
+    setFailPointOnConfigNodes("alwaysOn");
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: fullNs,
         enableAutoSplitter: false,
@@ -98,9 +109,9 @@ jsTest.log("Begin and end defragmentation with balancer on");
         defaultChunkSize: defaultChunkSize,
     }));
     st.awaitBalancerRound();
-    var currStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
-    assert.eq(currStatus.balancerCompliant, false);
-    assert.eq(currStatus.firstComplianceViolation, 'chunksMerging');
+    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+    assert.eq(beforeStatus.balancerCompliant, false);
+    assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: fullNs,
         enableAutoSplitter: false,
@@ -108,14 +119,15 @@ jsTest.log("Begin and end defragmentation with balancer on");
         defaultChunkSize: defaultChunkSize,
     }));
     st.awaitBalancerRound();
-    assert.eq(balancerStatus.balancerCompliant, true);
+    let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+    assert.neq(afterStatus.firstComplianceViolation, 'chunksMerging');
     st.stopBalancer();
-    phaseTransitionFailpoint.off();
+    setFailPointOnConfigNodes("off");
 }
 
 jsTest.log("Begin defragmentation with balancer off, end with it on");
 {
-    var phaseTransitionFailpoint = configureFailPoint(configPrimary, "skipPhaseTransition");
+    setFailPointOnConfigNodes("alwaysOn");
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: fullNs,
         enableAutoSplitter: false,
@@ -124,9 +136,9 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     }));
     st.startBalancer();
     st.awaitBalancerRound();
-    var currStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
-    assert.eq(currStatus.balancerCompliant, false);
-    assert.eq(currStatus.firstComplianceViolation, 'chunksMerging');
+    let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+    assert.eq(beforeStatus.balancerCompliant, false);
+    assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: fullNs,
         enableAutoSplitter: false,
@@ -134,9 +146,10 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
         defaultChunkSize: defaultChunkSize,
     }));
     st.awaitBalancerRound();
-    assert.eq(balancerStatus.balancerCompliant, true);
+    let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
+    assert.neq(afterStatus.firstComplianceViolation, 'chunksMerging');
     st.stopBalancer();
-    phaseTransitionFailpoint.off();
+    setFailPointOnConfigNodes("off");
 }
 
 jsTest.log("Balancer on, begin defragmentation and let it complete");

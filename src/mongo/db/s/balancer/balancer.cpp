@@ -896,7 +896,7 @@ Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCt
     // TODO (SERVER-61727) update this with phase 2
     try {
         auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
-        bool isMerging = _defragmentationPolicy->isDefragmentingCollection(coll.getUuid());
+        bool isMerging = coll.getBalancerShouldMergeChunks();
         if (isMerging) {
             return {false, kBalancerPolicyStatusChunksMerging.toString()};
         }

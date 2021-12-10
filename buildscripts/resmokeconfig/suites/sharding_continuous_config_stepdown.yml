@@ -235,9 +235,6 @@ selector:
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
 
-  # SERVER-61940
-  - jstests/sharding/balancer_defragmentation_merge_chunks.js
-
   exclude_with_any_tags:
   - does_not_support_stepdowns
 
