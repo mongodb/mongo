@@ -333,7 +333,9 @@ public:
      * Throws a DBException with the ShardKeyNotFound code if unable to target a single shard due to
      * collation or due to the key not matching the shard key pattern.
      */
-    Chunk findIntersectingChunk(const BSONObj& shardKey, const BSONObj& collation) const;
+    Chunk findIntersectingChunk(const BSONObj& shardKey,
+                                const BSONObj& collation,
+                                bool bypassIsFieldHashedCheck = false) const;
 
     /**
      * Same as findIntersectingChunk, but assumes the simple collation.

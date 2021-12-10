@@ -182,6 +182,7 @@ selector:
   - jstests/sharding/pipeline_length_limit.js
   - jstests/sharding/mongos_precache_routing_info.js
   - jstests/sharding/warm_up_connection_pool.js
+  - jstests/sharding/collation_shard_targeting_hashed_shard_key.js
 
   exclude_with_any_tags:
   - multiversion_incompatible
