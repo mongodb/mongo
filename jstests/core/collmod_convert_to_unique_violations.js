@@ -1,13 +1,24 @@
 /**
  * Tests that the CannotEnableIndexConstraint error returned when collmod fails to convert an index
- * to unique contains correct information about the number of violations found.
+ * to unique contains correct information about violations found.
  *
- * TODO SERVER-61854 Move this test to the core suite, or otherwise expand it to be run on replica
- * sets and sharded clusters.
+ * @tags: [
+ *  # Cannot implicitly shard accessed collections because of collection existing when none
+ *  # expected.
+ *  assumes_no_implicit_collection_creation_after_drop,  # common tag in collMod tests.
+ *  requires_fcv_52,
+ *  requires_non_retryable_commands, # common tag in collMod tests.
+ *  # TODO(SERVER-61181): Fix validation errors under ephemeralForTest.
+ *  incompatible_with_eft,
+ *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
+ *  requires_persistence,
+ * ]
  */
 
 (function() {
 'use strict';
+
+load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
 
 const collModIndexUniqueEnabled = assert
                                       .commandWorked(db.getMongo().adminCommand(
@@ -17,6 +28,23 @@ const collModIndexUniqueEnabled = assert
 if (!collModIndexUniqueEnabled) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
     return;
+}
+
+function extractResult(obj) {
+    if (!FixtureHelpers.isMongos(db)) {
+        return obj;
+    }
+
+    let numFields = 0;
+    let result = null;
+    for (let field in obj.raw) {
+        result = obj.raw[field];
+        numFields++;
+    }
+
+    assert.neq(null, result);
+    assert.eq(1, numFields);
+    return result;
 }
 
 function sortViolationsArray(arr) {
@@ -37,14 +65,15 @@ function sortViolationsArray(arr) {
 }
 
 // Checks that the violations match what we expect.
-function assertFailedWithViolations(error, violations) {
+function assertFailedWithViolations(result, violations) {
+    const error = extractResult(result);
     assert.commandFailedWithCode(error, ErrorCodes.CannotEnableIndexConstraint);
     assert.eq(bsonWoCompare(sortViolationsArray(error.violations), sortViolationsArray(violations)),
               0,
               tojson(error));
 }
 
-const collName = 'collmod_convert_to_unique_violation_count';
+const collName = 'collmod_convert_to_unique_violations';
 const coll = db.getCollection(collName);
 coll.drop();
 assert.commandWorked(db.createCollection(collName));
@@ -91,4 +120,9 @@ assert.commandWorked(coll.insert({_id: 9, a: 101, b: 4}));
 assertFailedWithViolations(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1, b: 1}, unique: true}}),
     [{ids: [4, 9]}, {ids: [6, 7, 8]}]);
+
+assert.commandWorked(coll.insert({_id: "10", a: 101, b: 4}));
+assertFailedWithViolations(
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1, b: 1}, unique: true}}),
+    [{ids: [4, 9, "10"]}, {ids: [6, 7, 8]}]);
 })();
