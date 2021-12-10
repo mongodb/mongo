@@ -287,9 +287,10 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 cmr.numModifications++;
                 // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
                 if (cmrIndex->idx->hidden() == cmrIndex->indexHidden.booleanSafe()) {
-                    // If the collMod includes "expireAfterSeconds", remove the no-op "hidden"
-                    // parameter and write the remaining "index" object to the oplog entry builder.
-                    if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
+                    // If the collMod includes "expireAfterSeconds" or "unique", remove the no-op
+                    // "hidden" parameter and write the remaining "index" object to the oplog entry
+                    // builder.
+                    if (!cmrIndex->indexExpireAfterSeconds.eoo() || !cmrIndex->indexUnique.eoo()) {
                         oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
                     }
                     // Un-set "indexHidden" in ParsedCollModRequest, and skip the automatic write to
