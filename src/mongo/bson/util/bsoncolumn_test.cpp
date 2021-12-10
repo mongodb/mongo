@@ -3577,6 +3577,37 @@ TEST_F(BSONColumnTest, InterleavedIncompatibleAfterDeterminedReference) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, InterleavedSkipAfterEmptySubObj) {
+    BSONColumnBuilder cb("test"_sd);
+
+    std::vector<BSONElement> elems = {
+        createElementObj(BSON("x" << 1 << "y" << 2 << "z" << BSON("z1" << BSONObjBuilder().obj()))),
+        BSONElement()};
+
+    for (auto elem : elems) {
+        if (!elem.eoo())
+            cb.append(elem);
+        else
+            cb.skip();
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, boost::none);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, ObjectEmpty) {
     BSONColumnBuilder cb("test"_sd);
 

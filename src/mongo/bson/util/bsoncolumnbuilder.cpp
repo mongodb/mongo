@@ -360,7 +360,17 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 BSONColumnBuilder& BSONColumnBuilder::skip() {
     if (_mode == Mode::kRegular) {
         _state.skip();
-    } else if (_mode == Mode::kSubObjDeterminingReference) {
+        return *this;
+    }
+
+    // If the reference object contain any empty subobjects we need to end interleaved mode as
+    // skipping in all substreams would not be encoded as skipped root object.
+    if (_hasEmptyObj(_referenceSubObj)) {
+        _flushSubObjMode();
+        return skip();
+    }
+
+    if (_mode == Mode::kSubObjDeterminingReference) {
         _bufferedObjElements.push_back(BSONObj());
     } else {
         for (auto&& state : _subobjStates) {
