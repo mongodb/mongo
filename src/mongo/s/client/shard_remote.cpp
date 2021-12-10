@@ -328,7 +328,17 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
         return scheduleStatus;
     }
 
-    fetcher.join();
+    Status joinStatus = fetcher.join(opCtx);
+    if (!joinStatus.isOK()) {
+        if (ErrorCodes::isExceededTimeLimitError(joinStatus.code())) {
+            LOGV2(6195000,
+                  "Operation timed out {error}",
+                  "Operation timed out",
+                  "error"_attr = joinStatus);
+        }
+
+        return joinStatus;
+    }
 
     updateReplSetMonitor(host.getValue(), status);
 
@@ -513,7 +523,10 @@ Status ShardRemote::runAggregation(
         return scheduleStatus;
     }
 
-    fetcher.join();
+    Status joinStatus = fetcher.join(opCtx);
+    if (!joinStatus.isOK()) {
+        return joinStatus;
+    }
 
     updateReplSetMonitor(host, status);
 

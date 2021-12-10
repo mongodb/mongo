@@ -185,10 +185,13 @@ public:
     void shutdown();
 
     /**
-     * Waits for remote command requests to complete.
+     * Waits for remote command requests to complete subject to the Interruptible being interrupted.
      * Returns immediately if fetcher is not active.
+     *
+     * Returns an OK Status if the wait completed successfully without interruption.
+     * Returns a non-OK Status if the Interruptible had been interrupted.
      */
-    void join();
+    Status join(Interruptible* interruptible);
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
@@ -242,6 +245,12 @@ private:
      */
     bool _isShuttingDown() const;
     bool _isShuttingDown_inlock() const;
+
+    /**
+     * Waits for remote command requests to complete.
+     * Returns immediately if fetcher is not active.
+     */
+    void _join();
 
     // Not owned by us.
     executor::TaskExecutor* _executor;
