@@ -82,17 +82,24 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
             awaitCollMod = assertCommandWorkedInParallelShell(
                 primary, testDB, {collMod: collName, index: {keyPattern: {a: 1}, unique: true}});
         } else {
-            awaitCollMod = startParallelShell(
-                funWithArgs(function(dbName, collName, expectedViolations) {
-                    const testDB = db.getSiblingDB(dbName);
-                    const result = testDB.runCommand(
-                        {collMod: collName, index: {keyPattern: {a: 1}, unique: true}});
-                    assert.commandFailedWithCode(result, ErrorCodes.CannotEnableIndexConstraint);
-                    assert.eq(bsonWoCompare(result.violations, expectedViolations),
-                              0,
-                              "expectedViolations: " + tojson(expectedViolations) +
-                                  "; result.violations: " + tojson(result.violations));
-                }, testDB.getName(), collName, expectedViolations), primary.port);
+            const assertViolations = function(result, expectedViolations) {
+                const compareIds = function(lhs, rhs) {
+                    try {
+                        assert.sameMembers(lhs.ids, rhs.ids);
+                    } catch (e) {
+                        return false;
+                    }
+                    return true;
+                };
+                assert.sameMembers(result.violations, expectedViolations, '', compareIds);
+            };
+            awaitCollMod = assertCommandFailedWithCodeInParallelShell(
+                primary,
+                testDB,
+                {collMod: collName, index: {keyPattern: {a: 1}, unique: true}},
+                ErrorCodes.CannotEnableIndexConstraint,
+                assertViolations,
+                expectedViolations);
         }
         failPoint.wait();
 
