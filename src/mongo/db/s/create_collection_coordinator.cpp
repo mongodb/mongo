@@ -837,12 +837,13 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     // TODO: Remove once FCV 6.0 becomes last-lts
     std::shared_ptr<FixedFCVRegion> currentFCV;
 
+    // TODO SERVER-58368: Once we know that this feature will land in the next release we can
+    // simplify this code. Right now it's written to avoid acquiring the FixedFCVRegion if the long
+    // collection names support is not enabled.
     // TODO: Remove condition once FCV 6.0 becomes last-lts
     if (feature_flags::gFeatureFlagLongCollectionNames.isEnabledAndIgnoreFCV()) {
         currentFCV = std::make_shared<FixedFCVRegion>(opCtx);
-        if ((*currentFCV)
-                ->isGreaterThanOrEqualTo(
-                    multiversion::FeatureCompatibilityVersion::kUpgradingFrom_5_0_To_5_1)) {
+        if (feature_flags::gFeatureFlagLongCollectionNames.isEnabled(*(*currentFCV))) {
             coll.setSupportingLongName(SupportingLongNameStatusEnum::kImplicitlyEnabled);
         }
     }
