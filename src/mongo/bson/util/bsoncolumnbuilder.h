@@ -152,7 +152,7 @@ private:
     };
 
     // Append Object for sub-object compression when in mode kSubObjAppending
-    void _appendSubElements(const BSONObj& obj);
+    bool _appendSubElements(const BSONObj& obj);
 
     // Transition into kSubObjDeterminingReference mode
     void _startDetermineSubObjReference(const BSONObj& obj);
