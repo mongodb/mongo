@@ -3679,6 +3679,74 @@ TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromDetermine) {
+    BSONColumnBuilder cb("test"_sd);
+
+    // Append elements so we are in kSubObjDeterminingReference state when element with 'b' field is
+    // appended. Make sure this does not re-start subobj compression as it only contain empty
+    // subobj.
+    std::vector<BSONElement> elems;
+    elems.push_back(createElementObj(BSON("a" << 1)));
+    elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
+
+    for (const auto& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    appendLiteral(expected, elems[1]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleavingFromAppending) {
+    BSONColumnBuilder cb("test"_sd);
+
+    // Append enough elements so we are in kSubObjAppending state when element with 'b' field is
+    // appended. Make sure this does not re-start subobj compression as it only contain empty
+    // subobj.
+    std::vector<BSONElement> elems;
+    elems.push_back(createElementObj(BSON("a" << 1)));
+    elems.push_back(createElementObj(BSON("a" << 2)));
+    elems.push_back(createElementObj(BSON("a" << 3)));
+    elems.push_back(createElementObj(BSON("a" << 4)));
+    elems.push_back(createElementObj(BSON("a" << 5)));
+    elems.push_back(createElementObj(BSON("a" << 6)));
+    elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
+
+    for (const auto& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems.front().Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            deltaInt32(elems[1].Obj()["a"], elems[0].Obj()["a"]),
+                            deltaInt32(elems[2].Obj()["a"], elems[1].Obj()["a"]),
+                            deltaInt32(elems[3].Obj()["a"], elems[2].Obj()["a"]),
+                            deltaInt32(elems[4].Obj()["a"], elems[3].Obj()["a"]),
+                            deltaInt32(elems[5].Obj()["a"], elems[4].Obj()["a"])},
+                           1);
+    appendEOO(expected);
+
+    appendLiteral(expected, elems[6]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
     BSONColumnBuilder cb("test"_sd);
 
