@@ -309,25 +309,34 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
     auto obj = elem.Obj();
     // First validate that we don't store MinKey or MaxKey anywhere in the Object. If this is the
     // case, throw exception before we modify any state.
-    _traverse(obj, [](const BSONElement& elem, const BSONElement&) {
+    uint32_t numElements = 0;
+    _traverse(obj, [&numElements](const BSONElement& elem, const BSONElement&) {
+        ++numElements;
         uassert(ErrorCodes::InvalidBSONType,
                 "MinKey or MaxKey is not valid for storage",
                 elem.type() != MinKey && elem.type() != MaxKey);
     });
 
     if (_mode == Mode::kRegular) {
-        _startDetermineSubObjReference(obj);
+        if (numElements == 0) {
+            _state.append(elem);
+        } else {
+            _startDetermineSubObjReference(obj);
+        }
+
         return *this;
     }
 
     if (_mode == Mode::kSubObjDeterminingReference) {
         // We are in DeterminingReference mode, check if this current object is compatible and merge
         // in any new fields that are discovered.
-        uint32_t numElements = 0;
-        if (!traverseLockStep(_referenceSubObj,
-                              obj,
-                              [this, &numElements](const BSONElement& ref,
-                                                   const BSONElement& elem) { ++numElements; })) {
+        uint32_t numElementsReferenceObj = 0;
+        if (!traverseLockStep(
+                _referenceSubObj,
+                obj,
+                [this, &numElementsReferenceObj](const BSONElement& ref, const BSONElement& elem) {
+                    ++numElementsReferenceObj;
+                })) {
             BSONObj merged = mergeObj(_referenceSubObj, obj);
             if (merged.isEmptyPrototype()) {
                 // If merge failed, flush current sub-object compression and start over.
@@ -343,7 +352,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
 
         // If we've buffered twice as many objects as we have sub-elements we will achieve good
         // compression so use the currently built reference.
-        if (numElements * 2 >= _bufferedObjElements.size()) {
+        if (numElementsReferenceObj * 2 >= _bufferedObjElements.size()) {
             _bufferedObjElements.push_back(obj.getOwned());
             return *this;
         }

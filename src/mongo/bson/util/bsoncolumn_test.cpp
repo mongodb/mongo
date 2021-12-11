@@ -3658,6 +3658,27 @@ TEST_F(BSONColumnTest, ObjectEmptyAfterNonEmpty) {
     verifyDecompression(binData, elems);
 }
 
+TEST_F(BSONColumnTest, ObjectWithOnlyEmptyObjsDoesNotStartInterleaving) {
+    BSONColumnBuilder cb("test"_sd);
+
+    std::vector<BSONElement> elems;
+    elems.push_back(createElementObj(BSON("a" << BSONObjBuilder().obj())));
+    elems.push_back(createElementObj(BSON("b" << BSONObjBuilder().obj())));
+
+    for (const auto& elem : elems) {
+        cb.append(elem);
+    }
+
+    BufBuilder expected;
+    appendLiteral(expected, elems[0]);
+    appendLiteral(expected, elems[1]);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems);
+}
+
 TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
     BSONColumnBuilder cb("test"_sd);
 
