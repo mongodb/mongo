@@ -75,6 +75,11 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
               opCtx->recoveryUnit()->getTimestampReadSource());
 
     for (auto& collector : _collectors) {
+        // Skip collection if this collector has no data to return
+        if (!collector->hasData()) {
+            continue;
+        }
+
         BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
 
         // Add a Date_t before and after each BSON is collected so that we can track timing of the

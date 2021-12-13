@@ -3,6 +3,19 @@
  */
 'use strict';
 
+function getParameter(adminDb, field) {
+    var q = {getParameter: 1};
+    q[field] = 1;
+
+    var ret = adminDb.runCommand(q);
+    return ret[field];
+}
+
+function setParameter(adminDb, obj) {
+    let o = Object.extend({setParameter: 1}, obj, true);
+    return adminDb.runCommand(Object.extend({setParameter: 1}, obj));
+}
+
 /**
  * Verify that getDiagnosticData is working correctly.
  */
@@ -50,11 +63,7 @@ function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Check the defaults are correct
     //
     function getparam(field) {
-        var q = {getParameter: 1};
-        q[field] = 1;
-
-        var ret = adminDb.runCommand(q);
-        return ret[field];
+        return getParameter(adminDb, field);
     }
 
     // Verify the defaults are as we documented them
@@ -66,8 +75,7 @@ function verifyCommonFTDCParameters(adminDb, isEnabled) {
     assert.eq(getparam("diagnosticDataCollectionSamplesPerInterimUpdate"), 10);
 
     function setparam(obj) {
-        var ret = adminDb.runCommand(Object.extend({setParameter: 1}, obj));
-        return ret;
+        return setParameter(adminDb, obj);
     }
 
     if (!isMongos) {
@@ -102,4 +110,14 @@ function verifyCommonFTDCParameters(adminDb, isEnabled) {
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 1000}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 300}));
     assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 10}));
+}
+
+function waitFailedToStart(pid, exitCode) {
+    assert.soon(function() {
+        return !checkProgram(pid).alive;
+    }, `Failed to wait for ${pid} to die`, 30 * 1000);
+
+    assert.eq(exitCode,
+              checkProgram(pid).exitCode,
+              `Failed to wait for ${pid} to die with exit code ${exitCode}`);
 }

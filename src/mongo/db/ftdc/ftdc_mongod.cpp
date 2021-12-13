@@ -33,15 +33,69 @@
 
 #include <boost/filesystem.hpp>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_mongod_gen.h"
 #include "mongo/db/ftdc/ftdc_server.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
+Status validateCollectionStatsNamespaces(const std::vector<std::string> value) {
+    try {
+        for (const auto& nsStr : value) {
+            NamespaceString ns(nsStr);
+
+            if (!ns.isValid()) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("'{}' is not a valid namespace", nsStr));
+            }
+        }
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
+    return Status::OK();
+}
+
 namespace {
+
+class FTDCCollectionStatsCollector final : public FTDCCollectorInterface {
+public:
+    bool hasData() const override {
+        return !gDiagnosticDataCollectionStatsNamespaces->empty();
+    }
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
+        std::vector<std::string> namespaces = gDiagnosticDataCollectionStatsNamespaces.get();
+
+        for (const auto& nsStr : namespaces) {
+
+            try {
+                NamespaceString ns(nsStr);
+                auto result = CommandHelpers::runCommandDirectly(
+                    opCtx,
+                    OpMsgRequest::fromDBAndBody(
+                        ns.db(), BSON("collStats" << ns.coll() << "waitForLock" << false)));
+                builder.append(nsStr, result);
+
+            } catch (...) {
+                Status s = exceptionToStatus();
+                builder.append("error", s.toString());
+            }
+        }
+    }
+
+    std::string name() const override {
+        return "collectionStats";
+    }
+};
+
+
 void registerMongoDCollectors(FTDCController* controller) {
     // These metrics are only collected if replication is enabled
     if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
@@ -71,6 +125,8 @@ void registerMongoDCollectors(FTDCController* controller) {
                 BSON("getDefaultRWConcern" << 1 << "inMemory" << true)));
         }
     }
+
+    controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>());
 }
 
 }  // namespace

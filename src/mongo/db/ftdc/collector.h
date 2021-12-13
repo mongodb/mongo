@@ -63,6 +63,15 @@ public:
     virtual std::string name() const = 0;
 
     /**
+     * Some collectors can be optionally enabled at runtime but otherwise do not return any data.
+     *
+     * Returns true if this collector has data to collect.
+     */
+    virtual bool hasData() const {
+        return true;
+    }
+
+    /**
      * Collect a sample.
      *
      * If a collector fails to collect data, it should update builder with the result of the
