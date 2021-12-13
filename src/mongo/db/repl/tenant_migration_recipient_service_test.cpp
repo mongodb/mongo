@@ -1950,6 +1950,14 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
 
+    // Hang before reading oplog.
+    const auto hangAfterStartingOplogFetcher =
+        globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
+    hangAfterStartingOplogFetcher->setMode(FailPoint::alwaysOn,
+                                           0,
+                                           BSON("action"
+                                                << "hang"));
+
     // Hang before starting the oplog applier.
     const auto hangAfterStartingOplogApplier =
         globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
@@ -2010,6 +2018,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
                                 {resumeNoOpEntry.toBSON(), resumeRecipientOpTime.getTimestamp()},
                                 resumeRecipientOpTime.getTerm()));
 
+    hangAfterStartingOplogFetcher->setMode(FailPoint::off);
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
     auto oplogFetcher = getDonorOplogFetcher(instance.get());
