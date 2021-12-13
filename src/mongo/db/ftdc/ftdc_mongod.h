@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+
 namespace mongo {
 
 /**
@@ -41,5 +46,10 @@ void startMongoDFTDC();
  * Stop Full Time Data Capture
  */
 void stopMongoDFTDC();
+
+/**
+ * Validation callback for setParameter
+ */
+Status validateCollectionStatsNamespaces(std::vector<std::string> value);
 
 }  // namespace mongo

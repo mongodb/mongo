@@ -67,6 +67,7 @@ env.Library(
     source=[
         'ftdc_commands.cpp',
         'ftdc_mongod.cpp',
+        'ftdc_mongod.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -76,6 +77,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
