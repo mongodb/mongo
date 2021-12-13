@@ -288,17 +288,10 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     if (readPreference == ReadPreference::PrimaryOnly) {
         _setSyncSource(_choosePrimaryAsSyncSource(now, lastOpTimeFetched), now);
         if (_syncSource.empty()) {
-            if (readPreference == ReadPreference::PrimaryOnly) {
-                LOGV2_DEBUG(3873104,
-                            1,
-                            "Cannot select a sync source because the primary is not a valid sync "
-                            "source and the sync source read preference is 'primary'.");
-            } else {
-                LOGV2_DEBUG(3873105,
-                            1,
-                            "Cannot select a sync source because the primary is not a valid sync "
-                            "source and chaining is disabled.");
-            }
+            LOGV2_DEBUG(3873104,
+                        1,
+                        "Cannot select a sync source because the primary is not a valid sync "
+                        "source and the sync source read preference is 'primary'.");
         }
         return _syncSource;
     } else if (readPreference == ReadPreference::PrimaryPreferred) {
