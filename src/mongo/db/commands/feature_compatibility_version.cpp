@@ -346,7 +346,7 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
 void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                                                     repl::StorageInterface* storageInterface) {
-    if (!isCleanStartUp())
+    if (!hasNoReplicatedCollections(opCtx))
         return;
 
     // If the server was not started with --shardsvr, the default featureCompatibilityVersion on
@@ -382,13 +382,16 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                                              // replicated.
 }
 
-bool FeatureCompatibilityVersion::isCleanStartUp() {
+bool FeatureCompatibilityVersion::hasNoReplicatedCollections(OperationContext* opCtx) {
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     std::vector<std::string> dbNames = storageEngine->listDatabases();
-
+    auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& dbName : dbNames) {
-        if (dbName != "local") {
-            return false;
+        Lock::DBLock dbLock(opCtx, dbName, MODE_S);
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
+            if (collNss.isReplicated()) {
+                return false;
+            }
         }
     }
     return true;

@@ -84,18 +84,18 @@ public:
         bool setTargetVersion);
 
     /**
-     * If there are no non-local databases, store the featureCompatibilityVersion document. If we
-     * are not running with --shardsvr, set the version to be the upgrade value. If we are running
-     * with --shardsvr, set the version to be the downgrade value.
+     * If we are in clean startup (the server has no replicated collections), store the
+     * featureCompatibilityVersion document. If we are not running with --shardsvr, set the version
+     * to be the upgrade value. If we are running with --shardsvr, set the version to be the
+     * downgrade value.
      */
     static void setIfCleanStartup(OperationContext* opCtx,
                                   repl::StorageInterface* storageInterface);
 
     /**
-     * Returns true if the server is on a clean startup. A clean startup means there are no
-     * databases on disk besides the local database.
+     * Returns true if the server has no replicated collections.
      */
-    static bool isCleanStartUp();
+    static bool hasNoReplicatedCollections(OperationContext* opCtx);
 
     /**
      * Sets the server's outgoing and incomingInternalClient minWireVersions according to the
