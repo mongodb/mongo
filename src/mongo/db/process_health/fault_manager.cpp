@@ -200,12 +200,12 @@ boost::optional<FaultState> FaultManager::handleStartupCheck(const OptionalMessa
     }
 
     updateWithCheckStatus(HealthCheckStatus(status));
-    auto optionalActiveFault = getFaultFacetsContainer();
-    if (optionalActiveFault) {
-        optionalActiveFault->garbageCollectResolvedFacets();
+    auto optionalFault = getFaultFacetsContainer();
+    if (optionalFault) {
+        optionalFault->garbageCollectResolvedFacets();
     }
 
-    if (optionalActiveFault && hasCriticalFacet(_fault.get()) && !_transientFaultDeadline) {
+    if (optionalFault) {
         setTransientFaultDeadline(
             FaultState::kStartupCheck, FaultState::kStartupCheck, boost::none);
     }
@@ -298,8 +298,10 @@ void FaultManager::logCurrentState(FaultState, FaultState newState, const Option
 }
 
 void FaultManager::setTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
-    _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
-        this, _taskExecutor, _config->getActiveFaultDuration());
+    if (hasCriticalFacet(_fault.get()) && !_transientFaultDeadline) {
+        _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
+            this, _taskExecutor, _config->getActiveFaultDuration());
+    }
 }
 
 void FaultManager::clearTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
