@@ -218,6 +218,18 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
                                             const BSONObj& collation);
 
 /**
+ * Determines the shard(s) to which the given query will be targeted, and builds a separate
+ * versioned copy of the command object for each such shard.
+ */
+std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const BSONObj& query,
+    const BSONObj& collation);
+
+/**
  * If the command is running in a transaction, returns the proper routing table to use for targeting
  * shards. If there is no active transaction or the transaction is not running with snapshot level
  * read concern, the latest routing table is returned, otherwise a historical routing table is
