@@ -2,6 +2,10 @@
  * Tests inserting into collection while a unique index build is in the collection scan phase.
  * Ensures that even though the insert is seen by both the collection scan and the side writes
  * table, the index build does not need to resolve any duplicate keys.
+ *
+ * @tags: [
+ *   requires_document_locking,
+ * ]
  */
 (function() {
 "use strict";
