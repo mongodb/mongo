@@ -313,7 +313,7 @@ error_codes:
     # The two codes below are for internal use only and must never be returned in a network response
     # TransactionCoordinatorSteppingDown gets converted to InterruptedDueToReplStateChange
     - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption]}
-    - {code: 282,name: TransactionCoordinatorReachedAbortDecision}
+    - {code: 282,name: TransactionCoordinatorReachedAbortDecision,categories: [Interruption]}
 
     - {code: 283,name: WouldChangeOwningShard,extra: WouldChangeOwningShardInfo}
     - {code: 284,name: ForTestingErrorExtraInfoWithExtraInfoInNamespace,

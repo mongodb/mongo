@@ -183,6 +183,8 @@ all:
     test_file: jstests/sharding/collation_shard_targeting_hashed_shard_key.js
   - ticket: SERVER-60682
     test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+  - ticket: SERVER-60685
+    test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
 
 
 suites:
