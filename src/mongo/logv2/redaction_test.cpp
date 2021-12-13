@@ -154,5 +154,18 @@ TEST(RedactBSONTest, BSONWithArrays) {
 
     testBSONCases(testCases);
 }
+
+TEST(RedactBSONTest, RedactCausesBSONTooLarge) {
+    logv2::setShouldRedactLogs(true);
+    BSONObjBuilder bob;
+    for (int i = 0; i < 1024 * 1024; i++) {
+        auto fieldName = "abcdefg";
+        // The value of each field is smaller than the size of the kRedactionDefaultMask.
+        bob.append(fieldName, 1);
+    }
+    const auto obj = bob.obj();
+    // Demonstrates it is possible to grow a BSON too large by redacting fields.
+    ASSERT_THROWS_CODE(redact(obj), DBException, ErrorCodes::BSONObjectTooLarge);
+}
 }  // namespace
 }  // namespace mongo
