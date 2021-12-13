@@ -188,6 +188,10 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
                         # One or more enums does not have associated extra data.
                         indented_writer.write_line('default: return BSONObj();')
 
+                if len(extra_values) == len(self._enum.values):
+                    # All enum cases handled, the compiler should know this.
+                    indented_writer.write_line('MONGO_UNREACHABLE;')
+
 
 class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
     """Type information for integer enumerations."""

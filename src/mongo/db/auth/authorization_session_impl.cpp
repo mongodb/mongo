@@ -83,6 +83,73 @@ bool checkContracts() {
     return true;
 }
 
+using ServerlessPermissionMap = stdx::unordered_map<MatchTypeEnum, ActionSet>;
+ServerlessPermissionMap kServerlessPrivilegesPermitted;
+
+/**
+ * Load extra data from action_types.idl into runtime structure.
+ * For any given resource match type, we allow only the ActionTypes named
+ * to be granted to security token based users.
+ */
+MONGO_INITIALIZER(ServerlessPrivilegePermittedMap)(InitializerContext*) try {
+    ServerlessPermissionMap ret;
+
+    for (std::size_t i = 0; i < kNumMatchTypeEnum; ++i) {
+        auto matchType = static_cast<MatchTypeEnum>(i);
+        auto matchTypeName = MatchType_serializer(matchType);
+        auto dataObj = MatchType_get_extra_data(matchType);
+        auto data = MatchTypeExtraData::parse({matchTypeName}, dataObj);
+        auto actionTypes = data.getServerlessActionTypes();
+
+        std::vector<std::string> actionsToParse;
+        std::transform(actionTypes.cbegin(),
+                       actionTypes.cend(),
+                       std::back_inserter(actionsToParse),
+                       [](const auto& at) { return at.toString(); });
+
+        ActionSet actions;
+        std::vector<std::string> unknownActions;
+        auto status =
+            ActionSet::parseActionSetFromStringVector(actionsToParse, &actions, &unknownActions);
+        if (!status.isOK()) {
+            StringBuilder sb;
+            sb << "Unknown actions listed for match type '" << matchTypeName << "':";
+            for (const auto& unknownAction : unknownActions) {
+                sb << " '" << unknownAction << "'";
+            }
+            uassertStatusOK(status.withContext(sb.str()));
+        }
+
+        ret[matchType] = std::move(actions);
+    }
+
+    kServerlessPrivilegesPermitted = std::move(ret);
+} catch (const DBException& ex) {
+    uassertStatusOK(ex.toStatus().withContext("Failed parsing extraData for MatchType enum"));
+}
+
+void validateSecurityTokenUserPrivileges(const User::ResourcePrivilegeMap& privs) {
+    for (const auto& priv : privs) {
+        auto matchType = priv.first.matchType();
+        const auto& actions = priv.second.getActions();
+        auto it = kServerlessPrivilegesPermitted.find(matchType);
+        // This actually can't happen since the initializer above populated the map with all match
+        // types.
+        uassert(6161701,
+                str::stream() << "Unknown matchType: " << MatchType_serializer(matchType),
+                it != kServerlessPrivilegesPermitted.end());
+        if (MONGO_unlikely(!it->second.isSupersetOf(actions))) {
+            auto unauthorized = actions;
+            unauthorized.removeAllActionsFromSet(it->second);
+            uasserted(6161702,
+                      str::stream()
+                          << "Security Token user has one or more actions not approved for "
+                             "resource matchType '"
+                          << MatchType_serializer(matchType) << "': " << unauthorized.toString());
+        }
+    }
+}
+
 MONGO_FAIL_POINT_DEFINE(allowMultipleUsersWithApiStrict);
 }  // namespace
 
@@ -127,7 +194,7 @@ void AuthorizationSessionImpl::startContractTracking() {
 }
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
-                                                     const UserName& userName) {
+                                                     const UserName& userName) try {
     auto checkForMultipleUsers = [&]() {
         const auto userCount = _authenticatedUsers.count();
         if (userCount == 0) {
@@ -201,6 +268,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         uassert(6161502,
                 "Attempt to authorize a user other than that present in the security token",
                 token->getAuthenticatedUser() == userName);
+        validateSecurityTokenUserPrivileges(user->getPrivileges());
         _authenticationMode = AuthenticationMode::kSecurityToken;
     } else {
         _authenticationMode = AuthenticationMode::kConnection;
@@ -212,6 +280,9 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 
     _buildAuthenticatedRolesVector();
     return Status::OK();
+
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 User* AuthorizationSessionImpl::lookupUser(const UserName& name) {

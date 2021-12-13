@@ -261,7 +261,6 @@ public:
         return ResourcePattern(e);
     }
 
-private:
     // AuthorizationContract works directly with MatchTypeEnum. Users should not be concerned with
     // how a ResourcePattern was constructed.
     MatchTypeEnum matchType() const {
