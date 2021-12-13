@@ -1,38 +1,46 @@
-// @tags: [
-//   assumes_balancer_off,
-//   requires_fastcount,
-// ]
+/**
+ * @tags: [
+ *   assumes_balancer_off,
+ *   # explain does not support majority read concern
+ *   assumes_read_concern_local,
+ * ]
+ */
 
-t = db.geo_circle1;
+(function() {
+'use strict';
+
+const t = db.geo_circle1;
 t.drop();
 
-searches = [
+assert.commandWorked(t.createIndex({loc: "2d"}));
+
+const searches = [
     [[5, 5], 3],
     [[5, 5], 1],
     [[5, 5], 5],
     [[0, 5], 5],
 ];
-correct = searches.map(function(z) {
+let correct = searches.map(function(z) {
     return [];
 });
 
-num = 0;
+let num = 0;
 
-for (x = 0; x <= 20; x++) {
-    for (y = 0; y <= 20; y++) {
-        o = {_id: num++, loc: [x, y]};
-        t.save(o);
-        for (i = 0; i < searches.length; i++)
+let docs = [];
+for (let x = 0; x <= 20; x++) {
+    for (let y = 0; y <= 20; y++) {
+        const o = {_id: num++, loc: [x, y]};
+        docs.push(o);
+        for (let i = 0; i < searches.length; i++)
             if (Geo.distance([x, y], searches[i][0]) <= searches[i][1])
                 correct[i].push(o);
     }
 }
+assert.commandWorked(t.insert(docs));
 
-t.createIndex({loc: "2d"});
-
-for (i = 0; i < searches.length; i++) {
+for (let i = 0; i < searches.length; i++) {
     // print( tojson( searches[i] ) + "\t" + correct[i].length )
-    q = {loc: {$within: {$center: searches[i]}}};
+    const q = {loc: {$within: {$center: searches[i]}}};
 
     // correct[i].forEach( printjson )
     // printjson( q );
@@ -43,11 +51,13 @@ for (i = 0; i < searches.length; i++) {
 
     assert.eq(correct[i].length, t.find(q).itcount(), "itcount : " + tojson(searches[i]));
     assert.eq(correct[i].length, t.find(q).count(), "count : " + tojson(searches[i]));
-    var explain = t.find(q).explain("executionStats");
-    print('explain for ' + tojson(q, '', true) + ' = ' + tojson(explain));
-    // The index should be at least minimally effective in preventing the full collection
-    // scan.
-    assert.gt(t.find().count(),
+    assert.eq(correct[i].length, t.countDocuments(q), "aggregation : " + tojson(searches[i]));
+    const explain = t.find(q).explain("executionStats");
+    // The index should be at least minimally effective in preventing the full collection scan.
+    assert.gt(num,
               explain.executionStats.totalKeysExamined,
-              "nscanned : " + tojson(searches[i]));
+              "nscanned : " +
+                  tojson(searches[i] + "; query : " + tojson(q, '', true) +
+                         "; explain : " + tojson(explain)));
 }
+})();
