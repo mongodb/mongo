@@ -68,3 +68,12 @@ server_parameters:
             name: "HealthMonitoringIntensitiesServerParameter"
             data: "synchronized_value<HealthObserverIntensities>"
             override_set: true
+    activeFaultDurationSecs:
+        description: "A server parameter for specifying the duration after which we transition to active fault."
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gActiveFaultDurationSecs
+        default:
+            expr: 120
+        validator:
+            gte: 0

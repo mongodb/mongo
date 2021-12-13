@@ -113,8 +113,10 @@ public:
         _facetToIntensityMapForTest.insert({type, intensity});
     }
 
+    // If the server persists in TransientFault for more than this duration
+    // it will move to the ActiveFault state and terminate.
     Milliseconds getActiveFaultDuration() const {
-        return _activeFaultDuration;
+        return Milliseconds(Seconds(mongo::gActiveFaultDurationSecs.load()));
     }
 
     Milliseconds getPeriodicHealthCheckInterval() const {
@@ -140,15 +142,6 @@ public:
         _periodicChecksDisabledForTests = true;
     }
 
-    void setActiveFaultDurationForTests(Milliseconds duration) {
-        _activeFaultDuration = duration;
-    }
-
-protected:
-    // If the server persists in TransientFault for more than this duration
-    // it will move to the ActiveFault state and terminate.
-    static inline const auto kActiveFaultDuration = Seconds(120);
-
 private:
     static HealthMonitoringIntensitiesServerParameter* getHealthObserverIntensities() {
         return ServerParameterSet::getGlobal()->get<HealthMonitoringIntensitiesServerParameter>(
@@ -156,7 +149,6 @@ private:
     }
 
     bool _periodicChecksDisabledForTests = false;
-    Milliseconds _activeFaultDuration = kActiveFaultDuration;
 
     stdx::unordered_map<FaultFacetType, HealthObserverIntensityEnum> _facetToIntensityMapForTest;
 };

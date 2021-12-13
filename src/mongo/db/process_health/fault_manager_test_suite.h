@@ -126,6 +126,7 @@ class FaultManagerTest : public unittest::Test {
 public:
     void setUp() override {
         feature_flags::gFeatureFlagHealthMonitoring = true;
+        mongo::gActiveFaultDurationSecs.store(kActiveFaultDurationSecs);
         HealthObserverRegistration::resetObserverFactoriesForTest();
 
         createServiceContextIfNeeded();
@@ -236,6 +237,9 @@ public:
 
     static inline const Seconds kWaitTimeout{30};
     static inline const Milliseconds kSleepTime{1};
+
+    static inline const int kActiveFaultDurationSecs = 1;
+
     void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTimeout) {
         Timer t;
         while (t.elapsed() < timeout) {
