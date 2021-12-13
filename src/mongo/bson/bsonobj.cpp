@@ -142,25 +142,38 @@ BSONObj BSONObj::redact() const {
 
     // Helper to get an "internal function" to be able to do recursion
     struct redactor {
-        void operator()(BSONObjBuilder& builder, const BSONObj& obj) {
+        void operator()(BSONObjBuilder& builder, const BSONObj& obj, bool appendMask) {
             for (BSONElement e : obj) {
                 if (e.type() == Object) {
                     BSONObjBuilder subBuilder = builder.subobjStart(e.fieldNameStringData());
-                    operator()(subBuilder, e.Obj());
+                    operator()(subBuilder, e.Obj(), appendMask);
                     subBuilder.done();
                 } else if (e.type() == Array) {
                     BSONObjBuilder subBuilder = builder.subarrayStart(e.fieldNameStringData());
-                    operator()(subBuilder, e.Obj());
+                    operator()(subBuilder, e.Obj(), appendMask);
                     subBuilder.done();
-                } else {
+                } else if (appendMask) {
                     builder.append(e.fieldNameStringData(), "###"_sd);
+                } else {
+                    builder.appendNull(e.fieldNameStringData());
                 }
             }
         }
     };
 
+    try {
+        BSONObjBuilder builder;
+        redactor()(builder, *this, /*appendMask=*/true);
+        return builder.obj();
+    } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+    }
+
+    // For some BSONObj with lots of small fields, replacing each element's value with the default
+    // redaction mask "###" may cause us to exceed the maximum allowed BSON size. In this case,
+    // we use BSONType::jstNull, which ensures the redacted object will not be larger than the
+    // original.
     BSONObjBuilder builder;
-    redactor()(builder, *this);
+    redactor()(builder, *this, /*appendMask=*/false);
     return builder.obj();
 }
 
