@@ -597,7 +597,7 @@ struct OCSPFetchResponse {
     Date_t refreshTime;
     bool hasNextUpdate;
 
-    const bool cacheable() {
+    bool cacheable() {
         return (statusOfResponse == ErrorCodes::OCSPCertificateStatusRevoked) || hasNextUpdate;
     }
 
