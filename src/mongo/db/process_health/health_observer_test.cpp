@@ -107,7 +107,7 @@ TEST_F(FaultManagerTest, Stats) {
 
 TEST_F(FaultManagerTest, ProgressMonitorCheck) {
     AtomicWord<bool> shouldBlock{true};
-    registerMockHealthObserver(FaultFacetType::kMock1, [this, &shouldBlock] {
+    registerMockHealthObserver(FaultFacetType::kMock1, [&shouldBlock] {
         while (shouldBlock.load()) {
             sleepFor(Milliseconds(1));
         }
@@ -169,6 +169,39 @@ TEST_F(FaultManagerTest, PeriodicHealthCheckOnErrorMakesBadHealthStatus) {
     assertSoon([this] {
         return manager().currentFault() && manager().getFaultState() == FaultState::kStartupCheck;
     });
+}
+
+TEST_F(FaultManagerTest,
+       DeadlineFutureCausesTransientFaultWhenObserverBlocksAndGetsResolvedWhenObserverUnblocked) {
+    resetManager(std::make_unique<FaultManagerConfig>());
+    feature_flags::gFeatureFlagHealthMonitoring = true;
+    const auto saveActiveFaultDuration = gActiveFaultDurationSecs.load();
+    gActiveFaultDurationSecs.store(5);
+
+    AtomicWord<bool> shouldBlock{true};
+    registerMockHealthObserver(FaultFacetType::kMock1,
+                               [&shouldBlock] {
+                                   while (shouldBlock.load()) {
+                                       sleepFor(Milliseconds(1));
+                                   }
+                                   return 0.0;
+                               },
+                               Milliseconds(100));
+
+    ASSERT_TRUE(manager().getFaultState() == FaultState::kStartupCheck);
+
+    auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
+
+    assertSoon([this] {
+        return manager().currentFault() && manager().getFaultState() == FaultState::kStartupCheck;
+    });
+
+    shouldBlock.store(false);
+
+    assertSoon([this] { return manager().getFaultState() == FaultState::kOk; });
+
+    resetManager();  // Before fields above go out of scope.
+    gActiveFaultDurationSecs.store(saveActiveFaultDuration);
 }
 
 }  // namespace
