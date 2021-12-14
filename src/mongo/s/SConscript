@@ -430,6 +430,25 @@ env.Library(
 )
 
 env.Library(
+    target='startup_initialization',
+    source=[
+        'service_entry_point_mongos.cpp',
+        'sharding_uptime_reporter.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/not_primary_error_tracker',
+        '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+        '$BUILD_DIR/mongo/db/session_catalog',
+        'commands/cluster_commands',
+        'load_balancer_support',
+        'sharding_router_api',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+    ],
+)
+
+env.Library(
     target='mongos_initializers',
     source=[
         'cluster_cursor_stats.cpp',
@@ -498,8 +517,6 @@ env.Library(
         'mongos_options.cpp',
         'mongos_options_init.cpp',
         'mongos_options.idl',
-        'service_entry_point_mongos.cpp',
-        'sharding_uptime_reporter.cpp',
         'version_mongos.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -513,10 +530,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/authmongos',
         '$BUILD_DIR/mongo/db/commands/rwc_defaults_commands',
-        '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
-        '$BUILD_DIR/mongo/db/log_process_details',
-        '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/process_health/fault_manager',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/serverinit',
@@ -526,8 +540,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/latch_analyzer' if get_option('use-diagnostic-latches') == 'on' else [],
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
-        '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'client/sharding_client',
         'commands/cluster_commands',
@@ -539,6 +551,7 @@ env.Library(
         'sessions_collection_sharded',
         'sharding_initialization',
         'sharding_router_api',
+        'startup_initialization',
     ],
     LIBDEPS=[
         # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE

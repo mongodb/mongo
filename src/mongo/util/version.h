@@ -170,6 +170,11 @@ protected:
 };
 
 /**
+ * Returns a pretty string describing the provided binary's version.
+ */
+std::string formatVersionString(StringData versioned, const VersionInfoInterface& provider);
+
+/**
  * Returns a pretty string describing the current shell version.
  */
 std::string mongoShellVersion(const VersionInfoInterface& provider);

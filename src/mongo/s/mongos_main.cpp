@@ -637,7 +637,7 @@ private:
 ExitCode runMongosServer(ServiceContext* serviceContext) {
     ThreadClient tc("mongosMain", serviceContext);
 
-    logShardingVersionInfo(nullptr);
+    logMongosVersionInfo(nullptr);
     audit::logStartupOptions(tc.get(), serverGlobalParams.parsedOpts);
 
     // Set up the periodic runner for background job execution

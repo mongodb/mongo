@@ -38,6 +38,6 @@ namespace mongo {
  * NOTE: Outputs the version of MongoS to `os` (as part of the --version option),
  * which reports different data than if `os` is null!
  */
-void logShardingVersionInfo(std::ostream* os);
+void logMongosVersionInfo(std::ostream* os);
 
 }  // namespace mongo

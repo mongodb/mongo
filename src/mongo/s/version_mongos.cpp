@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-void logShardingVersionInfo(std::ostream* os) {
+void logMongosVersionInfo(std::ostream* os) {
     if (os) {
         auto&& vii = VersionInfoInterface::instance();
         *os << mongosVersion(vii) << std::endl;
