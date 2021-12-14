@@ -33,13 +33,14 @@ server_parameters:
         description: >-
           The maximum number of documents in each batch to delete during the cleanup stage of chunk
           migration (or the cleanupOrphaned command). A value of 0 indicates that the system chooses
-          the default value (128).
+          the default value (INT_MAX).
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: rangeDeleterBatchSize
         validator:
           gte: 0
-        default: 128
+        default:
+          expr: std::numeric_limits<int>::max()
 
     rangeDeleterBatchDelayMS:
         description: >-
