@@ -98,10 +98,17 @@ StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMerge
     OperationContext* opCtx, const NamespaceString& nss, const ChunkRange& chunkRange) {
     stdx::unique_lock<Latch> ul(_mutex);
 
-    opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
-        return !(_activeMoveChunkState && _activeMoveChunkState->args.getNss() == nss) &&
-            !_activeSplitMergeChunkStates.count(nss);
-    });
+    // In order for splits to not block for too long behind a potential chunk migration, limit the
+    // duration of waiting for conflicting operations to at most 5 seconds. Otherwise, due to the
+    // fact that chunk splits block write operations on the MongoS it is possible that the write
+    // workload gets a really long stall.
+    const auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() + Seconds{5};
+    if (!opCtx->waitForConditionOrInterruptUntil(_chunkOperationsStateChangedCV, ul, deadline, [&] {
+            return !(_activeMoveChunkState && _activeMoveChunkState->args.getNss() == nss) &&
+                !_activeSplitMergeChunkStates.count(nss);
+        })) {
+        return {ErrorCodes::LockBusy, "Timed out waiting for concurrent migration to complete"};
+    }
 
     auto [it, inserted] =
         _activeSplitMergeChunkStates.emplace(nss, ActiveSplitMergeChunkState(nss, chunkRange));
