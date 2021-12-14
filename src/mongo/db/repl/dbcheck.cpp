@@ -225,76 +225,6 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     }
 }
 
-std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
-    md5_state_t state;
-    md5_init(&state);
-
-    md5_append(&state, md5Cast(info.collectionName.data()), info.collectionName.size());
-
-    maybeAppend(&state, info.prev);
-    maybeAppend(&state, info.next);
-
-    for (const auto& index : info.indexes) {
-        md5_append(&state, md5Cast(index.objdata()), index.objsize());
-    }
-
-    md5_append(&state, md5Cast(info.options.objdata()), info.options.objsize());
-
-    md5digest digest;
-
-    md5_finish(&state, digest);
-    return digestToString(digest);
-}
-
-std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
-    OperationContext* opCtx, const CollectionPtr& collection) {
-    auto catalog = CollectionCatalog::get(opCtx);
-    const UUID uuid = collection->uuid();
-
-    std::vector<UUID> collectionUUIDs = catalog->getAllCollectionUUIDsFromDb(collection->ns().db());
-    auto uuidIt = std::find(collectionUUIDs.begin(), collectionUUIDs.end(), uuid);
-    invariant(uuidIt != collectionUUIDs.end());
-
-    boost::optional<UUID> prevUUID;
-    boost::optional<UUID> nextUUID;
-
-    if (uuidIt != collectionUUIDs.begin()) {
-        prevUUID = *std::prev(uuidIt);
-    }
-
-    if (auto nextIt = std::next(uuidIt); nextIt != collectionUUIDs.end()) {
-        nextUUID = *nextIt;
-    }
-
-    return std::make_pair(prevUUID, nextUUID);
-}
-
-std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,
-                                                       const UUID& uuid,
-                                                       const DbCheckCollectionInformation& expected,
-                                                       const DbCheckCollectionInformation& found,
-                                                       const repl::OpTime& optime) {
-    auto names = expectedFound(expected.collectionName, found.collectionName);
-    auto prevs = expectedFound(expected.prev, found.prev);
-    auto nexts = expectedFound(expected.next, found.next);
-    auto indices = expectedFound(expected.indexes, found.indexes);
-    auto options = expectedFound(expected.options, found.options);
-    bool match = names.first && prevs.first && nexts.first && indices.first && options.first;
-    auto severity = match ? SeverityEnum::Info : SeverityEnum::Error;
-
-    // Get the hash of all of the other fields.
-    auto md5s = expectedFound(hashCollectionInfo(expected), hashCollectionInfo(found));
-
-    std::string msg =
-        "dbCheck collection " + (match ? std::string("consistent") : std::string("inconsistent"));
-    auto data = BSON("success" << true << "uuid" << uuid.toString() << "found" << true << "name"
-                               << names.second << "prev" << prevs.second << "next" << nexts.second
-                               << "indexes" << indices.second << "options" << options.second
-                               << "md5" << md5s.second << "optime" << optime);
-
-    return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Collection, data);
-}
-
 Status DbCheckHasher::hashAll(void) {
     BSONObj currentObj;
 
@@ -363,29 +293,6 @@ bool DbCheckHasher::_canHash(const BSONObj& obj) {
     return true;
 }
 
-std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const CollectionPtr& collection) {
-    std::vector<BSONObj> result;
-    std::vector<std::string> names;
-
-    // List the indices,
-    collection->getAllIndexes(&names);
-
-    // and get the info for each one.
-    for (const auto& name : names) {
-        result.push_back(collection->getIndexSpec(name));
-    }
-
-    auto comp = std::make_unique<SimpleBSONObjComparator>();
-
-    std::sort(result.begin(), result.end(), SimpleBSONObjComparator::LessThan());
-
-    return result;
-}
-
-BSONObj collectionOptions(OperationContext* opCtx, const CollectionPtr& collection) {
-    return collection->getCollectionOptions().toBSON();
-}
-
 namespace {
 
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
@@ -450,54 +357,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
-                                  const repl::OpTime& optime,
-                                  const DbCheckOplogCollection& entry) {
-    // dbCheckCollectionResult-specific stuff.
-    auto uuid = uassertStatusOK(UUID::parse(entry.getUuid().toString()));
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
-
-    if (!collection) {
-        Status status(ErrorCodes::NamespaceNotFound, "Could not find collection for dbCheck");
-        auto logEntry = dbCheckErrorHealthLogEntry(
-            entry.getNss(), "dbCheckCollection failed", OplogEntriesEnum::Collection, status);
-        HealthLog::get(opCtx).log(*logEntry);
-        return Status::OK();
-    }
-
-    auto db = collection->ns().db();
-    AutoGetDb agd(opCtx, db, MODE_X);
-
-    DbCheckCollectionInformation expected;
-    DbCheckCollectionInformation found;
-
-    expected.collectionName = entry.getNss().coll().toString();
-    found.collectionName = collection->ns().coll().toString();
-
-    auto prevAndNext = getPrevAndNextUUIDs(opCtx, collection);
-
-    // found/expected previous UUID,
-    expected.prev = entry.getPrev();
-    found.prev = prevAndNext.first;
-
-    // found/expected next UUID,
-    expected.next = entry.getNext();
-    found.next = prevAndNext.second;
-
-    // found/expected indices,
-    expected.indexes = entry.getIndexes();
-    found.indexes = collectionIndexInfo(opCtx, collection);
-
-    // and found/expected collection options.
-    expected.options = entry.getOptions();
-    found.options = collectionOptions(opCtx, collection);
-
-    auto hle = dbCheckCollectionEntry(entry.getNss(), uuid, expected, found, optime);
-
-    HealthLog::get(opCtx).log(*hle);
-
-    return Status::OK();
-}
 }  // namespace
 
 namespace repl {
@@ -522,8 +381,8 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             return dbCheckBatchOnSecondary(opCtx, opTime, invocation);
         }
         case OplogEntriesEnum::Collection: {
-            auto invocation = DbCheckOplogCollection::parse(ctx, cmd);
-            return dbCheckDatabaseOnSecondary(opCtx, opTime, invocation);
+            // TODO SERVER-61963.
+            return Status::OK();
         }
     }
 

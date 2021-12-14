@@ -188,10 +188,8 @@ protected:
 
 private:
     void _doCollection(const DbCheckCollectionInfo& info) {
-        // If we can't find the collection, abort the check.
-        if (!_getCollectionMetadata(info)) {
-            return;
-        }
+        // The collection was confirmed as existing in singleCollectionRun().
+        // runBatch() will handle the case of the collection having been dropped since then.
 
         if (_done) {
             return;
@@ -285,66 +283,6 @@ private:
     bool _done;
     std::string _dbName;
     std::unique_ptr<DbCheckRun> _run;
-
-    bool _getCollectionMetadata(const DbCheckCollectionInfo& info) {
-        auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-        auto opCtx = uniqueOpCtx.get();
-
-        // While we get the prev/next UUID information, we need a database-level lock.
-        AutoGetDb agd(opCtx, info.nss.db(), MODE_S);
-
-        if (_stepdownHasOccurred(opCtx, info.nss)) {
-            _done = true;
-            return true;
-        }
-
-        auto db = agd.getDb();
-        if (!db) {
-            return false;
-        }
-
-        auto collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, info.nss);
-        if (!collection) {
-            return false;
-        }
-
-        auto [prev, next] = getPrevAndNextUUIDs(opCtx, collection);
-
-        // Find and report collection metadata.
-        auto indices = collectionIndexInfo(opCtx, collection);
-        auto options = collectionOptions(opCtx, collection);
-
-        DbCheckOplogCollection entry;
-        entry.setNss(collection->ns());
-        entry.setUuid(collection->uuid());
-        if (prev) {
-            entry.setPrev(*prev);
-        }
-        if (next) {
-            entry.setNext(*next);
-        }
-        entry.setType(OplogEntriesEnum::Collection);
-        entry.setIndexes(indices);
-        entry.setOptions(options);
-
-        // Send information on this collection over the oplog for the secondary to check.
-        auto optime = _logOp(opCtx, collection->ns(), collection->uuid(), entry.toBSON());
-
-        DbCheckCollectionInformation collectionInfo;
-        collectionInfo.collectionName = collection->ns().coll().toString();
-        collectionInfo.prev = entry.getPrev();
-        collectionInfo.next = entry.getNext();
-        collectionInfo.indexes = entry.getIndexes();
-        collectionInfo.options = entry.getOptions();
-
-        auto hle = dbCheckCollectionEntry(
-            collection->ns(), collection->uuid(), collectionInfo, collectionInfo, optime);
-
-        HealthLog::get(opCtx).log(*hle);
-
-        return true;
-    }
 
     StatusWith<BatchStats> _runBatch(const DbCheckCollectionInfo& info,
                                      const BSONKey& first,

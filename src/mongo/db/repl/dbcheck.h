@@ -80,33 +80,6 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const boost::optional<CollectionOptions>& options = boost::none);
 
 /**
- * The collection metadata dbCheck sends between nodes.
- */
-struct DbCheckCollectionInformation {
-    std::string collectionName;
-    boost::optional<UUID> prev;
-    boost::optional<UUID> next;
-    std::vector<BSONObj> indexes;
-    BSONObj options;
-};
-
-/**
- * Returns a pair of previous and next UUIDs around the given collections uuid. If there is no
- * previous or next UUID, return boost::none respectively.
- */
-std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
-    OperationContext* opCtx, const CollectionPtr& collection);
-
-/**
- * Get a HealthLogEntry for a dbCheck collection.
- */
-std::unique_ptr<HealthLogEntry> dbCheckCollectionEntry(const NamespaceString& nss,
-                                                       const UUID& uuid,
-                                                       const DbCheckCollectionInformation& expected,
-                                                       const DbCheckCollectionInformation& found,
-                                                       const repl::OpTime& optime);
-
-/**
  * Hashing collections and plans.
  *
  * Provides MD5-based hashing of ranges of documents.  Note that this class does *not* provide
@@ -176,16 +149,6 @@ private:
     int64_t _maxBytes = 0;
     int64_t _bytesSeen = 0;
 };
-
-/**
- * Gather the index information for a collection.
- */
-std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, const CollectionPtr& collection);
-
-/**
- * Gather other information for a collection.
- */
-BSONObj collectionOptions(OperationContext* opCtx, const CollectionPtr& collection);
 
 namespace repl {
 

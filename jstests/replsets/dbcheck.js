@@ -415,43 +415,7 @@ function simpleTestCatchesExtra() {
                   JSON.stringify(errors.toArray()));
 }
 
-// Test that dbCheck catches an extra index on the secondary.
-function testCollectionMetadataChanges() {
-    {
-        const primary = replSet.getPrimary();
-        const db = primary.getDB(dbName);
-        db[collName].drop();
-        clearLog();
-
-        // Create the collection on the primary.
-        db.createCollection(collName, {validationLevel: "off"});
-    }
-
-    replSet.awaitReplication();
-    injectInconsistencyOnSecondary(
-        {createIndexes: collName, indexes: [{key: {whatever: 1}, name: "whatever"}]});
-    replSet.awaitReplication();
-
-    {
-        const primary = replSet.getPrimary();
-        const db = primary.getDB(dbName);
-        assert.commandWorked(db.runCommand({dbCheck: collName}));
-        awaitDbCheckCompletion(db, collName);
-    }
-
-    const errors = replSet.getSecondary().getDB("local").system.healthlog.find(
-        {"operation": /dbCheck.*/, "severity": "error", "data.success": true});
-
-    assert.eq(errors.count(),
-              1,
-              "expected exactly 1 inconsistency after single inconsistent index creation, found: " +
-                  JSON.stringify(errors.toArray()));
-
-    clearLog();
-}
-
 simpleTestCatchesExtra();
-testCollectionMetadataChanges();
 
 replSet.stopSet();
 })();
