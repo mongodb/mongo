@@ -178,7 +178,12 @@ public:
         const BSONObj query = cmdObj.getObjectField("query");
         const BSONObj collation = getCollation(cmdObj);
         const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, query);
-        auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
+
+        // For now, set bypassIsFieldHashedCheck to be true in order to skip the
+        // isFieldHashedCheck in the special case where _id is hashed and used as the shard key.
+        // This means that we always assume that a findAndModify request using _id is targetable
+        // to a single shard.
+        auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation, true);
 
         _runCommand(opCtx,
                     chunk.getShardId(),
