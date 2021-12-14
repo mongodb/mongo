@@ -72,9 +72,6 @@ const secondary = rst.add({
         // This test is specifically testing that the cloners stop, so we turn off the
         // oplog fetcher to ensure that we don't inadvertently test that instead.
         'failpoint.hangBeforeStartingOplogFetcher': tojson({mode: 'alwaysOn'}),
-        // MongoBridge does not support 'exhaust'.
-        // TODO(SERVER-44644): remove this setting
-        'collectionClonerUsesExhaust': false,
         'collectionClonerBatchSize': 2,
         'numInitialSyncAttempts': 1,
     }
