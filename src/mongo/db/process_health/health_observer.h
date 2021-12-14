@@ -87,6 +87,11 @@ public:
      * Value used to introduce jitter between health check invocations.
      */
     virtual Milliseconds healthCheckJitter() const = 0;
+
+    /**
+     * Timeout value enforced on an individual health check.
+     */
+    virtual Milliseconds getObserverTimeout() const = 0;
 };
 
 }  // namespace process_health

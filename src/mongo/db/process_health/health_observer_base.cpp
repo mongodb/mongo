@@ -31,6 +31,7 @@
 
 #include "mongo/db/process_health/health_observer_base.h"
 
+#include "mongo/db/process_health/deadline_future.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 
@@ -48,17 +49,17 @@ SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
     {
         auto lk = stdx::lock_guard(_mutex);
         if (_currentlyRunningHealthCheck) {
-            return _periodicCheckPromise->getFuture();
+            return _deadlineFuture->get();
         }
 
         LOGV2_DEBUG(6007902, 2, "Start periodic health check", "observerType"_attr = getType());
         const auto now = _svcCtx->getPreciseClockSource()->now();
         _lastTimeTheCheckWasRun = now;
         _currentlyRunningHealthCheck = true;
-        _periodicCheckPromise = std::make_unique<SharedPromise<HealthCheckStatus>>();
     }
 
-    _periodicCheckPromise->setFrom(
+    _deadlineFuture = std::make_unique<DeadlineFuture<HealthCheckStatus>>(
+        taskExecutor,
         periodicCheckImpl({token, taskExecutor})
             .onCompletion([this](StatusWith<HealthCheckStatus> status) {
                 if (!status.isOK()) {
@@ -77,9 +78,10 @@ SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
                 _currentlyRunningHealthCheck = false;
                 _lastTimeCheckCompleted = now;
                 return status;
-            }));
+            }),
+        getObserverTimeout());
 
-    return _periodicCheckPromise->getFuture();
+    return _deadlineFuture->get();
 }
 
 HealthCheckStatus HealthObserverBase::makeHealthyStatus() const {

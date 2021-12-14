@@ -34,6 +34,9 @@ namespace mongo {
 namespace process_health {
 class TestHealthObserver : public HealthObserverBase {
 public:
+    TestHealthObserver(ServiceContext* svcCtx) : HealthObserverBase(svcCtx){};
+
+protected:
     FaultFacetType getType() const override {
         return FaultFacetType::kTestObserver;
     }
@@ -42,9 +45,10 @@ public:
         return Milliseconds(0);
     }
 
-    TestHealthObserver(ServiceContext* svcCtx) : HealthObserverBase(svcCtx){};
+    Milliseconds getObserverTimeout() const override {
+        return Milliseconds(Seconds(30));
+    }
 
-protected:
     Future<HealthCheckStatus> periodicCheckImpl(
         PeriodicHealthCheckContext&& periodicCheckContext) override;
 };
