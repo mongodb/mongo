@@ -813,10 +813,32 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
     }
 
+    BSONElement clusteredElt = spec["clustered"];
+    if (clusteredElt && clusteredElt.trueValue() && !collection->isClustered()) {
+        return Status(ErrorCodes::Error(6100905),
+                      "Cannot have the 'clustered' option on a non-clustered collection");
+    }
+
+    if (collection->isClustered()) {
+        auto status = clustered_util::checkSpecDoesNotConflictWithClusteredIndex(
+            spec, collection->getClusteredInfo()->getIndexSpec());
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (clustered_util::matchesClusterKey(key, collection->getClusteredInfo())) {
+            // The index matches the clusteredIndex which already exists implicitly.
+            return Status(ErrorCodes::IndexAlreadyExists,
+                          "The collection is clustered implicitly by the index");
+        }
+    }
+
     if (IndexDescriptor::isIdIndexPattern(key)) {
-        if (collection->isClustered()) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "cannot create the _id index on a clustered collection");
+        if (collection->isClustered() &&
+            !clustered_util::matchesClusterKey(key, collection->getClusteredInfo())) {
+            return Status(
+                ErrorCodes::CannotCreateIndex,
+                "cannot create the _id index on a clustered collection not clustered by _id");
         }
 
         BSONElement uniqueElt = spec["unique"];
@@ -837,13 +859,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                                                collection->getDefaultCollator())) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "_id index must have the collection default collation");
-        }
-    } else {
-        // Non _id index
-        if (collection->isClustered() &&
-            clustered_util::matchesClusterKey(key, collection->getClusteredInfo())) {
-            return Status(ErrorCodes::CannotCreateIndex,
-                          "cannot create an index with the same key as the cluster key");
         }
     }
 

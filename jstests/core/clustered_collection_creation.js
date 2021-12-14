@@ -6,7 +6,7 @@
  * non-replicated collections.
  *
  * @tags: [
- *   requires_fcv_51,
+ *   requires_fcv_52,
  *   assumes_against_mongod_not_mongos,
  *   assumes_no_implicit_collection_creation_after_drop,
  *   does_not_support_stepdowns,
@@ -38,17 +38,43 @@ const validateCompoundSecondaryIndexes = function(db, coll, clusterKey) {
     coll.drop();
 };
 
-// Cannot create an index with the same key as the cluster key.
-const validateClusteredIndexAlreadyExists = function(db, collName, fullCreateOptions) {
+// Tests it is legal to call createIndex on the cluster key with or without {'clustered': true} as
+// an option. Additionally, confirms it is illegal to call createIndex with the 'clustered' option
+// on a pattern that is not the cluster key.
+const validateCreateIndexOnClusterKey = function(db, collName, fullCreateOptions) {
     const clusterKey = fullCreateOptions.clusteredIndex.key;
-    const res = db[collName].createIndex(clusterKey);
-    assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
-    const clusterKeyField = Object.keys(clusterKey)[0];
-    if (clusterKeyField == "_id") {
-        assert(res.errmsg.includes("cannot create the _id index on a clustered collection"));
-    } else {
-        assert(res.errmsg.includes("cannot create an index with the same key as the cluster key"));
-    }
+
+    const listIndexes0 = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    const listIndexesClusteredIndex = listIndexes0.cursor.firstBatch[0];
+
+    // Expect listIndexes to append the 'clustered' field to it's clusteredIndex output.
+    assert.docEq(listIndexesClusteredIndex.key, clusterKey);
+    assert.eq(listIndexesClusteredIndex.clustered, true);
+
+    // no-op with the 'clustered' option.
+    assert.commandWorked(
+        db[collName].runCommand({createIndexes: collName, indexes: [listIndexesClusteredIndex]}));
+
+    // no-op without the 'clustered' option.
+    assert.commandWorked(db[collName].createIndex(clusterKey));
+
+    // 'clustered' is not a valid option for an index not on the cluster key.
+    assert.commandFailedWithCode(
+        db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6100904);
+
+    assert.commandFailedWithCode(db[collName].runCommand({
+        createIndexes: collName,
+        indexes: [
+            {key: {a: 1}, name: "a_1"},
+            {key: {b: 1}, name: "b_1_clustered", clustered: true, unique: true}
+        ]
+    }),
+                                 6100904);
+
+    // The listIndexes output should be unchanged.
+    const listIndexes1 = assert.commandWorked(db[collName].runCommand("listIndexes"));
+    assert.eq(listIndexes1.cursor.firstBatch.length, 1);
+    assert.docEq(listIndexes1.cursor.firstBatch[0], listIndexes0.cursor.firstBatch[0]);
 };
 
 // It is illegal to drop the clusteredIndex. Verify that the various ways of dropping the
@@ -66,15 +92,15 @@ const validateClusteredIndexUndroppable = function(db, collName, fullCreateOptio
 };
 
 const validateCreatedCollection = function(db, collName, createOptions) {
-    // Upon creating a collection, fields absent in the user provided create options are filled in
-    // with default values. The fullCreateOptions should contain default values for the fields not
-    // specified by the user.
+    // Upon creating a collection, fields absent in the user provided create options are filled
+    // in with default values. The fullCreateOptions should contain default values for the
+    // fields not specified by the user.
     const fullCreateOptions = ClusteredCollectionUtil.constructFullCreateOptions(createOptions);
 
     ClusteredCollectionUtil.validateListCollections(db, collName, fullCreateOptions);
     ClusteredCollectionUtil.validateListIndexes(db, collName, fullCreateOptions);
 
-    validateClusteredIndexAlreadyExists(db, collName, fullCreateOptions);
+    validateCreateIndexOnClusterKey(db, collName, fullCreateOptions);
     validateClusteredIndexUndroppable(db, collName, fullCreateOptions);
 };
 

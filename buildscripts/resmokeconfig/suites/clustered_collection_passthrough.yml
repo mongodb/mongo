@@ -41,6 +41,8 @@ selector:
   - jstests/core/internal_rename_if_options_and_indexes_match.js
   # The _id index is expected to not have a 'unique' field.
   - jstests/core/list_indexes.js
+  # Expects createIndex with 'clustered' option fails on a non-clustered collection.
+  - jstests/core/clustered_collection_create_index_clustered.js
 
   # TODO (SERVER-61259): $text not supported: "No query solutions"
   - jstests/core/fts6.js

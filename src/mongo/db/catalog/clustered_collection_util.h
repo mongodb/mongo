@@ -55,6 +55,14 @@ ClusteredCollectionInfo makeCanonicalClusteredInfo(ClusteredIndexSpec indexSpec)
 boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& elem);
 
 /**
+ * Commands like createIndex() can implicitly create collections. If the index specifies the
+ * 'clustered' field, then generate ClusteredCollectionInfo for the collection. Throws if invalid
+ * specs are provided.
+ */
+boost::optional<ClusteredCollectionInfo> createClusteredInfoForNewCollection(
+    const BSONObj& indexSpec);
+
+/**
  * Returns true if legacy format is required for the namespace.
  */
 bool requiresLegacyFormat(const NamespaceString& nss);
@@ -70,6 +78,12 @@ BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo);
  */
 bool matchesClusterKey(const BSONObj& obj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo);
+
+/**
+ * Returns an error if any field of the indexSpec conflicts with the field of the clusteredIndex.
+ */
+Status checkSpecDoesNotConflictWithClusteredIndex(const BSONObj& indexSpec,
+                                                  const ClusteredIndexSpec& clusteredIndexSpec);
 
 /**
  * Returns true if the collection is clustered on the _id field.

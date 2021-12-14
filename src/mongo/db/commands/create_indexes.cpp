@@ -36,6 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
@@ -105,9 +106,17 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
     const auto ns = cmd.getNamespace();
     const bool ignoreUnknownIndexOptions = cmd.getIgnoreUnknownIndexOptions();
 
+    bool containsClusteredIndex = false;
     std::vector<BSONObj> indexSpecs;
     for (const auto& index : cmd.getIndexes()) {
         BSONObj parsedIndexSpec = index;
+        if (parsedIndexSpec.hasField("clustered")) {
+            uassert(6100901,
+                    "A collection may only be clustered by a single index",
+                    !containsClusteredIndex);
+            containsClusteredIndex = true;
+        }
+
         if (ignoreUnknownIndexOptions) {
             parsedIndexSpec = index_key_validate::removeUnknownFields(parsedIndexSpec);
         }
@@ -319,6 +328,17 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
         BSONObjBuilder builder;
         builder.append("create", ns.coll());
         CollectionOptions options;
+        for (const auto& spec : specs) {
+            if (spec["clustered"] && !ns.isTimeseriesBucketsCollection()) {
+                // Timeseries buckets collections are created differently than standard clustered
+                // indexes.
+                tassert(6100900,
+                        "CollectionOptions are not expected to have a clusteredIndex yet",
+                        !options.clusteredIndex.is_initialized());
+                options.clusteredIndex = clustered_util::createClusteredInfoForNewCollection(spec);
+            }
+        }
+
         builder.appendElements(options.toBSON());
         BSONObj idIndexSpec;
 
