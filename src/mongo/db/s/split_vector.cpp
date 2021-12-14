@@ -231,9 +231,13 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                     currKey = dotted_path_support::extractElementsBasedOnTemplate(
                         prettyKey(shardKeyIdx->keyPattern(), currKey.getOwned()), keyPattern);
 
-                    // Do not use this split key if it is the same used in the previous split
-                    // point.
+
+                    const auto compareWithPreviousSplitPoint = currKey.woCompare(splitKeys.back());
+                    dassert(compareWithPreviousSplitPoint >= 0,
+                            str::stream() << "Found split key smaller then the previous one: "
+                                          << currKey << " < " << splitKeys.back());
                     if (currKey.woCompare(splitKeys.back()) == 0) {
+                        // Do not use this split key if it is the same of the previous split point.
                         tooFrequentKeys.insert(currKey.getOwned());
                     } else {
                         auto additionalKeySize =
@@ -347,11 +351,6 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 "duration"_attr = Milliseconds(timer.millis()));
         }
     }
-
-    // TODO SERVER-58750: investigate if it is really needed to sort the vector
-    // Make sure splitKeys is in ascending order
-    std::sort(
-        splitKeys.begin(), splitKeys.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
 
     return splitKeys;
 }

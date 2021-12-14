@@ -240,7 +240,11 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
             if (++numScannedKeys >= maxDocsPerChunk) {
                 currentKey = orderShardKeyFields(keyPattern, currentKey);
 
-                if (currentKey.woCompare(lastSplitPoint) == 0) {
+                const auto compareWithPreviousSplitPoint = currentKey.woCompare(lastSplitPoint);
+                dassert(compareWithPreviousSplitPoint >= 0,
+                        str::stream() << "Found split key smaller then the last one: " << currentKey
+                                      << " < " << lastSplitPoint);
+                if (compareWithPreviousSplitPoint == 0) {
                     // Do not add again the same split point in case of frequent shard key.
                     tooFrequentKeys.insert(currentKey.getOwned());
                     continue;
@@ -310,6 +314,10 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
 
                         const auto compareWithPreviousSplitPoint =
                             currentKey.woCompare(previousSplitPoint);
+
+                        dassert(compareWithPreviousSplitPoint >= 0,
+                                str::stream() << "Found split key smaller then the previous one: "
+                                              << currentKey << " < " << previousSplitPoint);
                         if (compareWithPreviousSplitPoint > 0) {
                             const auto additionalKeySize =
                                 currentKey.objsize() + estimatedAdditionalBytesPerItemInBSONArray;
@@ -361,11 +369,6 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                       "numSplits"_attr = splitKeys.size(),
                       "duration"_attr = Milliseconds(elapsedMillisToFindSplitPoints));
     }
-
-    // TODO SERVER-58750: investigate if it is really needed to sort the vector
-    // Make sure splitKeys is in ascending order
-    std::sort(
-        splitKeys.begin(), splitKeys.end(), SimpleBSONObjComparator::kInstance.makeLessThan());
 
     return splitKeys;
 }
