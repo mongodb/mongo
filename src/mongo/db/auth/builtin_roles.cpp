@@ -457,6 +457,9 @@ void addClusterManagerPrivileges(PrivilegeVector* privileges) {
         Privilege(ResourcePattern::forAnyNormalResource(), clusterManagerRoleDatabaseActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
+        Privilege(ResourcePattern::forAnySystemBuckets(), clusterManagerRoleDatabaseActions));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
         Privilege(ResourcePattern::forDatabaseName("config"), clusterManagerRoleDatabaseActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
