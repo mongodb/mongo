@@ -357,10 +357,10 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                    },
                    nss);
            })
-        .until([](StatusWith<int> swNumDeleted) {
+        .until([=](StatusWith<int> swNumDeleted) {
             // Continue iterating until there are no more documents to delete, retrying on
             // any error that doesn't indicate that this node is stepping down.
-            return (swNumDeleted.isOK() && swNumDeleted.getValue() == 0) ||
+            return (swNumDeleted.isOK() && swNumDeleted.getValue() < numDocsToRemovePerBatch) ||
                 swNumDeleted.getStatus() ==
                 ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist ||
                 swNumDeleted.getStatus() ==
