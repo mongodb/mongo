@@ -127,7 +127,6 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::createCollection  // db admin gets this also
         << ActionType::dropCollection
         << ActionType::dropIndex
-        << ActionType::emptycapped
         << ActionType::createIndex
         << ActionType::insert
         << ActionType::remove
