@@ -49,7 +49,6 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_config_optime_gossip.h"
@@ -129,7 +128,6 @@ void initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
                        repl::MemberState::RS_PRIMARY);
 
     CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-    ChunkSplitter::get(opCtx).setReplicaSetMode(isStandaloneOrPrimary);
 
     Grid::get(opCtx)->setShardingInitialized();
 
