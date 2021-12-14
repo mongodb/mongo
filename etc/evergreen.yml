@@ -8606,7 +8606,7 @@ buildvariants:
   - name: compile_benchmarks
     distros:
     - windows-vsCurrent-large
-  - name: .benchmarks
+  - name: .benchmarks !benchmarks_orphaned
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-wtdevelop
