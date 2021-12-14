@@ -104,7 +104,7 @@ if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shar
         remember: true,
         appendOptions: true,
         startClean: false,
-        setParameter: {rangeDeleterBatchDelayMS: 60000}
+        setParameter: {rangeDeleterBatchDelayMS: 60000, rangeDeleterBatchSize: 128}
     });
 
     st.rs1.restart(0, {
