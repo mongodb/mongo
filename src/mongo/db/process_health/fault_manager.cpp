@@ -418,7 +418,8 @@ FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
 
 void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token) {
     auto schedulerCb = [this, observer, token] {
-        auto scheduledTime = _taskExecutor->now() + _config->kPeriodicHealthCheckInterval +
+        auto scheduledTime = _taskExecutor->now() +
+            _config->getPeriodicHealthCheckInterval(observer->getType()) +
             std::min(observer->healthCheckJitter(),
                      FaultManagerConfig::kPeriodicHealthCheckMaxJitter);
         LOGV2_DEBUG(5939701,

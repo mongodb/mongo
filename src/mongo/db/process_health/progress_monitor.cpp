@@ -91,9 +91,22 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
     if (secondPass.empty()) {
         return;
     }
+
+    auto longestIntervalHealthObserver = *std::max_element(
+        secondPass.begin(), secondPass.end(), [&](const auto& lhs, const auto& rhs) {
+            auto lhs_interval =
+                _faultManager->getConfig().getPeriodicHealthCheckInterval(lhs->getType());
+            auto rhs_interval =
+                _faultManager->getConfig().getPeriodicHealthCheckInterval(rhs->getType());
+            return lhs_interval < rhs_interval;
+        });
+
+    auto longestInterval = _faultManager->getConfig().getPeriodicHealthCheckInterval(
+        longestIntervalHealthObserver->getType());
+
+    sleepFor(longestInterval * 2);
     // The observer is enabled but did not run for a while. Sleep two cycles
     // and check again. Note: this should be rare.
-    sleepFor(_faultManager->getConfig().getPeriodicHealthCheckInterval() * 2);
     for (auto observer : secondPass) {
         const auto stats = observer->getStats();
         if (!_faultManager->getConfig().isHealthObserverEnabled(observer->getType()) &&

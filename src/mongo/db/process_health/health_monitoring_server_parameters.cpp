@@ -54,4 +54,44 @@ void HealthMonitoringIntensitiesServerParameter::append(OperationContext*,
     b.append(name, healthMonitoring.obj());
 }
 
+Status HealthMonitoringProgressMonitorServerParameter::setFromString(const std::string& value) {
+    *_data = HealthObserverProgressMonitorConfig::parse(
+        IDLParserErrorContext("health monitoring liveness"), fromjson(value));
+    return Status::OK();
+}
+
+Status HealthMonitoringProgressMonitorServerParameter::set(const BSONElement& newValueElement) {
+    *_data = HealthObserverProgressMonitorConfig::parse(
+        IDLParserErrorContext("health monitoring liveness"), newValueElement.Obj());
+    return Status::OK();
+}
+
+void HealthMonitoringProgressMonitorServerParameter::append(OperationContext*,
+                                                            BSONObjBuilder& b,
+                                                            const std::string& name) {
+    BSONObjBuilder healthMonitoring;
+    _data->serialize(&healthMonitoring);
+    b.append(name, healthMonitoring.obj());
+}
+
+Status PeriodicHealthCheckIntervalsServerParameter::setFromString(const std::string& value) {
+    *_data = HealthObserverIntervals::parse(IDLParserErrorContext("health monitoring liveness"),
+                                            fromjson(value));
+    return Status::OK();
+}
+
+Status PeriodicHealthCheckIntervalsServerParameter::set(const BSONElement& newValueElement) {
+    *_data = HealthObserverIntervals::parse(IDLParserErrorContext("health monitoring liveness"),
+                                            newValueElement.Obj());
+    return Status::OK();
+}
+
+void PeriodicHealthCheckIntervalsServerParameter::append(OperationContext*,
+                                                         BSONObjBuilder& b,
+                                                         const std::string& name) {
+    BSONObjBuilder healthMonitoring;
+    _data->serialize(&healthMonitoring);
+    b.append(name, healthMonitoring.obj());
+}
+
 }  // namespace mongo
