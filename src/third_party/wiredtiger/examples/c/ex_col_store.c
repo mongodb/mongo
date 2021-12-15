@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * ex_col_store.c
- *	This is an example application that demonstrates
- *	how to perform operations with column store.
+ *	This is an example application that demonstrates column-store operations.
  */
 
 #include <test_util.h>
@@ -199,21 +198,21 @@ generate_data(WEATHER *w_array)
             assert(false);
         }
         /* 24-hour-time 0-2400. */
-        w.hour = rand() % 2401;
+        w.hour = (uint16_t)(rand() % 2401);
         /* Temperature range: 0-50C.  */
-        w.temp = rand() % 51;
+        w.temp = (uint8_t)(rand() % 51);
         /* Feels like temperature range 0-50C */
-        w.feels_like_temp = rand() % 51;
+        w.feels_like_temp = (uint8_t)(rand() % 51);
         /* Humidity range: 0-100%. */
-        w.humidity = rand() % 101;
+        w.humidity = (uint8_t)(rand() % 101);
         /* Pressure range: 900-1100pa */
-        w.pressure = (rand() % (1100 + 1 - 900)) + 900;
+        w.pressure = (uint16_t)((rand() % (1100 + 1 - 900)) + 900);
         /* Wind range: 0-200 km/hr. */
-        w.wind = rand() % 201;
+        w.wind = (uint8_t)(rand() % 201);
         /* latitude: 0-180 degrees. */
-        w.loc_lat = rand() % 181;
+        w.loc_lat = (uint16_t)(rand() % 181);
         /* longitude: 0-90 degrees. */
-        w.loc_long = rand() % 91;
+        w.loc_long = (uint16_t)(rand() % 91);
 
         country = rand() % 7;
         switch (country) {
