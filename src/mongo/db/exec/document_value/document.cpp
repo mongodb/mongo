@@ -232,7 +232,7 @@ Value& DocumentStorage::appendField(StringData name, ValueElement::Kind kind) {
 
     // Make room for new field (and padding at end for alignment)
     const unsigned newUsed = ValueElement::align(_usedBytes + sizeof(ValueElement) + nameSize);
-    if (_cache + newUsed > _cacheEnd)
+    if (newUsed > _cacheEnd - _cache)
         alloc(newUsed);
     _usedBytes = newUsed;
 

@@ -294,7 +294,7 @@ public:
     }
 
     char* get() const {
-        return _data + SharedBuffer::kHolderSize;
+        return _data ? _data + SharedBuffer::kHolderSize : nullptr;
     }
 
     explicit operator bool() const {

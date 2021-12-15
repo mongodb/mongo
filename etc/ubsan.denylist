@@ -15,6 +15,11 @@ src:src/third_party/unicode-*/*
 src:src/third_party/yaml-cpp-*/*
 src:src/third_party/zlib-*/*
 
+# TODO(SERVER-49230) Remove this after upgrading to 1.5 per
+# https://github.com/facebook/zstd/issues/2110#issuecomment-996146316
+[pointer-overflow]
+src:src/third_party/zstandard-*/*
+
 # See SERVER-29505.
 src:src/third_party/timelib-*/*
 

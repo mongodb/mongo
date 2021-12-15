@@ -241,7 +241,7 @@ UniqueIndexData::const_iterator UniqueIndexData::upper_bound(RecordId loc) const
 }
 
 size_t UniqueIndexData::_memoryUsage() const {
-    return sizeof(_size) + _end - _begin;
+    return sizeof(_size) + (_end - _begin);
 }
 
 boost::optional<std::string> UniqueIndexData::add(RecordId loc,
