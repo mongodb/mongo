@@ -65,6 +65,10 @@ AS_CASE([$host_cpu],
 	[wt_cv_zseries="no"])
 AM_CONDITIONAL([ZSERIES_HOST], [test "$wt_cv_zseries" = "yes"])
 AS_CASE([$host_cpu],
+	[riscv64*], [wt_cv_riscv64="yes"],
+	[wt_cv_riscv64="no"])
+AM_CONDITIONAL([RISCV64_HOST], [test "$wt_cv_riscv64" = "yes"])
+AS_CASE([$host_cpu],
 	[aarch64*], [wt_cv_arm64="yes"],
 	[wt_cv_arm64="no"])
 AM_CONDITIONAL([ARM64_HOST], [test "$wt_cv_arm64" = "yes"])

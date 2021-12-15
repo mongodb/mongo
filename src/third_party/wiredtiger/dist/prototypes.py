@@ -60,6 +60,8 @@ def prototypes_extern():
             continue
         if fnmatch.fnmatch(name, '*/checksum/power8/*'):
             continue
+        if fnmatch.fnmatch(name, '*/checksum/riscv64/*'):
+            continue
         if fnmatch.fnmatch(name, '*/checksum/zseries/*'):
             continue
         if fnmatch.fnmatch(name, '*/os_posix/*'):
