@@ -610,13 +610,19 @@ public:
 
         // Check that the query should be cached.
         if (CollectionQueryInfo::get(_collection).getPlanCache()->shouldCacheQuery(*_cq)) {
-            // Fill in opDebug information.
+            // Fill in some opDebug information, unless it has already been filled by an outer
+            // pipeline.
             const auto planCacheKey =
                 CollectionQueryInfo::get(_collection).getPlanCache()->computeKey(*_cq);
-            CurOp::get(_opCtx)->debug().queryHash =
-                canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
-            CurOp::get(_opCtx)->debug().planCacheKey =
-                canonical_query_encoder::computeHash(planCacheKey.toString());
+            OpDebug& opDebug = CurOp::get(_opCtx)->debug();
+            if (!opDebug.queryHash) {
+                opDebug.queryHash =
+                    canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
+            }
+            if (!opDebug.planCacheKey) {
+                opDebug.planCacheKey =
+                    canonical_query_encoder::computeHash(planCacheKey.toString());
+            }
 
             // Try to look up a cached solution for the query.
             if (auto cs = CollectionQueryInfo::get(_collection)
