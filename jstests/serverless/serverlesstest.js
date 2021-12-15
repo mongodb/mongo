@@ -57,7 +57,7 @@ class ServerlessTest {
         }
 
         this.q0 = this.q;
-        jsTest.log("DefaultServerlessTest is created.");
+        jsTest.log("ServerlessTest is created.");
     }
 
     /**

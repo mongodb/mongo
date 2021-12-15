@@ -34,3 +34,10 @@ feature_flags:
         description: "Enable mongod operation in MongoStore mode"
         cpp_varname: gFeatureFlagMongoStore
         default: false
+    featureFlagRequireTenantID:
+        # Only available with the server parameter "multitenancySupport".
+        description: >-
+            When enabled in conjunction with the server parameter "multitenancySupport",
+            require tenantID to be a part of TenantNamespace and TenantDatabase.
+        cpp_varname: gFeatureFlagRequireTenantID
+        default: false
