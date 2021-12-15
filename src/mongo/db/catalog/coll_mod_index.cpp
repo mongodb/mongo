@@ -87,15 +87,15 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
 void _processCollModIndexRequestHidden(OperationContext* opCtx,
                                        AutoGetCollection* autoColl,
                                        const IndexDescriptor* idx,
-                                       BSONElement indexHidden,
-                                       BSONElement* newHidden,
-                                       BSONElement* oldHidden) {
+                                       bool indexHidden,
+                                       boost::optional<bool>* newHidden,
+                                       boost::optional<bool>* oldHidden) {
     *newHidden = indexHidden;
-    *oldHidden = idx->infoObj().getField("hidden");
+    *oldHidden = idx->hidden();
     // Make sure when we set 'hidden' to false, we can remove the hidden field from catalog.
-    if (SimpleBSONElementComparator::kInstance.evaluate(*oldHidden != *newHidden)) {
+    if (*oldHidden != *newHidden) {
         autoColl->getWritableCollection()->updateHiddenSetting(
-            opCtx, idx->indexName(), newHidden->booleanSafe());
+            opCtx, idx->indexName(), indexHidden);
     }
 }
 
@@ -201,8 +201,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
     BSONElement newExpireSecs = {};
     BSONElement oldExpireSecs = {};
-    BSONElement newHidden = {};
-    BSONElement oldHidden = {};
+    boost::optional<bool> newHidden;
+    boost::optional<bool> oldHidden;
     boost::optional<bool> newUnique;
 
     // TTL Index
@@ -215,7 +215,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
     // User wants to hide or unhide index.
     if (indexHidden) {
         _processCollModIndexRequestHidden(
-            opCtx, autoColl, idx, indexHidden, &newHidden, &oldHidden);
+            opCtx, autoColl, idx, *indexHidden, &newHidden, &oldHidden);
     }
 
     // User wants to convert an index to be unique.
@@ -230,8 +230,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                  : Seconds(newExpireSecs.safeNumberLong()),
         !indexExpireAfterSeconds || oldExpireSecs.eoo() ? boost::optional<Seconds>()
                                                         : Seconds(oldExpireSecs.safeNumberLong()),
-        !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
-        !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
+        newHidden,
+        oldHidden,
         newUnique,
         idx->indexName()};
 
@@ -258,10 +258,10 @@ void processCollModIndexRequest(OperationContext* opCtx,
             if (!newExpireSecs.eoo()) {
                 result->appendAs(newExpireSecs, "expireAfterSeconds_new");
             }
-            if (!newHidden.eoo()) {
-                bool oldValue = oldHidden.eoo() ? false : oldHidden.booleanSafe();
-                result->append("hidden_old", oldValue);
-                result->appendAs(newHidden, "hidden_new");
+            if (newHidden) {
+                invariant(oldHidden);
+                result->append("hidden_old", *oldHidden);
+                result->append("hidden_new", *newHidden);
             }
             if (newUnique) {
                 invariant(*newUnique);

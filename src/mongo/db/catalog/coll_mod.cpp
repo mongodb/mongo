@@ -300,7 +300,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 if (cmrIndex->idx->hidden() == *cmdIndex.getHidden()) {
                     indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kHiddenFieldName);
                 } else {
-                    cmrIndex->indexHidden = indexObj[CollModIndex::kHiddenFieldName];
+                    cmrIndex->indexHidden = cmdIndex.getHidden();
                 }
             }
 

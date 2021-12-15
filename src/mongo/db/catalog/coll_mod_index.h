@@ -49,7 +49,7 @@ struct ParsedCollModIndexRequest {
     BSONObj indexObj;  // owned
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
-    BSONElement indexHidden = {};
+    boost::optional<bool> indexHidden;
     boost::optional<bool> indexUnique;
 };
 
