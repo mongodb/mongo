@@ -536,18 +536,10 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) const {
-        // For now, just use `find` permissions.
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-
-        // First, check that we can read this collection.
-        Status status = AuthorizationSession::get(client)->checkAuthForFind(nss, false);
-
-        if (!status.isOK()) {
-            return status;
-        }
-
-        // Then check that we can read the health log.
-        return AuthorizationSession::get(client)->checkAuthForFind(HealthLog::nss, false);
+        const bool isAuthorized =
+            AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyResource(), ActionType::dbCheck);
+        return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -565,8 +557,7 @@ public:
         result.append("ok", true);
         return true;
     }
-};
+} dbCheckCmd;
 
-MONGO_REGISTER_TEST_COMMAND(DbCheckCmd);
 }  // namespace
 }  // namespace mongo
