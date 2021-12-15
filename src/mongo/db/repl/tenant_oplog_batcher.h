@@ -76,8 +76,7 @@ public:
     TenantOplogBatcher(const std::string& tenantId,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
-                       Timestamp resumeBatchingTs,
-                       OpTime beginApplyingAfterOpTime);
+                       Timestamp resumeBatchingTs);
 
     virtual ~TenantOplogBatcher();
 
@@ -119,7 +118,6 @@ private:
     bool _batchRequested = false;                       // (M)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
     const Timestamp _resumeBatchingTs;                  // (R)
-    const OpTime _beginApplyingAfterOpTime;             // (R)
 };
 
 }  // namespace repl
