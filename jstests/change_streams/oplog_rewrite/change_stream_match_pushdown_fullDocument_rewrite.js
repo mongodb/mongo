@@ -26,6 +26,7 @@ const st = new ShardingTest({
 
 // Create a sharded collection where shard key is 'shard'.
 const coll = createShardedCollection(st, "shard" /* shardKey */, dbName, collName, 1 /* splitAt */);
+const testDB = st.s.getDB(dbName);
 
 // A helper that opens a change stream with the user supplied match expression 'userMatchExpr' and
 // validates that:
@@ -38,8 +39,9 @@ function verifyOps(resumeAfterToken,
                    userMatchExpr,
                    expectedOps,
                    expectedChangeStreamDocsReturned,
-                   expectedOplogCursorReturnedDocs) {
-    const cursor = coll.aggregate([
+                   expectedOplogCursorReturnedDocs,
+                   runOnWholeDB) {
+    const cursor = (runOnWholeDB ? testDB : coll).aggregate([
         {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
         userMatchExpr
     ]);
@@ -59,10 +61,17 @@ function verifyOps(resumeAfterToken,
     assert(!cursor.hasNext());
 
     // An 'executionStats' could only be captured for a non-invalidating stream.
-    const stats = coll.explain("executionStats").aggregate([
-        {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
-        userMatchExpr
-    ]);
+    const stats = assert.commandWorked(testDB.runCommand({
+        explain: {
+            aggregate: (runOnWholeDB ? 1 : coll.getName()),
+            pipeline: [
+                {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
+                userMatchExpr
+            ],
+            cursor: {}
+        },
+        verbosity: "executionStats"
+    }));
 
     assertNumChangeStreamDocsReturnedFromShard(
         stats, st.rs0.name, expectedChangeStreamDocsReturned[0]);
@@ -106,20 +115,121 @@ const runDeleteOps = () => {
 const runVerifyOpsTestcases = (op) => {
     // 'delete' operations don't have a 'fullDocument' field, so we handle them as a special case.
     if (op == "delete") {
-        // Test out the '{$exists: true}' predicate on the full 'fullDocument' field.
+        // The 'delete' event never has a 'fullDocument' field, so we expect the same results
+        // whether we are filtering on the field itself or a subfield.
+        for (let fullDocumentPath of ["fullDocument", "fullDocument._id", "fullDocument.shard"]) {
+            jsTestLog("Testing path '" + fullDocumentPath + "' for 'delete' events");
+
+            // Test out the '{$exists: true}' predicate on the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$exists: true}}},
+                      [],
+                      [0, 0] /* expectedChangeStreamDocsReturned */,
+                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out the '{$exists: false}' predicate on the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$exists: false}}},
+                      [[op], [op], [op], [op]],
+                      [2, 2] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out the '{$eq: null}' predicate on the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$eq: null}}},
+                      [[op], [op], [op], [op]],
+                      [2, 2] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out the '{$ne: null}' predicate on the 'fullDocument' field. We cannot perform
+            // an exact rewrite of this negated predicate on 'fullDocument', so the oplog scan
+            // returns all 'delete' events and we subsequently filter them out in the pipeline.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$ne: null}}},
+                      [],
+                      [0, 0] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out an inequality on null for the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$gt: null}}},
+                      [],
+                      [0, 0] /* expectedChangeStreamDocsReturned */,
+                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out a negated inequality on null for the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$not: {$gt: null}}}},
+                      [[op], [op], [op], [op]],
+                      [2, 2] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+            // We expect the same results for $lte as we got for {$not: {$gt}}, although we can
+            // rewrite this predicate into the oplog.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$lte: null}}},
+                      [[op], [op], [op], [op]],
+                      [2, 2] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+            // Test that {$type: 'null'} on the 'fullDocument' field does not match.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$type: "null"}}},
+                      [],
+                      [0, 0] /* expectedChangeStreamDocsReturned */,
+                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+            // Test that negated {$type: 'null'} on the 'fullDocument' field matches.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$not: {$type: "null"}}}},
+                      [[op], [op], [op], [op]],
+                      [2, 2] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out a non-null non-$exists predicate on the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$eq: 5}}},
+                      [],
+                      [0, 0] /* expectedChangeStreamDocsReturned */,
+                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+            // Test out a negated non-null non-$exists predicate on the 'fullDocument' field.
+            verifyOps(resumeAfterToken,
+                      {$match: {operationType: op, [fullDocumentPath]: {$ne: 5}}},
+                      [[op], [op], [op], [op]],
+                      [2, 2] /* expectedChangeStreamDocsReturned */,
+                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+        }
+        return;
+    }
+
+    // Non-CRUD events don't have a 'fullDocument' field, so test 'drop' separately. We run these
+    // tests on the whole DB because otherwise the stream will be invalidated, and it's impossible
+    // to tell whether we will see one drop or two, or from which shard.
+    if (op == "drop") {
+        // Test that {$eq: null} on the 'fullDocument' field matches the 'drop' event.
+        verifyOps(resumeAfterToken,
+                  {$match: {operationType: op, fullDocument: {$eq: null}}},
+                  [[op], [op]],
+                  [1, 1] /* expectedChangeStreamDocsReturned */,
+                  [1, 1] /* expectedOplogCursorReturnedDocs */,
+                  true /* runOnWholeDB */);
+
+        // Test that {$exists: false} on the 'fullDocument' field matches the 'drop' event.
+        verifyOps(resumeAfterToken,
+                  {$match: {operationType: op, fullDocument: {$exists: false}}},
+                  [[op], [op]],
+                  [1, 1] /* expectedChangeStreamDocsReturned */,
+                  [1, 1] /* expectedOplogCursorReturnedDocs */,
+                  true /* runOnWholeDB */);
+
+        // Test that {$exists: true} on the 'fullDocument' field does not match the 'drop' event.
         verifyOps(resumeAfterToken,
                   {$match: {operationType: op, fullDocument: {$exists: true}}},
                   [],
                   [0, 0] /* expectedChangeStreamDocsReturned */,
-                  [0, 0] /* expectedOplogCursorReturnedDocs */);
-
-        // Test out the '{$exists: false}' predicate on the full 'fullDocument' field.
-        verifyOps(resumeAfterToken,
-                  {$match: {operationType: op, fullDocument: {$exists: false}}},
-                  [[op], [op], [op], [op]],
-                  [2, 2] /* expectedChangeStreamDocsReturned */,
-                  [2, 2] /* expectedOplogCursorReturnedDocs */);
-
+                  [0, 0] /* expectedOplogCursorReturnedDocs */,
+                  true /* runOnWholeDB */);
         return;
     }
 
@@ -191,6 +301,20 @@ const runVerifyOpsTestcases = (op) => {
               [],
               [0, 0] /* expectedChangeStreamDocsReturned */,
               [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out the '{$eq: null}' predicate on the 'fullDocument' field.
+    verifyOps(resumeAfterToken,
+              {$match: {operationType: op, fullDocument: {$eq: null}}},
+              [],
+              [0, 0] /* expectedChangeStreamDocsReturned */,
+              op != "update" ? [0, 0] : [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out the '{$ne: null}' predicate on the 'fullDocument' field.
+    verifyOps(resumeAfterToken,
+              {$match: {operationType: op, fullDocument: {$ne: null}}},
+              [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
+              [2, 2] /* expectedChangeStreamDocsReturned */,
+              [2, 2] /* expectedOplogCursorReturnedDocs */);
 };
 
 // Verify '$match's on the 'update' operation type with various predicates get rewritten correctly.
@@ -206,6 +330,10 @@ runDeleteOps();
 runVerifyOpsTestcases("insert");
 runVerifyOpsTestcases("replace");
 runVerifyOpsTestcases("delete");
+
+// Now drop the collection and verify that we see the 'drop' event with no 'fullDocument'.
+assert(coll.drop());
+runVerifyOpsTestcases("drop");
 
 st.stop();
 })();
