@@ -462,12 +462,62 @@ void _validateBSONColumnRoundtrip(OperationContext* opCtx,
     std::deque<BSONObj> original;
     auto cursor = validateState->getCollection()->getRecordStore()->getCursor(opCtx);
 
+    // This function is memory intensive as it needs to store the original documents prior to
+    // compressing and decompressing them to check that the documents are the same afterwards. We'll
+    // limit the number of original documents we hold in-memory to be approximately 100MB to avoid
+    // running out of memory.
+    constexpr size_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
+    size_t currentMemoryUsageBytes = 0;
+
     BSONColumnBuilder columnBuilder("");
+
+    auto doBSONColumnRoundtrip = [&]() {
+        ON_BLOCK_EXIT([&] {
+            // Reset the in-memory state to prepare for the next round of BSONColumn roundtripping.
+            original.clear();
+            columnBuilder = BSONColumnBuilder("");
+            currentMemoryUsageBytes = 0;
+        });
+
+        BSONObjBuilder compressed;
+        try {
+            compressed.append(""_sd, columnBuilder.finalize());
+
+            BSONColumn column(compressed.done().firstElement());
+            size_t index = 0;
+            for (const auto& decompressed : column) {
+                if (!decompressed.binaryEqual(original[index].firstElement())) {
+                    results->valid = false;
+                    results->errors.push_back(
+                        fmt::format("Roundtripping via BSONColumn failed. Index: {}, Original: {}, "
+                                    "Roundtripped: {}",
+                                    index,
+                                    original[index].toString(),
+                                    decompressed.toString()));
+                    return;
+                }
+                ++index;
+            }
+            if (index != original.size()) {
+                results->valid = false;
+                results->errors.push_back(fmt::format(
+                    "Roundtripping via BSONColumn failed. Original size: {}, Roundtripped size: {}",
+                    original.size(),
+                    index));
+            }
+        } catch (const DBException&) {
+            // We swallow any other DBException so we do not interfere with the rest of Collection
+            // validation.
+            return;
+        }
+    };
+
     while (auto record = cursor->next()) {
         try {
             BSONObjBuilder wrapper;
             wrapper.append(""_sd, record->data.toBson());
             original.push_back(wrapper.obj());
+            currentMemoryUsageBytes += original.back().objsize();
         } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
             // Improbable but possible, wrapping the data in a new BSONObj may push it over the
             // limit.
@@ -492,38 +542,16 @@ void _validateBSONColumnRoundtrip(OperationContext* opCtx,
             // we allocate over 64MB in the internal BufBuilder inside BSONColumnBuilder.
             return;
         }
+
+        if (currentMemoryUsageBytes >= kMaxMemoryUsageBytes) {
+            doBSONColumnRoundtrip();
+        }
     }
 
-    BSONObjBuilder compressed;
-    try {
-        compressed.append(""_sd, columnBuilder.finalize());
-
-        BSONColumn column(compressed.done().firstElement());
-        size_t index = 0;
-        for (const auto& decompressed : column) {
-            if (!decompressed.binaryEqual(original[index].firstElement())) {
-                results->valid = false;
-                results->errors.push_back(
-                    fmt::format("Roundtripping via BSONColumn failed. Index: {}, Original: {}, "
-                                "Roundtripped: {}",
-                                index,
-                                original[index].toString(),
-                                decompressed.toString()));
-                return;
-            }
-            ++index;
-        }
-        if (index != original.size()) {
-            results->valid = false;
-            results->errors.push_back(fmt::format(
-                "Roundtripping via BSONColumn failed. Original size: {}, Roundtripped size: {}",
-                original.size(),
-                index));
-        }
-    } catch (const DBException&) {
-        // We swallow any other DBException so we do not interfere with the rest of Collection
-        // validation.
-        return;
+    if (currentMemoryUsageBytes > 0) {
+        // We've exhausted the cursor but we haven't reached the memory usage threshold to do the
+        // BSONColumn roundtrip yet, so do it now.
+        doBSONColumnRoundtrip();
     }
 }
 }  // namespace
