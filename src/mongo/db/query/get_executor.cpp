@@ -460,13 +460,17 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
     // Check that the query should be cached.
     if (collection->infoCache()->getPlanCache()->shouldCacheQuery(*canonicalQuery)) {
-        // Fill in opDebug information.
+        // Fill in opDebug information, unless it has already been filled by an outer pipeline.
         const auto planCacheKey =
             collection->infoCache()->getPlanCache()->computeKey(*canonicalQuery);
-        CurOp::get(opCtx)->debug().queryHash =
-            canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
-        CurOp::get(opCtx)->debug().planCacheKey =
-            canonical_query_encoder::computeHash(planCacheKey.toString());
+        OpDebug& opDebug = CurOp::get(opCtx)->debug();
+        if (!opDebug.queryHash) {
+            opDebug.queryHash =
+                canonical_query_encoder::computeHash(planCacheKey.getStableKeyStringData());
+        }
+        if (!opDebug.planCacheKey) {
+            opDebug.planCacheKey = canonical_query_encoder::computeHash(planCacheKey.toString());
+        }
 
         // Try to look up a cached solution for the query.
         if (auto cs =
