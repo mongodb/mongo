@@ -109,7 +109,7 @@ public:
     }
 
     Seconds getPeriodicLivenessDeadline() const {
-        return Seconds(_getLivenessConfig()->_data->getInterval());
+        return Seconds(_getLivenessConfig()->_data->getDeadline());
     }
 
     /** @returns true if the periodic checks are disabled for testing purposes. This is
