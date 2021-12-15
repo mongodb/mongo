@@ -400,27 +400,46 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     //       {$or: [{op: 'i'}, {op: 'u'}]},
     //       {o: <predicate>}
     //     ]},
+    //     // The following predicates are only present if the predicate matches a missing field
+    //     {op: "d"},
+    //     {$nor: [{op: 'i'}, {op: 'u'}, {op: 'd'}]}
     //   ]}
     auto rewrittenPredicate = std::make_unique<OrMatchExpression>();
 
+    // Handle the case of non-replacement update entries. For the general case, we cannot apply the
+    // predicate and must return all such events.
     auto updateCase = std::make_unique<AndMatchExpression>();
     updateCase->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
     updateCase->add(
         std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"_sd)));
     rewrittenPredicate->add(std::move(updateCase));
 
+    // Handle the case of insert and replacement entries. We can always apply the predicate in these
+    // cases, because the full document is present in the oplog.
     auto insertOrReplaceCase = std::make_unique<AndMatchExpression>();
 
-    auto orExpr = std::make_unique<OrMatchExpression>();
-    orExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
-    orExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
-    insertOrReplaceCase->add(std::move(std::move(orExpr)));
+    auto insertOrReplaceOpFilter = std::make_unique<OrMatchExpression>();
+    insertOrReplaceOpFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
+    insertOrReplaceOpFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    insertOrReplaceCase->add(std::move(insertOrReplaceOpFilter));
 
-    auto renamedExpr = predicate->shallowClone();
-    static_cast<PathMatchExpression*>(renamedExpr.get())->applyRename({{"fullDocument", "o"}});
-    insertOrReplaceCase->add(std::move(std::move(renamedExpr)));
+    auto predForInsertOrReplace = predicate->shallowClone();
+    static_cast<PathMatchExpression*>(predForInsertOrReplace.get())
+        ->applyRename({{"fullDocument", "o"}});
+    insertOrReplaceCase->add(std::move(predForInsertOrReplace));
 
     rewrittenPredicate->add(std::move(insertOrReplaceCase));
+
+    // Handle the case of delete and non-CRUD events. The 'fullDocument' field never exists for such
+    // events, so we evaluate the predicate against a non-existent field to see whether it matches.
+    if (predicate->matchesSingleElement({})) {
+        auto deleteCase = std::make_unique<EqualityMatchExpression>("op"_sd, Value("d"_sd));
+        rewrittenPredicate->add(std::move(deleteCase));
+
+        auto nonCRUDCase = MatchExpressionParser::parseAndNormalize(
+            fromjson("{$nor: [{op: 'i'}, {op: 'u'}, {op: 'd'}]}"), expCtx);
+        rewrittenPredicate->add(std::move(nonCRUDCase));
+    }
 
     return rewrittenPredicate;
 }

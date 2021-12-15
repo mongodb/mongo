@@ -4747,6 +4747,38 @@ TEST_F(ChangeStreamRewriteTest, CanRewriteArbitraryPredicateOnFieldFullDocumentF
                                "]}"));
 }
 
+TEST_F(ChangeStreamRewriteTest, CanRewriteNullComparisonPredicateOnFieldFullDocumentFoo) {
+    auto spec = fromjson("{'fullDocument.foo': {$eq: null}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocument"});
+    ASSERT(rewrittenMatchExpression);
+
+    // Note that the filter below includes a predicate on delete and non-CRUD events. These are only
+    // present when the user's predicate matches a non-existent field. This is because these change
+    // events never have a 'fullDocument' field, and so we either match all such events in the oplog
+    // or none of them, depending on how the predicate evaluates against a missing field.
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$or: ["
+                               "  {$and: ["
+                               "    {op: {$eq: 'u'}},"
+                               "    {'o._id': {$not: {$exists: true}}}"
+                               "  ]},"
+                               "  {$and: ["
+                               "    {$or: ["
+                               "      {op: {$eq: 'i'}},"
+                               "      {op: {$eq: 'u'}}"
+                               "    ]},"
+                               "    {'o.foo': {$eq: null}}"
+                               "  ]},"
+                               "  {op: {$eq: 'd'}},"
+                               "  {$nor: [{op: {$eq: 'i'}}, {op: {$eq: 'u'}}, {op: {$eq: 'd'}}]}"
+                               "]}"));
+}
+
 TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldFullDocumentFoo) {
     auto spec = fromjson("{'fullDocument.foo': {$not: {$eq: 'bar'}}}");
     auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
