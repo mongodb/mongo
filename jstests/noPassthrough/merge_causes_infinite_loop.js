@@ -2,7 +2,9 @@
  * Test that exposes the Halloween problem.
  *
  * The Halloween problem describes the potential for a document to be visited more than once
- * following an update operation that changes its physical location.
+ * following an update operation that changes its physical location. The purpose of this test is
+ * to show that this behavior can be encountered when running a $merge aggregation which writes
+ * to the collection being read from.
  */
 (function() {
 "use strict";
@@ -71,18 +73,32 @@ for (const doc of diffCollResult) {
     assert.eq(doc["a"], expectedVal, doc);
 }
 
-// Targeting the same collection that is being aggregated over will still result in each
-// document's value of 'a' being updated exactly once.
+// Targeting the same collection that is being aggregated over will result in some documents' value
+// of 'a' being updated multiple times.
 assert.commandWorked(
     db.runCommand({aggregate: coll.getName(), pipeline: sameCollPipeline, cursor: {}}));
 
-const sameCollResult = out.find({}, {largeArray: 0}).toArray();
+const sameCollResult = coll.find({}, {largeArray: 0}).toArray();
 
+// At least one document in our collection should have been updated multiple times.
+let foundDocumentUpdatedMultipleTimes = false;
 for (const doc of sameCollResult) {
     assert(doc.hasOwnProperty("a"), doc);
     const expectedVal = doc["_id"] * 2 * largeNum;
-    assert.eq(doc["a"], expectedVal, doc);
+    const actualVal = doc["a"];
+
+    // If we find a mismatch, it must be the case that 'actualVal' is at least twice as large as
+    // 'expectedVal'. This means that the $multiply expression was applied multiple times to the
+    // same document.
+    if (actualVal !== expectedVal && actualVal >= 2 * expectedVal) {
+        foundDocumentUpdatedMultipleTimes = true;
+        break;
+    }
 }
+
+assert(foundDocumentUpdatedMultipleTimes,
+       "All documents were updated exactly once, which is unexpected. Contents of the collection" +
+           " being aggregated over and merged into: " + tojson(sameCollResult));
 
 MongoRunner.stopMongod(conn);
 }());
