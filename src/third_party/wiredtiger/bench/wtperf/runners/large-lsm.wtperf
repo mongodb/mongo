@@ -1,6 +1,6 @@
 # wtperf options file: large lsm configuration
 conn_config="cache_size=20G,mmap=false,lsm_manager=(worker_thread_max=8)"
-table_config="internal_page_max=128K,lsm=(bloom_config=(leaf_page_max=8MB),bloom_bit_count=28,bloom_hash_count=19,bloom_oldest=true,chunk_max=5GB,chunk_size=100MB),type=lsm,leaf_page_max=16K,os_cache_dirty_max=16MB"
+table_config="internal_page_max=128K,lsm=(bloom_config=(leaf_page_max=128KB),bloom_bit_count=28,bloom_hash_count=19,bloom_oldest=true,chunk_max=5GB,chunk_size=100MB),type=lsm,leaf_page_max=16K,os_cache_dirty_max=16MB"
 compact=true
 compression="snappy"
 icount=250000000
