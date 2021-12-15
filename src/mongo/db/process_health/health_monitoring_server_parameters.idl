@@ -60,14 +60,66 @@ structs:
                 type: HealthObserverIntensity
                 default: kOff
 
+    HealthObserverIntervals:
+        description: "A struct representing the interval in milliseconds for each health observer."
+        strict: true
+        fields:
+            dns:
+                description: "DNS health check interval."
+                type: int
+                default: 1000
+                validator: { gt: 0 }
+            ldap:
+                description: "LDAP health check interval."
+                type: int
+                default: 10000
+                validator: { gt: 0 }
+            test:
+                description: "Test health observer health check interval."
+                type: int
+                default: 1
+                validator: { gt: 0 }
+            
+    HealthObserverProgressMonitorConfig:
+        description: "A struct representing configuration for health observer liveness checks." 
+        strict: true
+        fields:
+            interval:
+                description: "Interval between liveness checks in milliseconds."
+                type: int
+                default: 50
+                validator: { gt: 0 }
+            deadline:
+                description: "Deadline for liveness checks, after which process should exit, in seconds."
+                type: int
+                default: 300
+                validator: { gt: 0 }
+
 server_parameters:
-    healthMonitoring:
+    healthMonitoringIntensities:
         set_at: ["startup", "runtime"]
         description: "A server parameter for specifying the intensity of fault facets."
         cpp_class:
             name: "HealthMonitoringIntensitiesServerParameter"
             data: "synchronized_value<HealthObserverIntensities>"
             override_set: true
+
+    progressMonitor:
+        set_at: ["startup", "runtime"]
+        description: "A server parameter for specifying intervals for health monitoring."
+        cpp_class:
+            name: "HealthMonitoringProgressMonitorServerParameter"
+            data: "synchronized_value<HealthObserverProgressMonitorConfig>"
+            override_set: true
+
+    healthMonitoringIntervals:
+        set_at: [startup, runtime]
+        description: "A server parameter for specifying the interval in milliseconds between health checks."
+        cpp_class:
+            name: "PeriodicHealthCheckIntervalsServerParameter"
+            data: "synchronized_value<HealthObserverIntervals>"
+            override_set: true
+
     activeFaultDurationSecs:
         description: "A server parameter for specifying the duration after which we transition to active fault."
         set_at: [startup, runtime]
