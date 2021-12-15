@@ -211,6 +211,8 @@ create_database(const char *home, WT_CONNECTION **connp)
     if (GV(RUNS_IN_MEMORY) != 0)
         CONFIG_APPEND(p, ",in_memory=1");
 
+#if 0
+    /* FIXME: WT-8568 */
     /* Block cache configuration. */
     if (GV(BLOCK_CACHE) != 0)
         CONFIG_APPEND(p,
@@ -220,6 +222,7 @@ create_database(const char *home, WT_CONNECTION **connp)
           ",size=%" PRIu32 "MB)",
           GV(BLOCK_CACHE_CACHE_ON_CHECKPOINT) == 0 ? "false" : "true",
           GV(BLOCK_CACHE_CACHE_ON_WRITES) == 0 ? "false" : "true", GV(BLOCK_CACHE_SIZE));
+#endif
 
     /* LSM configuration. */
     if (g.lsm_config)
