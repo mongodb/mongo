@@ -110,9 +110,9 @@ public:
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
     /**
-     * Hash all of our documents.
+     * Hash all documents up to the deadline.
      */
-    Status hashAll(void);
+    Status hashAll(OperationContext* opCtx, Date_t deadline = Date_t::max());
 
     /**
      * Return the total hash of all documents seen so far.

@@ -74,6 +74,12 @@ structs:
       maxCountPerSecond:
         type: safeInt64
         default: "std::numeric_limits<int64_t>::max()"
+      maxBatchTimeMillis:
+        type: safeInt64
+        default: 1000
+        validator:
+          gte: 10
+          lte: 20000
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"
@@ -84,6 +90,12 @@ structs:
       maxCountPerSecond:
         type: safeInt64
         default: "std::numeric_limits<int64_t>::max()"
+      maxBatchTimeMillis:
+        type: safeInt64
+        default: 1000
+        validator:
+          gte: 10
+          lte: 20000
 
   DbCheckOplogBatch:
     description: "Oplog entry for a dbCheck batch"

@@ -46,6 +46,8 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
+
 namespace {
 
 /*
@@ -225,11 +227,17 @@ void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     }
 }
 
-Status DbCheckHasher::hashAll(void) {
+Status DbCheckHasher::hashAll(OperationContext* opCtx, Date_t deadline) {
     BSONObj currentObj;
 
     PlanExecutor::ExecState lastState;
     while (PlanExecutor::ADVANCED == (lastState = _exec->getNext(&currentObj, nullptr))) {
+
+        SleepDbCheckInBatch.execute([opCtx](const BSONObj& data) {
+            int sleepMs = data["sleepMs"].safeNumberInt();
+            opCtx->sleepFor(Milliseconds(sleepMs));
+        });
+
         if (!currentObj.hasField("_id")) {
             return Status(ErrorCodes::NoSuchKey, "Document missing _id");
         }
@@ -245,6 +253,10 @@ Status DbCheckHasher::hashAll(void) {
         _countSeen += 1;
 
         md5_append(&_state, md5Cast(currentObj.objdata()), currentObj.objsize());
+
+        if (Date_t::now() > deadline) {
+            break;
+        }
     }
 
     // If we got to the end of the collection, set the last key to MaxKey.
@@ -328,7 +340,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
 
     // run the hasher.
     if (status.isOK()) {
-        status = hasher->hashAll();
+        status = hasher->hashAll(opCtx);
     }
 
     // In case of an error, report it to the health log,
