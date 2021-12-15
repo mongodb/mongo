@@ -124,6 +124,8 @@ last-continuous:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-61955
+      test_file: jstests/auth/dbcheck.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -389,6 +391,8 @@ last-lts:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-61955
+      test_file: jstests/auth/dbcheck.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

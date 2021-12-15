@@ -470,6 +470,13 @@ void addClusterManagerPrivileges(PrivilegeVector* privileges) {
                   readRoleActions));
     addReadOnlyDbPrivileges(privileges, "config");
 
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forAnyResource(), ActionType::dbCheck));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forExactNamespace(NamespaceString("local", "system.healthlog")),
+                  readRoleActions));
+
     ActionSet writeActions;
     writeActions << ActionType::insert << ActionType::update << ActionType::remove;
     Privilege::addPrivilegeToPrivilegeVector(
