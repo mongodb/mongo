@@ -685,24 +685,15 @@ dump_suffix(WT_SESSION *session, bool json)
 static int
 dup_json_string(const char *str, char **result)
 {
-    size_t left, nchars;
+    size_t nchars;
     char *q;
-    const char *p;
 
-    nchars = 0;
-    for (p = str; *p; p++, nchars++)
-        nchars += __wt_json_unpack_char((u_char)*p, NULL, 0, false);
-    q = malloc(nchars + 1);
+    nchars = __wt_json_unpack_str(NULL, 0, (const u_char *)str, strlen(str)) + 1;
+    q = malloc(nchars);
     if (q == NULL)
         return (1);
+    WT_IGNORE_RET(__wt_json_unpack_str((u_char *)q, nchars, (const u_char *)str, strlen(str)));
     *result = q;
-    left = nchars;
-    for (p = str; *p; p++, nchars++) {
-        nchars = __wt_json_unpack_char((u_char)*p, (u_char *)q, left, false);
-        left -= nchars;
-        q += nchars;
-    }
-    *q = '\0';
     return (0);
 }
 

@@ -57,6 +57,9 @@
 #define WT_ERR_STRING "[Error]"
 #define WT_NO_ADDR_STRING "[NoAddr]"
 
+/* Maximum length of an encoded JSON character. */
+#define WT_MAX_JSON_ENCODE 6
+
 /*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in common structures to save
  * space. To minimize conversions from size_t to uint32_t through the code, we use the following
