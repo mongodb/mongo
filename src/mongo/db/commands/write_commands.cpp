@@ -782,15 +782,6 @@ public:
             bool prepared = bucketCatalog.prepareCommit(batch);
             if (!prepared) {
                 invariant(batch->finished());
-                auto batchStatus = batch->getResult().getStatus();
-                tassert(5916402,
-                        str::stream() << "Got unexpected error (" << batchStatus
-                                      << ") preparing time-series bucket to be committed for "
-                                      << ns() << ": " << redact(request().toBSON({})),
-                        batchStatus == ErrorCodes::TimeseriesBucketCleared ||
-                            batchStatus.isA<ErrorCategory::Interruption>() ||
-                            batchStatus.isA<ErrorCategory::StaleShardVersionError>());
-
                 docsToRetry->push_back(index);
                 return true;
             }
