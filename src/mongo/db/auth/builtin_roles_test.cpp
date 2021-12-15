@@ -123,7 +123,7 @@ TEST(BuiltinRoles, addPrivilegesForBuiltinRole) {
 TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
     PrivilegeVector privs;
     ASSERT(auth::addPrivilegesForBuiltinRole(RoleName("clusterManager", "admin"), &privs));
-    ASSERT_EQ(privs.size(), 9);
+    ASSERT_EQ(privs.size(), 11);
 
     const auto systemBucketsResourcePattern = ResourcePattern::forAnySystemBuckets();
 

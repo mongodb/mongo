@@ -72,6 +72,7 @@ enums:
            createIndex :  "createIndex"     # ID only
            createRole :  "createRole"
            createUser :  "createUser"
+           dbCheck :  "dbCheck"
            dbHash :  "dbHash"
            dbStats :  "dbStats"
            dropAllRolesFromDatabase :  "dropAllRolesFromDatabase"  # ID only
