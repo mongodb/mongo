@@ -745,9 +745,15 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
         //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
         //    change streams and storing them in pre-image collection is redundant.
+        // 4. a request to update is not on a temporary resharding collection. This update request
+        //    does not result in change streams events. Recording pre-images from temporary
+        //    resharing collection could result in incorrect pre-image getting recorded due to the
+        //    temporary resharding collection not being consistent until writes are blocked (initial
+        //    sync mode application).
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection &&
             !opTime.writeOpTime.isNull() &&
-            args.updateArgs->source != OperationSource::kFromMigrate) {
+            args.updateArgs->source != OperationSource::kFromMigrate &&
+            !args.nss.isTemporaryReshardingCollection()) {
             const auto& preImageDoc = args.updateArgs->preImageDoc;
             tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.get().isEmpty());
 
@@ -901,8 +907,13 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
         //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
         //    change streams and storing them in pre-image collection is redundant.
+        // 4. a request to delete is not on a temporary resharding collection. This delete request
+        //    does not result in change streams events. Recording pre-images from temporary
+        //    resharing collection could result in incorrect pre-image getting recorded due to the
+        //    temporary resharding collection not being consistent until writes are blocked (initial
+        //    sync mode application).
         if (args.changeStreamPreAndPostImagesEnabledForCollection && !opTime.writeOpTime.isNull() &&
-            !args.fromMigrate) {
+            !args.fromMigrate && !nss.isTemporaryReshardingCollection()) {
             tassert(5868704, "Deleted document must be set", args.deletedDoc);
 
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);

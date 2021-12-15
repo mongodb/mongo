@@ -5,6 +5,7 @@
  *  @tags: [
  *    requires_fcv_52,
  *    featureFlagChangeStreamPreAndPostImages,
+ *    featureFlagClusteredIndexes,
  *    requires_sharding,
  *    uses_change_streams,
  *    change_stream_does_not_expect_txns,
@@ -195,6 +196,13 @@ function verifyChangeStreamEvents(csCursor, events) {
     MongoRunner.stopMongod(staticMongod);
     jsTest.log("Successfully migrated chunk with documents '{_id: 1}' and '{_id: 2}'");
 
+    // Verify that after the chunk-migration is complete, the pre-image collection exists on the
+    // recipient shard with clustered-index enabled.
+    const preImageCollInfo =
+        recipient.getDB("config").getCollectionInfos({name: "system.preimages"});
+    assert.eq(preImageCollInfo.length, 1, preImageCollInfo);
+    assert(preImageCollInfo[0].options.hasOwnProperty("clusteredIndex"), preImageCollInfo[0]);
+
     // Ensure that donor and recipient shard observed the expected 'fromMigrate' events for each
     // document id. Note that the "d" event for doc 1 on the donor is due to the post-migration
     // cleanup.
@@ -203,10 +211,14 @@ function verifyChangeStreamEvents(csCursor, events) {
     verifyFromMigrateOplogEvents(donor, 2, []);
     verifyFromMigrateOplogEvents(recipient, 2, ["i", "d"]);
 
-    // Ensure that the donor has expected pre-images and recipient has no pre-images.
+    // Update the document after chunk-migration is completed. This pre-image for this update should
+    // be recorded by the recipient shard.
+    assert.commandWorked(coll.update({_id: 1}, {$set: {annotate: "after_migration"}}));
+
+    // Ensure that the donor and recipient have expected pre-image after chunk-migration.
     verifyPreImages(donor, 1, ["before_update"]);
     verifyPreImages(donor, 2, ["before_update", "update"]);
-    verifyPreImages(recipient, 1, []);
+    verifyPreImages(recipient, 1, ["update"]);
     verifyPreImages(recipient, 2, []);
 
     // Verify the change streams events.
