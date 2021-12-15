@@ -197,7 +197,7 @@ void assertTxnMetadata(BSONObj obj,
 }
 
 TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
-    txnWithRetries().runSync(
+    auto swResult = txnWithRetries().runSyncNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -229,6 +229,9 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
             mockClient()->setNextCommandResponse(kOKCommandResponse);
             return SemiFuture<void>::makeReady();
         });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
@@ -251,7 +254,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
         resetTxnWithRetries();
 
         int attempt = -1;
-        txnWithRetries().runSync(
+        auto swResult = txnWithRetries().runSyncNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 attempt += 1;
 
@@ -289,6 +292,9 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
                 mockClient()->setNextCommandResponse(kOKCommandResponse);
                 return SemiFuture<void>::makeReady();
             });
+        ASSERT(swResult.getStatus().isOK());
+        ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
         auto lastRequest = mockClient()->getLastSentRequest();
         assertTxnMetadata(lastRequest,
                           attempt /* txnNumber */,
@@ -310,27 +316,25 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
         opCtx()->setWriteConcern(writeConcern);
 
         resetTxnWithRetries();
-        try {
-            txnWithRetries().runSync(
-                opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                    mockClient()->setNextCommandResponse(kOKInsertResponse);
-                    auto insertRes =
-                        txnClient
-                            .runCommand("user"_sd,
-                                        BSON("insert"
-                                             << "foo"
-                                             << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                            .get();
-                    ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+        auto swResult = txnWithRetries().runSyncNoThrow(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                auto insertRes = txnClient
+                                     .runCommand("user"_sd,
+                                                 BSON("insert"
+                                                      << "foo"
+                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                     .get();
+                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
-                    uasserted(ErrorCodes::InternalError, "Mock error");
-                    // The abort response, the client should ignore this.
-                    mockClient()->setNextCommandResponse(kResWithBadValueError);
-                    return SemiFuture<void>::makeReady();
-                });
-        } catch (const DBException& e) {
-            ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-        }
+                mockClient()->setSecondCommandResponse(
+                    kOKCommandResponse);  // Best effort abort response.
+
+                uasserted(ErrorCodes::InternalError, "Mock error");
+                return SemiFuture<void>::makeReady();
+            });
+        ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
         auto lastRequest = mockClient()->getLastSentRequest();
         assertTxnMetadata(lastRequest,
                           0 /* txnNumber */,
@@ -355,7 +359,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
         resetTxnWithRetries();
 
         int attempt = -1;
-        txnWithRetries().runSync(
+        auto swResult = txnWithRetries().runSyncNoThrow(
             opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 attempt += 1;
                 mockClient()->setNextCommandResponse(kOKInsertResponse);
@@ -393,6 +397,9 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
                 mockClient()->setNextCommandResponse(kOKCommandResponse);
                 return SemiFuture<void>::makeReady();
             });
+        ASSERT(swResult.getStatus().isOK());
+        ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
         auto lastRequest = mockClient()->getLastSentRequest();
         assertTxnMetadata(lastRequest,
                           attempt /* txnNumber */,
@@ -405,26 +412,25 @@ TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
 }
 
 TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
 
-                uasserted(ErrorCodes::InternalError, "Mock error");
-                // The abort response, the client should ignore this.
-                mockClient()->setNextCommandResponse(kResWithBadValueError);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            // The best effort abort response, the client should ignore this.
+            mockClient()->setNextCommandResponse(kResWithBadValueError);
+
+            uasserted(ErrorCodes::InternalError, "Mock error");
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
@@ -436,67 +442,67 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            // The commit response, the client should not receive this.
+            mockClient()->setNextCommandResponse(kResWithBadValueError);
 
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                uasserted(ErrorCodes::InternalError, "Mock error");
-                // The commit response, the client should not receive this.
-                mockClient()->setNextCommandResponse(kResWithBadValueError);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            uasserted(ErrorCodes::InternalError, "Mock error");
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT(lastRequest.isEmpty());
 }
 
 TEST_F(TxnAPITest, OwnSession_SkipsAbortIfNoCommandsWereRun) {
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                uasserted(ErrorCodes::InternalError, "Mock error");
-                // The abort response, the client should not receive this.
-                mockClient()->setNextCommandResponse(kResWithBadValueError);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            // The best effort abort response, the client should not receive this.
+            mockClient()->setNextCommandResponse(kResWithBadValueError);
+
+            uasserted(ErrorCodes::InternalError, "Mock error");
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT(lastRequest.isEmpty());
 }
 
 TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
     int attempt = -1;
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                attempt += 1;
-                mockClient()->setNextCommandResponse(attempt == 0 ? kNoSuchTransactionResponse
-                                                                  : kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                uassertStatusOK(getWriteConcernStatusFromCommandResult(insertRes));
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+            mockClient()->setNextCommandResponse(attempt == 0 ? kNoSuchTransactionResponse
+                                                              : kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            if (attempt == 0) {
+                uassertStatusOK(getStatusFromWriteCommandReply(insertRes));
+            } else {
+                ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
+            }
 
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
-                assertTxnMetadata(mockClient()->getLastSentRequest(),
-                                  attempt /* txnNumber */,
-                                  0 /* txnRetryCounter */,
-                                  true /* startTransaction */);
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              attempt /* txnNumber */,
+                              0 /* txnRetryCounter */,
+                              true /* startTransaction */);
 
-                // The commit response.
-                mockClient()->setNextCommandResponse(kOKCommandResponse);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            // The commit response.
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
@@ -509,33 +515,32 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
 
 TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
     int attempt = -1;
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                attempt += 1;
-                mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                uassertStatusOK(getWriteConcernStatusFromCommandResult(insertRes));
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
-                assertTxnMetadata(mockClient()->getLastSentRequest(),
-                                  attempt /* txnNumber */,
-                                  0 /* txnRetryCounter */,
-                                  true /* startTransaction */);
-                uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              attempt /* txnNumber */,
+                              0 /* txnRetryCounter */,
+                              true /* startTransaction */);
+            uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
 
-                // The commit response.
-                mockClient()->setNextCommandResponse(kOKCommandResponse);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            // The commit response.
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
@@ -547,34 +552,36 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_CommitError) {
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                uassertStatusOK(getWriteConcernStatusFromCommandResult(insertRes));
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
-                assertTxnMetadata(mockClient()->getLastSentRequest(),
-                                  0 /* txnNumber */,
-                                  0 /* txnRetryCounter */,
-                                  true /* startTransaction */);
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              0 /* txnNumber */,
+                              0 /* txnRetryCounter */,
+                              true /* startTransaction */);
 
-                // The commit response.
-                mockClient()->setNextCommandResponse(
-                    BSON("ok" << 0 << "code" << ErrorCodes::InternalError));
-                mockClient()->setSecondCommandResponse(
-                    kOKCommandResponse);  // Best effort abort response.
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            // The commit response.
+            mockClient()->setNextCommandResponse(
+                BSON("ok" << 0 << "code" << ErrorCodes::InternalError));
+
+            // The best effort abort response, the client should ignore this.
+            mockClient()->setSecondCommandResponse(kResWithBadValueError);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT_EQ(swResult.getValue().cmdStatus, ErrorCodes::InternalError);
+    ASSERT(swResult.getValue().wcError.toStatus().isOK());
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
@@ -588,33 +595,32 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
 
 TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     int attempt = -1;
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                attempt += 1;
-                mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                uassertStatusOK(getWriteConcernStatusFromCommandResult(insertRes));
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            attempt += 1;
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
-                assertTxnMetadata(mockClient()->getLastSentRequest(),
-                                  attempt /* txnNumber */,
-                                  0 /* txnRetryCounter */,
-                                  true /* startTransaction */);
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              attempt /* txnNumber */,
+                              0 /* txnRetryCounter */,
+                              true /* startTransaction */);
 
-                // The commit response.
-                mockClient()->setNextCommandResponse(attempt == 0 ? kNoSuchTransactionResponse
-                                                                  : kOKCommandResponse);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            // The commit response.
+            mockClient()->setNextCommandResponse(attempt == 0 ? kNoSuchTransactionResponse
+                                                              : kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
@@ -626,33 +632,32 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                uassertStatusOK(getWriteConcernStatusFromCommandResult(insertRes));
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
-                assertTxnMetadata(mockClient()->getLastSentRequest(),
-                                  0 /* txnNumber */,
-                                  0 /* txnRetryCounter */,
-                                  true /* startTransaction */);
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              0 /* txnNumber */,
+                              0 /* txnRetryCounter */,
+                              true /* startTransaction */);
 
-                // The commit response.
-                mockClient()->setNextCommandResponse(
-                    BSON("ok" << 0 << "code" << ErrorCodes::InterruptedDueToReplStateChange));
-                mockClient()->setSecondCommandResponse(kOKCommandResponse);
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::InternalError);
-    }
+            // The commit response.
+            mockClient()->setNextCommandResponse(
+                BSON("ok" << 0 << "code" << ErrorCodes::InterruptedDueToReplStateChange));
+            mockClient()->setSecondCommandResponse(kOKCommandResponse);
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
@@ -664,31 +669,32 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
-    try {
-        txnWithRetries().runSync(
-            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                mockClient()->setNextCommandResponse(kOKInsertResponse);
-                auto insertRes = txnClient
-                                     .runCommand("user"_sd,
-                                                 BSON("insert"
-                                                      << "foo"
-                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
-                                     .get();
-                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
-                assertTxnMetadata(mockClient()->getLastSentRequest(),
-                                  0 /* txnNumber */,
-                                  0 /* txnRetryCounter */,
-                                  true /* startTransaction */);
+    auto swResult = txnWithRetries().runSyncNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            mockClient()->setNextCommandResponse(kOKInsertResponse);
+            auto insertRes = txnClient
+                                 .runCommand("user"_sd,
+                                             BSON("insert"
+                                                  << "foo"
+                                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                 .get();
+            ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+            assertTxnMetadata(mockClient()->getLastSentRequest(),
+                              0 /* txnNumber */,
+                              0 /* txnRetryCounter */,
+                              true /* startTransaction */);
 
-                // The commit response.
-                mockClient()->setNextCommandResponse(kResWithWriteConcernError);
-                mockClient()->setSecondCommandResponse(
-                    kOKCommandResponse);  // Best effort abort response.
-                return SemiFuture<void>::makeReady();
-            });
-    } catch (const DBException& e) {
-        ASSERT_EQ(e.code(), ErrorCodes::WriteConcernFailed);
-    }
+            // The commit response.
+            mockClient()->setNextCommandResponse(kResWithWriteConcernError);
+            mockClient()->setSecondCommandResponse(
+                kOKCommandResponse);  // Best effort abort response.
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().cmdStatus.isOK());
+    ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::WriteConcernFailed);
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
@@ -700,7 +706,7 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
 }
 
 TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
-    txnWithRetries().runSync(
+    auto swResult = txnWithRetries().runSyncNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
@@ -709,7 +715,7 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
                                                   << "foo"
                                                   << "documents" << BSON_ARRAY(BSON("x" << 1))))
                                  .get();
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(insertRes));
+            ASSERT_OK(getStatusFromWriteCommandReply(insertRes));
 
             ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
             assertTxnMetadata(mockClient()->getLastSentRequest(),
@@ -722,6 +728,8 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
             mockClient()->setSecondCommandResponse(kOKCommandResponse);
             return SemiFuture<void>::makeReady();
         });
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
 
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
@@ -731,6 +739,71 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
+TEST_F(TxnAPITest, RunSyncNoErrors) {
+    txnWithRetries().runSync(opCtx(),
+                             [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                                 return SemiFuture<void>::makeReady();
+                             });
+}
+
+TEST_F(TxnAPITest, RunSyncThrowsOnBodyError) {
+    ASSERT_THROWS_CODE(txnWithRetries().runSync(
+                           opCtx(),
+                           [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                               uasserted(ErrorCodes::InternalError, "Mock error");
+                               return SemiFuture<void>::makeReady();
+                           }),
+                       DBException,
+                       ErrorCodes::InternalError);
+}
+
+TEST_F(TxnAPITest, RunSyncThrowsOnCommitCmdError) {
+    ASSERT_THROWS_CODE(txnWithRetries().runSync(
+                           opCtx(),
+                           [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                               mockClient()->setNextCommandResponse(kOKInsertResponse);
+                               auto insertRes = txnClient
+                                                    .runCommand("user"_sd,
+                                                                BSON("insert"
+                                                                     << "foo"
+                                                                     << "documents"
+                                                                     << BSON_ARRAY(BSON("x" << 1))))
+                                                    .get();
+
+                               // The commit response.
+                               mockClient()->setNextCommandResponse(
+                                   BSON("ok" << 0 << "code" << ErrorCodes::InternalError));
+                               mockClient()->setSecondCommandResponse(
+                                   kOKCommandResponse);  // Best effort abort response.
+                               return SemiFuture<void>::makeReady();
+                           }),
+                       DBException,
+                       ErrorCodes::InternalError);
+}
+
+TEST_F(TxnAPITest, RunSyncThrowsOnCommitWCError) {
+    ASSERT_THROWS_CODE(txnWithRetries().runSync(
+                           opCtx(),
+                           [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                               mockClient()->setNextCommandResponse(kOKInsertResponse);
+                               auto insertRes = txnClient
+                                                    .runCommand("user"_sd,
+                                                                BSON("insert"
+                                                                     << "foo"
+                                                                     << "documents"
+                                                                     << BSON_ARRAY(BSON("x" << 1))))
+                                                    .get();
+
+                               // The commit response.
+                               mockClient()->setNextCommandResponse(kResWithWriteConcernError);
+                               mockClient()->setSecondCommandResponse(
+                                   kOKCommandResponse);  // Best effort abort response.
+                               return SemiFuture<void>::makeReady();
+                           }),
+                       DBException,
+                       ErrorCodes::WriteConcernFailed);
 }
 
 }  // namespace

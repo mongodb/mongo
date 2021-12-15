@@ -53,48 +53,55 @@
 
 namespace mongo::txn_api {
 
-void TransactionWithRetries::runSync(OperationContext* opCtx, TxnCallback func) {
+StatusWith<CommitResult> TransactionWithRetries::runSyncNoThrow(OperationContext* opCtx,
+                                                                TxnCallback func) noexcept {
     // TODO SERVER-59566 Add a retry policy.
     while (true) {
-        try {
-            ExecutorFuture<void>(_executor)
-                .then([this, anchor = shared_from_this(), &func] {
-                    return func(_internalTxn->getClient(), _executor);
-                })
-                .get(opCtx);
-        } catch (const DBException& e) {
-            auto nextStep = _internalTxn->handleError(e.toStatus());
-            switch (nextStep) {
-                case details::Transaction::ErrorHandlingStep::kDoNotRetry:
-                    _bestEffortAbort(opCtx);
-                    throw;
-                case details::Transaction::ErrorHandlingStep::kRetryTransaction:
-                    continue;
-                case details::Transaction::ErrorHandlingStep::kRetryCommit:
-                    MONGO_UNREACHABLE;
+        {
+            auto bodyStatus = ExecutorFuture<void>(_executor)
+                                  .then([this, anchor = shared_from_this(), &func] {
+                                      return func(_internalTxn->getClient(), _executor);
+                                  })
+                                  .getNoThrow(opCtx);
+
+            if (!bodyStatus.isOK()) {
+                auto nextStep = _internalTxn->handleError(bodyStatus);
+                switch (nextStep) {
+                    case details::Transaction::ErrorHandlingStep::kDoNotRetry:
+                        _bestEffortAbort(opCtx);
+                        return bodyStatus;
+                    case details::Transaction::ErrorHandlingStep::kRetryTransaction:
+                        continue;
+                    case details::Transaction::ErrorHandlingStep::kRetryCommit:
+                        MONGO_UNREACHABLE;
+                }
             }
         }
 
         while (true) {
-            try {
+            auto swResult =
                 ExecutorFuture<void>(_executor)
                     .then([this, anchor = shared_from_this()] { return _internalTxn->commit(); })
-                    .get(opCtx);
-                return;
-            } catch (const DBException& e) {
-                auto nextStep = _internalTxn->handleError(e.toStatus());
-                switch (nextStep) {
-                    case details::Transaction::ErrorHandlingStep::kDoNotRetry:
-                        _bestEffortAbort(opCtx);
-                        throw;
-                    case details::Transaction::ErrorHandlingStep::kRetryTransaction:
-                        break;
-                    case details::Transaction::ErrorHandlingStep::kRetryCommit:
-                        continue;
-                }
+                    .getNoThrow(opCtx);
+
+            if (swResult.isOK() && swResult.getValue().getEffectiveStatus().isOK()) {
+                // Commit succeeded so return to the caller.
+                return swResult;
+            }
+
+            auto nextStep = _internalTxn->handleError(swResult);
+            switch (nextStep) {
+                case details::Transaction::ErrorHandlingStep::kDoNotRetry:
+                    _bestEffortAbort(opCtx);
+                    return swResult;
+                case details::Transaction::ErrorHandlingStep::kRetryTransaction:
+                    break;
+                case details::Transaction::ErrorHandlingStep::kRetryCommit:
+                    continue;
             }
         }
     }
+    MONGO_UNREACHABLE;
 }
 
 void TransactionWithRetries::_bestEffortAbort(OperationContext* opCtx) {
@@ -178,17 +185,31 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
         .semi();
 }
 
-SemiFuture<void> Transaction::commit() {
-    return _commitOrAbort(NamespaceString::kAdminDb, CommitTransaction::kCommandName);
+SemiFuture<CommitResult> Transaction::commit() {
+    return _commitOrAbort(NamespaceString::kAdminDb, CommitTransaction::kCommandName)
+        .thenRunOn(_executor)
+        .then([this](BSONObj res) {
+            auto wcErrorHolder = getWriteConcernErrorDetailFromBSONObj(res);
+            WriteConcernErrorDetail wcError;
+            if (wcErrorHolder) {
+                wcErrorHolder->cloneTo(&wcError);
+            }
+            return CommitResult{getStatusFromCommandResult(res), wcError};
+        })
+        .semi();
 }
 
 SemiFuture<void> Transaction::abort() {
-    return _commitOrAbort(NamespaceString::kAdminDb, AbortTransaction::kCommandName);
+    return _commitOrAbort(NamespaceString::kAdminDb, AbortTransaction::kCommandName)
+        .thenRunOn(_executor)
+        .then([this](BSONObj res) {
+            uassertStatusOK(getStatusFromCommandResult(res));
+            uassertStatusOK(getWriteConcernStatusFromCommandResult(res));
+        })
+        .semi();
 }
 
-SemiFuture<void> Transaction::_commitOrAbort(StringData dbName, StringData cmdName) {
-    uassert(5875904, "Internal transaction already completed", _state != TransactionState::kDone);
-
+SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cmdName) {
     if (_state == TransactionState::kInit) {
         LOGV2_DEBUG(5875903,
                     0,  // TODO SERVER-61781: Raise verbosity.
@@ -196,7 +217,7 @@ SemiFuture<void> Transaction::_commitOrAbort(StringData dbName, StringData cmdNa
                     "cmdName"_attr = cmdName,
                     "sessionInfo"_attr = _sessionInfo,
                     "execContext"_attr = _execContextToString(_execContext));
-        return SemiFuture<void>::makeReady();
+        return BSON("ok" << 1);
     }
     uassert(5875902,
             "Internal transaction not in progress",
@@ -218,23 +239,17 @@ SemiFuture<void> Transaction::_commitOrAbort(StringData dbName, StringData cmdNa
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern.toBSON());
     auto cmdObj = cmdBuilder.obj();
 
-    return _txnClient->runCommand(dbName, cmdObj)
-        .thenRunOn(_executor)
-        .then([this](BSONObj res) {
-            uassertStatusOK(getStatusFromCommandResult(res));
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(res));
-            _state = TransactionState::kDone;
-        })
-        .semi();
+    return _txnClient->runCommand(dbName, cmdObj).semi();
 }
 
-Transaction::ErrorHandlingStep Transaction::handleError(Status clientStatus) {
+Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult) {
     LOGV2_DEBUG(5875905,
                 0,  // TODO SERVER-61781: Raise verbosity.
                 "Internal transaction handling error",
-                "clientStatus"_attr = clientStatus,
-                "latestResponseStatus"_attr = _latestResponseStatus,
-                "latestResponseWCStatus"_attr = _latestResponseWCStatus,
+                "error"_attr = swResult.isOK() ? swResult.getValue().getEffectiveStatus()
+                                               : swResult.getStatus(),
+                "hasTransientTransactionErrorLabel"_attr =
+                    _latestResponseHasTransientTransactionErrorLabel,
                 "txnInfo"_attr = reportStateForLog());
 
     if (_execContext == ExecutionContext::kClientTransaction) {
@@ -242,23 +257,42 @@ Transaction::ErrorHandlingStep Transaction::handleError(Status clientStatus) {
         return ErrorHandlingStep::kDoNotRetry;
     }
 
-    auto hasStartedCommit = _state == TransactionState::kStartedCommit;
-    auto clientReceivedNetworkError = ErrorCodes::isNetworkError(clientStatus);
-    if (_latestResponseHasTransientTransactionErrorLabel ||
-        // A network error before commit is a transient transaction error.
-        (!hasStartedCommit && clientReceivedNetworkError)) {
+    // The transient transaction error label is always returned in command responses, even for
+    // internal clients, so we use it to decide when to retry the transaction instead of inspecting
+    // error codes. The only exception is when a network error was received before commit, handled
+    // below.
+    if (_latestResponseHasTransientTransactionErrorLabel) {
         _primeForTransactionRetry();
         return ErrorHandlingStep::kRetryTransaction;
     }
 
-    bool latestResponseErrorWasRetryable = ErrorCodes::isRetriableError(_latestResponseStatus) ||
-        ErrorCodes::isRetriableError(_latestResponseWCStatus);
-    if (hasStartedCommit && latestResponseErrorWasRetryable) {
-        // TODO SERVER-59566: Handle timeouts and max retry attempts. Note commit might be retried
-        // within the command itself, e.g. ClusterCommitTransaction uses an idempotent retry policy,
-        // so we may want a timeout policy instead of number of retries.
-        _primeForCommitRetry();
-        return ErrorHandlingStep::kRetryCommit;
+    auto hasStartedCommit = _state == TransactionState::kStartedCommit;
+
+    const auto& clientStatus = swResult.getStatus();
+    if (!clientStatus.isOK()) {
+        // A network error before commit is a transient transaction error.
+        if (!hasStartedCommit && ErrorCodes::isNetworkError(clientStatus)) {
+            _primeForTransactionRetry();
+            return ErrorHandlingStep::kRetryTransaction;
+        }
+        return ErrorHandlingStep::kDoNotRetry;
+    }
+
+    if (hasStartedCommit) {
+        const auto& commitStatus = swResult.getValue().cmdStatus;
+        const auto& commitWCStatus = swResult.getValue().wcError.toStatus();
+
+        // The retryable write error label is not returned to internal clients, so we cannot rely on
+        // it and instead use error categories to decide when to retry commit, which is treated as a
+        // retryable write, per the drivers specification.
+        if (ErrorCodes::isRetriableError(commitStatus) ||
+            ErrorCodes::isRetriableError(commitWCStatus)) {
+            // TODO SERVER-59566: Handle timeouts and max retry attempts. Note commit might be
+            // retried within the command itself, e.g. ClusterCommitTransaction uses an idempotent
+            // retry policy, so we may want a timeout policy instead of number of retries.
+            _primeForCommitRetry();
+            return ErrorHandlingStep::kRetryCommit;
+        }
     }
 
     return ErrorHandlingStep::kDoNotRetry;
@@ -275,15 +309,10 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
         cmdBuilder->append(_readConcern.toBSON().firstElement());
     }
 
-    _latestResponseStatus = Status::OK();
-    _latestResponseWCStatus = Status::OK();
     _latestResponseHasTransientTransactionErrorLabel = false;
 }
 
 void Transaction::processResponse(const BSONObj& reply) {
-    _latestResponseStatus = getStatusFromCommandResult(reply);
-    _latestResponseWCStatus = getWriteConcernStatusFromCommandResult(reply);
-
     if (auto errorLabels = reply[kErrorLabelsFieldName]) {
         for (const auto& label : errorLabels.Array()) {
             if (label.String() == ErrorLabel::kTransientTransaction) {
@@ -302,6 +331,7 @@ void Transaction::_setSessionInfo(LogicalSessionId lsid,
 }
 
 void Transaction::_primeForTransactionRetry() {
+    _latestResponseHasTransientTransactionErrorLabel = false;
     switch (_execContext) {
         case ExecutionContext::kOwnSession:
             // Advance txnNumber.
@@ -329,6 +359,7 @@ void Transaction::_primeForTransactionRetry() {
 
 void Transaction::_primeForCommitRetry() {
     invariant(_state == TransactionState::kStartedCommit);
+    _latestResponseHasTransientTransactionErrorLabel = false;
     _state = TransactionState::kStarted;
 }
 

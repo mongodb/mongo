@@ -83,4 +83,14 @@ private:
     bool _isErrInfoSet;
 };
 
+/**
+ * Creates and returns a WriteConcernErrorDetail object from a BSONObj.
+ */
+std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj);
+
+/**
+ * Constructs a WriteConcernErrorDetail by parsing the given BSONElement.
+ */
+WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorElem);
+
 }  // namespace mongo

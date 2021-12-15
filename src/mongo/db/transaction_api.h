@@ -33,6 +33,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future.h"
@@ -42,6 +43,29 @@ namespace details {
 class TxnMetadataHooks;
 class Transaction;
 }  // namespace details
+
+/**
+ * Encapsulates the command status and write concern error from a response to a commitTransaction
+ * command.
+ */
+struct CommitResult {
+    /**
+     * Returns an error status with additional context if any of the inner errors are non OK.
+     */
+    Status getEffectiveStatus() const {
+        if (!cmdStatus.isOK()) {
+            return cmdStatus.withContext("Command error committing internal transaction");
+        }
+        if (!wcError.toStatus().isOK()) {
+            return wcError.toStatus().withContext(
+                "Write concern error committing internal transaction");
+        }
+        return Status::OK();
+    }
+
+    Status cmdStatus;
+    WriteConcernErrorDetail wcError;
+};
 
 /**
  * Interface for the “backend” of an internal transaction responsible for executing commands.
@@ -108,12 +132,27 @@ public:
               std::make_unique<details::Transaction>(opCtx, executor, std::move(txnClient))) {}
 
     /**
-     * Runs the given transaction callback synchronously, throwing on errors.
+     * Runs the given transaction callback synchronously.
+     *
+     * Returns a bundle with the commit command status and write concern error, if any. Any error
+     * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
+     * given callback) will result in a non-ok StatusWith. Note that abort errors are not returned
+     * because an abort will only happen implicitly when another error has occurred, and that
+     * original error is returned instead.
      *
      * TODO SERVER-61782: Make this async.
      * TODO SERVER-61782: Allow returning a SemiFuture with any type.
      */
-    void runSync(OperationContext* opCtx, TxnCallback func);
+    StatusWith<CommitResult> runSyncNoThrow(OperationContext* opCtx, TxnCallback func) noexcept;
+
+    /**
+     * Same as above except will throw if the commit result has a non-ok command status or a write
+     * concern error.
+     */
+    void runSync(OperationContext* opCtx, TxnCallback func) {
+        auto result = uassertStatusOK(runSyncNoThrow(opCtx, std::move(func)));
+        uassertStatusOK(result.getEffectiveStatus());
+    }
 
 private:
     /**
@@ -212,18 +251,25 @@ public:
     }
 
     /**
-     * Used by the transaction runner to commit or abort the transaction. Returns an error if the
-     * command fails.
+     * Used by the transaction runner to commit the transaction. Returns a future with a non-OK
+     * status if the commit failed to send, otherwise returns a future with a bundle with the
+     * command and write concern statuses.
      */
-    SemiFuture<void> commit();
+    SemiFuture<CommitResult> commit();
+
+    /**
+     * Used by the transaction runner to abort the transaction. Returns a future with a non-OK
+     * status if there was an error sending the command, a non-ok command result, or a write concern
+     * error.
+     */
     SemiFuture<void> abort();
 
     /**
-     * Handles the given client error or the latest error encountered in the transaction based on
-     * where the transaction is in its lifecycle, e.g. by updating its txnNumber or txnRetryCounter,
-     * and returns the next step for the transaction runner.
+     * Handles the given transaction result based on where the transaction is in its lifecycle and
+     * its execution context, e.g. by updating its txnNumber or txnRetryCounter, and returns the
+     * next step for the transaction runner.
      */
-    ErrorHandlingStep handleError(Status clientStatus);
+    ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult);
 
     /**
      * Returns an object with info about the internal transaction for diagnostics.
@@ -270,7 +316,7 @@ private:
                          TxnNumber txnNumber,
                          boost::optional<TxnRetryCounter> txnRetryCounter);
 
-    SemiFuture<void> _commitOrAbort(StringData dbName, StringData cmdName);
+    SemiFuture<BSONObj> _commitOrAbort(StringData dbName, StringData cmdName);
 
     /**
      * Extracts session options from Operation Context and infers the internal transaction’s
@@ -293,8 +339,6 @@ private:
     std::unique_ptr<TransactionClient> _txnClient;
 
     bool _latestResponseHasTransientTransactionErrorLabel{false};
-    Status _latestResponseStatus = Status::OK();
-    Status _latestResponseWCStatus = Status::OK();
 
     OperationSessionInfo _sessionInfo;
     repl::ReadConcernArgs _readConcern;

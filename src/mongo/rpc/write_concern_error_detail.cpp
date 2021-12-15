@@ -32,6 +32,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/rpc/write_concern_error_gen.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/util/str.h"
 
@@ -136,6 +137,34 @@ bool WriteConcernErrorDetail::isErrInfoSet() const {
 const BSONObj& WriteConcernErrorDetail::getErrInfo() const {
     dassert(_isErrInfoSet);
     return _errInfo;
+}
+
+WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorElem) {
+    WriteConcernErrorDetail wcError;
+    std::string errMsg;
+    auto wcErrorObj = wcErrorElem.Obj();
+    if (!wcError.parseBSON(wcErrorObj, &errMsg)) {
+        wcError.clear();
+        wcError.setStatus({ErrorCodes::FailedToParse,
+                           "Failed to parse writeConcernError: " + wcErrorObj.toString() +
+                               ", Received error: " + errMsg});
+    }
+
+    return wcError;
+}
+
+std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj) {
+    BSONElement wcErrorElem;
+    Status status = bsonExtractTypedField(obj, "writeConcernError", Object, &wcErrorElem);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::NoSuchKey) {
+            return nullptr;
+        } else {
+            uassertStatusOK(status);
+        }
+    }
+
+    return std::make_unique<WriteConcernErrorDetail>(getWriteConcernErrorDetail(wcErrorElem));
 }
 
 }  // namespace mongo
