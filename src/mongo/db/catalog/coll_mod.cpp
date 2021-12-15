@@ -134,65 +134,46 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
         } else if (fieldName == "collMod") {
             // no-op
         } else if (fieldName == "index" && !isView) {
-            auto cmrIndex = &cmr.indexRequest;
-            cmrIndex->indexObj = e.Obj().getOwned();
-            const auto& indexObj = cmrIndex->indexObj;
+            const auto& cmdIndex = *cmd.getIndex();
             StringData indexName;
             BSONObj keyPattern;
 
-            for (auto&& elem : indexObj) {
-                const auto field = elem.fieldNameStringData();
-                if (field != "name" && field != "keyPattern" && field != "expireAfterSeconds" &&
-                    field != "hidden" && field != "unique") {
-                    return {ErrorCodes::InvalidOptions,
-                            str::stream()
-                                << "Unrecognized field '" << field << "' in 'index' option"};
-                }
-            }
-
-            BSONElement nameElem = indexObj["name"];
-            BSONElement keyPatternElem = indexObj["keyPattern"];
-            if (nameElem && keyPatternElem) {
+            if (cmdIndex.getName() && cmdIndex.getKeyPattern()) {
                 return Status(ErrorCodes::InvalidOptions,
                               "Cannot specify both key pattern and name.");
             }
 
-            if (!nameElem && !keyPatternElem) {
+            if (!cmdIndex.getName() && !cmdIndex.getKeyPattern()) {
                 return Status(ErrorCodes::InvalidOptions,
                               "Must specify either index name or key pattern.");
             }
 
-            if (nameElem) {
-                if (nameElem.type() != BSONType::String) {
-                    return Status(ErrorCodes::InvalidOptions, "Index name must be a string.");
-                }
-                indexName = nameElem.valueStringData();
+            if (cmdIndex.getName()) {
+                indexName = *cmdIndex.getName();
             }
 
-            if (keyPatternElem) {
-                if (keyPatternElem.type() != BSONType::Object) {
-                    return Status(ErrorCodes::InvalidOptions, "Key pattern must be an object.");
-                }
-                keyPattern = keyPatternElem.embeddedObject();
+            if (cmdIndex.getKeyPattern()) {
+                keyPattern = *cmdIndex.getKeyPattern();
             }
 
-            cmrIndex->indexExpireAfterSeconds = indexObj["expireAfterSeconds"];
-            cmrIndex->indexHidden = indexObj["hidden"];
-            cmrIndex->indexUnique = indexObj["unique"];
+            if (!cmdIndex.getExpireAfterSeconds() && !cmdIndex.getHidden() &&
+                !cmdIndex.getUnique()) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "no expireAfterSeconds, hidden, or unique field");
+            }
 
-            if (cmrIndex->indexUnique) {
+            auto cmrIndex = &cmr.indexRequest;
+            cmrIndex->indexObj = e.Obj().getOwned();
+            const auto& indexObj = cmrIndex->indexObj;
+
+            if (cmdIndex.getUnique()) {
                 uassert(ErrorCodes::InvalidOptions,
                         "collMod does not support converting an index to unique",
                         feature_flags::gCollModIndexUnique.isEnabled(
                             serverGlobalParams.featureCompatibility));
             }
 
-            if (cmrIndex->indexExpireAfterSeconds.eoo() && cmrIndex->indexHidden.eoo() &&
-                cmrIndex->indexUnique.eoo()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "no expireAfterSeconds, hidden, or unique field");
-            }
-            if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
+            if (cmdIndex.getExpireAfterSeconds()) {
                 if (isTimeseries) {
                     return Status(ErrorCodes::InvalidOptions,
                                   "TTL indexes are not supported for time-series collections. "
@@ -204,18 +185,13 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                                   "TTL indexes are not supported for capped collections.");
                 }
                 if (auto status = index_key_validate::validateExpireAfterSeconds(
-                        cmrIndex->indexExpireAfterSeconds.safeNumberLong());
+                        *cmdIndex.getExpireAfterSeconds());
                     !status.isOK()) {
                     return {ErrorCodes::InvalidOptions, status.reason()};
                 }
             }
-            if (!cmrIndex->indexHidden.eoo() && !cmrIndex->indexHidden.isBoolean()) {
-                return Status(ErrorCodes::InvalidOptions, "hidden field must be a boolean");
-            }
-            if (!cmrIndex->indexUnique.eoo() && !cmrIndex->indexUnique.isBoolean()) {
-                return Status(ErrorCodes::InvalidOptions, "unique field must be a boolean");
-            }
-            if (!cmrIndex->indexHidden.eoo() && coll->isClustered() &&
+
+            if (cmdIndex.getHidden() && coll->isClustered() &&
                 !nss.isTimeseriesBucketsCollection()) {
                 auto clusteredInfo = coll->getClusteredInfo();
                 tassert(6011801,
@@ -264,7 +240,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 cmrIndex->idx = indexes[0];
             }
 
-            if (!cmrIndex->indexExpireAfterSeconds.eoo()) {
+            if (cmdIndex.getExpireAfterSeconds()) {
                 cmr.numModifications++;
                 BSONElement oldExpireSecs = cmrIndex->idx->infoObj().getField("expireAfterSeconds");
                 if (oldExpireSecs.eoo()) {
@@ -281,28 +257,32 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                     return Status(ErrorCodes::InvalidOptions,
                                   "existing expireAfterSeconds field is not a number");
                 }
+
+                cmrIndex->indexExpireAfterSeconds =
+                    indexObj[CollModIndex::kExpireAfterSecondsFieldName];
             }
 
-            if (cmrIndex->indexUnique) {
+            if (cmdIndex.getUnique()) {
                 cmr.numModifications++;
-                if (!cmrIndex->indexUnique.trueValue()) {
+                if (bool unique = *cmdIndex.getUnique(); !unique) {
                     return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
                 }
+
+                cmrIndex->indexUnique = indexObj[CollModIndex::kUniqueFieldName];
             }
 
-            if (cmrIndex->indexHidden) {
+            if (cmdIndex.getHidden()) {
                 cmr.numModifications++;
                 // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
-                if (cmrIndex->idx->hidden() == cmrIndex->indexHidden.booleanSafe()) {
+                if (cmrIndex->idx->hidden() == *cmdIndex.getHidden()) {
                     // If the collMod includes "expireAfterSeconds" or "unique", remove the no-op
                     // "hidden" parameter and write the remaining "index" object to the oplog entry
                     // builder.
-                    if (!cmrIndex->indexExpireAfterSeconds.eoo() || !cmrIndex->indexUnique.eoo()) {
+                    if (cmdIndex.getExpireAfterSeconds() || cmdIndex.getUnique()) {
                         oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
                     }
-                    // Un-set "indexHidden" in ParsedCollModRequest, and skip the automatic write to
-                    // the oplogEntryBuilder that occurs at the end of the parsing loop.
-                    cmrIndex->indexHidden = {};
+                    // Skip setting "indexHidden" in ParsedCollModRequest, and skip the automatic
+                    // write to the oplogEntryBuilder that occurs at the end of the parsing loop.
                     continue;
                 }
 
@@ -318,6 +298,8 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 if (cmrIndex->idx->isIdIndex()) {
                     return Status(ErrorCodes::BadValue, "can't hide _id index");
                 }
+
+                cmrIndex->indexHidden = indexObj[CollModIndex::kHiddenFieldName];
             }
         } else if (fieldName == "validator" && !isView && !isTimeseries) {
             cmr.numModifications++;
