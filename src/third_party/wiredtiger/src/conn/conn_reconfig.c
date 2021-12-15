@@ -430,7 +430,8 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     WT_ERR(__wt_tiered_conn_config(session, cfg, true));
     WT_ERR(__wt_sweep_config(session, cfg));
     WT_ERR(__wt_timing_stress_config(session, cfg));
-    WT_ERR(__wt_verbose_config(session, cfg));
+    WT_ERR(__wt_json_config(session, cfg, true));
+    WT_ERR(__wt_verbose_config(session, cfg, true));
 
     /* Third, merge everything together, creating a new connection state. */
     WT_ERR(__wt_config_merge(session, cfg, NULL, &p));

@@ -69,7 +69,7 @@ __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v)
 
     WT_RET(__wt_snprintf(buf, sizeof(buf), "verbose=[%s]", v));
     cfg[0] = buf;
-    return (__wt_verbose_config(session, cfg));
+    return (__wt_verbose_config(session, cfg, true));
 }
 
 /*
