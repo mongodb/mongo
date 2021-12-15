@@ -101,7 +101,6 @@ __rollback_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *first
 
             upd->txnid = WT_TXN_ABORTED;
             WT_STAT_CONN_INCR(session, txn_rts_upd_aborted);
-            upd->durable_ts = upd->start_ts = WT_TS_NONE;
         } else {
             /* Valid update is found. */
             stable_upd = upd;
