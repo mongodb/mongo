@@ -130,10 +130,8 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
                                        const IndexDescriptor* idx,
                                        boost::optional<repl::OplogApplication::Mode> mode,
                                        const CollModWriteOpsTracker::Docs* docsForUniqueIndex,
-                                       BSONElement indexUnique,
-                                       BSONElement* newUnique) {
+                                       boost::optional<bool>* newUnique) {
     invariant(!idx->unique(), str::stream() << "Index is already unique: " << idx->infoObj());
-
     const auto& collection = autoColl->getCollection();
 
     // Checks for duplicates on the primary or for the 'applyOps' command.
@@ -178,7 +176,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
             "unique", buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
     }
 
-    *newUnique = indexUnique;
+    *newUnique = true;
     autoColl->getWritableCollection()->updateUniqueSetting(opCtx, idx->indexName());
 }
 
@@ -205,7 +203,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
     BSONElement oldExpireSecs = {};
     BSONElement newHidden = {};
     BSONElement oldHidden = {};
-    BSONElement newUnique = {};
+    boost::optional<bool> newUnique;
 
     // TTL Index
     if (indexExpireAfterSeconds) {
@@ -222,8 +220,9 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
     // User wants to convert an index to be unique.
     if (indexUnique) {
+        invariant(*indexUnique);
         _processCollModIndexRequestUnique(
-            opCtx, autoColl, idx, mode, docsForUniqueIndex, indexUnique, &newUnique);
+            opCtx, autoColl, idx, mode, docsForUniqueIndex, &newUnique);
     }
 
     *indexCollModInfo = IndexCollModInfo{
@@ -233,7 +232,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
                                                         : Seconds(oldExpireSecs.safeNumberLong()),
         !indexHidden ? boost::optional<bool>() : newHidden.booleanSafe(),
         !indexHidden ? boost::optional<bool>() : oldHidden.booleanSafe(),
-        !indexUnique ? boost::optional<bool>() : newUnique.booleanSafe(),
+        newUnique,
         idx->indexName()};
 
     // This matches the default for IndexCatalog::refreshEntry().
@@ -264,8 +263,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
                 result->append("hidden_old", oldValue);
                 result->appendAs(newHidden, "hidden_new");
             }
-            if (!newUnique.eoo()) {
-                invariant(newUnique.trueValue());
+            if (newUnique) {
+                invariant(*newUnique);
                 result->appendBool("unique_new", true);
             }
         });

@@ -277,7 +277,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 if (cmrIndex->idx->unique()) {
                     indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kUniqueFieldName);
                 } else {
-                    cmrIndex->indexUnique = indexObj[CollModIndex::kUniqueFieldName];
+                    cmrIndex->indexUnique = true;
                 }
             }
 

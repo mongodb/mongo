@@ -50,7 +50,7 @@ struct ParsedCollModIndexRequest {
     const IndexDescriptor* idx = nullptr;
     BSONElement indexExpireAfterSeconds = {};
     BSONElement indexHidden = {};
-    BSONElement indexUnique = {};
+    boost::optional<bool> indexUnique;
 };
 
 /**
