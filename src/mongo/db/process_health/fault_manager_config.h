@@ -73,36 +73,16 @@ static const StringData FaultFacetType_serializer(const FaultFacetType value) {
 
 class FaultManagerConfig {
 public:
-    /* Default value of time between health checks
-     * TODO SERVER-61947 make this a property of health observers
-     */
-    static auto inline constexpr kPeriodicHealthCheckInterval{Milliseconds(1000)};
-
     /* Maximum possible jitter added to the time between health checks */
     static auto inline constexpr kPeriodicHealthCheckMaxJitter{Milliseconds{100}};
 
     HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) {
-        auto intensities = getHealthObserverIntensities();
-        switch (type) {
-            case FaultFacetType::kLdap:
-                return intensities->_data->getLdap();
-            case FaultFacetType::kDns:
-                return intensities->_data->getDns();
-                // TODO: update this function with additional fault facets when they are added
-            case FaultFacetType::kTestObserver:
-                return intensities->_data->getTest();
-            case FaultFacetType::kSystem:
-                return HealthObserverIntensityEnum::kCritical;
-            case FaultFacetType::kMock1:
-                if (_facetToIntensityMapForTest.contains(type)) {
-                    return _facetToIntensityMapForTest.at(type);
-                }
-                return HealthObserverIntensityEnum::kCritical;
-            case FaultFacetType::kMock2:
-                return HealthObserverIntensityEnum::kCritical;
-            default:
-                MONGO_UNREACHABLE;
+        auto intensities = _getHealthObserverIntensities();
+        if (type == FaultFacetType::kMock1 && _facetToIntensityMapForTest.contains(type)) {
+            return _facetToIntensityMapForTest.at(type);
         }
+        return _getPropertyByType(
+            type, &intensities->_data, HealthObserverIntensityEnum::kCritical);
     }
 
     bool isHealthObserverEnabled(FaultFacetType type) {
@@ -119,16 +99,17 @@ public:
         return Milliseconds(Seconds(mongo::gActiveFaultDurationSecs.load()));
     }
 
-    Milliseconds getPeriodicHealthCheckInterval() const {
-        return kPeriodicHealthCheckInterval;
+    Milliseconds getPeriodicHealthCheckInterval(FaultFacetType type) const {
+        auto intervals = _getHealthObserverIntervals();
+        return Milliseconds(_getPropertyByType(type, &intervals->_data, 1000));
     }
 
     Milliseconds getPeriodicLivenessCheckInterval() const {
-        return Milliseconds(50);
+        return Milliseconds(_getLivenessConfig()->_data->getInterval());
     }
 
     Seconds getPeriodicLivenessDeadline() const {
-        return Seconds(300);
+        return Seconds(_getLivenessConfig()->_data->getInterval());
     }
 
     /** @returns true if the periodic checks are disabled for testing purposes. This is
@@ -143,9 +124,40 @@ public:
     }
 
 private:
-    static HealthMonitoringIntensitiesServerParameter* getHealthObserverIntensities() {
+    static HealthMonitoringIntensitiesServerParameter* _getHealthObserverIntensities() {
         return ServerParameterSet::getGlobal()->get<HealthMonitoringIntensitiesServerParameter>(
-            "healthMonitoring");
+            "healthMonitoringIntensities");
+    }
+
+    static PeriodicHealthCheckIntervalsServerParameter* _getHealthObserverIntervals() {
+        return ServerParameterSet::getGlobal()->get<PeriodicHealthCheckIntervalsServerParameter>(
+            "healthMonitoringIntervals");
+    }
+
+    static HealthMonitoringProgressMonitorServerParameter* _getLivenessConfig() {
+        return ServerParameterSet::getGlobal()->get<HealthMonitoringProgressMonitorServerParameter>(
+            "progressMonitor");
+    }
+
+    template <typename T, typename R>
+    R _getPropertyByType(FaultFacetType type, synchronized_value<T>* data, R defaultValue) const {
+        switch (type) {
+            case FaultFacetType::kLdap:
+                return (*data)->getLdap();
+            case FaultFacetType::kDns:
+                return (*data)->getDns();
+            case FaultFacetType::kTestObserver:
+                return (*data)->getTest();
+            case FaultFacetType::kSystem:
+                return defaultValue;
+            case FaultFacetType::kMock1:
+                return defaultValue;
+            case FaultFacetType::kMock2:
+                return defaultValue;
+            // TODO: update this function with additional fault facets when they are added
+            default:
+                MONGO_UNREACHABLE;
+        }
     }
 
     bool _periodicChecksDisabledForTests = false;
