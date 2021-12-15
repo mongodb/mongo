@@ -67,6 +67,7 @@ struct DbCheckCollectionInfo {
     int64_t maxCount;
     int64_t maxSize;
     int64_t maxRate;
+    int64_t maxBatchTimeMillis;
 };
 
 /**
@@ -88,12 +89,14 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             "Cannot run dbCheck on " + nss.toString() + " because it is not replicated",
             nss.isReplicated());
 
-    auto start = invocation.getMinKey();
-    auto end = invocation.getMaxKey();
-    auto maxCount = invocation.getMaxCount();
-    auto maxSize = invocation.getMaxSize();
-    auto maxRate = invocation.getMaxCountPerSecond();
-    auto info = DbCheckCollectionInfo{nss, start, end, maxCount, maxSize, maxRate};
+    const auto start = invocation.getMinKey();
+    const auto end = invocation.getMaxKey();
+    const auto maxCount = invocation.getMaxCount();
+    const auto maxSize = invocation.getMaxSize();
+    const auto maxRate = invocation.getMaxCountPerSecond();
+    const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
+    const auto info =
+        DbCheckCollectionInfo{nss, start, end, maxCount, maxSize, maxRate, maxBatchTimeMillis};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -110,12 +113,14 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
 
     const int64_t max = std::numeric_limits<int64_t>::max();
     const auto rate = invocation.getMaxCountPerSecond();
+    const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
     auto result = std::make_unique<DbCheckRun>();
     auto perCollectionWork = [&](const Collection* coll) {
         if (!coll->ns().isReplicated()) {
             return true;
         }
-        DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate};
+        DbCheckCollectionInfo info{
+            coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate, maxBatchTimeMillis};
         result->push_back(info);
         return true;
     };
@@ -374,7 +379,8 @@ private:
                     return e.toStatus();
                 }
 
-                Status status = hasher->hashAll();
+                const auto deadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
+                Status status = hasher->hashAll(opCtx, deadline);
 
                 if (!status.isOK()) {
                     return status;
@@ -503,6 +509,7 @@ public:
                "              maxCount: <max number of docs>,\n"
                "              maxSize: <max size of docs>,\n"
                "              maxCountPerSecond: <max rate in docs/sec> } "
+               "              maxBatchTimeMillis: <max time processing a batch in milliseconds> } "
                "to check a collection.\n"
                "Invoke with {dbCheck: 1} to check all collections in the database.";
     }
