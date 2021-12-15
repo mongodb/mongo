@@ -570,15 +570,20 @@ public:
                                         << " tailable cursor requested on non capped collection");
         }
 
-        // Fill in some opDebug information.
+        // Fill in some opDebug information, unless it has already been filled by an outer pipeline.
         const PlanCacheKey planCacheKey =
             plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collection);
-        CurOp::get(_opCtx)->debug().queryHash = planCacheKey.queryHash();
+        OpDebug& opDebug = CurOp::get(_opCtx)->debug();
+        if (!opDebug.queryHash) {
+            opDebug.queryHash = planCacheKey.queryHash();
+        }
 
         // Check that the query should be cached.
         if (shouldCacheQuery(*_cq)) {
             // Fill in the 'planCacheKey' too if the query is actually being cached.
-            CurOp::get(_opCtx)->debug().planCacheKey = planCacheKey.planCacheKeyHash();
+            if (!opDebug.planCacheKey) {
+                opDebug.planCacheKey = planCacheKey.planCacheKeyHash();
+            }
 
             // Try to look up a cached solution for the query.
             if (auto cs = CollectionQueryInfo::get(_collection)
