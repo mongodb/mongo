@@ -629,27 +629,30 @@ validateUnrelatedCollAfterRefine(oldCollArr, oldChunkArr, oldTagsArr);
 // Verify that all shards containing chunks in the namespace 'db.foo' eventually refresh (i.e. the
 // secondary shard will not refresh because it does not contain any chunks in 'db.foo'). NOTE: This
 // will only succeed in a linear jstest without failovers.
-dropAndReshardColl(oldKeyDoc);
-assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
+const isStepdownSuite = typeof ContinuousStepdown !== 'undefined';
+if (!isStepdownSuite) {
+    dropAndReshardColl(oldKeyDoc);
+    assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
 
-assert.commandWorked(
-    mongos.adminCommand({moveChunk: kNsName, find: {a: 0, b: 0}, to: secondaryShard}));
-assert.commandWorked(
-    mongos.adminCommand({moveChunk: kNsName, find: {a: 0, b: 0}, to: primaryShard}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: kNsName, find: {a: 0, b: 0}, to: secondaryShard}));
+    assert.commandWorked(
+        mongos.adminCommand({moveChunk: kNsName, find: {a: 0, b: 0}, to: primaryShard}));
 
-const oldPrimaryEpoch = st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
-                            .metadata.shardVersionEpoch.toString();
-const oldSecondaryEpoch = st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
-                              .metadata.shardVersionEpoch.toString();
+    const oldPrimaryEpoch = st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                                .metadata.shardVersionEpoch.toString();
+    const oldSecondaryEpoch = st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                                  .metadata.shardVersionEpoch.toString();
 
-assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
 
-assert.soon(() => oldPrimaryEpoch !==
-                st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
-                    .metadata.shardVersionEpoch.toString());
-assert.soon(() => oldSecondaryEpoch ===
-                st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
-                    .metadata.shardVersionEpoch.toString());
+    assert.soon(() => oldPrimaryEpoch !==
+                    st.shard0.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                        .metadata.shardVersionEpoch.toString());
+    assert.soon(() => oldSecondaryEpoch ===
+                    st.shard1.adminCommand({getShardVersion: kNsName, fullMetadata: true})
+                        .metadata.shardVersionEpoch.toString());
+}
 
 (() => {
     //
