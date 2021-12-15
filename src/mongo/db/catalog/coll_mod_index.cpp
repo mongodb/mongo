@@ -132,10 +132,8 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
                                        const CollModWriteOpsTracker::Docs* docsForUniqueIndex,
                                        BSONElement indexUnique,
                                        BSONElement* newUnique) {
-    // Do not update catalog if index is already unique.
-    if (idx->infoObj().getField("unique").trueValue()) {
-        return;
-    }
+    invariant(!idx->unique(), str::stream() << "Index is already unique: " << idx->infoObj());
+
     const auto& collection = autoColl->getCollection();
 
     // Checks for duplicates on the primary or for the 'applyOps' command.

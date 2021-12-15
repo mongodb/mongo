@@ -262,30 +262,27 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                     indexObj[CollModIndex::kExpireAfterSecondsFieldName];
             }
 
+            // Make a copy of the index options doc for writing to the oplog.
+            // This index options doc should exclude the options that do not need
+            // to be modified.
+            auto indexObjForOplog = indexObj;
+
             if (cmdIndex.getUnique()) {
                 cmr.numModifications++;
                 if (bool unique = *cmdIndex.getUnique(); !unique) {
                     return Status(ErrorCodes::BadValue, "Cannot make index non-unique");
                 }
 
-                cmrIndex->indexUnique = indexObj[CollModIndex::kUniqueFieldName];
+                // Attempting to converting a unique index should be treated as a no-op.
+                if (cmrIndex->idx->unique()) {
+                    indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kUniqueFieldName);
+                } else {
+                    cmrIndex->indexUnique = indexObj[CollModIndex::kUniqueFieldName];
+                }
             }
 
             if (cmdIndex.getHidden()) {
                 cmr.numModifications++;
-                // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
-                if (cmrIndex->idx->hidden() == *cmdIndex.getHidden()) {
-                    // If the collMod includes "expireAfterSeconds" or "unique", remove the no-op
-                    // "hidden" parameter and write the remaining "index" object to the oplog entry
-                    // builder.
-                    if (cmdIndex.getExpireAfterSeconds() || cmdIndex.getUnique()) {
-                        oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
-                    }
-                    // Skip setting "indexHidden" in ParsedCollModRequest, and skip the automatic
-                    // write to the oplogEntryBuilder that occurs at the end of the parsing loop.
-                    continue;
-                }
-
                 // Disallow index hiding/unhiding on system collections.
                 // Bucket collections, which hold data for user-created time-series collections, do
                 // not have this restriction.
@@ -299,8 +296,25 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                     return Status(ErrorCodes::BadValue, "can't hide _id index");
                 }
 
-                cmrIndex->indexHidden = indexObj[CollModIndex::kHiddenFieldName];
+                // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
+                if (cmrIndex->idx->hidden() == *cmdIndex.getHidden()) {
+                    indexObjForOplog = indexObjForOplog.removeField(CollModIndex::kHiddenFieldName);
+                } else {
+                    cmrIndex->indexHidden = indexObj[CollModIndex::kHiddenFieldName];
+                }
             }
+
+            // The index options doc must contain either the name or key pattern, but not both.
+            // If we have just one field, the index modifications requested matches the current
+            // state in catalog and there is nothing further to do.
+            if (indexObjForOplog.nFields() > 1) {
+                oplogEntryBuilder->append(CollMod::kIndexFieldName, indexObjForOplog);
+            }
+
+            // Skip the automatic write to the oplogEntryBuilder that occurs at the end of the
+            // parsing loop because we have already written the normalized index options in
+            // 'indexObjForOplog'.
+            continue;
         } else if (fieldName == "validator" && !isView && !isTimeseries) {
             cmr.numModifications++;
             // If the feature compatibility version is not kLatest, and we are validating features
