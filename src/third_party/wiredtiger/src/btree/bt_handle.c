@@ -884,6 +884,20 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
           btree->allocsize);
 
     /*
+     * FLCS leaf pages have a lower size limit than the default, because the size configures the
+     * bitmap data size and the timestamp data adds on to that. Each time window can be up to 63
+     * bytes and the total page size must not exceed 4G. Thus for an 8t table there can be 64M
+     * entries (so 64M of bitmap data and up to 63*64M == 4032M of time windows), less a bit for
+     * headers. For a 1t table there can be (64 7/8)M entries because the bitmap takes less space,
+     * but that corresponds to a configured page size of a bit over 8M. Consequently the absolute
+     * limit on the page size is 8M, but since pages this large make no sense and perform poorly
+     * even if they don't get bloated out with timestamp data, we'll cut down by a factor of 16 and
+     * set the limit to 128KB.
+     */
+    if (btree->type == BTREE_COL_FIX && btree->maxleafpage > 128 * WT_KILOBYTE)
+        WT_RET_MSG(session, EINVAL, "page size for fixed-length column store is limited to 128KB");
+
+    /*
      * Default in-memory page image size for compression is 4x the maximum internal or leaf page
      * size, and enforce the on-disk page sizes as a lower-limit for the in-memory image size.
      */
