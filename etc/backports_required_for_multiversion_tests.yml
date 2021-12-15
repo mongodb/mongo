@@ -124,6 +124,8 @@ last-continuous:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-61757
+      test_file: jstests/replsets/dbcheck.js
     - ticket: SERVER-61955
       test_file: jstests/auth/dbcheck.js
 
@@ -391,6 +393,8 @@ last-lts:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-61757
+      test_file: jstests/replsets/dbcheck.js
     - ticket: SERVER-61955
       test_file: jstests/auth/dbcheck.js
 

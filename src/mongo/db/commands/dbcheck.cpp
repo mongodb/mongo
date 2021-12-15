@@ -54,9 +54,6 @@
 namespace mongo {
 
 namespace {
-constexpr uint64_t kBatchDocs = 5'000;
-constexpr uint64_t kBatchBytes = 20'000'000;
-
 
 /**
  * All the information needed to run dbCheck on a single collection.
@@ -68,6 +65,8 @@ struct DbCheckCollectionInfo {
     int64_t maxCount;
     int64_t maxSize;
     int64_t maxRate;
+    int64_t maxDocsPerBatch;
+    int64_t maxBytesPerBatch;
     int64_t maxBatchTimeMillis;
 };
 
@@ -95,9 +94,18 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     const auto maxCount = invocation.getMaxCount();
     const auto maxSize = invocation.getMaxSize();
     const auto maxRate = invocation.getMaxCountPerSecond();
+    const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
+    const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
-    const auto info =
-        DbCheckCollectionInfo{nss, start, end, maxCount, maxSize, maxRate, maxBatchTimeMillis};
+    const auto info = DbCheckCollectionInfo{nss,
+                                            start,
+                                            end,
+                                            maxCount,
+                                            maxSize,
+                                            maxRate,
+                                            maxDocsPerBatch,
+                                            maxBytesPerBatch,
+                                            maxBatchTimeMillis};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -114,11 +122,20 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
 
     const int64_t max = std::numeric_limits<int64_t>::max();
     const auto rate = invocation.getMaxCountPerSecond();
+    const auto maxDocsPerBatch = invocation.getMaxDocsPerBatch();
+    const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
     auto result = std::make_unique<DbCheckRun>();
     auto perCollectionWork = [&](const CollectionPtr& coll) {
-        DbCheckCollectionInfo info{
-            coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate, maxBatchTimeMillis};
+        DbCheckCollectionInfo info{coll->ns(),
+                                   BSONKey::min(),
+                                   BSONKey::max(),
+                                   max,
+                                   max,
+                                   rate,
+                                   maxDocsPerBatch,
+                                   maxBytesPerBatch,
+                                   maxBatchTimeMillis};
         result->push_back(info);
         return true;
     };
@@ -222,7 +239,7 @@ private:
                 docsInCurrentInterval = 0;
             }
 
-            auto result = _runBatch(info, start, kBatchDocs, kBatchBytes);
+            auto result = _runBatch(info, start, info.maxDocsPerBatch, info.maxBytesPerBatch);
 
             if (_done) {
                 return;
@@ -430,6 +447,8 @@ public:
                "              maxCount: <max number of docs>,\n"
                "              maxSize: <max size of docs>,\n"
                "              maxCountPerSecond: <max rate in docs/sec> } "
+               "              maxDocsPerBatch: <max number of docs/batch> } "
+               "              maxBytesPerBatch: <try to keep a batch within max bytes/batch> } "
                "              maxBatchTimeMillis: <max time processing a batch in milliseconds> } "
                "to check a collection.\n"
                "Invoke with {dbCheck: 1} to check all collections in the database.";
