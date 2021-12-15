@@ -160,6 +160,15 @@ protected:
     }
 
     /*
+     * Performs a noop write on all shards and the configsvr using the sessionId and txnNumber
+     * specified in 'osi'.
+     */
+    void _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+        OperationContext* opCtx,
+        const OperationSessionInfo& osi,
+        const std::shared_ptr<executor::TaskExecutor>& executor);
+
+    /*
      * Specify if the coordinator must indefinitely be retried in case of exceptions. It is always
      * expected for a coordinator to make progress after performing intermediate operations that
      * can't be rollbacked.

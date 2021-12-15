@@ -141,10 +141,6 @@ private:
      */
     void _logEndCreateCollection(OperationContext* opCtx);
 
-    void _performNoopRetryableWriteOnParticipants(
-        OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor);
-
-
     CreateCollectionCoordinatorDocument _doc;
     const BSONObj _critSecReason;
 

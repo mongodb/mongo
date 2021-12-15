@@ -103,20 +103,6 @@ private:
 
 }  // namespace
 
-void DropDatabaseCoordinator::_performNoopRetryableWriteOnParticipants(
-    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
-    auto shardsAndConfigsvr = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto participants = shardRegistry->getAllShardIds(opCtx);
-        participants.emplace_back(shardRegistry->getConfigShard()->getId());
-        return participants;
-    }();
-
-    _doc = _updateSession(opCtx, _doc);
-    sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
-}
-
 void DropDatabaseCoordinator::_dropShardedCollection(
     OperationContext* opCtx,
     const CollectionType& coll,
@@ -237,7 +223,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
-                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                    _doc = _updateSession(opCtx, _doc);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, getCurrentSession(_doc), **executor);
                 }
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", _dbName);

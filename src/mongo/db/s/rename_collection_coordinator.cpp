@@ -150,20 +150,6 @@ void RenameCollectionCoordinator::_enterPhase(Phase newPhase) {
     _doc = _updateStateDocument(cc().makeOperationContext().get(), std::move(newDoc));
 }
 
-void RenameCollectionCoordinator::_performNoopRetryableWriteOnParticipants(
-    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
-    auto shardsAndConfigsvr = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto participants = shardRegistry->getAllShardIds(opCtx);
-        participants.emplace_back(shardRegistry->getConfigShard()->getId());
-        return participants;
-    }();
-
-    _doc = _updateSession(opCtx, _doc);
-    sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
-}
-
 ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -253,8 +239,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                if (_recoveredFromDisk) {
-                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                if (!_firstExecution) {
+                    _doc = _updateSession(opCtx, _doc);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, getCurrentSession(_doc), **executor);
                 }
 
                 const auto& fromNss = nss();
@@ -303,8 +291,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                if (_recoveredFromDisk) {
-                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                if (!_firstExecution) {
+                    _doc = _updateSession(opCtx, _doc);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, getCurrentSession(_doc), **executor);
                 }
 
                 ConfigsvrRenameCollectionMetadata req(nss(), _doc.getTo());
@@ -342,8 +332,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                if (_recoveredFromDisk) {
-                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                if (!_firstExecution) {
+                    _doc = _updateSession(opCtx, _doc);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, getCurrentSession(_doc), **executor);
                 }
 
                 const auto& fromNss = nss();

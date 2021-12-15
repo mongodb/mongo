@@ -447,7 +447,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // Perform a noop write on the participants in order to advance the txnNumber
                     // for this coordinator's lsid so that requests with older txnNumbers can no
                     // longer execute.
-                    _performNoopRetryableWriteOnParticipants(opCtx, **executor);
+                    _doc = _updateSession(opCtx, _doc);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                        opCtx, getCurrentSession(_doc), **executor);
                 }
 
                 if (_recoveredFromDisk) {
@@ -938,20 +940,6 @@ void CreateCollectionCoordinator::_logEndCreateCollection(OperationContext* opCt
         collectionDetail.appendNumber("numChunks", static_cast<long long>(*_numChunks));
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "shardCollection.end", nss().ns(), collectionDetail.obj());
-}
-
-void CreateCollectionCoordinator::_performNoopRetryableWriteOnParticipants(
-    OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
-    auto shardsAndConfigsvr = [&] {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        auto participants = shardRegistry->getAllShardIds(opCtx);
-        participants.emplace_back(shardRegistry->getConfigShard()->getId());
-        return participants;
-    }();
-
-    _doc = _updateSession(opCtx, _doc);
-    sharding_ddl_util::performNoopRetryableWriteOnShards(
-        opCtx, shardsAndConfigsvr, getCurrentSession(_doc), executor);
 }
 
 // Phase change API.

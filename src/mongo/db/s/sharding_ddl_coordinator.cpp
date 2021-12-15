@@ -39,6 +39,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
@@ -309,6 +310,20 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return completionStatus;
         })
         .semi();
+}
+
+void ShardingDDLCoordinator::_performNoopRetryableWriteOnAllShardsAndConfigsvr(
+    OperationContext* opCtx,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    const auto shardsAndConfigsvr = [&] {
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        auto participants = shardRegistry->getAllShardIds(opCtx);
+        participants.emplace_back(shardRegistry->getConfigShard()->getId());
+        return participants;
+    }();
+
+    sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shardsAndConfigsvr, osi, executor);
 }
 
 ShardingDDLCoordinator_NORESILIENT::ShardingDDLCoordinator_NORESILIENT(OperationContext* opCtx,
