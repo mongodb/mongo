@@ -3,6 +3,7 @@
  * @tags: [
  * requires_profiling,
  * assumes_read_concern_unchanged,
+ * do_not_wrap_aggregations_in_facets,
  * ]
  */
 (function() {
@@ -36,19 +37,28 @@ seedWithTickerData(coll, 10);
 testAccumAgainstGroup(coll, "$sum", 0);
 
 function checkProfilerForDiskWrite(dbToCheck) {
-    if (!FixtureHelpers.isMongos) {
-        const profileObj = getLatestProfilerEntry(dbToCheck, {
-            $or: [
-                {originatingCommand: {pipeline: {$setWindowFields: {$exists: true}}}},
-                {command: {pipeline: {$setWindowFields: {$exists: true}}}}
-            ]
-        });
-        assert(profileObj.usedDisk, tojson(profileObj));
+    if (!FixtureHelpers.isMongos(dbToCheck)) {
+        const profileObj = getLatestProfilerEntry(dbToCheck, {usedDisk: true});
+        jsTestLog(profileObj);
+        // Verify that this was a $setWindowFields stage as expected.
+        if (profileObj.hasOwnProperty("originatingCommand")) {
+            assert(profileObj.originatingCommand.pipeline[0].hasOwnProperty("$setWindowFields"));
+        } else if (profileObj.hasOwnProperty("command")) {
+            assert(profileObj.command.pipeline[0].hasOwnProperty("$setWindowFields"));
+        } else {
+            assert(false, "Profiler should have had command field", profileObj);
+        }
     }
 }
 
-FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 2}});
+function resetProfiler(db) {
+    FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 0}});
+    db.system.profile.drop();
+    FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 2}});
+}
+
 // Test that a query that spills to disk succeeds across getMore requests.
+resetProfiler(db);
 const wfResults =
     coll.aggregate(
             [
@@ -76,6 +86,7 @@ for (let i = 0; i < largePartitionSize; i++) {
 }
 
 // Run an aggregation that will keep all documents in the cache for all documents.
+resetProfiler(db);
 let results =
     coll.aggregate(
             [
@@ -147,6 +158,7 @@ if (!FixtureHelpers.isMongos(db)) {
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
                        largePartitionSize * avgDocSize + 1);
+resetProfiler(db);
 results = coll.aggregate(
                   [
                       {
@@ -207,6 +219,7 @@ for (let docNum = 0; docNum < numDocs; docNum++) {
 }
 assert.commandWorked(coll.insert(batchArr));
 // Run a document window over the whole collection to keep everything in the cache.
+resetProfiler(db);
 results =
     coll.aggregate(
             [

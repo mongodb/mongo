@@ -75,14 +75,14 @@ bool modifiedSortPaths(const SortPattern& pat, const DocumentSource::GetModPaths
 
 REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
     setWindowFields,
-    document_source_set_window_fields::LiteParsedSetWindowFields::parse,
+    LiteParsedDocumentSourceDefault::parse,
     document_source_set_window_fields::createFromBson,
     AllowedWithApiStrict::kNeverInVersion1,
     multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
 
 REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(
     _internalSetWindowFields,
-    document_source_set_window_fields::LiteParsedSetWindowFields::parse,
+    LiteParsedDocumentSourceDefault::parse,
     DocumentSourceInternalSetWindowFields::createFromBson,
     AllowedWithApiStrict::kNeverInVersion1,
     multiversion::FeatureCompatibilityVersion::kFullyDowngradedTo_5_0);
