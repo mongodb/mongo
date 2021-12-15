@@ -1843,8 +1843,8 @@ extern void __wt_read_row_time_window(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_TIME_WINDOW *tw);
 extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l);
 extern void __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l);
-extern void __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-  uint32_t entries, uint32_t auxentries, uint8_t *image, size_t size);
+extern void __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
+  uint32_t aux_start_offset, uint32_t auxentries, uint8_t *image, size_t size);
 extern void __wt_rec_dictionary_free(WT_SESSION_IMPL *session, WT_RECONCILE *r);
 extern void __wt_rec_dictionary_reset(WT_RECONCILE *r);
 extern void __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref);

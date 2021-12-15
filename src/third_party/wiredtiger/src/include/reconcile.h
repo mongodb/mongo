@@ -59,7 +59,8 @@ struct __wt_rec_chunk {
 
     WT_ITEM image; /* disk-image */
 
-    /* For fixed-length column store, track how many time windows we have. */
+    /* For fixed-length column store, track where the time windows start and how many we have. */
+    uint32_t aux_start_offset;
     uint32_t auxentries;
 };
 

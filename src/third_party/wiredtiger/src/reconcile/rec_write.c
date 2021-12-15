@@ -1329,6 +1329,54 @@ __wt_rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
     return (0);
 }
 
+/*
+ * __rec_split_fix_shrink --
+ *     Consider eliminating the empty space on an FLCS page.
+ */
+static void
+__rec_split_fix_shrink(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+    uint32_t auxsize, emptysize, primarysize, totalsize;
+    uint8_t *src, *dst;
+
+    /* Total size of page. */
+    totalsize = WT_PTRDIFF32(r->aux_first_free, r->cur_ptr->image.mem);
+
+    /* Size of the entire primary data area, including headers. */
+    primarysize = WT_PTRDIFF32(r->first_free, r->cur_ptr->image.mem);
+
+    /* Size of the empty space. */
+    emptysize = r->aux_start_offset - (primarysize + WT_COL_FIX_AUXHEADER_RESERVATION);
+
+    /* Size of the auxiliary data. */
+    auxsize = totalsize - r->aux_start_offset;
+
+    /*
+     * Arbitrary criterion: if the empty space is bigger than the auxiliary data, memmove the
+     * auxiliary data, on the assumption that the cost of the memmove is outweighed by the cost of
+     * taking checksums of, writing out, and reading back in a bunch of useless empty space.
+     */
+    if (emptysize > auxsize) {
+        /* Source: current auxiliary start. */
+        src = (uint8_t *)r->cur_ptr->image.mem + r->aux_start_offset;
+
+        /* Destination: immediately after the primary data with space for the auxiliary header. */
+        dst = r->first_free + WT_COL_FIX_AUXHEADER_RESERVATION;
+
+        /* The move span should be the empty data size. */
+        WT_ASSERT(session, src == dst + emptysize);
+
+        /* Do the move. */
+        memmove(dst, src, auxsize);
+
+        /* Update the tracking information. */
+        r->aux_start_offset -= emptysize;
+        r->aux_first_free -= emptysize;
+        r->space_avail -= emptysize;
+        r->aux_space_avail += emptysize;
+    }
+}
+
 /* The minimum number of entries before we'll split a row-store internal page. */
 #define WT_PAGE_INTL_MINIMUM_ENTRIES 20
 
@@ -1378,9 +1426,17 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 
     /* Set the entries, timestamps and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
-    if (r->page->type == WT_PAGE_COL_FIX && (r->cur_ptr->auxentries = r->aux_entries) != 0)
-        r->cur_ptr->image.size = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
-    else
+    if (r->page->type == WT_PAGE_COL_FIX) {
+        if ((r->cur_ptr->auxentries = r->aux_entries) != 0) {
+            __rec_split_fix_shrink(session, r);
+            /* This must come after the shrink call, which can change the offset. */
+            r->cur_ptr->aux_start_offset = r->aux_start_offset;
+            r->cur_ptr->image.size = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
+        } else {
+            r->cur_ptr->aux_start_offset = r->aux_start_offset;
+            r->cur_ptr->image.size = inuse;
+        }
+    } else
         r->cur_ptr->image.size = inuse;
 
     /*
@@ -1619,9 +1675,17 @@ __wt_rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 
     /* Set the number of entries and size for the just finished chunk. */
     r->cur_ptr->entries = r->entries;
-    if (r->page->type == WT_PAGE_COL_FIX && (r->cur_ptr->auxentries = r->aux_entries) != 0)
-        r->cur_ptr->image.size = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
-    else
+    if (r->page->type == WT_PAGE_COL_FIX) {
+        if ((r->cur_ptr->auxentries = r->aux_entries) != 0) {
+            __rec_split_fix_shrink(session, r);
+            /* This must come after the shrink call, which can change the offset. */
+            r->cur_ptr->aux_start_offset = r->aux_start_offset;
+            r->cur_ptr->image.size = WT_PTRDIFF(r->aux_first_free, r->cur_ptr->image.mem);
+        } else {
+            r->cur_ptr->aux_start_offset = r->aux_start_offset;
+            r->cur_ptr->image.size = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
+        }
+    } else
         r->cur_ptr->image.size = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
 
     /*
@@ -2044,8 +2108,8 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
     /* Initialize the page header(s). */
     __rec_split_write_header(session, r, chunk, multi, chunk->image.mem);
     if (r->page->type == WT_PAGE_COL_FIX)
-        __wt_rec_col_fix_write_auxheader(
-          session, r, chunk->entries, chunk->auxentries, chunk->image.mem, chunk->image.size);
+        __wt_rec_col_fix_write_auxheader(session, chunk->entries, chunk->aux_start_offset,
+          chunk->auxentries, chunk->image.mem, chunk->image.size);
     if (compressed_image != NULL)
         __rec_split_write_header(session, r, chunk, multi, compressed_image->mem);
 
