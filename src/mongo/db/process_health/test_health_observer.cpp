@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/process_health/test_health_observer.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 
 namespace mongo {
@@ -54,8 +55,12 @@ Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
 
 namespace {
 MONGO_INITIALIZER(TestHealthObserver)(InitializerContext*) {
-    HealthObserverRegistration::registerObserverFactory(
-        [](ServiceContext* svcCtx) { return std::make_unique<TestHealthObserver>(svcCtx); });
+    // Failpoints can only be set when test commands are enabled, and so the test health observer
+    // is only useful in that case.
+    if (getTestCommandsEnabled()) {
+        HealthObserverRegistration::registerObserverFactory(
+            [](ServiceContext* svcCtx) { return std::make_unique<TestHealthObserver>(svcCtx); });
+    }
 }
 }  // namespace
 }  // namespace process_health
