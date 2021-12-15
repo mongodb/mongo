@@ -82,6 +82,8 @@ struct MigrateInfo {
 
 typedef std::vector<MigrateInfo> MigrateInfoVector;
 
+typedef std::vector<BSONObj> SplitPoints;
+
 /**
  * Describes a chunk which needs to be split, because it violates the balancer policy.
  */
@@ -92,7 +94,7 @@ struct SplitInfo {
               const ChunkVersion& chunkVersion,
               const BSONObj& minKey,
               const BSONObj& maxKey,
-              std::vector<BSONObj> splitKeys);
+              SplitPoints splitKeys);
 
     std::string toString() const;
 
@@ -102,7 +104,7 @@ struct SplitInfo {
     ChunkVersion chunkVersion;
     BSONObj minKey;
     BSONObj maxKey;
-    std::vector<BSONObj> splitKeys;
+    SplitPoints splitKeys;
 };
 
 typedef std::vector<SplitInfo> SplitInfoVector;
@@ -113,7 +115,7 @@ struct SplitInfoWithKeyPattern {
                             const ChunkVersion& collectionVersion,
                             const BSONObj& minKey,
                             const BSONObj& maxKey,
-                            std::vector<BSONObj> splitKeys,
+                            SplitPoints splitKeys,
                             const UUID& uuid,
                             const BSONObj& keyPattern);
     SplitInfo info;
@@ -191,6 +193,9 @@ typedef stdx::variant<MergeInfo,
                       SplitInfoWithKeyPattern,
                       EndOfActionStream>
     DefragmentationAction;
+
+typedef stdx::variant<Status, StatusWith<SplitPoints>, StatusWith<DataSizeResponse>>
+    DefragmentationActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
 typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;

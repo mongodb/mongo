@@ -334,7 +334,7 @@ public:
                           const BSONObj& lowerBoundKey,
                           const BSONObj& upperBoundKey,
                           const ChunkVersion& version,
-                          const std::vector<BSONObj>& splitPoints)
+                          const SplitPoints& splitPoints)
         : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
@@ -359,7 +359,7 @@ private:
     BSONObj _lowerBoundKey;
     BSONObj _upperBoundKey;
     ChunkVersion _version;
-    std::vector<BSONObj> _splitPoints;
+    SplitPoints _splitPoints;
 
     static const std::string kCommandName;
     static const std::string kShardName;
@@ -530,13 +530,13 @@ public:
                                         const ChunkRange& chunkRange,
                                         const ChunkVersion& version) override;
 
-    SemiFuture<std::vector<BSONObj>> requestAutoSplitVector(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            const ShardId& shardId,
-                                                            const BSONObj& keyPattern,
-                                                            const BSONObj& minKey,
-                                                            const BSONObj& maxKey,
-                                                            int64_t maxChunkSizeBytes) override;
+    SemiFuture<SplitPoints> requestAutoSplitVector(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ShardId& shardId,
+                                                   const BSONObj& keyPattern,
+                                                   const BSONObj& minKey,
+                                                   const BSONObj& maxKey,
+                                                   int64_t maxChunkSizeBytes) override;
 
     SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
                                        const NamespaceString& nss,
@@ -545,7 +545,7 @@ public:
                                        const KeyPattern& keyPattern,
                                        const BSONObj& minKey,
                                        const BSONObj& maxKey,
-                                       const std::vector<BSONObj>& splitPoints) override;
+                                       const SplitPoints& splitPoints) override;
 
     SemiFuture<DataSizeResponse> requestDataSize(OperationContext* opCtx,
                                                  const NamespaceString& nss,

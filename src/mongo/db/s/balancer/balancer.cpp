@@ -539,7 +539,8 @@ void Balancer::_mainThread() {
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
                 continue;
             }
-
+            // TODO (SERVER-62061) modify condition to allow defragmentation while balancer is
+            // disabled
             if (!balancerConfig->shouldBalance() || _stopOrPauseRequested()) {
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);

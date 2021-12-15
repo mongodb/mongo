@@ -70,7 +70,7 @@ function waitForBalanced() {
 function setFailPointOnConfigNodes(mode) {
     st.forEachConfigServer((config) => {
         assert.commandWorked(config.adminCommand(
-            {configureFailPoint: "skipDefragmentationPhaseTransition", mode: mode}));
+            {configureFailPoint: "beforeTransitioningDefragmentationPhase", mode: mode}));
     });
 }
 
@@ -118,11 +118,11 @@ jsTest.log("Begin and end defragmentation with balancer on");
         balancerShouldMergeChunks: false,
         defaultChunkSize: defaultChunkSize,
     }));
+    setFailPointOnConfigNodes("off");
     st.awaitBalancerRound();
     let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
     assert.neq(afterStatus.firstComplianceViolation, 'chunksMerging');
     st.stopBalancer();
-    setFailPointOnConfigNodes("off");
 }
 
 jsTest.log("Begin defragmentation with balancer off, end with it on");
@@ -145,11 +145,11 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
         balancerShouldMergeChunks: false,
         defaultChunkSize: defaultChunkSize,
     }));
+    setFailPointOnConfigNodes("off");
     st.awaitBalancerRound();
     let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: fullNs}));
     assert.neq(afterStatus.firstComplianceViolation, 'chunksMerging');
     st.stopBalancer();
-    setFailPointOnConfigNodes("off");
 }
 
 jsTest.log("Balancer on, begin defragmentation and let it complete");

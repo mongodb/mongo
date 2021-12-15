@@ -34,6 +34,31 @@
 #include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
+
+/**
+ * Interface describing the interactions that the defragmentation policy can establish with the
+ * phase of the algorithm that is currently active on a collection.
+ * With the exception getType(), its methods do not guarantee thread safety.
+ */
+class DefragmentationPhase {
+public:
+    virtual ~DefragmentationPhase() {}
+
+    virtual DefragmentationPhaseEnum getType() const = 0;
+
+    virtual boost::optional<DefragmentationAction> popNextStreamableAction(
+        OperationContext* opCtx) = 0;
+
+    virtual boost::optional<MigrateInfo> popNextMigration(
+        const stdx::unordered_set<ShardId>& unavailableShards) = 0;
+
+    virtual void applyActionResult(OperationContext* opCtx,
+                                   const DefragmentationAction& action,
+                                   const DefragmentationActionResponse& response) = 0;
+
+    virtual bool isComplete() const = 0;
+};
+
 class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
     BalancerDefragmentationPolicyImpl(const BalancerDefragmentationPolicyImpl&) = delete;
     BalancerDefragmentationPolicyImpl& operator=(const BalancerDefragmentationPolicyImpl&) = delete;
@@ -56,7 +81,7 @@ public:
 
     void acknowledgeAutoSplitVectorResult(OperationContext* opCtx,
                                           AutoSplitVectorInfo action,
-                                          const StatusWith<std::vector<BSONObj>>& result) override;
+                                          const StatusWith<SplitPoints>& result) override;
 
     void acknowledgeSplitResult(OperationContext* opCtx,
                                 SplitInfoWithKeyPattern action,
@@ -74,26 +99,6 @@ public:
 private:
     static constexpr int kMaxConcurrentOperations = 50;
 
-    // Data structures used to keep track of the defragmentation state.
-    struct CollectionDefragmentationState {
-        DefragmentationAction popFromActionQueue() {
-            auto action = queuedActions.front();
-            queuedActions.pop();
-            outstandingActions++;
-            return action;
-        };
-
-        NamespaceString nss;
-        DefragmentationPhaseEnum phase;
-        int64_t maxChunkSizeBytes;
-        BSONObj collectionShardKey;
-        std::queue<DefragmentationAction> queuedActions;
-        unsigned outstandingActions{0};
-        ShardToChunksMap shardToChunkMap;
-        std::vector<ChunkType> chunkList;
-        ZoneInfo zones;
-    };
-
     /**
      * Returns the next action from any collection in phase 1 or 3 or boost::none if there are no
      * actions to perform.
@@ -102,44 +107,17 @@ private:
     boost::optional<DefragmentationAction> _nextStreamingAction(OperationContext* opCtx);
 
     /**
-     * Adds next action to the collection's action queue if there is one. If there are no further
-     * actions, the queue is empty, and there are no outstanding actions for this collection, this
-     * will call _transitionPhases. Returns true if there is a new action for the collection and
-     * false otherwise.
-     * Must be called while holding the _streamingMutex.
-     */
-    bool _queueNextAction(OperationContext* opCtx,
-                          const UUID& uuid,
-                          CollectionDefragmentationState& collectionData);
-
-    /**
-     * Returns next phase 1 merge or datasize action for the collection if there is one and
-     * boost::none otherwise.
-     */
-    boost::optional<DefragmentationAction> _getCollectionPhase1Action(
-        OperationContext* opCtx, const UUID& uuid, CollectionDefragmentationState& collectionInfo);
-
-    /**
-     * Returns next phase 3 split action for the collection if there is one and boost::none
-     * otherwise.
-     */
-    boost::optional<SplitInfoWithKeyPattern> _getCollectionSplitAction(
-        CollectionDefragmentationState& collectionInfo) {
-        return boost::none;
-    }
-
-    /**
      * Move to the next phase and persist the phase change. This will end defragmentation if the
      * current phase is the last phase.
      * Must be called while holding the _streamingMutex.
      */
-    void _transitionPhases(OperationContext* opCtx,
-                           const UUID& uuid,
-                           CollectionDefragmentationState& collectionInfo);
+    std::unique_ptr<DefragmentationPhase> _transitionPhases(OperationContext* opCtx,
+                                                            const UUID& uuid,
+                                                            DefragmentationPhaseEnum currentPhase);
 
     /**
-     * Build the shardToChunk map for the namespace. Requires a scan of the config.chunks
-     * collection.
+     * Builds the defragmentation phase object matching the current state of the passed
+     * collection and sets it into _defragmentationStates.
      */
     void _initializeCollectionState(WithLock, OperationContext* opCtx, const CollectionType& coll);
 
@@ -158,17 +136,19 @@ private:
      */
     void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
 
-    void _processEndOfAction(WithLock,
-                             OperationContext* opCtx,
-                             const UUID& uuid,
-                             const boost::optional<DefragmentationAction>& nextActionOnNamespace);
+    void _processEndOfAction(WithLock, OperationContext* opCtx);
 
     Mutex _streamingMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_streamingMutex");
+
     unsigned _concurrentStreamingOps{0};
+
     boost::optional<Promise<DefragmentationAction>> _nextStreamingActionPromise{boost::none};
+
     bool _streamClosed{false};
 
     ClusterStatistics* const _clusterStats;
-    stdx::unordered_map<UUID, CollectionDefragmentationState, UUID::Hash> _defragmentationStates;
+
+    stdx::unordered_map<UUID, std::unique_ptr<DefragmentationPhase>, UUID::Hash>
+        _defragmentationStates;
 };
 }  // namespace mongo

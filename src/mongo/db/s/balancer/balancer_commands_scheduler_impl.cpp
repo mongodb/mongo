@@ -246,7 +246,7 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMergeChunks(OperationCont
         .semi();
 }
 
-SemiFuture<std::vector<BSONObj>> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
+SemiFuture<SplitPoints> BalancerCommandsSchedulerImpl::requestAutoSplitVector(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardId& shardId,
@@ -278,7 +278,7 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestSplitChunk(
     const KeyPattern& keyPattern,
     const BSONObj& minKey,
     const BSONObj& maxKey,
-    const std::vector<BSONObj>& splitPoints) {
+    const SplitPoints& splitPoints) {
 
     auto commandInfo = std::make_shared<SplitChunkCommandInfo>(
         nss, shardId, keyPattern.toBSON(), minKey, maxKey, collectionVersion, splitPoints);
@@ -504,7 +504,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
             _recentlyCompletedRequestIds.clear();
 
             if (_state == SchedulerState::Stopping) {
-                // reset the internal state and
+                // Reset the internal state and prepare to leave
                 _unsubmittedRequestIds.clear();
                 _requests.swap(requestsToCleanUpOnExit);
                 stopWorkerRequested = true;

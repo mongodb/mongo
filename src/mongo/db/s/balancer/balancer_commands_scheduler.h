@@ -128,13 +128,13 @@ public:
                                                 const ChunkRange& chunkRange,
                                                 const ChunkVersion& version) = 0;
 
-    virtual SemiFuture<std::vector<BSONObj>> requestAutoSplitVector(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    const ShardId& shardId,
-                                                                    const BSONObj& keyPattern,
-                                                                    const BSONObj& minKey,
-                                                                    const BSONObj& maxKey,
-                                                                    int64_t maxChunkSizeBytes) = 0;
+    virtual SemiFuture<SplitPoints> requestAutoSplitVector(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const ShardId& shardId,
+                                                           const BSONObj& keyPattern,
+                                                           const BSONObj& minKey,
+                                                           const BSONObj& maxKey,
+                                                           int64_t maxChunkSizeBytes) = 0;
 
     virtual SemiFuture<void> requestSplitChunk(OperationContext* opCtx,
                                                const NamespaceString& nss,
@@ -143,7 +143,7 @@ public:
                                                const KeyPattern& keyPattern,
                                                const BSONObj& minKey,
                                                const BSONObj& maxKey,
-                                               const std::vector<BSONObj>& splitPoints) = 0;
+                                               const SplitPoints& splitPoints) = 0;
 
     virtual SemiFuture<DataSizeResponse> requestDataSize(OperationContext* opCtx,
                                                          const NamespaceString& nss,
