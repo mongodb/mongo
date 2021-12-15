@@ -92,7 +92,7 @@ TEST(BuiltinRoles, getBuiltinRolesForDB) {
     ASSERT_GTE(adminRoles.size(), testRoles.size());
 }
 
-TEST(BuiltinRoles, addPrivilegsForBuiltinRole) {
+TEST(BuiltinRoles, addPrivilegesForBuiltinRole) {
     PrivilegeVector privs;
     ASSERT(auth::addPrivilegesForBuiltinRole(RoleName("read", "admin"), &privs));
     ASSERT_EQ(privs.size(), 2);
@@ -120,5 +120,29 @@ TEST(BuiltinRoles, addPrivilegsForBuiltinRole) {
     }
 }
 
+TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
+    PrivilegeVector privs;
+    ASSERT(auth::addPrivilegesForBuiltinRole(RoleName("clusterManager", "admin"), &privs));
+    ASSERT_EQ(privs.size(), 9);
+
+    const auto systemBucketsResourcePattern = ResourcePattern::forAnySystemBuckets();
+
+    const ActionSet clusterManagerRoleDatabaseActionSet({
+        ActionType::clearJumboFlag,
+        ActionType::splitChunk,
+        ActionType::moveChunk,
+        ActionType::enableSharding,
+        ActionType::splitVector,
+        ActionType::refineCollectionShardKey,
+        ActionType::reshardCollection,
+    });
+
+    for (const auto& priv : privs) {
+        auto resourcePattern = priv.getResourcePattern();
+        if (resourcePattern == systemBucketsResourcePattern) {
+            ASSERT(priv.getActions() == clusterManagerRoleDatabaseActionSet);
+        }
+    }
+}
 }  // namespace
 }  // namespace mongo
