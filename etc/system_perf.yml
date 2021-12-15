@@ -59,6 +59,7 @@ variables:
     - YCSB
     - benchmarks
     - py-tpcc
+    - PrivateWorkloads
 
 
 modules:
@@ -125,7 +126,10 @@ modules:
     repo: git@github.com:mongodb/mongo-tools.git
     prefix: mongo-tools/src/github.com/mongodb
     branch: master
-
+  - name: PrivateWorkloads
+    repo: git@github.com:10gen/PrivateWorkloads.git
+    prefix: ${workdir}/src
+    branch: production
 
 ###
 # Same in every DSI project
