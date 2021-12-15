@@ -187,6 +187,8 @@ all:
     test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
   - ticket: SERVER-61738
     test_file: jstests/replsets/dbcheck.js
+  - ticket: SERVER-61955
+    test_file: jstests/auth/dbcheck.js
 
 
 suites:

@@ -46,8 +46,10 @@ function addEnoughForMultipleBatches(collection) {
 
 // Name for a collection which takes multiple batches to check and which shouldn't be modified
 // by any of the tests.
-let multiBatchSimpleCollName = "dbcheck-simple-collection";
-addEnoughForMultipleBatches(replSet.getPrimary().getDB(dbName)[multiBatchSimpleCollName]);
+const multiBatchSimpleCollName = "dbcheck-simple-collection";
+const multiBatchSimpleCollSize = 10000;
+replSet.getPrimary().getDB(dbName)[multiBatchSimpleCollName].insertMany(
+    [...Array(10000).keys()].map(x => ({_id: x})));
 
 function dbCheckCompleted(db) {
     return db.currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
@@ -293,6 +295,53 @@ function testDbCheckParameters() {
         {dbCheck: multiBatchSimpleCollName, minKey: start, maxKey: end, maxSize: maxSize}));
     awaitDbCheckCompletion(db, multiBatchSimpleCollName, end, maxSize);
     checkEntryBounds(start, start + maxCount);
+
+    const healthlog = db.getSiblingDB('local').system.healthlog;
+    {
+        // Validate custom maxDocsPerBatch
+        clearLog();
+        const maxDocsPerBatch = 100;
+        assert.commandWorked(
+            db.runCommand({dbCheck: multiBatchSimpleCollName, maxDocsPerBatch: maxDocsPerBatch}));
+
+        const healthlog = db.getSiblingDB('local').system.healthlog;
+        assert.soon(function() {
+            const expectedBatches = multiBatchSimpleCollSize / maxDocsPerBatch +
+                (multiBatchSimpleCollSize % maxDocsPerBatch ? 1 : 0);
+            return (healthlog.find({"operation": "dbCheckBatch"}).itcount() == expectedBatches);
+        }, "dbCheck doesn't seem to complete", 60 * 1000);
+
+        assert.eq(
+            db.getSiblingDB('local')
+                .system.healthlog.find({"operation": "dbCheckBatch", "data.count": maxDocsPerBatch})
+                .itcount(),
+            multiBatchSimpleCollSize / maxDocsPerBatch);
+    }
+    {
+        // Validate custom maxBytesPerBatch
+        clearLog();
+        const coll = db.getSiblingDB("maxBytesPerBatch").maxBytesPerBatch;
+
+        // Insert nDocs, each of which being slightly larger than 1MB, and then run dbCheck with
+        // maxBytesPerBatch := 1MB
+        const nDocs = 5;
+        coll.insertMany([...Array(nDocs).keys()].map(x => ({a: 'a'.repeat(1024 * 1024)})));
+        const maxBytesPerBatch = 1024 * 1024;
+        assert.commandWorked(db.getSiblingDB("maxBytesPerBatch").runCommand({
+            dbCheck: coll.getName(),
+            maxBytesPerBatch: maxBytesPerBatch
+        }));
+
+        // Confirm dbCheck logs nDocs batches.
+        assert.soon(function() {
+            return (healthlog.find({"operation": "dbCheckBatch"}).itcount() == nDocs);
+        }, "dbCheck doesn't seem to complete", 60 * 1000);
+
+        assert.eq(db.getSiblingDB('local')
+                      .system.healthlog.find({"operation": "dbCheckBatch", "data.count": 1})
+                      .itcount(),
+                  nDocs);
+    }
 }
 
 testDbCheckParameters();
