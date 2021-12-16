@@ -184,7 +184,7 @@ TEST_F(VectorClockConfigServerTest, GossipOutInternal) {
     vc->tickTopologyTimeTo(topologyTime);
 
     BSONObjBuilder bob;
-    vc->gossipOut(nullptr, &bob, transport::Session::kInternalClient);
+    vc->gossipOut(operationContext(), &bob, true /*force internal*/);
     auto obj = bob.obj();
 
     // On config servers, gossip out to internal clients should have $clusterTime, $configTime, and
@@ -212,7 +212,7 @@ TEST_F(VectorClockConfigServerTest, GossipOutExternal) {
     vc->tickTopologyTimeTo(topologyTime);
 
     BSONObjBuilder bob;
-    vc->gossipOut(nullptr, &bob);
+    vc->gossipOut(operationContext(), &bob);
     auto obj = bob.obj();
 
     // On config servers, gossip out to external clients should have $clusterTime, but not

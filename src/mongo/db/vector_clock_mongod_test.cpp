@@ -164,7 +164,7 @@ TEST_F(VectorClockMongoDTest, GossipOutInternal) {
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
-    vc->gossipOut(nullptr, &bob, transport::Session::kInternalClient);
+    vc->gossipOut(operationContext(), &bob, true /* forceInternal */);
     auto obj = bob.obj();
 
     // On plain replset servers, gossip out to internal clients should have $clusterTime, but not
@@ -185,7 +185,7 @@ TEST_F(VectorClockMongoDTest, GossipOutExternal) {
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
-    vc->gossipOut(nullptr, &bob);
+    vc->gossipOut(operationContext(), &bob);
     auto obj = bob.obj();
 
     // On plain replset servers, gossip out to external clients should have $clusterTime, but not

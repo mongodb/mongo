@@ -48,7 +48,7 @@ VectorClockMetadataHook::VectorClockMetadataHook(ServiceContext* service) : _ser
 
 Status VectorClockMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                      BSONObjBuilder* metadataBob) {
-    VectorClock::get(_service)->gossipOut(opCtx, metadataBob, transport::Session::kInternalClient);
+    VectorClock::get(_service)->gossipOut(opCtx, metadataBob, true /* forceInternal */);
     return Status::OK();
 }
 

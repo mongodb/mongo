@@ -48,8 +48,7 @@ function setUpDatabaseAndEnableSharding(dbName) {
     assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
 
     // Check that the collection version has been bumped and the shard has refreshed.
-    // TODO SERVER-59053: Re-enable the following assert:
-    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 1));
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 1));
 
     // Use _configsvrSetAllowMigrations to allow migrations to happen
     assert.commandWorked(st.configRS.getPrimary().adminCommand(
@@ -60,8 +59,7 @@ function setUpDatabaseAndEnableSharding(dbName) {
     assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
 
     // Check that the collection version has been bumped and the shard has refreshed.
-    // TODO SERVER-59053: Re-enable the following assert:
-    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
 
     // Check that _configsvrSetAllowMigrations validates the 'collectionUUID' parameter if passed
     const collectionUUID = configDB.collections.findOne({_id: ns}).uuid;
@@ -77,8 +75,7 @@ function setUpDatabaseAndEnableSharding(dbName) {
     assert.eq(undefined, configDB.collections.findOne({_id: ns}).allowMigrations);
 
     // Check that the collection version has not changed.
-    // TODO SERVER-59053: Re-enable the following assert:
-    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 2));
 
     // Check that _configsvrSetAllowMigrations validates the 'collectionUUID' parameter if passed
     assert.commandWorked(st.configRS.getPrimary().adminCommand({
@@ -90,8 +87,7 @@ function setUpDatabaseAndEnableSharding(dbName) {
     assert.eq(false, configDB.collections.findOne({_id: ns}).allowMigrations);
 
     // Check that the collection version has been bumped and the shard has refreshed.
-    // TODO SERVER-59053: Re-enable the following assert:
-    //  ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 3));
+    ShardVersioningUtil.assertCollectionVersionEquals(st.shard0, ns, Timestamp(1, 3));
 })();
 
 // Tests that moveChunk does not succeed when {allowMigrations: false}

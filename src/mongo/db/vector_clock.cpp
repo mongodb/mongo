@@ -294,22 +294,26 @@ const VectorClock::ComponentArray<std::unique_ptr<VectorClock::ComponentFormat>>
 
 bool VectorClock::gossipOut(OperationContext* opCtx,
                             BSONObjBuilder* outMessage,
-                            const transport::Session::TagMask defaultClientSessionTags) const {
+                            bool forceInternal) const {
     if (!isEnabled()) {
         return false;
     }
 
-    auto clientSessionTags = defaultClientSessionTags;
-    if (opCtx && opCtx->getClient()) {
-        const auto session = opCtx->getClient()->session();
-        if (session && !(session->getTags() & transport::Session::kPending)) {
-            clientSessionTags = session->getTags();
+    const auto isInternal = [&]() -> bool {
+        if (forceInternal) {
+            return true;
         }
-    }
 
-    ComponentSet toGossip = clientSessionTags & transport::Session::kInternalClient
-        ? _gossipOutInternal()
-        : _gossipOutExternal();
+        if (opCtx && opCtx->getClient()) {
+            if (auto session = opCtx->getClient()->session()) {
+                return session->getTags() & transport::Session::kInternalClient;
+            }
+        }
+
+        return false;
+    }();
+
+    ComponentSet toGossip = isInternal ? _gossipOutInternal() : _gossipOutExternal();
 
     auto now = getTime();
     bool clusterTimeWasOutput = false;

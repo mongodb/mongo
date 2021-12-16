@@ -142,7 +142,7 @@ public:
      */
     bool gossipOut(OperationContext* opCtx,
                    BSONObjBuilder* outMessage,
-                   transport::Session::TagMask defaultClientSessionTags = 0) const;
+                   bool forceInternal = false) const;
 
     /**
      * Read the necessary fields from inMessage in order to update the current time, based on this

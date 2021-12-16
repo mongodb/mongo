@@ -153,7 +153,7 @@ TEST_F(VectorClockShardServerTest, GossipOutInternal) {
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
-    vc->gossipOut(nullptr, &bob, transport::Session::kInternalClient);
+    vc->gossipOut(operationContext(), &bob, true /*force internal*/);
     auto obj = bob.obj();
 
     // On shard servers, gossip out to internal clients should have $clusterTime, $configTime, and
@@ -176,7 +176,7 @@ TEST_F(VectorClockShardServerTest, GossipOutExternal) {
     const auto clusterTime = vc->tickClusterTime(1);
 
     BSONObjBuilder bob;
-    vc->gossipOut(nullptr, &bob);
+    vc->gossipOut(operationContext(), &bob);
     auto obj = bob.obj();
 
     // On shard servers, gossip out to external clients should have $clusterTime, but not
