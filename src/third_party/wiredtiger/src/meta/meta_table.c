@@ -335,36 +335,3 @@ err:
         __wt_free(session, *valuep);
     return (ret);
 }
-
-/*
- * __wt_metadata_btree_id_to_uri --
- *     Given a btree id, find the matching entry in the metadata and return a copy of the uri. The
- *     caller has to free the returned uri.
- */
-int
-__wt_metadata_btree_id_to_uri(WT_SESSION_IMPL *session, uint32_t btree_id, char **uri)
-{
-    WT_CONFIG_ITEM id;
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    char *key, *value;
-
-    *uri = NULL;
-    key = NULL;
-
-    WT_RET(__wt_metadata_cursor(session, &cursor));
-    while ((ret = cursor->next(cursor)) == 0) {
-        WT_ERR(cursor->get_value(cursor, &value));
-        if ((ret = __wt_config_getones(session, value, "id", &id)) == 0 && btree_id == id.val) {
-            WT_ERR(cursor->get_key(cursor, &key));
-            /* Return a copy as the uri. */
-            WT_ERR(__wt_strdup(session, key, uri));
-            break;
-        }
-        WT_ERR_NOTFOUND_OK(ret, false);
-    }
-
-err:
-    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-    return (ret);
-}
