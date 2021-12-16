@@ -423,7 +423,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
             std::min(observer->healthCheckJitter(),
                      FaultManagerConfig::kPeriodicHealthCheckMaxJitter);
         LOGV2_DEBUG(5939701,
-                    2,
+                    3,
                     "Schedule next health check",
                     "observerType"_attr = str::stream() << observer->getType(),
                     "scheduledTime"_attr = scheduledTime);
