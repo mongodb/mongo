@@ -53,6 +53,8 @@ using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
 namespace {
 using namespace fmt::literals;
 
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
 /*
  * Creates a ReshardingStateMachine if this node is primary and the ReshardingStateMachine doesn't
  * already exist.
@@ -328,22 +330,27 @@ void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) 
             continue;
         }
 
-        ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-            .then([svcCtx = opCtx->getServiceContext(), nss] {
-                ThreadClient tc("TriggerReshardingRecovery", svcCtx);
-                {
-                    stdx::lock_guard<Client> lk(*tc.get());
-                    tc->setSystemOperationKillableByStepdown(lk);
-                }
+        AsyncTry([svcCtx = opCtx->getServiceContext(), nss] {
+            ThreadClient tc("TriggerReshardingRecovery", svcCtx);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
 
-                auto opCtx = tc->makeOperationContext();
-                onShardVersionMismatch(opCtx.get(), nss, boost::none /* shardVersionReceived */);
+            auto opCtx = tc->makeOperationContext();
+            onShardVersionMismatch(opCtx.get(), nss, boost::none /* shardVersionReceived */);
+        })
+            .until([](const Status& status) {
+                if (!status.isOK()) {
+                    LOGV2_WARNING(5498101,
+                                  "Error on deferred shardVersion recovery execution",
+                                  "error"_attr = redact(status));
+                }
+                return status.isOK();
             })
-            .onError([](const Status& status) {
-                LOGV2_WARNING(5498101,
-                              "Error on deferred shardVersion recovery execution",
-                              "error"_attr = redact(status));
-            })
+            .withBackoffBetweenIterations(kExponentialBackoff)
+            .on(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                CancellationToken::uncancelable())
             .getAsync([](auto) {});
     }
 }
