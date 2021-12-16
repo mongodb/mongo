@@ -150,6 +150,7 @@ selector:
 executor:
   archive:
     hooks:
+      - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - CheckReplDBHash
       - ValidateCollections
@@ -163,6 +164,7 @@ executor:
           runningWithSessions: true
           traceExceptions: false
   hooks:
+  - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: ValidateCollections
@@ -181,6 +183,8 @@ executor:
         enableTestCommands: 1
         roleGraphInvalidationIsFatal: 1
         receiveChunkWaitForRangeDeleterTimeoutMS: 90000
+        # TODO (SERVER-61754): dbCheck takes strong locks which causes transactions to timeout
+        maxTransactionLockRequestTimeoutMillis: 3000
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

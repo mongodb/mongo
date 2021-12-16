@@ -46,6 +46,7 @@ CollectionOptions getOptions(void) {
     CollectionOptions options;
     options.capped = true;
     options.cappedSize = kDefaultHealthlogSize;
+    options.setNoIdIndex();
     return options;
 }
 }  // namespace

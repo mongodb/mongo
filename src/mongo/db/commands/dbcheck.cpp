@@ -113,6 +113,9 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     const auto rate = invocation.getMaxCountPerSecond();
     auto result = std::make_unique<DbCheckRun>();
     auto perCollectionWork = [&](const CollectionPtr& coll) {
+        if (!coll->ns().isReplicated() || coll->isClustered()) {
+            return true;
+        }
         DbCheckCollectionInfo info{coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate};
         result->push_back(info);
         return true;
@@ -168,6 +171,11 @@ protected:
     virtual void run() override {
         // Every dbCheck runs in its own client.
         ThreadClient tc(name(), getGlobalServiceContext());
+
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationKillableByStepdown(lk);
+        }
 
         for (const auto& coll : *_run) {
             try {
@@ -226,8 +234,34 @@ private:
             std::unique_ptr<HealthLogEntry> entry;
 
             if (!result.isOK()) {
-                entry = dbCheckErrorHealthLogEntry(
-                    info.nss, "dbCheck batch failed", OplogEntriesEnum::Batch, result.getStatus());
+                auto code = result.getStatus().code();
+                if (code == ErrorCodes::LockTimeout) {
+                    entry = dbCheckWarningHealthLogEntry(
+                        info.nss,
+                        "retrying dbCheck batch after timeout due to lock unavailability",
+                        OplogEntriesEnum::Batch,
+                        result.getStatus());
+                    HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+                    continue;
+                }
+                if (code == ErrorCodes::NamespaceNotFound) {
+                    entry = dbCheckWarningHealthLogEntry(
+                        info.nss,
+                        "abandoning dbCheck batch because collection no longer exists",
+                        OplogEntriesEnum::Batch,
+                        result.getStatus());
+                } else if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(code)) {
+                    entry = dbCheckWarningHealthLogEntry(
+                        info.nss,
+                        "stopping dbCheck because node is no longer primary",
+                        OplogEntriesEnum::Batch,
+                        result.getStatus());
+                } else {
+                    entry = dbCheckErrorHealthLogEntry(info.nss,
+                                                       "dbCheck batch failed",
+                                                       OplogEntriesEnum::Batch,
+                                                       result.getStatus());
+                }
                 HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
                 return;
             } else {

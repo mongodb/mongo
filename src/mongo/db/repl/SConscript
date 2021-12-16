@@ -180,6 +180,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/util/md5',
     ],
 )
