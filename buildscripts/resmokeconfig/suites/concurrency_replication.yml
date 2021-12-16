@@ -25,6 +25,7 @@ selector:
 executor:
   archive:
     hooks:
+      - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - ValidateCollectionsInBackground
       - CheckReplDBHash
@@ -37,6 +38,7 @@ executor:
   # validating the entire contents of the collection.
   #
   # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+  - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: ValidateCollectionsInBackground
   - class: CheckReplDBHash
@@ -49,4 +51,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         roleGraphInvalidationIsFatal: 1
+        # TODO (SERVER-61754): dbCheck takes strong locks which causes transactions to timeout
+        maxTransactionLockRequestTimeoutMillis: 3000
+
     num_nodes: 3

@@ -39,6 +39,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/dbcheck_gen.h"
 #include "mongo/db/repl/oplog.h"
@@ -148,6 +149,17 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString
                                  BSON("success" << false << "error" << err.toString()));
 }
 
+std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(const NamespaceString& nss,
+                                                             const std::string& msg,
+                                                             OplogEntriesEnum operation,
+                                                             const Status& err) {
+    return dbCheckHealthLogEntry(nss,
+                                 SeverityEnum::Warning,
+                                 msg,
+                                 operation,
+                                 BSON("success" << false << "error" << err.toString()));
+}
+
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
@@ -198,21 +210,31 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
     // Get the MD5 hasher set up.
     md5_init(&_state);
 
-    // Get the _id index.
-    const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+    if (!collection->isClustered()) {
+        // Get the _id index.
+        const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+        uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
 
-    uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
-
-    // Set up a simple index scan on that.
-    _exec = InternalPlanner::indexScan(opCtx,
-                                       &collection,
-                                       desc,
-                                       start.obj(),
-                                       end.obj(),
-                                       BoundInclusion::kIncludeEndKeyOnly,
-                                       PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                       InternalPlanner::FORWARD,
-                                       InternalPlanner::IXSCAN_FETCH);
+        // Set up a simple index scan on that.
+        _exec = InternalPlanner::indexScan(opCtx,
+                                           &collection,
+                                           desc,
+                                           start.obj(),
+                                           end.obj(),
+                                           BoundInclusion::kIncludeEndKeyOnly,
+                                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                           InternalPlanner::FORWARD,
+                                           InternalPlanner::IXSCAN_FETCH);
+    } else {
+        CollectionScanParams params;
+        params.minRecord = uassertStatusOK(record_id_helpers::keyForDoc(
+            start.obj(), collection->getClusteredInfo()->getIndexSpec()));
+        params.maxRecord = uassertStatusOK(record_id_helpers::keyForDoc(
+            end.obj(), collection->getClusteredInfo()->getIndexSpec()));
+        params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+        _exec = InternalPlanner::collectionScan(
+            opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    }
 }
 
 

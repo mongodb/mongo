@@ -65,6 +65,10 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString
                                                            OplogEntriesEnum operation,
                                                            const Status& err);
 
+std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(const NamespaceString& nss,
+                                                             const std::string& msg,
+                                                             OplogEntriesEnum operation,
+                                                             const Status& err);
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
