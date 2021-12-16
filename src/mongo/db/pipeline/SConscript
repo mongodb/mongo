@@ -257,9 +257,7 @@ env.Library(
     ],
 )
 
-pipelineEnv = env.Clone()
-pipelineEnv.InjectThirdParty(libraries=['snappy'])
-pipelineEnv.Library(
+env.Library(
     target='pipeline',
     source=[
         'document_source.cpp',
@@ -373,7 +371,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/projection_ast',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',
-        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+        '$BUILD_DIR/mongo/db/sorter/sorter',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/rpc/command_status',

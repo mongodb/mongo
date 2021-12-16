@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,37 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/exec/sort_executor.h"
+#include "mongo/db/sorter/sorted_data_iterator.h"
 
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/exec/working_set.h"
-
-namespace mongo {
-namespace {
+namespace mongo::sorter {
 /**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ * Returns results from sorted in-memory storage.
  */
-std::string nextFileName() {
-    static AtomicWord<unsigned> sortExecutorFileCounter;
-    return "extsort-sort-executor." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
-}
-}  // namespace
-}  // namespace mongo
+template <typename Key, typename Value>
+class InMemIterator : public SortedDataIterator<Key, Value> {
+public:
+    using Base = SortedDataIterator<Key, Value>;
+    using Data = typename Base::Data;
 
-#include "mongo/db/sorter/sorter.cpp"
+    using Base::_returnPolicy;
 
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::Document,
-                    mongo::SortExecutor<mongo::Document>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value,
-                    mongo::SortableWorkingSetMember,
-                    mongo::SortExecutor<mongo::SortableWorkingSetMember>::Comparator);
-MONGO_CREATE_SORTER(mongo::Value, mongo::BSONObj, mongo::SortExecutor<mongo::BSONObj>::Comparator);
+    InMemIterator(std::vector<Data>& data, typename Base::ReturnPolicy returnPolicy)
+        : Base(returnPolicy), _it(data.begin()), _end(data.end()) {}
+
+    bool more() const {
+        return _it != _end;
+    }
+
+    Data next() {
+        switch (_returnPolicy) {
+            case Base::ReturnPolicy::kCopy:
+                return *_it++;
+            case Base::ReturnPolicy::kMove:
+                return std::move(*_it++);
+        }
+        MONGO_UNREACHABLE;
+    }
+
+private:
+    typename std::vector<Data>::iterator _it;
+    typename std::vector<Data>::iterator _end;
+};
+}  // namespace mongo::sorter

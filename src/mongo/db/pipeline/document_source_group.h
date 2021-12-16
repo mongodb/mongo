@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/sorter/file.h"
 #include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
@@ -233,7 +234,7 @@ private:
      * does not exhaust the previous stage before returning, and thus does not maintain as large a
      * store of documents at any one time, only an unsorted group can spill to disk.
      */
-    std::shared_ptr<Sorter<Value, Value>::Iterator> spill();
+    std::unique_ptr<sorter::Sorter<Value, Value>::Iterator> spill();
 
     /**
      * If we ran out of memory, finish all the pending operations so that some memory
@@ -275,7 +276,7 @@ private:
 
     GroupStats _stats;
 
-    std::shared_ptr<Sorter<Value, Value>::File> _file;
+    std::unique_ptr<sorter::File> _file;
 
     std::vector<std::string> _idFieldNames;  // used when id is a document
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
@@ -290,14 +291,14 @@ private:
     // definition of equality.
     boost::optional<GroupsMap> _groups;
 
-    std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _sortedFiles;
+    std::vector<std::unique_ptr<sorter::Sorter<Value, Value>::Iterator>> _sortedFiles;
     bool _spilled;
 
     // Only used when '_spilled' is false.
     GroupsMap::iterator groupsIterator;
 
     // Only used when '_spilled' is true.
-    std::unique_ptr<Sorter<Value, Value>::Iterator> _sorterIterator;
+    std::unique_ptr<sorter::Sorter<Value, Value>::Iterator> _sorterIterator;
 
     std::pair<Value, Value> _firstPartOfNextGroup;
 

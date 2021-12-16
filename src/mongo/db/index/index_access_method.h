@@ -40,6 +40,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/sorter/null_value.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/yieldable.h"
@@ -237,7 +238,7 @@ public:
 
     class BulkBuilder {
     public:
-        using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
+        using Sorter = sorter::Sorter<KeyString::Value, sorter::NullValue>;
 
         virtual ~BulkBuilder() = default;
 
@@ -269,7 +270,7 @@ public:
          * Inserts all multikey metadata keys cached during the BulkBuilder's lifetime into the
          * underlying Sorter, finalizes it, and returns an iterator over the sorted dataset.
          */
-        virtual Sorter::Iterator* done() = 0;
+        virtual std::unique_ptr<Sorter::Iterator> done() = 0;
 
         /**
          * Returns number of keys inserted using this BulkBuilder.

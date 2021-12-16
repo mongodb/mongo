@@ -33,6 +33,7 @@
 
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/sorter/factory.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
 namespace mongo {
@@ -66,21 +67,6 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
                              "path or an expression object, but found: "
                           << groupByField.toString(false, false));
     }
-}
-
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> documentSourceBucketAutoFileCounter;
-    return "extsort-doc-bucket." +
-        std::to_string(documentSourceBucketAutoFileCounter.fetchAndAdd(1));
 }
 
 }  // namespace
@@ -144,19 +130,18 @@ DepsTracker::State DocumentSourceBucketAuto::getDependencies(DepsTracker* deps) 
 
 DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
     if (!_sorter) {
-        SortOptions opts;
+        sorter::Options opts;
         opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
         if (pExpCtx->allowDiskUse && !pExpCtx->inMongos) {
-            opts.extSortAllowed = true;
             opts.tempDir = pExpCtx->tempDir;
         }
         const auto& valueCmp = pExpCtx->getValueComparator();
-        auto comparator = [valueCmp](const Sorter<Value, Document>::Data& lhs,
-                                     const Sorter<Value, Document>::Data& rhs) {
+        auto comparator = [valueCmp](const sorter::Sorter<Value, Document>::Data& lhs,
+                                     const sorter::Sorter<Value, Document>::Data& rhs) {
             return valueCmp.compare(lhs.first, rhs.first);
         };
 
-        _sorter.reset(Sorter<Value, Document>::make(opts, comparator));
+        _sorter = sorter::make<Value, Document>("doc-bucket", opts, comparator);
     }
 
     auto next = pSource->getNext();
@@ -215,13 +200,11 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
 void DocumentSourceBucketAuto::initalizeBucketIteration() {
     // Initialize the iterator on '_sorter'.
     invariant(_sorter);
-    _sortedInput.reset(_sorter->done());
+    _sortedInput = _sorter->done();
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
     metricsCollector.incrementKeysSorted(_sorter->numSorted());
     metricsCollector.incrementSorterSpills(_sorter->numSpills());
-
-    _sorter.reset();
 
     // If there are no buckets, then we don't need to populate anything.
     if (_nBuckets == 0) {
@@ -368,6 +351,7 @@ Document DocumentSourceBucketAuto::makeDocument(const Bucket& bucket) {
 
 void DocumentSourceBucketAuto::doDispose() {
     _sortedInput.reset();
+    _sorter.reset();
 }
 
 Value DocumentSourceBucketAuto::serialize(
@@ -521,6 +505,3 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
 }
 
 }  // namespace mongo
-
-#include "mongo/db/sorter/sorter.cpp"
-// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

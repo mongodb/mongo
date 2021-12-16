@@ -40,28 +40,12 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/sorter/merge_iterator.h"
+#include "mongo/db/sorter/sorted_file_writer.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {
-
-namespace {
-
-/**
- * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
- *
- * Each user of the Sorter must implement this function to ensure that all temporary files that the
- * Sorter instances produce are uniquely identified using a unique file name extension with separate
- * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
- * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
- */
-std::string nextFileName() {
-    static AtomicWord<unsigned> documentSourceGroupFileCounter;
-    return "extsort-doc-group." + std::to_string(documentSourceGroupFileCounter.fetchAndAdd(1));
-}
-
-}  // namespace
 
 using boost::intrusive_ptr;
 using std::pair;
@@ -415,10 +399,10 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
                          ? *maxMemoryUsageBytes
                          : static_cast<size_t>(internalDocumentSourceGroupMaxMemoryBytes.load())},
       // We spill to disk in debug mode, regardless of allowDiskUse, to stress the system.
-      _file(
-          !expCtx->inMongos && (expCtx->allowDiskUse || kDebugBuild)
-              ? std::make_shared<Sorter<Value, Value>::File>(expCtx->tempDir + "/" + nextFileName())
-              : nullptr),
+      _file(!expCtx->inMongos && (expCtx->allowDiskUse || kDebugBuild)
+                ? std::make_unique<sorter::File>(expCtx->tempDir + "/" +
+                                                 sorter::nextFileName("doc-group"))
+                : nullptr),
       _initialized(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
@@ -641,8 +625,8 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::initi
                 // We won't be using groups again so free its memory.
                 _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
 
-                _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
-                    _sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
+                _sorterIterator = std::make_unique<sorter::MergeIterator<Value, Value>>(
+                    _sortedFiles, 0, SorterComparator(pExpCtx->getValueComparator()));
 
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
@@ -666,7 +650,7 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::initi
     MONGO_UNREACHABLE;
 }
 
-shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
+std::unique_ptr<sorter::Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     _stats.spills++;
 
     vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
@@ -677,7 +661,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
 
     stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(pExpCtx->getValueComparator()));
 
-    SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir), _file);
+    sorter::SortedFileWriter<Value, Value> writer(_file.get());
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.
         case 0:                           // no values, essentially a distinct
             for (size_t i = 0; i < ptrs.size(); i++) {
@@ -714,8 +698,7 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
         _memoryTracker.set(accum.fieldName, 0);
     }
 
-    Sorter<Value, Value>::Iterator* iteratorPtr = writer.done();
-    return shared_ptr<Sorter<Value, Value>::Iterator>(iteratorPtr);
+    return writer.done();
 }
 
 Value DocumentSourceGroup::computeId(const Document& root) {
@@ -900,6 +883,3 @@ size_t DocumentSourceGroup::getMaxMemoryUsageBytes() const {
 }
 
 }  // namespace mongo
-
-#include "mongo/db/sorter/sorter.cpp"
-// Explicit instantiation unneeded since we aren't exposing Sorter outside of this file.

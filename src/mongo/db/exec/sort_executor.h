@@ -35,6 +35,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/sorter/factory.h"
 #include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
@@ -51,18 +52,7 @@ namespace mongo {
 template <typename T>
 class SortExecutor {
 public:
-    using DocumentSorter = Sorter<Value, T>;
-    class Comparator {
-    public:
-        Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
-        int operator()(const typename DocumentSorter::Data& lhs,
-                       const typename DocumentSorter::Data& rhs) const {
-            return _sortKeyComparator(lhs.first, rhs.first);
-        }
-
-    private:
-        SortKeyComparator _sortKeyComparator;
-    };
+    using DocumentSorter = sorter::Sorter<Value, T>;
 
     /**
      * If the passed in limit is 0, this is treated as no limit.
@@ -124,7 +114,7 @@ public:
      */
     void add(const Value& sortKey, const T& data) {
         if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
+            _sorter = sorter::make<Value, T>("sort-executor", makeSortOptions(), _getCompFn());
         }
         _sorter->add(sortKey, data);
     }
@@ -135,13 +125,12 @@ public:
     void loadingDone() {
         // This conditional should only pass if no documents were added to the sorter.
         if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
+            _sorter = sorter::make<Value, T>("sort-executor", makeSortOptions(), _getCompFn());
         }
-        _output.reset(_sorter->done());
+        _output = _sorter->done();
         _stats.keysSorted += _sorter->numSorted();
         _stats.spills += _sorter->numSpills();
         _stats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
-        _sorter.reset();
     }
 
     /**
@@ -155,6 +144,7 @@ public:
 
         if (!_output->more()) {
             _output.reset();
+            _sorter.reset();
             _isEOF = true;
             return false;
         }
@@ -176,19 +166,26 @@ public:
     }
 
 private:
-    SortOptions makeSortOptions() const {
-        SortOptions opts;
+    sorter::Options makeSortOptions() const {
+        sorter::Options opts;
         if (_stats.limit) {
             opts.limit = _stats.limit;
         }
 
         opts.maxMemoryUsageBytes = _stats.maxMemoryUsageBytes;
         if (_diskUseAllowed) {
-            opts.extSortAllowed = true;
             opts.tempDir = _tempDir;
         }
 
         return opts;
+    }
+
+    auto _getCompFn() const {
+        return [sortKeyComparator =
+                    SortKeyComparator{_sortPattern}](const typename DocumentSorter::Data& lhs,
+                                                     const typename DocumentSorter::Data& rhs) {
+            return sortKeyComparator(lhs.first, rhs.first);
+        };
     }
 
     const SortPattern _sortPattern;

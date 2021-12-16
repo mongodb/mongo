@@ -158,8 +158,8 @@ private:
      */
     Document makeDocument(const Bucket& bucket);
 
-    std::unique_ptr<Sorter<Value, Document>> _sorter;
-    std::unique_ptr<Sorter<Value, Document>::Iterator> _sortedInput;
+    std::unique_ptr<sorter::Sorter<Value, Document>> _sorter;
+    std::unique_ptr<sorter::Sorter<Value, Document>::Iterator> _sortedInput;
 
     std::vector<AccumulationStatement> _accumulatedFields;
 

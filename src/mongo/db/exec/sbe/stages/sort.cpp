@@ -34,17 +34,10 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/sorter/factory.h"
+#include "mongo/db/sorter/options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/str.h"
-
-namespace {
-std::string nextFileName() {
-    static mongo::AtomicWord<unsigned> sortExecutorFileCounter;
-    return "extsort-sort-sbe." + std::to_string(sortExecutorFileCounter.fetchAndAdd(1));
-}
-}  // namespace
-
-#include "mongo/db/sorter/sorter.cpp"
 
 namespace mongo {
 namespace sbe {
@@ -120,13 +113,13 @@ value::SlotAccessor* SortStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
 }
 
 void SortStage::makeSorter() {
-    SortOptions opts;
-    opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
+    sorter::Options opts;
+    if (_allowDiskUse) {
+        opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
+    }
     opts.maxMemoryUsageBytes = _specificStats.maxMemoryUsageBytes;
-    opts.extSortAllowed = _allowDiskUse;
     opts.limit =
         _specificStats.limit != std::numeric_limits<size_t>::max() ? _specificStats.limit : 0;
-    opts.moveSortedDataIntoIterator = true;
 
     auto comp = [&](const SorterData& lhs, const SorterData& rhs) {
         auto size = lhs.first.size();
@@ -146,7 +139,8 @@ void SortStage::makeSorter() {
         return 0;
     };
 
-    _sorter.reset(Sorter<value::MaterializedRow, value::MaterializedRow>::make(opts, comp, {}));
+    _sorter =
+        sorter::make<value::MaterializedRow, value::MaterializedRow>("sort-sbe", opts, comp, {});
     _mergeIt.reset();
 }
 
@@ -194,7 +188,7 @@ void SortStage::open(bool reOpen) {
             vals.reset(idx++, true, cTag, cVal);
         }
 
-        _sorter->emplace(std::move(keys), std::move(vals));
+        _sorter->addOwned(std::move(keys), std::move(vals));
 
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
             // If we either hit the maximum number of document to return during the trial run, or
@@ -212,7 +206,7 @@ void SortStage::open(bool reOpen) {
     }
 
     _specificStats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
-    _mergeIt.reset(_sorter->done());
+    _mergeIt = _sorter->done();
     _specificStats.spills += _sorter->numSpills();
     _specificStats.keysSorted += _sorter->numSorted();
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
