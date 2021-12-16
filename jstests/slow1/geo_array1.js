@@ -28,8 +28,9 @@ for (let i = 0; i < numLocations; i++) {
 const collNamePrefix = 'geo_array1_';
 let collCount = 0;
 
-function test(index) {
-    let t = db.getCollection(collNamePrefix + collCount++);
+function test(conn, index) {
+    const testDB = conn.getDB('test');
+    let t = testDB.getCollection(collNamePrefix + collCount++);
     t.drop();
 
     if (index) {
@@ -52,6 +53,14 @@ function test(index) {
     }
 }
 
-test(/*index=*/true);
-test(/*index=*/false);
+const rst = ReplSetTest({nodes: 1});
+rst.startSet();
+rst.initiate();
+
+const primary = rst.getPrimary();
+
+test(primary, /*index=*/true);
+test(primary, /*index=*/false);
+
+rst.stopSet();
 })();

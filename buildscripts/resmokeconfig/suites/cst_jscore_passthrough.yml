@@ -662,7 +662,6 @@ selector:
   - jstests/core/geo_2d_with_geojson_point.js
   - jstests/core/geo_allowedcomparisons.js
   - jstests/core/geo_array0.js
-  - jstests/core/geo_array1.js
   - jstests/core/geo_array2.js
   - jstests/core/geo_big_polygon.js
   - jstests/core/geo_big_polygon2.js
