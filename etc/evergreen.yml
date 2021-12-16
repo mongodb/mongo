@@ -2755,6 +2755,20 @@ tasks:
         args:
           - "src/evergreen/stitch_support_run_tests.sh"
 
+- name: csfle_create_lib
+  tags: []
+  commands:
+    - *f_expansions_write
+    - func: "scons compile"
+      vars:
+        targets: install-mongo-csfle
+        task_compile_flags: >-
+          --allocator=system
+          --enable-free-mon=off
+          --js-engine=none
+          --link-model=dynamic-sdk
+          DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+
 - name: compile_benchmarks
   tags: []
   depends_on: []
@@ -7188,6 +7202,35 @@ task_groups:
     - "stitch_support_install_tests"
     - "stitch_support_run_tests"
 
+- name: csfle_build
+  setup_task:
+    - func: "f_expansions_write"
+    - func: "apply compile expansions"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
+  teardown_task:
+  - func: "attach scons logs"
+  setup_group_can_fail_task: true
+  setup_group:
+    - command: manifest.load
+    - func: "git get project and add git tag"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "set up venv"
+    - func: "upload pip requirements"
+    - func: "get buildnumber"
+    - func: "f_expansions_write"
+    - func: "set up win mount script"
+    - func: "generate compile expansions"
+  teardown_group:
+    - func: "umount shared scons directory"
+  tags: ["csfle"]
+  max_hosts: 1
+  tasks:
+    - "csfle_create_lib"
+
 #######################################
 #               Modules               #
 #######################################
@@ -7424,6 +7467,7 @@ buildvariants:
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
+  - name: .csfle
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7514,6 +7558,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -7641,6 +7686,7 @@ buildvariants:
     distros:
     - ubuntu2004-large
   - name: build_variant_gen
+  - name: .csfle
   - name: .aggfuzzer .common !.multiversion
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7712,6 +7758,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: .ssl
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -7848,6 +7895,7 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless !.multiversion
@@ -8069,6 +8117,7 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -8183,6 +8232,7 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -8297,6 +8347,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -9338,6 +9389,9 @@ buildvariants:
   - name: .sharding .common
   - name: snmp
   - name: .stitch
+  - name: .csfle
+    distros:
+      - rhel80-xlarge
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -9460,6 +9514,9 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: snmp
   - name: .stitch
+  - name: .csfle
+    distros:
+      - rhel80-xlarge
   - name: .serverless
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
@@ -9827,6 +9884,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
@@ -9912,6 +9970,9 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
+    distros:
+      - rhel80-xlarge
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -9969,6 +10030,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10328,6 +10390,7 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: .publish
     distros:
     - rhel70-small
@@ -10411,6 +10474,7 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: .publish
     distros:
     - rhel70-small
@@ -10521,6 +10585,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10619,6 +10684,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: .publish
     distros:
     - suse15-small
@@ -10721,6 +10787,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10829,6 +10896,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -11172,6 +11240,7 @@ buildvariants:
   - name: .serverless
   - name: .watchdog
   - name: .stitch
+  - name: .csfle
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
@@ -11340,6 +11409,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: snmp
   - name: .stitch
+  - name: .csfle
   - name: .updatefuzzer
   - name: .serverless
   - name: watchdog_wiredtiger
