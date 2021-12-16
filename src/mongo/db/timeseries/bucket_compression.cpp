@@ -59,6 +59,10 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
         std::vector<BSONElement> dataFields;
     };
 
+    // Buffer to help manipulate data if simulateBsonColumnCompressionDataLoss is set.
+    // Contents must outlive `measurements` defined below.
+    std::unique_ptr<char[]> tamperedData;
+
     BSONObjBuilder builder;                 // builder to build the compressed bucket
     std::vector<Measurement> measurements;  // Extracted measurements from uncompressed bucket
     boost::optional<BSONObjIterator> time;  // Iterator to read time fields from uncompressed bucket
@@ -267,7 +271,6 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
 
             // Simulate compression data loss by tampering with original data when FailPoint is set.
             // This should be detected in the validate call below.
-            std::unique_ptr<char[]> tamperedData;
             if (MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail() &&
                                !measurements.empty())) {
                 // We copy the entire BSONElement and modify the first value byte. The original
