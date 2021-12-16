@@ -129,6 +129,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/namespace_string',
         'auth',
         'auth_options',
         'authprivilege',

@@ -686,8 +686,16 @@ void addRootRolePrivileges(PrivilegeVector* privileges) {
     addReadWriteAnyDbPrivileges(privileges);
     addBackupPrivileges(privileges);
     addRestorePrivileges(privileges);
+
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forAnyResource(), ActionType::validate));
+
+    // Grant privilege to 'root' to perform 'find' and 'remove' on pre-images collection.
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(
+            ResourcePattern::forExactNamespace(NamespaceString::kChangeStreamPreImagesNamespace),
+            {ActionType::find, ActionType::remove}));
 }
 
 void addInternalRolePrivileges(PrivilegeVector* privileges) {
