@@ -407,7 +407,7 @@ void ReshardingMetrics::onCompletion(Role role,
 void ReshardingMetrics::onStepUp(Role role) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     _emplaceCurrentOpForRole(role, boost::none);
-
+    _onStepUpCalled = true;
     // TODO SERVER-53914 Implement coordinator metrics rehydration.
 
     // TODO SERVER-57094 Resume the runningOperation duration from a timestamp stored on disk
@@ -420,6 +420,7 @@ void ReshardingMetrics::onStepUp(DonorStateEnum state, ReshardingDonorMetrics do
     _emplaceCurrentOpForRole(
         Role::kDonor, operationRuntime.has_value() ? operationRuntime->getStart() : boost::none);
     _currentOp->donorState = state;
+    _onStepUpCalled = true;
 
     if (auto criticalSectionTimeInterval = donorMetrics.getCriticalSection();
         criticalSectionTimeInterval.has_value() &&
@@ -757,6 +758,11 @@ boost::optional<Milliseconds> ReshardingMetrics::getOperationRemainingTime() con
     if (_currentOp)
         return _currentOp->remainingOperationTime(_now());
     return boost::none;
+}
+
+bool ReshardingMetrics::wasReshardingEverAttempted() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _started != 0 || _succeeded != 0 || _failed != 0 || _canceled != 0 || _onStepUpCalled;
 }
 
 void ReshardingMetrics::serializeCumulativeOpMetrics(BSONObjBuilder* bob) const {

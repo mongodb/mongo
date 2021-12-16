@@ -160,6 +160,8 @@ public:
     };
     BSONObj reportForCurrentOp(const ReporterOptions& options) const noexcept;
 
+    bool wasReshardingEverAttempted() const;
+
     // Append metrics to the builder in CurrentOp format for the given `role`.
     void serializeCurrentOpMetrics(BSONObjBuilder*, Role role) const;
 
@@ -183,6 +185,8 @@ private:
                                   boost::optional<Date_t> runningOperationStartTime) noexcept;
 
     Date_t _now() const;
+
+    bool _onStepUpCalled = false;
 
     // The following maintain the number of resharding operations that have started, succeeded,
     // failed with an unrecoverable error, and canceled by the user, respectively.

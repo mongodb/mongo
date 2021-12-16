@@ -48,26 +48,38 @@ function testMetricsArePresent(mongo, expectedMetrics, minOplogEntriesFetchedAnd
     }
 }
 
-function verifyParticipantServerStatusOutput(
-    reshardingTest, inputCollection, expectedMetrics, minOplogEntriesFetchedAndApplied) {
+function verifyStatsMissing(mongo) {
+    const stats = mongo.getDB('admin').serverStatus({});
+    assert(!stats.hasOwnProperty('shardingStatistics') ||
+               !stats.shardingStatistics.hasOwnProperty('resharding'),
+           `Resharding section not expected in ${tojson(stats)}`);
+}
+
+function getDonorRecipientPrimaries(reshardingTest, inputCollection) {
     const donorShardNames = reshardingTest.donorShardNames;
     const recipientShardNames = reshardingTest.recipientShardNames;
-
     const mongos = inputCollection.getMongo();
     const topology = DiscoverTopology.findConnectedNodes(mongos);
+    return [
+        topology.shards[donorShardNames[0]].primary,
+        topology.shards[donorShardNames[1]].primary,
+        topology.shards[recipientShardNames[0]].primary,
+        topology.shards[recipientShardNames[1]].primary
+    ];
+}
 
-    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[0]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-    testMetricsArePresent(new Mongo(topology.shards[donorShardNames[1]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-    testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[0]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
-    testMetricsArePresent(new Mongo(topology.shards[recipientShardNames[1]].primary),
-                          expectedMetrics,
-                          minOplogEntriesFetchedAndApplied);
+function verifyParticipantServerStatusOutput(
+    reshardingTest, inputCollection, expectedMetrics, minOplogEntriesFetchedAndApplied) {
+    for (const primary of getDonorRecipientPrimaries(reshardingTest, inputCollection)) {
+        testMetricsArePresent(
+            new Mongo(primary), expectedMetrics, minOplogEntriesFetchedAndApplied);
+    }
+}
+
+function verifyParticipantServerStatusHasNoOutput(reshardingTest, inputCollection) {
+    for (const primary of getDonorRecipientPrimaries(reshardingTest, inputCollection)) {
+        verifyStatsMissing(new Mongo(primary));
+    }
 }
 
 function verifyCoordinatorServerStatusOutput(inputCollection, expectedMetrics) {
@@ -75,6 +87,13 @@ function verifyCoordinatorServerStatusOutput(inputCollection, expectedMetrics) {
     const topology = DiscoverTopology.findConnectedNodes(mongos);
 
     testMetricsArePresent(new Mongo(topology.configsvr.primary), expectedMetrics);
+}
+
+function verifyCoordinatorServerStatusHasNoOutput(inputCollection) {
+    const mongos = inputCollection.getMongo();
+    const topology = DiscoverTopology.findConnectedNodes(mongos);
+
+    verifyStatsMissing(new Mongo(topology.configsvr.primary));
 }
 
 // Tests the currentOp output for each donor, each recipient, and the coordinator.
@@ -175,27 +194,10 @@ const inputCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-var initialServerStatusMetrics = {
-    "countReshardingOperations": 0,
-    "countReshardingSuccessful": 0,
-    "countReshardingFailures": 0,
-    "countReshardingCanceled": 0,
-    "documentsCopied": 0,
-    "bytesCopied": 0,
-    "oplogEntriesApplied": 0,
-    "countWritesDuringCriticalSection": 0,
-    "lastOpEndingChunkImbalance": 0,
-};
-
-verifyParticipantServerStatusOutput(reshardingTest, inputCollection, initialServerStatusMetrics);
+verifyParticipantServerStatusHasNoOutput(reshardingTest, inputCollection);
 
 // Min and max remaining times should be 0 because the resharding operation hasn't yet started.
-var expected = {
-    lastOpEndingChunkImbalance: 0,
-    minShardRemainingOperationTimeEstimatedMillis: 0,
-    maxShardRemainingOperationTimeEstimatedMillis: 0,
-};
-verifyCoordinatorServerStatusOutput(inputCollection, expected);
+verifyCoordinatorServerStatusHasNoOutput(inputCollection);
 
 var documentsInserted = [
     {_id: "stays on shard0", oldKey: -10, newKey: -10},

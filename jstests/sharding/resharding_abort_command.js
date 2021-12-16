@@ -173,10 +173,11 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
     const topology = DiscoverTopology.findConnectedNodes(mongos);
     const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-    let reshardingMetrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.resharding;
-    const reshardingOperationsInitialCount = reshardingMetrics.countReshardingOperations;
-    const reshardingSuccessesInitialCount = reshardingMetrics.countReshardingSuccessful;
-    const reshardingCanceledInitialCount = reshardingMetrics.countReshardingCanceled;
+    const status = configsvr.getDB('admin').serverStatus({});
+    // Resharding has not been attempted yet, so resharding metrics will not be reported. This means
+    // shardingStatistics will be empty, and thus not reported. So we assert that the serverStatus
+    // does not have shardingStatistics yet.
+    assert(!status.hasOwnProperty('shardingStatistics'), status);
 
     let expectedAbortErrorCodes = ErrorCodes.OK;
     let expectedReshardingErrorCode = ErrorCodes.ReshardCollectionAborted;
@@ -256,19 +257,20 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
             }
         });
 
-    reshardingMetrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.resharding;
+    const reshardingMetrics =
+        configsvr.getDB('admin').serverStatus({}).shardingStatistics.resharding;
     const reshardingOperationsFinalCount = reshardingMetrics.countReshardingOperations;
     const reshardingSuccessesFinalCount = reshardingMetrics.countReshardingSuccessful;
     const reshardingCanceledFinalCount = reshardingMetrics.countReshardingCanceled;
 
-    assert(reshardingOperationsFinalCount == reshardingOperationsInitialCount + 1);
+    assert.eq(reshardingOperationsFinalCount, 1);
 
     if (expectedReshardingErrorCode == ErrorCodes.OK) {
-        assert.eq(reshardingSuccessesFinalCount, reshardingSuccessesInitialCount + 1);
-        assert.eq(reshardingCanceledInitialCount, reshardingCanceledFinalCount);
+        assert.eq(reshardingSuccessesFinalCount, 1);
+        assert.eq(reshardingCanceledFinalCount, 0);
     } else if (expectedAbortErrorCodes == ErrorCodes.OK) {
-        assert.eq(reshardingCanceledFinalCount, reshardingCanceledInitialCount + 1);
-        assert.eq(reshardingSuccessesInitialCount, reshardingSuccessesFinalCount);
+        assert.eq(reshardingCanceledFinalCount, 1);
+        assert.eq(reshardingSuccessesFinalCount, 0);
     }
 
     abortThread.join();

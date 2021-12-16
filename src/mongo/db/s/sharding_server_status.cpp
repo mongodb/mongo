@@ -123,7 +123,8 @@ public:
 
         // The serverStatus command is run before the FCV is initialized so we ignore it when
         // checking whether the resharding feature is enabled here.
-        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
+        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV() &&
+            ReshardingMetrics::get(opCtx->getServiceContext())->wasReshardingEverAttempted()) {
             BSONObjBuilder subObjBuilder(result.subobjStart("resharding"));
             ReshardingMetrics::get(opCtx->getServiceContext())
                 ->serializeCumulativeOpMetrics(&subObjBuilder);
