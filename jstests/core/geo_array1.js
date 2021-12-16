@@ -7,6 +7,24 @@
 (function() {
 'use strict';
 
+const numLocations = 300;
+let locObj = [];
+// Add locations everywhere
+for (let i = 0; i < 10; i++) {
+    for (let j = 0; j < 10; j++) {
+        if (j % 2 == 0)
+            locObj.push([i, j]);
+        else
+            locObj.push({x: i, y: j});
+    }
+}
+
+// Add docs with all these locations
+let docs = [];
+for (let i = 0; i < numLocations; i++) {
+    docs.push({_id: i, loc: locObj});
+}
+
 const collNamePrefix = 'geo_array1_';
 let collCount = 0;
 
@@ -14,26 +32,11 @@ function test(index) {
     let t = db.getCollection(collNamePrefix + collCount++);
     t.drop();
 
-    const numLocations = 300;
-    let locObj = [];
-    // Add locations everywhere
-    for (let i = 0; i < 10; i++) {
-        for (let j = 0; j < 10; j++) {
-            if (j % 2 == 0)
-                locObj.push([i, j]);
-            else
-                locObj.push({x: i, y: j});
-        }
-    }
-
-    // Add docs with all these locations
-    for (let i = 0; i < numLocations; i++) {
-        assert.commandWorked(t.insert({loc: locObj}));
-    }
-
     if (index) {
         assert.commandWorked(t.createIndex({loc: "2d"}));
     }
+
+    assert.commandWorked(t.insert(docs));
 
     // Pull them back
     for (let i = 0; i < 10; i++) {
@@ -49,6 +52,6 @@ function test(index) {
     }
 }
 
-test(true);
-test(false);
+test(/*index=*/true);
+test(/*index=*/false);
 })();
