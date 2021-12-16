@@ -63,7 +63,8 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss
 std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString& nss,
                                                            const std::string& msg,
                                                            OplogEntriesEnum operation,
-                                                           const Status& err);
+                                                           const Status& err,
+                                                           const BSONObj& context = BSONObj());
 
 std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(const NamespaceString& nss,
                                                              const std::string& msg,
@@ -80,6 +81,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const std::string& foundHash,
     const BSONKey& minKey,
     const BSONKey& maxKey,
+    const boost::optional<Timestamp>& timestamp,
     const repl::OpTime& optime,
     const boost::optional<CollectionOptions>& options = boost::none);
 

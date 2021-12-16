@@ -118,6 +118,9 @@ structs:
         validator:
           gte: 10
           lte: 20000
+      snapshotRead:
+        type: safeBool
+        default: true
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"
@@ -134,6 +137,9 @@ structs:
         validator:
           gte: 10
           lte: 20000
+      snapshotRead:
+        type: safeBool
+        default: true
 
   DbCheckOplogBatch:
     description: "Oplog entry for a dbCheck batch"
@@ -155,6 +161,9 @@ structs:
         cpp_name: maxKey
       maxRate:
         type: safeInt64
+        optional: true
+      readTimestamp:
+        type: timestamp
         optional: true
 
   DbCheckOplogCollection:

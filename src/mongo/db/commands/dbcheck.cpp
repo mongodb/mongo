@@ -69,6 +69,7 @@ struct DbCheckCollectionInfo {
     int64_t maxSize;
     int64_t maxRate;
     int64_t maxBatchTimeMillis;
+    bool snapshotRead;
 };
 
 /**
@@ -96,8 +97,14 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     const auto maxSize = invocation.getMaxSize();
     const auto maxRate = invocation.getMaxCountPerSecond();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
-    const auto info =
-        DbCheckCollectionInfo{nss, start, end, maxCount, maxSize, maxRate, maxBatchTimeMillis};
+    const auto info = DbCheckCollectionInfo{nss,
+                                            start,
+                                            end,
+                                            maxCount,
+                                            maxSize,
+                                            maxRate,
+                                            maxBatchTimeMillis,
+                                            invocation.getSnapshotRead()};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -120,8 +127,14 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
         if (!coll->ns().isReplicated() || coll->isClustered()) {
             return true;
         }
-        DbCheckCollectionInfo info{
-            coll->ns(), BSONKey::min(), BSONKey::max(), max, max, rate, maxBatchTimeMillis};
+        DbCheckCollectionInfo info{coll->ns(),
+                                   BSONKey::min(),
+                                   BSONKey::max(),
+                                   max,
+                                   max,
+                                   rate,
+                                   maxBatchTimeMillis,
+                                   invocation.getSnapshotRead()};
         result->push_back(info);
         return true;
     };
@@ -236,23 +249,35 @@ private:
                 return;
             }
 
-            std::unique_ptr<HealthLogEntry> entry;
-
             if (!result.isOK()) {
-                auto code = result.getStatus().code();
+                bool retryable = false;
+                std::unique_ptr<HealthLogEntry> entry;
+
+                const auto code = result.getStatus().code();
                 if (code == ErrorCodes::LockTimeout) {
+                    retryable = true;
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
                         "retrying dbCheck batch after timeout due to lock unavailability",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
-                    HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
-                    continue;
-                }
-                if (code == ErrorCodes::NamespaceNotFound) {
+                } else if (code == ErrorCodes::SnapshotUnavailable) {
+                    retryable = true;
+                    entry = dbCheckWarningHealthLogEntry(
+                        info.nss,
+                        "retrying dbCheck batch after conflict with pending catalog operation",
+                        OplogEntriesEnum::Batch,
+                        result.getStatus());
+                } else if (code == ErrorCodes::NamespaceNotFound) {
                     entry = dbCheckWarningHealthLogEntry(
                         info.nss,
                         "abandoning dbCheck batch because collection no longer exists",
+                        OplogEntriesEnum::Batch,
+                        result.getStatus());
+                } else if (code == ErrorCodes::IndexNotFound) {
+                    entry = dbCheckWarningHealthLogEntry(
+                        info.nss,
+                        "skipping dbCheck on collection because it is missing an _id index",
                         OplogEntriesEnum::Batch,
                         result.getStatus());
                 } else if (ErrorCodes::isA<ErrorCategory::NotPrimaryError>(code)) {
@@ -268,21 +293,23 @@ private:
                                                        result.getStatus());
                 }
                 HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+                if (retryable) {
+                    continue;
+                }
                 return;
-            } else {
-                auto stats = result.getValue();
-                entry = dbCheckBatchEntry(info.nss,
-                                          stats.nDocs,
-                                          stats.nBytes,
-                                          stats.md5,
-                                          stats.md5,
-                                          start,
-                                          stats.lastKey,
-                                          stats.time);
-                HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
             }
 
             auto stats = result.getValue();
+            auto entry = dbCheckBatchEntry(info.nss,
+                                           stats.nDocs,
+                                           stats.nBytes,
+                                           stats.md5,
+                                           stats.md5,
+                                           start,
+                                           stats.lastKey,
+                                           stats.readTimestamp,
+                                           stats.time);
+            HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
 
             start = stats.lastKey;
 
@@ -316,6 +343,7 @@ private:
         BSONKey lastKey;
         std::string md5;
         repl::OpTime time;
+        boost::optional<Timestamp> readTimestamp;
     };
 
     // Set if the job cannot proceed.
@@ -331,6 +359,17 @@ private:
         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
+        auto lockMode = MODE_S;
+        if (info.snapshotRead) {
+            // Each batch will read at the latest no-overlap point, which is the all_durable
+            // timestamp on primaries. We assume that the history window on secondaries is always
+            // longer than the time it takes between starting and replicating a batch on the
+            // primary. Otherwise, the readTimestamp will not be available on a secondary by the
+            // time it processes the oplog entry.
+            lockMode = MODE_IS;
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
+        }
+
         BatchStats result;
         auto timeoutMs = Milliseconds(gDbCheckCollectionTryLockTimeoutMillis.load());
         const auto initialBackoffMs =
@@ -338,14 +377,14 @@ private:
         auto backoffMs = initialBackoffMs;
         for (int attempt = 1;; attempt++) {
             try {
-                // Try to acquire collection lock in S mode with increasing timeout and bounded
-                // exponential backoff.
+                // Try to acquire collection lock with increasing timeout and bounded exponential
+                // backoff.
                 auto const lockDeadline = Date_t::now() + timeoutMs;
                 timeoutMs *= 2;
 
                 AutoGetCollection agc(opCtx,
                                       info.nss,
-                                      MODE_S,
+                                      lockMode,
                                       AutoGetCollectionViewMode::kViewsForbidden,
                                       lockDeadline);
 
@@ -359,13 +398,16 @@ private:
                     CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, info.nss);
                 if (!collection) {
                     const auto msg = "Collection under dbCheck no longer exists";
-                    auto entry = dbCheckHealthLogEntry(info.nss,
-                                                       SeverityEnum::Info,
-                                                       "dbCheck failed",
-                                                       OplogEntriesEnum::Batch,
-                                                       BSON("success" << false << "error" << msg));
-                    HealthLog::get(opCtx).log(*entry);
                     return {ErrorCodes::NamespaceNotFound, msg};
+                }
+
+                auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+                auto minVisible = collection->getMinimumVisibleSnapshot();
+                if (readTimestamp && minVisible &&
+                    *readTimestamp < *collection->getMinimumVisibleSnapshot()) {
+                    return {ErrorCodes::SnapshotUnavailable,
+                            str::stream() << "Unable to read from collection " << info.nss
+                                          << " due to pending catalog changes"};
                 }
 
                 boost::optional<DbCheckHasher> hasher;
@@ -395,9 +437,11 @@ private:
                 batch.setMd5(md5);
                 batch.setMinKey(first);
                 batch.setMaxKey(BSONKey(hasher->lastKey()));
+                batch.setReadTimestamp(readTimestamp);
 
                 // Send information on this batch over the oplog.
                 result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
+                result.readTimestamp = readTimestamp;
 
                 result.nDocs = hasher->docsSeen();
                 result.nBytes = hasher->bytesSeen();
@@ -509,8 +553,9 @@ public:
                "              maxKey: <last key, inclusive>,\n"
                "              maxCount: <max number of docs>,\n"
                "              maxSize: <max size of docs>,\n"
-               "              maxCountPerSecond: <max rate in docs/sec> } "
-               "              maxBatchTimeMillis: <max time processing a batch in milliseconds> } "
+               "              maxCountPerSecond: <max rate in docs/sec>\n"
+               "              maxBatchTimeMillis: <max time processing a batch in milliseconds>\n"
+               "              readTimestamp: <bool, read at a timestamp without strong locks> }\n"
                "to check a collection.\n"
                "Invoke with {dbCheck: 1} to check all collections in the database.";
     }
