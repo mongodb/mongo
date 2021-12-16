@@ -66,7 +66,8 @@ var $config = (function() {
         function createIndex(db, collName) {
             const coll = db.getCollection(getCollectionName(collName));
             const res = coll.createIndex({z: 1});
-            assertAlways(res.ok === 1 || res.code === ErrorCodes.IndexBuildAlreadyInProgress,
+            assertAlways(res.ok === 1 || res.code === ErrorCodes.IndexBuildAlreadyInProgress ||
+                             res.code == ErrorCodes.IndexBuildAborted,
                          "Create index failed: " + tojson(res));
         }
 
