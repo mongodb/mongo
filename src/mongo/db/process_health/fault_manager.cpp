@@ -347,10 +347,13 @@ FaultManager::~FaultManager() {
     _taskExecutor->shutdown();
 
     LOGV2(5936601, "Shutting down periodic health checks");
-    for (auto& pair : _healthCheckContexts) {
-        auto cbHandle = pair.second.resultStatus;
-        if (cbHandle) {
-            _taskExecutor->cancel(cbHandle.get());
+    {
+        stdx::lock_guard lock(_mutex);
+        for (auto& pair : _healthCheckContexts) {
+            auto cbHandle = pair.second.resultStatus;
+            if (cbHandle) {
+                _taskExecutor->cancel(cbHandle.get());
+            }
         }
     }
 
@@ -456,6 +459,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
                     periodicThreadCbHandleStatus.isOK());
         }
 
+        stdx::lock_guard lock(_mutex);
         _healthCheckContexts.at(observer->getType()).resultStatus =
             std::move(periodicThreadCbHandleStatus.getValue());
     };
@@ -468,7 +472,11 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
         return healthCheckStatus;
     };
 
-    _healthCheckContexts.insert({observer->getType(), HealthCheckContext(nullptr, boost::none)});
+    {
+        stdx::lock_guard lock(_mutex);
+        _healthCheckContexts.insert(
+            {observer->getType(), HealthCheckContext(nullptr, boost::none)});
+    }
 
     // If health observer is disabled, then do nothing and schedule another run (health observer may
     // become enabled).
@@ -497,9 +505,10 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
                                      accept(status.getValue());
                                      return status.getValue();
                                  });
-    auto futurePtr =
+
+    stdx::lock_guard lock(_mutex);
+    _healthCheckContexts.at(observer->getType()).result =
         std::make_unique<ExecutorFuture<HealthCheckStatus>>(std::move(healthCheckFuture));
-    _healthCheckContexts.at(observer->getType()).result = std::move(futurePtr);
 }
 
 void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
