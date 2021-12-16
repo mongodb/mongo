@@ -141,12 +141,14 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss
 std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString& nss,
                                                            const std::string& msg,
                                                            OplogEntriesEnum operation,
-                                                           const Status& err) {
-    return dbCheckHealthLogEntry(nss,
-                                 SeverityEnum::Error,
-                                 msg,
-                                 operation,
-                                 BSON("success" << false << "error" << err.toString()));
+                                                           const Status& err,
+                                                           const BSONObj& context) {
+    return dbCheckHealthLogEntry(
+        nss,
+        SeverityEnum::Error,
+        msg,
+        operation,
+        BSON("success" << false << "error" << err.toString() << "context" << context));
 }
 
 std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(const NamespaceString& nss,
@@ -171,13 +173,22 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     const std::string& foundHash,
     const BSONKey& minKey,
     const BSONKey& maxKey,
+    const boost::optional<Timestamp>& readTimestamp,
     const repl::OpTime& optime,
     const boost::optional<CollectionOptions>& options) {
     auto hashes = expectedFound(expectedHash, foundHash);
 
-    auto data = BSON("success" << true << "count" << count << "bytes" << bytes << "md5"
-                               << hashes.second << "minKey" << minKey.elem() << "maxKey"
-                               << maxKey.elem() << "optime" << optime);
+    BSONObjBuilder builder;
+    builder.append("success", true);
+    builder.append("count", count);
+    builder.append("bytes", bytes);
+    builder.append("md5", hashes.second);
+    builder.appendAs(minKey.elem(), "minKey");
+    builder.appendAs(maxKey.elem(), "maxKey");
+    if (readTimestamp) {
+        builder.append("readTimestamp", *readTimestamp);
+    }
+    builder.append("optime", optime.toBSON());
 
     const auto hashesMatch = hashes.first;
     const auto severity = [&] {
@@ -196,7 +207,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     std::string msg =
         "dbCheck batch " + (hashesMatch ? std::string("consistent") : std::string("inconsistent"));
 
-    return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Batch, data);
+    return dbCheckHealthLogEntry(nss, severity, msg, OplogEntriesEnum::Batch, builder.obj());
 }
 
 DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
@@ -332,62 +343,57 @@ namespace {
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
                                const DbCheckOplogBatch& entry) {
-    AutoGetCollection coll(opCtx, entry.getNss(), MODE_S);
-    const auto& collection = coll.getCollection();
-
-    if (!collection) {
-        const auto msg = "Collection under dbCheck no longer exists";
-        auto logEntry = dbCheckHealthLogEntry(entry.getNss(),
-                                              SeverityEnum::Info,
-                                              "dbCheck failed",
-                                              OplogEntriesEnum::Batch,
-                                              BSON("success" << false << "info" << msg));
-        HealthLog::get(opCtx).log(*logEntry);
-        return Status::OK();
-    }
-
     const auto msg = "replication consistency check";
 
     // Set up the hasher,
-    Status status = Status::OK();
     boost::optional<DbCheckHasher> hasher;
     try {
+        auto lockMode = MODE_S;
+        if (entry.getReadTimestamp()) {
+            lockMode = MODE_IS;
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                          entry.getReadTimestamp());
+        }
+
+        AutoGetCollection coll(opCtx, entry.getNss(), lockMode);
+        const auto& collection = coll.getCollection();
+
+        if (!collection) {
+            const auto msg = "Collection under dbCheck no longer exists";
+            auto logEntry = dbCheckHealthLogEntry(entry.getNss(),
+                                                  SeverityEnum::Info,
+                                                  "dbCheck failed",
+                                                  OplogEntriesEnum::Batch,
+                                                  BSON("success" << false << "info" << msg));
+            HealthLog::get(opCtx).log(*logEntry);
+            return Status::OK();
+        }
+
         hasher.emplace(opCtx, collection, entry.getMinKey(), entry.getMaxKey());
+        uassertStatusOK(hasher->hashAll(opCtx));
+
+        std::string expected = entry.getMd5().toString();
+        std::string found = hasher->total();
+
+        auto logEntry = dbCheckBatchEntry(entry.getNss(),
+                                          hasher->docsSeen(),
+                                          hasher->bytesSeen(),
+                                          expected,
+                                          found,
+                                          entry.getMinKey(),
+                                          hasher->lastKey(),
+                                          entry.getReadTimestamp(),
+                                          optime,
+                                          collection->getCollectionOptions());
+
+        HealthLog::get(opCtx).log(*logEntry);
     } catch (const DBException& exception) {
+        // In case of an error, report it to the health log,
         auto logEntry = dbCheckErrorHealthLogEntry(
-            entry.getNss(), msg, OplogEntriesEnum::Batch, exception.toStatus());
+            entry.getNss(), msg, OplogEntriesEnum::Batch, exception.toStatus(), entry.toBSON());
         HealthLog::get(opCtx).log(*logEntry);
         return Status::OK();
     }
-
-    // run the hasher.
-    if (status.isOK()) {
-        status = hasher->hashAll(opCtx);
-    }
-
-    // In case of an error, report it to the health log,
-    if (!status.isOK()) {
-        auto logEntry =
-            dbCheckErrorHealthLogEntry(entry.getNss(), msg, OplogEntriesEnum::Batch, status);
-        HealthLog::get(opCtx).log(*logEntry);
-        return Status::OK();
-    }
-
-    std::string expected = entry.getMd5().toString();
-    std::string found = hasher->total();
-
-    auto logEntry = dbCheckBatchEntry(entry.getNss(),
-                                      hasher->docsSeen(),
-                                      hasher->bytesSeen(),
-                                      expected,
-                                      found,
-                                      entry.getMinKey(),
-                                      hasher->lastKey(),
-                                      optime,
-                                      collection->getCollectionOptions());
-
-    HealthLog::get(opCtx).log(*logEntry);
-
     return Status::OK();
 }
 

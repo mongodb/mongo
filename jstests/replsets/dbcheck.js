@@ -201,6 +201,25 @@ function simpleTestConsistent() {
     });
 }
 
+function simpleTestNonSnapshot() {
+    let primary = replSet.getPrimary();
+    clearLog();
+
+    assert.neq(primary, undefined);
+    let db = primary.getDB(dbName);
+    assert.commandWorked(db.runCommand({"dbCheck": multiBatchSimpleCollName, snapshotRead: false}));
+
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName);
+
+    checkLogAllConsistent(primary);
+    checkTotalCounts(primary, db[multiBatchSimpleCollName]);
+
+    forEachSecondary(function(secondary) {
+        checkLogAllConsistent(secondary);
+        checkTotalCounts(secondary, secondary.getDB(dbName)[multiBatchSimpleCollName]);
+    });
+}
+
 // Same thing, but now with concurrent updates.
 function concurrentTestConsistent() {
     let primary = replSet.getPrimary();
@@ -229,6 +248,7 @@ function concurrentTestConsistent() {
 }
 
 simpleTestConsistent();
+simpleTestNonSnapshot();
 concurrentTestConsistent();
 
 // Test the various other parameters.
