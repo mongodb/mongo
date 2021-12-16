@@ -313,64 +313,110 @@ private:
         // New OperationContext for each batch.
         auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
-        DbCheckOplogBatch batch;
-
-        // Acquire collection lock in S mode.
-        AutoGetCollection coll(opCtx, info.nss, MODE_S);
-        const auto& collection = coll.getCollection();
-        if (_stepdownHasOccurred(opCtx, info.nss)) {
-            _done = true;
-            return Status(ErrorCodes::PrimarySteppedDown, "dbCheck terminated due to stepdown");
-        }
-
-        if (!collection) {
-            const auto msg = "Collection under dbCheck no longer exists";
-            auto entry = dbCheckHealthLogEntry(info.nss,
-                                               SeverityEnum::Info,
-                                               "dbCheck failed",
-                                               OplogEntriesEnum::Batch,
-                                               BSON("success" << false << "error" << msg));
-            HealthLog::get(opCtx).log(*entry);
-            return {ErrorCodes::NamespaceNotFound, msg};
-        }
-
-        boost::optional<DbCheckHasher> hasher;
-        try {
-            hasher.emplace(opCtx,
-                           collection,
-                           first,
-                           info.end,
-                           std::min(batchDocs, info.maxCount),
-                           std::min(batchBytes, info.maxSize));
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-
-        const auto deadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
-        Status status = hasher->hashAll(opCtx, deadline);
-
-        if (!status.isOK()) {
-            return status;
-        }
-
-        std::string md5 = hasher->total();
-
-        batch.setType(OplogEntriesEnum::Batch);
-        batch.setNss(info.nss);
-        batch.setMd5(md5);
-        batch.setMinKey(first);
-        batch.setMaxKey(BSONKey(hasher->lastKey()));
 
         BatchStats result;
+        auto timeoutMs = Milliseconds(gDbCheckCollectionTryLockTimeoutMillis.load());
+        const auto initialBackoffMs =
+            Milliseconds(gDbCheckCollectionTryLockMinBackoffMillis.load());
+        auto backoffMs = initialBackoffMs;
+        for (int attempt = 1;; attempt++) {
+            try {
+                // Try to acquire collection lock in S mode with increasing timeout and bounded
+                // exponential backoff.
+                auto const lockDeadline = Date_t::now() + timeoutMs;
+                timeoutMs *= 2;
 
-        // Send information on this batch over the oplog.
-        result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
+                AutoGetCollection agc(opCtx,
+                                      info.nss,
+                                      MODE_S,
+                                      AutoGetCollectionViewMode::kViewsForbidden,
+                                      lockDeadline);
 
-        result.nDocs = hasher->docsSeen();
-        result.nBytes = hasher->bytesSeen();
-        result.lastKey = hasher->lastKey();
-        result.md5 = md5;
+                if (_stepdownHasOccurred(opCtx, info.nss)) {
+                    _done = true;
+                    return Status(ErrorCodes::PrimarySteppedDown,
+                                  "dbCheck terminated due to stepdown");
+                }
 
+                const auto& collection =
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, info.nss);
+                if (!collection) {
+                    const auto msg = "Collection under dbCheck no longer exists";
+                    auto entry = dbCheckHealthLogEntry(info.nss,
+                                                       SeverityEnum::Info,
+                                                       "dbCheck failed",
+                                                       OplogEntriesEnum::Batch,
+                                                       BSON("success" << false << "error" << msg));
+                    HealthLog::get(opCtx).log(*entry);
+                    return {ErrorCodes::NamespaceNotFound, msg};
+                }
+
+                boost::optional<DbCheckHasher> hasher;
+                try {
+                    hasher.emplace(opCtx,
+                                   collection,
+                                   first,
+                                   info.end,
+                                   std::min(batchDocs, info.maxCount),
+                                   std::min(batchBytes, info.maxSize));
+                } catch (const DBException& e) {
+                    return e.toStatus();
+                }
+
+                const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
+                Status status = hasher->hashAll(opCtx, batchDeadline);
+
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                std::string md5 = hasher->total();
+
+                DbCheckOplogBatch batch;
+                batch.setType(OplogEntriesEnum::Batch);
+                batch.setNss(info.nss);
+                batch.setMd5(md5);
+                batch.setMinKey(first);
+                batch.setMaxKey(BSONKey(hasher->lastKey()));
+
+                // Send information on this batch over the oplog.
+                result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
+
+                result.nDocs = hasher->docsSeen();
+                result.nBytes = hasher->bytesSeen();
+                result.lastKey = hasher->lastKey();
+                result.md5 = md5;
+
+                break;
+            } catch (const ExceptionFor<ErrorCodes::LockTimeout>& e) {
+                if (attempt > gDbCheckCollectionTryLockMaxAttempts.load()) {
+                    return StatusWith<BatchStats>(e.code(),
+                                                  "Unable to acquire the collection lock");
+                }
+
+                // Bounded exponential backoff between tryLocks.
+                opCtx->sleepFor(backoffMs);
+                const auto maxBackoffMillis =
+                    Milliseconds(gDbCheckCollectionTryLockMaxBackoffMillis.load());
+                if (backoffMs < maxBackoffMillis) {
+                    auto backoff = durationCount<Milliseconds>(backoffMs);
+                    auto initialBackoff = durationCount<Milliseconds>(initialBackoffMs);
+                    backoff *= initialBackoff;
+                    backoffMs = Milliseconds(backoff);
+                }
+                if (backoffMs > maxBackoffMillis) {
+                    backoffMs = maxBackoffMillis;
+                }
+                LOGV2_DEBUG(6175700,
+                            1,
+                            "Could not acquire collection lock, retrying",
+                            "ns"_attr = info.nss.ns(),
+                            "batchRangeMin"_attr = info.start.obj(),
+                            "batchRangeMax"_attr = info.end.obj(),
+                            "attempt"_attr = attempt,
+                            "backoff"_attr = backoffMs);
+            }
+        }
         return result;
     }
 
