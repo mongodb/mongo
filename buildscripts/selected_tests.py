@@ -120,7 +120,8 @@ class EvgExpansions(BaseModel):
         """Build options needed to generate tasks."""
         return GenTaskOptions(create_misc_suite=False,
                               generated_config_dir=SELECTED_TESTS_CONFIG_DIR, is_patch=self.is_patch
-                              or False, use_default_timeouts=False)
+                              or False, use_default_timeouts=False, timeout_secs=None,
+                              exec_timeout_secs=None)
 
     def build_suite_split_config(self, start_date: datetime,
                                  end_date: datetime) -> SuiteSplitConfig:

@@ -29,9 +29,10 @@ class TestHelperMethods(unittest.TestCase):
         self.assertEqual(False, under_test.string_contains_any_of_args(string, args))
 
 
-def build_mock_gen_options(use_default_timeouts=False):
+def build_mock_gen_options(use_default_timeouts=False, timeout_secs=None, exec_timeout_secs=None):
     return GenTaskOptions(create_misc_suite=True, is_patch=True, generated_config_dir="tmpdir",
-                          use_default_timeouts=use_default_timeouts)
+                          use_default_timeouts=use_default_timeouts, timeout_secs=timeout_secs,
+                          exec_timeout_secs=exec_timeout_secs)
 
 
 def build_mock_gen_params(repeat_suites=1, resmoke_args="resmoke args"):
@@ -155,3 +156,20 @@ class TestGenerateTask(unittest.TestCase):
             for cmd in task.shrub_task.commands:
                 cmd_dict = cmd.as_dict()
                 self.assertNotEqual("timeout.update", cmd_dict.get("command"))
+
+    def test_suites_without_enough_info_should_inherit_bv_timeouts_if_specified(self):
+        mock_gen_options = build_mock_gen_options(timeout_secs=300, exec_timeout_secs=150)
+        params = build_mock_gen_params()
+        suites = build_mock_suite(1, include_runtimes=False)
+
+        resmoke_service = under_test.ResmokeGenTaskService(mock_gen_options)
+        tasks = resmoke_service.generate_tasks(suites, params)
+
+        self.assertEqual(2, len(tasks))
+        for resmoke_task in tasks:
+            task = resmoke_task.shrub_task
+            self.assertGreaterEqual(len(task.commands), 1)
+            timeout_cmd = task.commands[0]
+            self.assertEqual("timeout.update", timeout_cmd.command)
+            self.assertEqual(300, timeout_cmd.params["timeout_secs"])
+            self.assertEqual(150, timeout_cmd.params["exec_timeout_secs"])

@@ -13,6 +13,8 @@ def build_mock_gen_task_options(config_dir="."):
         is_patch=True,
         generated_config_dir=config_dir,
         use_default_timeouts=False,
+        timeout_secs=None,
+        exec_timeout_secs=None,
     )
 
 

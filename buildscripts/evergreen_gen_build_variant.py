@@ -39,6 +39,7 @@ class EvgExpansions(BaseModel):
 
     build_id: Build ID being run under.
     build_variant: Build variant being generated.
+    exec_timeout_secs: Seconds to wait before considering a task timed out.
     gen_task_gran: Granularity of how tasks are being generated.
     is_patch: Whether generation is part of a patch build.
     project: Evergreen project being run under.
@@ -50,10 +51,12 @@ class EvgExpansions(BaseModel):
     task_name: Name of task running.
     target_resmoke_time: Target time of generated sub-suites.
     task_id: ID of task being run under.
+    timeout_secs: Seconds to wait with no output before considering a task timed out.
     """
 
     build_id: str
     build_variant: str
+    exec_timeout_secs: Optional[int] = None
     is_patch: Optional[bool]
     project: str
     max_tests_per_suite: Optional[int] = 100
@@ -64,6 +67,7 @@ class EvgExpansions(BaseModel):
     task_name: str
     target_resmoke_time: Optional[int] = None
     task_id: str
+    timeout_secs: Optional[int] = None
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "EvgExpansions":
@@ -110,6 +114,8 @@ class EvgExpansions(BaseModel):
             is_patch=self.is_patch,
             generated_config_dir=GENERATED_CONFIG_DIR,
             use_default_timeouts=False,
+            timeout_secs=self.timeout_secs,
+            exec_timeout_secs=self.exec_timeout_secs,
         )
 
     def config_location(self) -> str:

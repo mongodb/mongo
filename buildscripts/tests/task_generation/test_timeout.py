@@ -32,6 +32,21 @@ class TimeoutEstimateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             timeout_est.generate_timeout_cmd(is_patch=True, repeat_factor=1)
 
+    def test_is_specified_should_return_true_when_a_test_runtime_is_specified(self):
+        timeout_est = under_test.TimeoutEstimate(max_test_runtime=3.14, expected_task_runtime=None)
+
+        self.assertTrue(timeout_est.is_specified())
+
+    def test_is_specified_should_return_true_when_a_task_runtime_is_specified(self):
+        timeout_est = under_test.TimeoutEstimate(max_test_runtime=None, expected_task_runtime=3.14)
+
+        self.assertTrue(timeout_est.is_specified())
+
+    def test_is_specified_should_return_false_when_no_data_is_specified(self):
+        timeout_est = under_test.TimeoutEstimate(max_test_runtime=None, expected_task_runtime=None)
+
+        self.assertFalse(timeout_est.is_specified())
+
 
 class TestGenerateTimeoutCmd(unittest.TestCase):
     def test_evg_config_does_not_fails_if_test_timeout_too_high_on_mainline(self):

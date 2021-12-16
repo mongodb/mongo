@@ -137,9 +137,12 @@ class ResmokeGenTaskService:
                                                   suite_file=suite.suite_name,
                                                   task_name=suite.task_name, params=params)
 
-        timeout_info = timeout_est.generate_timeout_cmd(self.gen_task_options.is_patch,
-                                                        params.repeat_suites,
-                                                        self.gen_task_options.use_default_timeouts)
+        if timeout_est.is_specified():
+            timeout_info = timeout_est.generate_timeout_cmd(
+                self.gen_task_options.is_patch, params.repeat_suites,
+                self.gen_task_options.use_default_timeouts)
+        else:
+            timeout_info = self.gen_task_options.build_defualt_timeout()
 
         commands = [
             timeout_info.cmd,

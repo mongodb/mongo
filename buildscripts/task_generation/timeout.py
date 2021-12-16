@@ -43,6 +43,10 @@ class TimeoutEstimate(NamedTuple):
         """Create an instance with no estimation data."""
         return cls(max_test_runtime=None, expected_task_runtime=None)
 
+    def is_specified(self) -> bool:
+        """Determine if any specific timeout value has been specified."""
+        return self.max_test_runtime is not None or self.expected_task_runtime is not None
+
     def calculate_test_timeout(self, repeat_factor: int) -> Optional[int]:
         """
         Calculate the timeout to use for tests.
@@ -84,7 +88,7 @@ class TimeoutEstimate(NamedTuple):
         :return: Timeout info for the task.
         """
 
-        if (self.max_test_runtime is None and self.expected_task_runtime is None) or use_default:
+        if not self.is_specified or use_default:
             return TimeoutInfo.default_timeout()
 
         test_timeout = self.calculate_test_timeout(repeat_factor)

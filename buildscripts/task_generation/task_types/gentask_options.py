@@ -2,6 +2,8 @@
 import os
 from typing import NamedTuple, Optional, List
 
+from buildscripts.patch_builds.task_generation import TimeoutInfo
+
 
 class GenTaskOptions(NamedTuple):
     """
@@ -18,6 +20,8 @@ class GenTaskOptions(NamedTuple):
     is_patch: bool
     generated_config_dir: str
     use_default_timeouts: bool
+    timeout_secs: Optional[int]
+    exec_timeout_secs: Optional[int]
 
     def suite_location(self, suite_name: str) -> str:
         """
@@ -39,3 +43,9 @@ class GenTaskOptions(NamedTuple):
         # here, just use the forward slash; otherwise the path separator will be treated as
         # the escape character on Windows.
         return "/".join([self.generated_config_dir, base_file])
+
+    def build_defualt_timeout(self) -> TimeoutInfo:
+        """Generate a timeout command that can be used if historic timing info is missing."""
+        if self.timeout_secs is not None or self.exec_timeout_secs is not None:
+            return TimeoutInfo.overridden(self.exec_timeout_secs, self.timeout_secs)
+        return TimeoutInfo.default_timeout()
