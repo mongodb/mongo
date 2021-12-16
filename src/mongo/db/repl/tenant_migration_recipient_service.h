@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/client/fetcher.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -368,6 +369,16 @@ public:
         void _fetchAndStoreDonorClusterTimeKeyDocs(const CancellationToken& token);
 
         /**
+         * Creates a backup cursor wrapped in a Fetcher.
+         */
+        ExecutorFuture<void> _createFileFetcher(const CancellationToken& token);
+
+        /**
+         * Kills the Donor backup cursor
+         */
+        void _killBackupCursor(WithLock lk);
+
+        /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
          */
         void _getStartOpTimesFromDonor(WithLock lk);
@@ -566,6 +577,9 @@ public:
         // Follow DBClientCursor synchonization rules.
         std::unique_ptr<DBClientConnection> _client;              // (S)
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
+
+        CursorId _backupCursorId;                      // (M)
+        NamespaceString _backupCursorNamespaceString;  // (M)
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
             std::make_unique<CreateOplogFetcherFn>();                               // (M)

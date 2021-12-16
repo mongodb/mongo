@@ -465,7 +465,7 @@ var {DataConsistencyChecker} = (function() {
                 // collections in the database and there aren't any capped collections,
                 // then the hashes for the whole database should match.
                 if (sourceDBHash.md5 !== syncingDBHash.md5) {
-                    prettyPrint(`the two nodes have a different has for the ${dbName} database: ${
+                    prettyPrint(`the two nodes have a different hash for the ${dbName} database: ${
                         dbHashesMsg}`);
                     success = false;
                 }

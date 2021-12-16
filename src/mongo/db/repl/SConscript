@@ -1350,6 +1350,7 @@ env.Library(
         'vote_commit_migration_progress.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',

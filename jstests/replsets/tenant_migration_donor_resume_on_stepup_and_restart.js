@@ -44,7 +44,8 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
  * donor using the 'interruptFunc', and asserts that migration eventually commits.
  */
-function testDonorStartMigrationInterrupt(interruptFunc, donorRestarted) {
+function testDonorStartMigrationInterrupt(interruptFunc,
+                                          {donorRestarted = false, disableForShardMerge = true}) {
     const donorRst =
         new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
 
@@ -55,6 +56,14 @@ function testDonorStartMigrationInterrupt(interruptFunc, donorRestarted) {
 
     let donorPrimary = tenantMigrationTest.getDonorPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+    if (disableForShardMerge &&
+        TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+        jsTest.log("Skipping test for shard merge");
+        tenantMigrationTest.stop();
+        donorRst.stopSet();
+        return;
+    }
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -346,7 +355,7 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
         assert.commandWorked(
             donorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
-    }, false /* donor restarted */);
+    }, {donorRestarted: false});
 })();
 
 (() => {
@@ -354,7 +363,7 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
     testDonorStartMigrationInterrupt((donorRst) => {
         donorRst.stopSet(null /* signal */, true /*forRestart */);
         donorRst.startSet({restart: true});
-    }, true /* donor restarted */);
+    }, {donorRestarted: true, disableForShardMerge: true});
 })();
 
 (() => {

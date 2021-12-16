@@ -87,6 +87,7 @@ using namespace fmt;
 const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
+constexpr int kBackupCursorFileFetcherRetryAttempts = 10;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString(NamespaceString::kConfigDb,
@@ -902,16 +903,182 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
         .semi();
 }
 
+void TenantMigrationRecipientService::Instance::_killBackupCursor(WithLock lk) {
+    if (!_backupCursorId || _backupCursorNamespaceString.isEmpty()) {
+        return;
+    }
+
+    // TODO (SERVER-61131) likely want to cancel getMore/keepalive here as well
+
+    executor::RemoteCommandRequest request(_client->getServerHostAndPort(),
+                                           _backupCursorNamespaceString.db().toString(),
+                                           BSON("killCursors"
+                                                << _backupCursorNamespaceString.coll().toString()
+                                                << "cursors" << BSON_ARRAY(_backupCursorId)),
+                                           nullptr);
+    request.sslMode = transport::kGlobalSSLMode;
+
+    auto scheduleResult =
+        (**_scopedExecutor)
+            ->scheduleRemoteCommand(
+                request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                    if (!args.response.isOK()) {
+                        LOGV2_WARNING(6113005,
+                                      "killCursors command task failed",
+                                      "error"_attr = redact(args.response.status));
+                        return;
+                    }
+                    auto status = getStatusFromCommandResult(args.response.data);
+                    if (!status.isOK()) {
+                        LOGV2_WARNING(
+                            6113006, "killCursors command failed", "error"_attr = redact(status));
+                    }
+                });
+    if (!scheduleResult.isOK()) {
+        LOGV2_WARNING(6113004,
+                      "Failed to run killCursors command on backup cursor",
+                      "status"_attr = scheduleResult.getStatus());
+    }
+
+    _backupCursorId = 0;
+}
+ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetcher(
+    const CancellationToken& token) {
+    stdx::lock_guard lk(_mutex);
+    LOGV2_DEBUG(6113000,
+                1,
+                "Trying to open backup cursor on donor primary",
+                "migrationId"_attr = _stateDoc.getId(),
+                "donorConnectionString"_attr = _stateDoc.getDonorConnectionString());
+    const auto cmdObj = [] {
+        AggregateCommandRequest aggRequest(
+            NamespaceString::makeCollectionlessAggregateNSS(NamespaceString::kAdminDb),
+            {BSON("$backupCursor" << BSONObj())});
+        // We must set a writeConcern on internal commands.
+        aggRequest.setWriteConcern(WriteConcernOptions());
+        return aggRequest.toBSON(BSONObj());
+    }();
+
+    // TODO (SERVER-61131) store or pass in returnedFiles so that we can access it when this
+    // work is done
+    auto returnedFiles = std::make_shared<std::vector<BSONObj>>();
+
+    auto fetchStatus = std::make_shared<boost::optional<Status>>();
+    auto fetcherCallback = [this, fetchStatus, returnedFiles, token](
+                               const Fetcher::QueryResponseStatus& dataStatus,
+                               Fetcher::NextAction* nextAction,
+                               BSONObjBuilder* getMoreBob) {
+        if (!dataStatus.isOK()) {
+            *fetchStatus = dataStatus.getStatus();
+            returnedFiles->clear();
+            LOGV2_ERROR(6113003, "backup cursor failed", "error"_attr = dataStatus.getStatus());
+            return;
+        }
+
+        if (token.isCanceled()) {
+            *fetchStatus = Status(ErrorCodes::CallbackCanceled, "backup cursor interrupted");
+            returnedFiles->clear();
+            return;
+        }
+
+        stdx::lock_guard lk(_mutex);
+
+        const auto& data = dataStatus.getValue();
+        _backupCursorId = data.cursorId;
+        _backupCursorNamespaceString = data.nss;
+
+        for (const BSONObj& doc : data.documents) {
+            if (doc["metadata"]) {
+                // First batch must contain the metadata.
+                const auto& metadata = doc["metadata"].Obj();
+                auto startApplyingDonorOpTime =
+                    OpTime(metadata["checkpointTimestamp"].timestamp(), OpTime::kUninitializedTerm);
+                // TODO (SERVER-61131) Uncomment the following lines when we skip
+                // _getStartopTimesFromDonor entirely
+                // _stateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
+                // _stateDoc.setStartFetchingDonorOpTime(startApplyingDonorOpTime);
+                LOGV2_INFO(6113001,
+                           "Opened backup cursor on donor",
+                           "migrationId"_attr = _stateDoc.getId(),
+                           "startApplyingDonorOpTime"_attr = startApplyingDonorOpTime,
+                           "backupCursorId"_attr = data.cursorId);
+            } else {
+                LOGV2_DEBUG(6113002,
+                            1,
+                            "Backup cursor entry",
+                            "migrationId"_attr = _stateDoc.getId(),
+                            "filename"_attr = doc["filename"].String(),
+                            "backupCursorId"_attr = data.cursorId);
+                returnedFiles->emplace_back(doc.getOwned());
+            }
+        }
+
+        *fetchStatus = Status::OK();
+        if (!getMoreBob || data.documents.empty()) {
+            // Exit fetcher but keep the backupCursor alive to prevent WT on Donor from
+            // modifying file bytes. backupCursor can be closed after all Recipient nodes
+            // have copied files from Donor primary.
+            *nextAction = Fetcher::NextAction::kExitAndKeepCursorAlive;
+            return;
+        }
+
+        getMoreBob->append("getMore", data.cursorId);
+        getMoreBob->append("collection", data.nss.coll());
+    };
+
+    auto fetcher = std::make_shared<Fetcher>(
+        (**_scopedExecutor).get(),
+        _client->getServerHostAndPort(),
+        NamespaceString::kAdminDb.toString(),
+        cmdObj,
+        fetcherCallback,
+        ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
+        executor::RemoteCommandRequest::kNoTimeout, /* aggregateTimeout */
+        executor::RemoteCommandRequest::kNoTimeout, /* getMoreNetworkTimeout */
+        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
+            kBackupCursorFileFetcherRetryAttempts, executor::RemoteCommandRequest::kNoTimeout),
+        transport::kGlobalSSLMode);
+
+    uassertStatusOK(fetcher->schedule());
+
+    return fetcher->onCompletion().thenRunOn(**_scopedExecutor).then([this, fetcher, fetchStatus] {
+        if (!*fetchStatus) {
+            // the callback was never invoked
+            uasserted(6113007, "Internal error running cursor callback in command");
+        }
+
+        auto status = fetchStatus->get();
+        if (!status.isOK() && status.code() != 50915) {
+            // In the event of 50915: A checkpoint took place while
+            // opening a backup cursor, we should retry and *not* cancel
+            // migration. See https://jira.mongodb.org/browse/SERVER-61964
+            // TODO (SERVER-61964): remove conditional check for 50915 error
+            // and cancel migration if !status.isOK()
+            this->cancelMigration();
+        }
+
+        uassertStatusOK(status);
+    });
+}
+
 void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLock lk) {
+    // Get the last oplog entry at the read concern majority optime in the remote oplog.  It
+    // does not matter which tenant it is for.
     if (_sharedData->isResuming()) {
         // We are resuming a migration.
         return;
     }
-    // We only expect to already have start optimes populated if we are resuming a migration.
-    invariant(!_stateDoc.getStartApplyingDonorOpTime().has_value());
-    invariant(!_stateDoc.getStartFetchingDonorOpTime().has_value());
-    // Get the last oplog entry at the read concern majority optime in the remote oplog.  It
-    // does not matter which tenant it is for.
+
+    // We only expect to already have start optimes populated if we are not
+    // resuming a migration and this is a multitenant migration.
+    // TODO (SERVER-61131) Eventually we'll skip _getStartopTimesFromDonor entirely
+    // for shard merge, but currently _createFileFetcher will populate optimes for
+    // the shard merge case. We can just overwrite here since we aren't doing anything
+    // with the backup cursor results yet.
+    auto isShardMerge = _stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge;
+    invariant(isShardMerge || !_stateDoc.getStartApplyingDonorOpTime().has_value());
+    invariant(isShardMerge || !_stateDoc.getStartFetchingDonorOpTime().has_value());
+
     auto lastOplogEntry1OpTime = _getDonorMajorityOpTime(_client);
     LOGV2_DEBUG(4880600,
                 2,
@@ -2325,9 +2492,36 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        _stopOrHangOnFailPoint(&fpAfterRecordingRecipientPrimaryStartingFCV);
                        _compareRecipientAndDonorFCV();
                    })
-                   .then([this, self = shared_from_this()] {
+                   .then([this, self = shared_from_this(), token] {
                        _stopOrHangOnFailPoint(&fpAfterComparingRecipientAndDonorFCV);
+                       if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
+                           return SemiFuture<void>::makeReady().thenRunOn(**_scopedExecutor);
+                       }
+
+                       return AsyncTry([this, token] { return _createFileFetcher(token); })
+                           .until([](Status status) {
+                               if (status.code() == 50915) {
+                                   LOGV2_DEBUG(6113008,
+                                               1,
+                                               "Retrying backup cursor creation after error",
+                                               "status"_attr = status);
+                                   // In the event of 50915: A checkpoint took place while
+                                   // opening a backup cursor, we should retry and *not* cancel
+                                   // migration. See https://jira.mongodb.org/browse/SERVER-61964
+                                   // TODO (SERVER-61964): remove retry
+                                   return false;
+                               }
+
+                               return true;
+                           })
+                           .on(_recipientService->getInstanceCleanupExecutor(), token);
+                   })
+                   .then([this, self = shared_from_this()] {
+                       // TODO (SERVER-61131) temporarily stop fetcher/backup cursor for
+                       // now. Otherwise, nothing will actually shut down the backup cursor,
+                       // since we won't be implementing that until later.
                        stdx::lock_guard lk(_mutex);
+                       _killBackupCursor(lk);
                        _getStartOpTimesFromDonor(lk);
                        return _updateStateDocForMajority(lk);
                    })
@@ -2526,6 +2720,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this()](
                           StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
+            {
+                stdx::lock_guard lk(_mutex);
+                _killBackupCursor(lk);
+            }
             // On shutDown/stepDown, the _scopedExecutor may have already been shut down. So we
             // need to schedule the clean up work on the parent executor.
 
