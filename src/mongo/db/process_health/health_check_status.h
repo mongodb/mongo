@@ -119,24 +119,6 @@ private:
     std::string _description;
 };
 
-inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {
-    switch (type) {
-        case FaultFacetType::kMock1:
-            return s << "kMock1"_sd;
-        case FaultFacetType::kMock2:
-            return s << "kMock2"_sd;
-        default:
-            return s << "Unknown"_sd;
-    }
-}
-
-inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
-    StringBuilder sb;
-    sb << type;
-    os << sb.stringData();
-    return os;
-}
-
 inline void HealthCheckStatus::appendDescription(BSONObjBuilder* builder) const {
     builder->append("type", _type);
     builder->append("description", _description);
