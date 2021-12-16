@@ -29,8 +29,9 @@
 #ifndef TEST_H
 #define TEST_H
 
-#include <vector>
+#include <memory>
 #include <string>
+#include <vector>
 
 extern "C" {
 #include "wiredtiger.h"
