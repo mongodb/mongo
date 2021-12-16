@@ -96,6 +96,10 @@ public:
         _clockSource->advance(step);
     }
 
+    auto getWasReshardingEverAttempted() {
+        return getMetrics()->wasReshardingEverAttempted();
+    }
+
     auto getReport(OpReportType reportType) {
         BSONObjBuilder bob;
         if (reportType == OpReportType::CumulativeReport) {
@@ -832,6 +836,57 @@ TEST_F(ReshardingMetricsTest, CumulativeOpMetricsAccumulate) {
                  kDocumentsToCopy1 + kDocumentsToCopy2,
                  "Cumulative metrics are not accumulated",
                  OpReportType::CumulativeReport);
+}
+
+TEST_F(ReshardingMetricsTest, TestWasReshardingEverAttemptedStartComplete) {
+    ASSERT_FALSE(getWasReshardingEverAttempted());
+
+    startOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+
+    completeOperation(ReshardingMetrics::Role::kRecipient, ReshardingOperationStatusEnum::kSuccess);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+}
+
+TEST_F(ReshardingMetricsTest, TestWasReshardingEverAttemptedStartStepDownStepUp) {
+    ASSERT_FALSE(getWasReshardingEverAttempted());
+
+    startOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+
+    stepDownOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+
+    stepUpOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+}
+
+TEST_F(ReshardingMetricsTest, TestWasReshardingEverAttemptedStepUpStepDown) {
+    ASSERT_FALSE(getWasReshardingEverAttempted());
+
+    stepUpOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+
+    stepDownOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+}
+
+TEST_F(ReshardingMetricsTest, TestWasReshardingEverAttemptedStepUpComplete) {
+    ASSERT_FALSE(getWasReshardingEverAttempted());
+
+    stepUpOperation(ReshardingMetrics::Role::kRecipient);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+
+    completeOperation(ReshardingMetrics::Role::kRecipient, ReshardingOperationStatusEnum::kSuccess);
+    ASSERT_TRUE(getWasReshardingEverAttempted());
+}
+
+TEST_F(ReshardingMetricsTest, TestOnStepUpWithDonorMetrics) {
+    ASSERT_FALSE(getWasReshardingEverAttempted());
+
+    getMetrics()->onStepUp(DonorStateEnum::kUnused, ReshardingDonorMetrics());
+
+    ASSERT_TRUE(getWasReshardingEverAttempted());
 }
 
 }  // namespace
