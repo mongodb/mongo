@@ -147,6 +147,17 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(const NamespaceString
                                  BSON("success" << false << "error" << err.toString()));
 }
 
+std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(const NamespaceString& nss,
+                                                             const std::string& msg,
+                                                             OplogEntriesEnum operation,
+                                                             const Status& err) {
+    return dbCheckHealthLogEntry(nss,
+                                 SeverityEnum::Warning,
+                                 msg,
+                                 operation,
+                                 BSON("success" << false << "error" << err.toString()));
+}
+
 /**
  * Get a HealthLogEntry for a dbCheck batch.
  */
@@ -199,7 +210,6 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
 
     // Get the _id index.
     const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
-
     uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
 
     // Set up a simple index scan on that.

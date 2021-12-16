@@ -155,6 +155,7 @@ selector:
 executor:
   archive:
     hooks:
+      - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - CheckReplDBHash
       - ValidateCollections
@@ -169,6 +170,7 @@ executor:
           traceExceptions: false
           usingReplicaSetShards: true
   hooks:
+  - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: ValidateCollections
@@ -185,6 +187,8 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        # TODO (SERVER-61754): dbCheck takes strong locks which causes transactions to timeout
+        maxTransactionLockRequestTimeoutMillis: 3000
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

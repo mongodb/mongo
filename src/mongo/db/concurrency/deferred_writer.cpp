@@ -100,7 +100,7 @@ StatusWith<std::unique_ptr<AutoGetCollection>> DeferredWriter::_getCollection(
     return std::move(agc);
 }
 
-void DeferredWriter::_worker(InsertStatement stmt) {
+void DeferredWriter::_worker(InsertStatement stmt) try {
     auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
     OperationContext* opCtx = uniqueOpCtx.get();
     auto result = _getCollection(opCtx);
@@ -133,6 +133,8 @@ void DeferredWriter::_worker(InsertStatement stmt) {
     if (!status.isOK()) {
         _logFailure(status);
     }
+} catch (const DBException& e) {
+    _logFailure(e.toStatus());
 }
 
 DeferredWriter::DeferredWriter(NamespaceString nss, CollectionOptions opts, int64_t maxSize)
