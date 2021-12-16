@@ -99,3 +99,8 @@ feature_flags:
       description: "Feature flag for enabling improved change streams visibility"
       cpp_varname: gFeatureFlagChangeStreamsVisibility
       default: false
+
+    featureFlagPerShardCursor:
+      description: "Feature flag for enabling a per-shard cursor via mongos"
+      cpp_varname: gFeatureFlagPerShardCursor
+      default: false
