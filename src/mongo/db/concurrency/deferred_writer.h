@@ -136,7 +136,7 @@ private:
     /**
      * The method that the worker thread will run.
      */
-    void _worker(InsertStatement stmt);
+    Status _worker(InsertStatement stmt) noexcept;
 
     /**
      * The options for the collection, in case we need to create it.

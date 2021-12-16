@@ -5,6 +5,7 @@
  *   # We need persistence as we temporarily restart nodes as standalones.
  *   requires_persistence,
  *   assumes_against_mongod_not_mongos,
+ *   requires_fcv_50,
  * ]
  */
 
@@ -201,6 +202,25 @@ function simpleTestConsistent() {
     });
 }
 
+function simpleTestNonSnapshot() {
+    let primary = replSet.getPrimary();
+    clearLog();
+
+    assert.neq(primary, undefined);
+    let db = primary.getDB(dbName);
+    assert.commandWorked(db.runCommand({"dbCheck": multiBatchSimpleCollName, snapshotRead: false}));
+
+    awaitDbCheckCompletion(db, multiBatchSimpleCollName);
+
+    checkLogAllConsistent(primary);
+    checkTotalCounts(primary, db[multiBatchSimpleCollName]);
+
+    forEachSecondary(function(secondary) {
+        checkLogAllConsistent(secondary);
+        checkTotalCounts(secondary, secondary.getDB(dbName)[multiBatchSimpleCollName]);
+    });
+}
+
 // Same thing, but now with concurrent updates.
 function concurrentTestConsistent() {
     let master = replSet.getPrimary();
@@ -229,6 +249,7 @@ function concurrentTestConsistent() {
 }
 
 simpleTestConsistent();
+simpleTestNonSnapshot();
 concurrentTestConsistent();
 
 // Test the various other parameters.

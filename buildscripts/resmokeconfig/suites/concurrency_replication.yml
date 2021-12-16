@@ -46,6 +46,4 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
-        # TODO (SERVER-61754): dbCheck takes strong locks which causes transactions to timeout
-        maxTransactionLockRequestTimeoutMillis: 3000
     num_nodes: 3
