@@ -531,7 +531,7 @@ server_parameters:
     cpp_varname: "internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill"
     cpp_vartype: AtomicWord<long long>
     default:
-      expr: 1024 * 1024
+      expr: 100 * 1024 * 1024
     validator:
         gt: 0
 
