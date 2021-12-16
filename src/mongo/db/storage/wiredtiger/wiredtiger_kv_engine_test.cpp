@@ -502,7 +502,10 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
 }
 
 TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
-    WiredTigerFileVersion version;
+    // Initializing this value to silence Coverity warning. Doesn't matter what value
+    // _startupVersion is set to since shouldDowngrade() & getDowngradeString() only look at
+    // _startupVersion when FCV is uninitialized. This test initializes FCV via setVersion().
+    WiredTigerFileVersion version = {WiredTigerFileVersion::StartupVersion::IS_42};
 
     // (Generic FCV reference): When FCV is kLatest, no downgrade is necessary.
     serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
