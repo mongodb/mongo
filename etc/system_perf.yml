@@ -170,6 +170,7 @@ functions:
           benchmarks: ${benchmarks_rev}
           py-tpcc: ${py-tpcc_rev}
           # mongo: ${mongo_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
@@ -382,6 +383,7 @@ functions:
           YCSB: ${YCSB_rev}
           benchmarks: ${benchmarks_rev}
           py-tpcc: ${py-tpcc_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
