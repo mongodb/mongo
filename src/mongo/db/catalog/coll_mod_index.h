@@ -48,7 +48,7 @@ struct ParsedCollModIndexRequest {
     // Internal fields of this 'cmdObj' are referenced by BSONElement fields here.
     BSONObj indexObj;  // owned
     const IndexDescriptor* idx = nullptr;
-    BSONElement indexExpireAfterSeconds = {};
+    boost::optional<long long> indexExpireAfterSeconds;
     boost::optional<bool> indexHidden;
     boost::optional<bool> indexUnique;
 };

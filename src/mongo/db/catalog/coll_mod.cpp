@@ -258,8 +258,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                                   "existing expireAfterSeconds field is not a number");
                 }
 
-                cmrIndex->indexExpireAfterSeconds =
-                    indexObj[CollModIndex::kExpireAfterSecondsFieldName];
+                cmrIndex->indexExpireAfterSeconds = *cmdIndex.getExpireAfterSeconds();
             }
 
             // Make a copy of the index options doc for writing to the oplog.

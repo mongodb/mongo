@@ -33,7 +33,6 @@
 
 #include <fmt/format.h>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/catalog/cannot_enable_index_constraint_info.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/index/index_access_method.h"
@@ -58,13 +57,13 @@ MONGO_FAIL_POINT_DEFINE(assertAfterIndexUpdate);
 void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
                                                    AutoGetCollection* autoColl,
                                                    const IndexDescriptor* idx,
-                                                   BSONElement indexExpireAfterSeconds,
-                                                   BSONElement* newExpireSecs,
-                                                   BSONElement* oldExpireSecs) {
+                                                   long long indexExpireAfterSeconds,
+                                                   boost::optional<long long>* newExpireSecs,
+                                                   boost::optional<long long>* oldExpireSecs) {
     *newExpireSecs = indexExpireAfterSeconds;
-    *oldExpireSecs = idx->infoObj().getField("expireAfterSeconds");
+    auto oldExpireSecsElement = idx->infoObj().getField("expireAfterSeconds");
     // If this collection was not previously TTL, inform the TTL monitor when we commit.
-    if (oldExpireSecs->eoo()) {
+    if (!oldExpireSecsElement) {
         auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
         const auto& coll = autoColl->getCollection();
         // Do not refer to 'idx' within this commit handler as it may be be invalidated by
@@ -73,11 +72,20 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
             [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
                 ttlCache->registerTTLInfo(uuid, indexName);
             });
-    }
-    if (SimpleBSONElementComparator::kInstance.evaluate(*oldExpireSecs != *newExpireSecs)) {
+
         // Change the value of "expireAfterSeconds" on disk.
         autoColl->getWritableCollection()->updateTTLSetting(
-            opCtx, idx->indexName(), newExpireSecs->safeNumberLong());
+            opCtx, idx->indexName(), indexExpireAfterSeconds);
+        return;
+    }
+
+    // This collection is already TTL. Compare the requested value against the existing setting
+    // before updating the catalog.
+    *oldExpireSecs = oldExpireSecsElement.safeNumberLong();
+    if (**oldExpireSecs != indexExpireAfterSeconds) {
+        // Change the value of "expireAfterSeconds" on disk.
+        autoColl->getWritableCollection()->updateTTLSetting(
+            opCtx, idx->indexName(), indexExpireAfterSeconds);
     }
 }
 
@@ -199,8 +207,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
         return;
     }
 
-    BSONElement newExpireSecs = {};
-    BSONElement oldExpireSecs = {};
+    boost::optional<long long> newExpireSecs;
+    boost::optional<long long> oldExpireSecs;
     boost::optional<bool> newHidden;
     boost::optional<bool> oldHidden;
     boost::optional<bool> newUnique;
@@ -208,7 +216,7 @@ void processCollModIndexRequest(OperationContext* opCtx,
     // TTL Index
     if (indexExpireAfterSeconds) {
         _processCollModIndexRequestExpireAfterSeconds(
-            opCtx, autoColl, idx, indexExpireAfterSeconds, &newExpireSecs, &oldExpireSecs);
+            opCtx, autoColl, idx, *indexExpireAfterSeconds, &newExpireSecs, &oldExpireSecs);
     }
 
 
@@ -225,15 +233,13 @@ void processCollModIndexRequest(OperationContext* opCtx,
             opCtx, autoColl, idx, mode, docsForUniqueIndex, &newUnique);
     }
 
-    *indexCollModInfo = IndexCollModInfo{
-        !indexExpireAfterSeconds ? boost::optional<Seconds>()
-                                 : Seconds(newExpireSecs.safeNumberLong()),
-        !indexExpireAfterSeconds || oldExpireSecs.eoo() ? boost::optional<Seconds>()
-                                                        : Seconds(oldExpireSecs.safeNumberLong()),
-        newHidden,
-        oldHidden,
-        newUnique,
-        idx->indexName()};
+    *indexCollModInfo =
+        IndexCollModInfo{!newExpireSecs ? boost::optional<Seconds>() : Seconds(*newExpireSecs),
+                         !oldExpireSecs ? boost::optional<Seconds>() : Seconds(*oldExpireSecs),
+                         newHidden,
+                         oldHidden,
+                         newUnique,
+                         idx->indexName()};
 
     // This matches the default for IndexCatalog::refreshEntry().
     auto flags = CreateIndexEntryFlags::kIsReady;
@@ -252,11 +258,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
         [oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result](
             boost::optional<Timestamp>) {
             // add the fields to BSONObjBuilder result
-            if (!oldExpireSecs.eoo()) {
-                result->appendAs(oldExpireSecs, "expireAfterSeconds_old");
+            if (oldExpireSecs) {
+                result->append("expireAfterSeconds_old", *oldExpireSecs);
             }
-            if (!newExpireSecs.eoo()) {
-                result->appendAs(newExpireSecs, "expireAfterSeconds_new");
+            if (newExpireSecs) {
+                result->append("expireAfterSeconds_new", *newExpireSecs);
             }
             if (newHidden) {
                 invariant(oldHidden);
