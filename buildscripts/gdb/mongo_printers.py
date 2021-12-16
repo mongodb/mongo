@@ -681,6 +681,140 @@ class WtUpdateToBsonPrinter(object):
             yield 'value', bson.json_util.dumps(value)
 
 
+def make_inverse_enum_dict(enum_type_name):
+    """
+    Create a dictionary that maps enum values to the unqualified names of the enum elements.
+
+    For example, if the enum type is 'mongo::sbe::vm::Builtin' with an element 'regexMatch', the
+    dictionary will contain 'regexMatch' value and not 'mongo::sbe::vm::Builtin::regexMatch'.
+    """
+    enum_dict = gdb.types.make_enum_dict(gdb.lookup_type(enum_type_name))
+    enum_inverse_dic = dict()
+    for key, value in enum_dict.items():
+        enum_inverse_dic[int(value)] = key.split('::')[-1]  # take last element
+    return enum_inverse_dic
+
+
+def read_as_integer(pmem, size):
+    """Read 'size' bytes at 'pmem' as an integer."""
+    # We assume the same platform for the debugger and the debuggee (thus, 'sys.byteorder'). If
+    # this becomes a problem look into whether it's possible to determine the byteorder of the
+    # inferior.
+    return int.from_bytes( \
+        gdb.selected_inferior().read_memory(pmem, size).tobytes(), \
+        sys.byteorder)
+
+
+class SbeCodeFragmentPrinter(object):
+    """
+    Pretty-printer for mongo::sbe::vm::CodeFragment.
+
+    Objects of 'mongo::sbe::vm::CodeFragment' type contain a stream of op-codes to be executed by
+    the 'sbe::vm::ByteCode' class. The pretty printer decodes the stream and outputs it as a list of
+    named instructions.
+    """
+
+    def __init__(self, val):
+        """Initialize SbeCodeFragmentPrinter."""
+        self.val = val
+
+        # The instructions stream is stored using 'absl::InlinedVector<uint8_t, 16>' type, which can
+        # either use an inline buffer or an allocated one. The choice of storage is decoded in the
+        # last bit of the 'metadata_' field.
+        storage = self.val['_instrs']['storage_']
+        meta = storage['metadata_'].cast(gdb.lookup_type('size_t'))
+        self.is_inlined = (meta % 2 == 0)
+        self.size = (meta >> 1)
+        self.pdata = \
+            storage['data_']['inlined']['inlined_data'].cast(gdb.lookup_type('uint8_t').pointer()) \
+            if self.is_inlined \
+            else storage['data_']['allocated']['allocated_data']
+
+        # Precompute lookup tables for Instructions and Builtins.
+        self.optags_lookup = make_inverse_enum_dict('mongo::sbe::vm::Instruction::Tags')
+        self.builtins_lookup = make_inverse_enum_dict('mongo::sbe::vm::Builtin')
+        self.valuetags_lookup = make_inverse_enum_dict('mongo::sbe::value::TypeTags')
+
+    def to_string(self):
+        """Return sbe::vm::CodeFragment for printing."""
+        return "%s" % (self.val.type)
+
+    # pylint: disable=R0915
+    def children(self):
+        """children."""
+        yield '_instrs', '{... (to see raw output, run "disable pretty-printer")}'
+        yield '_fixUps', self.val['_fixUps']
+        yield '_stackSize', self.val['_stackSize']
+
+        yield 'inlined', self.is_inlined
+        yield 'instrs data at', '[{} - {}]'.format(hex(self.pdata), hex(self.pdata + self.size))
+        yield 'instrs total size', self.size
+
+        # Sizes for types we'll use when parsing the insructions stream.
+        int_size = gdb.lookup_type('int').sizeof
+        ptr_size = gdb.lookup_type('void').pointer().sizeof
+        tag_size = gdb.lookup_type('mongo::sbe::value::TypeTags').sizeof
+        value_size = gdb.lookup_type('mongo::sbe::value::Value').sizeof
+        uint32_size = gdb.lookup_type('uint32_t').sizeof
+        builtin_size = gdb.lookup_type('mongo::sbe::vm::Builtin').sizeof
+
+        cur_op = self.pdata
+        end_op = self.pdata + self.size
+        instr_count = 0
+        error = False
+        while cur_op < end_op:
+            op_addr = cur_op
+            op_tag = read_as_integer(op_addr, 1)
+
+            if not op_tag in self.optags_lookup:
+                yield hex(op_addr), 'unknown op tag: {}'.format(op_tag)
+                error = True
+                break
+            op_name = self.optags_lookup[op_tag]
+
+            cur_op += 1
+            instr_count += 1
+
+            # Some instructions have extra arguments, embedded into the ops stream.
+            args = ''
+            if op_name in ['pushLocalVal', 'pushMoveLocalVal', 'pushLocalLambda']:
+                args = 'arg: ' + str(read_as_integer(cur_op, int_size))
+                cur_op += int_size
+            if op_name in ['jmp', 'jmpTrue', 'jmpNothing']:
+                offset = read_as_integer(cur_op, int_size)
+                cur_op += int_size
+                args = 'offset: ' + str(offset) + ', target: ' + hex(cur_op + offset)
+            elif op_name in ['pushConstVal']:
+                tag = read_as_integer(cur_op, tag_size)
+                args = 'tag: ' + self.valuetags_lookup.get(tag, "unknown") + \
+                    ', value: ' + hex(read_as_integer(cur_op + tag_size, value_size))
+                cur_op += (tag_size + value_size)
+            elif op_name in ['pushAccessVal', 'pushMoveVal']:
+                args = 'accessor: ' + hex(read_as_integer(cur_op, ptr_size))
+                cur_op += ptr_size
+            elif op_name in ['numConvert']:
+                args = 'convert to: ' + \
+                    self.valuetags_lookup.get(read_as_integer(cur_op, tag_size), "unknown")
+                cur_op += tag_size
+            elif op_name in ['typeMatch']:
+                args = 'mask: ' + hex(read_as_integer(cur_op, uint32_size))
+                cur_op += uint32_size
+            elif op_name in ['function', 'functionSmall']:
+                arity_size = \
+                    gdb.lookup_type('mongo::sbe::vm::ArityType').sizeof \
+                    if op_name == 'function' \
+                    else gdb.lookup_type('mongo::sbe::vm::SmallArityType').sizeof
+                builtin_id = read_as_integer(cur_op, builtin_size)
+                args = 'builtin: ' + self.builtins_lookup.get(builtin_id, "unknown")
+                args += ' arity: ' + str(read_as_integer(cur_op + builtin_size, arity_size))
+                cur_op += (builtin_size + arity_size)
+
+            yield hex(op_addr), '{} ({})'.format(op_name, args)
+
+        yield 'instructions count', \
+            instr_count if not error else '? (successfully parsed {})'.format(instr_count)
+
+
 def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
@@ -701,6 +835,7 @@ def build_pretty_printer():
     pp.add('__wt_session_impl', '__wt_session_impl', False, WtSessionImplPrinter)
     pp.add('__wt_txn', '__wt_txn', False, WtTxnPrinter)
     pp.add('__wt_update', '__wt_update', False, WtUpdateToBsonPrinter)
+    pp.add('CodeFragment', 'mongo::sbe::vm::CodeFragment', False, SbeCodeFragmentPrinter)
     return pp
 
 

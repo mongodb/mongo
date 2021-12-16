@@ -325,6 +325,151 @@ struct Instruction {
     static int stackOffset[];
 
     uint8_t tag;
+
+    const char* toString() const {
+        switch (tag) {
+            case pushConstVal:
+                return "pushConstVal";
+            case pushAccessVal:
+                return "pushAccessVal";
+            case pushMoveVal:
+                return "pushMoveVal";
+            case pushLocalVal:
+                return "pushLocalVal";
+            case pushMoveLocalVal:
+                return "pushMoveLocalVal";
+            case pushLocalLambda:
+                return "pushLocalLambda";
+            case pop:
+                return "pop";
+            case swap:
+                return "swap";
+            case add:
+                return "add";
+            case sub:
+                return "sub";
+            case mul:
+                return "mul";
+            case div:
+                return "div";
+            case idiv:
+                return "idiv";
+            case mod:
+                return "mod";
+            case negate:
+                return "negate";
+            case numConvert:
+                return "numConvert";
+            case logicNot:
+                return "logicNot";
+            case less:
+                return "less";
+            case lessEq:
+                return "lessEq";
+            case greater:
+                return "greater";
+            case greaterEq:
+                return "greaterEq";
+            case eq:
+                return "eq";
+            case neq:
+                return "neq";
+            case cmp3w:
+                return "cmp3w";
+            case collLess:
+                return "collLess";
+            case collLessEq:
+                return "collLessEq";
+            case collGreater:
+                return "collGreater";
+            case collGreaterEq:
+                return "collGreaterEq";
+            case collEq:
+                return "collEq";
+            case collNeq:
+                return "collNeq";
+            case collCmp3w:
+                return "collCmp3w";
+            case fillEmpty:
+                return "fillEmpty";
+            case getField:
+                return "getField";
+            case getElement:
+                return "getElement";
+            case collComparisonKey:
+                return "collComparisonKey";
+            case getFieldOrElement:
+                return "getFieldOrElement";
+            case traverseP:
+                return "traverseP";
+            case traverseF:
+                return "traverseF";
+            case setField:
+                return "setField";
+            case getArraySize:
+                return "getArraySize";
+            case aggSum:
+                return "aggSum";
+            case aggMin:
+                return "aggMin";
+            case aggMax:
+                return "aggMax";
+            case aggFirst:
+                return "aggFirst";
+            case aggLast:
+                return "aggLast";
+            case aggCollMin:
+                return "aggCollMin";
+            case aggCollMax:
+                return "aggCollMax";
+            case exists:
+                return "exists";
+            case isNull:
+                return "isNull";
+            case isObject:
+                return "isObject";
+            case isArray:
+                return "isArray";
+            case isString:
+                return "isString";
+            case isNumber:
+                return "isNumber";
+            case isBinData:
+                return "isBinData";
+            case isDate:
+                return "isDate";
+            case isNaN:
+                return "isNaN";
+            case isInfinity:
+                return "isInfinity";
+            case isRecordId:
+                return "isRecordId";
+            case isMinKey:
+                return "isMinKey";
+            case isMaxKey:
+                return "isMaxKey";
+            case isTimestamp:
+                return "isTimestamp";
+            case typeMatch:
+                return "typeMatch";
+            case function:
+                return "function";
+            case functionSmall:
+                return "functionSmall";
+            case jmp:
+                return "jmp";
+            case jmpTrue:
+                return "jmpTrue";
+            case jmpNothing:
+                return "jmpNothing";
+            case ret:
+                return "ret";
+            case fail:
+                return "fail";
+            default:
+                return "unrecognized";
+        }
+    }
 };
 static_assert(sizeof(Instruction) == sizeof(uint8_t));
 
@@ -627,6 +772,10 @@ private:
 
     void adjustStackSimple(const Instruction& i);
     void copyCodeAndFixup(CodeFragment&& from);
+
+private:
+    // For printing from an interactive debugger.
+    std::string toString() const;
 
     absl::InlinedVector<uint8_t, 16> _instrs;
 

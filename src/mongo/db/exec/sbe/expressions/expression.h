@@ -302,6 +302,10 @@ protected:
             invariant(node);
         }
     }
+
+private:
+    // For printing from an interactive debugger.
+    std::string toString() const;
 };
 
 template <typename T, typename... Args>

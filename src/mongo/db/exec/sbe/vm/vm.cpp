@@ -168,6 +168,144 @@ size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
 }
 }  // namespace
 
+std::string CodeFragment::toString() const {
+    std::ostringstream ss;
+    auto pcPointer = _instrs.data();
+    auto pcEnd = pcPointer + _instrs.size();
+    ss << "[" << (void*)pcPointer << "-" << (void*)pcEnd << "] ";
+
+    while (pcPointer < pcEnd) {
+        Instruction i = readFromMemory<Instruction>(pcPointer);
+        ss << (void*)pcPointer << ": " << i.toString() << "(";
+        pcPointer += sizeof(i);
+        switch (i.tag) {
+            // Instructions with no arguments.
+            case Instruction::pop:
+            case Instruction::swap:
+            case Instruction::add:
+            case Instruction::sub:
+            case Instruction::mul:
+            case Instruction::div:
+            case Instruction::idiv:
+            case Instruction::mod:
+            case Instruction::negate:
+            case Instruction::logicNot:
+            case Instruction::less:
+            case Instruction::collLess:
+            case Instruction::lessEq:
+            case Instruction::collLessEq:
+            case Instruction::greater:
+            case Instruction::collGreater:
+            case Instruction::greaterEq:
+            case Instruction::collGreaterEq:
+            case Instruction::eq:
+            case Instruction::collEq:
+            case Instruction::neq:
+            case Instruction::collNeq:
+            case Instruction::cmp3w:
+            case Instruction::collCmp3w:
+            case Instruction::fillEmpty:
+            case Instruction::getField:
+            case Instruction::getElement:
+            case Instruction::getArraySize:
+            case Instruction::collComparisonKey:
+            case Instruction::getFieldOrElement:
+            case Instruction::traverseP:
+            case Instruction::traverseF:
+            case Instruction::setField:
+            case Instruction::aggSum:
+            case Instruction::aggMin:
+            case Instruction::aggCollMin:
+            case Instruction::aggMax:
+            case Instruction::aggCollMax:
+            case Instruction::aggFirst:
+            case Instruction::aggLast:
+            case Instruction::exists:
+            case Instruction::isNull:
+            case Instruction::isObject:
+            case Instruction::isArray:
+            case Instruction::isString:
+            case Instruction::isNumber:
+            case Instruction::isBinData:
+            case Instruction::isDate:
+            case Instruction::isNaN:
+            case Instruction::isInfinity:
+            case Instruction::isRecordId:
+            case Instruction::isMinKey:
+            case Instruction::isMaxKey:
+            case Instruction::isTimestamp:
+            case Instruction::fail:
+            case Instruction::ret: {
+                break;
+            }
+            // Instructions with a single integer argument.
+            case Instruction::pushLocalVal:
+            case Instruction::pushMoveLocalVal:
+            case Instruction::pushLocalLambda: {
+                auto arg = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(arg);
+                ss << "arg: " << arg;
+                break;
+            }
+            case Instruction::jmp:
+            case Instruction::jmpTrue:
+            case Instruction::jmpNothing: {
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                ss << "offset: " << offset << ", target: " << (void*)(pcPointer + offset);
+                break;
+            }
+            // Instructions with other kinds of arguments.
+            case Instruction::pushConstVal: {
+                auto tag = readFromMemory<value::TypeTags>(pcPointer);
+                pcPointer += sizeof(tag);
+                auto val = readFromMemory<value::Value>(pcPointer);
+                pcPointer += sizeof(val);
+                ss << "value: " << std::make_pair(tag, val);
+                break;
+            }
+            case Instruction::pushAccessVal:
+            case Instruction::pushMoveVal: {
+                auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
+                pcPointer += sizeof(accessor);
+                ss << "accessor: " << static_cast<void*>(accessor);
+                break;
+            }
+            case Instruction::numConvert: {
+                auto tag = readFromMemory<value::TypeTags>(pcPointer);
+                pcPointer += sizeof(tag);
+                ss << "tag: " << tag;
+                break;
+            }
+            case Instruction::typeMatch: {
+                auto typeMask = readFromMemory<uint32_t>(pcPointer);
+                pcPointer += sizeof(typeMask);
+                ss << "typeMask: " << typeMask;
+                break;
+            }
+            case Instruction::function:
+            case Instruction::functionSmall: {
+                auto f = readFromMemory<Builtin>(pcPointer);
+                pcPointer += sizeof(f);
+                ArityType arity{0};
+                if (i.tag == Instruction::function) {
+                    arity = readFromMemory<ArityType>(pcPointer);
+                    pcPointer += sizeof(ArityType);
+                } else {
+                    arity = readFromMemory<SmallArityType>(pcPointer);
+                    pcPointer += sizeof(SmallArityType);
+                }
+                ss << "f: " << static_cast<uint8_t>(f) << ", arity: " << arity;
+                break;
+            }
+            default:
+                ss << "unknown";
+        }
+        ss << "); ";
+    }
+    return ss.str();
+}
+
 void CodeFragment::adjustStackSimple(const Instruction& i) {
     _stackSize += Instruction::stackOffset[i.tag];
 }

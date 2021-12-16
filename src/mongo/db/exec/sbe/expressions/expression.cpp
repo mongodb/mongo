@@ -61,6 +61,10 @@ vm::CodeFragment wrapNothingTest(vm::CodeFragment&& code, F&& generator) {
     return std::move(code);
 }
 
+std::string EExpression::toString() const {
+    return DebugPrinter{}.print(debugPrint());
+}
+
 std::unique_ptr<EExpression> EConstant::clone() const {
     auto [tag, val] = value::copyValue(_tag, _val);
     return std::make_unique<EConstant>(tag, val);
