@@ -71,6 +71,17 @@ static const StringData FaultFacetType_serializer(const FaultFacetType value) {
     return FaultFacetTypeStrings[static_cast<int>(value)];
 }
 
+inline StringBuilder& operator<<(StringBuilder& s, const FaultFacetType& type) {
+    return s << FaultFacetType_serializer(type);
+}
+
+inline std::ostream& operator<<(std::ostream& os, const FaultFacetType& type) {
+    StringBuilder sb;
+    sb << type;
+    os << sb.stringData();
+    return os;
+}
+
 class FaultManagerConfig {
 public:
     /* Maximum possible jitter added to the time between health checks */
