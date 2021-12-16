@@ -76,6 +76,8 @@ public:
 
             uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
                 migrationProtocol, cmd.getTenantId().toString()));
+            tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
+                                                                            migrationProtocol);
 
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
                                                   cmd.getRecipientConnectionString().toString(),
