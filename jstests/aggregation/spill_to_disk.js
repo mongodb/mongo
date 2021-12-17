@@ -7,12 +7,9 @@
 // Some in memory variants will error because this test uses too much memory. As such, we do not
 // run this test on in-memory variants.
 //
-// TODO SERVER-61300 investigate the memory usage when the inMemory storage engine is used and
-// remove the 'requires_persistence tag'.
 // @tags: [
 //   requires_collstats,
 //   requires_pipeline_optimization,
-//   requires_persistence,
 // ]
 (function() {
 'use strict';
@@ -166,7 +163,6 @@ for (const op of ['$firstN', '$lastN', '$minN', '$maxN', '$topN', '$bottomN']) {
         canSpillToDisk: true
     });
 }
-
 // don't leave large collection laying around
-coll.drop();
+assert(coll.drop());
 })();

@@ -1,8 +1,4 @@
 // In MongoDB 3.4, $graphLookup was introduced. In this file, we test the error cases.
-// @tags: [
-//    assumes_unsharded_collection
-// ]
-// TODO SERVER-58405: Potentially remove the 'assumes_unsharded_collection' tag from this test.
 
 load("jstests/aggregation/extras/utils.js");        // For "assertErrorCode".
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
