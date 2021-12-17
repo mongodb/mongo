@@ -46,13 +46,17 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
 namespace {
 
 const Seconds kRefreshPeriod(30);
+
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 }  // namespace
 
@@ -268,9 +272,6 @@ void ShardRegistry::_periodicReload(const CallbackArgs& cbArgs) {
     try {
         reload(opCtx.get());
     } catch (const DBException& e) {
-        if (e.code() == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-            refreshPeriod = Seconds(1);
-        }
         LOGV2(22727,
               "Error running periodic reload of shard registry caused by {error}; will retry after "
               "{shardRegistryReloadInterval}",
@@ -437,6 +438,29 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) const {
 }
 
 void ShardRegistry::reload(OperationContext* opCtx) {
+    if (MONGO_unlikely(TestingProctor::instance().isEnabled())) {
+        // TODO SERVER-62163 investigate hang on reload in unit tests
+        // Some unit tests don't support running the reload's AsyncTry on the fixed executor.
+        _reloadInternal(opCtx);
+    } else {
+        AsyncTry([=]() mutable {
+            ThreadClient tc("ShardRegistry::reload", getGlobalServiceContext());
+            auto opCtx = tc->makeOperationContext();
+
+            _reloadInternal(opCtx.get());
+        })
+            .until([](Status status) mutable {
+                return status != ErrorCodes::ReadConcernMajorityNotAvailableYet;
+            })
+            .withBackoffBetweenIterations(kExponentialBackoff)
+            .on(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                CancellationToken::uncancelable())
+            .semi()
+            .get(opCtx);
+    }
+}
+
+void ShardRegistry::_reloadInternal(OperationContext* opCtx) {
     // Make the next acquire do a lookup.
     auto value = _forceReloadIncrement.addAndFetch(1);
     LOGV2_DEBUG(4620253, 2, "Forcing ShardRegistry reload", "newForceReloadIncrement"_attr = value);
