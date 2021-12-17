@@ -6,6 +6,7 @@ selector:
   - jstests/sharding/change_streams/*.js
   - jstests/sharding/query/*.js
   - jstests/sharding/load_balancer_support/*.js
+  - jstests/sharding/health_monitor/*.js
 
 executor:
   archive:

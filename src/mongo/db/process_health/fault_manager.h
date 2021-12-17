@@ -93,11 +93,18 @@ public:
     // specific flags.
     SharedSemiFuture<void> startPeriodicHealthChecks();
 
+    bool isInitialized();
+
+
     static FaultManager* get(ServiceContext* svcCtx);
 
     // Replace the FaultManager for the 'svcCtx'. This functionality
     // is exposed for testing and initial bootstrap.
     static void set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> newFaultManager);
+
+    // Signals that the intensity for a health observer has been updated.
+    static void healthMonitoringIntensitiesUpdated(HealthObserverIntensities oldValue,
+                                                   HealthObserverIntensities newValue);
 
     // Returns the current fault state for the server.
     FaultState getFaultState() const;
@@ -107,7 +114,7 @@ public:
 
     // All observers remain valid for the manager lifetime, thus returning
     // just pointers is safe, as long as they are used while manager exists.
-    std::vector<HealthObserver*> getHealthObservers();
+    std::vector<HealthObserver*> getHealthObservers() const;
 
     // Gets the aggregate configuration for all process health environment.
     FaultManagerConfig getConfig() const;
@@ -117,7 +124,8 @@ public:
 
 protected:
     // Returns all health observers not configured as Off
-    std::vector<HealthObserver*> getActiveHealthObservers();
+    std::vector<HealthObserver*> getActiveHealthObservers() const;
+    HealthObserver* getHealthObserver(FaultFacetType type) const;
 
     // Runs a particular health observer.  Then attempts to transition states. Then schedules next
     // run.
@@ -164,6 +172,7 @@ private:
     mutable Mutex _stateMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
 
+    bool _initialized = false;
     Date_t _lastTransitionTime;
 
     // Responsible for transitioning the state of FaultManager to ActiveFault after a

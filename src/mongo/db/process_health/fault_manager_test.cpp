@@ -50,9 +50,9 @@ TEST(FaultManagerTest, Registration) {
 TEST_F(FaultManagerTest, GetHealthObserverIntensity) {
     auto config = manager().getConfig();
     ASSERT(config.getHealthObserverIntensity(FaultFacetType::kLdap) ==
-           HealthObserverIntensityEnum::kNonCritical);
+           HealthObserverIntensityEnum::kOff);
     ASSERT(config.getHealthObserverIntensity(FaultFacetType::kDns) ==
-           HealthObserverIntensityEnum::kNonCritical);
+           HealthObserverIntensityEnum::kOff);
 }
 
 }  // namespace
