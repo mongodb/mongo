@@ -57,5 +57,19 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state) {
     return os << sb.stringData();
 }
 
+// TODO(SERVER-62125): remove this conversion and use idl type everywhere
+FaultFacetType toFaultFacetType(HealthObserverTypeEnum type) {
+    switch (type) {
+        case HealthObserverTypeEnum::kLdap:
+            return FaultFacetType::kLdap;
+        case HealthObserverTypeEnum::kDns:
+            return FaultFacetType::kDns;
+        case HealthObserverTypeEnum::kTest:
+            return FaultFacetType::kTestObserver;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace process_health
 }  // namespace mongo

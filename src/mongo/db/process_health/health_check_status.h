@@ -60,6 +60,9 @@ public:
     explicit HealthCheckStatus(FaultFacetType type)
         : _type(type), _severity(0), _description("resolved"_sd) {}
 
+    explicit HealthCheckStatus(HealthObserverTypeEnum type)
+        : _type(toFaultFacetType(type)), _severity(0), _description("resolved"_sd) {}
+
     HealthCheckStatus(const HealthCheckStatus&) = default;
     HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
     HealthCheckStatus(HealthCheckStatus&&) = default;
@@ -113,6 +116,7 @@ public:
 private:
     friend std::ostream& operator<<(std::ostream&, const HealthCheckStatus&);
     friend StringBuilder& operator<<(StringBuilder& s, const HealthCheckStatus& hcs);
+
 
     FaultFacetType _type;
     double _severity;

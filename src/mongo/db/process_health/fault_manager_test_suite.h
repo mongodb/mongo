@@ -242,7 +242,7 @@ public:
         tickSource().advance(d);
     }
 
-    static inline const Seconds kWaitTimeout{30};
+    static inline const Seconds kWaitTimeout{10};
     static inline const Milliseconds kSleepTime{1};
 
     static inline const int kActiveFaultDurationSecs = 1;
@@ -254,7 +254,7 @@ public:
                 return;
             sleepFor(kSleepTime);
         }
-        invariant(false);
+        ASSERT(false);
     }
 
     static inline const Milliseconds kCheckTimeIncrement{100};

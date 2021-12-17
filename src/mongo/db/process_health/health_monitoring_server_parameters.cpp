@@ -26,23 +26,66 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include <algorithm>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/process_health/fault_manager.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/process_health/health_observer.h"
 
 
 namespace mongo {
 
+namespace {
+// Replaces values in oldIntensities with values in newIntensities while preserving all values in
+// oldIntensities not in newIntensities.
+HealthObserverIntensities mergeIntensities(const HealthObserverIntensities& oldIntensities,
+                                           const HealthObserverIntensities& newIntensities) {
+    using namespace std;
+    HealthObserverIntensities result = oldIntensities;
+    auto optionalOldValues = result.getValues();
+    auto optionalNewValues = newIntensities.getValues();
+    if (!optionalNewValues) {
+        return oldIntensities;
+    }
+    if (!optionalOldValues) {
+        result.setValues(*optionalNewValues);
+        return result;
+    }
+    for (const auto& setting : *optionalNewValues) {
+        auto it = find_if(begin(*optionalOldValues),
+                          end(*optionalOldValues),
+                          [&setting](const HealthObserverIntensitySetting& destSetting) {
+                              return (destSetting.getType() == setting.getType()) ? true : false;
+                          });
+        if (it != optionalOldValues->end()) {
+            *it = setting;
+        } else {
+            optionalOldValues->emplace_back(setting);
+        }
+    }
+    result.setValues(*optionalOldValues);
+    return result;
+}
+}  // namespace
+
 Status HealthMonitoringIntensitiesServerParameter::setFromString(const std::string& value) {
-    *_data = HealthObserverIntensities::parse(
+    auto oldValue = **_data;
+    auto newValue = HealthObserverIntensities::parse(
         IDLParserErrorContext("health monitoring intensities"), fromjson(value));
+    newValue = mergeIntensities(oldValue, newValue);
+    process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
+    **_data = newValue;
     return Status::OK();
 }
 
 Status HealthMonitoringIntensitiesServerParameter::set(const BSONElement& newValueElement) {
-    *_data = HealthObserverIntensities::parse(
+    auto oldValue = **_data;
+    auto newValue = HealthObserverIntensities::parse(
         IDLParserErrorContext("health monitoring intensities"), newValueElement.Obj());
+    newValue = mergeIntensities(oldValue, newValue);
+    process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
+    **_data = newValue;
     return Status::OK();
 }
 
