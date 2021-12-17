@@ -838,6 +838,14 @@ tasks:
         vars:
           test_control: "initialsync"
 
+  - name: initialsync-fcbis
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync"
+          mongodb_setup: "replica-2node-fcbis"
+
   - name: initialsync-logkeeper-short
     priority: 5
     commands:
@@ -848,14 +856,34 @@ tasks:
           # Logkeeper dataset with FCV set to 5.0
           mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.0.tgz"
 
-  - name: initialsync-logkeeper
+  - name: initialsync-logkeeper-short-fcbis
     priority: 5
-    exec_timeout_secs: 216000 # 2.5 days
     commands:
       - func: f_run_dsi_workload
-        timeout_secs: 216000 # 2.5 days
         vars:
           test_control: "initialsync-logkeeper"
+          mongodb_setup: "initialsync-logkeeper-short-fcbis"
+          # Logkeeper dataset with FCV set to 5.0
+          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-5.0.tgz"
+
+  - name: initialsync-logkeeper
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        timeout_secs: 43200 # 12 hours
+        vars:
+          test_control: "initialsync-logkeeper"
+
+  - name: initialsync-logkeeper-fcbis
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        timeout_secs: 43200 # 12 hours
+        vars:
+          test_control: "initialsync-logkeeper"
+          mongodb_setup: "initialsync-logkeeper-fcbis"
 
   # The following two initial sync logkeeper automation tasks are only used in the commented-out
   # "Linux ReplSet Initial Sync LogKeeper Snapshot Update" variant below and are only intended to be
@@ -884,6 +912,14 @@ tasks:
       - func: f_run_dsi_workload
         vars:
           test_control: "initialsync-large"
+
+  - name: initialsync-large-fcbis
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-large"
+          mongodb_setup: "replica-2node-fcbis"
 
   - name: change_streams_throughput
     priority: 5
@@ -1674,8 +1710,11 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: initialsync
+      - name: initialsync-fcbis
       - name: initialsync-logkeeper-short
+      - name: initialsync-logkeeper-short-fcbis
       - name: initialsync-large
+      - name: initialsync-large-fcbis
 
   - name: linux-replSet-initialsync-logkeeper
     display_name: Linux ReplSet Initial Sync LogKeeper
@@ -1697,6 +1736,7 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: initialsync-logkeeper
+      - name: initialsync-logkeeper-fcbis
 
   # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
   # patch builds.
