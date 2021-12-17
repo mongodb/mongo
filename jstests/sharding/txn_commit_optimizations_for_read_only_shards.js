@@ -25,6 +25,10 @@ function waitForLog(logLine, times) {
     }, 'Failed to find "' + logLine + '" logged ' + times + ' times');
 }
 
+function getLSID() {
+    return {id: UUID()};
+}
+
 const addTxnFields = function(command, lsid, txnNumber, startTransaction) {
     let txnFields = {
         lsid: lsid,
@@ -102,7 +106,6 @@ assert.commandWorked(st.s.getDB(dbName).runCommand({
     documents: [{_id: -1 * MAX_TRANSACTIONS}, {_id: 0}, {_id: MAX_TRANSACTIONS}]
 }));
 
-let lsid = {id: UUID()};
 let txnNumber = 1;
 
 const readShard0 = txnNumber => {
@@ -341,6 +344,7 @@ const failureModes = {
 
 for (const failureModeName in failureModes) {
     for (const type in transactionTypes) {
+        const lsid = getLSID();
         txnNumber++;
         assert.lt(txnNumber,
                   MAX_TRANSACTIONS,
