@@ -14,8 +14,6 @@ selector:
   # $unionWith explain output does not check whether the collection is sharded in a sharded
   # cluster.
   - jstests/aggregation/sources/unionWith/unionWith_explain.js
-  # TODO SERVER-58405: Potentially remove graphLookup/error.js from the exclude list.
-  - jstests/aggregation/sources/graphLookup/error.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - requires_profiling
@@ -36,6 +34,8 @@ executor:
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
   fixture:
     class: ShardedClusterFixture
     mongos_options:
