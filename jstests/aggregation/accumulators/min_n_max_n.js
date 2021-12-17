@@ -88,6 +88,34 @@ function runAndCompareMinMaxN(nFunction, n, expectedResults) {
             ])
             .toArray();
     assert.eq(expectedResults, actualResults);
+
+    // Basic correctness test for $minN/$maxN used in $bucketAuto. Though $bucketAuto uses
+    // accumulators in the same way that $group does, the test below verifies that everything
+    // works properly with serialization and reporting results. Note that the $project allows us
+    // to compare the $bucketAuto results to the expected $group results (because there are more
+    // buckets than groups, it will always be the case that the min value of each bucket
+    // corresponds to the group key).
+    let actualBucketAutoResults =
+        coll.aggregate([
+                {
+                    $bucketAuto: {
+                        groupBy: '$state',
+                        buckets: 10 * 1000,
+                        output: {sales: {[nFunction]: {input: '$sales', n: n}}}
+                    }
+                },
+                {$project: {_id: "$_id.min", sales: 1}},
+                {$sort: {_id: 1}},
+            ])
+            .toArray();
+
+    // Using a computed projection will put the fields out of order. As such, we re-order them
+    // below.
+    for (let i = 0; i < actualBucketAutoResults.length; ++i) {
+        const currentDoc = actualBucketAutoResults[i];
+        actualBucketAutoResults[i] = {_id: currentDoc._id, sales: currentDoc.sales};
+    }
+    assert.eq(expectedResults, actualBucketAutoResults);
 }
 
 // Test for regular N.

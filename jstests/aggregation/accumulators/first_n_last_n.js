@@ -58,18 +58,74 @@ function runFirstLastN(n, expectedFirstNResults, expectedLastNResults) {
             ])
             .toArray();
 
+    // As these are unordered operators, we need to ensure we can deterministically test the values
+    // returned by firstN/lastN. As the output is not guaranteed to be in order, arrayEq is used
+    // instead.
+    assert(arrayEq(expectedFirstNResults, actualFirstNResults),
+           () => "expected " + tojson(expectedFirstNResults) + " actual " +
+               tojson(actualFirstNResults));
+
     const actualLastNResults =
         coll.aggregate([
                 {$sort: {_id: 1}},
                 {$group: {_id: '$state', sales: {$lastN: {input: "$sales", n: n}}}},
             ])
             .toArray();
+    assert(
+        arrayEq(expectedLastNResults, actualLastNResults),
+        () => "expected " + tojson(expectedLastNResults) + " actual " + tojson(actualLastNResults));
 
-    // As these are unordered operators, we need to ensure we can deterministically test the values
-    // returned by firstN/lastN. As the output is not guaranteed to be in order, arrayEq is used
-    // instead.
-    arrayEq(expectedFirstNResults, actualFirstNResults);
-    arrayEq(expectedLastNResults, actualLastNResults);
+    function reorderBucketResults(bucketResults) {
+        // Using a computed projection will put the fields out of order. As such, we re-order them
+        // below.
+        for (let i = 0; i < bucketResults.length; ++i) {
+            const currentDoc = bucketResults[i];
+            bucketResults[i] = {_id: currentDoc._id, sales: currentDoc.sales};
+        }
+    }
+
+    // Basic correctness test for $firstN/$lastN used in $bucketAuto. Though $bucketAuto uses
+    // accumulators in the same way that $group does, the test below verifies that everything
+    // works properly with serialization and reporting results. Note that the $project allows us
+    // to compare the $bucketAuto results to the expected $group results (because there are more
+    // buckets than groups, it will always be the case that the min value of each bucket
+    // corresponds to the group key).
+    let actualFirstNBucketAutoResults =
+        coll.aggregate([
+                {$sort: {state: 1, sales: 1}},
+                {
+                    $bucketAuto: {
+                        groupBy: '$state',
+                        buckets: 10 * 1000,
+                        output: {sales: {$firstN: {input: "$sales", n: n}}}
+                    }
+                },
+                {$project: {_id: "$_id.min", sales: 1}}
+            ])
+            .toArray();
+
+    reorderBucketResults(actualFirstNBucketAutoResults);
+    assert(arrayEq(expectedFirstNResults, actualFirstNBucketAutoResults),
+           () => "expected " + tojson(expectedFirstNResults) + " actual " +
+               tojson(actualFirstNBucketAutoResults));
+
+    let actualLastNBucketAutoResults =
+        coll.aggregate([
+                {$sort: {state: 1, sales: 1}},
+                {
+                    $bucketAuto: {
+                        groupBy: '$state',
+                        buckets: 10 * 1000,
+                        output: {sales: {$lastN: {input: "$sales", n: n}}}
+                    }
+                },
+                {$project: {_id: "$_id.min", sales: 1}}
+            ])
+            .toArray();
+    reorderBucketResults(actualLastNBucketAutoResults);
+    assert(arrayEq(expectedLastNResults, actualLastNBucketAutoResults),
+           () => "expected " + tojson(expectedLastNResults) + " actual " +
+               tojson(actualLastNBucketAutoResults));
 
     // Verify that an index on {_id: 1, sales: -1} will produce the expected results.
     const idxSpec = {_id: 1, sales: -1};
