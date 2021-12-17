@@ -293,8 +293,8 @@ wt_connect(const char *config_open)
           config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
     else {
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_prefix="
-          "\"%s\"%s%s%s%s",
+          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=(enabled),"
+          "error_prefix=\"%s\"%s%s%s%s",
           progname, g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
           config_open == NULL ? "" : config_open, timing_stress ? timing_stress_cofing : ""));
     }

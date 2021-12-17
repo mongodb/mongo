@@ -29,7 +29,7 @@
 import fnmatch, os, shutil, threading, time
 from wtthread import checkpoint_thread, op_thread
 from helper import simulate_crash_restart
-import wttest
+import wiredtiger, wttest
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
@@ -43,17 +43,41 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
     # Create a table.
     uri = "table:test_checkpoint_snapshot02"
     nrows = 1000
+    backup_dir = "BACKUP"
+    backup_dir2 = "BACKUP2"
 
     key_format_values = [
         ('column', dict(key_format='r')),
         ('integer_row', dict(key_format='i')),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    restart_values = [
+        ("crash_restart", dict(restart=True)),
+        ("backup", dict(restart=False)),
+    ]
+
+    scenarios = make_scenarios(key_format_values, restart_values)
 
     def conn_config(self):
         config = 'cache_size=10MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[checkpoint_slow]'
         return config
+
+    def take_full_backup(self, fromdir, todir):
+        # Open up the backup cursor, and copy the files.  Do a full backup.
+        cursor = self.session.open_cursor('backup:', None, None)
+        self.pr('Full backup from '+ fromdir + ' to ' + todir + ': ')
+        os.mkdir(todir)
+        while True:
+            ret = cursor.next()
+            if ret != 0:
+                break
+            bkup_file = cursor.get_key()
+            copy_file = os.path.join(fromdir, bkup_file)
+            sz = os.path.getsize(copy_file)
+            self.pr('Copy from: ' + bkup_file + ' (' + str(sz) + ') to ' + todir)
+            shutil.copy(copy_file, todir)
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        cursor.close()
 
     def large_updates(self, uri, value, ds, nrows, commit_ts):
         # Update a large number of records.
@@ -81,6 +105,15 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             count += 1
         session.commit_transaction()
         self.assertEqual(count, nrows)
+
+    def perform_backup_or_crash_restart(self, fromdir, todir):
+        if self.restart == True:
+            #Simulate a crash by copying to a new directory(RESTART).
+            simulate_crash_restart(self, fromdir, todir)
+        else:
+            #Take a backup and restore it.
+            self.take_full_backup(fromdir, todir)
+            self.reopen_conn(todir)
 
     def test_checkpoint_snapshot(self):
 
@@ -113,8 +146,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             done.set()
             ckpt.join()
 
-        #Simulate a crash by copying to a new directory(RESTART).
-        simulate_crash_restart(self, ".", "RESTART")
+        self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
         self.check(valuea, self.uri, self.nrows, 0)
@@ -166,8 +198,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             done.set()
             ckpt.join()
 
-        #Simulate a crash by copying to a new directory(RESTART).
-        simulate_crash_restart(self, ".", "RESTART")
+        self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
         self.check(valuea, self.uri, self.nrows, 30)
@@ -224,8 +255,8 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
             ckpt.join()
 
         session1.rollback_transaction()
-        #Simulate a crash by copying to a new directory(RESTART).
-        simulate_crash_restart(self, ".", "RESTART")
+
+        self.perform_backup_or_crash_restart(".", self.backup_dir)
 
         # Check the table contains the last checkpointed value.
         self.check(valuea, self.uri, self.nrows, 30)
@@ -238,7 +269,8 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.assertGreater(inconsistent_ckpt, 0)
         self.assertGreaterEqual(keys_removed, 0)
 
-        simulate_crash_restart(self, "RESTART", "RESTART2")
+        self.perform_backup_or_crash_restart(self.backup_dir, self.backup_dir2)
+
         # Check the table contains the last checkpointed value.
         self.check(valuea, self.uri, self.nrows, 30)
 

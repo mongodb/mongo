@@ -2437,6 +2437,10 @@ __conn_version_verify(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
+    conn->recovery_major = 0;
+    conn->recovery_minor = 0;
+    conn->recovery_patch = 0;
+
     /* Always set the compatibility versions. */
     __wt_logmgr_compat_version(session);
     /*
@@ -2445,7 +2449,12 @@ __conn_version_verify(WT_SESSION_IMPL *session)
     if (F_ISSET(conn, WT_CONN_SALVAGE))
         return (0);
 
-    /* If we have a turtle file, validate versions. */
+    /*
+     * Initialize the version variables. These aren't always populated since there are expected
+     * cases where the turtle files doesn't exist (restoring from a backup, for example). All code
+     * that deals with recovery versions must consider the case where they are default initialized
+     * to zero.
+     */
     WT_RET(__wt_fs_exist(session, WT_METADATA_TURTLE, &exist));
     if (exist)
         WT_RET(__wt_turtle_validate_version(session));
