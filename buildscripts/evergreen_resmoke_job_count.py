@@ -31,7 +31,10 @@ SYS_PLATFORM = sys.platform
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
     "enterprise-rhel-80-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
-    "enterprise-rhel-80-64-bit-inmem": [{"task": "secondary_reads_passthrough", "factor": 0.3}]
+    "enterprise-rhel-80-64-bit-inmem": [
+        {"task": "secondary_reads_passthrough", "factor": 0.3},
+        {"task": "multi_stmt_txn_jscore_passthrough_with_migration", "factor": 0.3},
+    ]
 }
 
 TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]
