@@ -285,9 +285,11 @@ class Mapper:
 
         if not os.path.exists(lib_folder_path):
             # sometimes we don't get lib folder, which means there is no shared libraries for current build variant.
+            self.logger.info("'lib' folder does not exist.")
             sofiles = []
         else:
-            _, _, sofiles = os.walk(lib_folder_path)
+            sofiles = os.listdir(lib_folder_path)
+            self.logger.info("'lib' folder: %s", sofiles)
 
         for sofile in sofiles:
             sofile_path = os.path.join(lib_folder_path, sofile)
