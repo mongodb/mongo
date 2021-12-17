@@ -1080,15 +1080,8 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
         _acc->startNewGroup(Value(n.value_or(1)));
     }
 
-    void add(int sortKey, int output) {
-        auto v =
-            Value(BSON(AccumulatorN::kFieldNameOutput
-                       << output << AccumulatorN::kFieldNameSortFields << BSON_ARRAY(sortKey)));
-        _acc->process(v, false);
-        _q.push(v);
-    }
-
-    void add(const char* sortKey, int output) {
+    template <typename SortKeyType>
+    void add(SortKeyType sortKey, int output) {
         auto v =
             Value(BSON(AccumulatorN::kFieldNameOutput
                        << output << AccumulatorN::kFieldNameSortFields << BSON_ARRAY(sortKey)));
@@ -1111,6 +1104,23 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
 
     void assertNull() {
         ASSERT_VALUE_EQ(Value(BSONNULL), _acc->getValue(false));
+    }
+
+    // Assumes init() already called.
+    void testNoRemoveUnderflow() {
+        auto usageBefore = _acc->getMemUsage();
+        auto sortKey =
+            BSON("a" << BSONNULL << "b" << BSONNULL << "c" << BSONNULL << "d" << BSONNULL);
+        add(sortKey, 0);
+        add(sortKey, 0);
+        add(sortKey, 0);
+        add(sortKey, 0);
+        remove();
+        remove();
+        remove();
+        remove();
+        auto usageAfter = _acc->getMemUsage();
+        ASSERT_EQ(usageBefore, usageAfter);
     }
 
     intrusive_ptr<T> _acc = nullptr;
@@ -1220,6 +1230,12 @@ TEST_F(TopNRemoveTest, TopNRemoveCollator) {
     assertExpected({Value(3), Value(4)});
     remove();
     assertExpected({Value(4)});
+}
+
+TEST_F(TopNRemoveTest, TopNRemoveNoUnderflow) {
+    // Test accumulator {$topN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << 1));
+    testNoRemoveUnderflow();
 }
 
 using BottomNRemoveTest =
@@ -1345,6 +1361,12 @@ TEST_F(BottomNRemoveTest, BottomNRemoveCollator) {
     assertExpected({Value(4)});
 }
 
+TEST_F(BottomNRemoveTest, BottomNRemoveNoUnderflow) {
+    // Test accumulator {$bottomN: {n: 3, output: "$output", sortBy: {sortKey: 1}}}
+    init(3, BSON("sortKey" << -1));
+    testNoRemoveUnderflow();
+}
+
 using TopRemoveTest = TopBottomNRemoveTest<AccumulatorTopBottomN<TopBottomSense::kTop, true>>;
 TEST_F(TopRemoveTest, TopRemove) {
     // Test accumulator {$top: {output: "$output", sortBy: {sortKey: 1}}}
@@ -1393,7 +1415,7 @@ TEST_F(TopRemoveTest, TopRemove) {
 
 TEST_F(TopRemoveTest, TopAddRemove) {
     // Test accumulator {$top: {output: "$output", sortBy: {sortKey: 1}}}
-    init(3, BSON("sortKey" << 1));
+    init(boost::none, BSON("sortKey" << 1));
 
     assertNull();
     add(1, 1);
@@ -1402,6 +1424,12 @@ TEST_F(TopRemoveTest, TopAddRemove) {
     add(1, 3);
     remove();
     assertExpectedSingle(2);
+}
+
+TEST_F(TopRemoveTest, TopRemoveNoUnderflow) {
+    // Test accumulator {$top: {output: "$output", sortBy: {sortKey: 1}}}
+    init(boost::none, BSON("sortKey" << 1));
+    testNoRemoveUnderflow();
 }
 
 using BottomRemoveTest = TopBottomNRemoveTest<AccumulatorTopBottomN<TopBottomSense::kBottom, true>>;
@@ -1461,6 +1489,12 @@ TEST_F(BottomRemoveTest, BottomAddRemove) {
     add(1, 3);
     remove();
     assertExpectedSingle(3);
+}
+
+TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
+    // Test accumulator {$bottom: {output: "$output", sortBy: {sortKey: 1}}}
+    init(boost::none, BSON("sortKey" << 1));
+    testNoRemoveUnderflow();
 }
 
 TEST(Accumulators, Rank) {
