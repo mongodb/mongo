@@ -118,6 +118,28 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
             }
         });
         validateHint(coll, {
+            expectedNReturned: 0,
+            cmd: {
+                find: collName,
+                hint: clusterKey,
+                min: {[clusterKeyFieldName]: 101},
+                max: {[clusterKeyFieldName]: MaxKey}
+            },
+            expectedWinningPlanStats:
+                {stage: "COLLSCAN", direction: "forward", minRecord: 101, maxRecord: MaxKey}
+        });
+        validateHint(coll, {
+            expectedNReturned: 0,
+            cmd: {
+                find: collName,
+                hint: clusterKey,
+                min: {[clusterKeyFieldName]: MinKey},
+                max: {[clusterKeyFieldName]: -2}
+            },
+            expectedWinningPlanStats:
+                {stage: "COLLSCAN", direction: "forward", minRecord: MinKey, maxRecord: -2}
+        });
+        validateHint(coll, {
             expectedNReturned: 1,
             cmd: {
                 find: collName,

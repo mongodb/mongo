@@ -405,6 +405,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
         // via minRecord and maxRecord if applicable.
         handleRIDRangeScan(csn->filter.get(), csn.get(), params);
+        handleRIDRangeMinMax(query, csn.get());
     }
 
     return csn;
