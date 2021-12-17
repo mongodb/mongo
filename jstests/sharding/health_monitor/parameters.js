@@ -8,10 +8,6 @@
 let CUSTOM_INTERVAL = 1337;
 let CUSTOM_DEADLINE = 5;
 
-// TODO(SERVER-59368):re-enable
-if (CUSTOM_INTERVAL > 0)
-    return;
-
 var st = new ShardingTest({
     mongos: [
         {
