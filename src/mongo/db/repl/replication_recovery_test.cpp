@@ -228,9 +228,9 @@ private:
     }
 
     ServiceContext::UniqueOperationContext _opCtx;
-    StorageInterfaceRecovery* _storageInterface;
+    StorageInterfaceRecovery* _storageInterface = nullptr;
     std::unique_ptr<ReplicationConsistencyMarkersMock> _consistencyMarkers;
-    bool _stashedEnableMajorityReadConcern;
+    bool _stashedEnableMajorityReadConcern = false;
 };
 
 /**
