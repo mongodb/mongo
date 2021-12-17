@@ -156,7 +156,7 @@ env.Library(
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_balancer_collection_status_cmd.cpp',
         'cluster_clear_jumbo_flag_cmd.cpp',
-        'cluster_configure_collection_auto_split.cpp',
+        'cluster_configure_collection_balancing.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_list_shards_cmd.cpp',
         'cluster_merge_chunks_cmd.cpp',

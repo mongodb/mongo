@@ -59,7 +59,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
-#include "mongo/s/request_types/configure_collection_auto_split_gen.h"
+#include "mongo/s/request_types/configure_collection_balancing_gen.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"

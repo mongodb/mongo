@@ -549,10 +549,10 @@ void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
 }
 
 
-void ShardingCatalogManager::configureCollectionAutoSplit(
+void ShardingCatalogManager::configureCollectionBalancing(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    boost::optional<int64_t> maxChunkSizeBytes,
+    boost::optional<int64_t> chunkSizeBytes,
     boost::optional<bool> balancerShouldMergeChunks,
     boost::optional<bool> enableAutoSplitter) {
 
@@ -566,22 +566,22 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
 
     uassert(ErrorCodes::InvalidOptions,
             "invalid collection auto splitter config update",
-            maxChunkSizeBytes || balancerShouldMergeChunks || enableAutoSplitter);
+            chunkSizeBytes || balancerShouldMergeChunks || enableAutoSplitter);
 
     short updatedFields = 0;
     bool doMerge, doSplit = false;
     BSONObjBuilder updateCmd;
     {
         BSONObjBuilder setBuilder(updateCmd.subobjStart("$set"));
-        if (maxChunkSizeBytes && *maxChunkSizeBytes != 0) {
+        if (chunkSizeBytes && *chunkSizeBytes != 0) {
             // verify we got a positive integer in range [1MB, 1GB]
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Chunk size '" << *maxChunkSizeBytes
+                    str::stream() << "Chunk size '" << *chunkSizeBytes
                                   << "' out of range [1MB, 1GB]",
-                    *maxChunkSizeBytes > 0 &&
-                        ChunkSizeSettingsType::checkMaxChunkSizeValid(*maxChunkSizeBytes));
+                    *chunkSizeBytes > 0 &&
+                        ChunkSizeSettingsType::checkMaxChunkSizeValid(*chunkSizeBytes));
 
-            setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, *maxChunkSizeBytes);
+            setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, *chunkSizeBytes);
             updatedFields++;
         }
         if (balancerShouldMergeChunks) {
@@ -595,7 +595,7 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
             updatedFields++;
         }
     }
-    if (maxChunkSizeBytes && *maxChunkSizeBytes == 0) {
+    if (chunkSizeBytes && *chunkSizeBytes == 0) {
         BSONObjBuilder unsetBuilder(updateCmd.subobjStart("$unset"));
         unsetBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, 0);
         updatedFields++;

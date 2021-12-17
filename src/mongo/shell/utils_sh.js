@@ -94,9 +94,8 @@ sh.help = function() {
     print(
         "\tsh.balancerCollectionStatus(fullName)       " +
         "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
-    print(
-        "\tsh.configureCollectionAutoSplitter(fullName, params)       " +
-        "configure both the default chunk size and the auto-splitting behaviour for a collection");
+    print("\tsh.configureCollectionBalancing(fullName, params)       " +
+          "configure balancing settings for a specific collection");
 };
 
 sh.status = function(verbose, configDB) {
@@ -556,8 +555,8 @@ sh.balancerCollectionStatus = function(coll) {
     return sh._adminCommand({balancerCollectionStatus: coll}, true);
 };
 
-sh.configureCollectionAutoSplitter = function(coll) {
-    let cmd = {configureCollectionAutoSplitter: coll};
+sh.configureCollectionBalancing = function(coll) {
+    let cmd = {configureCollectionBalancing: coll};
     if (opts) {
         cmd = Object.assign(cmd, opts);
     }

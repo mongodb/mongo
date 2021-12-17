@@ -93,7 +93,10 @@ let testCases = {
     _configsvrCommitChunkSplit: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: "internal command"},
-    _configsvrConfigureAutoSplit: {skip: "internal command"},
+    _configsvrConfigureAutoSplit: {
+        skip: "internal command"
+    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
+    _configsvrConfigureCollectionBalancing: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrDropCollection:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
@@ -266,7 +269,10 @@ let testCases = {
         useLogs: true,
     },
     compact: {skip: "does not accept read or write concern"},
-    configureCollectionAutoSplitter: {skip: "does not accept read or write concern"},
+    configureCollectionAutoSplitter: {
+        skip: "does not accept read or write concern"
+    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
+    configureCollectionBalancing: {skip: "does not accept read or write concern"},
     configureFailPoint: {skip: "does not accept read or write concern"},
     connPoolStats: {skip: "does not accept read or write concern"},
     connPoolSync: {skip: "internal command"},

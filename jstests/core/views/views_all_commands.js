@@ -90,7 +90,10 @@ let viewsCommandTests = {
     _configsvrCommitMovePrimary:
         {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
-    _configsvrConfigureAutoSplit: {skip: isAnInternalCommand},
+    _configsvrConfigureAutoSplit: {
+        skip: isAnInternalCommand
+    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
+    _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrDropCollection:
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
@@ -220,7 +223,10 @@ let viewsCommandTests = {
     commitTransaction: {skip: isUnrelated},
     compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
     configureFailPoint: {skip: isUnrelated},
-    configureCollectionAutoSplitter: {skip: isUnrelated},
+    configureCollectionAutoSplitter: {
+        skip: isUnrelated
+    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
+    configureCollectionBalancing: {skip: isUnrelated},
     connPoolStats: {skip: isUnrelated},
     connPoolSync: {skip: isUnrelated},
     connectionStatus: {skip: isUnrelated},

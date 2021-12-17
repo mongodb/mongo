@@ -1,9 +1,9 @@
 /**
- * Test the setCollectionAutosplitter command and balancerCollectionStatus command
+ * Test the configureCollectionBalancing command and balancerCollectionStatus command
  *
  * @tags: [
- *  requires_fcv_51,
- *  featureFlagPerCollectionAutoSplitter,
+ *  requires_fcv_53,
+ *  featureFlagPerCollBalancingSettings,
  * ]
  */
 
@@ -43,7 +43,7 @@ st.forEachConfigServer((conn) => {
     });
 });
 
-const defaultChunkSize = 2;
+const chunkSize = 2;
 const bigString = "X".repeat(32 * 1024);  // 32 KB
 
 function waitForBalanced(ns) {
@@ -64,9 +64,9 @@ function setupCollection() {
 
     // "startBalancer" only guarantee that all the shards will EVENTUALLY enable the autosplitter.
     // In order to ensure that all the shards have ALREADY enabled the autosplitter, we use the
-    // configureCollectionAutoSplitter command instead.
+    // configureCollectionBalancing command instead.
     assert.commandWorked(
-        st.s.adminCommand({configureCollectionAutoSplitter: fullNs, enableAutoSplitter: true}));
+        st.s.adminCommand({configureCollectionBalancing: fullNs, enableAutoSplitter: true}));
 
     for (let i = 0; i < 250; i++) {
         assert.commandWorked(coll.insert({key: Random.randInt(1000) - 500, str: bigString}));
@@ -110,19 +110,19 @@ jsTest.log("Begin and end defragmentation with balancer off.");
 {
     st.stopBalancer();
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll1,
+        configureCollectionBalancing: coll1,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
     assert.eq(beforeStatus.balancerCompliant, false);
     assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll1,
+        configureCollectionBalancing: coll1,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: false,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
     assert.eq(afterStatus.balancerCompliant, true);
@@ -134,20 +134,20 @@ jsTest.log("Begin and end defragmentation with balancer on");
     // Allow the first phase transition to build the initial defragmentation state
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll1,
+        configureCollectionBalancing: coll1,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     st.awaitBalancerRound();
     let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
     assert.eq(beforeStatus.balancerCompliant, false);
     assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll1,
+        configureCollectionBalancing: coll1,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: false,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", "off");
     st.awaitBalancerRound();
@@ -162,10 +162,10 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     // Allow the first phase transition to build the initial defragmentation state
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll2,
+        configureCollectionBalancing: coll2,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     st.startBalancer();
     st.awaitBalancerRound();
@@ -173,10 +173,10 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     assert.eq(beforeStatus.balancerCompliant, false);
     assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll2,
+        configureCollectionBalancing: coll2,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: false,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", "off");
     st.awaitBalancerRound();
@@ -193,10 +193,10 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     // Pause after phase 1 completes to check merging succeeded
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll3,
+        configureCollectionBalancing: coll3,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     st.startBalancer();
     // Wait for phase 1 to complete
@@ -231,10 +231,10 @@ jsTest.log("Changed uuid causes defragmentation to restart");
     // Pause defragmentation after initialization but before phase 1 runs
     setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", "alwaysOn");
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll4,
+        configureCollectionBalancing: coll4,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     st.startBalancer();
     // Reshard collection
@@ -270,10 +270,10 @@ jsTest.log("Refined shard key causes defragmentation to restart");
     // Pause defragmentation after initialization but before phase 1 runs
     setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", "alwaysOn");
     assert.commandWorked(st.s.adminCommand({
-        configureCollectionAutoSplitter: coll5,
+        configureCollectionBalancing: coll5,
         enableAutoSplitter: false,
         balancerShouldMergeChunks: true,
-        defaultChunkSize: defaultChunkSize,
+        chunkSize: chunkSize,
     }));
     st.startBalancer();
     // Refine shard key - shouldn't change uuid

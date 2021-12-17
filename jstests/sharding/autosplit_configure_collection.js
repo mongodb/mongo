@@ -3,8 +3,8 @@
  * due to data insertion.
  *
  * @tags: [
- *  requires_fcv_51,
- *  featureFlagPerCollectionAutoSplitter,
+ *  requires_fcv_53,
+ *  featureFlagPerCollBalancingSettings,
  * ]
  */
 (function() {
@@ -52,10 +52,10 @@ function insertDocsAndWaitForSplit(numDocs) {
 
 let configDB = db.getSiblingDB('config');
 
-jsTest.log("Testing enableAutoSplitter == false, defaultChunkSize=unset ...");
+jsTest.log("Testing enableAutoSplitter == false, chunkSize=unset ...");
 {
     assert.commandWorked(
-        st.s0.adminCommand({configureCollectionAutoSplitter: fullNS, enableAutoSplitter: false}));
+        st.s0.adminCommand({configureCollectionBalancing: fullNS, enableAutoSplitter: false}));
 
     let configColl = configDB.collections.findOne({_id: fullNS});
 
@@ -71,10 +71,10 @@ jsTest.log("Testing enableAutoSplitter == false, defaultChunkSize=unset ...");
         findChunksUtil.countChunksForNs(st.config, fullNS), 1, "Number of chunks is more than one");
 }
 
-jsTest.log("Testing enableAutoSplitter == true, defaultChunkSize=unset ...");
+jsTest.log("Testing enableAutoSplitter == true, chunkSize=unset ...");
 {
     assert.commandWorked(
-        st.s0.adminCommand({configureCollectionAutoSplitter: fullNS, enableAutoSplitter: true}));
+        st.s0.adminCommand({configureCollectionBalancing: fullNS, enableAutoSplitter: true}));
 
     let configColl = configDB.collections.findOne({_id: fullNS});
 
@@ -90,10 +90,10 @@ jsTest.log("Testing enableAutoSplitter == true, defaultChunkSize=unset ...");
         findChunksUtil.countChunksForNs(st.config, fullNS), 1, "Number of chunks is more than one");
 }
 
-jsTest.log("Testing enableAutoSplitter == false, defaultChunkSize=1 ...");
+jsTest.log("Testing enableAutoSplitter == false, chunkSize=1 ...");
 {
     assert.commandWorked(st.s0.adminCommand(
-        {configureCollectionAutoSplitter: fullNS, enableAutoSplitter: false, defaultChunkSize: 1}));
+        {configureCollectionBalancing: fullNS, enableAutoSplitter: false, chunkSize: 1}));
 
     let configColl = configDB.collections.findOne({_id: fullNS});
 
@@ -111,10 +111,10 @@ jsTest.log("Testing enableAutoSplitter == false, defaultChunkSize=1 ...");
         findChunksUtil.countChunksForNs(st.config, fullNS), 1, "Number of chunks is more than one");
 }
 
-jsTest.log("Testing enableAutoSplitter == true, defaultChunkSize=10 ...");
+jsTest.log("Testing enableAutoSplitter == true, chunkSize=10 ...");
 {
     assert.commandWorked(st.s0.adminCommand(
-        {configureCollectionAutoSplitter: fullNS, enableAutoSplitter: true, defaultChunkSize: 10}));
+        {configureCollectionBalancing: fullNS, enableAutoSplitter: true, chunkSize: 10}));
 
     let configColl = configDB.collections.findOne({_id: fullNS});
 

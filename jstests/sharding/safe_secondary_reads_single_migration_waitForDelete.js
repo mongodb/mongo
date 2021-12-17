@@ -52,7 +52,10 @@ let testCases = {
     _configsvrCommitChunkSplit: {skip: "primary only"},
     _configsvrCommitMovePrimary:
         {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
-    _configsvrConfigureAutoSplit: {skip: "primary only"},
+    _configureCollectionAutoSplitter: {
+        skip: "primary only"
+    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
+    _configsvrConfigureCollectionBalancing: {skip: "primary only"},
     _configsvrDropCollection:
         {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrDropDatabase:
@@ -124,7 +127,10 @@ let testCases = {
     commitReshardCollection: {skip: "primary only"},
     commitTransaction: {skip: "primary only"},
     compact: {skip: "does not return user data"},
-    configureCollectionAutoSplitter: {skip: "does not return user data"},
+    configureCollectionAutoSplitter: {
+        skip: "does not return user data"
+    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
+    configureCollectionBalancing: {skip: "does not return user data"},
     configureFailPoint: {skip: "does not return user data"},
     connPoolStats: {skip: "does not return user data"},
     connPoolSync: {skip: "does not return user data"},

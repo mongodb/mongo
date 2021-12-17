@@ -43,14 +43,14 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/configure_collection_auto_split_gen.h"
+#include "mongo/s/request_types/configure_collection_balancing_gen.h"
 
 namespace mongo {
 namespace {
 
-class ConfigCollAutoSplitCmd final : public TypedCommand<ConfigCollAutoSplitCmd> {
+class ConfigCollectionBalancingCmd final : public TypedCommand<ConfigCollectionBalancingCmd> {
 public:
-    using Request = ConfigureCollAutoSplit;
+    using Request = ConfigureCollectionBalancing;
 
     class Invocation final : public InvocationBase {
     public:
@@ -62,8 +62,8 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp();
             const NamespaceString& nss = ns();
 
-            ConfigsvrConfigureCollAutoSplit configsvrRequest(nss);
-            configsvrRequest.setConfigureCollAutoSplit(request().getConfigureCollAutoSplit());
+            ConfigsvrConfigureCollectionBalancing configsvrRequest(nss);
+            configsvrRequest.setCollBalancingParams(request().getCollBalancingParams());
             configsvrRequest.setDbName(request().getDbName());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -113,7 +113,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-} configureCollectionAutoSplitCmd;
+} configureCollectionBalancingCmd;
 
 }  // namespace
 }  // namespace mongo

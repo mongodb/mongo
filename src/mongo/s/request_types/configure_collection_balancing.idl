@@ -26,7 +26,7 @@
 # it in the license file.
 #
 
-# _configsvrConfigureCollectionAutoSplitter and configureCollectionAutoSplitter IDL File
+# _configsvrConfigureCollectionBalancing and configureCollectionBalancing IDL File
 
 global:
     cpp_namespace: "mongo"
@@ -35,19 +35,19 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 feature_flags:
-  featureFlagPerCollectionAutoSplitter:
-    description: "Add capability to configure per collection auto-splitter settings."
-    cpp_varname: feature_flags::gShardingPerCollectionAutoSplitter
+  featureFlagPerCollBalancingSettings:
+    description: "Add capability to configure per collection balancing settings."
+    cpp_varname: feature_flags::gPerCollBalancingSettings
     default: false
 
 structs:
-    configure_auto_split_params:
-        description: "Parameters for configureCollectionAutoSplitter command"
+    configure_coll_balancing_params:
+        description: "Parameters for configureCollectionBalancing command"
         fields:
-            defaultChunkSize: 
+            chunkSize:
                 type: safeInt
-                cpp_name: defaultChunkSizeMB
-                description: "New default chunk size in MB, 0 will unset the collection specific chunk size."
+                cpp_name: chunkSizeMB
+                description: "New default chunk size in MiB, 0 will unset the collection specific chunk size."
                 optional: true
             enableAutoSplitter: 
                 type: bool
@@ -59,27 +59,27 @@ structs:
                 optional: true
 
 commands:
-    configureAutoSplit:
-        command_name: configureCollectionAutoSplitter
-        cpp_name: ConfigureCollAutoSplit
-        description: "Public configureCollectionAutoSplitter command on mongos"
+    configureCollectionBalancing:
+        command_name: configureCollectionBalancing
+        cpp_name: ConfigureCollectionBalancing
+        description: "Public configureCollectionBalancing command on mongos"
         strict: false
         namespace: type
         api_version: ""
         reply_type: OkReply
         type: namespacestring
         chained_structs:
-            configure_auto_split_params: 
-                cpp_name: ConfigureCollAutoSplit
+            configure_coll_balancing_params:
+                cpp_name: CollBalancingParams
 
-    _configsvrConfigureAutoSplit:
-        command_name: _configsvrConfigureAutoSplit
-        cpp_name: ConfigsvrConfigureCollAutoSplit
-        description: "Internal configureCollectionAutoSplitter command on the config server"
+    _configsvrConfigureCollectionBalancing:
+        command_name: _configsvrConfigureCollectionBalancing
+        cpp_name: ConfigsvrConfigureCollectionBalancing
+        description: "Internal configureCollectionBalancing command on the config server"
         strict: true
         namespace: type
         api_version: ""
         type: namespacestring
         chained_structs:
-            configure_auto_split_params: 
-                cpp_name: ConfigureCollAutoSplit
+            configure_coll_balancing_params:
+                cpp_name: CollBalancingParams

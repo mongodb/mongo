@@ -44,16 +44,16 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/configure_collection_auto_split_gen.h"
+#include "mongo/s/request_types/configure_collection_balancing_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 namespace {
 
-class ConfigsvrConfigureAutoSplitCommand final
-    : public TypedCommand<ConfigsvrConfigureAutoSplitCommand> {
+class ConfigsvrConfigureCollectionBalancingCmd final
+    : public TypedCommand<ConfigsvrConfigureCollectionBalancingCmd> {
 public:
-    using Request = ConfigsvrConfigureCollAutoSplit;
+    using Request = ConfigsvrConfigureCollectionBalancing;
 
     class Invocation final : public InvocationBase {
     public:
@@ -65,8 +65,8 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
             uassert(8423309,
-                    "_configsvrConfigureAutoSplit command not supported",
-                    mongo::feature_flags::gShardingPerCollectionAutoSplitter.isEnabled(
+                    str::stream() << Request::kCommandName << " command not supported",
+                    mongo::feature_flags::gPerCollBalancingSettings.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
             const NamespaceString& nss = ns();
@@ -75,18 +75,18 @@ public:
                     str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                     nss.isValid());
 
-            const auto maxChunkSizeBytes = [&]() -> boost::optional<int64_t> {
-                if (request().getDefaultChunkSizeMB()) {
-                    return *request().getDefaultChunkSizeMB() * 1024 * 1024;
+            const auto chunkSizeBytes = [&]() -> boost::optional<int64_t> {
+                if (request().getChunkSizeMB()) {
+                    return *request().getChunkSizeMB() * 1024 * 1024;
                 }
                 return boost::none;
             }();
 
             // throws if collection does not exist or parameters are invalid
-            ShardingCatalogManager::get(opCtx)->configureCollectionAutoSplit(
+            ShardingCatalogManager::get(opCtx)->configureCollectionBalancing(
                 opCtx,
                 nss,
-                maxChunkSizeBytes,
+                chunkSizeBytes,
                 request().getBalancerShouldMergeChunks(),
                 request().getEnableAutoSplitter());
         }
@@ -127,7 +127,7 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-} configsvrConfigureAutoSplitCmd;
+} configsvrConfigureCollectionBalancingCmd;
 
 }  // namespace
 }  // namespace mongo

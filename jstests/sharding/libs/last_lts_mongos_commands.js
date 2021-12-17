@@ -5,6 +5,8 @@
 // test defined without always existing on the servers being used.
 const commandsRemovedFromMongosSinceLastLTS = [
     "repairShardedCollectionChunksHistory",
+    "configureCollectionAutoSplitter",  // TODO SERVER-62374: remove this once 5.3 becomes
+                                        // last-continuos
 ];
 // These commands were added in mongos since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongos. We will allow these commands to have a test
@@ -13,7 +15,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "abortReshardCollection",
     "cleanupReshardCollection",
     "commitReshardCollection",
-    "configureCollectionAutoSplitter",
+    "configureCollectionBalancing",
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",
