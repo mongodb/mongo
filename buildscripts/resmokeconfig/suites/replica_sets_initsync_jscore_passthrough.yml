@@ -31,6 +31,8 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
+  # Change stream pre-images are not cloned during initial sync.
+  - jstests/core/write_change_stream_pit_preimage.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
