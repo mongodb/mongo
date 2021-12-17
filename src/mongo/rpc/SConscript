@@ -189,6 +189,7 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/client/clientdriver_minimal',
+            '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/db/multitenancy_params',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum',
