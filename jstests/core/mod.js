@@ -167,4 +167,10 @@ assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$
                              ErrorCodes.BadValue);
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: ["a", "b"]}}}),
                              ErrorCodes.BadValue);
+assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [3, "r"]}}}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [10, null]}}}),
+                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [null, 2]}}}),
+                             ErrorCodes.BadValue);
 }());

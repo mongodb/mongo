@@ -452,7 +452,7 @@ StatusWithMatchExpression parseMOD(StringData name, BSONElement e) {
     if (!i.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, not enough elements")};
     auto r = i.next();
-    if (!d.isNumber())
+    if (!r.isNumber())
         return {Status(ErrorCodes::BadValue, "malformed mod, remainder not a number")};
 
     if (i.more())

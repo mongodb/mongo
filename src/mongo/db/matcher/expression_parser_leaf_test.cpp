@@ -322,6 +322,14 @@ TEST(MatchExpressionParserLeafTest, SimpleModBad1) {
     query = BSON("x" << BSON("$mod" << BSON("a" << 1 << "b" << 2)));
     result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_NOT_OK(result.getStatus());
+
+    query = BSON("x" << BSON("$mod" << BSON_ARRAY(5 << "r")));
+    result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
+
+    query = BSON("x" << BSON("$mod" << BSON_ARRAY(5 << BSONNULL)));
+    result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_NOT_OK(result.getStatus());
 }
 
 TEST(MatchExpressionParserLeafTest, SimpleMod1) {
@@ -333,19 +341,6 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 5)));
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 4)));
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 8)));
-}
-
-TEST(MatchExpressionParserLeafTest, SimpleModNotNumber) {
-    BSONObj query = BSON("x" << BSON("$mod" << BSON_ARRAY(2 << "r")));
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(result.getStatus());
-
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << 2)));
-    ASSERT(result.getValue()->matchesBSON(BSON("x" << 4)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5)));
-    ASSERT(!result.getValue()->matchesBSON(BSON("x"
-                                                << "a")));
 }
 
 TEST(MatchExpressionParserLeafTest, ModFloatTruncate) {
