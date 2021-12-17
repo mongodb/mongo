@@ -440,6 +440,8 @@ private:
 
     void _periodicReload(const executor::TaskExecutor::CallbackArgs& cbArgs);
 
+    void _reloadInternal(OperationContext* opCtx);
+
     /**
      * Factory to create shards.  Never changed after startup so safe to access outside of _mutex.
      */
