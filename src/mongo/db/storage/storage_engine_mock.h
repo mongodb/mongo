@@ -179,9 +179,6 @@ public:
     bool isUsingDirectoryPerDb() const final {
         return false;
     }
-    bool isUsingDirectoryForIndexes() const final {
-        return false;
-    }
     KVEngine* getEngine() final {
         return nullptr;
     }

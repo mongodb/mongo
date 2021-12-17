@@ -348,10 +348,6 @@ public:
         return _options.directoryPerDB;
     }
 
-    bool isUsingDirectoryForIndexes() const override {
-        return _options.directoryForIndexes;
-    }
-
     StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
