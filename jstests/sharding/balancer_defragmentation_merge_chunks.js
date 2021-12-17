@@ -116,7 +116,8 @@ jsTest.log("Begin and end defragmentation with balancer off.");
 jsTest.log("Begin and end defragmentation with balancer on");
 {
     st.startBalancer();
-    setFailPointOnConfigNodes("alwaysOn");
+    // Allow the first phase transition to build the initial defragmentation state
+    setFailPointOnConfigNodes({skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: coll1,
         enableAutoSplitter: false,
@@ -143,7 +144,8 @@ jsTest.log("Begin and end defragmentation with balancer on");
 const coll2 = setupCollection();
 jsTest.log("Begin defragmentation with balancer off, end with it on");
 {
-    setFailPointOnConfigNodes("alwaysOn");
+    // Allow the first phase transition to build the initial defragmentation state
+    setFailPointOnConfigNodes({skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionAutoSplitter: coll2,
         enableAutoSplitter: false,

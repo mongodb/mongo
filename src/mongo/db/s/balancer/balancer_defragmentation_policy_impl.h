@@ -107,13 +107,19 @@ private:
     boost::optional<DefragmentationAction> _nextStreamingAction(OperationContext* opCtx);
 
     /**
+     * Returns the phase that should run after the input phase.
+     */
+    DefragmentationPhaseEnum _getNextPhase(DefragmentationPhaseEnum currentPhase);
+
+    /**
      * Move to the next phase and persist the phase change. This will end defragmentation if the
-     * current phase is the last phase.
+     * next phase is kFinished.
      * Must be called while holding the _streamingMutex.
      */
     std::unique_ptr<DefragmentationPhase> _transitionPhases(OperationContext* opCtx,
-                                                            const UUID& uuid,
-                                                            DefragmentationPhaseEnum currentPhase);
+                                                            const CollectionType& coll,
+                                                            DefragmentationPhaseEnum nextPhase,
+                                                            bool shouldPersistPhase = true);
 
     /**
      * Builds the defragmentation phase object matching the current state of the passed
@@ -122,12 +128,12 @@ private:
     void _initializeCollectionState(WithLock, OperationContext* opCtx, const CollectionType& coll);
 
     /**
-     * Write the new phase to the defragmentationPhase field in config.collections. If phase is not
-     * set, the field will be removed.
+     * Write the new phase to the defragmentationPhase field in config.collections. If phase is
+     * kFinished, the field will be removed.
      * Must be called while holding the _streamingMutex.
      */
     void _persistPhaseUpdate(OperationContext* opCtx,
-                             boost::optional<DefragmentationPhaseEnum> phase,
+                             DefragmentationPhaseEnum phase,
                              const UUID& uuid);
 
     /**

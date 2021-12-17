@@ -251,7 +251,7 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     } else if (!coll.getBalancerShouldMergeChunks() && _defragmentationStates.contains(uuid)) {
         _clearDataSizeInformation(opCtx, uuid);
         _defragmentationStates.erase(uuid);
-        _persistPhaseUpdate(opCtx, boost::none, uuid);
+        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kFinished, uuid);
     }
 }
 
@@ -274,20 +274,23 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextS
     // TODO (SERVER-61635) validate fairness through collections
     for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
         auto& currentCollectionDefragmentationState = it->second;
-        if (currentCollectionDefragmentationState->isComplete()) {
-            auto nextPhase = _transitionPhases(
-                opCtx, it->first, currentCollectionDefragmentationState->getType());
-            if (!nextPhase) {
-                it = _defragmentationStates.erase(it, std::next(it));
-                continue;
-            }
-        } else {
-            auto nextAction = currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
-            if (nextAction) {
-                return nextAction;
-            }
-            ++it;
+        // Phase transition if needed
+        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, it->first);
+        while (currentCollectionDefragmentationState &&
+               currentCollectionDefragmentationState->isComplete()) {
+            currentCollectionDefragmentationState = _transitionPhases(
+                opCtx, coll, _getNextPhase(currentCollectionDefragmentationState->getType()));
         }
+        if (!currentCollectionDefragmentationState) {
+            it = _defragmentationStates.erase(it, std::next(it));
+            continue;
+        }
+        // Get next action
+        auto nextAction = currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
+        if (nextAction) {
+            return nextAction;
+        }
+        ++it;
     }
 
     boost::optional<DefragmentationAction> noAction;
@@ -372,29 +375,38 @@ void BalancerDefragmentationPolicyImpl::_processEndOfAction(WithLock, OperationC
 }
 
 std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transitionPhases(
-    OperationContext* opCtx, const UUID& uuid, DefragmentationPhaseEnum currentPhase) {
+    OperationContext* opCtx,
+    const CollectionType& coll,
+    DefragmentationPhaseEnum nextPhase,
+    bool shouldPersistPhase) {
     beforeTransitioningDefragmentationPhase.pauseWhileSet();
-    boost::optional<DefragmentationPhaseEnum> nextPhase;
     std::unique_ptr<DefragmentationPhase> nextPhaseObject(nullptr);
-    switch (currentPhase) {
-        case DefragmentationPhaseEnum::kMergeChunks:
-            // TODO (SERVER-60459) Change to kMoveAndMergeChunks
-            nextPhase = boost::none;
-            break;
-        case DefragmentationPhaseEnum::kMoveAndMergeChunks:
-            // TODO (SERVER-60479) Change to kSplitChunks
-            nextPhase = boost::none;
-            break;
-        case DefragmentationPhaseEnum::kSplitChunks:
-            nextPhase = boost::none;
-            break;
+    try {
+        switch (nextPhase) {
+            case DefragmentationPhaseEnum::kMergeChunks:
+                nextPhaseObject = MergeChunksPhase::build(opCtx, coll);
+                break;
+            case DefragmentationPhaseEnum::kMoveAndMergeChunks:
+                // TODO (SERVER-60459) build phase 2
+                break;
+            case DefragmentationPhaseEnum::kSplitChunks:
+                // TODO (SERVER-60479) build phase 3
+                break;
+            case DefragmentationPhaseEnum::kFinished:
+                _clearDataSizeInformation(opCtx, coll.getUuid());
+                break;
+        }
+        if (shouldPersistPhase) {
+            _persistPhaseUpdate(opCtx, nextPhase, coll.getUuid());
+        }
+    } catch (const DBException& e) {
+        LOGV2_ERROR(6153101,
+                    "Error while building defragmentation phase on collection",
+                    "namespace"_attr = coll.getNss(),
+                    "uuid"_attr = coll.getUuid(),
+                    "phase"_attr = nextPhase,
+                    "error"_attr = e);
     }
-    if (nextPhase) {
-        // TODO build next phase object
-    } else {
-        _clearDataSizeInformation(opCtx, uuid);
-    }
-    _persistPhaseUpdate(opCtx, nextPhase, uuid);
     return nextPhaseObject;
 }
 
@@ -403,46 +415,46 @@ void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
                                                                    const CollectionType& coll) {
     auto phaseToBuild = coll.getDefragmentationPhase() ? coll.getDefragmentationPhase().get()
                                                        : DefragmentationPhaseEnum::kMergeChunks;
-    try {
-        std::unique_ptr<MergeChunksPhase> collectionPhase = nullptr;
-        switch (phaseToBuild) {
-            case DefragmentationPhaseEnum::kMergeChunks:
-                collectionPhase = MergeChunksPhase::build(opCtx, coll);
-                break;
-            case DefragmentationPhaseEnum::kMoveAndMergeChunks:
-            case DefragmentationPhaseEnum::kSplitChunks:
-            default:
-                uasserted(ErrorCodes::BadValue, "Unsupported phase value");
-        }
-        if (!collectionPhase || collectionPhase->isComplete()) {
-            // TODO If the current state cannot be built, try with the next one.
-            return;
-        }
-
-        _persistPhaseUpdate(opCtx, collectionPhase->getType(), coll.getUuid());
+    auto collectionPhase = _transitionPhases(
+        opCtx, coll, phaseToBuild, !coll.getDefragmentationPhase().is_initialized());
+    while (collectionPhase && collectionPhase->isComplete()) {
+        collectionPhase = _transitionPhases(opCtx, coll, _getNextPhase(collectionPhase->getType()));
+    }
+    if (collectionPhase) {
         auto [_, inserted] =
             _defragmentationStates.insert_or_assign(coll.getUuid(), std::move(collectionPhase));
         dassert(inserted);
-    } catch (const DBException& e) {
-        LOGV2_ERROR(6153101,
-                    "Error while starting defragmentation on collection",
-                    "namespace"_attr = coll.getNss(),
-                    "uuid"_attr = coll.getUuid(),
-                    "error"_attr = e);
     }
 }
 
-void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(
-    OperationContext* opCtx, boost::optional<DefragmentationPhaseEnum> phase, const UUID& uuid) {
+DefragmentationPhaseEnum BalancerDefragmentationPolicyImpl::_getNextPhase(
+    DefragmentationPhaseEnum currentPhase) {
+    switch (currentPhase) {
+        case DefragmentationPhaseEnum::kMergeChunks:
+            // TODO (SERVER-60459) change to kMoveAndMergeChunks
+            return DefragmentationPhaseEnum::kFinished;
+        case DefragmentationPhaseEnum::kMoveAndMergeChunks:
+            // TODO (SERVER-60479) change to kSplitChunks
+            return DefragmentationPhaseEnum::kFinished;
+        case DefragmentationPhaseEnum::kSplitChunks:
+            return DefragmentationPhaseEnum::kFinished;
+        default:
+            uasserted(ErrorCodes::BadValue, "Invalid phase transition");
+    }
+}
+
+void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* opCtx,
+                                                            DefragmentationPhaseEnum phase,
+                                                            const UUID& uuid) {
     DBDirectClient dbClient(opCtx);
     write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
     updateOp.setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
         entry.setQ(BSON(CollectionType::kUuidFieldName << uuid));
-        if (phase) {
+        if (phase != DefragmentationPhaseEnum::kFinished) {
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
                 BSON("$set" << BSON(CollectionType::kDefragmentationPhaseFieldName
-                                    << DefragmentationPhase_serializer(*phase)))));
+                                    << DefragmentationPhase_serializer(phase)))));
         } else {
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
                 "$unset" << BSON(CollectionType::kBalancerShouldMergeChunksFieldName
