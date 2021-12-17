@@ -42,11 +42,13 @@ namespace repl {
 TenantOplogBatcher::TenantOplogBatcher(const std::string& tenantId,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
-                                       Timestamp resumeBatchingTs)
+                                       Timestamp resumeBatchingTs,
+                                       OpTime beginApplyingAfterOpTime)
     : AbstractAsyncComponent(executor.get(), std::string("TenantOplogBatcher_") + tenantId),
       _oplogBuffer(oplogBuffer),
       _executor(executor),
-      _resumeBatchingTs(resumeBatchingTs) {}
+      _resumeBatchingTs(resumeBatchingTs),
+      _beginApplyingAfterOpTime(beginApplyingAfterOpTime) {}
 
 TenantOplogBatcher::~TenantOplogBatcher() {
     shutdown();
@@ -62,6 +64,10 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
             !op.isPreparedCommit() &&
                 (op.getCommandType() != OplogEntry::CommandType::kApplyOps || !op.shouldPrepare()));
     if (op.isTerminalApplyOps()) {
+        if (op.getOpTime() <= _beginApplyingAfterOpTime) {
+            // Fetched for the sake of retryable commitTransaction, don't need to apply.
+            return;
+        }
         // All applyOps entries are expanded and the expansions put in the batch expansion array.
         // The original applyOps is kept in the batch ops array.
         // This applies to both multi-document transactions and atomic applyOps.
