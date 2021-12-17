@@ -161,11 +161,6 @@ evergreen_buildvariants:
     platform: rhel67
     architecture: s390x
 
-  - name: rhel-72-s390x
-    edition: targeted
-    platform: rhel72
-    architecture: s390x
-
   - name: enterprise-rhel-72-s390x
     edition: enterprise
     platform: rhel72
