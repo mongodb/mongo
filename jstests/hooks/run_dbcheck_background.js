@@ -37,10 +37,19 @@ function runBackgroundDbCheck(hosts) {
         rst = new ReplSetTest(hosts[0]);
     });
 
-    print("Running dbCheck for: " + rst.getURL());
-
     const dbNames = new Set();
     const primary = rst.getPrimary();
+
+    const version =
+        assert
+            .commandWorked(primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
+            .featureCompatibilityVersion.version;
+    if (version != latestFCV) {
+        print("Not running dbCheck in FCV " + version);
+        return {ok: 1};
+    }
+
+    print("Running dbCheck for: " + rst.getURL());
 
     const adminDb = primary.getDB('admin');
     let res = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
