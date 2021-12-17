@@ -1,12 +1,26 @@
 /**
  * Tests server status has correct fault/facet information.
+ *
+ *  @tags: [multiversion_incompatible]
  */
 (function() {
 'use strict';
 
+function changeObserverIntensity(observer, intensity) {
+    let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
+    assert.commandWorked(
+        st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}));
+}
+
 const params = {
     setParameter: {
-        healthMonitoring: tojson({test: "off", ldap: "off", dns: "off"}),
+        healthMonitoringIntensities: tojson({
+            values: [
+                {type: "test", intensity: "off"},
+                {type: "ldap", intensity: "off"},
+                {type: "dns", intensity: "off"}
+            ]
+        }),
         featureFlagHealthMonitoring: true
     }
 };
@@ -23,8 +37,7 @@ print(tojson(result));
 assert.eq(result.state, "Ok");
 assert(result.enteredStateAtTime);
 
-assert.commandWorked(st.s0.adminCommand(
-    {"setParameter": 1, healthMonitoring: {test: "critical", dns: 'off', ldap: 'off'}}));
+changeObserverIntensity('test', 'critical');
 
 // Check server status after test health observer enabled and failpoint returns fault.
 assert.commandWorked(st.s0.adminCommand({

@@ -42,23 +42,35 @@ enums:
             kCritical: "critical"
             kNonCritical: "non-critical"
 
+    HealthObserverType:
+        description: "Enum representing available health observer types"
+        type: string
+        values:
+            kLdap: "ldap"
+            kDns: "dns"
+            kTest: "test"
+
 structs:
-    HealthObserverIntensities:
-        description: "A struct representing the health observer intensities."
+    HealthObserverIntensitySetting:
+        description: "One health observer intensity setting"
         strict: true
         fields:
-            dns:
-                description: "Intensity of DNS fault facet"
+            type:
+                type: HealthObserverType
+                optional: false
+            intensity:
                 type: HealthObserverIntensity
-                default: kNonCritical
-            ldap:
-                description: "Intensity of LDAP fault facet"
-                type: HealthObserverIntensity
-                default: kNonCritical
-            test:
-                description: "Intensity of test fault facet"
-                type: HealthObserverIntensity
+                optional: false
                 default: kOff
+
+    HealthObserverIntensities:
+        description: "A struct representing the health observer intensities."
+        strict: false
+        fields:
+            values:
+                description: "Array of health observer intensity settings"
+                type: array<HealthObserverIntensitySetting>
+                optional: true
 
     HealthObserverIntervals:
         description: "A struct representing the interval in milliseconds for each health observer."
@@ -77,7 +89,7 @@ structs:
             test:
                 description: "Test health observer health check interval."
                 type: int
-                default: 1
+                default: 10
                 validator: { gt: 0 }
             
     HealthObserverProgressMonitorConfig:

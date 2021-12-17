@@ -1,3 +1,6 @@
+/*
+ *  @tags: [multiversion_incompatible]
+ */
 const PROGRESS_TIMEOUT_SECONDS = 5;
 const CHECK_PING_SECONDS = 1;
 (function() {
@@ -5,9 +8,16 @@ const CHECK_PING_SECONDS = 1;
 
 const params = {
     setParameter: {
-        healthMonitoringIntensities: tojson({test: "non-critical", ldap: "off", dns: "off"}),
+        healthMonitoringIntensities: tojson({
+            values: [
+                {type: "test", intensity: "non-critical"},
+                {type: "ldap", intensity: "off"},
+                {type: "dns", intensity: "off"}
+            ]
+        }),
         healthMonitoringIntervals: tojson({test: 500}),
-        progressMonitor: tojson({deadline: PROGRESS_TIMEOUT_SECONDS}),
+        progressMonitor:
+            tojson({interval: PROGRESS_TIMEOUT_SECONDS, deadline: PROGRESS_TIMEOUT_SECONDS}),
         featureFlagHealthMonitoring: true
     }
 };
@@ -18,6 +28,8 @@ let st = new ShardingTest({
 // After cluster startup, make sure both mongos's are available.
 assert.commandWorked(st.s0.adminCommand({"ping": 1}));
 assert.commandWorked(st.s1.adminCommand({"ping": 1}));
+assert.commandWorked(st.s1.adminCommand(
+    {"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 2}}}));
 
 // Set the failpoint on one of the mongos's to pause its healthchecks.
 assert.commandWorked(
@@ -40,9 +52,13 @@ assert.soon(() => {
         if (e.message.indexOf("network error") >= 0) {
             return true;
         } else {
-            throw (e);
+            jsTestLog(`Failure: ${e}`);
+            sleep(1000);
+            return false;
         }
     }
+    sleep(1000);
+    return false;
 }, "Pinging faulty mongos should fail with network error.", PROGRESS_TIMEOUT_SECONDS * 1000);
 // Don't validate exit codes, since a mongos will exit on its own with a non-zero exit code.
 

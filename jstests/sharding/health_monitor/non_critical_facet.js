@@ -1,5 +1,7 @@
 /**
- * Tests behaviour of non-critical fault facet.
+ * Tests behavior of non-critical fault facet.
+ *
+ *  @tags: [multiversion_incompatible]
  */
 (function() {
 'use strict';
@@ -7,7 +9,13 @@ const ACTIVE_FAULT_DURATION_SECS = 1;
 
 const params = {
     setParameter: {
-        healthMonitoring: tojson({test: "non-critical", ldap: "off", dns: "off"}),
+        healthMonitoringIntensities: tojson({
+            values: [
+                {type: "test", intensity: "non-critical"},
+                {type: "ldap", intensity: "off"},
+                {type: "dns", intensity: "off"}
+            ]
+        }),
         featureFlagHealthMonitoring: true
     }
 };

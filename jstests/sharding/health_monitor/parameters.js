@@ -1,19 +1,39 @@
+/*
+ *  @tags: [multiversion_incompatible]
+ */
+
 (function() {
 'use strict';
 
 let CUSTOM_INTERVAL = 1337;
 let CUSTOM_DEADLINE = 5;
 
+// TODO(SERVER-59368):re-enable
+if (CUSTOM_INTERVAL > 0)
+    return;
+
 var st = new ShardingTest({
     mongos: [
         {
             setParameter: {
-                healthMonitoringIntensities: tojson({dns: "off", ldap: "critical", test: "off"}),
+                healthMonitoringIntensities: tojson({
+                    values: [
+                        {type: "dns", intensity: "off"},
+                        {type: "ldap", intensity: "critical"},
+                        {type: "test", intensity: "off"}
+                    ]
+                }),
             }
         },
         {
             setParameter: {
-                healthMonitoringIntensities: tojson({dns: "off", ldap: "off"}),
+                healthMonitoringIntensities: tojson({
+                    values: [
+                        {type: "dns", intensity: "off"},
+                        {type: "ldap", intensity: "off"},
+                        {type: "test", intensity: "off"}
+                    ]
+                }),
                 progressMonitor: tojson({interval: CUSTOM_INTERVAL, deadline: CUSTOM_DEADLINE}),
                 healthMonitoringIntervals: tojson({test: CUSTOM_INTERVAL})
             }
@@ -24,20 +44,37 @@ var st = new ShardingTest({
 
 // Intensity parameter
 let result = st.s0.adminCommand({"getParameter": 1, "healthMonitoringIntensities": 1});
-assert.eq(result.healthMonitoringIntensities.dns, "off");
-assert.eq(result.healthMonitoringIntensities.ldap, "critical");
+let getIntensity = (param_value, type) => {
+    let intensities = result.healthMonitoringIntensities.values;
+    for (var i = 0; i < intensities.length; i++) {
+        if (intensities[i].type === type)
+            return intensities[i].intensity;
+    }
+};
 
-assert.commandFailed(
-    st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: {dns: "INVALID"}}));
-assert.commandFailed(
-    st.s0.adminCommand({"setParameter": 1, healthMonitoringIntensities: {invalid: "off"}}));
+assert.eq(getIntensity(result, "dns"), "off");
+assert.eq(getIntensity(result, "ldap"), "critical");
 
-assert.commandWorked(st.s0.adminCommand(
-    {"setParameter": 1, healthMonitoringIntensities: {dns: 'non-critical', ldap: 'off'}}));
+assert.commandFailed(st.s0.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntensities: {values: [{type: "dns", intensity: "INVALID"}]}
+}));
+assert.commandFailed(st.s0.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntensities: {values: [{type: "invalid", intensity: "off"}]}
+}));
+
+jsTestLog('Test setting 2 intensities');
+assert.commandWorked(st.s0.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntensities:
+        {values: [{type: "dns", intensity: 'non-critical'}, {type: "ldap", intensity: 'off'}]}
+}));
 result =
     assert.commandWorked(st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}));
-assert.eq(result.healthMonitoringIntensities.dns, "non-critical");
-assert.eq(result.healthMonitoringIntensities.ldap, "off");
+
+assert.eq(getIntensity(result, "dns"), "non-critical");
+assert.eq(getIntensity(result, "ldap"), "off");
 
 // Interval parameter
 result = st.s1.adminCommand({"getParameter": 1, "healthMonitoringIntervals": 1});

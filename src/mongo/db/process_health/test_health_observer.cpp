@@ -26,10 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 
 #include "mongo/db/process_health/test_health_observer.h"
+
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/process_health/health_observer_registration.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace process_health {
@@ -37,6 +40,7 @@ MONGO_FAIL_POINT_DEFINE(hangTestHealthObserver);
 MONGO_FAIL_POINT_DEFINE(testHealthObserver);
 Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
     PeriodicHealthCheckContext&& periodicCheckContext) {
+    LOGV2_DEBUG(5936801, 2, "Test health observer executing");
     hangTestHealthObserver.pauseWhileSet();
 
     auto result = Future<HealthCheckStatus>::makeReady(makeHealthyStatus());
@@ -50,6 +54,7 @@ Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
         },
         [&](const BSONObj& data) { return !data.isEmpty(); });
 
+    LOGV2_DEBUG(5936802, 2, "Test health observer returns", "result"_attr = result.get());
     return result;
 }
 
@@ -58,6 +63,7 @@ MONGO_INITIALIZER(TestHealthObserver)(InitializerContext*) {
     // Failpoints can only be set when test commands are enabled, and so the test health observer
     // is only useful in that case.
     if (getTestCommandsEnabled()) {
+        LOGV2(5936803, "Test health observer instantiated");
         HealthObserverRegistration::registerObserverFactory(
             [](ServiceContext* svcCtx) { return std::make_unique<TestHealthObserver>(svcCtx); });
     }

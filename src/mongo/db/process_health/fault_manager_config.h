@@ -67,6 +67,9 @@ enum class FaultFacetType { kSystem, kMock1, kMock2, kTestObserver, kLdap, kDns 
 static const StringData FaultFacetTypeStrings[] = {
     "kSystem", "kMock1", "kMock2", "kTestObserver", "kLdap", "kDns"};
 
+FaultFacetType toFaultFacetType(HealthObserverTypeEnum type);
+
+
 static const StringData FaultFacetType_serializer(const FaultFacetType value) {
     return FaultFacetTypeStrings[static_cast<int>(value)];
 }
@@ -89,11 +92,43 @@ public:
 
     HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) {
         auto intensities = _getHealthObserverIntensities();
-        if (type == FaultFacetType::kMock1 && _facetToIntensityMapForTest.contains(type)) {
-            return _facetToIntensityMapForTest.at(type);
-        }
-        return _getPropertyByType(
-            type, &intensities->_data, HealthObserverIntensityEnum::kCritical);
+
+        auto toObserverType = [](FaultFacetType type) -> boost::optional<HealthObserverTypeEnum> {
+            switch (type) {
+                case FaultFacetType::kLdap:
+                    return HealthObserverTypeEnum::kLdap;
+                case FaultFacetType::kDns:
+                    return HealthObserverTypeEnum::kDns;
+                case FaultFacetType::kTestObserver:
+                    return HealthObserverTypeEnum::kTest;
+                default:
+                    return boost::none;
+            }
+        };
+
+        auto getIntensity = [this, intensities, &toObserverType](FaultFacetType type) {
+            auto observerType = toObserverType(type);
+            if (observerType) {
+                auto x = intensities->_data->getValues();
+                if (x) {
+                    for (auto setting : *x) {
+                        if (setting.getType() == observerType) {
+                            return setting.getIntensity();
+                        }
+                    }
+                }
+                return HealthObserverIntensityEnum::kOff;
+            } else {
+                // TODO SERVER-61944: this is for kMock1 & kMock2. Remove this branch once mock
+                // types are deleted.
+                if (_facetToIntensityMapForTest.contains(type)) {
+                    return _facetToIntensityMapForTest.at(type);
+                }
+                return HealthObserverIntensityEnum::kCritical;
+            }
+        };
+
+        return getIntensity(type);
     }
 
     bool isHealthObserverEnabled(FaultFacetType type) {
@@ -152,23 +187,31 @@ private:
 
     template <typename T, typename R>
     R _getPropertyByType(FaultFacetType type, synchronized_value<T>* data, R defaultValue) const {
+        // TODO: update this function with additional fault facets when they are added
+        boost::optional<R> result;
         switch (type) {
             case FaultFacetType::kLdap:
-                return (*data)->getLdap();
+                result = (*data)->getLdap();
+                break;
             case FaultFacetType::kDns:
-                return (*data)->getDns();
+                result = (*data)->getDns();
+                break;
             case FaultFacetType::kTestObserver:
-                return (*data)->getTest();
+                result = (*data)->getTest();
+                break;
             case FaultFacetType::kSystem:
-                return defaultValue;
+                result = defaultValue;
+                break;
             case FaultFacetType::kMock1:
-                return defaultValue;
+                result = defaultValue;
+                break;
             case FaultFacetType::kMock2:
-                return defaultValue;
-            // TODO: update this function with additional fault facets when they are added
+                result = defaultValue;
+                break;
             default:
                 MONGO_UNREACHABLE;
         }
+        return *result;
     }
 
     bool _periodicChecksDisabledForTests = false;
