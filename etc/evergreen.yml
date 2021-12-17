@@ -11242,7 +11242,6 @@ buildvariants:
   - name: .serverless
   - name: .watchdog
   - name: .stitch
-  - name: .csfle
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
@@ -11411,7 +11410,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: snmp
   - name: .stitch
-  - name: .csfle
   - name: .updatefuzzer
   - name: .serverless
   - name: watchdog_wiredtiger
