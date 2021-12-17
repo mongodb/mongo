@@ -163,8 +163,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             auto cmrIndex = &cmr.indexRequest;
-            cmrIndex->indexObj = e.Obj().getOwned();
-            const auto& indexObj = cmrIndex->indexObj;
+            auto indexObj = e.Obj();
 
             if (cmdIndex.getUnique()) {
                 uassert(ErrorCodes::InvalidOptions,

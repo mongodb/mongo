@@ -45,8 +45,6 @@ namespace mongo {
  * Refer to CollModRequest in coll_mod.cpp for non-index collMod options.
  */
 struct ParsedCollModIndexRequest {
-    // Internal fields of this 'cmdObj' are referenced by BSONElement fields here.
-    BSONObj indexObj;  // owned
     const IndexDescriptor* idx = nullptr;
     boost::optional<long long> indexExpireAfterSeconds;
     boost::optional<bool> indexHidden;
