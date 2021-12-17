@@ -47,6 +47,7 @@ const rolloverConfig = function(newConfig) {
         const configId = "n" + nodeId;
         rst.nodeOptions[configId] = Object.merge(rst.nodeOptions[configId], newConfig, true);
         const newNode = rst.start(nodeId, {}, true, true);
+        rst.awaitSecondaryNodes();
         assert(newNode.getDB("admin").auth("root", "root"));
     };
 
