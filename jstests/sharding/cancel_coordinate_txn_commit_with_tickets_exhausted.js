@@ -90,9 +90,14 @@ const transactionThread = new Thread(
         const currentOp = (pipeline = []) =>
             conn.getDB("admin").aggregate([{$currentOp: {}}, ...pipeline]).toArray();
         assert.soon(() => {
-            const removeOperations = currentOp([
-                {$match: {op: "remove", failpointMsg: failpointName, ns: `${dbName}.${collName}`}}
-            ]);
+            const removeOperations = currentOp([{
+                $match: {
+                    $or: [
+                        {op: "remove", failpointMsg: failpointName, ns: `${dbName}.${collName}`},
+                        {op: "remove", msg: failpointName, ns: `${dbName}.${collName}`}
+                    ]
+                }
+            }]);
             return removeOperations.length === totalWriteTickets;
         }, () => `Timed out waiting for the remove operations: ${tojson(currentOp())}`);
 
