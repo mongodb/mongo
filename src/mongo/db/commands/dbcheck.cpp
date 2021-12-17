@@ -202,9 +202,12 @@ protected:
             tc.get()->setSystemOperationKillableByStepdown(lk);
         }
 
+        auto uniqueOpCtx = tc->makeOperationContext();
+        auto opCtx = uniqueOpCtx.get();
+
         for (const auto& coll : *_run) {
             try {
-                _doCollection(coll);
+                _doCollection(opCtx, coll);
             } catch (const DBException& e) {
                 auto logEntry = dbCheckErrorHealthLogEntry(
                     coll.nss, "dbCheck failed", OplogEntriesEnum::Batch, e.toStatus());
@@ -220,12 +223,23 @@ protected:
     }
 
 private:
-    void _doCollection(const DbCheckCollectionInfo& info) {
+    void _doCollection(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
         // The collection was confirmed as existing in singleCollectionRun().
         // runBatch() will handle the case of the collection having been dropped since then.
 
         if (_done) {
             return;
+        }
+
+        const std::string curOpMessage = "Scanning namespace " + info.nss.toString();
+        ProgressMeterHolder progress;
+        {
+            AutoGetCollection coll(opCtx, info.nss, MODE_IS);
+            if (coll) {
+                stdx::unique_lock<Client> lk(*opCtx->getClient());
+                progress.set(CurOp::get(opCtx)->setProgress_inlock(StringData(curOpMessage),
+                                                                   coll->numRecords(opCtx)));
+            }
         }
 
         // Parameters for the hasher.
@@ -250,7 +264,8 @@ private:
                 docsInCurrentInterval = 0;
             }
 
-            auto result = _runBatch(info, start, info.maxDocsPerBatch, info.maxBytesPerBatch);
+            auto result =
+                _runBatch(opCtx, info, start, info.maxDocsPerBatch, info.maxBytesPerBatch);
 
             if (_done) {
                 return;
@@ -324,6 +339,7 @@ private:
             totalDocsSeen += stats.nDocs;
             totalBytesSeen += stats.nBytes;
             docsInCurrentInterval += stats.nDocs;
+            progress.get()->hit(stats.nDocs);
 
             // Check if we've exceeded any limits.
             bool reachedLast = stats.lastKey >= info.end;
@@ -339,6 +355,8 @@ private:
                 stdx::this_thread::sleep_for(timesExceeded * 1s - (Clock::now() - lastStart));
             }
         } while (!reachedEnd);
+
+        progress.finished();
     }
 
     /**
@@ -358,14 +376,11 @@ private:
     std::string _dbName;
     std::unique_ptr<DbCheckRun> _run;
 
-    StatusWith<BatchStats> _runBatch(const DbCheckCollectionInfo& info,
+    StatusWith<BatchStats> _runBatch(OperationContext* opCtx,
+                                     const DbCheckCollectionInfo& info,
                                      const BSONKey& first,
                                      int64_t batchDocs,
                                      int64_t batchBytes) {
-        // New OperationContext for each batch.
-        auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
-        auto opCtx = uniqueOpCtx.get();
-
         auto lockMode = MODE_S;
         if (info.snapshotRead) {
             // Each batch will read at the latest no-overlap point, which is the all_durable
