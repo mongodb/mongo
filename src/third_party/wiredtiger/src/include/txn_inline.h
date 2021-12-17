@@ -901,10 +901,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
             continue;
         }
 
-        if (F_ISSET(&cbt->iface, WT_CURSTD_VISIBLE_ALL))
-            upd_visible = WT_VISIBLE_TRUE;
-        else
-            upd_visible = __wt_txn_upd_visible_type(session, upd);
+        upd_visible = __wt_txn_upd_visible_type(session, upd);
 
         if (upd_visible == WT_VISIBLE_TRUE)
             break;
@@ -1044,11 +1041,9 @@ retry:
         /*
          * We return the onpage value in the following cases:
          * 1. The record is from the history store.
-         * 2. It has the WT_CURSTD_VISIBLE_ALL flag set.
-         * 3. It is visible to the reader.
+         * 2. It is visible to the reader.
          */
-        if (WT_IS_HS(session->dhandle) || F_ISSET(&cbt->iface, WT_CURSTD_VISIBLE_ALL) ||
-          __wt_txn_tw_start_visible(session, &tw)) {
+        if (WT_IS_HS(session->dhandle) || __wt_txn_tw_start_visible(session, &tw)) {
             if (cbt->upd_value->skip_buf) {
                 cbt->upd_value->buf.data = NULL;
                 cbt->upd_value->buf.size = 0;

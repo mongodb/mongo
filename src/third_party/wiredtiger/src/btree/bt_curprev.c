@@ -184,6 +184,9 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
     else
         __cursor_set_recno(cbt, cbt->recno - 1);
 
+    if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+        return (0);
+
     /*
      * Fixed-width column store appends are inherently non-transactional. Even a non-visible update
      * by a concurrent or aborted transaction changes the effective end of the data. The effect is
@@ -249,6 +252,10 @@ new_page:
     cbt->ins = __col_insert_search(cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
     if (cbt->ins != NULL && cbt->recno != WT_INSERT_RECNO(cbt->ins))
         cbt->ins = NULL;
+
+    if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+        return (0);
+
     /*
      * FIXME-WT-6127: Now we only do transaction read if we have an update chain and it doesn't work
      * in durable history. Review this when we have a plan for fixed-length column store.
@@ -296,6 +303,10 @@ new_page:
             return (WT_NOTFOUND);
 
         __cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
+
+        if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+            return (0);
+
 restart_read:
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
@@ -372,8 +383,12 @@ restart_read:
         cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
         cbt->ins = __col_insert_search_match(cbt->ins_head, cbt->recno);
         __wt_upd_value_clear(cbt->upd_value);
-        if (cbt->ins != NULL)
+        if (cbt->ins != NULL) {
+            if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+                return (0);
+
             WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
+        }
         if (cbt->upd_value->type != WT_UPDATE_INVALID) {
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
                 if (cbt->upd_value->tw.stop_txn != WT_TXN_NONE &&
@@ -433,6 +448,9 @@ restart_read:
             ++*skippedp;
             continue;
         }
+
+        if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+            return (0);
 
         WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins ? cbt->ins->upd : NULL));
         if (cbt->upd_value->type == WT_UPDATE_INVALID ||
@@ -543,6 +561,10 @@ restart_read_insert:
         if ((ins = cbt->ins) != NULL) {
             key->data = WT_INSERT_KEY(ins);
             key->size = WT_INSERT_KEY_SIZE(ins);
+
+            if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+                return (0);
+
             /*
              * If the cursor has prefix search configured we can early exit here if the key we are
              * visiting is before our prefix.
@@ -590,6 +612,10 @@ restart_read_insert:
 restart_read_page:
         rip = &page->pg_row[cbt->slot];
         WT_RET(__cursor_row_slot_key_return(cbt, rip, &kpack));
+
+        if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+            return (0);
+
         /*
          * If the cursor has prefix search configured we can early exit here if the key we are
          * visiting is before our prefix.
@@ -659,6 +685,8 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
     restart = F_ISSET(cbt, WT_CBT_ITERATE_RETRY_PREV);
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_PREV);
     for (newpage = false;; newpage = true, restart = false) {
+        /* Calls with key only flag should never restart. */
+        WT_ASSERT(session, !F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY) || !restart);
         page = cbt->ref == NULL ? NULL : cbt->ref->page;
 
         /*
@@ -743,7 +771,8 @@ __wt_btcur_prev_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
          * information to determine if something is visible on the page. If nothing is, the page is
          * skipped.
          */
-        if (session->txn->isolation == WT_ISO_SNAPSHOT &&
+        if (!F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY) &&
+          session->txn->isolation == WT_ISO_SNAPSHOT &&
           !F_ISSET(&cbt->iface, WT_CURSTD_IGNORE_TOMBSTONE))
             WT_ERR(
               __wt_tree_walk_custom_skip(session, &cbt->ref, __wt_btcur_skip_page, NULL, flags));
@@ -762,7 +791,10 @@ err:
 
     switch (ret) {
     case 0:
-        F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+        if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
+            F_SET(cursor, WT_CURSTD_KEY_INT);
+        else
+            F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 #ifdef HAVE_DIAGNOSTIC
         /*
          * Skip key order check, if next is called after a prev returned a prepare conflict error,
