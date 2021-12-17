@@ -393,7 +393,6 @@ void Balancer::_consumeActionStreamLoop() {
                                                  mergeAction.collectionVersion)
                             .thenRunOn(*executor)
                             .onCompletion([this, mergeAction](const Status& status) {
-                                // TODO (SERVER-61880) Remove this ThreadClient
                                 ThreadClient tc(
                                     "BalancerDefragmentationPolicy::acknowledgeMergeResult",
                                     getGlobalServiceContext());
@@ -415,7 +414,6 @@ void Balancer::_consumeActionStreamLoop() {
                             .thenRunOn(*executor)
                             .onCompletion([this, dataSizeAction](
                                               const StatusWith<DataSizeResponse>& swDataSize) {
-                                // TODO (SERVER-61880) Remove this ThreadClient
                                 ThreadClient tc(
                                     "BalancerDefragmentationPolicy::acknowledgeDataSizeResult",
                                     getGlobalServiceContext());
