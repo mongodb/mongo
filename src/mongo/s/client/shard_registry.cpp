@@ -439,7 +439,7 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) const {
 
 void ShardRegistry::reload(OperationContext* opCtx) {
     if (MONGO_unlikely(TestingProctor::instance().isEnabled())) {
-        // TODO SERVER-61003 investigate hang on reload in unit tests
+        // TODO SERVER-62152 investigate hang on reload in unit tests
         // Some unit tests don't support running the reload's AsyncTry on the fixed executor.
         _reloadInternal(opCtx);
     } else {
