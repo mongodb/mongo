@@ -1,7 +1,7 @@
 /*
  * Test that internal sessions are only supported in FCV latest.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [featureFlagInternalTransactions]
  */
 (function() {
 'use strict';

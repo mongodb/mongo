@@ -2,7 +2,7 @@
  * Tests that the client can only retry a transaction that failed with a transient transaction error
  * by attaching a higher txnRetryCounter when the FCV is latest.
  *
- * @tags: [requires_fcv_51, featureFlagInternalTransactions]
+ * @tags: [featureFlagInternalTransactions]
  */
 (function() {
 'use strict';
