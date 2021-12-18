@@ -142,6 +142,9 @@ long long AccumulatorN::validateN(const Value& input) {
     return n;
 }
 void AccumulatorN::startNewGroup(const Value& input) {
+    // TODO SERVER-59327 consider overriding this method in AccumulatorTopBottomN so that
+    // sortPattern doesn't need to get passed through the constructor and we can make sure
+    // n == 1 for the single variants
     _n = validateN(input);
 }
 
@@ -666,6 +669,13 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
         }
     }
 
+    // TODO SERVER-61281 consider removing this call to fillCache().
+    // Since Document caches fields the size of this cache and getApproximateSize() can vary
+    // depending on access. In order to avoid this and make sure we subtract the right amount if
+    // remove() ever gets called, we can fill the cache to get a consistent view of the size.
+    // Normally the outer window function code handles this, but _genKeyOutPair() makes a new
+    // document for sortKey, so its cache get reset.
+    keyOutPair.first.fillCache();
     const auto memUsage = keyOutPair.first.getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
     updateAndCheckMemUsage(memUsage);
@@ -685,6 +695,10 @@ void AccumulatorTopBottomN<sense, single>::remove(const Value& val) {
     // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
     auto it = _map->lower_bound(keyOutPair.first);
     _map->erase(it);
+
+    // TODO SERVER-61281 consider removing this comment if its no longer relevant.
+    // After calling lower_bound() it uses SortKeyComparator and the sortKey's field cache should be
+    // fully populated so no need to call fillCache() again.
     _memUsageBytes -= keyOutPair.first.getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
 }
