@@ -64,11 +64,14 @@ structs:
     description: "An entry in system.local.healthlog."
     fields:
       namespace:
-          cpp_name: nss
-          type: namespacestring
+        cpp_name: nss
+        type: namespacestring
+        optional: true
       timestamp: date
       severity: Severity
       msg: string
       scope: Scope
       operation: string
-      data: object
+      data:
+        type: object
+        optional: true

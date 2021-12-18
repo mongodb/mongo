@@ -55,6 +55,79 @@ namespace mongo {
 
 namespace {
 
+repl::OpTime _logOp(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    const boost::optional<UUID>& uuid,
+                    const BSONObj& obj) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(nss);
+    if (uuid) {
+        oplogEntry.setUuid(*uuid);
+    }
+    oplogEntry.setObject(obj);
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    return writeConflictRetry(
+        opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
+            oplogEntry.setWallClockTime(clockSource->now());
+
+            WriteUnitOfWork uow(opCtx);
+            repl::OpTime result = repl::logOp(opCtx, &oplogEntry);
+            uow.commit();
+            return result;
+        });
+}
+
+/**
+ * RAII-style class, which logs dbCheck start and stop events in the healthlog and replicates them.
+ */
+class DbCheckStartAndStopLogger {
+public:
+    DbCheckStartAndStopLogger(OperationContext* opCtx) : _opCtx(opCtx) {
+        try {
+            const auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                              SeverityEnum::Info,
+                                                              "",
+                                                              OplogEntriesEnum::Start,
+                                                              boost::none /*data*/
+            );
+            HealthLog::get(_opCtx->getServiceContext()).log(*healthLogEntry);
+
+            DbCheckOplogStartStop oplogEntry;
+            const auto nss = NamespaceString("admin.$cmd");
+            oplogEntry.setNss(nss);
+            oplogEntry.setType(OplogEntriesEnum::Start);
+            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
+        } catch (const DBException&) {
+            LOGV2(6202200, "Could not log start event");
+        }
+    }
+
+    ~DbCheckStartAndStopLogger() {
+        try {
+            DbCheckOplogStartStop oplogEntry;
+            const auto nss = NamespaceString("admin.$cmd");
+            oplogEntry.setNss(nss);
+            oplogEntry.setType(OplogEntriesEnum::Stop);
+            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
+
+            const auto healthLogEntry = dbCheckHealthLogEntry(boost::none /*nss*/,
+                                                              SeverityEnum::Info,
+                                                              "",
+                                                              OplogEntriesEnum::Stop,
+                                                              boost::none /*data*/
+            );
+            HealthLog::get(_opCtx->getServiceContext()).log(*healthLogEntry);
+        } catch (const DBException&) {
+            LOGV2(6202201, "Could not log stop event");
+        }
+    }
+
+private:
+    OperationContext* _opCtx;
+};
+
 /**
  * All the information needed to run dbCheck on a single collection.
  */
@@ -205,6 +278,8 @@ protected:
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
+        DbCheckStartAndStopLogger startStop(opCtx);
+
         for (const auto& coll : *_run) {
             try {
                 _doCollection(opCtx, coll);
@@ -271,9 +346,10 @@ private:
                 return;
             }
 
+            std::unique_ptr<HealthLogEntry> entry;
+
             if (!result.isOK()) {
                 bool retryable = false;
-                std::unique_ptr<HealthLogEntry> entry;
 
                 const auto code = result.getStatus().code();
                 if (code == ErrorCodes::LockTimeout) {
@@ -319,19 +395,27 @@ private:
                     continue;
                 }
                 return;
+            } else {
+                _batchesProcessed++;
+                auto stats = result.getValue();
+                entry = dbCheckBatchEntry(info.nss,
+                                          stats.nDocs,
+                                          stats.nBytes,
+                                          stats.md5,
+                                          stats.md5,
+                                          start,
+                                          stats.lastKey,
+                                          stats.readTimestamp,
+                                          stats.time);
+                if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info ||
+                    (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
+                    // On debug builds, health-log every batch result; on release builds, health-log
+                    // every N batches.
+                    HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+                }
             }
 
             auto stats = result.getValue();
-            auto entry = dbCheckBatchEntry(info.nss,
-                                           stats.nDocs,
-                                           stats.nBytes,
-                                           stats.md5,
-                                           stats.md5,
-                                           start,
-                                           stats.lastKey,
-                                           stats.readTimestamp,
-                                           stats.time);
-            HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
 
             start = stats.lastKey;
 
@@ -522,27 +606,9 @@ private:
         return false;
     }
 
-    repl::OpTime _logOp(OperationContext* opCtx,
-                        const NamespaceString& nss,
-                        const UUID& uuid,
-                        const BSONObj& obj) {
-        repl::MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-        oplogEntry.setNss(nss);
-        oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(obj);
-        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-        return writeConflictRetry(
-            opCtx, "dbCheck oplog entry", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                auto const clockSource = opCtx->getServiceContext()->getFastClockSource();
-                oplogEntry.setWallClockTime(clockSource->now());
-
-                WriteUnitOfWork uow(opCtx);
-                repl::OpTime result = repl::logOp(opCtx, &oplogEntry);
-                uow.commit();
-                return result;
-            });
-    }
+    // Cumulative number of batches processed. Can wrap around; it's not guaranteed to be in
+    // lockstep with other replica set members.
+    unsigned int _batchesProcessed = 0;
 };
 
 /**
