@@ -73,6 +73,15 @@ server_parameters:
         validator:
           gte: 20
           lte: 120000
+    dbCheckHealthLogEveryNBatches:
+        description: 'Emit an info-severity health log batch every N batches processed'
+        set_at: [ startup, runtime ]
+        cpp_vartype: 'AtomicWord<int>'
+        cpp_varname: gDbCheckHealthLogEveryNBatches
+        default: 25
+        validator:
+          gte: 1
+          lte: 10000
 
 types:
   _id_key:
@@ -89,6 +98,8 @@ enums:
     values:
       Batch: "batch"
       Collection: "collection"
+      Start: "start"
+      Stop: "stop"
 
 structs:
   DbCheckSingleInvocation:
@@ -216,3 +227,13 @@ structs:
       options:
         type: object
         cpp_name: options
+
+  DbCheckOplogStartStop:
+    description: "Oplog entry for dbCheck start and stop"
+    fields:
+      dbCheck:
+        type: namespacestring
+        cpp_name: nss
+      type:
+        type: OplogEntries
+        cpp_name: type
