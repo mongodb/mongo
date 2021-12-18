@@ -91,7 +91,8 @@ void HashAggStage::doSaveState(bool relinquishCursor) {
 void HashAggStage::doRestoreState(bool relinquishCursor) {
     invariant(_opCtx);
     if (_rsCursor && relinquishCursor) {
-        _rsCursor->restore();
+        auto couldRestore = _rsCursor->restore();
+        uassert(6196500, "HashAggStage could not restore cursor", couldRestore);
     }
 }
 
