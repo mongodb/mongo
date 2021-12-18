@@ -344,6 +344,11 @@ Status handleOplogCommand(RoleGraph* roleGraph, const BSONObj& cmdObj) {
         return Status::OK();
     }
 
+    if (cmdName == "dbCheck") {
+        // dbCheck uses admin.$cmd to propagate start/stop information to the secondaries.
+        return Status::OK();
+    }
+
     //  No other commands expected.  Warn.
     return Status(ErrorCodes::OplogOperationUnsupported, "Unsupported oplog operation");
 }

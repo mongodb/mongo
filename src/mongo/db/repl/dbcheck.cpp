@@ -110,6 +110,10 @@ std::string renderForHealthLog(OplogEntriesEnum op) {
             return "dbCheckBatch";
         case OplogEntriesEnum::Collection:
             return "dbCheckCollection";
+        case OplogEntriesEnum::Start:
+            return "dbCheckStart";
+        case OplogEntriesEnum::Stop:
+            return "dbCheckStop";
     }
 
     MONGO_UNREACHABLE;
@@ -119,19 +123,23 @@ std::string renderForHealthLog(OplogEntriesEnum op) {
 /**
  * Fills in the timestamp and scope, which are always the same for dbCheck's entries.
  */
-std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss,
+std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<NamespaceString>& nss,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
                                                       OplogEntriesEnum operation,
-                                                      const BSONObj& data) {
+                                                      const boost::optional<BSONObj>& data) {
     auto entry = std::make_unique<HealthLogEntry>();
-    entry->setNss(nss);
+    if (nss) {
+        entry->setNss(*nss);
+    }
     entry->setTimestamp(Date_t::now());
     entry->setSeverity(severity);
     entry->setScope(ScopeEnum::Cluster);
     entry->setMsg(msg);
     entry->setOperation(renderForHealthLog(operation));
-    entry->setData(data);
+    if (data) {
+        entry->setData(*data);
+    }
     return entry;
 }
 
@@ -329,6 +337,10 @@ bool DbCheckHasher::_canHash(const BSONObj& obj) {
 
 namespace {
 
+// Cumulative number of batches processed. Can wrap around; it's not guaranteed to be in lockstep
+// with other replica set members.
+unsigned int batchesProcessed = 0;
+
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
                                const DbCheckOplogBatch& entry) {
@@ -377,7 +389,13 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                           optime,
                                           options);
 
-        HealthLog::get(opCtx).log(*logEntry);
+        batchesProcessed++;
+        if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info ||
+            (batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
+            // On debug builds, health-log every batch result; on release builds, health-log
+            // every N batches.
+            HealthLog::get(opCtx).log(*logEntry);
+        }
     } catch (const DBException& exception) {
         // In case of an error, report it to the health log,
         auto logEntry = dbCheckErrorHealthLogEntry(
@@ -416,6 +434,14 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             // TODO SERVER-61963.
             return Status::OK();
         }
+        case OplogEntriesEnum::Start:
+            // fallthrough
+        case OplogEntriesEnum::Stop:
+            const auto entry = mongo::dbCheckHealthLogEntry(
+                boost::none /*nss*/, SeverityEnum::Info, "", type, boost::none /*data*/
+            );
+            HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+            return Status::OK();
     }
 
     MONGO_UNREACHABLE;

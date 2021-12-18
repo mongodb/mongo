@@ -50,11 +50,11 @@ class OpTime;
 /**
  * Logs an entry into 'local.system.healthLog'.
  */
-std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const NamespaceString& nss,
+std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<NamespaceString>& nss,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
                                                       OplogEntriesEnum operation,
-                                                      const BSONObj& data);
+                                                      const boost::optional<BSONObj>& data);
 
 /**
  * Logs an error into 'local.system.healthLog'.
