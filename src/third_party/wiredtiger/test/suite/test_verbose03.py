@@ -42,7 +42,7 @@ class test_verbose03(test_verbose_base):
     nlines = 50000
 
     @contextmanager
-    def expect_event_handler_json(self, config, stdErr=False):
+    def expect_event_handler_json(self, config, expected_categories, stdErr=False):
         # Clean the stdout/stderr resource before yielding the context to the execution block. We only want to
         # capture the verbose output of the using context (ignoring any previous output up to this point).
         if stdErr:
@@ -80,6 +80,7 @@ class test_verbose03(test_verbose_base):
                 self.pr('Unable to parse JSON message format: %s' % line)
                 raise e
             self.validate_json_schema(msg)
+            self.validate_json_category(msg, expected_categories)
 
         # Close the connection resource and clean up the contents of the stdout/stderr file, flushing out the
         # verbose output that occurred during the execution of this context.
@@ -95,8 +96,12 @@ class test_verbose03(test_verbose_base):
         # this test.
         self.close_conn()
 
+        expected_verbose_categories = {
+            'WT_VERB_API':  wiredtiger.WT_VERB_API,
+            'WT_VERB_VERSION':  wiredtiger.WT_VERB_VERSION,
+        }
         # Test passing a single verbose category, 'api'.
-        with self.expect_event_handler_json(self.create_verbose_configuration(['api'])) as conn:
+        with self.expect_event_handler_json(self.create_verbose_configuration(['api']), expected_verbose_categories) as conn:
             # Perform a set of simple API operations (table creations and cursor operations) to generate verbose API
             # messages.
             uri = 'table:test_verbose03_api'
@@ -108,7 +113,7 @@ class test_verbose03(test_verbose_base):
             session.close()
 
         # Test passing multiple verbose categories, being 'api' & 'version'.
-        with self.expect_event_handler_json(self.create_verbose_configuration(['api','version'])) as conn:
+        with self.expect_event_handler_json(self.create_verbose_configuration(['api','version']), expected_verbose_categories) as conn:
             # Perform a set of simple API operations (table creations and cursor operations) to generate verbose API
             # messages. Beyond opening the connection resource, we shouldn't need to do anything special for the version
             # category.
@@ -125,8 +130,11 @@ class test_verbose03(test_verbose_base):
         # this test.
         self.close_conn()
 
+        expected_verbose_categories = {
+            'WT_VERB_DEFAULT':  wiredtiger.WT_VERB_DEFAULT,
+        }
         # Test generating an error message, ensuring the JSON output is valid.
-        with self.expect_event_handler_json('', stdErr=True) as conn:
+        with self.expect_event_handler_json('', expected_verbose_categories, stdErr=True) as conn:
             # Attempt to begin a read transaction with an invalid timestamp, inorder to produce an error message.
             uri = 'table:test_verbose03_error'
             session = conn.open_session()

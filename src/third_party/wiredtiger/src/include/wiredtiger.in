@@ -7090,6 +7090,103 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  */
 /*! @} */
 
+/*******************************************
+ * Verbose categories
+ *******************************************/
+/*!
+ * @addtogroup wt
+ * @{
+ */
+/*!
+ * @name Verbose categories
+ * @anchor verbose_categories
+ * @{
+ */
+/*!
+ * WiredTiger verbose event categories.
+ * Note that the verbose categories cover a wide set of sub-systems and operations
+ * within WiredTiger. As such, the categories are subject to change and evolve
+ * between different WiredTiger releases.
+ */
+typedef enum {
+/* VERBOSE ENUM START */
+    WT_VERB_API,                  /*!< API messages. */
+    WT_VERB_BACKUP,               /*!< Backup messages. */
+    WT_VERB_BLKCACHE,
+    WT_VERB_BLOCK,                /*!< Block manager messages. */
+    WT_VERB_CHECKPOINT,           /*!< Checkpoint messages. */
+    WT_VERB_CHECKPOINT_CLEANUP,
+    WT_VERB_CHECKPOINT_PROGRESS,  /*!< Checkpoint progress messages. */
+    WT_VERB_COMPACT,              /*!< Compact messages. */
+    WT_VERB_COMPACT_PROGRESS,     /*!< Compact progress messages. */
+    WT_VERB_DEFAULT,
+    WT_VERB_ERROR_RETURNS,
+    WT_VERB_EVICT,                /*!< Eviction messages. */
+    WT_VERB_EVICTSERVER,          /*!< Eviction server messages. */
+    WT_VERB_EVICT_STUCK,
+    WT_VERB_EXTENSION,            /*!< Extension messages. */
+    WT_VERB_FILEOPS,
+    WT_VERB_GENERATION,
+    WT_VERB_HANDLEOPS,
+    WT_VERB_HS,                   /*!< History store messages. */
+    WT_VERB_HS_ACTIVITY,          /*!< History store activity messages. */
+    WT_VERB_LOG,                  /*!< Log messages. */
+    WT_VERB_LSM,                  /*!< LSM messages. */
+    WT_VERB_LSM_MANAGER,
+    WT_VERB_MUTEX,
+    WT_VERB_METADATA,             /*!< Metadata messages. */
+    WT_VERB_OUT_OF_ORDER,
+    WT_VERB_OVERFLOW,
+    WT_VERB_READ,
+    WT_VERB_RECONCILE,            /*!< Reconcile messages. */
+    WT_VERB_RECOVERY,             /*!< Recovery messages. */
+    WT_VERB_RECOVERY_PROGRESS,    /*!< Recovery progress messages. */
+    WT_VERB_RTS,                  /*!< RTS messages. */
+    WT_VERB_SALVAGE,              /*!< Salvage messages. */
+    WT_VERB_SHARED_CACHE,
+    WT_VERB_SPLIT,
+    WT_VERB_TEMPORARY,
+    WT_VERB_THREAD_GROUP,
+    WT_VERB_TIERED,               /*!< Tiered messages. */
+    WT_VERB_TIMESTAMP,            /*!< Timestamp messages. */
+    WT_VERB_TRANSACTION,          /*!< Transaction messages. */
+    WT_VERB_VERIFY,               /*!< Verify messages. */
+    WT_VERB_VERSION,              /*!< Version messages. */
+    WT_VERB_WRITE,
+/* VERBOSE ENUM STOP */
+    WT_VERB_NUM_CATEGORIES
+} WT_VERBOSE_CATEGORY;
+/*! @} */
+
+/*******************************************
+ * Verbose levels
+ *******************************************/
+/*!
+ * @name Verbose levels
+ * @anchor verbose_levels
+ * @{
+ */
+/*!
+ * WiredTiger verbosity levels. The levels define a range of severity categories, with
+ * \c WT_VERBOSE_ERROR being the lowest, most critical level (used by messages on critical error
+ * paths) and \c WT_VERBOSE_DEBUG being the highest verbosity/informational level (mostly adopted
+ * for debugging).
+ */
+typedef enum {
+    WT_VERBOSE_ERROR = -3,  /*!< Error conditions triggered in WiredTiger. */
+    WT_VERBOSE_WARNING,     /*!< Warning conditions potentially signaling non-imminent errors and
+                            behaviors. */
+    WT_VERBOSE_NOTICE,      /*!< Messages for significant events in WiredTiger, usually worth
+                            noting. */
+    WT_VERBOSE_INFO,        /*!< Informational style messages. */
+    WT_VERBOSE_DEBUG        /*!< Low severity messages, useful for debugging purposes. */
+} WT_VERBOSE_LEVEL;
+/*! @} */
+/*
+ * Verbose section: END
+ */
+/*! @} */
+
 #undef __F
 
 #if defined(__cplusplus)

@@ -59,19 +59,33 @@ class test_verbose_base(wttest.WiredTigerTestCase, suite_subprocess):
     # Validates the JSON schema of a given event handler message, ensuring the schema is consistent and expected.
     def validate_json_schema(self, json_msg):
         expected_schema = dict(self.expected_json_schema)
+
         for field in json_msg:
             # Assert the JSON field is valid and expected.
             self.assertTrue(field in expected_schema, 'Unexpected field "%s" in JSON message: %s' % (field, str(json_msg)))
+
             # Assert the type of the JSON field is expected.
             self.assertEqual(type(json_msg[field]), expected_schema[field]['type'],
                     'Unexpected type of field "%s" in JSON message, expected "%s" but got "%s": %s' % (field,
                         str(expected_schema[field]['type']), str(type(json_msg[field])), str(json_msg)))
+
             expected_schema.pop(field, None)
+
         # Go through the remaining fields in the schema and ensure we've seen all the fields that are always expected be present
         # in the JSON message
         for field in expected_schema:
             self.assertFalse(expected_schema[field]['always_expected'], 'Expected field "%s" in JSON message, but not found: %s' %
                 (field, str(json_msg)))
+
+    # Validates the verbose category (and ID) in a JSON message is expected.
+    def validate_json_category(self, json_msg, expected_categories):
+        # Assert the category field is in the JSON message.
+        self.assertTrue('category' in json_msg, 'JSON message missing "category" field')
+        self.assertTrue('category_id' in json_msg, 'JSON message missing "category_id" field')
+        # Assert the category field values in the JSON message are expected.
+        self.assertTrue(json_msg['category'] in expected_categories, 'Unexpected verbose category "%s"' % json_msg['category'])
+        self.assertTrue(json_msg['category_id'] == expected_categories[json_msg['category']],
+                'The category ID received in the message "%d" does not match its expected definition "%d"' % (json_msg['category_id'], expected_categories[json_msg['category']]))
 
     def create_verbose_configuration(self, categories):
         if len(categories) == 0:
