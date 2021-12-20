@@ -162,9 +162,6 @@ __txn_oplist_printlog(
 void
 __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
-    /* The weak pointer should have already been freed. */
-    WT_ASSERT(session, op->whp == NULL);
-
     switch (op->type) {
     case WT_TXN_OP_NONE:
         /*
@@ -260,26 +257,18 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     conn = S2C(session);
     txn = session->txn;
 
+    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
+      F_ISSET(session, WT_SESSION_NO_LOGGING) ||
+      (F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING) &&
+        !FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE)))
+        return (0);
+
     /* We'd better have a transaction. */
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING) && F_ISSET(txn, WT_TXN_HAS_ID));
 
     WT_ASSERT(session, txn->mod_count > 0);
     op = txn->mod + txn->mod_count - 1;
     fileid = op->btree->id;
-
-    /* Set the weak hazard pointer for this update. */
-    if ((op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW)) {
-        if (!WT_IS_METADATA(op->btree->dhandle)) {
-            WT_ASSERT(session, cbt != NULL);
-            WT_RET(__wt_hazard_weak_set(session, cbt->ref, op));
-        }
-    }
-
-    if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||
-      F_ISSET(session, WT_SESSION_NO_LOGGING) ||
-      (F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING) &&
-        !FLD_ISSET(conn->log_flags, WT_CONN_LOG_DEBUG_MODE)))
-        return (0);
 
     /*
      * If this operation is diagnostic only, set the ignore bit on the fileid so that recovery can
