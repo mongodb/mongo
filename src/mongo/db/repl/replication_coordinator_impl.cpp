@@ -923,6 +923,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
 
     _replExecutor->startup();
 
+    LOGV2(6005300, "Starting up replica set aware services");
     ReplicaSetAwareServiceRegistry::get(_service).onStartup(opCtx);
 
     bool doneLoadingConfig = _startLoadLocalConfig(opCtx, lastShutdownState);
