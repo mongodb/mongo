@@ -200,12 +200,10 @@ TEST_F(FaultManagerTest, OneFacetIsResolved) {
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(FaultFacetType::kMock1, 1.1, "failing health check 1"));
     manager().acceptTest(HealthCheckStatus(FaultFacetType::kMock2, 1.1, "failing health check 2"));
-    assertSoon([this] {
-        return manager().getOrCreateFaultFacetsContainerTest()->getFacets().size() == 2;
-    });
+    assertSoon([this] { return manager().getOrCreateFaultTest()->getFacets().size() == 2; });
     manager().acceptTest(HealthCheckStatus(FaultFacetType::kMock1));
     assertSoon([this] {
-        return manager().getOrCreateFaultFacetsContainerTest()->getFacets().front()->getType() ==
+        return manager().getOrCreateFaultTest()->getFacets().front()->getType() ==
             FaultFacetType::kMock2;
     });
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);

@@ -92,14 +92,14 @@ public:
         return getHealthObservers();
     }
 
-    FaultFacetsContainerPtr getOrCreateFaultFacetsContainerTest() {
-        return getOrCreateFaultFacetsContainer();
+    FaultPtr getOrCreateFaultTest() {
+        return getOrCreateFault();
     }
 
-    FaultInternal& getFault() {
-        FaultFacetsContainerPtr fault = getFaultFacetsContainer();
+    Fault& getFault() {
+        FaultPtr fault = FaultManager::getFault();
         invariant(fault);
-        return *(static_cast<FaultInternal*>(fault.get()));
+        return *(static_cast<Fault*>(fault.get()));
     }
 
     void progressMonitorCheckTest(std::function<void(std::string cause)> crashCb) {

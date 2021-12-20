@@ -62,9 +62,7 @@ public:
     // Implements the common logic for periodic checks.
     // Every observer should implement periodicCheckImpl() for specific tests.
     SharedSemiFuture<HealthCheckStatus> periodicCheck(
-        FaultFacetsContainerFactory& factory,
-        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-        CancellationToken token) override;
+        std::shared_ptr<executor::TaskExecutor> taskExecutor, CancellationToken token) override;
 
     HealthCheckStatus makeHealthyStatus() const;
     HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;

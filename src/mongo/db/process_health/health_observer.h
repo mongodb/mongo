@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/process_health/fault_facet.h"
-#include "mongo/db/process_health/fault_facets_container.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
@@ -74,12 +73,10 @@ public:
      * Triggers health check. The implementation should not block to wait for the completion
      * of this check.
      *
-     * @param factory Interface to get or create the factory of facets container.
+     * @param factory Interface to get or create the factory of faults.
      */
     virtual SharedSemiFuture<HealthCheckStatus> periodicCheck(
-        FaultFacetsContainerFactory& factory,
-        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-        CancellationToken token) = 0;
+        std::shared_ptr<executor::TaskExecutor> taskExecutor, CancellationToken token) = 0;
 
     virtual HealthObserverLivenessStats getStats() const = 0;
 

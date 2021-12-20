@@ -32,7 +32,6 @@
 
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet.h"
-#include "mongo/db/process_health/fault_facet_container.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/process_health/health_observer.h"
@@ -56,8 +55,7 @@ namespace process_health {
  *
  * If an active fault state persists, FaultManager will terminate the server process.
  */
-class FaultManager : protected StateMachine<HealthCheckStatus, FaultState>,
-                     protected FaultFacetsContainerFactory {
+class FaultManager : protected StateMachine<HealthCheckStatus, FaultState> {
     FaultManager(const FaultManager&) = delete;
     FaultManager& operator=(const FaultManager&) = delete;
 
@@ -131,19 +129,19 @@ protected:
     // run.
     virtual void healthCheck(HealthObserver* observer, CancellationToken token);
 
-    // Protected interface FaultFacetsContainerFactory implementation.
+    FaultPtr getFault() const;
 
-    // The interface FaultFacetsContainerFactory is implemented by the member '_fault'.
-    FaultFacetsContainerPtr getFaultFacetsContainer() const override;
+    FaultPtr createFault();
 
-    FaultFacetsContainerPtr getOrCreateFaultFacetsContainer() override;
+    FaultPtr getOrCreateFault();
 
-    void updateWithCheckStatus(HealthCheckStatus&& checkStatus) override;
+    /**
+     * Update the active fault with supplied check result.
+     * Create or delete existing facet depending on the status.
+     */
+    void updateWithCheckStatus(HealthCheckStatus&& checkStatus);
 
     void schedulePeriodicHealthCheckThread();
-
-    // TODO: move this into fault class; refactor to remove FaultInternal
-    bool hasCriticalFacet(const FaultInternal* fault) const;
 
     void progressMonitorCheckForTests(std::function<void(std::string cause)> crashCb);
 
@@ -160,7 +158,7 @@ private:
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManager::_mutex");
 
-    std::shared_ptr<FaultInternal> _fault;
+    std::shared_ptr<Fault> _fault;
     // This source is canceled before the _taskExecutor shutdown(). It
     // can be used to check for the start of the shutdown sequence.
     CancellationSource _managerShuttingDownCancellationSource;

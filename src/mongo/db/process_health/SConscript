@@ -7,8 +7,8 @@ env = env.Clone()
 env.Library(
     target='fault_manager',
     source=[
+        'fault.cpp',
         'fault_facet_impl.cpp',
-        'fault_impl.cpp',
         'fault_manager.cpp',
         'fault_manager_config.cpp',
         'health_monitoring_server_parameters.idl',
@@ -37,10 +37,10 @@ env.Library(
 env.CppUnitTest(
     target='fault_base_classes_test',
     source=[
-        'fault_impl_test.cpp',
         'fault_facet_test.cpp',
         'fault_manager_test.cpp',
         'fault_state_machine_test.cpp',
+        'fault_test.cpp',
         'health_observer_test.cpp',
         'state_machine_test.cpp',
     ],
