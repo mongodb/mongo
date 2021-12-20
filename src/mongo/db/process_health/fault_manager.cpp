@@ -306,8 +306,7 @@ boost::optional<FaultState> FaultManager::handleOk(const OptionalMessageType& me
         logMessageReceived(state(), status);
     }
 
-    if (_config->getHealthObserverIntensity(status.getType()) ==
-        HealthObserverIntensityEnum::kOff) {
+    if (!_config->isHealthObserverEnabled(status.getType())) {
         return boost::none;
     }
 
@@ -472,7 +471,6 @@ SharedSemiFuture<void> FaultManager::startPeriodicHealthChecks() {
 }
 
 FaultState FaultManager::getFaultState() const {
-    stdx::lock_guard<Latch> lk(_stateMutex);
     return state();
 }
 
@@ -661,8 +659,7 @@ std::vector<HealthObserver*> FaultManager::getActiveHealthObservers() const {
     std::vector<HealthObserver*> result;
     result.reserve(allObservers.size());
     for (auto observer : allObservers) {
-        if (_config->getHealthObserverIntensity(observer->getType()) !=
-            HealthObserverIntensityEnum::kOff) {
+        if (_config->isHealthObserverEnabled(observer->getType())) {
             result.push_back(observer);
         }
     }
