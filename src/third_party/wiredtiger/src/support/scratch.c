@@ -67,7 +67,16 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
             WT_ASSERT(session, buf->size <= buf->memsize);
             memcpy(buf->mem, buf->data, buf->size);
         }
-        buf->data = (uint8_t *)buf->mem + offset;
+
+        /*
+         * There's an edge case where our caller initializes the item to zero bytes, for example if
+         * there's no configuration value and we're setting the item to reference it. In which case
+         * we never allocated memory and buf.mem == NULL. Handle the case explicitly to avoid
+         * sanitizer errors and let the caller continue. It's an error in the caller, but unless
+         * caller assumes buf.data points into buf.mem, there shouldn't be a subsequent failure, the
+         * item is consistent.
+         */
+        buf->data = buf->mem == NULL ? NULL : (uint8_t *)buf->mem + offset;
     }
 
     return (0);

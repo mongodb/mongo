@@ -19,35 +19,27 @@ __key_return(WT_CURSOR_BTREE *cbt)
     WT_ITEM *tmp;
     WT_PAGE *page;
     WT_ROW *rip;
-    WT_SESSION_IMPL *session;
 
     page = cbt->ref->page;
     cursor = &cbt->iface;
-    session = CUR2S(cbt);
 
     if (page->type == WT_PAGE_ROW_LEAF) {
-        rip = &page->pg_row[cbt->slot];
-
-        /*
-         * If the cursor references a WT_INSERT item, take its key. Else, if we have an exact match,
-         * we copied the key in the search function, take it from there. If we don't have an exact
-         * match, take the key from the original page.
-         */
+        /* If the cursor references a WT_INSERT item, take its key. */
         if (cbt->ins != NULL) {
             cursor->key.data = WT_INSERT_KEY(cbt->ins);
             cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
             return (0);
         }
 
+        /*
+         * If not in an insert list and there's an exact match, the row-store search function built
+         * the key we want to return in the cursor's temporary buffer. Swap the cursor's search-key
+         * and temporary buffers so we can return it (it's unsafe to return the temporary buffer
+         * itself because our caller might do another search in this table using the key we return,
+         * and we'd corrupt the search key during any subsequent search that used the temporary
+         * buffer).
+         */
         if (cbt->compare == 0) {
-            /*
-             * If not in an insert list and there's an exact match, the row-store search function
-             * built the key we want to return in the cursor's temporary buffer. Swap the cursor's
-             * search-key and temporary buffers so we can return it (it's unsafe to return the
-             * temporary buffer itself because our caller might do another search in this table
-             * using the key we return, and we'd corrupt the search key during any subsequent search
-             * that used the temporary buffer).
-             */
             tmp = cbt->row_key;
             cbt->row_key = cbt->tmp;
             cbt->tmp = tmp;
@@ -56,14 +48,16 @@ __key_return(WT_CURSOR_BTREE *cbt)
             cursor->key.size = cbt->row_key->size;
             return (0);
         }
-        return (__wt_row_leaf_key(session, page, rip, &cursor->key, false));
+
+        /* Otherwise, take the key from the original page. */
+        rip = &page->pg_row[cbt->slot];
+        return (__wt_row_leaf_key(CUR2S(cbt), page, rip, &cursor->key, false));
     }
 
     /*
-     * WT_PAGE_COL_FIX, WT_PAGE_COL_VAR:
-     *	The interface cursor's record has usually been set, but that
-     * isn't universally true, specifically, cursor.search_near may call
-     * here without first setting the interface cursor.
+     * WT_PAGE_COL_FIX, WT_PAGE_COL_VAR: The interface cursor's record has usually been set, but
+     * that isn't universally true, specifically, cursor.search_near may call here without first
+     * setting the interface cursor.
      */
     cursor->recno = cbt->recno;
     return (0);

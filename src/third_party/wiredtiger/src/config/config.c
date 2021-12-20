@@ -28,7 +28,8 @@ __wt_config_initn(WT_SESSION_IMPL *session, WT_CONFIG *conf, const char *str, si
 {
     conf->session = session;
     conf->orig = conf->cur = str;
-    conf->end = str + len;
+    if ((conf->end = str) != NULL)
+        conf->end += len;
     conf->depth = 0;
     conf->top = -1;
     conf->go = NULL;
