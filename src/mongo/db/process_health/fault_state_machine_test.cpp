@@ -279,16 +279,13 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
     resetManager(std::move(config));
 
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
-
-    // Create another observer so that we don't skip the startup check state.
+    registerMockHealthObserver(faultFacetType, [] { return 1.0; });
+    // kSystem is enabled.
     registerMockHealthObserver(FaultFacetType::kSystem, [] { return 0; });
 
+    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
-    advanceTime(Milliseconds(100));
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
     ASSERT(initialHealthCheckFuture.isReady());
 }
