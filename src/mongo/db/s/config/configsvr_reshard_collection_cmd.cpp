@@ -36,6 +36,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -221,6 +222,7 @@ public:
                 // requested shard key. Wait until the work is complete.
                 instance.get()->getCompletionFuture().get(opCtx);
             }
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
 
     private:
