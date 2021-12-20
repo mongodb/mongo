@@ -136,10 +136,11 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                     const CollectionPtr& collection,
-                                                     const BSONObj& shardKey,
-                                                     bool requireSingleKey) const override;
+    const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const BSONObj& shardKey,
+        bool requireSingleKey) const override;
 
     void findIndexByType(OperationContext* opCtx,
                          const std::string& type,

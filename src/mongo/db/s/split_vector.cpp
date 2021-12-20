@@ -166,14 +166,14 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         long long currCount = 0;
         long long numChunks = 0;
 
-        auto exec = InternalPlanner::indexScan(opCtx,
-                                               &collection.getCollection(),
-                                               shardKeyIdx,
-                                               minKey,
-                                               maxKey,
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                               InternalPlanner::FORWARD);
+        auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                       &collection.getCollection(),
+                                                       *shardKeyIdx,
+                                                       minKey,
+                                                       maxKey,
+                                                       BoundInclusion::kIncludeStartKeyOnly,
+                                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                       InternalPlanner::FORWARD);
 
         BSONObj currKey;
         PlanExecutor::ExecState state = exec->getNext(&currKey, nullptr);
@@ -184,14 +184,14 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         // Get the final key in the range, and see if it's the same as the first key.
         BSONObj maxKeyInChunk;
         {
-            auto exec = InternalPlanner::indexScan(opCtx,
-                                                   &collection.getCollection(),
-                                                   shardKeyIdx,
-                                                   maxKey,
-                                                   minKey,
-                                                   BoundInclusion::kIncludeEndKeyOnly,
-                                                   PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                   InternalPlanner::BACKWARD);
+            auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                           &collection.getCollection(),
+                                                           *shardKeyIdx,
+                                                           maxKey,
+                                                           minKey,
+                                                           BoundInclusion::kIncludeEndKeyOnly,
+                                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                           InternalPlanner::BACKWARD);
 
             PlanExecutor::ExecState state = exec->getNext(&maxKeyInChunk, nullptr);
             uassert(
@@ -307,14 +307,14 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                   "splitVector doing another cycle because of force",
                   "keyCount"_attr = keyCount);
 
-            exec = InternalPlanner::indexScan(opCtx,
-                                              &collection.getCollection(),
-                                              shardKeyIdx,
-                                              minKey,
-                                              maxKey,
-                                              BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                              InternalPlanner::FORWARD);
+            exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                      &collection.getCollection(),
+                                                      *shardKeyIdx,
+                                                      minKey,
+                                                      maxKey,
+                                                      BoundInclusion::kIncludeStartKeyOnly,
+                                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                      InternalPlanner::FORWARD);
 
             state = exec->getNext(&currKey, nullptr);
         }

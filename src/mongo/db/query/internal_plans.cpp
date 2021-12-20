@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/internal_plans.h"
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -42,8 +43,101 @@
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/record_id_helpers.h"
 
 namespace mongo {
+
+namespace {
+CollectionScanParams::ScanBoundInclusion getScanBoundInclusion(BoundInclusion indexBoundInclusion) {
+    switch (indexBoundInclusion) {
+        case BoundInclusion::kExcludeBothStartAndEndKeys:
+            return CollectionScanParams::ScanBoundInclusion::kExcludeBothStartAndEndRecords;
+        case BoundInclusion::kIncludeStartKeyOnly:
+            return CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+        case BoundInclusion::kIncludeEndKeyOnly:
+            return CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+        case BoundInclusion::kIncludeBothStartAndEndKeys:
+            return CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+// Construct collection scan params for a scan over the collection's cluster key. Callers must
+// confirm the collection's cluster key matches the keyPattern.
+CollectionScanParams convertIndexScanParamsToCollScanParams(
+    OperationContext* opCtx,
+    const CollectionPtr* coll,
+    const BSONObj& keyPattern,
+    const BSONObj& startKey,
+    const BSONObj& endKey,
+    BoundInclusion boundInclusion,
+    const InternalPlanner::Direction direction) {
+    const auto& collection = *coll;
+
+    dassert(collection->isClustered() &&
+            clustered_util::matchesClusterKey(keyPattern, collection->getClusteredInfo()));
+
+    boost::optional<RecordId> startRecord, endRecord;
+    if (!startKey.isEmpty()) {
+        startRecord = RecordId(record_id_helpers::keyForElem(startKey.firstElement()));
+    }
+    if (!endKey.isEmpty()) {
+        endRecord = RecordId(record_id_helpers::keyForElem(endKey.firstElement()));
+    }
+
+    // For a forward scan, the startKey is the minRecord. For a backward scan, it is the maxRecord.
+    auto minRecord = (direction == InternalPlanner::FORWARD) ? startRecord : endRecord;
+    auto maxRecord = (direction == InternalPlanner::FORWARD) ? endRecord : startRecord;
+
+    if (minRecord && maxRecord) {
+        // Regardless of direction, the minRecord should always be less than the maxRecord
+        dassert(minRecord < maxRecord,
+                str::stream() << "Expected the minRecord " << minRecord
+                              << " to be less than the maxRecord " << maxRecord
+                              << " on a bounded collection scan. Original startKey and endKey for "
+                                 "index scan ["
+                              << startKey << ", " << endKey << "]. Is FORWARD? "
+                              << (direction == InternalPlanner::FORWARD));
+    }
+
+    CollectionScanParams params;
+    params.minRecord = minRecord;
+    params.maxRecord = maxRecord;
+    if (InternalPlanner::FORWARD == direction) {
+        params.direction = CollectionScanParams::FORWARD;
+    } else {
+        params.direction = CollectionScanParams::BACKWARD;
+    }
+    params.boundInclusion = getScanBoundInclusion(boundInclusion);
+    return params;
+}
+
+CollectionScanParams createCollectionScanParams(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    WorkingSet* ws,
+    const CollectionPtr* coll,
+    InternalPlanner::Direction direction,
+    boost::optional<RecordId> resumeAfterRecordId,
+    boost::optional<RecordId> minRecord,
+    boost::optional<RecordId> maxRecord) {
+    const auto& collection = *coll;
+    invariant(collection);
+
+    CollectionScanParams params;
+    params.shouldWaitForOplogVisibility =
+        shouldWaitForOplogVisibility(expCtx->opCtx, collection, false);
+    params.resumeAfterRecordId = resumeAfterRecordId;
+    params.minRecord = minRecord;
+    params.maxRecord = maxRecord;
+    if (InternalPlanner::FORWARD == direction) {
+        params.direction = CollectionScanParams::FORWARD;
+    } else {
+        params.direction = CollectionScanParams::BACKWARD;
+    }
+    return params;
+}
+}  // namespace
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
@@ -60,8 +154,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
 
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
-    auto cs = _collectionScan(
-        expCtx, ws.get(), &collection, direction, resumeAfterRecordId, minRecord, maxRecord);
+
+    auto collScanParams = createCollectionScanParams(
+        expCtx, ws.get(), coll, direction, resumeAfterRecordId, minRecord, maxRecord);
+
+    auto cs = _collectionScan(expCtx, ws.get(), &collection, collScanParams);
 
     // Takes ownership of 'ws' and 'cs'.
     auto statusWithPlanExecutor =
@@ -116,14 +213,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
-    auto root = _collectionScan(expCtx,
-                                ws.get(),
-                                &collection,
-                                direction,
-                                boost::none,
-                                minRecord,
-                                maxRecord,
-                                true /* relaxCappedConstraints */);
+    auto collScanParams = createCollectionScanParams(
+        expCtx, ws.get(), coll, direction, boost::none /* resumeAfterId */, minRecord, maxRecord);
+
+    auto root = _collectionScan(
+        expCtx, ws.get(), &collection, collScanParams, true /* relaxCappedConstraints */);
 
     root = std::make_unique<DeleteStage>(
         expCtx.get(), std::move(params), ws.get(), collection, root.release());
@@ -217,6 +311,80 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     return std::move(executor.getValue());
 }
 
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::shardKeyIndexScan(
+    OperationContext* opCtx,
+    const CollectionPtr* collection,
+    const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+    const BSONObj& startKey,
+    const BSONObj& endKey,
+    BoundInclusion boundInclusion,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    Direction direction,
+    int options) {
+    if (shardKeyIdx.descriptor() != nullptr) {
+        return indexScan(opCtx,
+                         collection,
+                         shardKeyIdx.descriptor(),
+                         startKey,
+                         endKey,
+                         boundInclusion,
+                         yieldPolicy,
+                         direction,
+                         options);
+    }
+    // Do a clustered collection scan.
+    auto params = convertIndexScanParamsToCollScanParams(
+        opCtx, collection, shardKeyIdx.keyPattern(), startKey, endKey, boundInclusion, direction);
+    return collectionScan(opCtx, collection, params, yieldPolicy);
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWithShardKeyIndexScan(
+    OperationContext* opCtx,
+    const CollectionPtr* coll,
+    std::unique_ptr<DeleteStageParams> params,
+    const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+    const BSONObj& startKey,
+    const BSONObj& endKey,
+    BoundInclusion boundInclusion,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    Direction direction) {
+    if (shardKeyIdx.descriptor()) {
+        return deleteWithIndexScan(opCtx,
+                                   coll,
+                                   std::move(params),
+                                   shardKeyIdx.descriptor(),
+                                   startKey,
+                                   endKey,
+                                   boundInclusion,
+                                   yieldPolicy,
+                                   direction);
+    }
+    auto collectionScanParams = convertIndexScanParamsToCollScanParams(
+        opCtx, coll, shardKeyIdx.keyPattern(), startKey, endKey, boundInclusion, direction);
+
+    const auto& collection = *coll;
+    invariant(collection);
+
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+
+    auto root = _collectionScan(expCtx, ws.get(), &collection, collectionScanParams);
+    root = std::make_unique<DeleteStage>(
+        expCtx.get(), std::move(params), ws.get(), collection, root.release());
+
+    auto executor = plan_executor_factory::make(expCtx,
+                                                std::move(ws),
+                                                std::move(root),
+                                                &collection,
+                                                yieldPolicy,
+                                                false /* whether owned BSON must be returned */
+    );
+    invariant(executor.getStatus());
+    return std::move(executor.getValue());
+}
+
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
     OperationContext* opCtx,
     const CollectionPtr* coll,
@@ -255,41 +423,14 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
     const CollectionPtr* coll,
-    Direction direction,
-    boost::optional<RecordId> resumeAfterRecordId,
-    boost::optional<RecordId> minRecord,
-    boost::optional<RecordId> maxRecord,
+    const CollectionScanParams& params,
     bool relaxCappedConstraints) {
 
     const auto& collection = *coll;
     invariant(collection);
 
-    CollectionScanParams params;
-    params.shouldWaitForOplogVisibility =
-        shouldWaitForOplogVisibility(expCtx->opCtx, collection, false);
-    params.resumeAfterRecordId = resumeAfterRecordId;
-    params.minRecord = minRecord;
-    params.maxRecord = maxRecord;
-    if (FORWARD == direction) {
-        params.direction = CollectionScanParams::FORWARD;
-    } else {
-        params.direction = CollectionScanParams::BACKWARD;
-    }
-
     return std::make_unique<CollectionScan>(
         expCtx.get(), collection, params, ws, nullptr, relaxCappedConstraints);
-}
-
-std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    WorkingSet* ws,
-    const CollectionPtr* coll,
-    const CollectionScanParams& params) {
-
-    const auto& collection = *coll;
-    invariant(collection);
-
-    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, nullptr);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(

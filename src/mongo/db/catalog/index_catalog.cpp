@@ -39,6 +39,7 @@ namespace mongo {
 using IndexIterator = IndexCatalog::IndexIterator;
 using ReadyIndexesIterator = IndexCatalog::ReadyIndexesIterator;
 using AllIndexesIterator = IndexCatalog::AllIndexesIterator;
+using ShardKeyIndex = IndexCatalog::ShardKeyIndex;
 
 bool IndexIterator::more() {
     if (_start) {
@@ -99,6 +100,25 @@ const IndexCatalogEntry* AllIndexesIterator::_advance() {
     IndexCatalogEntry* entry = *_iterator;
     ++_iterator;
     return entry;
+}
+
+ShardKeyIndex::ShardKeyIndex(const IndexDescriptor* indexDescriptor)
+    : _indexDescriptor(indexDescriptor) {
+    tassert(6012300,
+            "The indexDescriptor for ShardKeyIndex(const IndexDescriptor* indexDescripto) must not "
+            "be a nullptr",
+            indexDescriptor != nullptr);
+}
+
+ShardKeyIndex::ShardKeyIndex(const ClusteredIndexSpec& clusteredIndexSpec)
+    : _indexDescriptor(nullptr),
+      _clusteredIndexKeyPattern(clusteredIndexSpec.getKey().getOwned()) {}
+
+const BSONObj& ShardKeyIndex::keyPattern() const {
+    if (_indexDescriptor != nullptr) {
+        return _indexDescriptor->keyPattern();
+    }
+    return _clusteredIndexKeyPattern;
 }
 
 StringData toString(IndexBuildMethod method) {

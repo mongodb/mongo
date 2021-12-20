@@ -160,18 +160,6 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                 "max"_attr = max,
                 "namespace"_attr = nss.ns());
 
-    const auto indexName = shardKeyIdx->indexName();
-    const IndexDescriptor* descriptor =
-        collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
-    if (!descriptor) {
-        LOGV2_ERROR_OPTIONS(23767,
-                            {logv2::UserAssertAfterLog(ErrorCodes::InternalError)},
-                            "Shard key index with name {indexName} on {namespace} was dropped",
-                            "Shard key index was dropped",
-                            "indexName"_attr = indexName,
-                            "namespace"_attr = nss.ns());
-    }
-
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
     deleteStageParams->fromMigrate = true;
     deleteStageParams->isMulti = true;
@@ -182,10 +170,11 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
             std::make_unique<RemoveSaver>("moveChunk", nss.ns(), "cleaning");
     }
 
-    auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
+    auto exec =
+        InternalPlanner::deleteWithShardKeyIndexScan(opCtx,
                                                      &collection,
                                                      std::move(deleteStageParams),
-                                                     descriptor,
+                                                     *shardKeyIdx,
                                                      min,
                                                      max,
                                                      BoundInclusion::kIncludeStartKeyOnly,

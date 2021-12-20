@@ -4,7 +4,7 @@
  * Perform CRUD operations in parallel on a clustered collection. Disallows dropping the collection
  * to prevent implicit creation of a non-clustered collection.
  *
- * TODO SERVER-60123: Enable sharding for clustered collections.
+ * TODO SERVER-61449: Support implicit clustered collection creation via shardCollection().
  * @tags: [
  *  requires_fcv_51,
  *  featureFlagClusteredIndexes,

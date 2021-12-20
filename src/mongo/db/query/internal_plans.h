@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
@@ -92,7 +93,7 @@ public:
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithCollectionScan(
         OperationContext* opCtx,
         const CollectionPtr* collection,
-        std::unique_ptr<DeleteStageParams> params,
+        std::unique_ptr<DeleteStageParams> deleteStageParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
         boost::optional<RecordId> minRecord = boost::none,
@@ -120,6 +121,39 @@ public:
         const CollectionPtr* collection,
         std::unique_ptr<DeleteStageParams> params,
         const IndexDescriptor* descriptor,
+        const BSONObj& startKey,
+        const BSONObj& endKey,
+        BoundInclusion boundInclusion,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        Direction direction = FORWARD);
+
+    /**
+     * Returns a scan over the 'shardKeyIdx'. If the 'shardKeyIdx' is a non-clustered index, returns
+     * an index scan. If the 'shardKeyIdx' is a clustered idx, returns a bounded collection scan
+     * since the clustered index does not require a separate index lookup table.
+     */
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> shardKeyIndexScan(
+        OperationContext* opCtx,
+        const CollectionPtr* collection,
+        const IndexCatalog::ShardKeyIndex& shardKeyIdx,
+        const BSONObj& startKey,
+        const BSONObj& endKey,
+        BoundInclusion boundInclusion,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        Direction direction = FORWARD,
+        int options = IXSCAN_DEFAULT);
+
+
+    /**
+     * Returns an IXSCAN => FETCH => DELETE plan when 'shardKeyIdx' indicates the index is a
+     * standard index or a COLLSCAN => DELETE when 'shardKeyIdx' indicates the index is a clustered
+     * index.
+     */
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithShardKeyIndexScan(
+        OperationContext* opCtx,
+        const CollectionPtr* collection,
+        std::unique_ptr<DeleteStageParams> params,
+        const IndexCatalog::ShardKeyIndex& shardKeyIdx,
         const BSONObj& startKey,
         const BSONObj& endKey,
         BoundInclusion boundInclusion,
@@ -157,7 +191,8 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
         const CollectionPtr* collection,
-        const CollectionScanParams& params);
+        const CollectionScanParams& params,
+        bool relaxCappedConstraints = false);
 
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.

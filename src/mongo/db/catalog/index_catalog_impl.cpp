@@ -1291,10 +1291,17 @@ void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
     }
 }
 
-const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                                   const CollectionPtr& collection,
-                                                                   const BSONObj& shardKey,
-                                                                   bool requireSingleKey) const {
+const boost::optional<IndexCatalog::ShardKeyIndex> IndexCatalogImpl::findShardKeyPrefixedIndex(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const BSONObj& shardKey,
+    bool requireSingleKey) const {
+    if (collection->isClustered() &&
+        clustered_util::matchesClusterKey(shardKey, collection->getClusteredInfo())) {
+        auto clusteredIndexSpec = collection->getClusteredInfo()->getIndexSpec();
+        return IndexCatalog::ShardKeyIndex(clusteredIndexSpec);
+    }
+
     const IndexDescriptor* best = nullptr;
 
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, false);
@@ -1309,14 +1316,19 @@ const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationCont
         if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
             continue;
 
-        if (!entry->isMultikey(opCtx, collection) && hasSimpleCollation)
-            return desc;
+        if (!entry->isMultikey(opCtx, collection) && hasSimpleCollation) {
+            return IndexCatalog::ShardKeyIndex(desc);
+        }
 
         if (!requireSingleKey && hasSimpleCollation)
             best = desc;
     }
 
-    return best;
+    if (best != nullptr) {
+        return IndexCatalog::ShardKeyIndex(best);
+    }
+
+    return boost::none;
 }
 
 void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,

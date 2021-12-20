@@ -791,11 +791,15 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
                                               Milliseconds(-1)));
 
     for (auto&& spec : indexes.docs) {
-        donorIndexSpecs.push_back(spec);
-        if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
-            if (indexNameElem.type() == BSONType::String &&
-                indexNameElem.valueStringData() == "_id_"_sd) {
-                donorIdIndexSpec = spec;
+        if (spec["clustered"]) {
+            // The 'clustered' index is implicitly created upon clustered collection creation.
+        } else {
+            donorIndexSpecs.push_back(spec);
+            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
+                if (indexNameElem.type() == BSONType::String &&
+                    indexNameElem.valueStringData() == "_id_"_sd) {
+                    donorIdIndexSpec = spec;
+                }
             }
         }
     }

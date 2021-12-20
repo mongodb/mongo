@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
@@ -181,6 +182,31 @@ public:
         std::unique_ptr<std::vector<IndexCatalogEntry*>> _ownedContainer;
     };
 
+    class ShardKeyIndex {
+    public:
+        /**
+         * Wraps information pertaining to the 'index' used as the shard key.
+         *
+         * A clustered index is not tied to an IndexDescriptor whereas all other types of indexes
+         * are. Either the 'index' is a clustered index and '_clusteredIndexKeyPattern' is
+         * non-empty, or '_indexDescriptor' is non-null and a standard index exists.
+         */
+        ShardKeyIndex(const IndexDescriptor* indexDescriptor);
+        ShardKeyIndex(const ClusteredIndexSpec& clusteredIndexSpec);
+
+        const BSONObj& keyPattern() const;
+        const IndexDescriptor* descriptor() const {
+            return _indexDescriptor;
+        }
+
+    private:
+        const IndexDescriptor* _indexDescriptor;
+
+        // Stores the keyPattern when the index is a clustered index and there is no
+        // IndexDescriptor. Empty otherwise.
+        BSONObj _clusteredIndexKeyPattern;
+    };
+
     IndexCatalog() = default;
     virtual ~IndexCatalog() = default;
 
@@ -261,10 +287,11 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
-                                                             const CollectionPtr& collection,
-                                                             const BSONObj& shardKey,
-                                                             bool requireSingleKey) const = 0;
+    virtual const boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const BSONObj& shardKey,
+        bool requireSingleKey) const = 0;
 
     virtual void findIndexByType(OperationContext* opCtx,
                                  const std::string& type,

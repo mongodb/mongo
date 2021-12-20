@@ -857,15 +857,15 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(
 
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.
-    return InternalPlanner::indexScan(opCtx,
-                                      &collection,
-                                      shardKeyIdx,
-                                      min,
-                                      max,
-                                      BoundInclusion::kIncludeStartKeyOnly,
-                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                      InternalPlanner::Direction::FORWARD,
-                                      scanOption);
+    return InternalPlanner::shardKeyIndexScan(opCtx,
+                                              &collection,
+                                              *shardKeyIdx,
+                                              min,
+                                              max,
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                              InternalPlanner::Direction::FORWARD,
+                                              scanOption);
 }
 
 Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
@@ -942,8 +942,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     uint64_t averageObjectIdSize = 0;
     const uint64_t defaultObjectIdSize = OID::kOIDSize;
 
-    // For a time series collection, an index on '_id' is not required.
-    if (totalRecs > 0 && !collection->getTimeseriesOptions()) {
+    // For clustered collection, an index on '_id' is not required.
+    if (totalRecs > 0 && !collection->isClustered()) {
         const auto idIdx = collection->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
         if (!idIdx) {
             return {ErrorCodes::IndexNotFound,

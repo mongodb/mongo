@@ -376,7 +376,7 @@ public:
                                                                   keyPattern,
                                                                   /*requireSingleKey=*/true);
 
-            if (shardKeyIdx == nullptr) {
+            if (!shardKeyIdx) {
                 errmsg = "couldn't find valid index containing key pattern";
                 return false;
             }
@@ -385,13 +385,13 @@ public:
             min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
-            exec = InternalPlanner::indexScan(opCtx,
-                                              &collection.getCollection(),
-                                              shardKeyIdx,
-                                              min,
-                                              max,
-                                              BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+            exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                      &collection.getCollection(),
+                                                      *shardKeyIdx,
+                                                      min,
+                                                      max,
+                                                      BoundInclusion::kIncludeStartKeyOnly,
+                                                      PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         }
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(

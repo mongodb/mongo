@@ -62,10 +62,9 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
  * object extended to cover the entire shardKey. See KeyPattern::extendRangeBound documentation for
  * some examples.
  */
-const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const IndexDescriptor* shardKeyIdx,
-                                                           const BSONObj& min,
-                                                           const BSONObj& max) {
-    KeyPattern kp(shardKeyIdx->keyPattern());
+const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(
+    const IndexCatalog::ShardKeyIndex& shardKeyIdx, const BSONObj& min, const BSONObj& max) {
+    KeyPattern kp(shardKeyIdx.keyPattern());
 
     // Extend min to get (min, MinKey, MinKey, ....)
     BSONObj minKey = Helpers::toKeyFormat(kp.extendRangeBound(min, false /* upperInclusive */));
@@ -86,21 +85,21 @@ const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const IndexDescriptor
  */
 bool maxKeyEqualToMinKey(OperationContext* opCtx,
                          const CollectionPtr* collection,
-                         const IndexDescriptor* shardKeyIdx,
+                         const IndexCatalog::ShardKeyIndex& shardKeyIdx,
                          const BSONObj& minBound,
                          const BSONObj& maxBound,
                          const BSONObj& minKeyInChunk) {
     BSONObj maxKeyInChunk;
     {
         auto backwardIdxScanner =
-            InternalPlanner::indexScan(opCtx,
-                                       collection,
-                                       shardKeyIdx,
-                                       maxBound,
-                                       minBound,
-                                       BoundInclusion::kIncludeEndKeyOnly,
-                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                       InternalPlanner::BACKWARD);
+            InternalPlanner::shardKeyIndexScan(opCtx,
+                                               collection,
+                                               shardKeyIdx,
+                                               maxBound,
+                                               minBound,
+                                               BoundInclusion::kIncludeEndKeyOnly,
+                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                               InternalPlanner::BACKWARD);
 
         PlanExecutor::ExecState state = backwardIdxScanner->getNext(&maxKeyInChunk, nullptr);
         uassert(ErrorCodes::OperationFailed,
@@ -115,9 +114,9 @@ bool maxKeyEqualToMinKey(OperationContext* opCtx,
             5865001,
             "Possible low cardinality key detected in range. Range contains only a single key.",
             "namespace"_attr = collection->get()->ns(),
-            "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minBound)),
-            "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxBound)),
-            "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKeyInChunk)));
+            "minKey"_attr = redact(prettyKey(shardKeyIdx.keyPattern(), minBound)),
+            "maxKey"_attr = redact(prettyKey(shardKeyIdx.keyPattern(), maxBound)),
+            "key"_attr = redact(prettyKey(shardKeyIdx.keyPattern(), minKeyInChunk)));
         return true;
     }
 
@@ -171,18 +170,18 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                               << keyPattern.clientReadable().toString(),
                 shardKeyIdx);
 
-        const auto [minKey, maxKey] = getMinMaxExtendedBounds(shardKeyIdx, min, max);
+        const auto [minKey, maxKey] = getMinMaxExtendedBounds(*shardKeyIdx, min, max);
 
         // Setup the index scanner that will be used to find the split points
         auto forwardIdxScanner =
-            InternalPlanner::indexScan(opCtx,
-                                       &(*collection),
-                                       shardKeyIdx,
-                                       minKey,
-                                       maxKey,
-                                       BoundInclusion::kIncludeStartKeyOnly,
-                                       PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                       InternalPlanner::FORWARD);
+            InternalPlanner::shardKeyIndexScan(opCtx,
+                                               &(*collection),
+                                               *shardKeyIdx,
+                                               minKey,
+                                               maxKey,
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                               InternalPlanner::FORWARD);
 
         // Get minimum key belonging to the chunk
         BSONObj minKeyInOriginalChunk;
@@ -197,7 +196,7 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
         // Return empty vector if chunk's min and max keys are the same.
         if (maxKeyEqualToMinKey(opCtx,
                                 &collection.getCollection(),
-                                shardKeyIdx,
+                                *shardKeyIdx,
                                 minKey,
                                 maxKey,
                                 minKeyInOriginalChunk)) {
@@ -295,15 +294,15 @@ std::vector<BSONObj> autoSplitVector(OperationContext* opCtx,
                 // Fairly recalculate the last `nSplitPointsToReposition` split points.
                 splitKeys.erase(splitKeys.end() - nSplitPointsToReposition, splitKeys.end());
 
-                auto forwardIdxScanner =
-                    InternalPlanner::indexScan(opCtx,
-                                               &collection.getCollection(),
-                                               shardKeyIdx,
-                                               splitKeys.empty() ? minKeyElement : splitKeys.back(),
-                                               maxKey,
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                               InternalPlanner::FORWARD);
+                auto forwardIdxScanner = InternalPlanner::shardKeyIndexScan(
+                    opCtx,
+                    &collection.getCollection(),
+                    *shardKeyIdx,
+                    splitKeys.empty() ? minKeyElement : splitKeys.back(),
+                    maxKey,
+                    BoundInclusion::kIncludeStartKeyOnly,
+                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                    InternalPlanner::FORWARD);
 
                 numScannedKeys = 0;
 
