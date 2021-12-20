@@ -42,7 +42,6 @@ HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx)
     : _svcCtx(svcCtx), _rand(PseudoRandom(SecureRandom().nextInt64())) {}
 
 SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
-    FaultFacetsContainerFactory& factory,
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     std::shared_ptr<AtomicWord<bool>> cancellationToken) {
     // If we have reached here, the intensity of this health observer must not be off

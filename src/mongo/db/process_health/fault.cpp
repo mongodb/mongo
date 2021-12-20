@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/process_health/fault_impl.h"
+#include "mongo/db/process_health/fault.h"
 
 namespace mongo {
 namespace process_health {
 
-FaultImpl::FaultImpl(ClockSource* clockSource)
+Fault::Fault(ClockSource* clockSource)
     : _clockSource(clockSource), _startTime(_clockSource->now()) {
     invariant(clockSource);  // Will crash before this line, just for readability.
 }
 
-UUID FaultImpl::getId() const {
+UUID Fault::getId() const {
     return _id;
 }
 
-double FaultImpl::getSeverity() const {
+double Fault::getSeverity() const {
     auto facets = getFacets();
 
     // Simple algo to compute aggregate severity: take the max from all facets.
@@ -56,17 +56,17 @@ double FaultImpl::getSeverity() const {
     return severity;
 }
 
-Milliseconds FaultImpl::getDuration() const {
+Milliseconds Fault::getDuration() const {
     return Milliseconds(_clockSource->now() - _startTime);
 }
 
-std::vector<FaultFacetPtr> FaultImpl::getFacets() const {
+std::vector<FaultFacetPtr> Fault::getFacets() const {
     auto lk = stdx::lock_guard(_mutex);
     std::vector<FaultFacetPtr> result(_facets.begin(), _facets.end());
     return result;
 }
 
-FaultFacetPtr FaultImpl::getFaultFacet(FaultFacetType type) {
+FaultFacetPtr Fault::getFaultFacet(FaultFacetType type) {
     auto lk = stdx::lock_guard(_mutex);
     auto it = std::find_if(_facets.begin(), _facets.end(), [type](const FaultFacetPtr& facet) {
         return facet->getType() == type;
@@ -77,34 +77,31 @@ FaultFacetPtr FaultImpl::getFaultFacet(FaultFacetType type) {
     return *it;
 }
 
-void FaultImpl::updateWithSuppliedFacet(FaultFacetType type, FaultFacetPtr facet) {
+void Fault::removeFacet(FaultFacetType type) {
     auto lk = stdx::lock_guard(_mutex);
+    _facets.erase(
+        std::remove_if(_facets.begin(),
+                       _facets.end(),
+                       [this, type](const FaultFacetPtr& f) { return f->getType() == type; }),
+        _facets.end());
+}
 
-    if (!facet) {
-        // Delete existing.
-        _facets.erase(
-            std::remove_if(_facets.begin(),
-                           _facets.end(),
-                           [this, type](const FaultFacetPtr& f) { return f->getType() == type; }),
-            _facets.end());
-        return;
-    }
-
-    invariant(type == facet->getType());
-    // Update or insert.
+void Fault::upsertFacet(FaultFacetPtr facet) {
+    invariant(facet);
+    auto type = facet->getType();
+    auto lk = stdx::lock_guard(_mutex);
     for (auto& existing : _facets) {
         invariant(existing);
         if (existing->getType() == type) {
-            existing = facet;
+            existing->update(facet->getStatus());
             return;
         }
     }
-
     // We are here if existing was not found - insert new.
     _facets.push_back(std::move(facet));
 }
 
-void FaultImpl::garbageCollectResolvedFacets() {
+void Fault::garbageCollectResolvedFacets() {
     auto lk = stdx::lock_guard(_mutex);
     _facets.erase(std::remove_if(_facets.begin(),
                                  _facets.end(),
@@ -116,7 +113,7 @@ void FaultImpl::garbageCollectResolvedFacets() {
                   _facets.end());
 }
 
-void FaultImpl::appendDescription(BSONObjBuilder* builder) const {
+void Fault::appendDescription(BSONObjBuilder* builder) const {
     builder->append("id", getId().toBSON());
     builder->append("severity", getSeverity());
     builder->append("duration", getDuration().toBSON());
@@ -127,6 +124,18 @@ void FaultImpl::appendDescription(BSONObjBuilder* builder) const {
 
     builder->append("facets", facetsBuilder.obj());
     builder->append("numFacets", static_cast<int>(_facets.size()));
+}
+
+bool Fault::hasCriticalFacet(const FaultManagerConfig& config) const {
+    const auto& facets = this->getFacets();
+    for (const auto& facet : facets) {
+        auto facetType = facet->getType();
+        if (config.getHealthObserverIntensity(facetType) ==
+            HealthObserverIntensityEnum::kCritical) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace process_health
