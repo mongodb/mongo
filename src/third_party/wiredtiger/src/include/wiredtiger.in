@@ -6354,20 +6354,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_WALK_SESSIONS			1514
 /*! transaction: transactions committed */
 #define	WT_STAT_CONN_TXN_COMMIT				1515
-/*!
- * transaction: transactions committed with one or more updates resolved
- * through the slow path
- */
-#define	WT_STAT_CONN_TXN_COMMIT_SLOW_RESOLVED		1516
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1517
-/*!
- * transaction: transactions rolled back with one or more updates
- * resolved through the slow path
- */
-#define	WT_STAT_CONN_TXN_ROLLBACK_SLOW_RESOLVED		1518
+#define	WT_STAT_CONN_TXN_ROLLBACK			1516
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1519
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1517
 
 /*!
  * @}

@@ -254,8 +254,6 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     WT_ITEM *logrec;
     WT_TXN *txn;
     WT_TXN_OP *op;
-    WT_UPDATE *upd;
-    bool set_weak_hazard;
 
     uint32_t fileid;
 
@@ -269,33 +267,12 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
     op = txn->mod + txn->mod_count - 1;
     fileid = op->btree->id;
 
-    /*
-     * We take a weak hazard pointer for an operation if this transaction is marked to be resolving
-     * the uncommitted updates. This is not supported on the metadata, and is only supported on the
-     * row and column store operations.
-     */
-    set_weak_hazard = (txn->resolve_weak_hazard_updates && !WT_IS_METADATA(op->btree->dhandle) &&
-      (op->type == WT_TXN_OP_BASIC_COL || op->type == WT_TXN_OP_INMEM_COL ||
-        op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW));
-
-    /*
-     * This is temporary till we support more cases for resolving uncommitted updates: If there are
-     * older updates to this key by the same transaction, or if there are truncates, for now decide
-     * not to proceed with resolving uncommitted updates. If we decide to stop resolving the
-     * uncommitted updates, we need to clear the weak hazard pointers for the operations that have
-     * taken one.
-     */
-    upd = op->u.op_upd;
-    if (set_weak_hazard && upd != NULL && upd->next != NULL &&
-      (upd->next->txnid == txn->id || F_ISSET(upd->next, WT_UPDATE_RESTORED_FAST_TRUNCATE))) {
-        WT_RET(__wt_txn_op_list_clear_weak_hazard(session));
-        set_weak_hazard = txn->resolve_weak_hazard_updates = false;
-    }
-
     /* Set the weak hazard pointer for this update. */
-    if (set_weak_hazard) {
-        WT_ASSERT(session, cbt != NULL);
-        WT_RET(__wt_hazard_weak_set(session, cbt->ref, op));
+    if ((op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW)) {
+        if (!WT_IS_METADATA(op->btree->dhandle)) {
+            WT_ASSERT(session, cbt != NULL);
+            WT_RET(__wt_hazard_weak_set(session, cbt->ref, op));
+        }
     }
 
     if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ||

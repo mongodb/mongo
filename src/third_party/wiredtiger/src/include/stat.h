@@ -848,9 +848,7 @@ struct __wt_connection_stats {
     int64_t txn_rollback_to_stable_running;
     int64_t txn_walk_sessions;
     int64_t txn_commit;
-    int64_t txn_commit_slow_resolved;
     int64_t txn_rollback;
-    int64_t txn_rollback_slow_resolved;
     int64_t txn_update_conflict;
 };
 

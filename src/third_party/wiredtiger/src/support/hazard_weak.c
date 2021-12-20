@@ -179,16 +179,27 @@ __wt_hazard_weak_set(WT_SESSION_IMPL *session, WT_REF *ref, WT_TXN_OP *op)
 
 /*
  * __wt_hazard_weak_clear --
- *     Clear a weak hazard pointer.
+ *     Clear a weak hazard pointer, given a modify operation.
  */
 int
-__wt_hazard_weak_clear(WT_SESSION_IMPL *session, WT_HAZARD_WEAK **whpp)
+__wt_hazard_weak_clear(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
     WT_HAZARD_WEAK *whp;
     WT_HAZARD_WEAK_ARRAY *wha;
 
-    whp = *whpp;
-    *whpp = NULL;
+    /* If a file can never be evicted, hazard pointers aren't required. */
+    if (F_ISSET(op->btree, WT_BTREE_IN_MEMORY))
+        return (0);
+
+    whp = op->whp;
+    /*
+     * An empty slot reflects a serious error, we should always find the weak hazard pointer. Panic,
+     * because we messed up in and it could imply corruption.
+     */
+    if (whp == NULL || whp->ref == NULL)
+        WT_RET_PANIC(session, WT_PANIC,
+          "session %p: could not find the weak hazard pointer for a modify operation",
+          (void *)session);
 
     /*
      * We don't publish the weak hazard pointer clear as we only clear while holding the hazard
@@ -219,6 +230,9 @@ __wt_hazard_weak_clear(WT_SESSION_IMPL *session, WT_HAZARD_WEAK **whpp)
         WT_RET_PANIC(session, EINVAL,
           "session %p: While clearing weak hazard pointer could not find the array.",
           (void *)session);
+
+    /* Clear the hazard stored in the modify operation. */
+    op->whp = NULL;
 
     return (0);
 }
@@ -263,71 +277,4 @@ __wt_hazard_weak_invalidate(WT_SESSION_IMPL *session, WT_REF *ref)
         WT_HAZARD_WEAK_FORALL_BARRIER_END
     }
     WT_STAT_CONN_INCRV(session, cache_hazard_walks, walk_cnt);
-}
-
-/*
- * __wt_hazard_weak_upgrade --
- *     Attempts to convert a weak hazard pointer into a full hazard pointer, failing if it has been
- *     invalidated.
- */
-int
-__wt_hazard_weak_upgrade(WT_SESSION_IMPL *session, WT_HAZARD_WEAK **whpp, WT_REF **refp)
-{
-    WT_DECL_RET;
-    WT_HAZARD_WEAK *whp;
-    bool busy;
-
-    *refp = NULL;
-    whp = *whpp;
-
-    /* If a file can never be evicted, hazard pointers aren't required. */
-    if (F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
-        return (0);
-
-    /*
-     * An empty slot reflects a serious error, we should always find the weak hazard pointer.
-     * Assert, because we messed up in and it could imply corruption.
-     */
-    WT_ASSERT(session, whp != NULL && whp->ref != NULL);
-
-    /* If the weak pointer has already been invalidated, we can't upgrade, we are done. */
-    if (!whp->valid)
-        WT_ERR(EBUSY);
-
-#ifdef HAVE_DIAGNOSTIC
-    /*
-     * Failing to upgrade the hazard pointer will encourage testing the resolution of uncommitted
-     * updates more often.
-     */
-    if (__wt_random(&session->rnd) % 10 == 0)
-        WT_ERR(EBUSY);
-#endif
-
-    /*
-     * Attempt to take a strong hazard pointer. Eviction on this page might prevent us from being
-     * able to do so, in such a case we can't upgrade, we are done.
-     */
-    WT_ERR(__wt_hazard_set(session, whp->ref, &busy));
-    if (busy)
-        WT_ERR(EBUSY);
-
-    /*
-     * Paranoia: Eviction could still race with us and mark the pointers invalid after we have
-     * checked their validity and before setting strong hazard pointer. Check again.
-     */
-    if (!whp->valid) {
-        WT_ERR(__wt_hazard_clear(session, whp->ref));
-        WT_ERR(EBUSY);
-    }
-
-    /*
-     * We have successfully upgraded. Clear the weak hazards and return the page reference. We want
-     * to clear the weak hazard pointers even in case of errors as we will take a slow path to
-     * resolve the updates.
-     */
-    *refp = whp->ref;
-
-err:
-    WT_TRET(__wt_hazard_weak_clear(session, whpp));
-    return (ret);
 }

@@ -289,9 +289,6 @@ struct __wt_txn {
     u_int prepare_count;
 #endif
 
-    /* This is a temporary feature flag to simplify resolving uncommitted updates. */
-    bool resolve_weak_hazard_updates;
-
     /* Scratch buffer for in-memory log records. */
     WT_ITEM *logrec;
 
