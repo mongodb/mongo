@@ -144,6 +144,14 @@ protected:
         return *_txnWithRetries;
     }
 
+    void resetTxnWithRetries() {
+        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
+        _mockClient = mockClient.get();
+        _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
+            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
+    }
+
+private:
     ServiceContext::UniqueOperationContext _opCtx;
     txn_api::details::MockTransactionClient* _mockClient;
     std::shared_ptr<txn_api::TransactionWithRetries> _txnWithRetries;
@@ -152,19 +160,39 @@ protected:
 void assertTxnMetadata(BSONObj obj,
                        TxnNumber txnNumber,
                        boost::optional<TxnRetryCounter> txnRetryCounter,
-                       boost::optional<bool> startTransaction) {
+                       boost::optional<bool> startTransaction,
+                       boost::optional<BSONObj> readConcern = boost::none,
+                       boost::optional<BSONObj> writeConcern = boost::none) {
     ASSERT_EQ(obj["lsid"].type(), BSONType::Object);
     ASSERT_EQ(obj["autocommit"].Bool(), false);
     ASSERT_EQ(obj["txnNumber"].Long(), txnNumber);
+
     if (txnRetryCounter) {
         ASSERT_EQ(obj["txnRetryCounter"].Int(), *txnRetryCounter);
     } else {
         ASSERT(obj["txnRetryCounter"].eoo());
     }
+
     if (startTransaction) {
         ASSERT_EQ(obj["startTransaction"].Bool(), *startTransaction);
     } else {
         ASSERT(obj["startTransaction"].eoo());
+    }
+
+    if (readConcern) {
+        ASSERT_BSONOBJ_EQ(obj["readConcern"].Obj(), *readConcern);
+    } else if (startTransaction) {
+        // If we didn't expect an explicit read concern, the startTransaction request should still
+        // send the implicit default read concern.
+        ASSERT_BSONOBJ_EQ(obj["readConcern"].Obj(), repl::ReadConcernArgs::kImplicitDefault);
+    } else {
+        ASSERT(obj["readConcern"].eoo());
+    }
+
+    if (writeConcern) {
+        ASSERT_BSONOBJ_EQ(obj["writeConcern"].Obj(), *writeConcern);
+    } else {
+        ASSERT(obj["writeConcern"].eoo());
     }
 }
 
@@ -205,8 +233,175 @@ TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
+TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnCommit) {
+    const std::vector<WriteConcernOptions> writeConcernOptions = {
+        WriteConcernOptions(1, WriteConcernOptions::SyncMode::JOURNAL, 100),
+        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::FSYNC, 0),
+        WriteConcernOptions(2, WriteConcernOptions::SyncMode::NONE, -1)};
+
+    for (const auto& writeConcern : writeConcernOptions) {
+        opCtx()->setWriteConcern(writeConcern);
+
+        resetTxnWithRetries();
+
+        int attempt = -1;
+        txnWithRetries().runSync(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                attempt += 1;
+
+                // No write concern on requests prior to commit/abort.
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                auto insertRes = txnClient
+                                     .runCommand("user"_sd,
+                                                 BSON("insert"
+                                                      << "foo"
+                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                     .get();
+                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+                assertTxnMetadata(mockClient()->getLastSentRequest(),
+                                  attempt /* txnNumber */,
+                                  0 /* txnRetryCounter */,
+                                  true /* startTransaction */);
+
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                insertRes = txnClient
+                                .runCommand("user"_sd,
+                                            BSON("insert"
+                                                 << "foo"
+                                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                .get();
+                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+                assertTxnMetadata(mockClient()->getLastSentRequest(),
+                                  attempt /* txnNumber */,
+                                  0 /* txnRetryCounter */,
+                                  boost::none /* startTransaction */);
+
+                // Throw a transient error to verify the retries behavior.
+                uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
+
+                // The commit response.
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+                return SemiFuture<void>::makeReady();
+            });
+        auto lastRequest = mockClient()->getLastSentRequest();
+        assertTxnMetadata(lastRequest,
+                          attempt /* txnNumber */,
+                          0 /* txnRetryCounter */,
+                          boost::none /* startTransaction */,
+                          boost::none /* readConcern */,
+                          writeConcern.toBSON());
+        ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+    }
+}
+
+TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
+    const std::vector<WriteConcernOptions> writeConcernOptions = {
+        WriteConcernOptions(1, WriteConcernOptions::SyncMode::JOURNAL, 100),
+        WriteConcernOptions("majority", WriteConcernOptions::SyncMode::FSYNC, 0),
+        WriteConcernOptions(2, WriteConcernOptions::SyncMode::NONE, -1)};
+
+    for (const auto& writeConcern : writeConcernOptions) {
+        opCtx()->setWriteConcern(writeConcern);
+
+        resetTxnWithRetries();
+        try {
+            txnWithRetries().runSync(
+                opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                    mockClient()->setNextCommandResponse(kOKInsertResponse);
+                    auto insertRes =
+                        txnClient
+                            .runCommand("user"_sd,
+                                        BSON("insert"
+                                             << "foo"
+                                             << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                            .get();
+                    ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+
+                    uasserted(ErrorCodes::InternalError, "Mock error");
+                    // The abort response, the client should ignore this.
+                    mockClient()->setNextCommandResponse(kResWithBadValueError);
+                    return SemiFuture<void>::makeReady();
+                });
+        } catch (const DBException& e) {
+            ASSERT_EQ(e.code(), ErrorCodes::InternalError);
+        }
+        auto lastRequest = mockClient()->getLastSentRequest();
+        assertTxnMetadata(lastRequest,
+                          0 /* txnNumber */,
+                          0 /* txnRetryCounter */,
+                          boost::none /* startTransaction */,
+                          boost::none /* readConcern */,
+                          writeConcern.toBSON() /* writeConcern */);
+        ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+    }
+}
+
+TEST_F(TxnAPITest, OwnSession_AttachesReadConcernOnStartTransaction) {
+    const std::vector<repl::ReadConcernLevel> readConcernLevels = {
+        repl::ReadConcernLevel::kLocalReadConcern,
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernLevel::kSnapshotReadConcern};
+
+    for (const auto& readConcernLevel : readConcernLevels) {
+        auto readConcern = repl::ReadConcernArgs(readConcernLevel);
+        repl::ReadConcernArgs::get(opCtx()) = readConcern;
+
+        resetTxnWithRetries();
+
+        int attempt = -1;
+        txnWithRetries().runSync(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                attempt += 1;
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                auto insertRes = txnClient
+                                     .runCommand("user"_sd,
+                                                 BSON("insert"
+                                                      << "foo"
+                                                      << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                     .get();
+                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+                assertTxnMetadata(mockClient()->getLastSentRequest(),
+                                  attempt /* txnNumber */,
+                                  0 /* txnRetryCounter */,
+                                  true /* startTransaction */,
+                                  readConcern.toBSONInner());
+
+                // Subsequent requests shouldn't have a read concern.
+                mockClient()->setNextCommandResponse(kOKInsertResponse);
+                insertRes = txnClient
+                                .runCommand("user"_sd,
+                                            BSON("insert"
+                                                 << "foo"
+                                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                                .get();
+                ASSERT_EQ(insertRes["n"].Int(), 1);  // Verify the mocked response was returned.
+                assertTxnMetadata(mockClient()->getLastSentRequest(),
+                                  attempt /* txnNumber */,
+                                  0 /* txnRetryCounter */,
+                                  boost::none /* startTransaction */);
+
+                // Throw a transient error to verify the retry will still use the read concern.
+                uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
+
+                // The commit response.
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+                return SemiFuture<void>::makeReady();
+            });
+        auto lastRequest = mockClient()->getLastSentRequest();
+        assertTxnMetadata(lastRequest,
+                          attempt /* txnNumber */,
+                          0 /* txnRetryCounter */,
+                          boost::none /* startTransaction */,
+                          boost::none /* readConcern */,
+                          WriteConcernOptions().toBSON() /* writeConcern */);
+        ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+    }
 }
 
 TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
@@ -234,7 +429,9 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 }
 
@@ -304,7 +501,9 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -341,7 +540,9 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -378,7 +579,9 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     // The retry loop will try to best effort abort before returning.
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 }
@@ -416,7 +619,9 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -452,7 +657,9 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 
@@ -486,7 +693,9 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 }
 
@@ -518,7 +727,9 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
                       0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */);
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
 

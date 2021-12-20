@@ -297,6 +297,8 @@ private:
     Status _latestResponseWCStatus = Status::OK();
 
     OperationSessionInfo _sessionInfo;
+    repl::ReadConcernArgs _readConcern;
+    WriteConcernOptions _writeConcern;
     ExecutionContext _execContext;
     TransactionState _state{TransactionState::kInit};
 };

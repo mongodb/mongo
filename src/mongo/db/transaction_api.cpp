@@ -41,6 +41,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
@@ -213,7 +215,7 @@ SemiFuture<void> Transaction::_commitOrAbort(StringData dbName, StringData cmdNa
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(cmdName, 1);
-    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
+    cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern.toBSON());
     auto cmdObj = cmdBuilder.obj();
 
     return _txnClient->runCommand(dbName, cmdObj)
@@ -270,6 +272,7 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
     if (_state == TransactionState::kInit) {
         _state = TransactionState::kStarted;
         _sessionInfo.setStartTransaction(boost::none);
+        cmdBuilder->append(_readConcern.toBSON().firstElement());
     }
 
     _latestResponseStatus = Status::OK();
@@ -377,10 +380,16 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
     _sessionInfo.setStartTransaction(true);
     _sessionInfo.setAutocommit(false);
 
+    // Extract non-session options.
+    _readConcern = repl::ReadConcernArgs::get(opCtx);
+    _writeConcern = opCtx->getWriteConcern();
+
     LOGV2_DEBUG(5875901,
                 0,  // TODO SERVER-61781: Raise verbosity.
                 "Started internal transaction",
                 "sessionInfo"_attr = _sessionInfo,
+                "readConcern"_attr = _readConcern,
+                "writeConcern"_attr = _writeConcern,
                 "execContext"_attr = _execContextToString(_execContext));
 }
 

@@ -491,6 +491,15 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
 
     if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
             serverGlobalParams.featureCompatibility)) {
+        // The transaction API will use the write concern on the opCtx, which will have the default
+        // sharding wTimeout of 60 seconds. Refining a shard key may involve writing many more
+        // documents than a normal operation, so we override the write concern to not use a
+        // wTimeout, matching the behavior before the API was introduced.
+        WriteConcernOptions originalWC = opCtx->getWriteConcern();
+        opCtx->setWriteConcern(WriteConcernOptions(
+            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0));
+        ON_BLOCK_EXIT([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
+
         withTransactionAPI(opCtx, nss, std::move(updateCollectionAndChunksWithAPIFn));
     } else {
         withTransaction(opCtx, nss, std::move(updateCollectionAndChunksFn));
