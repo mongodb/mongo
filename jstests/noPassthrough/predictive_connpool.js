@@ -85,6 +85,18 @@ function hasConnPoolStats(args) {
         }
 
         jsTestLog("Connection stats for " + host + ": " + tojson(stats));
+        if (stats.available != ready) {
+            jsTestLog("Different stats for the \"available\" field. Actual: " + stats.available +
+                      ", Expected: " + ready);
+        }
+        if (stats.refreshing != pending) {
+            jsTestLog("Different stats for the \"refreshing\" field. Actual: " + stats.refreshing +
+                      ", Expected: " + pending);
+        }
+        if (stats.inUse != active) {
+            jsTestLog("Different stats for the \"inUse\" field. Actual: " + stats.inUse +
+                      ", Expected: " + active);
+        }
         return stats.available == ready && stats.refreshing == pending && stats.inUse == active;
     }
 
