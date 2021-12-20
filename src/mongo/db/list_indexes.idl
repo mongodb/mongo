@@ -151,7 +151,7 @@ structs:
             originalSpec:
                 type: object_owned
                 optional: true
-                unstable: false
+                unstable: true
             clustered:
                 type: safeBool
                 optional: true
