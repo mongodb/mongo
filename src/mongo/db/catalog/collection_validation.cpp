@@ -619,9 +619,6 @@ Status validate(OperationContext* opCtx,
             // results.
             _validateIndexesInternalStructure(opCtx, &validateState, results);
         }
-        if (MONGO_unlikely(gRoundtripBsonColumnOnValidate && getTestCommandsEnabled())) {
-            _validateBSONColumnRoundtrip(opCtx, &validateState, results);
-        }
 
         if (!results->valid) {
             _reportInvalidResults(opCtx, &validateState, results, output);
@@ -719,6 +716,10 @@ Status validate(OperationContext* opCtx,
         // At this point, validation is complete and successful.
         // Report the validation results for the user to see.
         _reportValidationResults(opCtx, &validateState, results, output);
+
+        if (MONGO_unlikely(gRoundtripBsonColumnOnValidate && getTestCommandsEnabled())) {
+            _validateBSONColumnRoundtrip(opCtx, &validateState, results);
+        }
 
         LOGV2_OPTIONS(20306,
                       {LogComponent::kIndex},
