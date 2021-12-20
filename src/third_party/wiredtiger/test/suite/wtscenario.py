@@ -135,7 +135,7 @@ def multiply_scenarios(sep, *args):
 
 def prune_sorter_key(scene):
     """
-    Used by prune_scenerios to extract key for sorting.
+    Used by prune_scenarios to extract key for sorting.
     The key is the saved random value multiplied by
     the probability of choosing.
     """
@@ -146,7 +146,7 @@ def prune_sorter_key(scene):
 
 def prune_resort_key(scene):
     """
-    Used by prune_scenerios to extract the original ordering key for sorting.
+    Used by prune_scenarios to extract the original ordering key for sorting.
     """
     return scene[1]['_order']
 
