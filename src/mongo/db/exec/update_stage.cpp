@@ -694,7 +694,7 @@ bool UpdateStage::wasExistingShardKeyUpdated(const ShardingWriteRouter& sharding
                                              const Snapshotted<BSONObj>& oldObj) {
     const auto css = shardingWriteRouter.getCollectionShardingState();
 
-    const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+    const ShardKeyPattern& shardKeyPattern = collDesc.getShardKeyPattern();
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
 

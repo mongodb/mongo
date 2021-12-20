@@ -111,8 +111,7 @@ bool skipWriteToOrphanDocument(OperationContext* opCtx,
         return false;
     }
 
-    const ShardKeyPattern shardKeyPattern{collFilter.getKeyPattern()};
-    const auto shardKey{shardKeyPattern.extractShardKeyFromDocThrows(doc)};
+    const auto shardKey{collFilter.getShardKeyPattern().extractShardKeyFromDocThrows(doc)};
 
     return !collFilter.keyBelongsToMe(shardKey);
 }

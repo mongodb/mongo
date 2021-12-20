@@ -125,7 +125,7 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
         if (css->getCollectionDescription(opCtx()).isSharded()) {
             const auto collFilter = css->getOwnershipFilter(
                 opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
-            const ShardKeyPattern shardKeyPattern(collFilter.getKeyPattern());
+            const ShardKeyPattern& shardKeyPattern = collFilter.getShardKeyPattern();
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newDocument);
 
             if (!collFilter.keyBelongsToMe(newShardKey)) {
