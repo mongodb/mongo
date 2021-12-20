@@ -35,7 +35,8 @@ const donorRst = new ReplSetTest({
         }
     })
 });
-donorRst.startSet();
+const oplogMinRetentionHours = 2;  // Set to standard Evergreen task timeout time
+donorRst.startSet({oplogMinRetentionHours});
 donorRst.initiateWithHighElectionTimeout();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
 
