@@ -103,7 +103,7 @@ protected:
 
     // Indicates if there any check running to prevent running checks concurrently.
     bool _currentlyRunningHealthCheck = false;
-    std::unique_ptr<DeadlineFuture<HealthCheckStatus>> _deadlineFuture;
+    std::shared_ptr<const DeadlineFuture<HealthCheckStatus>> _deadlineFuture;
     // Enforces the safety interval.
     Date_t _lastTimeTheCheckWasRun;
     Date_t _lastTimeCheckCompleted;

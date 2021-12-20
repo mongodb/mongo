@@ -56,7 +56,7 @@ SharedSemiFuture<HealthCheckStatus> HealthObserverBase::periodicCheck(
         _currentlyRunningHealthCheck = true;
     }
 
-    _deadlineFuture = std::make_unique<DeadlineFuture<HealthCheckStatus>>(
+    _deadlineFuture = DeadlineFuture<HealthCheckStatus>::create(
         taskExecutor,
         periodicCheckImpl({token, taskExecutor})
             .onCompletion([this](StatusWith<HealthCheckStatus> status) {
