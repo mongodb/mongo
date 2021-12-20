@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/process_health/fault_impl.h"
+#include "mongo/db/process_health/fault.h"
 
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -37,37 +37,37 @@ namespace mongo {
 namespace process_health {
 namespace {
 
-class FaultImplTest : public unittest::Test {
+class FaultTest : public unittest::Test {
 public:
     void setUp() override {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
-        _faultImpl = std::make_unique<FaultImpl>(_svcCtx->getFastClockSource());
+        _faultImpl = std::make_unique<Fault>(_svcCtx->getFastClockSource());
     }
 
     ClockSourceMock& clockSource() {
         return *static_cast<ClockSourceMock*>(_svcCtx->getFastClockSource());
     }
 
-    FaultImpl& fault() {
+    Fault& fault() {
         return *_faultImpl;
     }
 
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
 
-    std::unique_ptr<FaultImpl> _faultImpl;
+    std::unique_ptr<Fault> _faultImpl;
 };
 
 
-TEST_F(FaultImplTest, TimeSourceWorks) {
+TEST_F(FaultTest, TimeSourceWorks) {
     // Fault was just created, duration should be zero.
     ASSERT_EQ(Milliseconds(0), fault().getDuration());
     clockSource().advance(Milliseconds(1));
     ASSERT_EQ(Milliseconds(1), fault().getDuration());
 }
 
-TEST_F(FaultImplTest, SeverityLevelHelpersWork) {
+TEST_F(FaultTest, SeverityLevelHelpersWork) {
     FaultFacetMock resolvedFacet(FaultFacetType::kMock1, &clockSource(), [] { return 0; });
     ASSERT_TRUE(HealthCheckStatus::isResolved(resolvedFacet.getStatus().getSeverity()));
 
@@ -78,26 +78,26 @@ TEST_F(FaultImplTest, SeverityLevelHelpersWork) {
     ASSERT_TRUE(HealthCheckStatus::isActiveFault(faultyFacet.getStatus().getSeverity()));
 }
 
-TEST_F(FaultImplTest, FindFacetByType) {
+TEST_F(FaultTest, FindFacetByType) {
     ASSERT_EQ(0, fault().getFacets().size());
     ASSERT_FALSE(fault().getFaultFacet(FaultFacetType::kMock1));
 
     FaultFacetPtr newFacet =
         std::make_shared<FaultFacetMock>(FaultFacetType::kMock1, &clockSource(), [] { return 0; });
-    fault().updateWithSuppliedFacet(FaultFacetType::kMock1, newFacet);
+    fault().upsertFacet(newFacet);
     auto facet = fault().getFaultFacet(FaultFacetType::kMock1);
     ASSERT_TRUE(facet);
     auto status = facet->getStatus();
     ASSERT_EQ(FaultFacetType::kMock1, status.getType());
 }
 
-TEST_F(FaultImplTest, CanCreateAndGarbageCollectFacets) {
+TEST_F(FaultTest, CanCreateAndGarbageCollectFacets) {
     AtomicDouble severity{0.1};
 
     ASSERT_EQ(0, fault().getFacets().size());
     FaultFacetPtr newFacet = std::make_shared<FaultFacetMock>(
         FaultFacetType::kMock1, &clockSource(), [&severity] { return severity.load(); });
-    fault().updateWithSuppliedFacet(FaultFacetType::kMock1, newFacet);
+    fault().upsertFacet(newFacet);
     // New facet was added successfully.
     ASSERT_EQ(1, fault().getFacets().size());
 

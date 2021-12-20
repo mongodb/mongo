@@ -35,8 +35,8 @@
 
 #include <algorithm>
 
+#include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet_impl.h"
-#include "mongo/db/process_health/fault_impl.h"
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_monitoring_gen.h"
 #include "mongo/db/process_health/health_observer_registration.h"
@@ -269,7 +269,7 @@ boost::optional<FaultState> FaultManager::handleStartupCheck(const OptionalMessa
     }
 
     updateWithCheckStatus(HealthCheckStatus(status));
-    auto optionalFault = getFaultFacetsContainer();
+    auto optionalFault = getFault();
     if (optionalFault) {
         optionalFault->garbageCollectResolvedFacets();
     }
@@ -279,7 +279,10 @@ boost::optional<FaultState> FaultManager::handleStartupCheck(const OptionalMessa
             FaultState::kStartupCheck, FaultState::kStartupCheck, boost::none);
     }
 
-    std::shared_ptr<FaultInternal> faultToDelete;
+    // If the whole fault becomes resolved, garbage collect it
+    // with proper locking.
+    std::shared_ptr<Fault> faultToDelete;
+
     {
         auto lk = stdx::lock_guard(_mutex);
         if (_fault && _fault->getFacets().empty()) {
@@ -331,7 +334,7 @@ boost::optional<FaultState> FaultManager::handleTransientFault(const OptionalMes
 
     updateWithCheckStatus(HealthCheckStatus(status));
 
-    auto optionalActiveFault = getFaultFacetsContainer();
+    auto optionalActiveFault = getFault();
     if (optionalActiveFault) {
         optionalActiveFault->garbageCollectResolvedFacets();
     }
@@ -372,7 +375,7 @@ void FaultManager::logCurrentState(FaultState, FaultState newState, const Option
 }
 
 void FaultManager::setTransientFaultDeadline(FaultState, FaultState, const OptionalMessageType&) {
-    if (hasCriticalFacet(_fault.get()) && !_transientFaultDeadline) {
+    if (_fault->hasCriticalFacet(getConfig()) && !_transientFaultDeadline) {
         _transientFaultDeadline = std::make_unique<TransientFaultDeadline>(
             this, _taskExecutor, _config->getActiveFaultDuration());
     }
@@ -480,21 +483,27 @@ Date_t FaultManager::getLastTransitionTime() const {
 
 FaultConstPtr FaultManager::currentFault() const {
     auto lk = stdx::lock_guard(_mutex);
-    return std::static_pointer_cast<const Fault>(_fault);
+    return _fault;
 }
 
-FaultFacetsContainerPtr FaultManager::getFaultFacetsContainer() const {
+FaultPtr FaultManager::getFault() const {
     auto lk = stdx::lock_guard(_mutex);
-    return std::static_pointer_cast<FaultFacetsContainer>(_fault);
+    return _fault;
 }
 
-FaultFacetsContainerPtr FaultManager::getOrCreateFaultFacetsContainer() {
+FaultPtr FaultManager::createFault() {
+    auto lk = stdx::lock_guard(_mutex);
+    _fault = std::make_shared<Fault>(_svcCtx->getFastClockSource());
+    return _fault;
+}
+
+FaultPtr FaultManager::getOrCreateFault() {
     auto lk = stdx::lock_guard(_mutex);
     if (!_fault) {
         // Create a new one.
-        _fault = std::make_shared<FaultImpl>(_svcCtx->getFastClockSource());
+        _fault = std::make_shared<Fault>(_svcCtx->getFastClockSource());
     }
-    return std::static_pointer_cast<FaultFacetsContainer>(_fault);
+    return _fault;
 }
 
 void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token) {
@@ -565,7 +574,7 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
     }
 
     // Run asynchronous health check.  Send output to the state machine. Schedule next run.
-    auto healthCheckFuture = observer->periodicCheck(*this, _taskExecutor, token)
+    auto healthCheckFuture = observer->periodicCheck(_taskExecutor, token)
                                  .thenRunOn(_taskExecutor)
                                  .onCompletion([this, acceptNotOKStatus, schedulerCb](
                                                    StatusWith<HealthCheckStatus> status) {
@@ -589,37 +598,22 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
 }
 
 void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
+    auto fault = getFault();
+    // Remove resolved facet from the fault.
     if (HealthCheckStatus::isResolved(checkStatus.getSeverity())) {
-        auto container = getFaultFacetsContainer();
-        if (container) {
-            container->updateWithSuppliedFacet(checkStatus.getType(), nullptr);
+        if (fault) {
+            fault->removeFacet(checkStatus.getType());
         }
-
         return;
     }
 
-    auto container = getOrCreateFaultFacetsContainer();
-    auto facet = container->getFaultFacet(checkStatus.getType());
-    if (!facet) {
-        const auto type = checkStatus.getType();
-        auto newFacet =
-            new FaultFacetImpl(type, _svcCtx->getFastClockSource(), std::move(checkStatus));
-        container->updateWithSuppliedFacet(type, FaultFacetPtr(newFacet));
-    } else {
-        facet->update(std::move(checkStatus));
+    if (!_fault) {
+        fault = createFault();  // Create fault if it doesn't exist.
     }
-}
 
-bool FaultManager::hasCriticalFacet(const FaultInternal* fault) const {
-    invariant(fault);
-    const auto& facets = fault->getFacets();
-    for (const auto& facet : facets) {
-        auto facetType = facet->getType();
-        if (_config->getHealthObserverIntensity(facetType) ==
-            HealthObserverIntensityEnum::kCritical)
-            return true;
-    }
-    return false;
+    const auto type = checkStatus.getType();
+    fault->upsertFacet(std::make_shared<FaultFacetImpl>(
+        type, _svcCtx->getFastClockSource(), std::move(checkStatus)));
 }
 
 FaultManagerConfig FaultManager::getConfig() const {

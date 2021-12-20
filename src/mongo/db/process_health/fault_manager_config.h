@@ -90,7 +90,7 @@ public:
     /* Maximum possible jitter added to the time between health checks */
     static auto inline constexpr kPeriodicHealthCheckMaxJitter{Milliseconds{100}};
 
-    HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) {
+    HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) const {
         auto intensities = _getHealthObserverIntensities();
 
         auto toObserverType = [](FaultFacetType type) -> boost::optional<HealthObserverTypeEnum> {
