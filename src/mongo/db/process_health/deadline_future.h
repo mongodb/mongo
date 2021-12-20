@@ -42,19 +42,45 @@ namespace process_health {
  * - otherwise the outputFuture returns an error.
  */
 template <typename ResultStatus>
-class DeadlineFuture {
+class DeadlineFuture : public std::enable_shared_from_this<DeadlineFuture<ResultStatus>> {
 public:
-    DeadlineFuture(std::shared_ptr<executor::TaskExecutor> executor,
-                   Future<ResultStatus> inputFuture,
-                   Milliseconds timeout)
-        : _executor(executor) {
+    static std::shared_ptr<DeadlineFuture<ResultStatus>> create(
+        std::shared_ptr<executor::TaskExecutor> executor,
+        Future<ResultStatus> inputFuture,
+        Milliseconds timeout) {
+        auto instance = std::shared_ptr<DeadlineFuture<ResultStatus>>(
+            new DeadlineFuture<ResultStatus>(executor));
+        instance->init(instance, std::move(inputFuture), timeout);
+        return instance;
+    }
+
+    ~DeadlineFuture() {
+        auto lk = stdx::lock_guard(_mutex);
+        _executor->cancel(_timeoutCbHandle.get());
+        // The _executor holds the shared ptr on this, the callback will set the promise.
+        invariant(get().isReady());
+    }
+
+    SharedSemiFuture<ResultStatus> get() const {
+        return _outputFuturePromise->getFuture();
+    }
+
+private:
+    DeadlineFuture(std::shared_ptr<executor::TaskExecutor> executor) : _executor(executor) {}
+
+    void init(std::shared_ptr<DeadlineFuture<ResultStatus>> self,
+              Future<ResultStatus> inputFuture,
+              Milliseconds timeout) {
         _outputFuturePromise = std::make_unique<SharedPromise<ResultStatus>>();
 
         auto swCbHandle = _executor->scheduleWorkAt(
-            _executor->now() + timeout, [this](const executor::TaskExecutor::CallbackArgs& cbData) {
+            _executor->now() + timeout,
+            [this, self](const executor::TaskExecutor::CallbackArgs& cbData) {
                 auto lk = stdx::lock_guard(_mutex);
-
                 if (!cbData.status.isOK()) {
+                    if (!get().isReady()) {
+                        _outputFuturePromise->setError(cbData.status);
+                    }
                     return;
                 }
 
@@ -74,33 +100,22 @@ public:
 
         _timeoutCbHandle = swCbHandle.getValue();
 
-        _inputFuture = std::move(inputFuture).onCompletion([this](StatusWith<ResultStatus> status) {
-            {
+        _inputFuture =
+            std::move(inputFuture).onCompletion([this, self](StatusWith<ResultStatus> status) {
                 auto lk = stdx::lock_guard(_mutex);
                 _executor->cancel(_timeoutCbHandle.get());
                 if (!get().isReady()) {
                     _outputFuturePromise->setFrom(status);
                 }
                 return status;
-            }
-        });
-    }
-
-    ~DeadlineFuture() {
-        {
-            auto lk = stdx::lock_guard(_mutex);
-            _executor->cancel(_timeoutCbHandle.get());
-        }
-    }
-
-    SharedSemiFuture<ResultStatus> get() const {
-        return _outputFuturePromise->getFuture();
+            });
     }
 
 private:
+    const std::shared_ptr<executor::TaskExecutor> _executor;
+
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "DeadlineFuture::_mutex");
-    const std::shared_ptr<executor::TaskExecutor> _executor;
     Future<ResultStatus> _inputFuture;
     boost::optional<executor::TaskExecutor::CallbackHandle> _timeoutCbHandle;
     std::unique_ptr<SharedPromise<ResultStatus>> _outputFuturePromise;
