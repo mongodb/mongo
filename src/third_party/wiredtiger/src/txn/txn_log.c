@@ -548,10 +548,13 @@ __wt_txn_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_
         txn->ckpt_nsnapshot = txn->snapshot_count;
         recsize = (size_t)txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
         WT_ERR(__wt_scr_alloc(session, recsize, &txn->ckpt_snapshot));
-        p = txn->ckpt_snapshot->mem;
-        end = p + recsize;
-        for (i = 0; i < txn->snapshot_count; i++)
-            WT_ERR(__wt_vpack_uint(&p, WT_PTRDIFF(end, p), txn->snapshot[i]));
+        end = p = txn->ckpt_snapshot->mem;
+        /* There many not be any snapshot entries. */
+        if (end != NULL) {
+            end += recsize;
+            for (i = 0; i < txn->snapshot_count; i++)
+                WT_ERR(__wt_vpack_uint(&p, WT_PTRDIFF(end, p), txn->snapshot[i]));
+        }
         break;
     case WT_TXN_LOG_CKPT_STOP:
         /*
@@ -591,8 +594,7 @@ __wt_txn_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_
             FLD_ISSET(conn->log_flags, WT_CONN_LOG_FORCE_DOWNGRADE)) &&
           txn->full_ckpt)
             __wt_log_ckpt(session, ckpt_lsn);
-
-    /* FALLTHROUGH */
+        /* FALLTHROUGH */
     case WT_TXN_LOG_CKPT_CLEANUP:
         /* Cleanup any allocated resources */
         WT_INIT_LSN(ckpt_lsn);
