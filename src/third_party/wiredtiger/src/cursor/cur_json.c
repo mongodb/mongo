@@ -306,7 +306,8 @@ __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 
 /*
  * __wt_json_unpack_char --
- *     Unpack a single character into JSON escaped format. Can be called with null buf for sizing.
+ *     Unpack a single character into JSON escaped format. Can be called with NULL buf for sizing,
+ *     and won't overwrite the buffer end in any case.
  */
 size_t
 __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
@@ -357,6 +358,28 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
         *buf++ = __wt_hex(ch & 0x0f);
     }
     return (6);
+}
+
+/*
+ * __wt_json_unpack_str --
+ *     Unpack a string into JSON escaped format. Can be called with NULL buf for sizing and won't
+ *     overwrite the buffer end in any case.
+ */
+size_t
+__wt_json_unpack_str(u_char *dest, size_t dest_len, const u_char *src, size_t src_len)
+{
+    size_t n, total;
+
+    for (total = 0; src_len > 0; ++src, --src_len, total += n) {
+        n = __wt_json_unpack_char(*src, dest, dest_len, false);
+        if (dest_len >= n) {
+            dest_len -= n;
+            dest += n;
+        }
+    }
+    if (dest_len > 0)
+        *dest = '\0';
+    return (total);
 }
 
 /*
