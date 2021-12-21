@@ -6,81 +6,56 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define WT_GEN_VERBOSE_ENUM(value) value,
-#define WT_GEN_VERBOSE_ENUM_STR(value_str) #value_str,
-
-/* Disable clang format for the following macro to keep the categories formatted on a new line. */
 /* clang-format off */
-#define WT_GEN_VERBOSE_CATEGORIES(gen) \
-    gen(WT_VERB_API)                   \
-    gen(WT_VERB_BACKUP)                \
-    gen(WT_VERB_BLKCACHE)              \
-    gen(WT_VERB_BLOCK)                 \
-    gen(WT_VERB_CHECKPOINT)            \
-    gen(WT_VERB_CHECKPOINT_CLEANUP)    \
-    gen(WT_VERB_CHECKPOINT_PROGRESS)   \
-    gen(WT_VERB_COMPACT)               \
-    gen(WT_VERB_COMPACT_PROGRESS)      \
-    gen(WT_VERB_DEFAULT)               \
-    gen(WT_VERB_ERROR_RETURNS)         \
-    gen(WT_VERB_EVICT)                 \
-    gen(WT_VERB_EVICTSERVER)           \
-    gen(WT_VERB_EVICT_STUCK)           \
-    gen(WT_VERB_EXTENSION)             \
-    gen(WT_VERB_FILEOPS)               \
-    gen(WT_VERB_GENERATION)            \
-    gen(WT_VERB_HANDLEOPS)             \
-    gen(WT_VERB_HS)                    \
-    gen(WT_VERB_HS_ACTIVITY)           \
-    gen(WT_VERB_LOG)                   \
-    gen(WT_VERB_LSM)                   \
-    gen(WT_VERB_LSM_MANAGER)           \
-    gen(WT_VERB_METADATA)              \
-    gen(WT_VERB_MUTEX)                 \
-    gen(WT_VERB_OUT_OF_ORDER)          \
-    gen(WT_VERB_OVERFLOW)              \
-    gen(WT_VERB_READ)                  \
-    gen(WT_VERB_RECONCILE)             \
-    gen(WT_VERB_RECOVERY)              \
-    gen(WT_VERB_RECOVERY_PROGRESS)     \
-    gen(WT_VERB_RTS)                   \
-    gen(WT_VERB_SALVAGE)               \
-    gen(WT_VERB_SHARED_CACHE)          \
-    gen(WT_VERB_SPLIT)                 \
-    gen(WT_VERB_TEMPORARY)             \
-    gen(WT_VERB_THREAD_GROUP)          \
-    gen(WT_VERB_TIERED)                \
-    gen(WT_VERB_TIMESTAMP)             \
-    gen(WT_VERB_TRANSACTION)           \
-    gen(WT_VERB_VERIFY)                \
-    gen(WT_VERB_VERSION)               \
-    gen(WT_VERB_WRITE)
+#define WT_VERBOSE_CATEGORY_STR_INIT \
+    { \
+    /* AUTOMATIC VERBOSE ENUM STRING GENERATION START */ \
+    "WT_VERB_API", \
+    "WT_VERB_BACKUP", \
+    "WT_VERB_BLKCACHE", \
+    "WT_VERB_BLOCK", \
+    "WT_VERB_CHECKPOINT", \
+    "WT_VERB_CHECKPOINT_CLEANUP", \
+    "WT_VERB_CHECKPOINT_PROGRESS", \
+    "WT_VERB_COMPACT", \
+    "WT_VERB_COMPACT_PROGRESS", \
+    "WT_VERB_DEFAULT", \
+    "WT_VERB_ERROR_RETURNS", \
+    "WT_VERB_EVICT", \
+    "WT_VERB_EVICTSERVER", \
+    "WT_VERB_EVICT_STUCK", \
+    "WT_VERB_EXTENSION", \
+    "WT_VERB_FILEOPS", \
+    "WT_VERB_GENERATION", \
+    "WT_VERB_HANDLEOPS", \
+    "WT_VERB_HS", \
+    "WT_VERB_HS_ACTIVITY", \
+    "WT_VERB_LOG", \
+    "WT_VERB_LSM", \
+    "WT_VERB_LSM_MANAGER", \
+    "WT_VERB_MUTEX", \
+    "WT_VERB_METADATA", \
+    "WT_VERB_OUT_OF_ORDER", \
+    "WT_VERB_OVERFLOW", \
+    "WT_VERB_READ", \
+    "WT_VERB_RECONCILE", \
+    "WT_VERB_RECOVERY", \
+    "WT_VERB_RECOVERY_PROGRESS", \
+    "WT_VERB_RTS", \
+    "WT_VERB_SALVAGE", \
+    "WT_VERB_SHARED_CACHE", \
+    "WT_VERB_SPLIT", \
+    "WT_VERB_TEMPORARY", \
+    "WT_VERB_THREAD_GROUP", \
+    "WT_VERB_TIERED", \
+    "WT_VERB_TIMESTAMP", \
+    "WT_VERB_TRANSACTION", \
+    "WT_VERB_VERIFY", \
+    "WT_VERB_VERSION", \
+    "WT_VERB_WRITE", \
+    /* AUTOMATIC VERBOSE ENUM STRING GENERATION STOP */ \
+    }
 /* clang-format on */
-
-/* Permitted verbose event categories that can be used when defining a verbose message. */
-typedef enum {
-    WT_GEN_VERBOSE_CATEGORIES(WT_GEN_VERBOSE_ENUM)
-    /* This entry needs to be the last in order to track the number of category items. */
-    WT_VERB_NUM_CATEGORIES,
-} WT_VERBOSE_CATEGORY;
-
-/* Convert a category to its string representation. */
-#define WT_VERBOSE_CATEGORY_STR(category) \
-    (const char *[]){WT_GEN_VERBOSE_CATEGORIES(WT_GEN_VERBOSE_ENUM_STR)}[category]
-
-/*
- * Permitted verbosity levels; to be used when defining verbose messages. The levels define a range
- * of severity categories, with WT_VERBOSE_ERROR being the lowest, most critical level (used by
- * messages on critical error paths) and WT_VERBOSE_DEBUG being the highest verbosity/informational
- * level (mostly adopted for debugging).
- */
-typedef enum {
-    WT_VERBOSE_ERROR = -3,
-    WT_VERBOSE_WARNING,
-    WT_VERBOSE_NOTICE,
-    WT_VERBOSE_INFO,
-    WT_VERBOSE_DEBUG
-} WT_VERBOSE_LEVEL;
 
 /* Convert a verbose level to its string representation. */
 #define WT_VERBOSE_LEVEL_STR(level, level_str) \
