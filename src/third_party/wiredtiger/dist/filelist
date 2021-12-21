@@ -102,7 +102,6 @@ src/evict/evict_stat.c
 src/history/hs_conn.c
 src/history/hs_cursor.c
 src/history/hs_rec.c
-src/history/hs_verify.c
 src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c

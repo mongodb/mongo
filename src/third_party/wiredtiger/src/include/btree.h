@@ -92,11 +92,6 @@ typedef enum { /* Start position for eviction walk */
 } WT_EVICT_WALK_TYPE;
 
 /*
- * An invalid btree file ID value. ID 0 is reserved for the metadata file.
- */
-#define WT_BTREE_ID_INVALID UINT32_MAX
-
-/*
  * WT_BTREE --
  *	A btree handle.
  */
