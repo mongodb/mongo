@@ -487,8 +487,10 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         invariant((*collection)->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
     }
 
-    // TODO(SERVER-61481): (Generic FCV reference): Remove this block once kLastLTS is 6.0.
-    if (serverGlobalParams.featureCompatibility.isLessThan(multiversion::GenericFCV::kLatest)) {
+    // TODO(SERVER-61481): Remove this block once kLastLTS is 6.0. As of 5.2, dropping an index
+    // while having a separate index build on the same collection is permitted.
+    if (serverGlobalParams.featureCompatibility.isLessThan(
+            multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
         // The index catalog requires that no active index builders are running when dropping ready
         // indexes.
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
@@ -532,8 +534,10 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                   "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 
-        // TODO(SERVER-61481): (Generic FCV reference): Remove this block once kLastLTS is 6.0.
-        if (serverGlobalParams.featureCompatibility.isLessThan(multiversion::GenericFCV::kLatest)) {
+        // TODO(SERVER-61481): Remove this block once kLastLTS is 6.0. As of 5.2, dropping an index
+        // while having a separate index build on the same collection is permitted.
+        if (serverGlobalParams.featureCompatibility.isLessThan(
+                multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
             IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
                 collection->uuid());
         }
