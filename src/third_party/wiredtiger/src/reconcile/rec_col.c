@@ -35,6 +35,8 @@ __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
              */
             __wt_rec_incr(
               session, r, cbulk->entry, __bitstr_size((size_t)cbulk->entry * btree->bitcnt));
+            __bit_clear_end(
+              WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), cbulk->entry, btree->bitcnt);
             WT_RET(__wt_rec_split(session, r, 0));
         }
         cbulk->entry = 0;
@@ -907,6 +909,10 @@ __wt_rec_col_fix(
                 WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &unpack.tw);
             }
 
+            /* Make sure the trailing bits in the bitmap get cleared. */
+            __bit_clear_end(
+              WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), r->entries, btree->bitcnt);
+
             /* Now split. */
             WT_ERR(__wt_rec_split(session, r, 0));
 
@@ -937,6 +943,9 @@ __wt_rec_col_fix(
         WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &unpack.tw);
     }
 
+    /* Make sure the trailing bits in the bitmap get cleared. */
+    __bit_clear_end(WT_PAGE_HEADER_BYTE(btree, r->cur_ptr->image.mem), r->entries, btree->bitcnt);
+
     /* Write the remnant page. */
     WT_ERR(__wt_rec_split_finish(session, r));
 
@@ -953,7 +962,7 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
   uint32_t auxentries, uint8_t *image, size_t size)
 {
     WT_BTREE *btree;
-    uint32_t auxdataoffset, auxheaderoffset, bitmapsize, offset;
+    uint32_t auxdataoffset, auxheaderoffset, bitmapsize, offset, space;
     uint8_t *endp, *p;
 
     btree = S2BT(session);
@@ -1040,9 +1049,6 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
      */
     WT_STATIC_ASSERT(WT_COL_FIX_AUXHEADER_SIZE_MAX < POS_1BYTE_MAX);
 
-    /* Should not be overwriting anything. */
-    WT_ASSERT(session, image[auxheaderoffset] == 0);
-
     p = image + auxheaderoffset;
     endp = image + auxdataoffset;
 
@@ -1050,6 +1056,11 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
     WT_IGNORE_RET(__wt_vpack_uint(&p, WT_PTRDIFF32(endp, p), auxentries));
     WT_IGNORE_RET(__wt_vpack_uint(&p, WT_PTRDIFF32(endp, p), offset));
     WT_ASSERT(session, p <= endp);
+
+    /* Zero the empty space, if any. */
+    space = WT_PTRDIFF32(endp, p);
+    if (space > 0)
+        memset(p, 0, space);
 }
 
 /*

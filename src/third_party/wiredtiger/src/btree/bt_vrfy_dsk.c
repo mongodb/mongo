@@ -55,8 +55,8 @@ static int __verify_dsk_row_leaf(
     for ((cell) = WT_PAGE_HEADER_BYTE(S2BT(session), dsk), (i) = (dsk)->u.entries; (i) > 0; \
          (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
-#define WT_CELL_FOREACH_FIX_TIMESTAMPS_VRFY(session, dsk, aux, cell, unpack, i)            \
-    for ((cell) = (WT_CELL *)((uint8_t *)(dsk) + (aux)->offset), (i) = (aux)->entries * 2; \
+#define WT_CELL_FOREACH_FIX_TIMESTAMPS_VRFY(session, dsk, aux, cell, unpack, i)                \
+    for ((cell) = (WT_CELL *)((uint8_t *)(dsk) + (aux)->dataoffset), (i) = (aux)->entries * 2; \
          (i) > 0; (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
 /*
@@ -711,7 +711,7 @@ __verify_dsk_col_fix(
     WT_DECL_RET;
     uint64_t recno_offset;
     uint32_t cell_num, datalen, i;
-    const uint8_t *p, *end;
+    const uint8_t *bitstring, *p, *end;
 
     btree = S2BT(session);
     unpack = &_unpack;
@@ -719,16 +719,18 @@ __verify_dsk_col_fix(
 
     /* First, check that the bitmap data isn't off the end of the page. */
     datalen = __bitstr_size(btree->bitcnt * dsk->u.entries);
-    if ((uint8_t *)WT_PAGE_HEADER_BYTE(btree, dsk) + datalen > end)
+    bitstring = (uint8_t *)WT_PAGE_HEADER_BYTE(btree, dsk);
+    if (bitstring + datalen > end)
         WT_RET_VRFY(session, "data on page at %s extends past the end of the page", tag);
+
+    /* Check that any leftover bits in the bitmap are zeroed. */
+    if (!__bit_end_is_clear(bitstring, dsk->u.entries, btree->bitcnt))
+        WT_RET_VRFY(session, "last byte of data on page at %s contains trailing garbage", tag);
 
     /* Unpack the auxiliary header. This function is expected to be paranoid enough to use here. */
     ret = __wt_col_fix_read_auxheader(session, dsk, &auxhdr);
     if (ret != 0)
         WT_RET_VRFY_RETVAL(session, ret, "auxiliary header on page %s invalid", tag);
-    if (auxhdr.offset > dsk->mem_size)
-        WT_RET_VRFY_RETVAL(
-          session, EINVAL, "auxiliary header on page %s has offset off end of page", tag);
 
     switch (auxhdr.version) {
     case WT_COL_FIX_VERSION_NIL:
@@ -741,14 +743,20 @@ __verify_dsk_col_fix(
           __wt_page_type_string(dsk->type), tag, dsk->version);
     }
 
-    /* Validate the offset in the auxiliary header. */
-    if (auxhdr.offset > dsk->mem_size)
+    /* Validate the offsets in the auxiliary header. */
+    if (auxhdr.emptyoffset > auxhdr.dataoffset)
+        /* The empty-space offset is the also end of the auxiliary header. */
+        WT_RET_VRFY_RETVAL(session, EINVAL,
+          "%s page at %s auxiliary header overlaps data: header ends at offset %" PRIu32
+          " and data begins at offset %" PRIu32,
+          __wt_page_type_string(dsk->type), tag, auxhdr.emptyoffset, auxhdr.dataoffset);
+    if (auxhdr.dataoffset > dsk->mem_size)
         WT_RET_VRFY(session, "%s page at %s has cell offset %" PRIu32 " off the end at %" PRIu32,
-          __wt_page_type_string(dsk->type), tag, auxhdr.offset, dsk->mem_size);
-    if (auxhdr.offset == dsk->mem_size && auxhdr.entries > 0)
+          __wt_page_type_string(dsk->type), tag, auxhdr.dataoffset, dsk->mem_size);
+    if (auxhdr.dataoffset == dsk->mem_size && auxhdr.entries > 0)
         WT_RET_VRFY(session,
-          "%s page at %s has cell offset %" PRIu32 " at the end with %" PRIu32 " entries",
-          __wt_page_type_string(dsk->type), tag, auxhdr.offset, auxhdr.entries);
+          "%s page at %s has cell offset %" PRIu32 " at the end with %" PRIu32 " auxiliary entries",
+          __wt_page_type_string(dsk->type), tag, auxhdr.dataoffset, auxhdr.entries);
 
     /* Check the number of entries in the auxiliary header. (Note dsk->u.entries is uint32_t.) */
     if (auxhdr.entries > dsk->u.entries)
@@ -756,6 +764,15 @@ __verify_dsk_col_fix(
           "%s page at %s has %" PRIu32
           " auxiliary (time window) entries but there are only %" PRIu32 " keys",
           __wt_page_type_string(dsk->type), tag, auxhdr.entries, dsk->u.entries);
+
+    /* The space between the end of the auxiliary header and the auxiliary data should be zeroed. */
+    for (p = (uint8_t *)dsk + auxhdr.emptyoffset; p != (uint8_t *)dsk + auxhdr.dataoffset; p++) {
+        if (*p != 0)
+            WT_RET_VRFY(session,
+              "%s page at %s has nonzero filler byte %u at offset %u (auxiliary start %u)",
+              __wt_page_type_string(dsk->type), tag, *p, WT_PTRDIFF32(p, (uint8_t *)dsk),
+              auxhdr.dataoffset);
+    }
 
     cell_num = 0;
     WT_CELL_FOREACH_FIX_TIMESTAMPS_VRFY (session, dsk, &auxhdr, cell, unpack, i) {
