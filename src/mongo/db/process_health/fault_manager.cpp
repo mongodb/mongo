@@ -358,6 +358,7 @@ void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus&
                 1,
                 "Fault manager recieved health check result",
                 "state"_attr = (str::stream() << state),
+                "observer_type"_attr = (str::stream() << status.getType()),
                 "result"_attr = status,
                 "passed"_attr = (!status.isActiveFault(status.getSeverity())));
 }
