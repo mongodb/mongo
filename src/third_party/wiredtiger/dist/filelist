@@ -200,7 +200,6 @@ src/support/global.c
 src/support/hash_city.c
 src/support/hash_fnv.c
 src/support/hazard.c
-src/support/hazard_weak.c
 src/support/hex.c
 src/support/huffman.c
 src/support/lock_ext.c
