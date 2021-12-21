@@ -618,13 +618,13 @@ if __name__ == '__main__':
                 s = test.scenario_number
                 if s > 1000:
                     hugetests.add(name)    # warn for too many scenarios
-            return (s, test.simpleName())  # sort by scenerio number first
+            return (s, test.simpleName())  # sort by scenario number first
         all_tests = sorted(tests, key = get_sort_keys)
         if not longtest:
             for name in hugetests:
                 print("WARNING: huge test " + name + " has > 1000 scenarios.\n" +
                       "That is only appropriate when using the --long option.\n" +
-                      "The number of scenerios for the test should be pruned")
+                      "The number of scenarios for the test should be pruned")
 
         # At this point we have an ordered list of all the tests.
         # Break it into just our batch.
