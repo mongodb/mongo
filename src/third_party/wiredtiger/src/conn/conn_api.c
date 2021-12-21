@@ -1983,11 +1983,50 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
+ * __wt_json_config --
+ *     Set JSON output configuration.
+ */
+int
+__wt_json_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+{
+    static const WT_NAME_FLAG jsontypes[] = {
+      {"error", WT_JSON_OUTPUT_ERROR}, {"message", WT_JSON_OUTPUT_MESSAGE}, {NULL, 0}};
+
+    WT_CONFIG_ITEM cval, sval;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    const WT_NAME_FLAG *ft;
+    uint8_t flags;
+
+    conn = S2C(session);
+
+    /*
+     * When reconfiguring, check if there are any configurations we care about, otherwise leave the
+     * current settings in place.
+     */
+    if (reconfig && (ret = __wt_config_gets(session, cfg + 1, "json_output", &cval)) == WT_NOTFOUND)
+        return (0);
+    WT_RET(ret);
+
+    /* Check if JSON-encoded message strings are enabled, per event handler category. */
+    WT_RET(__wt_config_gets(session, cfg, "json_output", &cval));
+    flags = 0;
+    for (ft = jsontypes; ft->name != NULL; ft++) {
+        if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+            LF_SET(ft->flag);
+        WT_RET_NOTFOUND_OK(ret);
+    }
+    conn->json_output = flags;
+
+    return (0);
+}
+
+/*
  * __wt_verbose_config --
  *     Set verbose configuration.
  */
 int
-__wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     static const WT_NAME_FLAG verbtypes[] = {{"api", WT_VERB_API}, {"backup", WT_VERB_BACKUP},
       {"block", WT_VERB_BLOCK}, {"block_cache", WT_VERB_BLKCACHE},
@@ -2007,29 +2046,23 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
       {"thread_group", WT_VERB_THREAD_GROUP}, {"timestamp", WT_VERB_TIMESTAMP},
       {"tiered", WT_VERB_TIERED}, {"transaction", WT_VERB_TRANSACTION}, {"verify", WT_VERB_VERIFY},
       {"version", WT_VERB_VERSION}, {"write", WT_VERB_WRITE}, {NULL, 0}};
-    static const WT_NAME_FLAG jsontypes[] = {
-      {"error", WT_JSON_OUTPUT_ERROR}, {"message", WT_JSON_OUTPUT_MESSAGE}, {NULL, 0}};
 
     WT_CONFIG_ITEM cval, sval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint8_t flags;
 
     conn = S2C(session);
 
-    /* Check if JSON-encoded message strings are enabled, per event handler category. */
-    WT_RET(__wt_config_gets(session, cfg, "json_output", &cval));
-    flags = 0;
-    for (ft = jsontypes; ft->name != NULL; ft++) {
-        if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
-            LF_SET(ft->flag);
-        WT_RET_NOTFOUND_OK(ret);
-    }
-    conn->json_output = flags;
+    /*
+     * When reconfiguring, check if there are any configurations we care about, otherwise leave the
+     * current settings in place.
+     */
+    if (reconfig && (ret = __wt_config_gets(session, cfg + 1, "verbose", &cval)) == WT_NOTFOUND)
+        return (0);
+    WT_RET(ret);
 
     WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
-
     for (ft = verbtypes; ft->name != NULL; ft++) {
         ret = __wt_config_subgets(session, &cval, ft->name, &sval);
         WT_RET_NOTFOUND_OK(ret);
@@ -2724,7 +2757,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
         __wt_free(session, conn->error_prefix);
         WT_ERR(__wt_strndup(session, cval.str, cval.len, &conn->error_prefix));
     }
-    WT_ERR(__wt_verbose_config(session, cfg));
+    WT_ERR(__wt_json_config(session, cfg, false));
+    WT_ERR(__wt_verbose_config(session, cfg, false));
     WT_ERR(__wt_timing_stress_config(session, cfg));
     WT_ERR(__wt_block_cache_setup(session, cfg, false));
     WT_ERR(__wt_conn_optrack_setup(session, cfg, false));
