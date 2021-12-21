@@ -37,7 +37,7 @@ functions:
       aws_secret: ${aws_secret}
       remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${dependent_task|compile}_${build_id}.tgz
       bucket: build_external
-      extract_to: wiredtiger
+      extract_to: ${destination|wiredtiger}
   "fetch artifacts from little-endian" :
     - command: s3.get
       params:
@@ -3575,15 +3575,15 @@ tasks:
     #        Performance Long Tests           #
     ###########################################
 
-  - name: perf-test-long-btree
+  - name: perf-test-long-500m-btree-populate
     tags: ["long-perf"]
     depends_on:
       - name: compile
     commands:
       - command: timeout.update
         params:
-          exec_timeout_secs: 86400
-          timeout_secs: 86400
+          exec_timeout_secs: 7200
+          timeout_secs: 7200
       - func: "fetch artifacts"
       - func: "run-perf-test"
         vars:
@@ -3593,6 +3593,29 @@ tasks:
       - func: "upload-perf-test-stats"
         vars:
           perf-test-name: 500m-btree-populate.wtperf
+      - func: "upload artifact"
+        vars:
+          upload_filename: WT_TEST.tgz
+          upload_source_dir: wiredtiger/cmake_build/bench/wtperf/WT_TEST_0_0/
+      # Call cleanup function to avoid duplicated artifact upload in the post-task stage.
+      - func: "cleanup"
+
+  - name: perf-test-long-500m-btree-50r50u
+    tags: ["long-perf"]
+    depends_on:
+      - name: perf-test-long-500m-btree-populate
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 10800
+          timeout_secs: 10800
+      # Fetch the compile artifacts.
+      - func: "fetch artifacts"
+      # Fetch the database created by perf-test-long-500m-btree-populate task.
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: perf-test-long-500m-btree-populate
+          destination: "wiredtiger/cmake_build/bench/wtperf/WT_TEST_0_0"
       - func: "run-perf-test"
         vars:
           perf-test-name: 500m-btree-50r50u.wtperf
@@ -3602,6 +3625,24 @@ tasks:
       - func: "upload-perf-test-stats"
         vars:
           perf-test-name: 500m-btree-50r50u.wtperf
+      - func: "cleanup"
+
+  - name: perf-test-long-500m-btree-50r50u-backup
+    tags: ["long-perf"]
+    depends_on:
+      - name: perf-test-long-500m-btree-populate
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 10800
+          timeout_secs: 10800
+      # Fetch the compile artifacts.
+      - func: "fetch artifacts"
+      # Fetch the database created by perf-test-long-500m-btree-populate task.
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: perf-test-long-500m-btree-populate
+          destination: "wiredtiger/cmake_build/bench/wtperf/WT_TEST_0_0"
       - func: "run-perf-test"
         vars:
           perf-test-name: 500m-btree-50r50u-backup.wtperf
@@ -3611,6 +3652,24 @@ tasks:
       - func: "upload-perf-test-stats"
         vars:
           perf-test-name: 500m-btree-50r50u-backup.wtperf
+      - func: "cleanup"
+
+  - name: perf-test-long-500m-btree-80r20u
+    tags: ["long-perf"]
+    depends_on:
+      - name: perf-test-long-500m-btree-populate
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 10800
+          timeout_secs: 10800
+      # Fetch the compile artifacts.
+      - func: "fetch artifacts"
+      # Fetch the database created by perf-test-long-500m-btree-populate task.
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: perf-test-long-500m-btree-populate
+          destination: "wiredtiger/cmake_build/bench/wtperf/WT_TEST_0_0"
       - func: "run-perf-test"
         vars:
           perf-test-name: 500m-btree-80r20u.wtperf
@@ -3620,6 +3679,24 @@ tasks:
       - func: "upload-perf-test-stats"
         vars:
           perf-test-name: 500m-btree-80r20u.wtperf
+      - func: "cleanup"
+
+  - name: perf-test-long-500m-btree-rdonly
+    tags: ["long-perf"]
+    depends_on:
+      - name: perf-test-long-500m-btree-populate
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 10800
+          timeout_secs: 10800
+      # Fetch the compile artifacts.
+      - func: "fetch artifacts"
+      # Fetch the database created by perf-test-long-500m-btree-populate task.
+      - func: "fetch artifacts"
+        vars:
+          dependent_task: perf-test-long-500m-btree-populate
+          destination: "wiredtiger/cmake_build/bench/wtperf/WT_TEST_0_0"
       - func: "run-perf-test"
         vars:
           perf-test-name: 500m-btree-rdonly.wtperf
@@ -3629,6 +3706,7 @@ tasks:
       - func: "upload-perf-test-stats"
         vars:
           perf-test-name: 500m-btree-rdonly.wtperf
+      - func: "cleanup"
 
   - name: perf-test-long-checkpoint-stress
     tags: ["long-perf"]
