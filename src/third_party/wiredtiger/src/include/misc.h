@@ -362,7 +362,8 @@ union __wt_rand_state {
             (buf)->size = 0;                                                    \
         for (;;) {                                                              \
             WT_ASSERT(session, (buf)->memsize >= (buf)->size);                  \
-            __p = (char *)((uint8_t *)(buf)->mem + (buf)->size);                \
+            if ((__p = (buf)->mem) != NULL)                                     \
+                __p += (buf)->size;                                             \
             __space = (buf)->memsize - (buf)->size;                             \
                                                                                 \
             /* Format into the buffer. */                                       \

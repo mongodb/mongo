@@ -32,7 +32,7 @@ __wt_config_collapse(WT_SESSION_IMPL *session, const char **cfg, char **config_r
 
     *config_ret = NULL;
 
-    WT_RET(__wt_scr_alloc(session, 0, &tmp));
+    WT_RET(__wt_scr_alloc(session, 1024, &tmp));
 
     __wt_config_init(session, &cparser, cfg[0]);
     while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
@@ -112,8 +112,8 @@ __config_merge_scan(
     WT_DECL_RET;
     size_t len;
 
-    WT_ERR(__wt_scr_alloc(session, 0, &kb));
-    WT_ERR(__wt_scr_alloc(session, 0, &vb));
+    WT_ERR(__wt_scr_alloc(session, 1024, &kb));
+    WT_ERR(__wt_scr_alloc(session, 1024, &vb));
 
     __wt_config_init(session, &cparser, value);
     while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
