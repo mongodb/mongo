@@ -54,16 +54,18 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
             } else
                 WT_RET(__pack_init(session, &pack, c->key_format));
             buf = &c->key;
-            p = (uint8_t *)buf->data;
-            end = p + buf->size;
+            end = p = (uint8_t *)buf->data;
+            if (end != NULL)
+                end += buf->size;
             continue;
 
         case WT_PROJ_VALUE:
             c = cp[arg];
             WT_RET(__pack_init(session, &pack, c->value_format));
             buf = &c->value;
-            p = (uint8_t *)buf->data;
-            end = p + buf->size;
+            end = p = (uint8_t *)buf->data;
+            if (end != NULL)
+                end += buf->size;
             continue;
         }
 
