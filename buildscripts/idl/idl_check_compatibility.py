@@ -160,6 +160,14 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'getMore-reply-invalidated',
 ]
 
+# Do not add user visible fields already released in earlier versions.
+IGNORE_UNSTABLE_LIST: List[str] = [
+    # The 'originalSpec' field was introduced in v5.1 behind a disabled feature flag and is not user
+    # visible. This is part of the listIndexes output when executed against system.bucket.*
+    # collections, which users should avoid doing.
+    'listIndexes-reply-originalSpec',
+]
+
 SKIPPED_FILES = ["unittest.idl"]
 
 
@@ -474,7 +482,8 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
     """Check compatibility between old and new reply field."""
     # pylint: disable=too-many-arguments
     if not old_field.unstable:
-        if new_field.unstable:
+        field_name: str = cmd_name + "-reply-" + new_field.name
+        if new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
             ctxt.add_new_reply_field_unstable_error(cmd_name, new_field.name, new_idl_file_path)
         if new_field.optional and not old_field.optional:
             ctxt.add_new_reply_field_optional_error(cmd_name, new_field.name, new_idl_file_path)
