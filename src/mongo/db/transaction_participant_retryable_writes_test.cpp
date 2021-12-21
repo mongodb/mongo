@@ -259,8 +259,9 @@ protected:
         const auto session = OperationContextSession::get(opCtx());
 
         DBDirectClient client(opCtx());
-        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   BSON("_id" << session->getSessionId().toBSON()));
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON("_id" << session->getSessionId().toBSON()));
+        auto cursor = client.find(std::move(findRequest));
         ASSERT(cursor);
         ASSERT(cursor->more());
 
@@ -298,8 +299,9 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin)
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
 
     DBDirectClient client(opCtx());
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               BSON("_id" << sessionId.toBSON()));
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setFilter(BSON("_id" << sessionId.toBSON()));
+    auto cursor = client.find(std::move(findRequest));
     ASSERT(cursor);
     ASSERT(!cursor->more());
 }
@@ -316,8 +318,9 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrit
     const auto opTime = writeTxnRecord(txnNum, {0}, {}, boost::none);
 
     DBDirectClient client(opCtx());
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               BSON("_id" << sessionId.toBSON()));
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setFilter(BSON("_id" << sessionId.toBSON()));
+    auto cursor = client.find(std::move(findRequest));
     ASSERT(cursor);
     ASSERT(cursor->more());
 
@@ -342,8 +345,9 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     const auto secondOpTime = writeTxnRecord(200, {1}, firstOpTime, boost::none);
 
     DBDirectClient client(opCtx());
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               BSON("_id" << sessionId.toBSON()));
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setFilter(BSON("_id" << sessionId.toBSON()));
+    auto cursor = client.find(std::move(findRequest));
     ASSERT(cursor);
     ASSERT(cursor->more());
 

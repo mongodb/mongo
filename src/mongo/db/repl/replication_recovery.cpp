@@ -144,14 +144,9 @@ public:
         BSONObj predicate = _oplogApplicationEndPoint
             ? BSON("$gte" << _oplogApplicationStartPoint << "$lte" << *_oplogApplicationEndPoint)
             : BSON("$gte" << _oplogApplicationStartPoint);
-        _cursor = _client->query(NamespaceString::kRsOplogNamespace,
-                                 BSON("ts" << predicate),
-                                 /*querySettings*/ Query(),
-                                 /*limit*/ 0,
-                                 /*skip*/ 0,
-                                 /*projection*/ nullptr,
-                                 /*options*/ 0,
-                                 /*batchSize*/ 0);
+        FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+        findRequest.setFilter(BSON("ts" << predicate));
+        _cursor = _client->find(std::move(findRequest));
 
         // Check that the first document matches our appliedThrough point then skip it since it's
         // already been applied.

@@ -411,8 +411,10 @@ public:
                     const BSONObj& query,
                     const BSONObj& sort) {
         DBDirectClient client(opCtx);
-        std::unique_ptr<DBClientCursor> c =
-            client.query(NamespaceString(ns), query, Query().sort(sort));
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(query);
+        findRequest.setSort(sort);
+        std::unique_ptr<DBClientCursor> c = client.find(std::move(findRequest));
         while (c->more()) {
             LOGV2(20454, "Chunk: {chunk}", "Dumping chunks", "chunk"_attr = c->nextSafe());
         }

@@ -82,21 +82,12 @@ const NamespaceString kToNss("test.to");
 
 // Query 'limit' objects from the database into an array.
 void findN(DBClientBase& client,
-           const std::string& ns,
-           const BSONObj& filter,
-           const Query& querySettings,
+           FindCommandRequest findRequest,
            int limit,
            std::vector<BSONObj>& out) {
     out.reserve(limit);
-    std::unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns),
-                                                     filter,
-                                                     querySettings,
-                                                     limit,
-                                                     0 /*nToSkip*/,
-                                                     nullptr /*fieldsToReturn*/,
-                                                     0 /*queryOptions*/,
-                                                     0 /* batchSize */,
-                                                     boost::none);
+    findRequest.setLimit(limit);
+    std::unique_ptr<DBClientCursor> c = client.find(std::move(findRequest));
     ASSERT(c.get());
 
     while (c->more()) {
@@ -158,13 +149,13 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     // Get FROM collection document and chunks
     auto fromDoc = client.findOne(CollectionType::ConfigNS, fromCollQuery);
     CollectionType fromCollection(fromDoc);
+
+    FindCommandRequest fromChunksRequest{ChunkType::ConfigNS};
+    fromChunksRequest.setFilter(BSON(ChunkType::collectionUUID << collUUID));
+    fromChunksRequest.setSort(BSON("_id" << 1));
+
     std::vector<BSONObj> fromChunks;
-    findN(client,
-          ChunkType::ConfigNS.ns(),
-          BSON(ChunkType::collectionUUID << collUUID) /*filter*/,
-          Query().sort(BSON("_id" << 1)),
-          nChunks,
-          fromChunks);
+    findN(client, std::move(fromChunksRequest), nChunks, fromChunks);
 
     auto fromCollType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, fromNss);
     // Perform the metadata rename
@@ -177,13 +168,13 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     // Get TO collection document and chunks
     auto toDoc = client.findOne(CollectionType::ConfigNS, toCollQuery);
     CollectionType toCollection(toDoc);
+
+    FindCommandRequest toChunksRequest{ChunkType::ConfigNS};
+    toChunksRequest.setFilter(BSON(ChunkType::collectionUUID << collUUID));
+    toChunksRequest.setSort(BSON("_id" << 1));
+
     std::vector<BSONObj> toChunks;
-    findN(client,
-          ChunkType::ConfigNS.ns(),
-          BSON(ChunkType::collectionUUID << collUUID) /*filter*/,
-          Query().sort(BSON("_id" << 1)),
-          nChunks,
-          toChunks);
+    findN(client, std::move(toChunksRequest), nChunks, toChunks);
 
     // Check that original epoch/timestamp are changed in config.collections entry
     ASSERT(fromCollection.getEpoch() != toCollection.getEpoch());

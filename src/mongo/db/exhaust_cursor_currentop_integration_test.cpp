@@ -153,7 +153,7 @@ auto startExhaustQuery(
                         // Issue the initial 'find' with a batchSize of 2 and the exhaust flag set.
                         // We then iterate through the first batch and confirm that the results are
                         // as expected.
-                        queryCursor = queryConnection->query(
+                        queryCursor = queryConnection->query_DEPRECATED(
                             testNSS, BSONObj{}, Query(), 0, 0, &projSpec, queryOptions, 2);
                         for (int i = 0; i < 2; ++i) {
                             ASSERT_BSONOBJ_EQ(queryCursor->nextSafe(), BSON("a" << i));

@@ -80,13 +80,13 @@ constexpr std::array<StringData, 11> kEncryptedCommands = {"aggregate"_sd,
 
 class EncryptedDBClientBase : public DBClientBase, public mozjs::EncryptionCallbacks {
 public:
-    using DBClientBase::query;
+    using DBClientBase::find;
+    using DBClientBase::query_DEPRECATED;
 
     EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
                           ClientSideFLEOptions encryptionOptions,
                           JS::HandleValue collection,
                           JSContext* cx);
-
 
     std::string getServerAddress() const final;
 
@@ -118,7 +118,10 @@ public:
     using EncryptionCallbacks::trace;
     void trace(JSTracer* trc) final;
 
-    std::unique_ptr<DBClientCursor> query(
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref) final;
+
+    std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
         const Query& querySettings,

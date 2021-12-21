@@ -52,21 +52,13 @@ class DBDirectClient : public DBClientBase {
 public:
     DBDirectClient(OperationContext* opCtx);
 
+    using DBClientBase::find;
     using DBClientBase::insert;
-    using DBClientBase::query;
     using DBClientBase::remove;
     using DBClientBase::update;
 
-    std::unique_ptr<DBClientCursor> query(
-        const NamespaceStringOrUUID& nsOrUuid,
-        const BSONObj& filter,
-        const Query& querySettings = Query(),
-        int limit = 0,
-        int nToSkip = 0,
-        const BSONObj* fieldsToReturn = nullptr,
-        int queryOptions = 0,
-        int batchSize = 0,
-        boost::optional<BSONObj> readConcernObj = boost::none) override;
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref) override;
 
     write_ops::FindAndModifyCommandReply findAndModify(
         const write_ops::FindAndModifyCommandRequest& findAndModify);

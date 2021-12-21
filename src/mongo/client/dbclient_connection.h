@@ -75,8 +75,6 @@ class DBClientCursorBatchIterator;
  */
 class DBClientConnection : public DBClientBase {
 public:
-    using DBClientBase::query;
-
     /**
      * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
      * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
@@ -145,7 +143,7 @@ public:
      */
     void logout(const std::string& dbname, BSONObj& info) override;
 
-    std::unique_ptr<DBClientCursor> query(
+    std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
         const Query& querySettings = Query(),
@@ -156,25 +154,26 @@ public:
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none) override {
         checkConnection();
-        return DBClientBase::query(nsOrUuid,
-                                   filter,
-                                   querySettings,
-                                   limit,
-                                   nToSkip,
-                                   fieldsToReturn,
-                                   queryOptions,
-                                   batchSize,
-                                   readConcernObj);
+        return DBClientBase::query_DEPRECATED(nsOrUuid,
+                                              filter,
+                                              querySettings,
+                                              limit,
+                                              nToSkip,
+                                              fieldsToReturn,
+                                              queryOptions,
+                                              batchSize,
+                                              readConcernObj);
     }
 
-    unsigned long long query(std::function<void(DBClientCursorBatchIterator&)>,
-                             const NamespaceStringOrUUID& nsOrUuid,
-                             const BSONObj& filter,
-                             const Query& querySettings,
-                             const BSONObj* fieldsToReturn,
-                             int queryOptions,
-                             int batchSize = 0,
-                             boost::optional<BSONObj> readConcernObj = boost::none) override;
+    unsigned long long query_DEPRECATED(
+        std::function<void(DBClientCursorBatchIterator&)>,
+        const NamespaceStringOrUUID& nsOrUuid,
+        const BSONObj& filter,
+        const Query& querySettings,
+        const BSONObj* fieldsToReturn,
+        int queryOptions,
+        int batchSize = 0,
+        boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;

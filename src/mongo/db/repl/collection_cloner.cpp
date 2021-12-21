@@ -339,15 +339,16 @@ void CollectionCloner::runQuery() {
     _firstBatchOfQueryRound = true;
 
     try {
-        getClient()->query([this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
-                           _sourceDbAndUuid,
-                           BSONObj{},
-                           query,
-                           nullptr /* fieldsToReturn */,
-                           QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
-                               (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
-                           _collectionClonerBatchSize,
-                           ReadConcernArgs::kImplicitDefault);
+        getClient()->query_DEPRECATED(
+            [this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
+            _sourceDbAndUuid,
+            BSONObj{},
+            query,
+            nullptr /* fieldsToReturn */,
+            QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
+                (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
+            _collectionClonerBatchSize,
+            ReadConcernArgs::kImplicitDefault);
     } catch (...) {
         auto status = exceptionToStatus();
 

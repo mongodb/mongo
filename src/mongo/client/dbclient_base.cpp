@@ -564,57 +564,17 @@ bool DBClientBase::exists(const string& ns) {
     return !results.empty();
 }
 
-std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(
-    const std::string& db,
-    UUID uuid,
-    const BSONObj& filter,
-    boost::optional<BSONObj> readConcernObj) {
-    list<BSONObj> results;
-    BSONObj res;
-
-    BSONObjBuilder cmdBuilder;
-    uuid.appendToBuilder(&cmdBuilder, "find");
-    cmdBuilder.append("filter", filter);
-    cmdBuilder.append("limit", 1);
-    cmdBuilder.append("singleBatch", true);
-    if (readConcernObj) {
-        cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcernObj);
-    }
-
-    BSONObj cmd = cmdBuilder.obj();
-
-    if (runCommand(db, cmd, res, QueryOption_SecondaryOk)) {
-        BSONObj cursorObj = res.getObjectField("cursor");
-        BSONObj docs = cursorObj.getObjectField("firstBatch");
-        BSONObjIterator it(docs);
-        while (it.more()) {
-            BSONElement e = it.next();
-            results.push_back(e.Obj().getOwned());
-        }
-        invariant(results.size() <= 1);
-        NamespaceString resNss(cursorObj["ns"].valueStringData());
-        if (results.empty()) {
-            return {BSONObj(), resNss};
-        }
-        return {results.front(), resNss};
-    }
-
-    uassertStatusOKWithContext(getStatusFromCommandResult(res),
-                               str::stream() << "find command using UUID failed. Command: " << cmd);
-    MONGO_UNREACHABLE;
-}
-
 const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = std::numeric_limits<uint64_t>::max();
 
-unique_ptr<DBClientCursor> DBClientBase::query(const NamespaceStringOrUUID& nsOrUuid,
-                                               const BSONObj& filter,
-                                               const Query& querySettings,
-                                               int limit,
-                                               int nToSkip,
-                                               const BSONObj* fieldsToReturn,
-                                               int queryOptions,
-                                               int batchSize,
-                                               boost::optional<BSONObj> readConcernObj) {
+unique_ptr<DBClientCursor> DBClientBase::query_DEPRECATED(const NamespaceStringOrUUID& nsOrUuid,
+                                                          const BSONObj& filter,
+                                                          const Query& querySettings,
+                                                          int limit,
+                                                          int nToSkip,
+                                                          const BSONObj* fieldsToReturn,
+                                                          int queryOptions,
+                                                          int batchSize,
+                                                          boost::optional<BSONObj> readConcernObj) {
     unique_ptr<DBClientCursor> c(new DBClientCursor(this,
                                                     nsOrUuid,
                                                     filter,
@@ -637,6 +597,15 @@ std::unique_ptr<DBClientCursor> DBClientBase::find(FindCommandRequest findReques
         return cursor;
     }
     return nullptr;
+}
+
+void DBClientBase::find(FindCommandRequest findRequest,
+                        const ReadPreferenceSetting& readPref,
+                        std::function<void(const BSONObj&)> callback) {
+    auto cursor = this->find(std::move(findRequest), readPref);
+    while (cursor->more()) {
+        callback(cursor->nextSafe());
+    }
 }
 
 BSONObj DBClientBase::findOne(FindCommandRequest findRequest,
@@ -666,57 +635,28 @@ unique_ptr<DBClientCursor> DBClientBase::getMore(const string& ns, long long cur
     return nullptr;
 }
 
-struct DBClientFunConvertor {
-    void operator()(DBClientCursorBatchIterator& i) {
-        while (i.moreInCurrentBatch()) {
-            _f(i.nextSafe());
-        }
-    }
-    std::function<void(const BSONObj&)> _f;
-};
-
-unsigned long long DBClientBase::query(std::function<void(const BSONObj&)> f,
-                                       const NamespaceStringOrUUID& nsOrUuid,
-                                       const BSONObj& filter,
-                                       const Query& querySettings,
-                                       const BSONObj* fieldsToReturn,
-                                       int queryOptions,
-                                       int batchSize,
-                                       boost::optional<BSONObj> readConcernObj) {
-    DBClientFunConvertor fun;
-    fun._f = f;
-    std::function<void(DBClientCursorBatchIterator&)> ptr(fun);
-    return this->query(ptr,
-                       nsOrUuid,
-                       filter,
-                       querySettings,
-                       fieldsToReturn,
-                       queryOptions,
-                       batchSize,
-                       readConcernObj);
-}
-
-unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIterator&)> f,
-                                       const NamespaceStringOrUUID& nsOrUuid,
-                                       const BSONObj& filter,
-                                       const Query& querySettings,
-                                       const BSONObj* fieldsToReturn,
-                                       int queryOptions,
-                                       int batchSize,
-                                       boost::optional<BSONObj> readConcernObj) {
+unsigned long long DBClientBase::query_DEPRECATED(
+    std::function<void(DBClientCursorBatchIterator&)> f,
+    const NamespaceStringOrUUID& nsOrUuid,
+    const BSONObj& filter,
+    const Query& querySettings,
+    const BSONObj* fieldsToReturn,
+    int queryOptions,
+    int batchSize,
+    boost::optional<BSONObj> readConcernObj) {
     // mask options
     queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk);
 
-    unique_ptr<DBClientCursor> c(this->query(nsOrUuid,
-                                             filter,
-                                             querySettings,
-                                             0,
-                                             0,
-                                             fieldsToReturn,
-                                             queryOptions,
-                                             batchSize,
-                                             readConcernObj));
-    // query() throws on network error so OK to uassert with numeric code here.
+    unique_ptr<DBClientCursor> c(this->query_DEPRECATED(nsOrUuid,
+                                                        filter,
+                                                        querySettings,
+                                                        0,
+                                                        0,
+                                                        fieldsToReturn,
+                                                        queryOptions,
+                                                        batchSize,
+                                                        readConcernObj));
+    // query_DEPRECATED() throws on network error so OK to uassert with numeric code here.
     uassert(16090, "socket error for mapping query", c.get());
 
     unsigned long long n = 0;

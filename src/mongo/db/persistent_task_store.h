@@ -141,7 +141,9 @@ public:
                  std::function<bool(const T&)> handler) {
         DBDirectClient dbClient(opCtx);
 
-        auto cursor = dbClient.query(_storageNss, filter);
+        FindCommandRequest findRequest{_storageNss};
+        findRequest.setFilter(filter);
+        auto cursor = dbClient.find(std::move(findRequest));
 
         while (cursor->more()) {
             auto bson = cursor->next();
@@ -159,8 +161,10 @@ public:
     size_t count(OperationContext* opCtx, const BSONObj& filter = BSONObj{}) {
         DBDirectClient client(opCtx);
 
-        auto projection = BSON("_id" << 1);
-        auto cursor = client.query(_storageNss, filter, Query(), 0, 0, &projection);
+        FindCommandRequest findRequest{_storageNss};
+        findRequest.setFilter(filter);
+        findRequest.setProjection(BSON("_id" << 1));
+        auto cursor = client.find(std::move(findRequest));
 
         return cursor->itcount();
     }

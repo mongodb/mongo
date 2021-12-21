@@ -100,9 +100,9 @@ protected:
 
     BSONObj getConfigCollectionEntry() {
         DBDirectClient client(operationContext());
-        auto cursor = client.query(NamespaceStringOrUUID(CollectionType::ConfigNS),
-                                   BSON(CollectionType::kUuidFieldName << kUuid),
-                                   {});
+        FindCommandRequest findRequest{NamespaceStringOrUUID{CollectionType::ConfigNS}};
+        findRequest.setFilter(BSON(CollectionType::kUuidFieldName << kUuid));
+        auto cursor = client.find(std::move(findRequest));
         if (!cursor || !cursor->more())
             return BSONObj();
         else

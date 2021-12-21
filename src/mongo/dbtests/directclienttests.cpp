@@ -93,7 +93,9 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
 
-        ASSERT_THROWS_CODE(client.query(NamespaceString(), BSONObj{}, Query(), 1)->nextSafe(),
+        FindCommandRequest findRequest{NamespaceString{}};
+        findRequest.setLimit(1);
+        ASSERT_THROWS_CODE(client.find(std::move(findRequest))->nextSafe(),
                            AssertionException,
                            ErrorCodes::InvalidNamespace);
     }

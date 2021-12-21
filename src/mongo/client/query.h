@@ -36,9 +36,9 @@
 namespace mongo {
 
 /**
- * Represents a subset query settings, such as sort, hint, etc. and might also contain a query
- * filter. The class is being evolved into statically checkable QueryOptions type that won't include
- * the filter and will encompass all relevant query settings.
+ * Represents a subset of query settings, such as sort, hint, etc. It is only used in the context of
+ * the deprecated query API in 'DBClientBase', which has been superseded by `DBClientBase::find()`
+ * and friends. Additional uses of this class should not be added to the code base!
  */
 class Query {
 public:
@@ -68,16 +68,6 @@ public:
           fromjson(" name : 1, ts : -1 ")
     */
     Query& sort(const BSONObj& sortPattern);
-
-    /** Add a sort (ORDER BY) criteria to the query expression.
-        This version of sort() assumes you want to sort on a single field.
-        @param asc = 1 for ascending order
-        asc = -1 for descending order
-    */
-    Query& sort(const std::string& field, int asc = 1) {
-        sort(BSON(field << asc));
-        return *this;
-    }
 
     /** Provide a hint to the query.
         @param keyPattern Key pattern for the index to use.

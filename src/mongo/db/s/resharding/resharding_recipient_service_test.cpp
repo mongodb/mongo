@@ -621,8 +621,9 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss = constructTemporaryReshardingNss("sourcedb", doc.getSourceUUID());
 
-    auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
-                               BSON("ns" << sourceNss.toString()));
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(BSON("ns" << sourceNss.toString()));
+    auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
     repl::OplogEntry op(cursor->next());

@@ -85,9 +85,10 @@ void RecoverableCriticalSectionService::acquireRecoverableCriticalSectionBlockWr
         AutoGetCollection cCollLock(opCtx, nss, MODE_S);
 
         DBDirectClient dbClient(opCtx);
-        auto cursor = dbClient.query(
-            NamespaceString::kCollectionCriticalSectionsNamespace,
+        FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
+        findRequest.setFilter(
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        auto cursor = dbClient.find(std::move(findRequest));
 
         // if there is a doc with the same nss -> in order to not fail it must have the same reason
         if (cursor->more()) {
@@ -170,9 +171,10 @@ void RecoverableCriticalSectionService::promoteRecoverableCriticalSectionToBlock
         AutoGetCollection cCollLock(opCtx, nss, MODE_X);
 
         DBDirectClient dbClient(opCtx);
-        auto cursor = dbClient.query(
-            NamespaceString::kCollectionCriticalSectionsNamespace,
+        FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
+        findRequest.setFilter(
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+        auto cursor = dbClient.find(std::move(findRequest));
 
         invariant(
             cursor->more(),
@@ -272,8 +274,9 @@ void RecoverableCriticalSectionService::releaseRecoverableCriticalSection(
 
         const auto queryNss =
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString());
-        auto cursor =
-            dbClient.query(NamespaceString::kCollectionCriticalSectionsNamespace, queryNss);
+        FindCommandRequest findRequest{NamespaceString::kCollectionCriticalSectionsNamespace};
+        findRequest.setFilter(queryNss);
+        auto cursor = dbClient.find(std::move(findRequest));
 
         // if there is no document with the same nss -> do nothing!
         if (!cursor->more()) {

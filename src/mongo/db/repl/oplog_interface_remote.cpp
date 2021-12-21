@@ -81,18 +81,13 @@ std::string OplogInterfaceRemote::toString() const {
 }
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() const {
-    const Query query = Query().sort(BSON("$natural" << -1));
-    const BSONObj fields = BSON("ts" << 1 << "t" << 1LL);
+    FindCommandRequest findRequest{NamespaceString{_collectionName}};
+    findRequest.setProjection(BSON("ts" << 1 << "t" << 1LL));
+    findRequest.setSort(BSON("$natural" << -1));
+    findRequest.setBatchSize(_batchSize);
+    findRequest.setReadConcern(ReadConcernArgs::kImplicitDefault);
     return std::unique_ptr<OplogInterface::Iterator>(
-        new OplogIteratorRemote(_getConnection()->query(NamespaceString(_collectionName),
-                                                        BSONObj{},
-                                                        query,
-                                                        0,
-                                                        0,
-                                                        &fields,
-                                                        0,
-                                                        _batchSize,
-                                                        ReadConcernArgs::kImplicitDefault)));
+        new OplogIteratorRemote(_getConnection()->find(std::move(findRequest))));
 }
 
 std::unique_ptr<TransactionHistoryIteratorBase>

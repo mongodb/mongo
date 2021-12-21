@@ -525,13 +525,22 @@ public:
     }
 
     /**
+     * Issues a find command described by 'findRequest' and the given read preference. Rather than
+     * returning a cursor to the caller, iterates the cursor under the hood and calls the provided
+     * 'callback' function against each of the documents produced by the cursor.
+     */
+    void find(FindCommandRequest findRequest,
+              const ReadPreferenceSetting& readPref,
+              std::function<void(const BSONObj&)> callback);
+
+    /**
      * Issues a find command describe by 'findRequest', but augments the request to have a limit of
      * 1. It is illegal for the given 'findRequest' to have a limit already set.
      *
      * Returns the document resulting from the query, or an empty document if the query has no
      * results.
      */
-    virtual BSONObj findOne(FindCommandRequest findRequest, const ReadPreferenceSetting& readPref);
+    BSONObj findOne(FindCommandRequest findRequest, const ReadPreferenceSetting& readPref);
 
     /**
      * Identical to the 'findOne()' overload above, but uses a default value of "primary" for the
@@ -549,26 +558,12 @@ public:
      * Returns the document resulting from the query, or an empty document if the query has no
      * results.
      */
-    virtual BSONObj findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj filter);
-
-    /**
-     * Returns a pair with a single object that matches the filter within the collection specified
-     * by the UUID and the namespace of that collection on the queried node.
-     *
-     * If the command fails, an assertion error is thrown. Otherwise, if no document matches
-     * the query, an empty BSONObj is returned.
-     * Throws AssertionException.
-     */
-    virtual std::pair<BSONObj, NamespaceString> findOneByUUID(
-        const std::string& db,
-        UUID uuid,
-        const BSONObj& filter,
-        boost::optional<BSONObj> readConcernObj = boost::none);
+    BSONObj findOne(const NamespaceStringOrUUID& nssOrUuid, BSONObj filter);
 
     /**
      * Legacy find API. Do not add new callers! Use the 'find*()' methods above instead.
      */
-    virtual std::unique_ptr<DBClientCursor> query(
+    virtual std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
         const Query& querySettings = Query(),
@@ -578,22 +573,15 @@ public:
         int queryOptions = 0,
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none);
-    unsigned long long query(std::function<void(const BSONObj&)> f,
-                             const NamespaceStringOrUUID& nsOrUuid,
-                             const BSONObj& filter,
-                             const Query& querySettings = Query(),
-                             const BSONObj* fieldsToReturn = nullptr,
-                             int queryOptions = QueryOption_Exhaust,
-                             int batchSize = 0,
-                             boost::optional<BSONObj> readConcernObj = boost::none);
-    virtual unsigned long long query(std::function<void(DBClientCursorBatchIterator&)> f,
-                                     const NamespaceStringOrUUID& nsOrUuid,
-                                     const BSONObj& filter,
-                                     const Query& querySettings = Query(),
-                                     const BSONObj* fieldsToReturn = nullptr,
-                                     int queryOptions = QueryOption_Exhaust,
-                                     int batchSize = 0,
-                                     boost::optional<BSONObj> readConcernObj = boost::none);
+    virtual unsigned long long query_DEPRECATED(
+        std::function<void(DBClientCursorBatchIterator&)> f,
+        const NamespaceStringOrUUID& nsOrUuid,
+        const BSONObj& filter,
+        const Query& querySettings = Query(),
+        const BSONObj* fieldsToReturn = nullptr,
+        int queryOptions = QueryOption_Exhaust,
+        int batchSize = 0,
+        boost::optional<BSONObj> readConcernObj = boost::none);
 
     /**
      * Don't use this - called automatically by DBClientCursor for you.

@@ -65,7 +65,10 @@ Status AuthzManagerExternalStateMongod::query(
     const std::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
-        client.query(resultProcessor, collectionName, filter, Query(), &projection);
+        FindCommandRequest findRequest{collectionName};
+        findRequest.setFilter(filter);
+        findRequest.setProjection(projection);
+        client.find(std::move(findRequest), ReadPreferenceSetting{}, resultProcessor);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();

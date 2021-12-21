@@ -368,14 +368,14 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     int options = ValueWriter(cx, args.get(6)).toInt32();
 
     const Query query = Query::fromBSONDeprecated(q);
-    std::unique_ptr<DBClientCursor> cursor(conn->query(NamespaceString(ns),
-                                                       query.getFilter(),
-                                                       query,
-                                                       limit,
-                                                       nToSkip,
-                                                       haveFields ? &fields : nullptr,
-                                                       options,
-                                                       batchSize));
+    std::unique_ptr<DBClientCursor> cursor(conn->query_DEPRECATED(NamespaceString(ns),
+                                                                  query.getFilter(),
+                                                                  query,
+                                                                  limit,
+                                                                  nToSkip,
+                                                                  haveFields ? &fields : nullptr,
+                                                                  options,
+                                                                  batchSize));
     if (!cursor.get()) {
         uasserted(ErrorCodes::InternalError, "error doing query: failed");
     }

@@ -291,7 +291,8 @@ Status _checkPrecondition(OperationContext* opCtx,
         // legacy API from 'DBDirectClient' in order to parse this format and convert it into the
         // corresponding find command.
         auto preconditionQuery = Query::fromBSONDeprecated(preCondition["q"].Obj());
-        auto cursor = db.query(nss, preconditionQuery.getFilter(), preconditionQuery, 1 /*limit*/);
+        auto cursor =
+            db.query_DEPRECATED(nss, preconditionQuery.getFilter(), preconditionQuery, 1 /*limit*/);
         BSONObj realres = cursor->more() ? cursor->nextSafe() : BSONObj{};
 
         // Get collection default collation.

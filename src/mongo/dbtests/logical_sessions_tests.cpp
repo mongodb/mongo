@@ -60,10 +60,10 @@ Status insertRecord(OperationContext* opCtx, LogicalSessionRecord record) {
 StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
                                              const LogicalSessionId& lsid) {
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString(kTestNS),
-                               BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()),
-                               Query(),
-                               1);
+    FindCommandRequest findRequest{NamespaceString{kTestNS}};
+    findRequest.setFilter(BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON()));
+    findRequest.setLimit(1);
+    auto cursor = client.find(std::move(findRequest));
     if (!cursor->more()) {
         return {ErrorCodes::NoSuchSession, "No matching record in the sessions collection"};
     }

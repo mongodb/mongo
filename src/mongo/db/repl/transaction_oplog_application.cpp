@@ -574,9 +574,10 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
               opCtx->recoveryUnit()->getTimestampReadSource());
 
     DBDirectClient client(opCtx);
-    const auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                     BSON("state"
-                                          << "prepared"));
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setFilter(BSON("state"
+                               << "prepared"));
+    const auto cursor = client.find(std::move(findRequest));
 
     // Iterate over each entry in the transactions table that has a prepared transaction.
     while (cursor->more()) {

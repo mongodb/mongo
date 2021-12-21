@@ -588,15 +588,16 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
     return checkPrimary()->find(std::move(findRequest), readPref);
 }
 
-unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID& nsOrUuid,
-                                                     const BSONObj& filter,
-                                                     const Query& querySettings,
-                                                     int limit,
-                                                     int nToSkip,
-                                                     const BSONObj* fieldsToReturn,
-                                                     int queryOptions,
-                                                     int batchSize,
-                                                     boost::optional<BSONObj> readConcernObj) {
+unique_ptr<DBClientCursor> DBClientReplicaSet::query_DEPRECATED(
+    const NamespaceStringOrUUID& nsOrUuid,
+    const BSONObj& filter,
+    const Query& querySettings,
+    int limit,
+    int nToSkip,
+    const BSONObj* fieldsToReturn,
+    int queryOptions,
+    int batchSize,
+    boost::optional<BSONObj> readConcernObj) {
     shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(querySettings, queryOptions));
     invariant(nsOrUuid.nss());
     const string ns = nsOrUuid.nss()->ns();
@@ -625,15 +626,15 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                     break;
                 }
 
-                unique_ptr<DBClientCursor> cursor = conn->query(nsOrUuid,
-                                                                filter,
-                                                                querySettings,
-                                                                limit,
-                                                                nToSkip,
-                                                                fieldsToReturn,
-                                                                queryOptions,
-                                                                batchSize,
-                                                                readConcernObj);
+                unique_ptr<DBClientCursor> cursor = conn->query_DEPRECATED(nsOrUuid,
+                                                                           filter,
+                                                                           querySettings,
+                                                                           limit,
+                                                                           nToSkip,
+                                                                           fieldsToReturn,
+                                                                           queryOptions,
+                                                                           batchSize,
+                                                                           readConcernObj);
 
                 return checkSecondaryQueryResult(std::move(cursor));
             } catch (const DBException& ex) {
@@ -659,15 +660,15 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::query(const NamespaceStringOrUUID
                 "dbclient_rs query to primary node",
                 "replicaSet"_attr = _getMonitor()->getName());
 
-    return checkPrimary()->query(nsOrUuid,
-                                 filter,
-                                 querySettings,
-                                 limit,
-                                 nToSkip,
-                                 fieldsToReturn,
-                                 queryOptions,
-                                 batchSize,
-                                 readConcernObj);
+    return checkPrimary()->query_DEPRECATED(nsOrUuid,
+                                            filter,
+                                            querySettings,
+                                            limit,
+                                            nToSkip,
+                                            fieldsToReturn,
+                                            queryOptions,
+                                            batchSize,
+                                            readConcernObj);
 }
 
 void DBClientReplicaSet::killCursor(const NamespaceString& ns, long long cursorID) {

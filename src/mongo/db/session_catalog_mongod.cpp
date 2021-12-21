@@ -260,9 +260,11 @@ void createRetryableFindAndModifyTable(OperationContext* opCtx) {
 
 void abortInProgressTransactions(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               BSON(SessionTxnRecord::kStateFieldName << DurableTxnState_serializer(
-                                        DurableTxnStateEnum::kInProgress)));
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setFilter(BSON(SessionTxnRecord::kStateFieldName
+                               << DurableTxnState_serializer(DurableTxnStateEnum::kInProgress)));
+    auto cursor = client.find(std::move(findRequest));
+
     if (cursor->more()) {
         LOGV2_DEBUG(21977, 3, "Aborting in-progress transactions on stepup.");
     }
@@ -450,12 +452,11 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
 
     // Scan for records older than the minimum lifetime and uses a sort to walk the '_id' index
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               BSON(kLastWriteDateFieldName << LT << possiblyExpired),
-                               Query().sort(kSortById),
-                               0,
-                               0,
-                               &kIdProjection);
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setFilter(BSON(kLastWriteDateFieldName << LT << possiblyExpired));
+    findRequest.setSort(kSortById);
+    findRequest.setProjection(kIdProjection);
+    auto cursor = client.find(std::move(findRequest));
 
     // The max batch size is chosen so that a single batch won't exceed the 16MB BSON object size
     // limit

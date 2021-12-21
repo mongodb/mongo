@@ -210,17 +210,13 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
 // Note we cannot simply use the count() above, because that checks metadata which may not be 100%
 // accurate.
 BaseCloner::AfterStageBehavior TenantCollectionCloner::checkIfDonorCollectionIsEmptyStage() {
-    auto fieldsToReturn = BSON("_id" << 1);
-    auto cursor =
-        getClient()->query(_sourceDbAndUuid,
-                           BSONObj{} /* filter */,
-                           Query() /* querySettings */,
-                           1 /* limit */,
-                           0 /* skip */,
-                           &fieldsToReturn,
-                           QueryOption_SecondaryOk,
-                           0 /* batchSize */,
-                           ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    FindCommandRequest findRequest{_sourceDbAndUuid};
+    findRequest.setProjection(BSON("_id" << 1));
+    findRequest.setLimit(1);
+    findRequest.setReadConcern(
+        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    auto cursor = getClient()->find(std::move(findRequest),
+                                    ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     _donorCollectionWasEmptyBeforeListIndexes = !cursor->more();
     LOGV2_DEBUG(5368500,
                 1,
@@ -480,15 +476,16 @@ void TenantCollectionCloner::runQuery() {
 
     // Any errors that are thrown here (including NamespaceNotFound) will be handled on the stage
     // level.
-    getClient()->query([this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
-                       _sourceDbAndUuid,
-                       filter,
-                       query,
-                       nullptr /* fieldsToReturn */,
-                       QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
-                           (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
-                       _collectionClonerBatchSize,
-                       ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    getClient()->query_DEPRECATED(
+        [this](DBClientCursorBatchIterator& iter) { handleNextBatch(iter); },
+        _sourceDbAndUuid,
+        filter,
+        query,
+        nullptr /* fieldsToReturn */,
+        QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
+            (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
+        _collectionClonerBatchSize,
+        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
 }
 
 void TenantCollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {

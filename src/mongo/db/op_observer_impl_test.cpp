@@ -906,8 +906,9 @@ protected:
                          repl::OpTime opTime,
                          boost::optional<DurableTxnStateEnum> txnState) {
         DBDirectClient client(opCtx());
-        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   BSON("_id" << session()->getSessionId().toBSON()));
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON("_id" << session()->getSessionId().toBSON()));
+        auto cursor = client.find(std::move(findRequest));
         ASSERT(cursor);
         ASSERT(cursor->more());
 
@@ -932,16 +933,18 @@ protected:
 
     void assertNoTxnRecord() {
         DBDirectClient client(opCtx());
-        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   BSON("_id" << session()->getSessionId().toBSON()));
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON("_id" << session()->getSessionId().toBSON()));
+        auto cursor = client.find(std::move(findRequest));
         ASSERT(cursor);
         ASSERT(!cursor->more());
     }
 
     void assertTxnRecordStartOpTime(boost::optional<repl::OpTime> startOpTime) {
         DBDirectClient client(opCtx());
-        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   BSON("_id" << session()->getSessionId().toBSON()));
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON("_id" << session()->getSessionId().toBSON()));
+        auto cursor = client.find(std::move(findRequest));
         ASSERT(cursor);
         ASSERT(cursor->more());
 

@@ -225,8 +225,8 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
 
     auto directDBClient = DBDirectClientFactory::get(opCtx).create(opCtx);
 
-    unique_ptr<DBClientCursor> c =
-        directDBClient->query(coll, BSONObj{}, Query(), 0, 0, nullptr, QueryOption_SecondaryOk, 0);
+    std::unique_ptr<DBClientCursor> c = directDBClient->find(
+        FindCommandRequest{coll}, ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
     massert(16669, "unable to get db client cursor from query", c.get());
 
     set<string> thisTime;

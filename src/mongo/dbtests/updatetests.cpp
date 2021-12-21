@@ -420,8 +420,9 @@ class MultiInc : public SetBase {
 public:
     string s() {
         stringstream ss;
-        unique_ptr<DBClientCursor> cc = _client.query(
-            NamespaceString(ns()), BSONObj{} /*filter*/, Query().sort(BSON("_id" << 1)));
+        FindCommandRequest findRequest{NamespaceString{ns()}};
+        findRequest.setSort(BSON("_id" << 1));
+        std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;
         while (cc->more()) {
             if (first)

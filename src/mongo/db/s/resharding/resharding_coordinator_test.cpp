@@ -422,8 +422,11 @@ protected:
                                                        const OID& collEpoch,
                                                        const Timestamp& collTimestamp) {
         DBDirectClient client(opCtx);
+        FindCommandRequest findRequest{ChunkType::ConfigNS};
+        findRequest.setFilter(BSON("uuid" << uuid));
+        auto cursor = client.find(std::move(findRequest));
+
         std::vector<ChunkType> foundChunks;
-        auto cursor = client.query(ChunkType::ConfigNS, BSON("uuid" << uuid));
         while (cursor->more()) {
             auto d = uassertStatusOK(
                 ChunkType::fromConfigBSON(cursor->nextSafe().getOwned(), collEpoch, collTimestamp));
@@ -448,8 +451,11 @@ protected:
         auto nss = expectedZones[0].getNS();
 
         DBDirectClient client(opCtx);
+        FindCommandRequest findRequest{TagsType::ConfigNS};
+        findRequest.setFilter(BSON("ns" << nss.ns()));
+        auto cursor = client.find(std::move(findRequest));
+
         std::vector<TagsType> foundZones;
-        auto cursor = client.query(TagsType::ConfigNS, BSON("ns" << nss.ns()));
         while (cursor->more()) {
             foundZones.push_back(
                 uassertStatusOK(TagsType::fromBSON(cursor->nextSafe().getOwned())));

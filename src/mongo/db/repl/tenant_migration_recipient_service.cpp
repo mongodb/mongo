@@ -2229,10 +2229,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMa
 void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
     const CancellationToken& token) {
     std::vector<ExternalKeysCollectionDocument> keyDocs;
-    auto cursor =
-        _client->query(NamespaceString::kKeysCollectionNamespace,
-                       BSONObj{},
-                       Query().readPref(_readPreference.pref, _readPreference.tags.getTagBSON()));
+    FindCommandRequest findRequest{NamespaceString::kKeysCollectionNamespace};
+    auto cursor = _client->find(std::move(findRequest), _readPreference);
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
         keyDocs.push_back(

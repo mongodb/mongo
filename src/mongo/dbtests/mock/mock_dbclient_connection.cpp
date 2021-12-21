@@ -158,7 +158,7 @@ std::unique_ptr<DBClientCursor> MockDBClientConnection::find(
     return nullptr;
 }
 
-std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
+std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query_DEPRECATED(
     const NamespaceStringOrUUID& nsOrUuid,
     const BSONObj& filter,
     const Query& querySettings,
@@ -209,25 +209,6 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
 
 mongo::ConnectionString::ConnectionType MockDBClientConnection::type() const {
     return mongo::ConnectionString::ConnectionType::kCustom;
-}
-
-unsigned long long MockDBClientConnection::query(
-    std::function<void(mongo::DBClientCursorBatchIterator&)> f,
-    const NamespaceStringOrUUID& nsOrUuid,
-    const BSONObj& filter,
-    const Query& querySettings,
-    const mongo::BSONObj* fieldsToReturn,
-    int queryOptions,
-    int batchSize,
-    boost::optional<BSONObj> readConcernObj) {
-    return DBClientBase::query(f,
-                               nsOrUuid,
-                               filter,
-                               querySettings,
-                               fieldsToReturn,
-                               queryOptions,
-                               batchSize,
-                               readConcernObj);
 }
 
 uint64_t MockDBClientConnection::getSockCreationMicroSec() const {

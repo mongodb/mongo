@@ -250,14 +250,14 @@ void Cloner::_copy(OperationContext* opCtx,
 
     int options = QueryOption_NoCursorTimeout | QueryOption_Exhaust;
 
-    conn->query(std::function<void(DBClientCursorBatchIterator&)>(f),
-                nss,
-                BSONObj{} /* filter */,
-                Query() /* querySettings */,
-                nullptr,
-                options,
-                0 /* batchSize */,
-                repl::ReadConcernArgs::kImplicitDefault);
+    conn->query_DEPRECATED(std::function<void(DBClientCursorBatchIterator&)>(f),
+                           nss,
+                           BSONObj{} /* filter */,
+                           Query() /* querySettings */,
+                           nullptr,
+                           options,
+                           0 /* batchSize */,
+                           repl::ReadConcernArgs::kImplicitDefault);
 }
 
 void Cloner::_copyIndexes(OperationContext* opCtx,

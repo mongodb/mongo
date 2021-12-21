@@ -650,8 +650,8 @@ std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationCont
     std::vector<TransactionCoordinatorDocument> allCoordinatorDocs;
 
     DBDirectClient client(opCtx);
-    auto coordinatorDocsCursor =
-        client.query(NamespaceString::kTransactionCoordinatorsNamespace, BSONObj{});
+    FindCommandRequest findRequest{NamespaceString::kTransactionCoordinatorsNamespace};
+    auto coordinatorDocsCursor = client.find(std::move(findRequest));
 
     while (coordinatorDocsCursor->more()) {
         // TODO (SERVER-38307): Try/catch around parsing the document and skip the document if it

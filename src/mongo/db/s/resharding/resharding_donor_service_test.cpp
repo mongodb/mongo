@@ -269,8 +269,9 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
 
     DBDirectClient client(opCtx.get());
     NamespaceString sourceNss("sourcedb", "sourcecollection");
-    auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
-                               BSON("ns" << sourceNss.toString()));
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(BSON("ns" << sourceNss.toString()));
+    auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
     repl::OplogEntry op(cursor->next());
@@ -308,9 +309,9 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    auto cursor =
-        client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
-                     BSON("ns" << NamespaceString::kForceOplogBatchBoundaryNamespace.ns()));
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(BSON("ns" << NamespaceString::kForceOplogBatchBoundaryNamespace.ns()));
+    auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
     repl::OplogEntry op(cursor->next());
@@ -345,8 +346,9 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
-                               BSON("o2.type" << kReshardFinalOpLogType));
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(BSON("o2.type" << kReshardFinalOpLogType));
+    auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
 

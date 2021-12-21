@@ -193,9 +193,9 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     // Sort is not needed for correctness. This is just for making it easier to write deterministic
     // tests.
     DBDirectClient client(opCtx);
-    auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                               BSONObj{},
-                               Query().sort(BSON("_id" << 1)));
+    FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+    findRequest.setSort(BSON("_id" << 1));
+    auto cursor = client.find(std::move(findRequest));
 
     while (cursor->more()) {
         auto nextSession = SessionTxnRecord::parse(

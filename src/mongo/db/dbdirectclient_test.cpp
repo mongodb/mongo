@@ -172,7 +172,7 @@ TEST_F(DBDirectClientTest, ExhaustQuery) {
 
     // The query should work even though exhaust mode is requested.
     int batchSize = 2;
-    auto cursor = client.query(
+    auto cursor = client.query_DEPRECATED(
         kNs, BSONObj{}, Query{}, 0 /*limit*/, 0 /*skip*/, nullptr, QueryOption_Exhaust, batchSize);
     ASSERT_EQ(cursor->itcount(), numDocs);
 }

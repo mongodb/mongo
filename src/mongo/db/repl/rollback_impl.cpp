@@ -475,12 +475,13 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
     const auto filterFromMigration = BSON("op"
                                           << "n"
                                           << "fromMigrate" << true);
-    auto cursor = client->query(
-        NamespaceString::kRsOplogNamespace,
-        BSON("ts" << BSON("$gt" << stableTimestamp) << "txnNumber" << BSON("$exists" << true)
-                  << "stmtId" << BSON("$exists" << true) << "prevOpTime.ts"
-                  << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp) << "$or"
-                  << BSON_ARRAY(filter << filterFromMigration)));
+    FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
+    findRequest.setFilter(BSON("ts" << BSON("$gt" << stableTimestamp) << "txnNumber"
+                                    << BSON("$exists" << true) << "stmtId"
+                                    << BSON("$exists" << true) << "prevOpTime.ts"
+                                    << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp)
+                                    << "$or" << BSON_ARRAY(filter << filterFromMigration)));
+    auto cursor = client->find(std::move(findRequest));
     while (cursor->more()) {
         auto doc = cursor->next();
         auto swEntry = OplogEntry::parse(doc);

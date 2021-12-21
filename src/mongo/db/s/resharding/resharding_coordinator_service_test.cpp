@@ -862,9 +862,10 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         DBDirectClient client(opCtx);
 
         // config.chunks should have been moved to the new UUID
+        FindCommandRequest findRequest{ChunkType::ConfigNS};
+        findRequest.setFilter(BSON(ChunkType::collectionUUID() << doc.getReshardingUUID()));
+        auto chunkCursor = client.find(std::move(findRequest));
         std::vector<ChunkType> foundChunks;
-        auto chunkCursor = client.query(
-            ChunkType::ConfigNS, BSON(ChunkType::collectionUUID() << doc.getReshardingUUID()));
         while (chunkCursor->more()) {
             auto d = uassertStatusOK(ChunkType::fromConfigBSON(
                 chunkCursor->nextSafe().getOwned(), _originalEpoch, _originalTimestamp));

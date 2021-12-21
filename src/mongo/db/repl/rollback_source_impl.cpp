@@ -85,7 +85,19 @@ BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& f
 std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std::string& db,
                                                                       UUID uuid,
                                                                       const BSONObj& filter) const {
-    return _getConnection()->findOneByUUID(db, uuid, filter, ReadConcernArgs::kImplicitDefault);
+    FindCommandRequest findRequest{NamespaceStringOrUUID{db, uuid}};
+    findRequest.setFilter(filter);
+    findRequest.setReadConcern(ReadConcernArgs::kImplicitDefault);
+    findRequest.setLimit(1);
+    findRequest.setSingleBatch(true);
+
+    auto cursor =
+        std::make_unique<DBClientCursor>(_getConnection(),
+                                         std::move(findRequest),
+                                         ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
+    BSONObj result = cursor->more() ? cursor->nextSafe() : BSONObj{};
+    NamespaceString nss = cursor->getNamespaceString();
+    return {std::move(result), std::move(nss)};
 }
 
 StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const std::string& db,

@@ -667,7 +667,8 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
                     Status(ErrorCodes::InternalError, "Querying state documents failed"));
             }
 
-            auto cursor = client.query(ns, BSONObj{});
+            FindCommandRequest findRequest{ns};
+            auto cursor = client.find(std::move(findRequest));
             while (cursor->more()) {
                 stateDocuments.push_back(cursor->nextSafe().getOwned());
             }

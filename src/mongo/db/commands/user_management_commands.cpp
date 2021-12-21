@@ -229,7 +229,10 @@ Status queryAuthzDocument(OperationContext* opCtx,
                           const std::function<void(const BSONObj&)>& resultProcessor) {
     try {
         DBDirectClient client(opCtx);
-        client.query(resultProcessor, collectionName, query, Query(), &projection);
+        FindCommandRequest findRequest{collectionName};
+        findRequest.setFilter(query);
+        findRequest.setProjection(projection);
+        client.find(std::move(findRequest), ReadPreferenceSetting{}, resultProcessor);
         return Status::OK();
     } catch (const DBException& e) {
         return e.toStatus();

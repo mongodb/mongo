@@ -145,18 +145,11 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
     invariant(dbResponse.response.empty());
 }
 
-unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& nsOrUuid,
-                                                 const BSONObj& filter,
-                                                 const Query& querySettings,
-                                                 int limit,
-                                                 int nToSkip,
-                                                 const BSONObj* fieldsToReturn,
-                                                 int queryOptions,
-                                                 int batchSize,
-                                                 boost::optional<BSONObj> readConcernObj) {
-    invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
-    return DBClientBase::query(
-        nsOrUuid, filter, querySettings, limit, nToSkip, fieldsToReturn, queryOptions, batchSize);
+std::unique_ptr<DBClientCursor> DBDirectClient::find(FindCommandRequest findRequest,
+                                                     const ReadPreferenceSetting& readPref) {
+    invariant(!findRequest.getReadConcern(),
+              "passing readConcern to DBDirectClient::find() is not supported");
+    return DBClientBase::find(std::move(findRequest), readPref);
 }
 
 write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(

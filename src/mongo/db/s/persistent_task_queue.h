@@ -109,8 +109,9 @@ PersistentTaskQueue<T>::PersistentTaskQueue(OperationContext* opCtx, NamespaceSt
 
     DBDirectClient client(opCtx);
 
-    auto projection = BSON("_id" << 1);
-    auto cursor = client.query(_storageNss, BSONObj{}, Query(), 0, 0, &projection);
+    FindCommandRequest findRequest{_storageNss};
+    findRequest.setProjection(BSON("_id" << 1));
+    auto cursor = client.find(std::move(findRequest));
     _count = cursor->itcount();
 
     if (_count > 0)

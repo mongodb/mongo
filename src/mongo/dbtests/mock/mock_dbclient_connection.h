@@ -103,7 +103,8 @@ public:
     //
     // DBClientBase methods
     //
-    using DBClientBase::query;
+    using DBClientBase::find;
+    using DBClientBase::query_DEPRECATED;
 
     bool connect(const char* hostName, StringData applicationName, std::string& errmsg);
 
@@ -123,7 +124,7 @@ public:
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
                                          const ReadPreferenceSetting& readPref) override;
 
-    std::unique_ptr<mongo::DBClientCursor> query(
+    std::unique_ptr<mongo::DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter = BSONObj{},
         const Query& querySettings = Query(),
@@ -180,19 +181,6 @@ public:
         stdx::lock_guard lk(_netMutex);
         return _blockedOnNetwork;
     }
-
-    //
-    // Unsupported methods (defined to get rid of virtual function was hidden error)
-    //
-
-    unsigned long long query(std::function<void(mongo::DBClientCursorBatchIterator&)> f,
-                             const NamespaceStringOrUUID& nsOrUuid,
-                             const BSONObj& filter,
-                             const Query& querySettings,
-                             const mongo::BSONObj* fieldsToReturn = nullptr,
-                             int queryOptions = 0,
-                             int batchSize = 0,
-                             boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     //
     // Unsupported methods (these are pure virtuals in the base class)

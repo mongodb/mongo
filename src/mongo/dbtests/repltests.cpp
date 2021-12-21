@@ -212,14 +212,16 @@ protected:
         return count;
     }
     int opCount() {
-        return DBDirectClient(&_opCtx).query(NamespaceString(cllNS()), BSONObj{})->itcount();
+        return DBDirectClient(&_opCtx)
+            .find(FindCommandRequest{NamespaceString{cllNS()}})
+            ->itcount();
     }
     void applyAllOperations() {
         Lock::GlobalWrite lk(&_opCtx);
         vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.query(NamespaceString(cllNS()), BSONObj{});
+            auto cursor = db.find(FindCommandRequest{NamespaceString{cllNS()}});
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }
@@ -771,8 +773,9 @@ class MultiInc : public Recovering {
 public:
     string s() const {
         StringBuilder ss;
-        unique_ptr<DBClientCursor> cc =
-            _client.query(NamespaceString(ns()), BSONObj{}, Query().sort(BSON("_id" << 1)));
+        FindCommandRequest findRequest{NamespaceString{ns()}};
+        findRequest.setSort(BSON("_id" << 1));
+        std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;
         while (cc->more()) {
             if (first)

@@ -162,11 +162,10 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
 
     try {
         DBDirectClient client(opCtx);
-        std::unique_ptr<DBClientCursor> cursor =
-            client.query(NamespaceString::kShardConfigCollectionsNamespace,
-                         BSON(ShardCollectionType::kNssFieldName << nss.ns()),
-                         Query(),
-                         1);
+        FindCommandRequest findRequest{NamespaceString::kShardConfigCollectionsNamespace};
+        findRequest.setFilter(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
+        findRequest.setLimit(1);
+        std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
@@ -191,11 +190,10 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
 StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     try {
         DBDirectClient client(opCtx);
-        std::unique_ptr<DBClientCursor> cursor =
-            client.query(NamespaceString::kShardConfigDatabasesNamespace,
-                         BSON(ShardDatabaseType::name() << dbName.toString()),
-                         Query(),
-                         1);
+        FindCommandRequest findRequest{NamespaceString::kShardConfigDatabasesNamespace};
+        findRequest.setFilter(BSON(ShardDatabaseType::name() << dbName.toString()));
+        findRequest.setLimit(1);
+        std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
@@ -313,8 +311,13 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
     try {
         DBDirectClient client(opCtx);
 
-        std::unique_ptr<DBClientCursor> cursor =
-            client.query(chunksNss, query, Query().sort(sort), limit.get_value_or(0));
+        FindCommandRequest findRequest{chunksNss};
+        findRequest.setFilter(query);
+        findRequest.setSort(sort);
+        if (limit) {
+            findRequest.setLimit(*limit);
+        }
+        std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "Failed to establish a cursor for reading " << chunksNss.ns()
                               << " from local storage",

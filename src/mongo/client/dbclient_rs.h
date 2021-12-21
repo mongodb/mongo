@@ -57,7 +57,7 @@ typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 */
 class DBClientReplicaSet : public DBClientBase {
 public:
-    using DBClientBase::query;
+    using DBClientBase::query_DEPRECATED;
 
     /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet
      * connections. */
@@ -92,7 +92,7 @@ public:
                                          const ReadPreferenceSetting& readPref) override;
 
     /** throws userassertion "no primary found" */
-    std::unique_ptr<DBClientCursor> query(
+    std::unique_ptr<DBClientCursor> query_DEPRECATED(
         const NamespaceStringOrUUID& nsOrUuid,
         const BSONObj& filter,
         const Query& querySettings,

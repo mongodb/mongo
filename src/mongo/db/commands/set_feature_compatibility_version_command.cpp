@@ -780,13 +780,10 @@ private:
         DBDirectClient client(opCtx);
 
         LogicalSessionIdMap<TxnNumber> parentLsidToTxnNum;
-        auto projection = BSON("_id" << 1 << "parentLsid" << 1);
-        auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                   BSON("parentLsid" << BSON("$exists" << true)),
-                                   {},
-                                   0,
-                                   0,
-                                   &projection);
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON("parentLsid" << BSON("$exists" << true)));
+        findRequest.setProjection(BSON("_id" << 1 << "parentLsid" << 1));
+        auto cursor = client.find(std::move(findRequest));
 
         while (cursor->more()) {
             auto doc = cursor->next();
@@ -823,8 +820,9 @@ private:
         for (const auto& [lsid, txnNumber] : parentLsidToTxnNum) {
             SessionTxnRecord modifiedDoc;
             bool parentSessionExists = false;
-            auto cursor = client.query(NamespaceString::kSessionTransactionsTableNamespace,
-                                       BSON("_id" << lsid.toBSON()));
+            FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+            findRequest.setFilter(BSON("_id" << lsid.toBSON()));
+            auto cursor = client.find(std::move(findRequest));
             if ((parentSessionExists = cursor->more())) {
                 modifiedDoc = SessionTxnRecord::parse(
                     IDLParserErrorContext("parse transaction document to modify"), cursor->next());

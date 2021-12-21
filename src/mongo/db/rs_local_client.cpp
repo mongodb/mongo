@@ -139,18 +139,20 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     }
 
     DBDirectClient client(opCtx);
-    Query querySettings;
+    FindCommandRequest findRequest{nss};
+    findRequest.setFilter(query);
     if (!sort.isEmpty()) {
-        querySettings.sort(sort);
+        findRequest.setSort(sort);
     }
     if (hint) {
-        querySettings.hint(*hint);
+        findRequest.setHint(*hint);
     }
-    querySettings.readPref(readPref.pref, BSONArray());
+    if (limit) {
+        findRequest.setLimit(*limit);
+    }
 
     try {
-        std::unique_ptr<DBClientCursor> cursor =
-            client.query(nss, query, querySettings, limit.get_value_or(0));
+        std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest), readPref);
 
         if (!cursor) {
             return {ErrorCodes::OperationFailed,

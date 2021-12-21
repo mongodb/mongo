@@ -467,14 +467,13 @@ public:
         insert(ns, BSON("a" << 0));
         insert(ns, BSON("a" << 1));
         insert(ns, BSON("a" << 2));
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns),
-                                                     BSONObj{},
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     0,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_CursorTailable,
-                                                     2);
+
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setHint(BSON("$natural" << 1));
+        findRequest.setTailable(true);
+        findRequest.setBatchSize(2);
+        std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
+
         ASSERT(0 != c->getCursorId());
         while (c->more())
             c->next();
@@ -501,23 +500,19 @@ public:
 
         const char* ns = "unittests.querytests.EmptyTail";
         _client.createCollection(ns, 1900, true);
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns),
-                                                     BSONObj{},
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     2,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_CursorTailable);
+
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setHint(BSON("$natural" << 1));
+        findRequest.setTailable(true);
+        findRequest.setBatchSize(2);
+
+        std::unique_ptr<DBClientCursor> c = _client.find(findRequest);
         ASSERT_EQUALS(0, c->getCursorId());
         ASSERT(c->isDead());
+
         insert(ns, BSON("a" << 0));
-        c = _client.query(NamespaceString(ns),
-                          BSON("a" << 1),
-                          Query().hint(BSON("$natural" << 1)),
-                          2,
-                          0,
-                          nullptr,
-                          QueryOption_CursorTailable);
+        findRequest.setFilter(BSON("a" << 1));
+        c = _client.find(findRequest);
         ASSERT(0 != c->getCursorId());
         ASSERT(!c->isDead());
     }
@@ -538,13 +533,12 @@ public:
         _client.createCollection(ns, 8192, true, 2);
         insert(ns, BSON("a" << 0));
         insert(ns, BSON("a" << 1));
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns),
-                                                     BSONObj{},
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     2,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_CursorTailable);
+
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setHint(BSON("$natural" << 1));
+        findRequest.setTailable(true);
+        findRequest.setBatchSize(2);
+        std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
         c->next();
         c->next();
         ASSERT(!c->more());
@@ -571,13 +565,12 @@ public:
         _client.createCollection(ns, 8192, true, 2);
         insert(ns, BSON("a" << 0));
         insert(ns, BSON("a" << 1));
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns),
-                                                     BSONObj{},
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     2,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_CursorTailable);
+
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setHint(BSON("$natural" << 1));
+        findRequest.setTailable(true);
+        findRequest.setBatchSize(2);
+        std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
         c->next();
         c->next();
         ASSERT(!c->more());
@@ -606,14 +599,13 @@ public:
         _client.createCollection(ns, 1330, true);
         insert(ns, BSON("a" << 0));
         insert(ns, BSON("a" << 1));
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns),
-                                                     BSONObj{},
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     0,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_CursorTailable,
-                                                     2);
+
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setHint(BSON("$natural" << 1));
+        findRequest.setTailable(true);
+        findRequest.setBatchSize(2);
+        std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
+
         c->next();
         c->next();
         ASSERT(!c->more());
@@ -632,10 +624,9 @@ public:
     void run() {
         const char* ns = "unittests.querytests.TailCappedOnly";
         _client.insert(ns, BSONObj());
-        ASSERT_THROWS(
-            _client.query(
-                NamespaceString(ns), BSONObj{}, Query(), 0, 0, nullptr, QueryOption_CursorTailable),
-            AssertionException);
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setTailable(true);
+        ASSERT_THROWS(_client.find(std::move(findRequest)), AssertionException);
     }
 };
 
@@ -668,22 +659,14 @@ public:
                            info);
         insertA(ns, 0);
         insertA(ns, 1);
-        unique_ptr<DBClientCursor> c1 = _client.query(NamespaceString(ns),
-                                                      BSON("a" << GT << -1),
-                                                      Query(),
-                                                      0,
-                                                      0,
-                                                      nullptr,
-                                                      QueryOption_CursorTailable);
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(BSON("a" << GT << -1));
+        findRequest.setTailable(true);
+        std::unique_ptr<DBClientCursor> c1 = _client.find(findRequest);
         OID id;
         id.init("000000000000000000000000");
-        unique_ptr<DBClientCursor> c2 = _client.query(NamespaceString(ns),
-                                                      BSON("value" << GT << id),
-                                                      Query(),
-                                                      0,
-                                                      0,
-                                                      nullptr,
-                                                      QueryOption_CursorTailable);
+        findRequest.setFilter(BSON("value" << GT << id));
+        std::unique_ptr<DBClientCursor> c2 = _client.find(findRequest);
         c1->next();
         c1->next();
         ASSERT(!c1->more());
@@ -732,23 +715,16 @@ public:
         insert(ns, BSON("ts" << Timestamp(1000, 0)));
         insert(ns, BSON("ts" << Timestamp(1000, 1)));
         insert(ns, BSON("ts" << Timestamp(1000, 2)));
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns),
-                                                     BSON("ts" << GT << Timestamp(1000, 1)),
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     0,
-                                                     0,
-                                                     nullptr);
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(BSON("ts" << GT << Timestamp(1000, 1)));
+        findRequest.setHint(BSON("$natural" << 1));
+        std::unique_ptr<DBClientCursor> c = _client.find(findRequest);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
         ASSERT(!c->more());
 
         insert(ns, BSON("ts" << Timestamp(1000, 3)));
-        c = _client.query(NamespaceString(ns),
-                          BSON("ts" << GT << Timestamp(1000, 1)),
-                          Query().hint(BSON("$natural" << 1)),
-                          0,
-                          0,
-                          nullptr);
+        c = _client.find(findRequest);
         ASSERT(c->more());
         ASSERT_EQUALS(2u, c->next()["ts"].timestamp().getInc());
         ASSERT(c->more());
@@ -1021,11 +997,10 @@ public:
         const char* ns = "unittests.querytests.Size";
         _client.insert(ns, fromjson("{a:[1,2,3]}"));
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
-        ASSERT(_client
-                   .query(NamespaceString(ns),
-                          BSON("a" << mongo::BSIZE << 3),
-                          Query().hint(BSON("a" << 1)))
-                   ->more());
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(BSON("a" << mongo::BSIZE << 3));
+        findRequest.setHint(BSON("a" << 1));
+        ASSERT(_client.find(std::move(findRequest))->more());
     }
 };
 
@@ -1037,17 +1012,15 @@ public:
     void run() {
         const char* ns = "unittests.querytests.IndexedArray";
         _client.insert(ns, fromjson("{a:[1,2,3]}"));
-        ASSERT(_client.query(NamespaceString(ns), fromjson("{a:[1,2,3]}"))->more());
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(fromjson("{a:[1,2,3]}"));
+        ASSERT(_client.find(findRequest)->more());
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
-        ASSERT(_client
-                   .query(NamespaceString(ns),
-                          fromjson("{a:{$in:[1,[1,2,3]]}}"),
-                          Query().hint(BSON("a" << 1)))
-                   ->more());
-        ASSERT(
-            _client
-                .query(NamespaceString(ns), fromjson("{a:[1,2,3]}"), Query().hint(BSON("a" << 1)))
-                ->more());
+        findRequest.setFilter(fromjson("{a:{$in:[1,[1,2,3]]}}"));
+        findRequest.setHint(BSON("a" << 1));
+        ASSERT(_client.find(findRequest)->more());
+        findRequest.setFilter(fromjson("{a:[1,2,3]}"));
+        ASSERT(_client.find(findRequest)->more());
     }
 };
 
@@ -1067,23 +1040,16 @@ public:
 private:
     void check(const string& hintField) {
         const char* ns = "unittests.querytests.InsideArray";
-        ASSERT(_client
-                   .query(NamespaceString(ns),
-                          fromjson("{a:[[1],2]}"),
-                          Query().hint(BSON(hintField << 1)))
-                   ->more());
-        ASSERT(
-            _client
-                .query(NamespaceString(ns), fromjson("{a:[1]}"), Query().hint(BSON(hintField << 1)))
-                ->more());
-        ASSERT(
-            _client
-                .query(NamespaceString(ns), fromjson("{a:2}"), Query().hint(BSON(hintField << 1)))
-                ->more());
-        ASSERT(
-            !_client
-                 .query(NamespaceString(ns), fromjson("{a:1}"), Query().hint(BSON(hintField << 1)))
-                 ->more());
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setHint(BSON(hintField << 1));
+        findRequest.setFilter(fromjson("{a:[[1],2]}"));
+        ASSERT(_client.find(findRequest)->more());
+        findRequest.setFilter(fromjson("{a:[1]}"));
+        ASSERT(_client.find(findRequest)->more());
+        findRequest.setFilter(fromjson("{a:2}"));
+        ASSERT(_client.find(findRequest)->more());
+        findRequest.setFilter(fromjson("{a:1}"));
+        ASSERT(!_client.find(findRequest)->more());
     }
 };
 
@@ -1097,11 +1063,10 @@ public:
         _client.insert(ns, fromjson("{'_id':1,a:[1]}"));
         _client.insert(ns, fromjson("{'_id':2,a:[[1]]}"));
         ASSERT_OK(dbtests::createIndex(&_opCtx, ns, BSON("a" << 1)));
-        ASSERT_EQUALS(
-            1,
-            _client.query(NamespaceString(ns), fromjson("{a:[1]}"), Query().hint(BSON("a" << 1)))
-                ->next()
-                .getIntField("_id"));
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(fromjson("{a:[1]}"));
+        findRequest.setHint(BSON("a" << 1));
+        ASSERT_EQUALS(1, _client.find(std::move(findRequest))->next().getIntField("_id"));
     }
 };
 
@@ -1121,16 +1086,12 @@ public:
 private:
     void check(const string& hintField) {
         const char* ns = "unittests.querytests.SubobjArr";
-        ASSERT(_client
-                   .query(NamespaceString(ns),
-                          fromjson("{'a.b':1}"),
-                          Query().hint(BSON(hintField << 1)))
-                   ->more());
-        ASSERT(_client
-                   .query(NamespaceString(ns),
-                          fromjson("{'a.b':[1]}"),
-                          Query().hint(BSON(hintField << 1)))
-                   ->more());
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setFilter(fromjson("{'a.b':1}"));
+        findRequest.setHint(BSON(hintField << 1));
+        ASSERT(_client.find(findRequest)->more());
+        findRequest.setFilter(fromjson("{'a.b':[1]}"));
+        ASSERT(_client.find(findRequest)->more());
     }
 };
 
@@ -1256,8 +1217,9 @@ public:
         _client.dropCollection("unittests.querytests.DifferentNumbers");
     }
     void t(const char* ns) {
-        unique_ptr<DBClientCursor> cursor =
-            _client.query(NamespaceString(ns), BSONObj{}, Query().sort("7"));
+        FindCommandRequest findRequest{NamespaceString{ns}};
+        findRequest.setSort(BSON("7" << 1));
+        std::unique_ptr<DBClientCursor> cursor = _client.find(std::move(findRequest));
         while (cursor->more()) {
             BSONObj o = cursor->next();
             verify(o.valid());
@@ -1401,13 +1363,11 @@ public:
 
         int a = count();
 
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns()),
-                                                     BSON("i" << GT << 0),
-                                                     Query().hint(BSON("$natural" << 1)),
-                                                     0,
-                                                     0,
-                                                     nullptr,
-                                                     QueryOption_CursorTailable);
+        FindCommandRequest findRequest{NamespaceString{ns()}};
+        findRequest.setFilter(BSON("i" << GT << 0));
+        findRequest.setHint(BSON("$natural" << 1));
+        findRequest.setTailable(true);
+        std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
         int n = 0;
         while (c->more()) {
             BSONObj z = c->next();
@@ -1570,20 +1530,13 @@ public:
 
         for (int k = 0; k < 5; ++k) {
             _client.insert(ns(), BSON("ts" << Timestamp(1000, i++)));
-            unsigned min =
-                _client
-                    .query(NamespaceString(ns()), BSONObj{}, Query().sort(BSON("$natural" << 1)))
-                    ->next()["ts"]
-                    .timestamp()
-                    .getInc();
+            FindCommandRequest findRequest{NamespaceString{ns()}};
+            findRequest.setSort(BSON("$natural" << 1));
+            unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
             for (unsigned j = -1; j < i; ++j) {
-                unique_ptr<DBClientCursor> c =
-                    _client.query(NamespaceString(ns()),
-                                  BSON("ts" << GTE << Timestamp(1000, j)),
-                                  Query(),
-                                  0,
-                                  0,
-                                  nullptr);
+                FindCommandRequest findRequestInner{NamespaceString{ns()}};
+                findRequestInner.setFilter(BSON("ts" << GTE << Timestamp(1000, j)));
+                std::unique_ptr<DBClientCursor> c = _client.find(findRequestInner);
                 ASSERT(c->more());
                 BSONObj next = c->next();
                 ASSERT(!next["ts"].eoo());
@@ -1635,20 +1588,13 @@ public:
 
         for (int k = 0; k < 5; ++k) {
             _client.insert(ns(), BSON("ts" << Timestamp(1000, i++)));
-            unsigned min =
-                _client
-                    .query(NamespaceString(ns()), BSONObj{}, Query().sort(BSON("$natural" << 1)))
-                    ->next()["ts"]
-                    .timestamp()
-                    .getInc();
+            FindCommandRequest findRequest{NamespaceString{ns()}};
+            findRequest.setSort(BSON("$natural" << 1));
+            unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
             for (unsigned j = -1; j < i; ++j) {
-                unique_ptr<DBClientCursor> c =
-                    _client.query(NamespaceString(ns()),
-                                  BSON("ts" << GTE << Timestamp(1000, j)),
-                                  Query(),
-                                  0,
-                                  0,
-                                  nullptr);
+                FindCommandRequest findRequestInner{NamespaceString{ns()}};
+                findRequestInner.setFilter(BSON("ts" << GTE << Timestamp(1000, j)));
+                std::unique_ptr<DBClientCursor> c = _client.find(findRequestInner);
                 ASSERT(c->more());
                 BSONObj next = c->next();
                 ASSERT(!next["ts"].eoo());
@@ -1681,13 +1627,10 @@ public:
         size_t startNumCursors = numCursorsOpen();
 
         // Check oplog replay mode with missing collection.
-        unique_ptr<DBClientCursor> c0 =
-            _client.query(NamespaceString("local.oplog.querytests.missing"),
-                          BSON("ts" << GTE << Timestamp(1000, 50)),
-                          Query(),
-                          0,
-                          0,
-                          nullptr);
+        FindCommandRequest findRequestMissingColl{
+            NamespaceString{"local.oplog.querytests.missing"}};
+        findRequestMissingColl.setFilter(BSON("ts" << GTE << Timestamp(1000, 50)));
+        std::unique_ptr<DBClientCursor> c0 = _client.find(std::move(findRequestMissingColl));
         ASSERT(!c0->more());
 
         BSONObj info;
@@ -1711,23 +1654,15 @@ public:
         }
 
         // Check oplog replay mode with empty collection.
-        unique_ptr<DBClientCursor> c = _client.query(NamespaceString(ns()),
-                                                     BSON("ts" << GTE << Timestamp(1000, 50)),
-                                                     Query(),
-                                                     0,
-                                                     0,
-                                                     nullptr);
+        FindCommandRequest findRequest{NamespaceString{ns()}};
+        findRequest.setFilter(BSON("ts" << GTE << Timestamp(1000, 50)));
+        std::unique_ptr<DBClientCursor> c = _client.find(findRequest);
         ASSERT(!c->more());
 
         // Check with some docs in the collection.
         for (int i = 100; i < 150; _client.insert(ns(), BSON("ts" << Timestamp(1000, i++))))
             ;
-        c = _client.query(NamespaceString(ns()),
-                          BSON("ts" << GTE << Timestamp(1000, 50)),
-                          Query(),
-                          0,
-                          0,
-                          nullptr);
+        c = _client.find(findRequest);
         ASSERT(c->more());
         ASSERT_EQUALS(100u, c->next()["ts"].timestamp().getInc());
 
@@ -1775,8 +1710,8 @@ public:
         insert(ns(), BSON("a" << 1));
         insert(ns(), BSON("a" << 2));
         insert(ns(), BSON("a" << 3));
-        unique_ptr<DBClientCursor> cursor =
-            _client.query(NamespaceStringOrUUID("unittests", *coll_opts.uuid), BSONObj{});
+        std::unique_ptr<DBClientCursor> cursor =
+            _client.find(FindCommandRequest{NamespaceStringOrUUID{"unittests", *coll_opts.uuid}});
         ASSERT_EQUALS(string(ns()), cursor->getns());
         for (int i = 1; i <= 3; ++i) {
             ASSERT(cursor->more());
@@ -1926,8 +1861,9 @@ public:
         {
             // With five results and a batch size of 5, a cursor is created since we don't know
             // there are no more results.
-            std::unique_ptr<DBClientCursor> c =
-                _client.query(NamespaceString(ns()), BSONObj{}, Query(), 0, 0, nullptr, 0, 5);
+            FindCommandRequest findRequest{NamespaceString{ns()}};
+            findRequest.setBatchSize(5);
+            std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
             ASSERT(c->more());
             ASSERT_NE(0, c->getCursorId());
             for (int i = 0; i < 5; ++i) {
@@ -1939,8 +1875,9 @@ public:
         {
             // With a batchsize of 6 we know there are no more results so we don't create a
             // cursor.
-            std::unique_ptr<DBClientCursor> c =
-                _client.query(NamespaceString(ns()), BSONObj{}, Query(), 6);
+            FindCommandRequest findRequest{NamespaceString{ns()}};
+            findRequest.setBatchSize(6);
+            std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
             ASSERT(c->more());
             ASSERT_EQ(0, c->getCursorId());
         }

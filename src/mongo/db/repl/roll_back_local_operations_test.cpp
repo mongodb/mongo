@@ -318,28 +318,18 @@ class DBClientConnectionForTest : public DBClientConnection {
 public:
     DBClientConnectionForTest(int numInitFailures) : _initFailuresLeft(numInitFailures) {}
 
-    using DBClientConnection::query;
-
-    std::unique_ptr<DBClientCursor> query(const NamespaceStringOrUUID& nsOrUuid,
-                                          const BSONObj& filter,
-                                          const Query& querySettings,
-                                          int limit,
-                                          int nToSkip,
-                                          const BSONObj* fieldsToReturn,
-                                          int queryOptions,
-                                          int batchSize,
-                                          boost::optional<BSONObj> readConcernObj) override {
+    std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
+                                         const ReadPreferenceSetting& readPref) override {
         if (_initFailuresLeft > 0) {
             _initFailuresLeft--;
             LOGV2(21657,
-                  "Throwing DBException on DBClientCursorForTest::query(). Failures left: "
-                  "{initFailuresLeft}",
+                  "Throwing DBException on DBClientCursorForTest::find()",
                   "initFailuresLeft"_attr = _initFailuresLeft);
             uasserted(50852, "Simulated network error");
             MONGO_UNREACHABLE;
         }
 
-        LOGV2(21658, "Returning success on DBClientCursorForTest::query()");
+        LOGV2(21658, "Returning success on DBClientCursorForTest::find()");
 
         BSONArrayBuilder builder;
         builder.append(makeOp(1));
