@@ -87,5 +87,25 @@ TEST_F(ThreadClientTest, TestAlternativeClientRegion) {
 
     ASSERT_TRUE(haveClient());
 }
+
+/**
+ * This test asserts that original thread names are restored after a ThreadClient object
+ * goes out of scope.
+ */
+TEST_F(ThreadClientTest, TestThreadName) {
+    ASSERT_FALSE(haveClient());
+    const auto originalThreadName = getThreadName();
+
+    {
+        ThreadClient threadClient("MyThreadClient", getGlobalServiceContext());
+        ASSERT_TRUE(haveClient());
+        // The instatiation of ThreadClient should have changed this thread name
+        ASSERT_NE(originalThreadName, getThreadName());
+    }
+
+    ASSERT_FALSE(haveClient());
+    // The original name for this thread should have been restored.
+    ASSERT_EQ(originalThreadName, getThreadName());
+}
 }  // namespace
 }  // namespace mongo

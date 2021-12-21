@@ -335,6 +335,9 @@ public:
     Client& operator*() const {
         return *get();
     }
+
+private:
+    boost::intrusive_ptr<ThreadName> _originalThreadName;
 };
 
 /**
