@@ -923,57 +923,57 @@ __verify_page_content_fix(
     /* Count the keys. */
     vs->records_so_far += page->entries;
 
+    /* Examine each row; iterate the keys and time windows in parallel. */
     /* Walk the time windows, if there are any. */
     numtws = WT_COL_FIX_TWS_SET(page) ? page->pg_fix_numtws : 0;
-    for (tw = 0; tw < numtws; tw++) {
-        /* The printable cell number for the value is 2x the entry number (tw) plus 1. */
-        cell_num = tw * 2 + 1;
-
-        cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
-        __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-
-        /* We are only supposed to see the values (not the keys) and only plain values belong. */
-        if (unpack.type != WT_CELL_VALUE)
-            WT_RET_MSG(session, EINVAL,
-              "cell %" PRIu32 " for key %" PRIu64 " on page at %s has wrong type %s", cell_num,
-              ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
-              __verify_addr_string(session, ref, vs->tmp1), __wt_cell_type_string(unpack.type));
-
-        /* The value cell should contain only a time window. */
-        if (unpack.size != 0)
-            WT_RET_MSG(session, EINVAL,
-              "cell %" PRIu32 " for key %" PRIu64 " on page at %s has nonempty value", cell_num,
-              ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
-              __verify_addr_string(session, ref, vs->tmp1));
-
-        if ((ret = __wt_time_value_validate(session, &unpack.tw, &parent->ta, false)) != 0)
-            WT_RET_MSG(session, ret,
-              "cell %" PRIu32 " for key %" PRIu64 " on page at %s failed timestamp validation",
-              cell_num, ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
-              __verify_addr_string(session, ref, vs->tmp1));
-
-        if (vs->stable_timestamp != WT_TS_NONE)
-            WT_RET(__verify_ts_stable_cmp(
-              session, NULL, ref, cell_num, unpack.tw.start_ts, unpack.tw.stop_ts, vs));
-    }
-
-    /*
-     * Verify key-associated history-store entries. Note that while a WT_COL_FIX_VERSION_NIL page
-     * written by a build that does not support FLCS timestamps and history will have no history
-     * store entries, such pages can also be written by newer builds; so we should always validate
-     * the history entries.
-     */
     for (recno_offset = 0, tw = 0; recno_offset < page->entries; recno_offset++) {
-        p = vs->tmp1->mem;
-        WT_RET(__wt_vpack_uint(&p, 0, ref->ref_recno + recno_offset));
-        vs->tmp1->size = WT_PTRDIFF(p, vs->tmp1->mem);
         if (tw < numtws && page->pg_fix_tws[tw].recno_offset == recno_offset) {
+            /* This row has a time window. */
+
+            /* The printable cell number for the value is 2x the entry number (tw) plus 1. */
+            cell_num = tw * 2 + 1;
+
             cell = WT_COL_FIX_TW_CELL(page, &page->pg_fix_tws[tw]);
             __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+
+            /* We are supposed to see only values (not keys) and only plain values belong. */
+            if (unpack.type != WT_CELL_VALUE)
+                WT_RET_MSG(session, EINVAL,
+                  "cell %" PRIu32 " for key %" PRIu64 " on page at %s has wrong type %s", cell_num,
+                  ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
+                  __verify_addr_string(session, ref, vs->tmp1), __wt_cell_type_string(unpack.type));
+
+            /* The value cell should contain only a time window. */
+            if (unpack.size != 0)
+                WT_RET_MSG(session, EINVAL,
+                  "cell %" PRIu32 " for key %" PRIu64 " on page at %s has nonempty value", cell_num,
+                  ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
+                  __verify_addr_string(session, ref, vs->tmp1));
+
+            if ((ret = __wt_time_value_validate(session, &unpack.tw, &parent->ta, false)) != 0)
+                WT_RET_MSG(session, ret,
+                  "cell %" PRIu32 " for key %" PRIu64 " on page at %s failed timestamp validation",
+                  cell_num, ref->ref_recno + page->pg_fix_tws[tw].recno_offset,
+                  __verify_addr_string(session, ref, vs->tmp1));
+
+            if (vs->stable_timestamp != WT_TS_NONE)
+                WT_RET(__verify_ts_stable_cmp(
+                  session, NULL, ref, cell_num, unpack.tw.start_ts, unpack.tw.stop_ts, vs));
+
             start_ts = unpack.tw.start_ts;
             tw++;
         } else
             start_ts = WT_TS_NONE;
+
+        /*
+         * Verify key-associated history-store entries. Note that while a WT_COL_FIX_VERSION_NIL
+         * page written by a build that does not support FLCS timestamps and history will have no
+         * history store entries, such pages can also be written by newer builds; so we should
+         * always validate the history entries.
+         */
+        p = vs->tmp1->mem;
+        WT_RET(__wt_vpack_uint(&p, 0, ref->ref_recno + recno_offset));
+        vs->tmp1->size = WT_PTRDIFF(p, vs->tmp1->mem);
         WT_RET(__verify_key_hs(session, vs->tmp1, start_ts, vs));
     }
 
