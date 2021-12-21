@@ -194,6 +194,11 @@ executor::RemoteCommandResponse initWireVersion(
         bob.append("helloOk", true);
     }
 
+    auto loadBalancedOpt = uri.getOption("loadBalanced");
+    if (loadBalancedOpt && (loadBalancedOpt.value() == "true")) {
+        bob.append("loadBalanced", true);
+    }
+
     *speculativeAuthType = auth::speculateAuth(&bob, uri, saslClientSession);
     if (!uri.getUser().empty()) {
         UserName user(uri.getUser(), uri.getAuthenticationDatabase());
