@@ -1,6 +1,14 @@
-// This test validates that if a shard donates a chunk immediately after a receive of another chunk
-// has completed, but before the original donor has committed the metadata change, we will not end
-// up with gaps in the metadata
+/**
+ * This test validates that if a shard donates a chunk immediately after a receive of another chunk
+ * has completed, but before the original donor has committed the metadata change, we will not end
+ * up with gaps in the metadata.
+ *
+ * @tags: [
+ *   # SERVER-62181 avoid CS stepdowns, since they can cause the migrations
+ *   # (in combination with their failpoints) issued by this test to enter a deadlock
+ *   does_not_support_stepdowns,
+ *  ]
+ */
 
 load('./jstests/libs/chunk_manipulation_util.js');
 
