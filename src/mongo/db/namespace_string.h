@@ -594,6 +594,12 @@ public:
         return _nss ? _nss->db() : StringData(_dbname);
     }
 
+    /**
+     * Returns OK if either the nss is not set or is a valid nss. Otherwise returns an
+     * InvalidNamespace error.
+     */
+    Status isNssValid() const;
+
     std::string toString() const;
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;

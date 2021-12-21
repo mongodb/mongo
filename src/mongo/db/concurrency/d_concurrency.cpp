@@ -196,13 +196,19 @@ void Lock::GlobalLock::_unlock() {
     _result = LOCK_INVALID;
 }
 
-Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Date_t deadline)
-    : _id(RESOURCE_DATABASE, db),
-      _opCtx(opCtx),
-      _result(LOCK_INVALID),
-      _mode(mode),
-      _globalLock(
-          opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, deadline, InterruptBehavior::kThrow) {
+Lock::DBLock::DBLock(OperationContext* opCtx,
+                     StringData db,
+                     LockMode mode,
+                     Date_t deadline,
+                     bool skipGlobalAndRSTLLocks)
+    : _id(RESOURCE_DATABASE, db), _opCtx(opCtx), _result(LOCK_INVALID), _mode(mode) {
+
+    if (!skipGlobalAndRSTLLocks) {
+        _globalLock.emplace(opCtx,
+                            isSharedLockMode(_mode) ? MODE_IS : MODE_IX,
+                            deadline,
+                            InterruptBehavior::kThrow);
+    }
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
     _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);

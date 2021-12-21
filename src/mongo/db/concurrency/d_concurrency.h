@@ -306,7 +306,8 @@ public:
         DBLock(OperationContext* opCtx,
                StringData db,
                LockMode mode,
-               Date_t deadline = Date_t::max());
+               Date_t deadline = Date_t::max(),
+               bool skipGlobalAndRSTLLocks = false);
         DBLock(DBLock&&);
         ~DBLock();
 
@@ -337,7 +338,7 @@ public:
         LockMode _mode;
 
         // Acquires the global lock on our behalf.
-        GlobalLock _globalLock;
+        boost::optional<GlobalLock> _globalLock;
     };
 
     /**

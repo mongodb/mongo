@@ -46,19 +46,161 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
+/**
+ * Returns true if 'nss' is a view. False if the namespace or view doesn't exist.
+ */
+bool isSecondaryNssAView(OperationContext* opCtx, const NamespaceString& nss) {
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
+    return viewCatalog && viewCatalog->lookup(opCtx, nss);
+}
+
+/**
+ * Performs some sanity checks on the collection and database.
+ */
+void verifyDbAndCollection(OperationContext* opCtx,
+                           LockMode modeColl,
+                           const NamespaceStringOrUUID& nsOrUUID,
+                           const NamespaceString& resolvedNss,
+                           CollectionPtr& coll,
+                           Database* db) {
+    invariant(!nsOrUUID.uuid() || coll,
+              str::stream() << "Collection for " << resolvedNss.ns()
+                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+
+    invariant(!nsOrUUID.uuid() || db,
+              str::stream() << "Database for " << resolvedNss.ns()
+                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+
+    // In most cases we expect modifications for system.views to upgrade MODE_IX to MODE_X before
+    // taking the lock. One exception is a query by UUID of system.views in a transaction. Usual
+    // queries of system.views (by name, not UUID) within a transaction are rejected. However, if
+    // the query is by UUID we can't determine whether the namespace is actually system.views until
+    // we take the lock here. So we have this one last assertion.
+    uassert(51070,
+            "Modifications to system.views must take an exclusive lock",
+            !resolvedNss.isSystemDotViews() || modeColl != MODE_IX);
+
+    if (!db || !coll) {
+        return;
+    }
+
+    // If we are in a transaction, we cannot yield and wait when there are pending catalog changes.
+    // Instead, we must return an error in such situations. We ignore this restriction for the
+    // oplog, since it never has pending catalog changes.
+    if (opCtx->inMultiDocumentTransaction() && resolvedNss != NamespaceString::kRsOplogNamespace) {
+        if (auto minSnapshot = coll->getMinimumVisibleSnapshot()) {
+            auto mySnapshot =
+                opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).get_value_or(
+                    opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+
+            uassert(
+                ErrorCodes::SnapshotUnavailable,
+                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
+                                 "changes; please retry the operation. Snapshot timestamp is "
+                              << mySnapshot.toString() << ". Collection minimum is "
+                              << minSnapshot->toString(),
+                mySnapshot.isNull() || mySnapshot >= minSnapshot.get());
+        }
+    }
+}
+
+/**
+ * Defines sorting order for NamespaceStrings based on what their ResourceId would be for locking.
+ */
+struct ResourceIdNssComparator {
+    bool operator()(const NamespaceString& lhs, const NamespaceString& rhs) const {
+        return ResourceId(RESOURCE_COLLECTION, lhs.ns()) <
+            ResourceId(RESOURCE_COLLECTION, rhs.ns());
+    }
+};
+
+/**
+ * Fills the input 'collLocks' with CollectionLocks, acquiring locks on namespaces 'nsOrUUID' and
+ * 'secondaryNssOrUUIDs' in ResourceId(RESOURCE_COLLECTION, nss.ns()) order.
+ *
+ * The namespaces will be resolved, the locks acquired, and then the namespaces will be checked for
+ * changes in case there is a race with rename and a UUID no longer matches the locked namespace.
+ *
+ * Handles duplicate namespaces across 'nsOrUUID' and 'secondaryNssOrUUIDs'. Only one lock will be
+ * taken on each namespace.
+ */
+void acquireCollectionLocksInResourceIdOrder(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    Date_t deadline,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    std::vector<Lock::CollectionLock>* collLocks) {
+    invariant(collLocks->empty());
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    // Use a set so that we can easily dedupe namespaces to avoid locking the same collection twice.
+    std::set<NamespaceString, ResourceIdNssComparator> temp;
+    std::set<NamespaceString, ResourceIdNssComparator> verifyTemp;
+    do {
+        // Clear the data structures when/if we loop more than once.
+        collLocks->clear();
+        temp.clear();
+        verifyTemp.clear();
+
+        // Create a single set with all the resolved namespaces sorted by ascending
+        // ResourceId(RESOURCE_COLLECTION, nss.ns()).
+        temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
+        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+            temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+        }
+
+        // Acquire all of the locks in order.
+        for (auto& nss : temp) {
+            collLocks->emplace_back(opCtx, nss, modeColl, deadline);
+        }
+
+        // Check that the namespaces have NOT changed after acquiring locks. It's possible to race
+        // with a rename collection when the given NamespaceStringOrUUID is a UUID, and consequently
+        // fail to lock the correct namespace.
+        verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
+        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+            verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+        }
+    } while (temp != verifyTemp);
+}
+
 }  // namespace
 
-AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
+AutoGetDb::AutoGetDb(OperationContext* opCtx,
+                     StringData dbName,
+                     LockMode mode,
+                     Date_t deadline,
+                     const std::set<StringData>& secondaryDbNames)
     : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
+    // Locking multiple databases is only supported in intent read mode (MODE_IS).
+    invariant(secondaryDbNames.empty() || mode == MODE_IS);
+
+    // Take the secondary dbs' database locks only: no global or RSTL, as they are already acquired
+    // above. Note: no consistent ordering is when acquiring database locks because there are no
+    // occasions where multiple strong locks are acquired to make ordering matter (deadlock
+    // avoidance).
+    for (const auto& secondaryDbName : secondaryDbNames) {
+        // The primary database may be repeated in the secondary databases and the primary database
+        // should not be locked twice.
+        if (secondaryDbName != _dbName) {
+            _secondaryDbLocks.emplace_back(
+                opCtx, secondaryDbName, MODE_IS, deadline, true /*skipGlobalAndRSTLLocks*/);
+        }
+    }
+
+    // The 'primary' database must be version checked for sharding.
     auto dss = DatabaseShardingState::get(opCtx, dbName);
     auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
     dss->checkDbVersion(opCtx, dssLock);
 }
 
 Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
+    invariant(_secondaryDbLocks.empty());
+
     if (_db) {
         return _db;
     }
@@ -73,23 +215,29 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     return _db;
 }
 
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     LockMode modeColl,
-                                     AutoGetCollectionViewMode viewMode,
-                                     Date_t deadline)
-    : _autoDb(opCtx,
-              !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
-              isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
-              deadline) {
+AutoGetCollection::AutoGetCollection(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
     invariant(!opCtx->isLockFreeReadsOp());
+    invariant(secondaryNssOrUUIDs.empty() || modeColl == MODE_IS);
 
-    auto& nss = nsOrUUID.nss();
-    if (nss) {
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace " << *nss << " is not a valid collection name",
-                nss->isValid());
+    // Get a unique list of 'secondary' database names to pass into AutoGetDbMulti below.
+    std::set<StringData> secondaryDbNames;
+    for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+        secondaryDbNames.emplace(secondaryNssOrUUID.db());
     }
+
+    // Acquire the global/RSTL and all the database locks (may or may not be multiple
+    // databases).
+    _autoDb.emplace(opCtx,
+                    !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
+                    isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
+                    deadline,
+                    secondaryDbNames);
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
@@ -101,85 +249,78 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                   str::stream() << "Snapshot opened before acquiring X lock for " << nsOrUUID);
     }
 
-    _collLock.emplace(opCtx, nsOrUUID, modeColl, deadline);
-    auto catalog = CollectionCatalog::get(opCtx);
-    _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+    // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
+    // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
+    // deadlocks across threads.
+    if (secondaryDbNames.empty()) {
+        uassertStatusOK(nsOrUUID.isNssValid());
+        _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
+    } else {
+        acquireCollectionLocksInResourceIdOrder(
+            opCtx, nsOrUUID, modeColl, deadline, secondaryNssOrUUIDs, &_collLocks);
+    }
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     setAutoGetCollectionWait.execute(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
-    Database* const db = _autoDb.getDb();
-    invariant(!nsOrUUID.uuid() || db,
-              str::stream() << "Database for " << _resolvedNss.ns()
-                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
 
-    // In most cases we expect modifications for system.views to upgrade MODE_IX to MODE_X before
-    // taking the lock. One exception is a query by UUID of system.views in a transaction. Usual
-    // queries of system.views (by name, not UUID) within a transaction are rejected. However, if
-    // the query is by UUID we can't determine whether the namespace is actually system.views until
-    // we take the lock here. So we have this one last assertion.
-    uassert(51070,
-            "Modifications to system.views must take an exclusive lock",
-            !_resolvedNss.isSystemDotViews() || modeColl != MODE_IX);
-
-    // If the database doesn't exists, we can't obtain a collection or check for views
-    if (!db)
-        return;
-
+    // Check that the collections are all safe to use.
+    _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
-    invariant(!nsOrUUID.uuid() || _coll,
-              str::stream() << "Collection for " << _resolvedNss.ns()
-                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+    verifyDbAndCollection(opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb->getDb());
+    for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+        auto secondaryResolvedNss =
+            catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
+        auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
+        verifyDbAndCollection(opCtx,
+                              MODE_IS,
+                              secondaryNssOrUUID,
+                              secondaryResolvedNss,
+                              secondaryColl,
+                              databaseHolder->getDb(opCtx, secondaryNssOrUUID.db()));
+
+        // Flag if a secondary namespace is a view.
+        if (!_secondaryNssIsView && isSecondaryNssAView(opCtx, secondaryResolvedNss)) {
+            _secondaryNssIsView = true;
+        }
+    }
 
     if (_coll) {
-        // If we are in a transaction, we cannot yield and wait when there are pending catalog
-        // changes. Instead, we must return an error in such situations. We
-        // ignore this restriction for the oplog, since it never has pending catalog changes.
-        if (opCtx->inMultiDocumentTransaction() &&
-            _resolvedNss != NamespaceString::kRsOplogNamespace) {
-
-            if (auto minSnapshot = _coll->getMinimumVisibleSnapshot()) {
-                auto mySnapshot =
-                    opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).get_value_or(
-                        opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
-
-                uassert(ErrorCodes::SnapshotUnavailable,
-                        str::stream()
-                            << "Unable to read from a snapshot due to pending collection catalog "
-                               "changes; please retry the operation. Snapshot timestamp is "
-                            << mySnapshot.toString() << ". Collection minimum is "
-                            << minSnapshot->toString(),
-                        mySnapshot.isNull() || mySnapshot >= minSnapshot.get());
-            }
-        }
-
         // Fetch and store the sharding collection description data needed for use during the
         // operation. The shardVersion will be checked later if the shard filtering metadata is
         // fetched, ensuring both that the collection description info used here and the routing
         // table are consistent with the read request's shardVersion.
+        //
+        // Note: sharding versioning for an operation has no concept of multiple collections.
         auto collDesc =
-            CollectionShardingState::get(opCtx, getNss())->getCollectionDescription(opCtx);
+            CollectionShardingState::get(opCtx, _resolvedNss)->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
         }
 
-        // If the collection exists, there is no need to check for views.
         return;
     }
 
-    _view = ViewCatalog::get(db)->lookup(opCtx, _resolvedNss);
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
-            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
-                !_view->timeseries());
-    uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
-            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+    if (_autoDb->getDb()) {
+        _view = ViewCatalog::get(_autoDb->getDb())->lookup(opCtx, _resolvedNss);
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
+                !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||
+                    !_view->timeseries());
+        uassert(ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "Namespace " << _resolvedNss.ns()
+                              << " is a view, not a collection",
+                !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+    }
 }
 
 Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx,
                                                      CollectionCatalog::LifetimeMode mode) {
+    invariant(_collLocks.size() == 1);
+
     // Acquire writable instance if not already available
     if (!_writableColl) {
 
