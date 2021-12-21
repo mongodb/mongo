@@ -292,6 +292,7 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_query_hash.js",
             parallelFilesDir + "/profile_sampling.js",
             parallelFilesDir + "/profile_update.js",
+            parallelFilesDir + "/cached_plan_trial_does_not_discard_work.js",
 
             // These tests rely on a deterministically refreshable logical session cache. If they
             // run in parallel, they could interfere with the cache and cause failures.
