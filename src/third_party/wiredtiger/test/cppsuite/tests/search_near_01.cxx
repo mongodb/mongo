@@ -185,7 +185,7 @@ class search_near_01 : public test_harness::test {
         /* Generate search prefix key of random length between a -> zzz. */
         srch_key = random_generator::instance().generate_random_string(
           srchkey_len, characters_type::ALPHABET);
-        logger::log_msg(LOG_INFO,
+        logger::log_msg(LOG_TRACE,
           "Search near thread {" + std::to_string(tc->id) +
             "} performing prefix search near with key: " + srch_key);
 
@@ -278,7 +278,7 @@ class search_near_01 : public test_harness::test {
               tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &entries_stat);
             runtime_monitor::get_stat(
               tc->stat_cursor, WT_STAT_CONN_CURSOR_SEARCH_NEAR_PREFIX_FAST_PATHS, &prefix_stat);
-            logger::log_msg(LOG_INFO,
+            logger::log_msg(LOG_TRACE,
               "Read thread skipped entries: " + std::to_string(entries_stat - prev_entries_stat) +
                 " prefix early exit: " +
                 std::to_string(prefix_stat - prev_prefix_stat - z_key_searches));

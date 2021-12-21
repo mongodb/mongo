@@ -1020,7 +1020,7 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t hs_cleanup -C 'debug_mode=(cursor_copy=true)' -f test/cppsuite/configs/hs_cleanup_default.txt -l 2
 
-  - name: cppsuite-search-near-default
+  - name: cppsuite-search-near-01-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1034,7 +1034,35 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_default.txt -l 2
+
+  - name: cppsuite-search-near-02-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_default.txt -l 2
+  
+  - name: cppsuite-search-near-03-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_03 -f test/cppsuite/configs/search_near_03_default.txt -l 2
 
   - name: cppsuite-base-test-stress
@@ -1065,7 +1093,7 @@ tasks:
 
             ${test_env_vars|} $(pwd)/run -t hs_cleanup -f configs/hs_cleanup_stress.txt -l 2
   
-  - name: cppsuite-search-near-stress
+  - name: cppsuite-search-near-01-stress
     depends_on:
       - name: compile
     commands:
@@ -1078,7 +1106,33 @@ tasks:
             set -o verbose
 
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_01 -f test/cppsuite/configs/search_near_01_stress.txt -l 2
+
+  - name: cppsuite-search-near-02-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_02 -f test/cppsuite/configs/search_near_02_stress.txt -l 2
+
+  - name: cppsuite-search-near-03-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/"
+          script: |
+            set -o errexit
+            set -o verbose
+
             ${test_env_vars|} $(pwd)/test/cppsuite/run -t search_near_03 -f test/cppsuite/configs/search_near_03_stress.txt -l 2
 
   # End of cppsuite test tasks.
@@ -3943,7 +3997,9 @@ buildvariants:
     - name: make-check-test
     - name: cppsuite-base-test-default
     - name: cppsuite-hs-cleanup-default
-    - name: cppsuite-search-near-default
+    - name: cppsuite-search-near-01-default
+    - name: cppsuite-search-near-02-default
+    - name: cppsuite-search-near-03-default
 
 - name: ubuntu2004-compilers
   display_name: "! Ubuntu 20.04 Compilers"
@@ -4105,7 +4161,9 @@ buildvariants:
     - name: compile
     - name: cppsuite-base-test-stress
     - name: cppsuite-hs-cleanup-stress
-    - name: cppsuite-search-near-stress
+    - name: cppsuite-search-near-01-stress
+    - name: cppsuite-search-near-02-stress
+    - name: cppsuite-search-near-03-stress
 
 - name: package
   display_name: "~ Package"

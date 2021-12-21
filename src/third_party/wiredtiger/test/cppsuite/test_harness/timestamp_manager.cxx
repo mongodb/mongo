@@ -103,7 +103,7 @@ timestamp_manager::do_work()
     }
 
     if (!log_msg.empty())
-        logger::log_msg(LOG_INFO, log_msg);
+        logger::log_msg(LOG_TRACE, log_msg);
 
     /*
      * Save the new timestamps. Any timestamps that we're viewing from another thread should be set
