@@ -7148,7 +7148,7 @@ buildvariants:
 - &linux-64-debug-required-template
   name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   run_on:
   - rhel80-medium
   expansions:
@@ -8013,7 +8013,7 @@ buildvariants:
 
 - name: windows-debug-suggested
   display_name: "* Windows DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   run_on:
   - windows-vsCurrent-small
   expansions:
@@ -8082,7 +8082,7 @@ buildvariants:
 - &enterprise-windows-required-template
   name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   modules:
   - enterprise
   run_on:
@@ -8129,7 +8129,7 @@ buildvariants:
 - &enterprise-windows-suggested-template
   name: enterprise-windows-suggested
   display_name: "* Enterprise Windows"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   modules:
     - enterprise
   run_on:
@@ -8465,7 +8465,7 @@ buildvariants:
 - &macos-debug-template
   name: macos-debug-suggested
   display_name: "* Shared Library macOS DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   run_on:
   - macos-1014
   expansions: &macos-debug-expansions
@@ -8613,7 +8613,7 @@ buildvariants:
 
 - name: enterprise-rhel-80-64-bit
   display_name: "Enterprise RHEL 8.0"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   modules:
   - enterprise
   run_on:
@@ -8724,7 +8724,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
-  batchtime: 240 # 4 hour
+  batchtime: 1440 # 1 day
   modules:
   - enterprise
   run_on:
@@ -8852,7 +8852,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-backport-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-backport-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (Backport Feature Flags)"
-  batchtime: 240 # 4 hour
+  batchtime: 1440 # 1 day
   modules:
     - enterprise
   run_on:
@@ -9048,7 +9048,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-small
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   expansions: &enterprise-rhel-80-64-bit-lock-free-reads-expansions
     test_flags: >-
       --mongodSetParameters="{featureFlagLockFreeReads: false}" --excludeWithAnyTags=incompatible_with_lockfreereads
@@ -9139,7 +9139,7 @@ buildvariants:
   display_name: "RHEL 8.0 Shared Library (No SSL)"
   run_on:
   - rhel80-small
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   expansions:
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -9363,7 +9363,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-suggested-template
   name: enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   modules:
   - enterprise
   run_on:
@@ -9478,7 +9478,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
   display_name: "~ Enterprise RHEL 7.0"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -9491,7 +9491,7 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
-  batchtime: 1440  # 1 day
+  batchtime: 2880 # 2 days
   run_on:
   - rhel70
   expansions:
@@ -9548,7 +9548,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-suggested
   display_name: "* Shared Library Ubuntu 18.04 DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   run_on:
   - ubuntu1804-test
   expansions:
@@ -9937,7 +9937,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   modules:
   - enterprise
   run_on:
@@ -10686,7 +10686,7 @@ buildvariants:
 - &ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  batchtime: 240 # 4 hours
+  batchtime: 1440 # 1 days
   modules:
   - enterprise
   run_on:
@@ -10779,7 +10779,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-unoptimized-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (without Diagnostic Latches)"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   modules:
   - enterprise
   expansions:
@@ -10803,7 +10803,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-fixed-service-executor-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with FixedServiceExecutor)"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   run_on:
     - ubuntu1804-test
   modules:
@@ -10836,7 +10836,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sdam-replica-set-monitor-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with SdamReplicaSetMonitor)"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   run_on:
     - ubuntu1804-test
   modules:
@@ -10868,7 +10868,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-task-executor-pool-size-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {taskExecutorPoolSize: 4})"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   run_on:
     - ubuntu1804-test
   modules:
@@ -10898,7 +10898,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchPrimary-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   run_on:
     - ubuntu1804-test
   modules:
@@ -10929,7 +10929,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchBusiest-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   run_on:
     - ubuntu1804-test
   modules:
@@ -10960,7 +10960,7 @@ buildvariants:
 
 - name: enterprise-ubuntu-sharding-task-executor-pool-rsm-disabled-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   run_on:
     - ubuntu1804-test
   modules:
@@ -11034,7 +11034,7 @@ buildvariants:
 
 - name: live-record
   display_name: "~ RHEL 8.0 Shared Library (with UndoDB live-record)"
-  batchtime: 1440 # 1 day
+  batchtime: 2880 # 2 days
   stepback: false
   modules:
   - enterprise
