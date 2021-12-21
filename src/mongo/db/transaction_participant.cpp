@@ -914,8 +914,6 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
 
     _apiParameters = APIParameters::get(opCtx);
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    _uncommittedCollections = UncommittedCollections::get(opCtx).releaseResources();
-    _uncommittedMultikey = UncommittedMultikey::get(opCtx).releaseResources();
 }
 
 TransactionParticipant::TxnResources::~TxnResources() {
@@ -978,14 +976,6 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     // operation context's locker and replace it with a new empty locker.
     opCtx->swapLockState(std::move(_locker), lk);
     opCtx->lockState()->updateThreadIdToCurrentThread();
-
-    // Transfer ownership of UncommittedCollections
-    UncommittedCollections::get(opCtx).receiveResources(_uncommittedCollections);
-    _uncommittedCollections = nullptr;
-
-    // Transfer ownership of UncommittedMultikey
-    UncommittedMultikey::get(opCtx).receiveResources(_uncommittedMultikey);
-    _uncommittedMultikey = nullptr;
 
     auto oldState = opCtx->setRecoveryUnit(std::move(_recoveryUnit),
                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

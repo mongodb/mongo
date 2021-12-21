@@ -37,16 +37,15 @@
 
 namespace mongo {
 namespace {
-const auto getUncommittedCollections =
-    OperationContext::declareDecoration<UncommittedCollections>();
+const auto getUncommittedCollections = RecoveryUnit::declareDecoration<UncommittedCollections>();
 }  // namespace
 
 UncommittedCollections& UncommittedCollections::get(OperationContext* opCtx) {
-    return getUncommittedCollections(opCtx);
+    return getUncommittedCollections(opCtx->recoveryUnit());
 }
 
 void UncommittedCollections::addToTxn(OperationContext* opCtx, std::shared_ptr<Collection> coll) {
-    auto collList = getUncommittedCollections(opCtx).getResources().lock();
+    auto collList = UncommittedCollections::get(opCtx).getResources().lock();
     auto existingColl = collList->_collections.find(coll->uuid());
     uassert(31370,
             str::stream() << "collection already exists. ns: " << coll->ns(),
@@ -58,7 +57,7 @@ void UncommittedCollections::addToTxn(OperationContext* opCtx, std::shared_ptr<C
     collList->_collections[uuid] = std::move(coll);
     collList->_nssIndex.insert({nss, uuid});
 
-    auto collListUnowned = getUncommittedCollections(opCtx).getResources();
+    auto collListUnowned = UncommittedCollections::get(opCtx).getResources();
 
     opCtx->recoveryUnit()->onRollback([collListUnowned, uuid, nss]() {
         UncommittedCollections::erase(uuid, nss, collListUnowned.lock().get());
@@ -97,7 +96,7 @@ std::shared_ptr<Collection> UncommittedCollections::getForTxn(OperationContext* 
 
 std::shared_ptr<Collection> UncommittedCollections::getForTxn(OperationContext* opCtx,
                                                               const NamespaceString& nss) {
-    auto collList = getUncommittedCollections(opCtx).getResources().lock();
+    auto collList = UncommittedCollections::get(opCtx).getResources().lock();
     auto it = collList->_nssIndex.find(nss);
     if (it == collList->_nssIndex.end()) {
         return nullptr;
@@ -108,7 +107,7 @@ std::shared_ptr<Collection> UncommittedCollections::getForTxn(OperationContext* 
 
 std::shared_ptr<Collection> UncommittedCollections::getForTxn(OperationContext* opCtx,
                                                               const UUID& uuid) {
-    auto collList = getUncommittedCollections(opCtx).getResources().lock();
+    auto collList = UncommittedCollections::get(opCtx).getResources().lock();
     auto it = collList->_collections.find(uuid);
     if (it == collList->_collections.end()) {
         return nullptr;
@@ -152,7 +151,7 @@ void UncommittedCollections::commit(OperationContext* opCtx,
 
     map->_collections.erase(it);
     map->_nssIndex.erase(nss);
-    auto collListUnowned = getUncommittedCollections(opCtx).getResources();
+    auto collListUnowned = UncommittedCollections::get(opCtx).getResources();
 
     opCtx->recoveryUnit()->onRollback([opCtx, collListUnowned, uuid]() {
         UncommittedCollections::rollback(opCtx, uuid, collListUnowned.lock().get());

@@ -44,14 +44,6 @@ public:
      */
     using MultikeyMap = std::map<const Collection*, BSONCollectionCatalogEntry::MetaData>;
 
-    std::shared_ptr<MultikeyMap> releaseResources() {
-        return std::move(_resourcesPtr);
-    }
-
-    void receiveResources(std::shared_ptr<MultikeyMap> resources) {
-        _resourcesPtr = std::move(resources);
-    }
-
     static UncommittedMultikey& get(OperationContext* opCtx);
 
     std::shared_ptr<MultikeyMap>& resources() {

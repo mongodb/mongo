@@ -232,8 +232,6 @@ public:
         APIParameters _apiParameters;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
-        std::shared_ptr<UncommittedCollections::UncommittedCollectionsMap> _uncommittedCollections;
-        std::shared_ptr<UncommittedMultikey::MultikeyMap> _uncommittedMultikey;
     };
 
     /**

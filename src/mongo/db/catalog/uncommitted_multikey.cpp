@@ -35,11 +35,11 @@
 namespace mongo {
 namespace {
 
-const auto getUncommittedMultikey = OperationContext::declareDecoration<UncommittedMultikey>();
+const auto getUncommittedMultikey = RecoveryUnit::declareDecoration<UncommittedMultikey>();
 }  // namespace
 
 UncommittedMultikey& UncommittedMultikey::get(OperationContext* opCtx) {
-    return getUncommittedMultikey(opCtx);
+    return getUncommittedMultikey(opCtx->recoveryUnit());
 }
 
 }  // namespace mongo

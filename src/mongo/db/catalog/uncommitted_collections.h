@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 class UncommittedCollections {
@@ -67,17 +68,6 @@ public:
 
     std::weak_ptr<UncommittedCollectionsMap> getResources() {
         return std::weak_ptr<UncommittedCollectionsMap>(_resourcesPtr);
-    }
-
-    std::shared_ptr<UncommittedCollectionsMap> releaseResources() {
-        auto ret = std::move(_resourcesPtr);
-        _resourcesPtr = std::make_shared<UncommittedCollectionsMap>();
-        return ret;
-    }
-
-    void receiveResources(std::shared_ptr<UncommittedCollectionsMap> resources) {
-        invariant(_resourcesPtr->empty());
-        _resourcesPtr = resources;
     }
 
     static UncommittedCollections& get(OperationContext* opCtx);

@@ -54,7 +54,7 @@ const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
 std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
 
 /**
- * Decoration on OperationContext to store cloned Collections until they are committed or rolled
+ * Decoration on RecoveryUnit to store cloned Collections until they are committed or rolled
  * back TODO SERVER-51236: This should be merged with UncommittedCollections
  */
 class UncommittedCatalogUpdates {
@@ -202,14 +202,20 @@ public:
         return ret;
     }
 
+    static UncommittedCatalogUpdates& get(OperationContext* opCtx);
+
 private:
     // Store entries in vector, we will do linear search to find what we're looking for but it will
     // be very few entries so it should be fine.
     std::vector<Entry> _entries;
 };
 
-const OperationContext::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
-    OperationContext::declareDecoration<UncommittedCatalogUpdates>();
+const RecoveryUnit::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
+    RecoveryUnit::declareDecoration<UncommittedCatalogUpdates>();
+
+UncommittedCatalogUpdates& UncommittedCatalogUpdates::get(OperationContext* opCtx) {
+    return getUncommittedCatalogUpdates(opCtx->recoveryUnit());
+}
 
 const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
     OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
@@ -563,14 +569,14 @@ void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
                                            const NamespaceString& fromCollection) const {
     invariant(coll);
 
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     uncommittedCatalogUpdates.rename(coll, fromCollection);
 }
 
 void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll) const {
     invariant(coll);
 
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     uncommittedCatalogUpdates.drop(coll);
 
     // Requesting a writable collection normally ensures we have registered PublishCatalogUpdates
@@ -621,7 +627,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
         return const_cast<Collection*>(lookupCollectionByUUID(opCtx, uuid).get());
     }
 
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
     // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
@@ -654,7 +660,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 }
 
 CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx, UUID uuid) const {
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return the pointer which will be nullptr in
     // case of a drop. We don't need to check UncommittedCollections as we will never share UUID for
@@ -700,7 +706,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
         return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss).get());
     }
 
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(nss);
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
@@ -738,7 +744,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
 
 CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* opCtx,
                                                              const NamespaceString& nss) const {
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(nss);
     // If uncommittedPtr is valid, found is always true. Return the pointer as the collection still
     // exists.
@@ -766,7 +772,7 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
                                                                     const UUID& uuid) const {
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(uuid);
     // If UUID is managed by uncommittedCatalogUpdates return its corresponding namespace if the
     // Collection exists, boost::none otherwise.
@@ -801,7 +807,7 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
 
 boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx,
                                                          const NamespaceString& nss) const {
-    auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(nss);
     if (uncommittedPtr) {
         return uncommittedPtr->uuid();
@@ -950,7 +956,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                 !it->second.contains(ns));
     }
     if (_collections.find(ns) != _collections.end()) {
-        auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
+        auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
         auto [found, uncommittedPtr] = uncommittedCatalogUpdates.lookup(ns);
         // If we have an uncommitted drop of this collection we can defer the creation, the register
         // will happen in the same catalog write as the drop.

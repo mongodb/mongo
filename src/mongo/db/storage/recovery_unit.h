@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/snapshot.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
@@ -109,7 +110,7 @@ public:
  * A RecoveryUnit is responsible for ensuring that data is persisted.
  * All on-disk information must be mutated through this interface.
  */
-class RecoveryUnit {
+class RecoveryUnit : public Decorable<RecoveryUnit> {
     RecoveryUnit(const RecoveryUnit&) = delete;
     RecoveryUnit& operator=(const RecoveryUnit&) = delete;
 
