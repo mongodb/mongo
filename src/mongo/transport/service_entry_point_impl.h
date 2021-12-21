@@ -74,7 +74,7 @@ public:
     bool shutdownAndWait(Milliseconds timeout);
     bool waitForNoSessions(Milliseconds timeout);
 
-    void appendStats(BSONObjBuilder* bob) const final;
+    void appendStats(BSONObjBuilder* bob) const override;
 
     size_t numOpenSessions() const final {
         return _currentConnections.load();

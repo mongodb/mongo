@@ -104,6 +104,11 @@ public:
     virtual void onEndSession(const transport::SessionHandle&) {}
 
     /**
+     * Optional handler which is invoked after a client connects.
+     */
+    virtual void onClientConnect(Client* client) {}
+
+    /**
      * Optional handler which is invoked after a client disconnect. A client disconnect occurs when
      * the connection between the mongo process and client is closed for any reason, and is defined
      * by the destruction and cleanup of the ServiceStateMachine that manages the client.

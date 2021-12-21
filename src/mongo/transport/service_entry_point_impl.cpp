@@ -175,10 +175,14 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             return boost::none;
         }
 
+        auto clientPtr = client.get();
         auto it = _sessions.emplace(_sessions.begin(), std::move(client));
+
         connectionCount = _sessions.size();
         _currentConnections.store(connectionCount);
         _createdConnections.addAndFetch(1);
+        onClientConnect(clientPtr);
+
         return it;
     }();
 
