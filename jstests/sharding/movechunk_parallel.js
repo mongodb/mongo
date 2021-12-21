@@ -1,5 +1,13 @@
-// Ensures that two manual moveChunk commands for the same collection will proceed in parallel so
-// long as they do not touch the same shards
+/**
+ * Ensures that two manual moveChunk commands for the same collection will proceed in parallel so
+ * long as they do not touch the same shards
+ *
+ * @tags: [
+ *   # SERVER-62181 avoid CS stepdowns, since they can cause the migrations
+ *   # (in combination with their failpoints) issued by this test to enter a deadlock
+ *   does_not_support_stepdowns,
+ *  ]
+ */
 
 load('./jstests/libs/chunk_manipulation_util.js');
 load("jstests/sharding/libs/find_chunks_util.js");
