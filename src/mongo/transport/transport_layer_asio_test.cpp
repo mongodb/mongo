@@ -30,6 +30,7 @@
 
 #include "mongo/transport/transport_layer_asio.h"
 
+#include <fstream>
 #include <queue>
 #include <system_error>
 #include <utility>
@@ -38,7 +39,10 @@
 #include <asio.hpp>
 #include <fmt/format.h>
 
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
@@ -53,7 +57,9 @@
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
+#include "mongo/util/thread_context.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -266,13 +272,29 @@ private:
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
 
+std::unique_ptr<transport::TransportLayerASIO> makeTLA(ServiceEntryPoint* sep) {
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::TransportLayerASIO::Options opts(&params);
+        // TODO SERVER-30212 should clean this up and assign a port from the supplied port range
+        // provided by resmoke.
+        opts.port = 0;
+        return opts;
+    }();
+    auto tla = std::make_unique<transport::TransportLayerASIO>(options, sep);
+    ASSERT_OK(tla->setup());
+    ASSERT_OK(tla->start());
+    return tla;
+}
+
 /**
  * Properly setting up and tearing down the MockSEP and TransportLayerASIO is
  * tricky. Most tests can delegate the details to this TestFixture.
  */
 class TestFixture {
 public:
-    TestFixture() : _tla{_makeTLA()} {}
+    TestFixture() : _tla{makeTLA(&_sep)} {}
 
     ~TestFixture() {
         _sep.endAllSessions({});
@@ -288,22 +310,6 @@ public:
     }
 
 private:
-    std::unique_ptr<transport::TransportLayerASIO> _makeTLA() {
-        auto options = [] {
-            ServerGlobalParams params;
-            params.noUnixSocket = true;
-            transport::TransportLayerASIO::Options opts(&params);
-            // TODO SERVER-30212 should clean this up and assign a port from the supplied port range
-            // provided by resmoke.
-            opts.port = 0;
-            return opts;
-        }();
-        auto tla = std::make_unique<transport::TransportLayerASIO>(options, &_sep);
-        ASSERT_OK(tla->setup());
-        ASSERT_OK(tla->start());
-        return tla;
-    }
-
     MockSEP _sep;
     std::unique_ptr<transport::TransportLayerASIO> _tla;
 };
@@ -582,6 +588,155 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
           "ASIO set_option response on peer-reset connection",
           "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
 }
+
+class TransportLayerASIOWithServiceContextTest : public ServiceContextTest {
+public:
+    /**
+     * `ThreadCounter` and `ThreadToken` allow tracking the number of active (running) threads.
+     * For each thread, a `ThreadToken` is created. The token notifies `ThreadCounter` about
+     * creation and destruction of its associated thread. This allows maintaining the number of
+     * active threads at any point during the execution of this unit-test.
+     */
+    class ThreadCounter {
+    public:
+        static ThreadCounter& get() {
+            static StaticImmortal<ThreadCounter> instance;
+            return *instance;
+        }
+
+        int64_t count() const {
+            const auto count = _count.load();
+            invariant(count > 0);
+            return count;
+        }
+
+        void onCreateThread() {
+            _count.fetchAndAdd(1);
+        }
+
+        void onDestroyThread() {
+            _count.fetchAndAdd(-1);
+        }
+
+    private:
+        AtomicWord<int64_t> _count;
+    };
+
+    struct ThreadToken {
+        ThreadToken() {
+            ThreadCounter::get().onCreateThread();
+        }
+
+        ~ThreadToken() {
+            ThreadCounter::get().onDestroyThread();
+        }
+    };
+
+    void setUp() override {
+        auto sep = std::make_unique<MockSEP>();
+        auto tl = makeTLA(sep.get());
+        getServiceContext()->setServiceEntryPoint(std::move(sep));
+        getServiceContext()->setTransportLayer(std::move(tl));
+    }
+
+    void tearDown() override {
+        getServiceContext()->getTransportLayer()->shutdown();
+    }
+
+    transport::TransportLayerASIO& tla() {
+        auto tl = getServiceContext()->getTransportLayer();
+        return *dynamic_cast<transport::TransportLayerASIO*>(tl);
+    }
+};
+
+const auto getThreadToken =
+    ThreadContext::declareDecoration<TransportLayerASIOWithServiceContextTest::ThreadToken>();
+
+TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceDoesNotSpawnThreadsBeforeStart) {
+    const auto beforeThreadCount = ThreadCounter::get().count();
+    transport::TransportLayerASIO::TimerService service;
+    // Note that the following is a best-effort and not deterministic as we don't have control over
+    // when threads may start running and advance the thread count.
+    const auto afterThreadCount = ThreadCounter::get().count();
+    ASSERT_EQ(beforeThreadCount, afterThreadCount);
+}
+
+TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceOneShotStart) {
+    const auto beforeThreadCount = ThreadCounter::get().count();
+    transport::TransportLayerASIO::TimerService service;
+    service.start();
+    LOGV2(5490004, "Waiting for the timer thread to start", "threads"_attr = beforeThreadCount);
+    while (ThreadCounter::get().count() == beforeThreadCount) {
+        sleepFor(Milliseconds(1));
+    }
+    const auto afterThreadCount = ThreadCounter::get().count();
+    LOGV2(5490005, "Returned from waiting for the timer thread", "threads"_attr = afterThreadCount);
+
+    // Start the service a few times and verify that the thread count has not changed. Note that the
+    // following is a best-effort and not deterministic as we don't have control over when threads
+    // may start running and advance the thread count.
+    service.start();
+    service.start();
+    service.start();
+    ASSERT_EQ(afterThreadCount, ThreadCounter::get().count());
+}
+
+TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceDoesNotStartAfterStop) {
+    const auto beforeThreadCount = ThreadCounter::get().count();
+    transport::TransportLayerASIO::TimerService service;
+    service.stop();
+    service.start();
+    const auto afterThreadCount = ThreadCounter::get().count();
+    // The test would fail if `start` proceeds to spawn a thread for `service`.
+    ASSERT_EQ(beforeThreadCount, afterThreadCount);
+}
+
+TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceCanStopMoreThanOnce) {
+    // Verifying that it is safe to have multiple calls to `stop()`.
+    {
+        transport::TransportLayerASIO::TimerService service;
+        service.start();
+        service.stop();
+        service.stop();
+    }
+    {
+        transport::TransportLayerASIO::TimerService service;
+        service.stop();
+        service.stop();
+    }
+}
+
+#ifdef MONGO_CONFIG_SSL
+#ifndef _WIN32
+// TODO SERVER-62035: enable the following on Windows.
+TEST_F(TransportLayerASIOWithServiceContextTest, ShutdownDuringSSLHandshake) {
+    /**
+     * Creates a server and a client thread:
+     * - The server listens for incoming connections, but doesn't participate in SSL handshake.
+     * - The client connects to the server, and is configured to perform SSL handshake.
+     * The server never writes on the socket in response to the handshake request, thus the client
+     * should block until it is timed out.
+     * The goal is to simulate a server crash, and verify the behavior of the client, during the
+     * handshake process.
+     */
+    int port = tla().listenerPort();
+
+    DBClientConnection conn;
+    conn.setSoTimeout(1);  // 1 second timeout
+
+    TransientSSLParams params;
+    params.sslClusterPEMPayload = [] {
+        std::ifstream input("jstests/libs/client.pem");
+        std::string str((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+        return str;
+    }();
+    params.targetedClusterConnectionString = ConnectionString::forLocal();
+
+    auto status = conn.connectSocketOnly({"localhost", port}, std::move(params));
+    ASSERT_EQ(status, ErrorCodes::HostUnreachable);
+}
+#endif  // _WIN32
+#endif  // MONGO_CONFIG_SSL
 
 }  // namespace
 }  // namespace mongo
