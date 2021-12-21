@@ -288,15 +288,7 @@ verify_metadata(WT_CONNECTION *conn, TABLE_INFO *tables)
         else if (t->verified != true)
             printf("%s not seen in metadata\n", t->name);
         else {
-            if ((ret = wt_session->open_cursor(wt_session, t->name, NULL, NULL, &cursor)) != 0) {
-                /*
-                 * It is possible for the metadata file to contain a table entry and no associated
-                 * file entry as WiredTiger didn't salvage the block associated with the file entry.
-                 */
-                if (ret == ENOENT)
-                    continue;
-                testutil_die(ret, "failed to open cursor on table");
-            }
+            testutil_check(wt_session->open_cursor(wt_session, t->name, NULL, NULL, &cursor));
             while ((ret = cursor->next(cursor)) == 0) {
                 testutil_check(cursor->get_value(cursor, &kv));
                 testutil_assert(strcmp(kv, VALUE) == 0);
