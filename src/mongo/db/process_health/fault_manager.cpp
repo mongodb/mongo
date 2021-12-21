@@ -565,31 +565,26 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
             {observer->getType(), HealthCheckContext(nullptr, boost::none)});
     }
 
-    // If health observer is disabled, then do nothing and schedule another run (health observer may
-    // become enabled).
-    if (!_config->isHealthObserverEnabled(observer->getType())) {
-        schedulerCb();
-        return;
-    }
-
     // Run asynchronous health check.  Send output to the state machine. Schedule next run.
-    auto healthCheckFuture = observer->periodicCheck(_taskExecutor, token)
-                                 .thenRunOn(_taskExecutor)
-                                 .onCompletion([this, acceptNotOKStatus, schedulerCb](
-                                                   StatusWith<HealthCheckStatus> status) {
-                                     ON_BLOCK_EXIT([this, schedulerCb]() {
-                                         if (!_config->periodicChecksDisabledForTests()) {
-                                             schedulerCb();
-                                         }
-                                     });
+    auto healthCheckFuture =
+        observer->periodicCheck(_taskExecutor, token)
+            .thenRunOn(_taskExecutor)
+            .onCompletion([this, acceptNotOKStatus, schedulerCb, observer](
+                              StatusWith<HealthCheckStatus> status) {
+                ON_BLOCK_EXIT([this, schedulerCb, observer]() {
+                    if (!_config->periodicChecksDisabledForTests() &&
+                        _config->isHealthObserverEnabled(observer->getType())) {
+                        schedulerCb();
+                    }
+                });
 
-                                     if (!status.isOK()) {
-                                         return acceptNotOKStatus(status.getStatus());
-                                     }
+                if (!status.isOK()) {
+                    return acceptNotOKStatus(status.getStatus());
+                }
 
-                                     accept(status.getValue());
-                                     return status.getValue();
-                                 });
+                accept(status.getValue());
+                return status.getValue();
+            });
 
     stdx::lock_guard lock(_mutex);
     _healthCheckContexts.at(observer->getType()).result =
