@@ -32,18 +32,16 @@ const shardTestDB = st.rs0.getPrimary().getDB('test');
 shardAdminDB.createUser({user: 'user', pwd: 'pwd', roles: jsTest.adminUserRoles});
 shardAdminDB.auth('user', 'pwd');
 const newTimestamp = Timestamp(getConfigOpTime().getTime() + 1000, 0);
-const metadata = {
-    $configServerState: {opTime: {ts: newTimestamp, t: -1}}
-};
-var res = shardTestDB.runCommandWithMetadata({ping: 1}, metadata);
-assert.commandFailedWithCode(res.commandReply, ErrorCodes.Unauthorized);
+assert.commandFailedWithCode(
+    shardTestDB.runCommand({ping: 1, $configServerState: {opTime: {ts: newTimestamp, t: -1}}}),
+    ErrorCodes.Unauthorized);
 assert(timestampCmp(getConfigOpTime(), newTimestamp) < 0, "Unexpected ConfigOpTime advancement");
 
 // Advance configOpTime
 shardAdminDB.createUser({user: 'internal', pwd: 'pwd', roles: ['__system']});
 shardAdminDB.auth('internal', 'pwd');
-res = shardTestDB.runCommandWithMetadata({ping: 1}, metadata);
-assert.commandWorked(res.commandReply);
+assert.commandWorked(
+    shardTestDB.runCommand({ping: 1, $configServerState: {opTime: {ts: newTimestamp, t: -1}}}));
 assert(timestampCmp(getConfigOpTime(), newTimestamp) >= 0,
        "ConfigOpTime did not advanced as expected");
 

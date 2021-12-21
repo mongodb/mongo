@@ -1,7 +1,6 @@
 /**
- * Overrides Mongo.prototype.runCommand and Mongo.prototype.runCommandWithMetadata to retry all
- * retryable writes at least once, randomly more than that, regardless of the outcome of the
- * command. Returns the result of the latest attempt.
+ * Overrides Mongo.prototype.runCommand to retry all retryable writes at least once, randomly more
+ * than that, regardless of the outcome of the command. Returns the result of the latest attempt.
  */
 (function() {
 "use strict";
@@ -14,14 +13,9 @@ Random.setRandomSeed();
 const kExtraRetryProbability = 0.2;
 
 const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
 Mongo.prototype.runCommand = function runCommand(dbName, cmdObj, options) {
     return runWithRetries(this, cmdObj, mongoRunCommandOriginal, arguments);
-};
-
-Mongo.prototype.runCommandWithMetadata = function runCommandWithMetadata(dbName, metadata, cmdObj) {
-    return runWithRetries(this, cmdObj, mongoRunCommandWithMetadataOriginal, arguments);
 };
 
 function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) {

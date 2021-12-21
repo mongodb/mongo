@@ -8,7 +8,6 @@
 const defaultTimeout = 10 * 60 * 1000;
 
 const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
 function awaitLatestOperationMajorityConfirmed(primary) {
     // Get the latest optime from the primary.
@@ -38,8 +37,7 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
     // We create a copy of 'commandObj' to avoid mutating the parameter the caller specified.
     // Instead, we use the makeFuncArgs() function to build the array of arguments to 'func' by
     // giving it the 'commandObj' that should be used. This is done to work around the
-    // difference in the order of parameters for the Mongo.prototype.runCommand() and
-    // Mongo.prototype.runCommandWithMetadata() functions.
+    // difference in the order of parameters for the Mongo.prototype.runCommand() function.
     commandObj = Object.assign({}, commandObj);
     const commandName = Object.keys(commandObj)[0];
     let resPrevious;
@@ -165,13 +163,5 @@ Mongo.prototype.runCommand = function(dbName, commandObj, options) {
                                  commandObj,
                                  mongoRunCommandOriginal,
                                  (commandObj) => [dbName, commandObj, options]);
-};
-
-Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
-    return runCommandWithRetries(this,
-                                 dbName,
-                                 commandArgs,
-                                 mongoRunCommandWithMetadataOriginal,
-                                 (commandArgs) => [dbName, metadata, commandArgs]);
 };
 })();

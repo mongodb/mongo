@@ -70,7 +70,6 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(logout);
         MONGO_DECLARE_JS_FUNCTION(remove);
         MONGO_DECLARE_JS_FUNCTION(runCommand);
-        MONGO_DECLARE_JS_FUNCTION(runCommandWithMetadata);
         MONGO_DECLARE_JS_FUNCTION(setClientRPCProtocols);
         MONGO_DECLARE_JS_FUNCTION(update);
         MONGO_DECLARE_JS_FUNCTION(getMinWireVersion);

@@ -43,18 +43,18 @@ var noSnapshotSecondary = secondaries[1];
 noSnapshotSecondary.setSecondaryOk();
 
 // Do a write, wait for it to replicate, and ensure it is visible.
-var res = primary.getDB(name).runCommandWithMetadata(  //
+var res = primary.getDB(name).runCommand(  //
     {
         insert: "foo",
         documents: [{_id: 1, state: 0}],
-        writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}
-    },
-    {"$replData": 1});
-assert.commandWorked(res.commandReply);
+        writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS},
+        $replData: 1
+    });
+assert.commandWorked(res);
 
 // We need to propagate the lastOpVisible from the primary as afterOpTime in the secondaries to
 // ensure we wait for the write to be in the majority committed view.
-var lastOp = res.commandReply["$replData"].lastOpVisible;
+var lastOp = res["$replData"].lastOpVisible;
 
 // Timeout is based on heartbeat timeout.
 assert.commandWorked(healthySecondary.getDB(name).foo.runCommand(

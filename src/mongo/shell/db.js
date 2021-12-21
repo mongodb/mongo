@@ -180,12 +180,6 @@ DB.prototype.runCommand = function(obj, extra, queryOptions) {
     }
 };
 
-DB.prototype.runCommandWithMetadata = function(commandArgs, metadata) {
-    const session = this.getSession();
-    return session._getSessionAwareClient().runCommandWithMetadata(
-        session, this._name, metadata, commandArgs);
-};
-
 DB.prototype._dbCommand = DB.prototype.runCommand;
 DB.prototype._dbReadCommand = DB.prototype.runReadCommand;
 

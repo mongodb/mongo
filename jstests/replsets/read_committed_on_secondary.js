@@ -57,17 +57,17 @@ var collSecondary = dbSecondary[name];
 
 function saveDoc(state) {
     log("saving doc.");
-    var res = dbPrimary.runCommandWithMetadata(  //
+    var res = dbPrimary.runCommand(  //
         {
             update: name,
             writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS},
             updates: [{q: {_id: 1}, u: {_id: 1, state: state}, upsert: true}],
-        },
-        {"$replData": 1});
-    assert.commandWorked(res.commandReply);
-    assert.eq(res.commandReply.writeErrors, undefined);
-    log("done saving doc: optime " + tojson(res.commandReply.$replData.lastOpVisible));
-    return res.commandReply.$replData.lastOpVisible;
+            $replData: 1
+        });
+    assert.commandWorked(res);
+    assert.eq(res.writeErrors, undefined);
+    log("done saving doc: optime " + tojson(res.$replData.lastOpVisible));
+    return res.$replData.lastOpVisible;
 }
 
 function doDirtyRead(lastOp) {

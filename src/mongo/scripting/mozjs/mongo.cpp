@@ -76,7 +76,6 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommandWithMetadata, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClientRPCProtocols, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMinWireVersion, MongoExternalInfo),
@@ -286,46 +285,6 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
         o.defineProperty(
             InternedString::_commandObj, args.get(1), JSPROP_READONLY | JSPROP_PERMANENT);
     }
-}
-
-void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
-    if (args.length() != 3)
-        uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 3 args");
-
-    if (!args.get(0).isString())
-        uasserted(ErrorCodes::BadValue,
-                  "the database parameter to runCommandWithMetadata must be a string");
-
-    if (!args.get(1).isObject())
-        uasserted(ErrorCodes::BadValue,
-                  "the metadata argument to runCommandWithMetadata must be an object");
-
-    if (!args.get(2).isObject())
-        uasserted(ErrorCodes::BadValue,
-                  "the commandArgs argument to runCommandWithMetadata must be an object");
-
-    std::string database = ValueWriter(cx, args.get(0)).toString();
-    BSONObj metadata = ValueWriter(cx, args.get(1)).toBSON();
-    BSONObj commandArgs = ValueWriter(cx, args.get(2)).toBSON();
-
-    const auto& conn = getConnectionRef(args);
-
-    if (isUnacknowledged(commandArgs)) {
-        runFireAndForgetCommand(conn, database, commandArgs, metadata);
-        setHiddenMongo(cx, args);
-        returnOk(cx, args);
-        return;
-    }
-
-    auto resTuple = conn->runCommandWithTarget(
-        OpMsgRequest::fromDBAndBody(database, commandArgs, metadata), conn);
-    auto res = std::move(std::get<0>(resTuple));
-
-    BSONObjBuilder mergedResultBob;
-    mergedResultBob.append("commandReply", res->getCommandReply());
-
-    ValueReader(cx, args.rval()).fromBSON(mergedResultBob.obj(), nullptr, false);
-    setHiddenMongo(cx, std::get<1>(resTuple), conn.get(), args);
 }
 
 void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {

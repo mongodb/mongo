@@ -61,28 +61,24 @@ const db = new Mongo(rst.getURL()).startSession({retryWrites: true}).getDatabase
 
 // Commands with no disconnections should work as normal.
 assert.commandWorked(db.runCommand({ping: 1}));
-assert.commandWorked(db.runCommandWithMetadata({ping: 1}, {}).commandReply);
 
 // Read commands are automatically retried on network errors.
 failNextCommand(db, "find");
 assert.commandWorked(db.runCommand({find: collName}));
 
 failNextCommand(db, "find");
-assert.commandWorked(db.runCommandWithMetadata({find: collName}, {}).commandReply);
 
 // Retryable write commands that can be retried succeed.
 failNextCommand(db, "insert");
 assert.commandWorked(db[collName].insert({x: 1}));
 
 failNextCommand(db, "insert");
-assert.commandWorked(db.runCommandWithMetadata({
-                           insert: collName,
-                           documents: [{x: 2}, {x: 3}],
-                           txnNumber: NumberLong(10),
-                           lsid: {id: UUID()}
-                       },
-                                               {})
-                         .commandReply);
+assert.commandWorked(db.runCommand({
+    insert: collName,
+    documents: [{x: 2}, {x: 3}],
+    txnNumber: NumberLong(10),
+    lsid: {id: UUID()}
+}));
 
 // Retryable write commands that cannot be retried (i.e. no transaction number, no session id,
 // or are unordered) throw.
@@ -93,11 +89,11 @@ assert.throws(function() {
 
 // The previous command shouldn't have been retried, so run a command to successfully re-target
 // the primary, so the connection to it can be closed.
-assert.commandWorked(db.runCommandWithMetadata({ping: 1}, {}).commandReply);
+assert.commandWorked(db.runCommand({ping: 1}));
 
 failNextCommand(db, "insert");
 assert.throws(function() {
-    db.runCommandWithMetadata({insert: collName, documents: [{x: 1}, {x: 2}], ordered: false}, {});
+    db.runCommand({insert: collName, documents: [{x: 1}, {x: 2}], ordered: false});
 });
 
 // getMore commands can't be retried because we won't know whether the cursor was advanced or
@@ -111,7 +107,7 @@ assert.throws(function() {
 cursorId = assert.commandWorked(db.runCommand({find: collName, batchSize: 0})).cursor.id;
 failNextCommand(db, "getMore");
 assert.throws(function() {
-    db.runCommandWithMetadata({getMore: cursorId, collection: collName}, {});
+    db.runCommand({getMore: cursorId, collection: collName});
 });
 
 rst.stopSet();
