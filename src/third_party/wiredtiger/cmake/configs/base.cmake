@@ -18,6 +18,7 @@ config_choice(
         "aarch64;WT_AARCH64;"
         "ppc64le;WT_PPC64;"
         "s390x;WT_S390X;"
+        "riscv64;WT_RISCV64;"
 )
 
 config_choice(

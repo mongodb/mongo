@@ -253,6 +253,7 @@ condition_map = {
     'ARM64_HOST' : False,
     'POSIX_HOST' : env['PLATFORM'] == 'posix',
     'POWERPC_HOST' : False,
+    'RISCV64_HOST' : False,
     'WINDOWS_HOST' : env['PLATFORM'] == 'win32',
     'X86_HOST' : True,
     'ZSERIES_HOST' : False,

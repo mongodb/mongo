@@ -1297,6 +1297,7 @@ ret
 retp
 revint
 rf
+risc
 rle
 rmw
 rng
@@ -1309,6 +1310,7 @@ rts
 ru
 run's
 runtime
+rw
 rwlock
 sH
 sHQ
@@ -1566,6 +1568,7 @@ zSeries
 zalloc
 zf
 zfree
+zihintpause
 zlib
 zlib's
 zseries

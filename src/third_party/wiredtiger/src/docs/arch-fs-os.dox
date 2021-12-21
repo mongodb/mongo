@@ -56,6 +56,6 @@ is mainly used for non-critical functionalities such as writing verbose messages
 writing to WiredTiger statistics logs.
 
 @section filesystem_usage Multiple System Architecture Support
-WiredTiger supports x86_64, i386, mips, ppc, aarch64, s390x, and sparc system architectures
-which are found in gcc.h.
+WiredTiger supports x86_64, i386, mips, ppc, aarch64, s390x, riscv64 and sparc system
+architectures which are found in gcc.h.
 */

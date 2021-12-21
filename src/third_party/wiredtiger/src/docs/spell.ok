@@ -562,6 +562,7 @@ req
 rerequests
 ret
 rf
+riscv
 rmw
 ro
 rotn
