@@ -1512,7 +1512,18 @@ int mongod_main(int argc, char* argv[]) {
         }
     }
 
-    audit::rotateAuditLog();
+    // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
+    // with existing log state. If this rotation fails, then exit nicely with failure
+    try {
+        audit::rotateAuditLog();
+    } catch (...) {
+
+        Status err = mongo::exceptionToStatus();
+        LOGV2(6169900, "Error rotating audit log", "error"_attr = err);
+
+        quickExit(ExitCode::EXIT_AUDIT_ROTATE_ERROR);
+    }
+
     setUpCollectionShardingState(service);
     setUpCatalog(service);
     setUpReplication(service);

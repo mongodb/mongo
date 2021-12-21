@@ -59,7 +59,8 @@ enum ExitCode : int {
     EXIT_THREAD_SANITIZER = 66,      // Default Exit code for Thread Sanitizer failures
     EXIT_PROCESS_HEALTH_CHECK = 67,  // Process health check triggered the crash.
     EXIT_UNCAUGHT = 100,             // top level exception that wasn't caught
-    EXIT_TEST = 101
+    EXIT_TEST = 101,
+    EXIT_AUDIT_ROTATE_ERROR = 102  // The startup rotation of audit logs failed
 };
 
 }  // namespace mongo

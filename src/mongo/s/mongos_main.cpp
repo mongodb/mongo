@@ -924,7 +924,18 @@ ExitCode mongos_main(int argc, char* argv[]) {
         return EXIT_ABRUPT;
     }
 
-    audit::rotateAuditLog();
+    // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
+    // with existing log state. If this rotation fails, then exit nicely with failure
+    try {
+        audit::rotateAuditLog();
+    } catch (...) {
+
+        Status err = mongo::exceptionToStatus();
+        LOGV2(6169901, "Error rotating audit log", "error"_attr = err);
+
+        quickExit(ExitCode::EXIT_AUDIT_ROTATE_ERROR);
+    }
+
     registerShutdownTask(cleanupTask);
 
     const auto service = getGlobalServiceContext();
