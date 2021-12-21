@@ -350,7 +350,7 @@ void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) 
             })
             .withBackoffBetweenIterations(kExponentialBackoff)
             .on(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                opCtx->getCancellationToken())
+                CancellationToken::uncancelable())
             .getAsync([](auto) {});
     }
 }
