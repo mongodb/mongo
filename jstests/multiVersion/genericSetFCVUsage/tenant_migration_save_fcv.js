@@ -1,7 +1,11 @@
 /**
  * Tests that we note down the recipient FCV at the beginning of a migration and that a change
  * in that FCV will abort the migration.
- * @tags: [requires_majority_read_concern, incompatible_with_windows_tls]
+ * @tags: [
+ *  requires_majority_read_concern,
+ *  incompatible_with_windows_tls,
+ *  disabled_due_to_server_61671,
+ *  ]
  */
 
 (function() {

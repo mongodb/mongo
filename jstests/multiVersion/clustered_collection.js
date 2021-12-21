@@ -7,7 +7,7 @@
  * large binary string RecordId encoding on time series collection, this test case is useful for
  * validating the RecordId KeyString encoding behaviour across versions.
  *
- * @tags: [future_git_tag_incompatible]
+ * @tags: [future_git_tag_incompatible, disabled_due_to_server_61671]
  *
  */
 

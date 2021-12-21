@@ -9,6 +9,7 @@
  *   requires_fcv_51,
  *   uses_api_parameters,
  *   requires_fcv_51,
+ *   disabled_due_to_server_61671,
  * ]
  */
 

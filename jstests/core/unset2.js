@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, disabled_due_to_server_61671]
 
 var res;
 

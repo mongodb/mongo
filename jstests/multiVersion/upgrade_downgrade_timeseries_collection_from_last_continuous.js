@@ -3,6 +3,8 @@
  * potentially mixed-schema data when building secondary indexes on time-series measurements on the
  * latest binary. Additionally, tests that downgrading FCV from 5.2 removes the
  * 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry flag from time-series collections.
+ *
+ * @tags: [disabled_due_to_server_61671]
  */
 (function() {
 "use strict";

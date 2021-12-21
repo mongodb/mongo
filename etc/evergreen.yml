@@ -292,7 +292,7 @@ variables:
     - windows-vsCurrent-large
   - name: build_variant_gen
   - name: burn_in_tests_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
@@ -7360,7 +7360,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: aggregation_auth
   - name: auth_gen
@@ -7399,7 +7399,7 @@ buildvariants:
     distros:
     - ubuntu1804-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: .misc_js
@@ -7475,7 +7475,7 @@ buildvariants:
     - ubuntu1804-build
   - name: build_variant_gen
   - name: .csfle
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
@@ -7636,7 +7636,7 @@ buildvariants:
     distros:
     - ubuntu2004-large
   - name: build_variant_gen
-  - name: .aggfuzzer .common !.multiversion
+#  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: .misc_js
@@ -7694,7 +7694,7 @@ buildvariants:
     - ubuntu2004-large
   - name: build_variant_gen
   - name: .csfle
-  - name: .aggfuzzer .common !.multiversion
+#  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
@@ -7838,7 +7838,7 @@ buildvariants:
       - rhel80-xlarge
   - name: build_variant_gen
   - name: test_api_version_compatibility
-  - name: .aggfuzzer !.multiversion
+#  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
   - name: .aggregation !.multiversion
   - name: audit
   - name: .auth !.multiversion
@@ -7970,7 +7970,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
   - name: audit
   - name: unittest_shell_hang_analyzer_gen
@@ -8103,7 +8103,7 @@ buildvariants:
     distros:
     - amazon1-2018-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.multiversion
   - name: audit
@@ -8160,7 +8160,7 @@ buildvariants:
     distros:
     - amazon1-2018-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -8219,7 +8219,7 @@ buildvariants:
     distros:
     - amazon2-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: audit
   - name: .auth !.multiversion
@@ -8275,7 +8275,7 @@ buildvariants:
     distros:
     - amazon2-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -8331,7 +8331,7 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: build_variant_gen
-  - name: .aggfuzzer !.multiversion
+#  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -8702,7 +8702,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -8754,7 +8754,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -8819,7 +8819,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -9194,7 +9194,7 @@ buildvariants:
     distros:
     - rhel80-large
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
   - name: audit
   - name: .auth
@@ -9317,7 +9317,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
   - name: audit
   - name: .auth
@@ -9453,7 +9453,7 @@ buildvariants:
       - rhel80-large
   - name: build_variant_gen
   - name: burn_in_tests_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
   - name: audit
   - name: .auth
@@ -9562,7 +9562,7 @@ buildvariants:
     test_flags: >-
       --mongodSetParameters="{internalQueryForceClassicEngine: true}"
   tasks:
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
   - name: .auth
   - name: .causally_consistent !.sharding
@@ -9858,7 +9858,7 @@ buildvariants:
     distros:
     - rhel70
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -9953,7 +9953,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -10014,7 +10014,7 @@ buildvariants:
     distros:
     - rhel82-arm64-large
   - name: build_variant_gen
-  - name: .aggfuzzer !.multiversion
+#  - name: .aggfuzzer !.multiversion # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -10094,7 +10094,7 @@ buildvariants:
     distros:
     - rhel70
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -10579,7 +10579,7 @@ buildvariants:
     distros:
     - suse12-sp5-large
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
@@ -10626,7 +10626,7 @@ buildvariants:
     distros:
     - suse12-sp5-large
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -10678,7 +10678,7 @@ buildvariants:
     distros:
     - suse15-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common !.multiversion
+#  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
@@ -10724,7 +10724,7 @@ buildvariants:
     distros:
     - suse15-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common !.multiversion
+#  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -10781,7 +10781,7 @@ buildvariants:
     distros:
     - debian92-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
@@ -10829,7 +10829,7 @@ buildvariants:
     distros:
     - debian92-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: aggregation_auth
   - name: .auth !.audit !.multiversion
@@ -10887,7 +10887,7 @@ buildvariants:
     distros:
     - debian10-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
@@ -10939,7 +10939,7 @@ buildvariants:
     distros:
     - debian10-build
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: aggregation
   - name: aggregation_auth
   - name: .auth !.audit !.multiversion
@@ -11004,7 +11004,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: .aggregation !.unwind !.encrypt
   - name: audit
   - name: .auth !.multiversion
@@ -11071,7 +11071,7 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     # TODO (SERVER-58125): Re-enable the timeseries fuzzer for EFT
   - name: build_variant_gen
-  - name: .aggfuzzer .common !.timeseries
+#  - name: .aggfuzzer .common !.timeseries # Disabled for FCV 5.3
   - name: aggregation
   - name: .auth !.multiversion !.audit !.sharding
   # SERVER-58597: Re-enable parallel
@@ -11347,7 +11347,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: build_variant_gen
-  - name: .aggfuzzer .common
+#  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: free_monitoring
   - name: .jstestfuzz !.initsync
 
@@ -11995,7 +11995,7 @@ buildvariants:
   tasks:
   - name: compile_and_archive_dist_test_TG
   - name: build_variant_gen
-  - name: .aggfuzzer
+#  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation
 #  - name: audit
 #  - name: .auth !.multiversion !.non_live_record

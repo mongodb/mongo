@@ -5,6 +5,7 @@
  *   requires_auth,
  *   requires_non_retryable_commands,
  *   requires_sharding,
+ *   disabled_due_to_server_61671,
  * ]
  */
 (function() {

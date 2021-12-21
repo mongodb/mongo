@@ -1,6 +1,6 @@
 /**
  * Tests that the "shard merge" protocol is enabled only in the proper FCV.
- * @tags: [requires_fcv_52, featureFlagShardMerge]
+ * @tags: [requires_fcv_52, featureFlagShardMerge, disabled_due_to_server_61671]
  */
 
 (function() {

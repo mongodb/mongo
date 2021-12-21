@@ -21,6 +21,7 @@ selector:
   - featureFlagToaster
   - featureFlagSpoon
   - disabled_due_to_server_60490
+  - disabled_due_to_server_61671
 
 # Multiversion tests start their own mongod's.
 executor:
