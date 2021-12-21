@@ -33,6 +33,7 @@
 
 #include "mongo/transport/transport_layer_asio.h"
 
+#include <fmt/format.h>
 #include <fstream>
 
 #include <asio.hpp>
@@ -59,6 +60,7 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/strong_weak_finish_line.h"
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl.hpp"
@@ -294,6 +296,60 @@ TransportLayerASIO::Options::Options(const ServerGlobalParams* params,
       maxConns(params->maxConns) {
 }
 
+TransportLayerASIO::TimerService::TimerService()
+    : _reactor(std::make_shared<TransportLayerASIO::ASIOReactor>()) {}
+
+TransportLayerASIO::TimerService::~TimerService() {
+    stop();
+}
+
+void TransportLayerASIO::TimerService::start() {
+    // Skip the expensive lock acquisition and `compareAndSwap` in the common path.
+    if (MONGO_likely(_state.load() != State::kInitialized))
+        return;
+
+    // The following ensures only one thread continues to spawn a thread to run the reactor. It also
+    // ensures concurrent `start()` and `stop()` invocations are serialized. Holding the lock
+    // guarantees that the following runs either before or after running `stop()`. Note that using
+    // `compareAndSwap` while holding the lock is for simplicity and not necessary.
+    auto lk = stdx::lock_guard(_mutex);
+    auto precondition = State::kInitialized;
+    if (_state.compareAndSwap(&precondition, State::kStarted)) {
+        _thread = stdx::thread([reactor = _reactor] {
+            LOGV2_INFO(5490002, "Started a new thread for the timer service");
+            reactor->run();
+            LOGV2_INFO(5490003, "Returning from the timer service thread");
+        });
+    }
+}
+
+void TransportLayerASIO::TimerService::stop() {
+    // It's possible for `stop()` to be called without `start()` having been called (or for them to
+    // be called concurrently), so we only proceed with stopping the reactor and joining the thread
+    // if we've already transitioned to the `kStarted` state.
+    auto lk = stdx::lock_guard(_mutex);
+    if (_state.swap(State::kStopped) != State::kStarted)
+        return;
+
+    _reactor->stop();
+    _thread.join();
+}
+
+std::unique_ptr<ReactorTimer> TransportLayerASIO::TimerService::makeTimer() {
+    return _getReactor()->makeTimer();
+}
+
+Date_t TransportLayerASIO::TimerService::now() {
+    return _getReactor()->now();
+}
+
+Reactor* TransportLayerASIO::TimerService::_getReactor() {
+    // TODO SERVER-57253 We can start this service as part of starting `TransportLayerASIO`.
+    // Then, we can remove the following invocation of `start()`.
+    start();
+    return _reactor.get();
+}
+
 TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
                                        ServiceEntryPoint* sep,
                                        const WireSpec& wireSpec)
@@ -302,7 +358,8 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
       _egressReactor(std::make_shared<ASIOReactor>()),
       _acceptorReactor(std::make_shared<ASIOReactor>()),
       _sep(sep),
-      _listenerOptions(opts) {}
+      _listenerOptions(opts),
+      _timerService(std::make_unique<TimerService>()) {}
 
 TransportLayerASIO::~TransportLayerASIO() = default;
 
@@ -539,11 +596,45 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(
         (sslMode == kGlobalSSLMode &&
          ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
           (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+        // The handshake is complete once either of the following passes the finish line:
+        // - The thread running the handshake returns from `handshakeSSLForEgress`.
+        // - The thread running `TimerService` cancels the handshake due to a timeout.
+        auto finishLine = std::make_shared<StrongWeakFinishLine>(2);
+
+        // Schedules a task to cancel the synchronous handshake if it does not complete before the
+        // specified timeout.
+        auto timer = _timerService->makeTimer();
+#ifndef _WIN32
+        // TODO SERVER-62035: enable the following on Windows.
+        if (timeout > Milliseconds(0)) {
+            timer->waitUntil(_timerService->now() + timeout)
+                .getAsync([finishLine, session](Status status) {
+                    if (status.isOK() && finishLine->arriveStrongly())
+                        session->end();
+                });
+        }
+#endif
+
         Date_t timeBefore = Date_t::now();
         auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
         Date_t timeAfter = Date_t::now();
+
         if (timeAfter - timeBefore > kSlowOperationThreshold) {
             networkCounter.incrementNumSlowSSLOperations();
+        }
+
+        if (finishLine->arriveStrongly()) {
+            timer->cancel();
+        } else if (!sslStatus.isOK()) {
+            // We only take this path if the handshake times out. Overwrite the socket exception
+            // with a network timeout.
+            auto errMsg = fmt::format("SSL handshake timed out after {}",
+                                      (timeAfter - timeBefore).toString());
+            sslStatus = Status(ErrorCodes::NetworkTimeout, errMsg);
+            LOGV2(5490001,
+                  "Timed out while running handshake",
+                  "peer"_attr = peer,
+                  "timeout"_attr = timeout);
         }
 
         if (!sslStatus.isOK()) {
@@ -1216,6 +1307,10 @@ void TransportLayerASIO::shutdown() {
         // We were already stopped
         return;
     }
+
+    lk.unlock();
+    _timerService->stop();
+    lk.lock();
 
     if (!_listenerOptions.isIngress()) {
         // Egress only reactors never start a listener
