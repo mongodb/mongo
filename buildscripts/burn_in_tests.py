@@ -161,6 +161,7 @@ def filter_tests(tests: Set[str], exclude_tests: List[str]) -> Set[str]:
     :param exclude_tests: Tests to filter out.
     :return: Set of tests with exclude_tests filtered out.
     """
+    tests = {test for test in tests if test.strip()}
     if not exclude_tests or not tests:
         return tests
 
