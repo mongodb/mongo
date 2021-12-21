@@ -123,7 +123,7 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
 }
 
 void ProgressMonitor::_progressMonitorLoop() {
-    Client::initThread("Health checks progress monitor"_sd, _svcCtx, nullptr);
+    Client::initThread("FaultManagerProgressMonitor"_sd, _svcCtx, nullptr);
 
     while (!_terminate.load()) {
         progressMonitorCheck(_crashCb);
