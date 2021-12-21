@@ -760,8 +760,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
     txn->flags = 0;
     txn->prepare_timestamp = WT_TS_NONE;
 
-    txn->resolve_weak_hazard_updates = false;
-
     /* Clear operation timer. */
     txn->operation_timeout_us = 0;
 }
@@ -1108,11 +1106,11 @@ err:
 }
 
 /*
- * __txn_search_uncommitted_op --
- *     Search for an operation's uncommitted update.
+ * __txn_search_prepared_op --
+ *     Search for an operation's prepared update.
  */
 static int
-__txn_search_uncommitted_op(
+__txn_search_prepared_op(
   WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR **cursorp, WT_UPDATE **updp)
 {
     WT_CURSOR *cursor;
@@ -1206,7 +1204,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     fix_upd = tombstone = NULL;
     upd_appended = false;
 
-    WT_RET(__txn_search_uncommitted_op(session, op, cursorp, &upd));
+    WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 
     if (commit)
         __wt_verbose(session, WT_VERB_TRANSACTION,
@@ -1498,7 +1496,7 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
 
         /* Search for prepared updates. */
         if (F_ISSET(txn, WT_TXN_PREPARE))
-            WT_ERR(__txn_search_uncommitted_op(session, op, &cursor, &upd));
+            WT_ERR(__txn_search_prepared_op(session, op, &cursor, &upd));
         else
             upd = op->u.op_upd;
 
@@ -1612,82 +1610,6 @@ __txn_mod_compare(const void *a, const void *b)
 }
 
 /*
- * __wt_txn_op_list_clear_weak_hazard --
- *     Walk the transaction op list clearing all the weak hazard pointers.
- */
-int
-__wt_txn_op_list_clear_weak_hazard(WT_SESSION_IMPL *session)
-{
-    WT_DECL_RET;
-    WT_TXN *txn;
-    WT_TXN_OP *op;
-    u_int i;
-
-    txn = session->txn;
-    for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
-        if (op->whp != NULL)
-            WT_WITH_BTREE(session, op->btree, ret = __wt_hazard_weak_clear(session, &op->whp));
-        WT_RET(ret);
-    }
-    return (0);
-}
-
-/*
- * __txn_resolve_weak_hazard_updates --
- *     Resolve an uncommitted op if needed. Fetches the latest update pointer to be used as part of
- *     the transaction operation.
- */
-static int
-__txn_resolve_weak_hazard_updates(
-  WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_CURSOR **cursorp, WT_REF **refp)
-{
-    WT_DECL_RET;
-    WT_REF *ref;
-    WT_TXN *txn;
-    WT_UPDATE *upd;
-
-    *refp = NULL;
-
-    ref = NULL;
-    txn = session->txn;
-
-    /* If we disabled resolution for some reason, or these are unsupported cases - do nothing. */
-    if (!txn->resolve_weak_hazard_updates)
-        return (0);
-    if (WT_IS_METADATA(op->btree->dhandle) ||
-      (op->type != WT_TXN_OP_BASIC_COL && op->type != WT_TXN_OP_INMEM_COL &&
-        op->type != WT_TXN_OP_BASIC_ROW && op->type != WT_TXN_OP_INMEM_ROW))
-        return (0);
-
-    /*
-     * Try to upgrade the weak pointer. If successful the page is still in memory and we are holding
-     * a strong hazard pointer. The caller will have to clear the strong hazard pointer when it is
-     * done using the page.
-     */
-    WT_WITH_BTREE(session, op->btree, ret = __wt_hazard_weak_upgrade(session, &op->whp, &ref));
-    if (ret == 0) {
-        *refp = ref;
-        return (0);
-    }
-
-    /* We could not upgrade the weak pointer, resolve the reference by searching for the update. */
-    if (ret == EBUSY) {
-        WT_SAVE_DHANDLE(session, ret = __txn_search_uncommitted_op(session, op, cursorp, &upd));
-        WT_RET(ret);
-
-        /*
-         * Since we are not evicting yet and we don't resolve updates on keys with multiple updates
-         * we expect to find the update we already have.
-         */
-        WT_ASSERT(session, op->u.op_upd == upd);
-
-        op->u.op_upd = upd;
-    }
-
-    return (ret);
-}
-
-/*
  * __wt_txn_commit --
  *     Commit the current transaction.
  */
@@ -1698,7 +1620,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_REF *ref;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_OP *op;
@@ -1710,11 +1631,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
-    bool locked, prepare, readonly, slow_resolved, update_durable_ts;
+    bool locked, prepare, readonly, update_durable_ts;
 
     conn = S2C(session);
     cursor = NULL;
-    ref = NULL;
     txn = session->txn;
     txn_global = &conn->txn_global;
 #ifdef HAVE_DIAGNOSTIC
@@ -1723,7 +1643,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     locked = false;
     prepare = F_ISSET(txn, WT_TXN_PREPARE);
     readonly = txn->mod_count == 0;
-    slow_resolved = false;
 
     /* Permit the commit if the transaction failed, but was read-only. */
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
@@ -1849,26 +1768,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         case WT_TXN_OP_BASIC_ROW:
         case WT_TXN_OP_INMEM_COL:
         case WT_TXN_OP_INMEM_ROW:
+            upd = op->u.op_upd;
+
             if (!prepare) {
-                /*
-                 * The page carrying the updates could have been evicted already. We will need to
-                 * fix the update pointer in the transaction op in such a case. If the resolution
-                 * returns a reference, the page was not evicted and we hold a strong hazard pointer
-                 * that we need to clear after the use. For testing purposes assert if resolution
-                 * fails. On successful slow resolution, after the cursor moves to resolve another
-                 * update, nothing prevents this update from getting evicted. We will have to deal
-                 * with that in the future work.
-                 */
-                ret = __txn_resolve_weak_hazard_updates(session, op, &cursor, &ref);
-                WT_ERR_ASSERT(
-                  session, ret == 0, ret, "Failed to resolve an update during txn_commit");
-
-                if (ref == NULL)
-                    slow_resolved = true;
-                else
-                    WT_WITH_BTREE(session, op->btree, ret = __wt_hazard_clear(session, ref));
-                upd = op->u.op_upd;
-
                 /*
                  * Switch reserved operations to abort to simplify obsolete update list truncation.
                  */
@@ -1876,6 +1778,14 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                     upd->txnid = WT_TXN_ABORTED;
                     break;
                 }
+
+                /*
+                 * For now just confirm that each operation has a weak hazard pointer and clear it
+                 * before proceeding.
+                 */
+                if ((op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW) &&
+                  !WT_IS_METADATA(op->btree->dhandle) && upd->type != WT_UPDATE_RESERVE)
+                    WT_ERR(__wt_hazard_weak_clear(session, op));
 
                 /*
                  * Don't reset the timestamp of the history store records with history store
@@ -1917,13 +1827,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         if (cursor != NULL)
             WT_CLEAR(cursor->key);
     }
-
-    /*
-     * This is temporary till we fix accounting for cached cursors in python testing: Don't cache
-     * the cursor that was opened for slow resolution of the updates.
-     */
-    if (cursor != NULL && slow_resolved)
-        F_CLR(cursor, WT_CURSTD_CACHEABLE);
 
     if (cursor != NULL) {
         WT_ERR(cursor->close(cursor));
@@ -2023,9 +1926,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
           "durable timestamp");
     }
 
-    if (slow_resolved)
-        WT_STAT_CONN_INCR(session, txn_commit_slow_resolved);
-
     return (0);
 
 err:
@@ -2094,12 +1994,6 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
         WT_RET(__wt_session_copy_values(session));
     }
 
-    /* For now we will decide not to resolve uncommitted updates on prepare. */
-    if (txn->resolve_weak_hazard_updates) {
-        WT_RET(__wt_txn_op_list_clear_weak_hazard(session));
-        txn->resolve_weak_hazard_updates = false;
-    }
-
     for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
         /* Assert it's not an update to the history store file. */
         WT_ASSERT(session, S2C(session)->cache->hs_fileid == 0 || !WT_IS_HS(op->btree->dhandle));
@@ -2135,6 +2029,14 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
                 __wt_txn_op_free(session, op);
                 break;
             }
+
+            /*
+             * For now just confirm that each operation has a weak hazard pointer and clear it
+             * before proceeding.
+             */
+            if ((op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW) &&
+              !WT_IS_METADATA(op->btree->dhandle) && upd->type != WT_UPDATE_RESERVE)
+                WT_RET(__wt_hazard_weak_clear(session, op));
 
             ++prepared_updates;
 
@@ -2207,7 +2109,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_REF *ref;
     WT_TXN *txn;
     WT_TXN_OP *op;
     WT_UPDATE *upd;
@@ -2215,17 +2116,15 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 #ifdef HAVE_DIAGNOSTIC
     u_int prepare_count;
 #endif
-    bool prepare, readonly, slow_resolved;
+    bool prepare, readonly;
 
     cursor = NULL;
-    ref = NULL;
     txn = session->txn;
 #ifdef HAVE_DIAGNOSTIC
     prepare_count = 0;
 #endif
     prepare = F_ISSET(txn, WT_TXN_PREPARE);
     readonly = txn->mod_count == 0;
-    slow_resolved = false;
 
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
 
@@ -2260,25 +2159,16 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
         case WT_TXN_OP_BASIC_ROW:
         case WT_TXN_OP_INMEM_COL:
         case WT_TXN_OP_INMEM_ROW:
+            upd = op->u.op_upd;
+
             if (!prepare) {
                 /*
-                 * The page carrying the updates could have been evicted already. We will need to
-                 * fix the update pointer in the transaction op in such a case. If the resolution
-                 * returns a reference, the page was not evicted and we hold a strong hazard pointer
-                 * that we need to clear after the use. For testing purposes assert if resolution
-                 * fails. On successful slow resolution, after the cursor moves to resolve another
-                 * update, nothing prevents this update from getting evicted. We will have to deal
-                 * with that in the future work.
+                 * For now just confirm that each operation has a weak hazard pointer and clear it
+                 * before proceeding.
                  */
-                ret = __txn_resolve_weak_hazard_updates(session, op, &cursor, &ref);
-                WT_RET_ASSERT(
-                  session, ret == 0, ret, "Failed to resolve an update during txn_rollback");
-
-                if (ref == NULL)
-                    slow_resolved = true;
-                else
-                    WT_WITH_BTREE(session, op->btree, ret = __wt_hazard_clear(session, ref));
-                upd = op->u.op_upd;
+                if ((op->type == WT_TXN_OP_BASIC_ROW || op->type == WT_TXN_OP_INMEM_ROW) &&
+                  !WT_IS_METADATA(op->btree->dhandle) && upd->type != WT_UPDATE_RESERVE)
+                    WT_TRET(__wt_hazard_weak_clear(session, op));
 
                 if (S2C(session)->cache->hs_fileid != 0 &&
                   op->btree->id == S2C(session)->cache->hs_fileid)
@@ -2320,9 +2210,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, txn->prepare_count == prepare_count);
     txn->prepare_count = 0;
 #endif
-
-    if (slow_resolved)
-        WT_STAT_CONN_INCR(session, txn_rollback_slow_resolved);
 
     if (cursor != NULL) {
         WT_TRET(cursor->close(cursor));
