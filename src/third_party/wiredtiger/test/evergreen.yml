@@ -684,7 +684,7 @@ variables:
           format_test_script_args: -t 360
           test_env_vars:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - &race-condition-stress-sanitizer-test
     exec_timeout_secs: 25200
@@ -701,7 +701,7 @@ variables:
           format_test_script_args: -R -t 360
           test_env_vars:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - &recovery-stress-test
     exec_timeout_secs: 25200
@@ -2554,7 +2554,7 @@ tasks:
         vars:
           test_env_vars:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           format_test_script_args: -S
 
   # Replace this test with format-asan-smoke-test after BUILD-10248 fix.
@@ -2736,7 +2736,7 @@ tasks:
         vars:
           test_env_vars:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           # Run for 30 mins, and explicitly set data_source to LSM with a large cache
           format_test_script_args: -t 30 data_source=lsm cache_minimum=5000
 
@@ -3803,7 +3803,7 @@ buildvariants:
       top_builddir=$top_dir/build_posix
       ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
       LSAN_OPTIONS="print_suppressions=0:suppressions=$top_dir/test/evergreen/asan_leaks.supp"
-      ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+      ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       TESTUTIL_BYPASS_ASAN=1
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so 
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
@@ -3833,7 +3833,7 @@ buildvariants:
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     test_env_vars:
       MSAN_OPTIONS="abort_on_error=1:disable_coredump=0:print_stacktrace=1"
-      MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer
+      MSAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       top_dir=$(git rev-parse --show-toplevel)
@@ -3871,7 +3871,7 @@ buildvariants:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     test_env_vars:
-      UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer:halt_on_error=1:print_stacktrace=1"
+      UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer:halt_on_error=1:print_stacktrace=1"
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       top_dir=$(git rev-parse --show-toplevel)
