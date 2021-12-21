@@ -771,14 +771,13 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
             if (view->timeseries()) {
                 auto tsCollection =
                     CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, *resolvedNss);
-                tassert(6067201,
+                uassert(6067201,
                         str::stream() << "expected time-series buckets collection " << *resolvedNss
                                       << " to exist",
-
                         tsCollection);
-                mixedData = tsCollection
-                    ? tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData()
-                    : false;
+                if (tsCollection) {
+                    mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();
+                }
             }
 
             dependencyChain.push_back(*resolvedNss);
