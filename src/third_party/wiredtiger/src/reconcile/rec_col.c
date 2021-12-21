@@ -958,11 +958,11 @@ err:
  *     Write the auxiliary header into the page image.
  */
 void
-__wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t entries,
-  uint32_t auxentries, uint8_t *image, size_t size)
+__wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
+  uint32_t aux_start_offset, uint32_t auxentries, uint8_t *image, size_t size)
 {
     WT_BTREE *btree;
-    uint32_t auxdataoffset, auxheaderoffset, bitmapsize, offset, space;
+    uint32_t auxheaderoffset, bitmapsize, offset, space;
     uint8_t *endp, *p;
 
     btree = S2BT(session);
@@ -1009,6 +1009,10 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
      *
      * However, this means that we should not assume the bitmap size is given by the btree maximum
      * leaf page size but get it from the reconciliation info.
+     *
+     * Note: it is important to use *this* chunk's auxiliary start offset (passed in) and not read
+     * the auxiliary start offset from the WT_RECONCILE, as we may be writing the previous chunk and
+     * the latter describes the current chunk.
      */
 
     /* Figure how much primary data we have. */
@@ -1017,14 +1021,8 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
     /* The auxiliary header goes after the bitmap, which goes after the page header. */
     auxheaderoffset = WT_PAGE_HEADER_BYTE_SIZE(btree) + bitmapsize;
 
-    /* The auxiliary data goes wherever we have been writing it. */
-    auxdataoffset = r->aux_start_offset;
-
-    /* This should be at or after the place it goes on a normal-sized page. */
-    WT_ASSERT(session, auxdataoffset >= btree->maxleafpage + WT_COL_FIX_AUXHEADER_RESERVATION);
-
     /* This should also have left sufficient room for the header. */
-    WT_ASSERT(session, auxdataoffset >= auxheaderoffset + WT_COL_FIX_AUXHEADER_RESERVATION);
+    WT_ASSERT(session, aux_start_offset >= auxheaderoffset + WT_COL_FIX_AUXHEADER_RESERVATION);
 
     /*
      * If there is no auxiliary data, we will have already shortened the image size to discard the
@@ -1033,12 +1031,12 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
      * last page in the tree, this also avoids the space wastage described above.
      */
     if (auxentries == 0) {
-        WT_ASSERT(session, auxdataoffset >= size);
+        WT_ASSERT(session, aux_start_offset >= size);
         return;
     }
 
     /* The offset we're going to write is the distance from the header start to the data. */
-    offset = auxdataoffset - auxheaderoffset;
+    offset = aux_start_offset - auxheaderoffset;
 
     /*
      * Encoding the offset should fit -- either it is less than what encodes to 1 byte or greater
@@ -1050,7 +1048,7 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint
     WT_STATIC_ASSERT(WT_COL_FIX_AUXHEADER_SIZE_MAX < POS_1BYTE_MAX);
 
     p = image + auxheaderoffset;
-    endp = image + auxdataoffset;
+    endp = image + aux_start_offset;
 
     *(p++) = WT_COL_FIX_VERSION_TS;
     WT_IGNORE_RET(__wt_vpack_uint(&p, WT_PTRDIFF32(endp, p), auxentries));
