@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_import05.py
-# Error conditions when trying to import files with timestamps past oldest.
+# Error conditions when trying to import files with timestamps past the configured global timestamp.
 
 import os, shutil
 import wiredtiger
@@ -52,9 +52,13 @@ class test_import05(test_import_base):
         ('file_metadata', dict(repair=False)),
         ('repair', dict(repair=True)),
     ]
-    scenarios = make_scenarios(optypes, import_types)
+    compare_timestamps = [
+        ('oldest', dict(global_ts='oldest')),
+        ('stable', dict(global_ts='stable')),
+    ]
+    scenarios = make_scenarios(optypes, import_types, compare_timestamps)
 
-    def test_file_import_ts_past_oldest(self):
+    def test_file_import_ts_past_global_ts(self):
         original_db_file = 'original_db_file'
         uri = 'file:' + original_db_file
         create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
@@ -102,15 +106,22 @@ class test_import05(test_import_base):
 
         # Contruct the config string.
         if self.repair:
-            import_config = 'import=(enabled,repair=true)'
+            if self.global_ts == 'stable':
+                import_config = 'import=(enabled,repair=true,compare_timestamp=stable)'
+            else:
+                import_config = 'import=(enabled,repair=true)'
         else:
-            import_config = 'import=(enabled,repair=false,file_metadata=(' + \
-                original_db_file_config + '))'
+            if self.global_ts == 'stable':
+                import_config = 'import=(enabled,repair=false,compare_timestamp=stable,file_metadata=(' + \
+                    original_db_file_config + '))'
+            else:
+                import_config = 'import=(enabled,repair=false,file_metadata=(' + \
+                    original_db_file_config + '))'
 
         # Create error pattern. Depending on the situation, we substitute a different timestamp into
         # error message to check against.
         error_pattern = \
-            'import found aggregated {} timestamp newer than the current oldest timestamp'
+            'import found aggregated {} timestamp newer than the current'
 
         # Now begin trying to import the file.
         #
@@ -128,7 +139,10 @@ class test_import05(test_import_base):
         #
         # The table we're importing had an operation past this point so we're still expecting an
         # error.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.ts[-1] - 1))
+        if self.global_ts == 'stable':
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.ts[-1] - 1))   
+        else: 
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.ts[-1] - 1))
 
         # If our latest operation was an insert, we're expecting it to complain about the aggregated
         # start timestamp whereas if we did a delete, we should expect it to complain about stop.
@@ -139,7 +153,10 @@ class test_import05(test_import_base):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: self.session.create(uri, import_config))
 
-        # Now place oldest equal to the last insert/delete we made. This should succeed since all
-        # of our aggregated timestamps are now equal to or behind oldest.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.ts[-1]))
+        # Now place global timestamp equal to the last insert/delete we made. This should succeed
+        # since all of our aggregated timestamps are now equal to or behind the global timestamp.
+        if self.global_ts == 'stable':
+            self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(self.ts[-1]))   
+        else: 
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.ts[-1]))
         self.session.create(uri, import_config)

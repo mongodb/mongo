@@ -46,21 +46,28 @@ __wt_direct_io_size_check(
 
 /*
  * __check_imported_ts --
- *     Check the aggregated timestamps for each checkpoint in a file that we've imported. We're not
- *     allowed to import files with timestamps ahead of our oldest timestamp since a subsequent
- *     rollback to stable could result in data loss and historical reads could yield unexpected
- *     values. Therefore, this function should return non-zero to callers to signify that this is
- *     the case.
+ *     Check the aggregated timestamps for each checkpoint in a file that we've imported. By
+ *     default, we're not allowed to import files with timestamps ahead of the oldest timestamp
+ *     since a subsequent rollback to stable could result in data loss and historical reads could
+ *     yield unexpected values. Therefore, this function should return non-zero to callers to
+ *     signify that this is the case. If configured, it is possible to import files with timestamps
+ *     smaller than or equal to the stable timestamp. However, there is no history migrated with the
+ *     files and thus reading historical versions will not work.
  */
 static int
-__check_imported_ts(WT_SESSION_IMPL *session, const char *uri, const char *config)
+__check_imported_ts(
+  WT_SESSION_IMPL *session, const char *uri, const char *config, bool against_stable)
 {
     WT_CKPT *ckptbase, *ckpt;
     WT_DECL_RET;
     WT_TXN_GLOBAL *txn_global;
+    wt_timestamp_t ts;
+    const char *ts_name;
 
     ckptbase = NULL;
     txn_global = &S2C(session)->txn_global;
+    ts = against_stable ? txn_global->stable_timestamp : txn_global->oldest_timestamp;
+    ts_name = against_stable ? "stable" : "oldest";
 
     WT_ERR_NOTFOUND_OK(
       __wt_meta_ckptlist_get_from_config(session, false, &ckptbase, NULL, config), true);
@@ -70,11 +77,11 @@ __check_imported_ts(WT_SESSION_IMPL *session, const char *uri, const char *confi
 
     /* Now iterate over each checkpoint and compare the aggregate timestamps with our oldest. */
     WT_CKPT_FOREACH (ckptbase, ckpt) {
-        if (ckpt->ta.newest_start_durable_ts > txn_global->oldest_timestamp)
-            WT_ERR_MSG(session, EINVAL,
+        if (ckpt->ta.newest_start_durable_ts > ts)
+            WT_ERR_MSG(session, WT_ROLLBACK,
               "%s: import found aggregated newest start durable timestamp newer than the current "
-              "oldest timestamp, newest_start_durable_ts=%" PRIu64 ", oldest_ts=%" PRIu64,
-              uri, ckpt->ta.newest_start_durable_ts, txn_global->oldest_timestamp);
+              "%s timestamp, newest_start_durable_ts=%" PRIu64 ", %s_ts=%" PRIu64,
+              uri, ts_name, ckpt->ta.newest_start_durable_ts, ts_name, ts);
 
         /*
          * No need to check "newest stop" here as "newest stop durable" serves that purpose. When a
@@ -82,12 +89,12 @@ __check_imported_ts(WT_SESSION_IMPL *session, const char *uri, const char *confi
          * whereas "newest stop durable" refers to the newest non-max timestamp which is more useful
          * to us in terms of comparing with oldest.
          */
-        if (ckpt->ta.newest_stop_durable_ts > txn_global->oldest_timestamp) {
+        if (ckpt->ta.newest_stop_durable_ts > ts) {
             WT_ASSERT(session, ckpt->ta.newest_stop_durable_ts != WT_TS_MAX);
-            WT_ERR_MSG(session, EINVAL,
+            WT_ERR_MSG(session, WT_ROLLBACK,
               "%s: import found aggregated newest stop durable timestamp newer than the current "
-              "oldest timestamp, newest_stop_durable_ts=%" PRIu64 ", oldest_ts=%" PRIu64,
-              uri, ckpt->ta.newest_stop_durable_ts, txn_global->oldest_timestamp);
+              "%s timestamp, newest_stop_durable_ts=%" PRIu64 ", %s_ts=%" PRIu64,
+              uri, ts_name, ckpt->ta.newest_stop_durable_ts, ts_name, ts);
         }
     }
 
@@ -136,7 +143,7 @@ __create_file(
       *filecfg[] = {WT_CONFIG_BASE(session, file_meta), config, NULL, NULL, NULL, NULL};
     char *fileconf, *filemeta;
     uint32_t allocsize;
-    bool exists, import_repair, is_metadata;
+    bool against_stable, exists, import_repair, is_metadata;
 
     fileconf = filemeta = NULL;
 
@@ -249,10 +256,14 @@ __create_file(
 
         /*
          * Ensure that the timestamps in the imported data file are not in the future relative to
-         * our oldest timestamp.
+         * the configured global timestamp.
          */
-        if (import)
-            WT_ERR(__check_imported_ts(session, uri, fileconf));
+        if (import) {
+            against_stable =
+              __wt_config_getones(session, config, "import.compare_timestamp", &cval) == 0 &&
+              WT_STRING_MATCH("stable", cval.str, cval.len);
+            WT_ERR(__check_imported_ts(session, uri, fileconf, against_stable));
+        }
     }
 
     /*

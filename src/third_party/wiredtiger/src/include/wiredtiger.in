@@ -1169,13 +1169,17 @@ struct __wt_session {
 	 * by any update to a record in the table., a boolean flag; default \c false.}
 	 * @config{import = (, configure import of an existing object into the currently running
 	 * database., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to import the input URI from disk., a
-	 * boolean flag; default \c false.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_metadata, the file
-	 * configuration extracted from the metadata of the export database., a string; default
-	 * empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;repair, whether to reconstruct the metadata from
-	 * the raw file content., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;compare_timestamp, Allow importing files with timestamps
+	 * smaller or equal to the configured global timestamps.  Note that the history of the files
+	 * are not imported together and thus snapshot read of historical data will not work with
+	 * the option "stable"., a string\, chosen from the following options: \c "oldest"\, \c
+	 * "stable"; default \c oldest.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to import
+	 * the input URI from disk., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_metadata, the file configuration extracted from the
+	 * metadata of the export database., a string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;repair, whether to reconstruct the metadata from the raw
+	 * file content., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{internal_key_max, This option is no longer supported\, retained for backward
 	 * compatibility., an integer greater than or equal to 0; default \c 0.}
