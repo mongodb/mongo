@@ -2586,9 +2586,37 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -x" WT_TEST.$t' 120
+
+  - name: data-validation-stress-test-checkpoint-no-timestamp
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/checkpoint"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
             ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args}" WT_TEST.$t' 120
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s1
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix/test/checkpoint"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -x -s 1" WT_TEST.$t' 120
+
+  - name: data-validation-stress-test-checkpoint-fp-hs-insert-s1-no-timestamp
     depends_on:
     - name: compile
     commands:
@@ -2614,7 +2642,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 2" WT_TEST.$t' 120
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -x -s 2" WT_TEST.$t' 120
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s3
     depends_on:
@@ -2628,7 +2656,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 3" WT_TEST.$t' 120
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -x -s 3" WT_TEST.$t' 120
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s4
     depends_on:
@@ -2642,7 +2670,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 4" WT_TEST.$t' 120
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -x -s 4" WT_TEST.$t' 120
 
   - name: data-validation-stress-test-checkpoint-fp-hs-insert-s5
     depends_on:
@@ -2656,7 +2684,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -s 5" WT_TEST.$t' 120
+            ${test_env_vars|} ../../../tools/run_parallel.sh 'nice ../../../test/checkpoint/recovery-test.sh "${data_validation_stress_test_args} -x -s 5" WT_TEST.$t' 120
 
   - name: format-failure-configs-test
     depends_on:
@@ -3775,7 +3803,7 @@ buildvariants:
       --prefix=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
-    data_validation_stress_test_args: -t r -m -W 3 -D -p -x -n 100000 -k 100000 -C cache_size=100MB
+    data_validation_stress_test_args: -t r -m -W 3 -D -p -n 100000 -k 100000 -C cache_size=100MB
   tasks:
     - name: ".pull_request !.windows_only !.pull_request_compilers"
     - name: linux-directio
@@ -3797,7 +3825,9 @@ buildvariants:
     - name: format-smoke-test
     - name: format-failure-configs-test
     - name: data-validation-stress-test-checkpoint
+    - name: data-validation-stress-test-checkpoint-no-timestamp
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s1
+    - name: data-validation-stress-test-checkpoint-fp-hs-insert-s1-no-timestamp
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s2
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s3
     - name: data-validation-stress-test-checkpoint-fp-hs-insert-s4
