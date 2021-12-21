@@ -208,8 +208,16 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     return hr->run();
 }
 
+void ServiceEntryPointMongos::onClientConnect(Client* client) {
+    if (load_balancer_support::isFromLoadBalancer(client)) {
+        _loadBalancedConnections.increment();
+    }
+}
+
 void ServiceEntryPointMongos::onClientDisconnect(Client* client) {
     if (load_balancer_support::isFromLoadBalancer(client)) {
+        _loadBalancedConnections.decrement();
+
         auto killerOperationContext = client->makeOperationContext();
 
         // Kill any cursors opened by the given Client.
@@ -245,6 +253,13 @@ void ServiceEntryPointMongos::onClientDisconnect(Client* client) {
                 {ErrorCodes::Interrupted,
                  "aborting in-progress transaction because load-balanced client disconnected"});
         }
+    }
+}
+
+void ServiceEntryPointMongos::appendStats(BSONObjBuilder* bob) const {
+    ServiceEntryPointImpl::appendStats(bob);
+    if (load_balancer_support::isEnabled()) {
+        bob->append("loadBalanced", _loadBalancedConnections);
     }
 }
 }  // namespace mongo
