@@ -351,14 +351,11 @@ __wt_debug_addr_print(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
 int
 __wt_debug_addr(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, const char *ofile)
 {
-    WT_BM *bm;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
 
-    bm = S2BT(session)->bm;
-
     WT_RET(__wt_scr_alloc(session, 1024, &buf));
-    WT_ERR(bm->read(bm, session, buf, addr, addr_size));
+    WT_ERR(__wt_blkcache_read(session, buf, addr, addr_size));
     ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:
@@ -417,7 +414,7 @@ __wt_debug_offset(
      * unencrypted as necessary).
      */
     WT_RET(__wt_scr_alloc(session, 0, &buf));
-    WT_ERR(__wt_bt_read(session, buf, addr, WT_PTRDIFF(endp, addr)));
+    WT_ERR(__wt_blkcache_read(session, buf, addr, WT_PTRDIFF(endp, addr)));
     ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:

@@ -709,7 +709,7 @@ __verify_overflow(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
     bm = S2BT(session)->bm;
 
     /* Read and verify the overflow item. */
-    WT_RET(__wt_bt_read(session, vs->tmp1, addr, addr_size));
+    WT_RET(__wt_blkcache_read(session, vs->tmp1, addr, addr_size));
 
     /*
      * The physical page has already been verified, but we haven't confirmed it was an overflow

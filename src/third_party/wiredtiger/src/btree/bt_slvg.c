@@ -454,7 +454,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
          *
          * Report the block's status to the block manager.
          */
-        if ((ret = __wt_bt_read(session, buf, addr, addr_size)) == 0)
+        if ((ret = __wt_blkcache_read(session, buf, addr, addr_size)) == 0)
             valid = true;
         else {
             valid = false;
@@ -1741,7 +1741,7 @@ __slvg_row_trk_update_start(WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t sl
      * the page into memory and we don't want page discard to free it.
      */
     WT_RET(__wt_scr_alloc(session, trk->trk_size, &dsk));
-    WT_ERR(__wt_bt_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
+    WT_ERR(__wt_blkcache_read(session, dsk, trk->trk_addr, trk->trk_addr_size));
     WT_ERR(__wt_page_inmem(session, NULL, dsk->data, 0, &page, NULL));
 
     /*

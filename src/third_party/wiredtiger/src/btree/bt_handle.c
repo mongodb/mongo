@@ -625,7 +625,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
     WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
 
     F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-    if ((ret = __wt_bt_read(session, &dsk, addr, addr_size)) == 0)
+    if ((ret = __wt_blkcache_read(session, &dsk, addr, addr_size)) == 0)
         ret = __wt_verify_dsk(session, tmp->data, &dsk);
     /*
      * Flag any failed read or verification: if we're in startup, it may be fatal.
@@ -795,7 +795,6 @@ static int
 __btree_preload(WT_SESSION_IMPL *session)
 {
     WT_ADDR_COPY addr;
-    WT_BM *bm;
     WT_BTREE *btree;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
@@ -803,7 +802,6 @@ __btree_preload(WT_SESSION_IMPL *session)
     uint64_t block_preload;
 
     btree = S2BT(session);
-    bm = btree->bm;
     block_preload = 0;
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
@@ -811,7 +809,7 @@ __btree_preload(WT_SESSION_IMPL *session)
     /* Pre-load the second-level internal pages. */
     WT_INTL_FOREACH_BEGIN (session, btree->root.page, ref)
         if (__wt_ref_addr_copy(session, ref, &addr)) {
-            WT_ERR(bm->read(bm, session, tmp, addr.addr, addr.size));
+            WT_ERR(__wt_blkcache_read(session, tmp, addr.addr, addr.size));
             ++block_preload;
         }
     WT_INTL_FOREACH_END;
