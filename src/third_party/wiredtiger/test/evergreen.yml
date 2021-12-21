@@ -2029,6 +2029,17 @@ tasks:
             set -o verbose
             test/evergreen/compatibility_test_for_releases.sh -o
 
+  - name: compatibility-test-upgrade-to-latest
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/compatibility_test_for_releases.sh -u
+
   - name: compatibility-test-for-wt-standalone-releases
     commands:
       - func: "get project"
@@ -4248,6 +4259,14 @@ buildvariants:
   tasks:
     - name: compatibility-test-for-older-releases
     - name: compatibility-test-for-wt-standalone-releases
+
+- name: compatibility-tests-daily
+  display_name: Compatibility tests (daily)
+  batchtime: 1440 # 1 day
+  run_on:
+  - ubuntu2004-test
+  tasks:
+    - name: compatibility-test-upgrade-to-latest
 
 - name: compatibility-tests
   display_name: Compatibility tests
