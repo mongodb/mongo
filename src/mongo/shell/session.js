@@ -471,17 +471,6 @@ var {
             processCommandResponse(driverSession, client, res);
             return res;
         };
-
-        this.runCommandWithMetadata = function runCommandWithMetadata(
-            driverSession, dbName, metadata, cmdObj) {
-            cmdObj = this.prepareCommandRequest(driverSession, cmdObj);
-
-            const res = runClientFunctionWithRetries(
-                driverSession, cmdObj, client.runCommandWithMetadata, [dbName, metadata, cmdObj]);
-
-            processCommandResponse(driverSession, client, res);
-            return res;
-        };
     }
 
     function TransactionOptions(rawOptions = {}) {

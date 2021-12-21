@@ -167,10 +167,6 @@ Mongo.prototype.runCommand = function(dbname, cmd, options) {
     return this._runCommandImpl(dbname, cmd, options, this._securityToken);
 };
 
-Mongo.prototype.runCommandWithMetadata = function(dbname, metadata, cmd) {
-    return this._runCommandWithMetadataImpl(dbname, metadata, cmd, this._securityToken);
-};
-
 /**
  * Returns all log components and current verbosity values
  */

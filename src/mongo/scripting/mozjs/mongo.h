@@ -74,7 +74,6 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(isTLS);
         MONGO_DECLARE_JS_FUNCTION(getApiParameters);
         MONGO_DECLARE_JS_FUNCTION(_runCommandImpl);
-        MONGO_DECLARE_JS_FUNCTION(_runCommandWithMetadataImpl);
         MONGO_DECLARE_JS_FUNCTION(_startSession);
     };
 

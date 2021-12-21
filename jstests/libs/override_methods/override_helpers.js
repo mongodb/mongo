@@ -74,7 +74,6 @@ var OverrideHelpers = (function() {
 
     function overrideRunCommand(overrideFunc) {
         const mongoRunCommandOriginal = Mongo.prototype.runCommand;
-        const mongoRunCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
 
         Mongo.prototype.runCommand = function(dbName, commandObj, options) {
             const commandName = Object.keys(commandObj)[0];
@@ -84,16 +83,6 @@ var OverrideHelpers = (function() {
                                 commandObj,
                                 mongoRunCommandOriginal,
                                 (commandObj) => [dbName, commandObj, options]);
-        };
-
-        Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
-            const commandName = Object.keys(commandArgs)[0];
-            return overrideFunc(this,
-                                dbName,
-                                commandName,
-                                commandArgs,
-                                mongoRunCommandWithMetadataOriginal,
-                                (commandArgs) => [dbName, metadata, commandArgs]);
         };
     }
 

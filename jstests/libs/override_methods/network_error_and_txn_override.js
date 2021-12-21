@@ -9,13 +9,12 @@
  * retries transactions that fail due to implicit collection creation.
  *
  * (2) When a network connection to the mongo shell is closed, attempting to call
- * Mongo.prototype.runCommand() and Mongo.prototype.runCommandWithMetadata() throws a JavaScript
- * exception. This override catches these exceptions (i.e. ones where isNetworkError() returns true)
- * and automatically re-sends the command request to the server, or propagates the error if the
- * command should already be using the shell's existing retryability logic. The goal of this
- * override is to implement retry logic such that the assertions within our existing JavaScript
- * tests still pass despite stepdowns of replica set primaries (optionally in sharded clusters)
- * happening in the background.
+ * Mongo.prototype.runCommand() throws a JavaScript exception. This override catches these
+ * exceptions (i.e. ones where isNetworkError() returns true) and automatically re-sends the
+ * command request to the server, or propagates the error if the command should already be using
+ * the shell's existing retryability logic. The goal of this override is to implement retry logic
+ * such that the assertions within our existing JavaScript tests still pass despite stepdowns of
+ * replica set primaries (optionally in sharded clusters) happening in the background.
  *
  * These two overrides are unified to simplify the retry logic.
  *

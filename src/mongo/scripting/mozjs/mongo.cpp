@@ -77,7 +77,6 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isTLS, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getApiParameters, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_runCommandImpl, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_runCommandWithMetadataImpl, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
     JS_FS_END,
 };
@@ -235,8 +234,6 @@ namespace {
 /**
  * Common implementation for:
  *   object Mongo._runCommandImpl(string dbname, object cmd, int options, object token)
- *   object Mongo._runCommandWithMetadataImpl(string dbname, object metadata, object commandArgs,
- * object token)
  *
  * Extra is for connection-wide metadata to pass with any given runCommand.
  */
@@ -314,21 +311,6 @@ void MongoBase::Functions::_runCommandImpl::call(JSContext* cx, JS::CallArgs arg
                 args.get(2).isNumber());
         auto options = ValueWriter(cx, args.get(2)).toInt32();
         return rpc::upconvertRequest(database, cmd, options);
-    });
-}
-
-struct RunCommandWithMetadataParams {
-    static constexpr bool kHoistReply = true;
-    static constexpr auto kCommandName = "runCommandWithMetadata"_sd;
-    static constexpr auto kArg1Name = "metadata"_sd;
-};
-
-void MongoBase::Functions::_runCommandWithMetadataImpl::call(JSContext* cx, JS::CallArgs args) {
-    doRunCommand<RunCommandWithMetadataParams>(cx, args, [&](StringData db, BSONObj metadata) {
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "The commandArgs parameter to runCommand must be an object",
-                args.get(2).isObject());
-        return OpMsgRequest::fromDBAndBody(db, ValueWriter(cx, args.get(2)).toBSON(), metadata);
     });
 }
 

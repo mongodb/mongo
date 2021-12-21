@@ -32,15 +32,12 @@ const shardTestDB = st.rs0.getPrimary().getDB('test');
 shardAdminDB.createUser({user: 'user', pwd: 'pwd', roles: jsTest.adminUserRoles});
 shardAdminDB.auth('user', 'pwd');
 const newTimestamp = Timestamp(getConfigOpTime().getTime() + 1000, 0);
-const metadata = {
-    $configTime: newTimestamp
-};
-assert.commandWorked(shardTestDB.runCommandWithMetadata({ping: 1}, metadata).commandReply);
+assert.commandWorked(shardTestDB.runCommand({ping: 1, $configTime: newTimestamp}));
 assert(timestampCmp(getConfigOpTime(), newTimestamp) < 0, "Unexpected ConfigOpTime advancement");
 
 shardAdminDB.createUser({user: 'internal', pwd: 'pwd', roles: ['__system']});
 shardAdminDB.auth('internal', 'pwd');
-assert.commandWorked(shardTestDB.runCommandWithMetadata({ping: 1}, metadata).commandReply);
+assert.commandWorked(shardTestDB.runCommand({ping: 1, $configTime: newTimestamp}));
 assert(timestampCmp(getConfigOpTime(), newTimestamp) < 0, "Unexpected ConfigOpTime advancement");
 
 mongosAdminDB.logout();
