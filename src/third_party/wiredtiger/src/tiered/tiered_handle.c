@@ -28,7 +28,7 @@ __tiered_dhandle_setup(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t i, 
             id = WT_TIERED_INDEX_LOCAL;
         else if (type == WT_DHANDLE_TYPE_TIERED_TREE)
             /*
-             * FIXME-WT-7538: this type can be removed. For now, there is nothing to do for this
+             * FIXME-WT-7731: this type can be removed. For now, there is nothing to do for this
              * type.
              */
             goto err;

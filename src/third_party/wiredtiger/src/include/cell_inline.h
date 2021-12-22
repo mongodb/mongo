@@ -391,7 +391,6 @@ __wt_cell_pack_del(WT_SESSION_IMPL *session, WT_CELL *cell, WT_TIME_WINDOW *tw, 
     p = cell->__chunk;
     *p = '\0';
 
-    /* FIXME-WT-6124: we should set the time window prepare value. */
     __cell_pack_value_validity(session, &p, tw);
 
     if (rle < 2)
