@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/logv2/log.h"
 #include "mongo/util/thread_context.h"
 
 #include <boost/optional.hpp>
@@ -76,37 +73,23 @@ synchronized_value gCounters{Counters{0, 0, 0}};
 class TestDecoration {
 public:
     TestDecoration() {
-        invariant(!ThreadContext::get());
+        ASSERT(!ThreadContext::get())
+            << "ThreadContext decorations should be created before the ThreadContext is set";
 
-        if (newInstancesEnabled) {
-            // Thread name is not available here, so log the ID for diagnostic purposes.
-            LOGV2_INFO(6173200,
-                       "Incrementing creation counter",
-                       "threadId"_attr = ProcessId::getCurrentThreadId());
-            ++gCounters->created;
-        }
-    }
+        ++gCounters->created;
+    };
 
     ~TestDecoration() {
-        if (newInstancesEnabled) {
-            // Thread name might not be available here, so log the ID for diagnostic purposes.
-            LOGV2_INFO(6173201,
-                       "Incrementing destruction counter(s)",
-                       "threadId"_attr = ProcessId::getCurrentThreadId());
-            ++gCounters->destroyed;
+        ++gCounters->destroyed;
 
-            if (ThreadContext::get()) {
-                // We should only be able to reference a ThreadContext in our destructor if our
-                // lifetime was extended to be off thread.
-                ++gCounters->destroyedOffThread;
-            }
+        if (ThreadContext::get()) {
+            // We should only be able to reference a ThreadContext in our destructor if our
+            // lifetime was extended to be off thread.
+            ++gCounters->destroyedOffThread;
         }
     }
-
-    static thread_local bool newInstancesEnabled;
 };
 
-thread_local bool TestDecoration::newInstancesEnabled = false;
 const auto getThreadTestDecoration = ThreadContext::declareDecoration<TestDecoration>();
 
 class ThreadContextTest : public unittest::Test {
@@ -115,13 +98,11 @@ public:
         ThreadContext::get();  // Ensure a ThreadContext for the main thread.
         _monitor.emplace();
         *gCounters = {0, 0, 0};
-        TestDecoration::newInstancesEnabled = true;
     }
 
     void tearDown() override {
         _monitor->notifyDone();
         _monitor.reset();
-        TestDecoration::newInstancesEnabled = false;
         auto endCount = gCounters.get();
         ASSERT_EQ(endCount.created, endCount.destroyed);
         ASSERT_GTE(endCount.destroyed, endCount.destroyedOffThread);
@@ -135,12 +116,6 @@ public:
 
         ASSERT(context);
         ASSERT(context->isAlive());
-
-        // Log the thread ID for diagnostic purposes, so it can be associated with
-        // the thread name and cross-referenced with other logging statements here.
-        LOGV2_INFO(6173202,
-                   "Retrieving thread context",
-                   "threadId"_attr = ProcessId::getCurrentThreadId());
 
         return context;
     }
@@ -158,12 +133,7 @@ public:
      */
     template <typename F>
     void launchAndJoinThread(F&& f) {
-        _monitor
-            ->spawn([&] {
-                TestDecoration::newInstancesEnabled = true;
-                std::forward<F>(f)();
-            })
-            .join();
+        _monitor->spawn(std::forward<F>(f)).join();
     }
 
     boost::optional<unittest::ThreadAssertionMonitor> _monitor;
