@@ -191,16 +191,6 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const CreateUserCommand& 
             as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                  ActionType::createUser));
 
-    if (request.getTenantOverride() != boost::none) {
-        const bool isNotTokenAuth = (as->getAuthenticationMode() !=
-                                     AuthorizationSession::AuthenticationMode::kSecurityToken);
-
-        uassert(ErrorCodes::Unauthorized,
-                "$tenant parameter to createUser command only accepted in "
-                "test mode with security tokens enabled but not in use",
-                getTestCommandsEnabled() && gMultitenancySupport && isNotTokenAuth);
-    }
-
     auto resolvedRoles = resolveRoleNames(request.getRoles(), dbname);
     uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
 

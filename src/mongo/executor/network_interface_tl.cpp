@@ -64,6 +64,9 @@ Status appendMetadata(RemoteCommandRequestOnAny* request,
         request->metadata = bob.obj();
     }
 
+    if (!request->opCtx)
+        return Status::OK();
+
     if (auto securityToken = auth::getSecurityToken(request->opCtx)) {
         request->securityToken = securityToken->toBSON();
     }

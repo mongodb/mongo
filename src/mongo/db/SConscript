@@ -85,7 +85,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'auth/auth',
         'auth/security_token',
+        'multitenancy_params',
     ],
 )
 
@@ -1013,6 +1015,7 @@ env.Library(
         'commands/server_status_core',
         'initialize_api_parameters',
         'introspect',
+        'multitenancy',
         'not_primary_error_tracker',
         'query_exec',
         'repl/repl_server_parameters',
@@ -2485,6 +2488,7 @@ if wiredtiger:
             'dbmessage_test.cpp',
             'db_raii_test.cpp',
             'db_raii_multi_collection_test.cpp',
+            'dollar_tenant_decoration_test.cpp',
             "explain_test.cpp",
             'field_parser_test.cpp',
             'field_ref_set_test.cpp',
@@ -2537,6 +2541,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/bson/util/bson_extract',
             '$BUILD_DIR/mongo/client/read_preference',
             '$BUILD_DIR/mongo/db/auth/auth',
+            '$BUILD_DIR/mongo/db/auth/security_token',
             '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
             '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
             '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
@@ -2574,6 +2579,7 @@ if wiredtiger:
             'logical_session_id_helpers',
             'logical_time',
             'mirror_maestro',
+            'multitenancy',
             'multitenancy_params',
             'namespace_string',
             'op_observer',

@@ -186,8 +186,11 @@ void appendMetadata(OperationContext* opCtx,
     }
 
     request.body = bob.obj();
-    if (auto securityToken = auth::getSecurityToken(opCtx)) {
-        request.securityToken = securityToken->toBSON();
+
+    if (opCtx) {
+        if (auto securityToken = auth::getSecurityToken(opCtx)) {
+            request.securityToken = securityToken->toBSON();
+        }
     }
 }
 }  // namespace
