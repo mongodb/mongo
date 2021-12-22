@@ -4,6 +4,7 @@
  * @tags: [
  *   # We need persistence as we temporarily restart nodes as standalones.
  *   requires_persistence,
+ *   requires_fcv_52,
  *   assumes_against_mongod_not_mongos,
  * ]
  */
