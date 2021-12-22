@@ -46,6 +46,7 @@
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/background.h"
 
@@ -142,6 +143,7 @@ struct DbCheckCollectionInfo {
     int64_t maxBytesPerBatch;
     int64_t maxBatchTimeMillis;
     bool snapshotRead;
+    WriteConcernOptions writeConcern;
 };
 
 /**
@@ -180,7 +182,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                             maxDocsPerBatch,
                                             maxBytesPerBatch,
                                             maxBatchTimeMillis,
-                                            invocation.getSnapshotRead()};
+                                            invocation.getSnapshotRead(),
+                                            invocation.getBatchWriteConcern()};
     auto result = std::make_unique<DbCheckRun>();
     result->push_back(info);
     return result;
@@ -214,7 +217,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                    maxDocsPerBatch,
                                    maxBytesPerBatch,
                                    maxBatchTimeMillis,
-                                   invocation.getSnapshotRead()};
+                                   invocation.getSnapshotRead(),
+                                   invocation.getBatchWriteConcern()};
         result->push_back(info);
         return true;
     };
@@ -351,10 +355,10 @@ private:
                 return;
             }
 
-            std::unique_ptr<HealthLogEntry> entry;
 
             if (!result.isOK()) {
                 bool retryable = false;
+                std::unique_ptr<HealthLogEntry> entry;
 
                 const auto code = result.getStatus().code();
                 if (code == ErrorCodes::LockTimeout) {
@@ -395,32 +399,41 @@ private:
                                                        OplogEntriesEnum::Batch,
                                                        result.getStatus());
                 }
-                HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+                HealthLog::get(opCtx).log(*entry);
                 if (retryable) {
                     continue;
                 }
                 return;
-            } else {
-                _batchesProcessed++;
-                auto stats = result.getValue();
-                entry = dbCheckBatchEntry(info.nss,
-                                          stats.nDocs,
-                                          stats.nBytes,
-                                          stats.md5,
-                                          stats.md5,
-                                          start,
-                                          stats.lastKey,
-                                          stats.readTimestamp,
-                                          stats.time);
-                if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info ||
-                    (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
-                    // On debug builds, health-log every batch result; on release builds, health-log
-                    // every N batches.
-                    HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
-                }
             }
 
-            auto stats = result.getValue();
+            const auto stats = result.getValue();
+
+            _batchesProcessed++;
+            auto entry = dbCheckBatchEntry(info.nss,
+                                           stats.nDocs,
+                                           stats.nBytes,
+                                           stats.md5,
+                                           stats.md5,
+                                           start,
+                                           stats.lastKey,
+                                           stats.readTimestamp,
+                                           stats.time);
+            if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info ||
+                (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
+                // On debug builds, health-log every batch result; on release builds, health-log
+                // every N batches.
+                HealthLog::get(opCtx).log(*entry);
+            }
+
+            WriteConcernResult unused;
+            auto status = waitForWriteConcern(opCtx, stats.time, info.writeConcern, &unused);
+            if (!status.isOK()) {
+                auto entry = dbCheckWarningHealthLogEntry(info.nss,
+                                                          "dbCheck failed waiting for writeConcern",
+                                                          OplogEntriesEnum::Batch,
+                                                          status);
+                HealthLog::get(opCtx).log(*entry);
+            }
 
             start = stats.lastKey;
 
