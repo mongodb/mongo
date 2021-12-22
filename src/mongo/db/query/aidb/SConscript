@@ -1,0 +1,22 @@
+Import("env")
+
+env = env.Clone()
+
+env.Program(
+    target='aidb',
+    source=[
+        'ai_application.cpp',
+        'ai_command.cpp',
+        'ai_data_generator.cpp',
+        'ai_database.cpp',
+        'ai_index_accessor.cpp',
+        'aidb.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ]
+)

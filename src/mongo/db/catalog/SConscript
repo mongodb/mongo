@@ -567,6 +567,7 @@ if wiredtiger:
     env.CppUnitTest(
         target='db_catalog_test',
         source=[
+            'ai_collection_test.cpp',
             'capped_utils_test.cpp',
             'catalog_control_test.cpp',
             'collection_catalog_test.cpp',

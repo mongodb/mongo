@@ -6,6 +6,7 @@ env = env.Clone()
 
 env.SConscript(
     dirs=[
+        "aidb",
         "collation",
         "datetime",
     ],
