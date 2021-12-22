@@ -475,7 +475,7 @@ __recovery_set_checkpoint_snapshot(WT_SESSION_IMPL *session)
     WT_CONFIG_ITEM k;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    uint8_t counter;
+    uint32_t counter;
     char *sys_config;
 
     sys_config = NULL;
