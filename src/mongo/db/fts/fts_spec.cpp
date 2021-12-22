@@ -485,7 +485,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
                         "text index option 'textIndexVersion' must be a number"};
             }
 
-            textIndexVersion = e.numberInt();
+            textIndexVersion = e.safeNumberInt();
             if (textIndexVersion != TEXT_INDEX_VERSION_2 &&
                 textIndexVersion != TEXT_INDEX_VERSION_3) {
                 return {ErrorCodes::CannotCreateIndex,
