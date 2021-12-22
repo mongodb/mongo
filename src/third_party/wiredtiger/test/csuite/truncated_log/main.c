@@ -236,7 +236,9 @@ main(int argc, char *argv[])
     uint32_t count, max_key;
     int ch, ret, status;
     const char *working_dir;
+    bool preserve;
 
+    preserve = false;
     (void)testutil_set_progname(argv);
 
     working_dir = "WT_TEST.truncated-log";
@@ -248,6 +250,9 @@ main(int argc, char *argv[])
             break;
         case 'h':
             working_dir = __wt_optarg;
+            break;
+        case 'p':
+            preserve = true;
             break;
         default:
             usage();
@@ -328,5 +333,12 @@ main(int argc, char *argv[])
      */
     write_and_read_new(session);
     testutil_check(conn->close(conn, NULL));
+    if (!preserve) {
+        /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
+        if (chdir("../") != 0)
+            testutil_die(errno, "root chdir: %s", home);
+        testutil_clean_work_dir(home);
+    }
+
     return (EXIT_SUCCESS);
 }

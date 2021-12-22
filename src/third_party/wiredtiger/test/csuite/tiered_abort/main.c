@@ -576,19 +576,20 @@ main(int argc, char *argv[])
     char buf[512], bucket_dir[512], build_dir[512], fname[64], kname[64];
     char envconf[1024], extconf[512];
     char ts_string[WT_TS_HEX_STRING_SIZE];
-    bool fatal, rand_th, rand_time, verify_only;
+    bool fatal, preserve, rand_th, rand_time, verify_only;
 
     (void)testutil_set_progname(argv);
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     use_ts = true;
     nth = MIN_TH;
+    preserve = false;
     rand_th = rand_time = true;
     timeout = MIN_TIME;
     verify_only = false;
     working_dir = "WT_TEST.tiered-abort";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "b:f:h:T:t:vz")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "b:f:h:pT:t:vz")) != EOF)
         switch (ch) {
         case 'b': /* Build directory */
             opts->build_dir = dstrdup(__wt_optarg);
@@ -598,6 +599,9 @@ main(int argc, char *argv[])
             break;
         case 'h':
             working_dir = __wt_optarg;
+            break;
+        case 'p':
+            preserve = true;
             break;
         case 'T':
             rand_th = false;
@@ -906,6 +910,13 @@ main(int argc, char *argv[])
     if (fatal)
         return (EXIT_FAILURE);
     printf("%" PRIu64 " records verified\n", count);
+    if (!preserve) {
+        testutil_clean_test_artifacts(home);
+        /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
+        if (chdir("../") != 0)
+            testutil_die(errno, "root chdir: %s", home);
+        testutil_clean_work_dir(home);
+    }
     testutil_cleanup(opts);
     return (EXIT_SUCCESS);
 }

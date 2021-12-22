@@ -265,15 +265,16 @@ main(int argc, char *argv[])
     char kname[64], statname[1024], tscfg[64];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     const char *working_dir;
-    bool fatal, rand_time;
+    bool fatal, preserve, rand_time;
 
     (void)testutil_set_progname(argv);
 
+    preserve = false;
     rand_time = true;
     timeout = MIN_TIME;
     working_dir = "WT_TEST.wt6616-checkpoint-oldest-ts";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "ch:t:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "ch:pt:")) != EOF)
         switch (ch) {
         case 'c':
             /* Variable-length columns only (for now) */
@@ -281,6 +282,9 @@ main(int argc, char *argv[])
             break;
         case 'h':
             working_dir = __wt_optarg;
+            break;
+        case 'p':
+            preserve = true;
             break;
         case 't':
             rand_time = false;
@@ -389,5 +393,12 @@ main(int argc, char *argv[])
     if (fatal)
         return (EXIT_FAILURE);
     printf("Verification successful\n");
+    if (!preserve) {
+        testutil_clean_test_artifacts(home);
+        /* At this point $PATH is inside `home`, which we intend to delete. cd to the parent dir. */
+        if (chdir("../") != 0)
+            testutil_die(errno, "root chdir: %s", home);
+        testutil_clean_work_dir(home);
+    }
     return (EXIT_SUCCESS);
 }

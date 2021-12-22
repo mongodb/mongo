@@ -268,6 +268,7 @@ void op_cursor(void *);
 void op_drop(void *);
 bool testutil_is_flag_set(const char *);
 void testutil_build_dir(TEST_OPTS *, char *, int);
+void testutil_clean_test_artifacts(const char *);
 void testutil_clean_work_dir(const char *);
 void testutil_cleanup(TEST_OPTS *);
 void testutil_copy_data(const char *);

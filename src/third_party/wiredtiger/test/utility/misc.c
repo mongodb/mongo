@@ -258,6 +258,27 @@ testutil_copy_data(const char *dir)
 }
 
 /*
+ * testutil_clean_test_artifacts --
+ *     Clean any temporary files and folders created during test execution
+ */
+void
+testutil_clean_test_artifacts(const char *dir)
+{
+    int status;
+    char buf[512];
+
+    testutil_check(__wt_snprintf(buf, sizeof(buf),
+      "rm -rf ../%s.SAVE; "
+      "rm -rf ../%s.CHECK; "
+      "rm -rf ../%s.DEBUG; "
+      "rm -rf ../%s.BACKUP; ",
+      dir, dir, dir, dir));
+
+    if ((status = system(buf)) < 0)
+        testutil_die(status, "system: %s", buf);
+}
+
+/*
  * testutil_timestamp_parse --
  *     Parse a timestamp to an integral value.
  */
