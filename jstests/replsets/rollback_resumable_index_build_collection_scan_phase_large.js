@@ -3,6 +3,9 @@
  * phase completes properly after being interrupted for rollback during the collection scan phase.
  *
  * @tags: [
+ *   # The rollback can be slow on macos and generates too many irrelevant logs to make the log
+ *   # message the test depends on fall off the log buffer.
+ *   incompatible_with_macos,
  *   requires_majority_read_concern,
  *   requires_persistence,
  * ]
