@@ -45,6 +45,7 @@ Command::Register<GenerateCommand> ___0{};
 Command::Register<DemoCommand> ___1{};
 Command::Register<UseCommand> ___2{};
 Command::Register<ShowCommand> ___3{};
+Command::Register<GetCommand> ___4{};
 }  // namespace
 
 Command* Command::getCommand(const std::string& name) {
@@ -169,6 +170,30 @@ Status ShowCommand::execute(OperationContext* opCtx, std::istream& commandStream
     } else {
         return Status{ErrorCodes::Error::BadValue, usage()};
     }
+
+    return Status::OK();
+}
+
+Status GetCommand::execute(OperationContext* opCtx, std::istream& commandStream) {
+    auto parts = split(commandStream, 2);
+    if (parts.size() != 2) {
+        return Status{ErrorCodes::Error::BadValue, usage()};
+    }
+
+    std::string collectionName = parts[0];
+    RecordId recordId{std::stoll(parts[1])};
+
+    Database db{opCtx};
+
+    AutoGetCollectionForRead autoColl{opCtx, db.getNamespaceString(collectionName)};
+    uassert(7777701, "collection is not found", autoColl);
+    RecordStore* recordStore = autoColl->getRecordStore();
+
+    std::unique_ptr<SeekableRecordCursor> cursor = recordStore->getCursor(opCtx);
+    boost::optional<Record> record = cursor->seekExact(recordId);
+    uassert(7777702, "record id is not found", record);
+
+    std::cout << record->data.toBson() << std::endl;
 
     return Status::OK();
 }

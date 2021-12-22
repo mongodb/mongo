@@ -118,4 +118,16 @@ public:
     Status execute(OperationContext* opCtx, std::istream& commandStream) override;
 };
 
+class GetCommand : public Command {
+public:
+    std::string name() const override {
+        return "get";
+    }
+    std::string help() const override {
+        return "get <collection> <record_id>";
+    }
+
+    Status execute(OperationContext* opCtx, std::istream& commandStream) override;
+};
+
 }  // namespace mongo::ai
