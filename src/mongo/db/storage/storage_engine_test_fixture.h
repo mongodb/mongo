@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -66,6 +67,7 @@ public:
 
     StatusWith<DurableCatalog::Entry> createCollection(OperationContext* opCtx,
                                                        NamespaceString ns) {
+        TenantNamespace tenantNs(getActiveTenant(opCtx), ns);
         AutoGetDb db(opCtx, ns.db(), LockMode::MODE_X);
         CollectionOptions options;
         options.uuid = UUID::gen();
@@ -79,7 +81,7 @@ public:
         }
         std::shared_ptr<Collection> coll = std::make_shared<CollectionImpl>(
             opCtx,
-            ns,
+            tenantNs,
             catalogId,
             _storageEngine->getCatalog()->getMetaData(opCtx, catalogId),
             std::move(rs));

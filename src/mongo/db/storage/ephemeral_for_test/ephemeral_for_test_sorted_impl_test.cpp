@@ -40,6 +40,7 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_radix_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/db/tenant_namespace.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -60,7 +61,8 @@ public:
                                   << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                   << "unique" << true);
 
-        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
+        auto collection =
+            std::make_unique<CollectionMock>(TenantNamespace(boost::none, NamespaceString(ns)));
         IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
@@ -84,7 +86,8 @@ public:
             spec = spec.addField(partialBSON.firstElement());
         }
 
-        auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
+        auto collection =
+            std::make_unique<CollectionMock>(TenantNamespace(boost::none, NamespaceString(ns)));
         _descs.emplace_back("", spec);
         return _kvEngine.getSortedDataInterface(&opCtx, keyFormat, "ident"_sd, &_descs.back());
     }

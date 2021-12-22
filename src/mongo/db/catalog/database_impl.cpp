@@ -58,6 +58,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/introspect.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -610,7 +611,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // because the CollectionCatalog manages the necessary isolation for this Collection until the
     // WUOW commits.
     auto writableCollection = collToRename.getWritableCollection();
-    Status status = writableCollection->rename(opCtx, toNss, stayTemp);
+    TenantNamespace toTenantNs(getActiveTenant(opCtx), toNss);
+    Status status = writableCollection->rename(opCtx, toTenantNs, stayTemp);
     if (!status.isOK())
         return status;
 
@@ -752,8 +754,9 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         uassertStatusOK(storageEngine->getCatalog()->createCollection(
             opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
     auto catalogId = catalogIdRecordStorePair.first;
+    TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
     std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-        opCtx, nss, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
+        opCtx, tenantNs, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
     auto collection = ownedCollection.get();
     ownedCollection->init(opCtx);
     ownedCollection->setCommitted(false);
