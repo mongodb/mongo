@@ -578,8 +578,9 @@ public:
         std::unique_ptr<DBClientConnection> _client;              // (S)
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
-        CursorId _backupCursorId;                      // (M)
-        NamespaceString _backupCursorNamespaceString;  // (M)
+        CursorId _backupCursorId;                           // (M)
+        NamespaceString _backupCursorNamespaceString;       // (M)
+        std::unique_ptr<Fetcher> _backupCursorFileFetcher;  // (M)
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
             std::make_unique<CreateOplogFetcherFn>();                               // (M)
