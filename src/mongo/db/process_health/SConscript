@@ -34,3 +34,11 @@ env.CppUnitTest(
         'fault_manager',
     ],
 )
+
+env.Library(
+    target='process_health_feature_flag',
+    source=[
+        'health_monitoring.idl',
+        'health_monitoring_feature_flag.cpp',
+    ],
+)

@@ -29,13 +29,16 @@
 # Feature flag for fault facet support.
 
 global:
-    cpp_namespace: "mongo::feature_flags"
+  cpp_namespace: "mongo::feature_flags"
+  cpp_includes:
+  - "mongo/db/process_health/health_monitoring_feature_flag.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+  - "mongo/idl/basic_types.idl"
 
-feature_flags:
-    featureFlagHealthMonitoring:
-        description: Feature flag for enabling fault facet support.
-        cpp_varname: gFeatureFlagHealthMonitoring
-        default: false
+server_parameters:
+  featureFlagHealthMonitoring:
+    set_at: [ startup ]
+    description: Feature flag for enabling process health checking support.
+    cpp_varname: gFeatureFlagHealthMonitoring
+    default: false
