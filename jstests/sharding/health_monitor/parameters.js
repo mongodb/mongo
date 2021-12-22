@@ -31,7 +31,8 @@ var st = new ShardingTest({
                     ]
                 }),
                 progressMonitor: tojson({interval: CUSTOM_INTERVAL, deadline: CUSTOM_DEADLINE}),
-                healthMonitoringIntervals: tojson({test: CUSTOM_INTERVAL})
+                healthMonitoringIntervals:
+                    tojson({values: [{type: "test", interval: CUSTOM_INTERVAL}]})
             }
         }
     ],
@@ -40,17 +41,21 @@ var st = new ShardingTest({
 
 // Intensity parameter
 let result = st.s0.adminCommand({"getParameter": 1, "healthMonitoringIntensities": 1});
-let getIntensity = (param_value, type) => {
+let getIntensity = (result, typeOfObserver) => {
     let intensities = result.healthMonitoringIntensities.values;
-    for (var i = 0; i < intensities.length; i++) {
-        if (intensities[i].type === type)
-            return intensities[i].intensity;
+    let foundPair = intensities.find(({type}) => type === typeOfObserver);
+    if (foundPair) {
+        return foundPair.intensity;
     }
 };
 
 assert.eq(getIntensity(result, "dns"), "off");
 assert.eq(getIntensity(result, "ldap"), "critical");
 
+assert.commandWorked(st.s0.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntensities: {values: [{type: "dns", intensity: "critical"}]}
+}));
 assert.commandFailed(st.s0.adminCommand({
     "setParameter": 1,
     healthMonitoringIntensities: {values: [{type: "dns", intensity: "INVALID"}]}
@@ -60,7 +65,12 @@ assert.commandFailed(st.s0.adminCommand({
     healthMonitoringIntensities: {values: [{type: "invalid", intensity: "off"}]}
 }));
 
-jsTestLog('Test setting 2 intensities');
+// Tests that ldap param is unchanged after dns was changed.
+result =
+    assert.commandWorked(st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}));
+assert.eq(getIntensity(result, "dns"), "critical");
+assert.eq(getIntensity(result, "ldap"), "critical");
+
 assert.commandWorked(st.s0.adminCommand({
     "setParameter": 1,
     healthMonitoringIntensities:
@@ -73,21 +83,48 @@ assert.eq(getIntensity(result, "dns"), "non-critical");
 assert.eq(getIntensity(result, "ldap"), "off");
 
 // Interval parameter
-result = st.s1.adminCommand({"getParameter": 1, "healthMonitoringIntervals": 1});
-assert.eq(result.healthMonitoringIntervals.test, CUSTOM_INTERVAL);
+let getInterval = (commandResult, typeOfObserver) => {
+    let allValues = commandResult.healthMonitoringIntervals.values;
+    let foundPair = allValues.find(({type}) => type === typeOfObserver);
+    if (foundPair) {
+        return foundPair.interval;
+    }
+};
 
-assert.commandFailed(st.s1.adminCommand({"setParameter": 1, healthMonitoringIntervals: {dns: 0}}));
-assert.commandFailed(
-    st.s1.adminCommand({"setParameter": 1, healthMonitoringIntervals: {invalid: 1000}}));
+result = st.s1.adminCommand({"getParameter": 1, "healthMonitoringIntervals": 1});
+assert.eq(getInterval(result, "test"), CUSTOM_INTERVAL);
 
 assert.commandWorked(st.s1.adminCommand({
     "setParameter": 1,
-    healthMonitoringIntervals: {dns: NumberInt(2000), ldap: NumberInt(600000)}
+    healthMonitoringIntervals: {values: [{type: "dns", interval: NumberInt(100)}]}
 }));
+assert.commandFailed(st.s1.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntervals: {values: [{type: "dns", interval: NumberInt(0)}]}
+}));
+assert.commandFailed(st.s1.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntervals: {values: [{type: "invalid", interval: NumberInt(100)}]}
+}));
+
+// Tests that test param is unchanged, dns is set to 100.
 result =
     assert.commandWorked(st.s1.adminCommand({"getParameter": 1, healthMonitoringIntervals: 1}));
-assert.eq(result.healthMonitoringIntervals.dns, 2000);
-assert.eq(result.healthMonitoringIntervals.ldap, 600000);
+assert.eq(getInterval(result, "test"), CUSTOM_INTERVAL);
+assert.eq(getInterval(result, "dns"), 100);
+
+assert.commandWorked(st.s1.adminCommand({
+    "setParameter": 1,
+    healthMonitoringIntervals: {
+        values:
+            [{type: "dns", interval: NumberInt(2000)}, {type: "ldap", interval: NumberInt(600000)}]
+    }
+}));
+
+result =
+    assert.commandWorked(st.s1.adminCommand({"getParameter": 1, healthMonitoringIntervals: 1}));
+assert.eq(getInterval(result, "dns"), 2000);
+assert.eq(getInterval(result, "ldap"), 600000);
 
 // Check that custom liveness values were set properly.
 result = st.s1.adminCommand({"getParameter": 1, "progressMonitor": 1});

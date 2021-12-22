@@ -36,6 +36,25 @@
 namespace mongo {
 namespace process_health {
 
+namespace {
+constexpr auto inline kDefaultObserverInterval = Milliseconds{10000};
+constexpr auto inline kDefaultLdapObserverInterval = Milliseconds{30000};
+constexpr auto inline kDefaultTestObserverInterval = Milliseconds{1000};
+}  // namespace
+
+Milliseconds FaultManagerConfig::_getDefaultObserverInterval(FaultFacetType type) {
+    switch (type) {
+        case FaultFacetType::kLdap:
+            return kDefaultLdapObserverInterval;
+        case FaultFacetType::kMock1:
+        case FaultFacetType::kMock2:
+        case FaultFacetType::kTestObserver:
+            return kDefaultTestObserverInterval;
+        default:
+            return kDefaultObserverInterval;
+    }
+}
+
 StringBuilder& operator<<(StringBuilder& s, const FaultState& state) {
     switch (state) {
         case FaultState::kOk:

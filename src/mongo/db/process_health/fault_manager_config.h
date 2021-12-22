@@ -55,10 +55,8 @@ enum class FaultState {
     kActiveFault
 };
 
-
 StringBuilder& operator<<(StringBuilder& s, const FaultState& state);
 std::ostream& operator<<(std::ostream& os, const FaultState& state);
-
 
 /**
  * Types of health observers available.
@@ -89,6 +87,20 @@ class FaultManagerConfig {
 public:
     /* Maximum possible jitter added to the time between health checks */
     static auto inline constexpr kPeriodicHealthCheckMaxJitter{Milliseconds{100}};
+
+    static constexpr auto toObserverType =
+        [](FaultFacetType type) -> boost::optional<HealthObserverTypeEnum> {
+        switch (type) {
+            case FaultFacetType::kLdap:
+                return HealthObserverTypeEnum::kLdap;
+            case FaultFacetType::kDns:
+                return HealthObserverTypeEnum::kDns;
+            case FaultFacetType::kTestObserver:
+                return HealthObserverTypeEnum::kTest;
+            default:
+                return boost::none;
+        }
+    };
 
     HealthObserverIntensityEnum getHealthObserverIntensity(FaultFacetType type) const {
         auto intensities = _getHealthObserverIntensities();
@@ -147,7 +159,21 @@ public:
 
     Milliseconds getPeriodicHealthCheckInterval(FaultFacetType type) const {
         auto intervals = _getHealthObserverIntervals();
-        return Milliseconds(_getPropertyByType(type, &intervals->_data, 1000));
+        // TODO(SERVER-62125): replace with unified type from IDL.
+        const auto convertedType = toObserverType(type);
+        if (convertedType) {
+            const auto values = intervals->_data->getValues();
+            if (values) {
+                const auto intervalIt =
+                    std::find_if(values->begin(), values->end(), [&](const auto& v) {
+                        return v.getType() == *convertedType;
+                    });
+                if (intervalIt != values->end()) {
+                    return Milliseconds(intervalIt->getInterval());
+                }
+            }
+        }
+        return _getDefaultObserverInterval(type);
     }
 
     Milliseconds getPeriodicLivenessCheckInterval() const {
@@ -184,6 +210,8 @@ private:
         return ServerParameterSet::getGlobal()->get<HealthMonitoringProgressMonitorServerParameter>(
             "progressMonitor");
     }
+
+    static Milliseconds _getDefaultObserverInterval(FaultFacetType type);
 
     template <typename T, typename R>
     R _getPropertyByType(FaultFacetType type, synchronized_value<T>* data, R defaultValue) const {

@@ -137,6 +137,11 @@ TEST_F(FaultManagerTest, ProgressMonitorCheck) {
 
 TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
     resetManager(std::make_unique<FaultManagerConfig>());
+    RAIIServerParameterControllerForTest _intervalController{
+        "healthMonitoringIntervals",
+        BSON("values" << BSON_ARRAY(BSON("type"
+                                         << "test"
+                                         << "interval" << 1)))};
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
     int severity = 0;
@@ -173,6 +178,11 @@ TEST_F(FaultManagerTest, PeriodicHealthCheckOnErrorMakesBadHealthStatus) {
 TEST_F(FaultManagerTest,
        DeadlineFutureCausesTransientFaultWhenObserverBlocksAndGetsResolvedWhenObserverUnblocked) {
     resetManager(std::make_unique<FaultManagerConfig>());
+    RAIIServerParameterControllerForTest _intervalController{
+        "healthMonitoringIntervals",
+        BSON("values" << BSON_ARRAY(BSON("type"
+                                         << "test"
+                                         << "interval" << 1)))};
     RAIIServerParameterControllerForTest _flagController{"featureFlagHealthMonitoring", true};
     RAIIServerParameterControllerForTest _serverParamController{"activeFaultDurationSecs", 5};
 
