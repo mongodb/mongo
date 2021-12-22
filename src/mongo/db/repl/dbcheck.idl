@@ -35,6 +35,7 @@ global:
 
 imports:
   - "mongo/idl/basic_types.idl"
+  - "mongo/db/write_concern_options.idl"
 
 server_parameters:
     dbCheckCollectionTryLockTimeoutMillis:
@@ -144,6 +145,10 @@ structs:
       snapshotRead:
         type: safeBool
         default: true
+      batchWriteConcern:
+        description: Wait for this writeConcern at the end of every batch. Default is w:1 with no timeout.
+        type: WriteConcern
+        default: WriteConcernOptions()
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"
@@ -175,6 +180,10 @@ structs:
       snapshotRead:
         type: safeBool
         default: true
+      batchWriteConcern:
+        description: Wait for this writeConcern at the end of every batch. Default is w:1 with no timeout.
+        type: WriteConcern
+        default: WriteConcernOptions()
 
   DbCheckOplogBatch:
     description: "Oplog entry for a dbCheck batch"

@@ -318,6 +318,9 @@ last-lts:
       test_file: jstests/auth/dbcheck.js
     - ticket: SERVER-56127
       test_file: jstests/sharding/retryable_writes_nested_shard_key.js
+    - ticket: SERVER-62212
+      test_file: jstests/replsets/dbcheck_write_concern.js
+
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
