@@ -17,8 +17,11 @@ if (!isMongoStoreEnabled) {
 function runTest(conn, rst = undefined) {
     const admin = conn.getDB('admin');
     const external = conn.getDB('$external');
-    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
-    assert(admin.auth('admin', 'admin'));
+
+    // Must be authenticated as the internal __system user in order to use $tenant
+    assert.commandWorked(
+        admin.runCommand({createUser: 'system', pwd: 'system', roles: ['__system']}));
+    assert(admin.auth('system', 'system'));
 
     // Create tenant-specific users.
     const users = {
