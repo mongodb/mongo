@@ -1156,7 +1156,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock, WT_PA
      * (which causes reconciliation to loop until the exclusive lock is resolved). If we want to
      * split the parent, give up to avoid that deadlock.
      */
-    if (!trylock && !__wt_btree_can_evict_dirty(session))
+    if (!trylock && __wt_btree_syncing_by_other_session(session))
         return (__wt_set_return(session, EBUSY));
 
     /*
@@ -1272,7 +1272,7 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page)
      * tree we'll skip the newly created insert split chunk, but we'll write it upon finding it in a
      * different part of the tree.
      */
-    if (!__wt_btree_can_evict_dirty(session)) {
+    if (__wt_btree_syncing_by_other_session(session)) {
         __split_internal_unlock(session, page);
         return (0);
     }
