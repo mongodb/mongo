@@ -5,12 +5,38 @@
 
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
+function getOplogEntriesForTxnWithRetries(rs, lsid, txnNumber) {
+    let oplogEntries;
+    assert.soon(
+        () => {
+            try {
+                oplogEntries = getOplogEntriesForTxn(rs, lsid, txnNumber);
+                return true;
+            } catch (e) {
+                // This read from the oplog can fail with CappedPositionLost if the oplog is
+                // concurrently truncated, but the test should only need the oplog entries
+                // from a recent transaction, which shouldn't be truncated because of the
+                // increased oplog size, so it should be safe to retry on this error.
+                if (e.code !== ErrorCodes.CappedPositionLost) {
+                    throw e;
+                }
+                print("Retrying loading oplog entries on CappedPositionLost error: " + tojson(e));
+            }
+        },
+        () => {
+            return "Failed to get oplog entries for transaction, lsid: " + tojson(lsid) +
+                ", txnNumber: " + tojson(txnNumber) +
+                ", latest oplog entries: " + tojson(oplogEntries);
+        });
+    return oplogEntries;
+}
+
 function RetryableInternalTransactionTest() {
     // Set a large oplogSize since this test runs a find command to get the oplog entries for
     // every transaction that it runs including large transactions and with the default oplogSize,
     // oplog reading done by the find command may not be able to keep up with the oplog truncation,
     // causing the command to fail with CappedPositionLost.
-    const st = new ShardingTest({shards: 1, rs: {nodes: 2, oplogSize: 1024}});
+    const st = new ShardingTest({shards: 1, rs: {nodes: 2, oplogSize: 256}});
 
     const kTestMode = {kNonRecovery: 1, kRestart: 2, kFailover: 3, kRollback: 4};
     const kOplogEntryLocation = {kFirst: 1, kMiddle: 2, kLast: 3};
@@ -31,7 +57,7 @@ function RetryableInternalTransactionTest() {
 
     function getTransactionState(lsid, txnNumber) {
         return {
-            oplogEntries: getOplogEntriesForTxn(st.rs0, lsid, txnNumber),
+            oplogEntries: getOplogEntriesForTxnWithRetries(st.rs0, lsid, txnNumber),
             txnEntries: getTxnEntriesForSession(st.rs0, lsid),
             imageEntries: getImageEntriesForTxn(st.rs0, lsid, txnNumber)
         };
