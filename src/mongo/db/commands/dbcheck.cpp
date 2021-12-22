@@ -299,9 +299,6 @@ protected:
 
 private:
     void _doCollection(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
-        // The collection was confirmed as existing in singleCollectionRun().
-        // runBatch() will handle the case of the collection having been dropped since then.
-
         if (_done) {
             return;
         }
@@ -314,6 +311,14 @@ private:
                 stdx::unique_lock<Client> lk(*opCtx->getClient());
                 progress.set(CurOp::get(opCtx)->setProgress_inlock(StringData(curOpMessage),
                                                                    coll->numRecords(opCtx)));
+            } else {
+                const auto entry = dbCheckWarningHealthLogEntry(
+                    info.nss,
+                    "abandoning dbCheck batch because collection no longer exists",
+                    OplogEntriesEnum::Batch,
+                    Status(ErrorCodes::NamespaceNotFound, "collection not found"));
+                HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+                return;
             }
         }
 
