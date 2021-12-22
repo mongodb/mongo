@@ -191,6 +191,8 @@ all:
     test_file: jstests/replsets/dbcheck.js
   - ticket: SERVER-61955
     test_file: jstests/auth/dbcheck.js
+  - ticket: SERVER-62212
+    test_file: jstests/replsets/dbcheck_write_concern.js
 
 
 suites:
