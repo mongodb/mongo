@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/tenant_namespace.h"
 
 namespace mongo {
 /**
@@ -57,11 +58,11 @@ public:
      */
     struct Entry {
         Entry() {}
-        Entry(RecordId catalogId, std::string ident, NamespaceString nss)
-            : catalogId(catalogId), ident(std::move(ident)), nss(std::move(nss)) {}
+        Entry(RecordId catalogId, std::string ident, TenantNamespace tenantNs)
+            : catalogId(catalogId), ident(std::move(ident)), tenantNs(std::move(tenantNs)) {}
         RecordId catalogId;
         std::string ident;
-        NamespaceString nss;
+        TenantNamespace tenantNs;
     };
 
     virtual ~DurableCatalog() {}
@@ -86,7 +87,7 @@ public:
         OperationContext* opCtx, RecordId id) const = 0;
 
     /**
-     * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
+     * Updates the catalog entry for the collection 'tenantNs' with the fields specified in 'md'. If
      * 'md.indexes' contains a new index entry, then this method generates a new index ident and
      * adds it to the catalog entry.
      */
@@ -132,7 +133,7 @@ public:
      */
     virtual StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
         OperationContext* opCtx,
-        const NamespaceString& nss,
+        const TenantNamespace& tenantNs,
         const CollectionOptions& options,
         bool allocateDefaultSpace) = 0;
 
@@ -147,7 +148,7 @@ public:
      * catalog entry and contain the following fields:
      * "md": A document representing the BSONCollectionCatalogEntry::MetaData of the collection.
      * "idxIdent": A document containing {<index_name>: <index_ident>} pairs for all indexes.
-     * "ns": Namespace of the collection being imported.
+     * "tenantNs": TenantNamespace of the collection being imported.
      * "ident": Ident of the collection file.
      *
      * On success, returns an ImportResult structure containing the RecordId which identifies the
@@ -165,14 +166,14 @@ public:
     };
 
     virtual StatusWith<ImportResult> importCollection(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
+                                                      const TenantNamespace& tenantNs,
                                                       const BSONObj& metadata,
                                                       const BSONObj& storageMetadata,
                                                       const ImportOptions& importOptions) = 0;
 
     virtual Status renameCollection(OperationContext* opCtx,
                                     RecordId catalogId,
-                                    const NamespaceString& toNss,
+                                    const TenantNamespace& toTenantNs,
                                     BSONCollectionCatalogEntry::MetaData& md) = 0;
 
     /**

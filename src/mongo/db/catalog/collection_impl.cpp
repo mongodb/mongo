@@ -1876,11 +1876,11 @@ Status CollectionImpl::rename(OperationContext* opCtx,
                               const TenantNamespace& tenantNs,
                               bool stayTemp) {
     auto metadata = std::make_shared<BSONCollectionCatalogEntry::MetaData>(*_metadata);
-    metadata->ns = tenantNs.getNss().ns();
+    metadata->tenantNs = tenantNs;
     if (!stayTemp)
         metadata->options.temp = false;
-    Status status = DurableCatalog::get(opCtx)->renameCollection(
-        opCtx, getCatalogId(), tenantNs.getNss(), *metadata);
+    Status status =
+        DurableCatalog::get(opCtx)->renameCollection(opCtx, getCatalogId(), tenantNs, *metadata);
     if (!status.isOK()) {
         return status;
     }

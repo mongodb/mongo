@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
@@ -84,7 +85,8 @@ protected:
                            const CollectionOptions& options,
                            DurableCatalogImpl* catalog) {
         Lock::DBLock dbLk(opCtx, ns.db(), MODE_IX);
-        auto swEntry = catalog->_addEntry(opCtx, ns, options);
+        TenantNamespace tenantNs(boost::none, ns);
+        auto swEntry = catalog->_addEntry(opCtx, tenantNs, options);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
@@ -1261,7 +1263,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1295,7 +1297,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
         putMetaData(opCtx, catalog.get(), catalogId, md);  // remove index
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
@@ -1349,7 +1351,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1399,7 +1401,7 @@ TEST_F(DurableCatalogImplTest, Split1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1449,7 +1451,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.tenantNs = TenantNamespace(boost::none, NamespaceString("a.b"));
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"

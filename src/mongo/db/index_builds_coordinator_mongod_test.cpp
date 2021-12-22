@@ -62,8 +62,8 @@ public:
     const NamespaceString _testBarNss = NamespaceString("test.bar");
     const UUID _othertestFooUUID = UUID::gen();
     const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
-    const std::string _tenantId{"tenant"};
-    const NamespaceString _testTenantFooNss{_tenantId + "_test.test"};
+    const TenantId _tenantId{OID::gen()};
+    const NamespaceString _testTenantFooNss{_tenantId.toString() + "_test.test"};
     const UUID _testFooTenantUUID = UUID::gen();
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
@@ -388,7 +388,8 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AbortBuildIndexDueToTenantMigration) {
 
     // This call may see the index build active and wait for it to be unregistered, or the index
     // build may already have been unregistered.
-    _indexBuildsCoord->abortTenantIndexBuilds(operationContext(), _tenantId, "tenant migration");
+    _indexBuildsCoord->abortTenantIndexBuilds(
+        operationContext(), _tenantId.toString(), "tenant migration");
 
     ASSERT_EQ(0, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
 

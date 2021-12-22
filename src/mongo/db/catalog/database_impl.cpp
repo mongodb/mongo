@@ -752,11 +752,11 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     // Create Collection object
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
     std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
         uassertStatusOK(storageEngine->getCatalog()->createCollection(
-            opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
+            opCtx, tenantNs, optionsWithUUID, true /*allocateDefaultSpace*/));
     auto catalogId = catalogIdRecordStorePair.first;
-    TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
     std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
         opCtx, tenantNs, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
     auto collection = ownedCollection.get();

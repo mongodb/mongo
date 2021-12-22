@@ -51,12 +51,24 @@ TenantNamespace TenantNamespace::parseTenantNamespaceFromDisk(StringData ns) {
     }
 
     auto tenantDelim = ns.find('_');
-    if (tenantDelim == std::string::npos)
+    auto collDelim = ns.find('.');
+    // If the first '_' is after the '.' that separates the db and coll names, the '_' is part
+    // of the coll name and is not a db prefix.
+    if (tenantDelim == std::string::npos || collDelim < tenantDelim) {
         return TenantNamespace(boost::none, NamespaceString(ns));
+    }
 
     const TenantId tenantId(OID(ns.substr(0, tenantDelim)));
     auto nss = NamespaceString(ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
     return TenantNamespace(tenantId, nss);
+}
+
+std::ostream& operator<<(std::ostream& stream, const TenantNamespace& tenantNs) {
+    return stream << tenantNs.toString();
+}
+
+StringBuilder& operator<<(StringBuilder& builder, const TenantNamespace& tenantNs) {
+    return builder << tenantNs.toString();
 }
 
 }  // namespace mongo

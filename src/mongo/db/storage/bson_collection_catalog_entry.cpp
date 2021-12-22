@@ -190,7 +190,7 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
 
 BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) const {
     BSONObjBuilder b;
-    b.append("ns", ns);
+    b.append("ns", tenantNs.toString());
     b.append("options", options.toBSON());
     {
         BSONArrayBuilder arr(b.subarrayStart("indexes"));
@@ -238,7 +238,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
 }
 
 void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
-    ns = obj.getStringField("ns").toString();
+    tenantNs = TenantNamespace::parseTenantNamespaceFromDisk(obj.getStringField("ns").toString());
 
     if (obj["options"].isABSONObj()) {
         options = uassertStatusOK(

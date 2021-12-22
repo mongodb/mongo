@@ -44,6 +44,11 @@ namespace mongo {
 
 class TenantNamespace {
 public:
+    TenantNamespace(const TenantNamespace& tenantNs)
+        : _tenantId(tenantNs.tenantId()),
+          _nss(tenantNs.getNss()),
+          _tenantNsStr(tenantNs.toString()) {}
+
     /**
      * Constructs an empty TenantNamespace.
      */
@@ -126,7 +131,7 @@ public:
     }
 
     friend auto logAttrs(const TenantNamespace& nss) {
-        return "tenantNamespace"_attr = nss;
+        return "namespace"_attr = nss;
     }
 
 private:
@@ -134,5 +139,8 @@ private:
     NamespaceString _nss;
     boost::optional<std::string> _tenantNsStr;  // Only set if _tenantId exists
 };
+
+std::ostream& operator<<(std::ostream& stream, const TenantNamespace& tenantNs);
+StringBuilder& operator<<(StringBuilder& builder, const TenantNamespace& tenantNs);
 
 }  // namespace mongo
