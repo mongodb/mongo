@@ -155,6 +155,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeys) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
+                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}};
@@ -183,6 +184,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubField) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
+                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}};
@@ -211,6 +213,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysDeepSubField) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
+                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}};
@@ -244,6 +247,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubFieldSomeMissing) {
                                      &actualKeys,
                                      &actualMultikeyPaths,
                                      KeyString::Version::kLatestVersion,
+                                     IndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
     PointSet set{{0, 0}, {3, 3}, {5, 5}};

@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/storage/key_string.h"
 
@@ -130,6 +131,7 @@ public:
                           KeyStringSet* keys,
                           MultikeyPaths* multikeyPaths,
                           KeyString::Version keyStringVersion,
+                          IndexAccessMethod::GetKeysContext context,
                           Ordering ordering,
                           boost::optional<RecordId> id = boost::none);
 };

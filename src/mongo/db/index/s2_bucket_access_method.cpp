@@ -131,6 +131,7 @@ void S2BucketAccessMethod::doGetKeys(OperationContext* opCtx,
                                      keys,
                                      multikeyPaths,
                                      getSortedDataInterface()->getKeyStringVersion(),
+                                     context,
                                      getSortedDataInterface()->getOrdering(),
                                      id);
 }

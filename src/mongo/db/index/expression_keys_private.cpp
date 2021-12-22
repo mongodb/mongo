@@ -62,6 +62,19 @@ namespace {
 using namespace mongo;
 
 namespace dps = ::mongo::dotted_path_support;
+MONGO_FAIL_POINT_DEFINE(relaxIndexMaxNumGeneratedKeysPerDocument);
+
+// Internal exception to abort key generation. Should be translated to something user friendly and
+// not escape past this file.
+class MaxKeysExceededException final : public DBException {
+public:
+    MaxKeysExceededException()
+        : DBException(Status(ErrorCodes::CannotBuildIndexKeys,
+                             "Maximum number of generated keys exceeded.")) {}
+
+private:
+    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+};
 //
 // Helper functions for getS2Keys
 //
@@ -109,8 +122,16 @@ Status S2GetKeysForElement(const BSONElement& element,
 void appendToS2Keys(const std::vector<KeyString::HeapBuilder>& existingKeys,
                     std::vector<KeyString::HeapBuilder>* out,
                     KeyString::Version keyStringVersion,
+                    IndexAccessMethod::GetKeysContext context,
                     Ordering ordering,
+                    size_t maxKeys,
                     const std::function<void(KeyString::HeapBuilder&)>& fn) {
+    if (context == IndexAccessMethod::GetKeysContext::kAddingKeys &&
+        existingKeys.size() + out->size() > maxKeys) {
+        if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
+            throw MaxKeysExceededException();
+        }
+    }
     if (existingKeys.empty()) {
         /*
          * This is the base case when the keys for the first field are generated.
@@ -139,7 +160,9 @@ bool getS2GeoKeys(const BSONObj& document,
                   const std::vector<KeyString::HeapBuilder>& keysToAdd,
                   std::vector<KeyString::HeapBuilder>* out,
                   KeyString::Version keyStringVersion,
-                  Ordering ordering) {
+                  IndexAccessMethod::GetKeysContext context,
+                  Ordering ordering,
+                  size_t maxKeys) {
     bool everGeneratedMultipleCells = false;
     for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
         vector<S2CellId> cells;
@@ -152,6 +175,15 @@ bool getS2GeoKeys(const BSONObj& document,
                 "Unable to generate keys for (likely malformed) geometry: " + document.toString(),
                 cells.size() > 0);
 
+        // We'll be taking the cartesian product of cells and keysToAdd, make sure the output won't
+        // be too big.
+        if (context == IndexAccessMethod::GetKeysContext::kAddingKeys &&
+            cells.size() * keysToAdd.size() > maxKeys) {
+            if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
+                throw MaxKeysExceededException();
+            }
+        }
+
         for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
             S2CellIdToIndexKeyStringAppend(
                 *it, params.indexVersion, keysToAdd, out, keyStringVersion, ordering);
@@ -161,9 +193,13 @@ bool getS2GeoKeys(const BSONObj& document,
     }
 
     if (0 == out->size()) {
-        appendToS2Keys(keysToAdd, out, keyStringVersion, ordering, [](KeyString::HeapBuilder& ks) {
-            ks.appendNull();
-        });
+        appendToS2Keys(keysToAdd,
+                       out,
+                       keyStringVersion,
+                       context,
+                       ordering,
+                       maxKeys,
+                       [](KeyString::HeapBuilder& ks) { ks.appendNull(); });
     }
     return everGeneratedMultipleCells;
 }
@@ -180,7 +216,9 @@ bool getS2BucketGeoKeys(const BSONObj& document,
                         const std::vector<KeyString::HeapBuilder>& keysToAdd,
                         std::vector<KeyString::HeapBuilder>* out,
                         KeyString::Version keyStringVersion,
-                        Ordering ordering) {
+                        IndexAccessMethod::GetKeysContext context,
+                        Ordering ordering,
+                        size_t maxKeys) {
     bool generatedMultipleCells = false;
     if (!elements.empty()) {
         /**
@@ -231,6 +269,15 @@ bool getS2BucketGeoKeys(const BSONObj& document,
                 str::stream() << "Unable to generate keys for (likely malformed) geometry",
                 cells.size() > 0);
 
+        // We'll be taking the cartesian product of cells and keysToAdd, make sure the output won't
+        // be too big.
+        if (context == IndexAccessMethod::GetKeysContext::kAddingKeys &&
+            cells.size() * keysToAdd.size() > maxKeys) {
+            if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
+                throw MaxKeysExceededException();
+            }
+        }
+
         for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
             S2CellIdToIndexKeyStringAppend(
                 *it, params.indexVersion, keysToAdd, out, keyStringVersion, ordering);
@@ -240,9 +287,13 @@ bool getS2BucketGeoKeys(const BSONObj& document,
     }
 
     if (0 == out->size()) {
-        appendToS2Keys(keysToAdd, out, keyStringVersion, ordering, [](KeyString::HeapBuilder& ks) {
-            ks.appendNull();
-        });
+        appendToS2Keys(keysToAdd,
+                       out,
+                       keyStringVersion,
+                       context,
+                       ordering,
+                       maxKeys,
+                       [](KeyString::HeapBuilder& ks) { ks.appendNull(); });
     }
     return generatedMultipleCells;
 }
@@ -256,27 +307,38 @@ void getS2LiteralKeysArray(const BSONObj& obj,
                            const std::vector<KeyString::HeapBuilder>& keysToAdd,
                            std::vector<KeyString::HeapBuilder>* out,
                            KeyString::Version keyStringVersion,
-                           Ordering ordering) {
+                           IndexAccessMethod::GetKeysContext context,
+                           Ordering ordering,
+                           size_t maxKeys) {
     BSONObjIterator objIt(obj);
     if (!objIt.more()) {
         // Empty arrays are indexed as undefined.
-        appendToS2Keys(keysToAdd, out, keyStringVersion, ordering, [](KeyString::HeapBuilder& ks) {
-            ks.appendUndefined();
-        });
+        appendToS2Keys(keysToAdd,
+                       out,
+                       keyStringVersion,
+                       context,
+                       ordering,
+                       maxKeys,
+                       [](KeyString::HeapBuilder& ks) { ks.appendUndefined(); });
     } else {
         // Non-empty arrays are exploded.
         while (objIt.more()) {
             const auto elem = objIt.next();
-            appendToS2Keys(
-                keysToAdd, out, keyStringVersion, ordering, [&](KeyString::HeapBuilder& ks) {
-                    if (collator) {
-                        ks.appendBSONElement(elem, [&](StringData stringData) {
-                            return collator->getComparisonString(stringData);
-                        });
-                    } else {
-                        ks.appendBSONElement(elem);
-                    }
-                });
+            appendToS2Keys(keysToAdd,
+                           out,
+                           keyStringVersion,
+                           context,
+                           ordering,
+                           maxKeys,
+                           [&](KeyString::HeapBuilder& ks) {
+                               if (collator) {
+                                   ks.appendBSONElement(elem, [&](StringData stringData) {
+                                       return collator->getComparisonString(stringData);
+                                   });
+                               } else {
+                                   ks.appendBSONElement(elem);
+                               }
+                           });
         }
     }
 }
@@ -292,21 +354,30 @@ bool getS2OneLiteralKey(const BSONElement& elt,
                         const std::vector<KeyString::HeapBuilder>& keysToAdd,
                         std::vector<KeyString::HeapBuilder>* out,
                         KeyString::Version keyStringVersion,
-                        Ordering ordering) {
+                        IndexAccessMethod::GetKeysContext context,
+                        Ordering ordering,
+                        size_t maxKeys) {
     if (Array == elt.type()) {
-        getS2LiteralKeysArray(elt.Obj(), collator, keysToAdd, out, keyStringVersion, ordering);
+        getS2LiteralKeysArray(
+            elt.Obj(), collator, keysToAdd, out, keyStringVersion, context, ordering, maxKeys);
         return true;
     } else {
         // One thing, not an array, index as-is.
-        appendToS2Keys(keysToAdd, out, keyStringVersion, ordering, [&](KeyString::HeapBuilder& ks) {
-            if (collator) {
-                ks.appendBSONElement(elt, [&](StringData stringData) {
-                    return collator->getComparisonString(stringData);
-                });
-            } else {
-                ks.appendBSONElement(elt);
-            }
-        });
+        appendToS2Keys(keysToAdd,
+                       out,
+                       keyStringVersion,
+                       context,
+                       ordering,
+                       maxKeys,
+                       [&](KeyString::HeapBuilder& ks) {
+                           if (collator) {
+                               ks.appendBSONElement(elt, [&](StringData stringData) {
+                                   return collator->getComparisonString(stringData);
+                               });
+                           } else {
+                               ks.appendBSONElement(elt);
+                           }
+                       });
     }
     return false;
 }
@@ -323,17 +394,23 @@ bool getS2LiteralKeys(const BSONElementSet& elements,
                       const std::vector<KeyString::HeapBuilder>& keysToAdd,
                       std::vector<KeyString::HeapBuilder>* out,
                       KeyString::Version keyStringVersion,
-                      Ordering ordering) {
+                      IndexAccessMethod::GetKeysContext context,
+                      Ordering ordering,
+                      size_t maxKeys) {
     bool foundIndexedArrayValue = false;
     if (0 == elements.size()) {
         // Missing fields are indexed as null.
-        appendToS2Keys(keysToAdd, out, keyStringVersion, ordering, [](KeyString::HeapBuilder& ks) {
-            ks.appendNull();
-        });
+        appendToS2Keys(keysToAdd,
+                       out,
+                       keyStringVersion,
+                       context,
+                       ordering,
+                       maxKeys,
+                       [](KeyString::HeapBuilder& ks) { ks.appendNull(); });
     } else {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-            const bool thisElemIsArray =
-                getS2OneLiteralKey(*i, collator, keysToAdd, out, keyStringVersion, ordering);
+            const bool thisElemIsArray = getS2OneLiteralKey(
+                *i, collator, keysToAdd, out, keyStringVersion, context, ordering, maxKeys);
             foundIndexedArrayValue = foundIndexedArrayValue || thisElemIsArray;
         }
     }
@@ -582,6 +659,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
                                       KeyStringSet* keys,
                                       MultikeyPaths* multikeyPaths,
                                       KeyString::Version keyStringVersion,
+                                      IndexAccessMethod::GetKeysContext context,
                                       Ordering ordering,
                                       boost::optional<RecordId> id) {
     std::vector<KeyString::HeapBuilder> keysToAdd;
@@ -596,122 +674,140 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
 
     size_t posInIdx = 0;
 
-    // We output keys in the same order as the fields we index.
-    for (const auto& keyElem : keyPattern) {
-        // First, we get the keys that this field adds.  Either they're added literally from
-        // the value of the field, or they're transformed if the field is geo.
-        BSONElementSet fieldElements;
-        const bool expandArrayOnTrailingField = false;
-        MultikeyComponents* arrayComponents = multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
+    try {
+        size_t maxNumKeys = gIndexMaxNumGeneratedKeysPerDocument;
+        // We output keys in the same order as the fields we index.
+        for (const auto& keyElem : keyPattern) {
+            // First, we get the keys that this field adds.  Either they're added literally from
+            // the value of the field, or they're transformed if the field is geo.
+            BSONElementSet fieldElements;
+            const bool expandArrayOnTrailingField = false;
+            MultikeyComponents* arrayComponents =
+                multikeyPaths ? &(*multikeyPaths)[posInIdx] : nullptr;
 
-        // Trailing array values aren't being expanded, so we still need to determine whether the
-        // last component of the indexed path 'keyElem.fieldName()' causes the index to be multikey.
-        // We say that it does if
-        //   (a) the last component of the indexed path ever refers to an array value (regardless of
-        //       the number of array elements)
-        //   (b) the last component of the indexed path ever refers to GeoJSON data that requires
-        //       multiple cells for its covering.
-        bool lastPathComponentCausesIndexToBeMultikey;
-        std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
+            // Trailing array values aren't being expanded, so we still need to determine whether
+            // the last component of the indexed path 'keyElem.fieldName()' causes the index to be
+            // multikey. We say that it does if
+            //   (a) the last component of the indexed path ever refers to an array value
+            //   (regardless of
+            //       the number of array elements)
+            //   (b) the last component of the indexed path ever refers to GeoJSON data that
+            //   requires
+            //       multiple cells for its covering.
+            bool lastPathComponentCausesIndexToBeMultikey;
+            std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
 
-        if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.valuestr()) {
-            timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
-                obj,
-                keyElem.fieldName(),
-                fieldElements,
-                expandArrayOnTrailingField,
-                arrayComponents);
+            if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.valuestr()) {
+                timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
+                    obj,
+                    keyElem.fieldName(),
+                    fieldElements,
+                    expandArrayOnTrailingField,
+                    arrayComponents);
 
-            // null, undefined, {} and [] should all behave like there is no geo field. So we look
-            // for these cases and ignore those measurements if we find them.
-            for (auto it = fieldElements.begin(); it != fieldElements.end();) {
-                decltype(it) next = std::next(it);
-                if (it->isNull() || Undefined == it->type() ||
-                    (it->isABSONObj() && 0 == it->Obj().nFields())) {
-                    fieldElements.erase(it);
+                // null, undefined, {} and [] should all behave like there is no geo field. So we
+                // look for these cases and ignore those measurements if we find them.
+                for (auto it = fieldElements.begin(); it != fieldElements.end();) {
+                    decltype(it) next = std::next(it);
+                    if (it->isNull() || Undefined == it->type() ||
+                        (it->isABSONObj() && 0 == it->Obj().nFields())) {
+                        fieldElements.erase(it);
+                    }
+                    it = next;
                 }
-                it = next;
-            }
 
-            // 2dsphere indices require that at least one geo field to be present in a
-            // document in order to index it.
-            if (fieldElements.size() > 0) {
-                haveGeoField = true;
-            }
+                // 2dsphere indices require that at least one geo field to be present in a
+                // document in order to index it.
+                if (fieldElements.size() > 0) {
+                    haveGeoField = true;
+                }
 
-            lastPathComponentCausesIndexToBeMultikey = getS2BucketGeoKeys(obj,
-                                                                          fieldElements,
-                                                                          params,
-                                                                          keysToAdd,
-                                                                          &updatedKeysToAdd,
-                                                                          keyStringVersion,
-                                                                          ordering);
-        } else {
-            dps::extractAllElementsAlongPath(obj,
-                                             keyElem.fieldName(),
-                                             fieldElements,
-                                             expandArrayOnTrailingField,
-                                             arrayComponents);
+                lastPathComponentCausesIndexToBeMultikey = getS2BucketGeoKeys(obj,
+                                                                              fieldElements,
+                                                                              params,
+                                                                              keysToAdd,
+                                                                              &updatedKeysToAdd,
+                                                                              keyStringVersion,
+                                                                              context,
+                                                                              ordering,
+                                                                              maxNumKeys);
+            } else {
+                dps::extractAllElementsAlongPath(obj,
+                                                 keyElem.fieldName(),
+                                                 fieldElements,
+                                                 expandArrayOnTrailingField,
+                                                 arrayComponents);
 
-            if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
-                if (params.indexVersion >= S2_INDEX_VERSION_2) {
-                    // For >= V2,
-                    // geo: null,
-                    // geo: undefined
-                    // geo: []
-                    // should all behave like there is no geo field.  So we look for these cases and
-                    // throw out the field elements if we find them.
-                    if (1 == fieldElements.size()) {
-                        BSONElement elt = *fieldElements.begin();
-                        // Get the :null and :undefined cases.
-                        if (elt.isNull() || Undefined == elt.type()) {
-                            fieldElements.clear();
-                        } else if (elt.isABSONObj()) {
-                            // And this is the :[] case.
-                            BSONObj obj = elt.Obj();
-                            if (0 == obj.nFields()) {
+                if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
+                    if (params.indexVersion >= S2_INDEX_VERSION_2) {
+                        // For >= V2,
+                        // geo: null,
+                        // geo: undefined
+                        // geo: []
+                        // should all behave like there is no geo field.  So we look for these cases
+                        // and throw out the field elements if we find them.
+                        if (1 == fieldElements.size()) {
+                            BSONElement elt = *fieldElements.begin();
+                            // Get the :null and :undefined cases.
+                            if (elt.isNull() || Undefined == elt.type()) {
                                 fieldElements.clear();
+                            } else if (elt.isABSONObj()) {
+                                // And this is the :[] case.
+                                BSONObj obj = elt.Obj();
+                                if (0 == obj.nFields()) {
+                                    fieldElements.clear();
+                                }
                             }
+                        }
+
+                        // >= V2 2dsphere indices require that at least one geo field to be present
+                        // in a document in order to index it.
+                        if (fieldElements.size() > 0) {
+                            haveGeoField = true;
                         }
                     }
 
-                    // >= V2 2dsphere indices require that at least one geo field to be present in a
-                    // document in order to index it.
-                    if (fieldElements.size() > 0) {
-                        haveGeoField = true;
-                    }
-                }
-
-                lastPathComponentCausesIndexToBeMultikey = getS2GeoKeys(obj,
-                                                                        fieldElements,
-                                                                        params,
-                                                                        keysToAdd,
-                                                                        &updatedKeysToAdd,
-                                                                        keyStringVersion,
-                                                                        ordering);
-            } else {
-                lastPathComponentCausesIndexToBeMultikey = getS2LiteralKeys(fieldElements,
-                                                                            params.collator,
+                    lastPathComponentCausesIndexToBeMultikey = getS2GeoKeys(obj,
+                                                                            fieldElements,
+                                                                            params,
                                                                             keysToAdd,
                                                                             &updatedKeysToAdd,
                                                                             keyStringVersion,
-                                                                            ordering);
+                                                                            context,
+                                                                            ordering,
+                                                                            maxNumKeys);
+                } else {
+                    lastPathComponentCausesIndexToBeMultikey = getS2LiteralKeys(fieldElements,
+                                                                                params.collator,
+                                                                                keysToAdd,
+                                                                                &updatedKeysToAdd,
+                                                                                keyStringVersion,
+                                                                                context,
+                                                                                ordering,
+                                                                                maxNumKeys);
+                }
             }
+
+
+            // We expect there to be the missing field element present in the keys if data is
+            // missing.  So, this should be non-empty.
+            invariant(!updatedKeysToAdd.empty());
+
+            if (multikeyPaths && lastPathComponentCausesIndexToBeMultikey) {
+                const size_t pathLengthOfThisField =
+                    FieldRef{keyElem.fieldNameStringData()}.numParts();
+                invariant(pathLengthOfThisField > 0);
+                (*multikeyPaths)[posInIdx].insert(pathLengthOfThisField - 1);
+            }
+
+            keysToAdd = std::move(updatedKeysToAdd);
+            ++posInIdx;
         }
-
-
-        // We expect there to be the missing field element present in the keys if data is
-        // missing.  So, this should be non-empty.
-        invariant(!updatedKeysToAdd.empty());
-
-        if (multikeyPaths && lastPathComponentCausesIndexToBeMultikey) {
-            const size_t pathLengthOfThisField = FieldRef{keyElem.fieldNameStringData()}.numParts();
-            invariant(pathLengthOfThisField > 0);
-            (*multikeyPaths)[posInIdx].insert(pathLengthOfThisField - 1);
-        }
-
-        keysToAdd = std::move(updatedKeysToAdd);
-        ++posInIdx;
+    } catch (const MaxKeysExceededException&) {
+        LOGV2_WARNING_OPTIONS(6118400,
+                              {logv2::UserAssertAfterLog(ErrorCodes::CannotBuildIndexKeys)},
+                              "Insert of geo object exceeded maximum number of generated keys",
+                              "obj"_attr = redact(obj));
     }
 
     // Make sure that if we're >= V2 there's at least one geo field present in the doc.

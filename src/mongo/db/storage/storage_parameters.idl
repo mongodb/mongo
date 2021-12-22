@@ -79,6 +79,15 @@ server_parameters:
         validator:
             gte: 1
 
+    indexMaxNumGeneratedKeysPerDocument:
+        description: 'Maximum number of index keys a single document is allowed to generate'
+        set_at: [ startup ]
+        cpp_vartype: int32_t
+        cpp_varname: gIndexMaxNumGeneratedKeysPerDocument
+        default: 100000
+        validator:
+            gte: 200
+
     storageGlobalParams.directoryperdb:
         description: 'Read-only view of directory per db config parameter'
         # Actually, never.  TODO(SERVER-59813): Use correct IDL for this once support is added.
