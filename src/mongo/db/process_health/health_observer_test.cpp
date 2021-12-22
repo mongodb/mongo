@@ -139,6 +139,13 @@ TEST_F(FaultManagerTest, ProgressMonitorCheck) {
 TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
     resetManager(std::make_unique<FaultManagerConfig>());
     feature_flags::gFeatureFlagHealthMonitoring = true;
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("healthMonitoringIntervals")
+                  ->second->setFromString(BSON("values" << BSON_ARRAY(BSON("type"
+                                                                           << "test"
+                                                                           << "interval" << 1)))
+                                              .toString()));
     auto faultFacetType = FaultFacetType::kMock1;
     int severity = 0;
     registerMockHealthObserver(faultFacetType, [&severity] { return severity; });
@@ -177,6 +184,13 @@ TEST_F(FaultManagerTest,
     feature_flags::gFeatureFlagHealthMonitoring = true;
     const auto saveActiveFaultDuration = gActiveFaultDurationSecs.load();
     gActiveFaultDurationSecs.store(5);
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("healthMonitoringIntervals")
+                  ->second->setFromString(BSON("values" << BSON_ARRAY(BSON("type"
+                                                                           << "test"
+                                                                           << "interval" << 1)))
+                                              .toString()));
 
     AtomicWord<bool> shouldBlock{true};
     registerMockHealthObserver(FaultFacetType::kMock1,
