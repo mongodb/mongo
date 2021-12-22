@@ -89,23 +89,9 @@ structs:
                 type: safeBool
                 unstable: true
 
-commands:
-    collMod:
-        description: "Specify collMod Command."
-        command_name: collMod
-        namespace: concatenate_with_db
-        cpp_name: collMod
+    CollModRequest:
+        description: "The collMod command's request."
         strict: true
-        api_version: "1"
-        access_check:
-            complex:
-                - check: should_ignore_auth_checks
-                - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: collMod
-                - privilege:
-                    resource_pattern: exact_namespace
-                    action_type: find
         fields:
             index:
                 description: "Index to be modified."
@@ -169,6 +155,8 @@ commands:
                 optional: true
                 type: CollModTimeseries
                 unstable: false
+            # TODO (SERVER-61685): `isTimeseriesNamespace` is not needed for the collMod command but kept
+            # for backward compatibility. Remove this flag after 6.0 branching.
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
@@ -183,4 +171,25 @@ commands:
                 optional: true
                 type: safeBool
                 unstable: true
+
+commands:
+    collMod:
+        description: "Specify collMod Command."
+        command_name: collMod
+        namespace: concatenate_with_db
+        cpp_name: collMod
+        strict: true
+        api_version: "1"
+        access_check:
+            complex:
+                - check: should_ignore_auth_checks
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: collMod
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: find
+        inline_chained_structs: true
+        chained_structs:
+            CollModRequest: CollModRequest
         reply_type: CollModReply

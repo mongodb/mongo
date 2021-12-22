@@ -153,6 +153,8 @@ let viewsCommandTests = {
     _shardsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _shardsvrShardCollection:
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _shardsvrCollMod: {skip: isAnInternalCommand},
+    _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {skip: isUnrelated},

@@ -96,7 +96,12 @@ var $config = (function() {
             const toName = this.getRandomView(this.viewList);
             const res = db.runCommand(
                 {collMod: fromName, viewOn: toName, pipeline: this.getRandomViewPipeline()});
-            assertAlways(res.ok === 1 || res.code === ErrorCodes.GraphContainsCycle, tojson(res));
+            assertAlways(res.ok === 1 ||
+                             [
+                                 ErrorCodes.GraphContainsCycle,
+                                 ErrorCodes.ConflictingOperationInProgress
+                             ].includes(res.code),
+                         tojson(res));
         }
 
         /**
@@ -112,7 +117,12 @@ var $config = (function() {
             const fromName = this.getRandomView(this.viewList);
             const res = db.runCommand(
                 {collMod: fromName, viewOn: collName, pipeline: this.getRandomViewPipeline()});
-            assertAlways(res.ok === 1 || res.code === ErrorCodes.GraphContainsCycle, tojson(res));
+            assertAlways(res.ok === 1 ||
+                             [
+                                 ErrorCodes.GraphContainsCycle,
+                                 ErrorCodes.ConflictingOperationInProgress
+                             ].includes(res.code),
+                         tojson(res));
         }
 
         function readFromView(db, collName) {

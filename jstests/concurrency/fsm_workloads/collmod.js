@@ -23,21 +23,23 @@ var $config = (function() {
                 collMod: this.threadCollName,
                 index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL}
             });
-            assertAlways.commandWorked(res);
+            assertAlways.commandWorkedOrFailedWithCode(res,
+                                                       [ErrorCodes.ConflictingOperationInProgress]);
             // only assert if new expireAfterSeconds differs from old one
-            if (res.hasOwnProperty('expireAfterSeconds_new')) {
+            if (res.ok === 1 && res.hasOwnProperty('expireAfterSeconds_new')) {
                 assertWhenOwnDB.eq(res.expireAfterSeconds_new, newTTL);
             }
 
             // Attempt an invalid collMod which should always fail regardless of whether a WCE
             // occurred. This is meant to reproduce SERVER-56772.
             const encryptSchema = {$jsonSchema: {properties: {_id: {encrypt: {}}}}};
-            assertAlways.commandFailedWithCode(db.runCommand({
-                collMod: this.threadCollName,
-                validator: encryptSchema,
-                validationAction: "warn"
-            }),
-                                               ErrorCodes.QueryFeatureNotAllowed);
+            assertAlways.commandFailedWithCode(
+                db.runCommand({
+                    collMod: this.threadCollName,
+                    validator: encryptSchema,
+                    validationAction: "warn"
+                }),
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
         }
 
         return {collMod: collMod};

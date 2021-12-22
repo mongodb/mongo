@@ -107,14 +107,17 @@ var $config = extendWorkload($config, function($config, $super) {
             // Change the validation level.
             const validationLevels = ['off', 'strict', 'moderate'];
             const newValidationLevel = validationLevels[Random.randInt(validationLevels.length)];
-            assertWhenOwnDB.commandWorked(
-                db.runCommand({collMod: this.outputCollName, validationLevel: newValidationLevel}));
+            assertWhenOwnDB.commandWorkedOrFailedWithCode(
+                db.runCommand({collMod: this.outputCollName, validationLevel: newValidationLevel}),
+                ErrorCodes.ConflictingOperationInProgress);
         } else {
             // Change the validation action.
-            assertWhenOwnDB.commandWorked(db.runCommand({
-                collMod: this.outputCollName,
-                validationAction: Random.rand() > 0.5 ? 'warn' : 'error'
-            }));
+            assertWhenOwnDB.commandWorkedOrFailedWithCode(
+                db.runCommand({
+                    collMod: this.outputCollName,
+                    validationAction: Random.rand() > 0.5 ? 'warn' : 'error'
+                }),
+                ErrorCodes.ConflictingOperationInProgress);
         }
     };
 

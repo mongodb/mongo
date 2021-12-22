@@ -30,23 +30,6 @@ if (!collModIndexUniqueEnabled) {
     return;
 }
 
-function extractResult(obj) {
-    if (!FixtureHelpers.isMongos(db)) {
-        return obj;
-    }
-
-    let numFields = 0;
-    let result = null;
-    for (let field in obj.raw) {
-        result = obj.raw[field];
-        numFields++;
-    }
-
-    assert.neq(null, result);
-    assert.eq(1, numFields);
-    return result;
-}
-
 function sortViolationsArray(arr) {
     // Sorting unsorted arrays of unsorted arrays -- Sort subarrays, then sort main array by first
     // key of subarray.
@@ -66,11 +49,11 @@ function sortViolationsArray(arr) {
 
 // Checks that the violations match what we expect.
 function assertFailedWithViolations(result, violations) {
-    const error = extractResult(result);
-    assert.commandFailedWithCode(error, ErrorCodes.CannotEnableIndexConstraint);
-    assert.eq(bsonWoCompare(sortViolationsArray(error.violations), sortViolationsArray(violations)),
-              0,
-              tojson(error));
+    assert.commandFailedWithCode(result, ErrorCodes.CannotEnableIndexConstraint);
+    assert.eq(
+        bsonWoCompare(sortViolationsArray(result.violations), sortViolationsArray(violations)),
+        0,
+        tojson(result));
 }
 
 const collName = 'collmod_convert_to_unique_violations';

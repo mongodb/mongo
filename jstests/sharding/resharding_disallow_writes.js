@@ -72,8 +72,10 @@ reshardingTest.withReshardingInBackground(
 
             jsTestLog("Attempting collMod");
             assert.commandFailedWithCode(
-                sourceCollection.runCommand({collMod: sourceCollection.getName()}),
-                ErrorCodes.ReshardCollectionInProgress);
+                // The collMod is serialized with the resharding command, so we explicitly add an
+                // timeout to the command so that it doesn't get blocked and timeout the test.
+                sourceCollection.runCommand({collMod: sourceCollection.getName(), maxTimeMS: 5000}),
+                [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.MaxTimeMSExpired]);
 
             jsTestLog("Attempting drop index");
             assert.commandFailedWithCode(
