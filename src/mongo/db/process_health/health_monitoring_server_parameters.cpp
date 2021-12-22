@@ -37,16 +37,16 @@
 namespace mongo {
 
 namespace {
-// Replaces values in oldIntensities with values in newIntensities while preserving all values in
-// oldIntensities not in newIntensities.
-HealthObserverIntensities mergeIntensities(const HealthObserverIntensities& oldIntensities,
-                                           const HealthObserverIntensities& newIntensities) {
+// Replaces values in oldIntensities/Intervals with values in newIntensities/Intervals while
+// preserving all values present in old- that are not present in new-.
+template <typename ConfigValues>
+ConfigValues mergeConfigValues(const ConfigValues& oldValues, const ConfigValues& newValues) {
     using namespace std;
-    HealthObserverIntensities result = oldIntensities;
+    ConfigValues result = oldValues;
     auto optionalOldValues = result.getValues();
-    auto optionalNewValues = newIntensities.getValues();
+    auto optionalNewValues = newValues.getValues();
     if (!optionalNewValues) {
-        return oldIntensities;
+        return oldValues;
     }
     if (!optionalOldValues) {
         result.setValues(*optionalNewValues);
@@ -55,7 +55,7 @@ HealthObserverIntensities mergeIntensities(const HealthObserverIntensities& oldI
     for (const auto& setting : *optionalNewValues) {
         auto it = find_if(begin(*optionalOldValues),
                           end(*optionalOldValues),
-                          [&setting](const HealthObserverIntensitySetting& destSetting) {
+                          [&setting](const auto& destSetting) {
                               return (destSetting.getType() == setting.getType()) ? true : false;
                           });
         if (it != optionalOldValues->end()) {
@@ -70,20 +70,20 @@ HealthObserverIntensities mergeIntensities(const HealthObserverIntensities& oldI
 }  // namespace
 
 Status HealthMonitoringIntensitiesServerParameter::setFromString(const std::string& value) {
-    auto oldValue = **_data;
+    const auto oldValue = **_data;
     auto newValue = HealthObserverIntensities::parse(
         IDLParserErrorContext("health monitoring intensities"), fromjson(value));
-    newValue = mergeIntensities(oldValue, newValue);
+    newValue = mergeConfigValues(oldValue, newValue);
     process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
     **_data = newValue;
     return Status::OK();
 }
 
 Status HealthMonitoringIntensitiesServerParameter::set(const BSONElement& newValueElement) {
-    auto oldValue = **_data;
+    const auto oldValue = **_data;
     auto newValue = HealthObserverIntensities::parse(
         IDLParserErrorContext("health monitoring intensities"), newValueElement.Obj());
-    newValue = mergeIntensities(oldValue, newValue);
+    newValue = mergeConfigValues(oldValue, newValue);
     process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
     **_data = newValue;
     return Status::OK();
@@ -118,14 +118,20 @@ void HealthMonitoringProgressMonitorServerParameter::append(OperationContext*,
 }
 
 Status PeriodicHealthCheckIntervalsServerParameter::setFromString(const std::string& value) {
-    *_data = HealthObserverIntervals::parse(IDLParserErrorContext("health monitoring liveness"),
-                                            fromjson(value));
+    const auto oldValue = **_data;
+    auto newValue = HealthObserverIntervals::parse(
+        IDLParserErrorContext("health monitoring liveness"), fromjson(value));
+    newValue = mergeConfigValues(oldValue, newValue);
+    **_data = newValue;
     return Status::OK();
 }
 
 Status PeriodicHealthCheckIntervalsServerParameter::set(const BSONElement& newValueElement) {
-    *_data = HealthObserverIntervals::parse(IDLParserErrorContext("health monitoring liveness"),
-                                            newValueElement.Obj());
+    const auto oldValue = **_data;
+    auto newValue = HealthObserverIntervals::parse(
+        IDLParserErrorContext("health monitoring liveness"), newValueElement.Obj());
+    newValue = mergeConfigValues(oldValue, newValue);
+    **_data = newValue;
     return Status::OK();
 }
 

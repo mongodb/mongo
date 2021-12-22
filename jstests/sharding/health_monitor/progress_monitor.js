@@ -15,7 +15,7 @@ const params = {
                 {type: "dns", intensity: "off"}
             ]
         }),
-        healthMonitoringIntervals: tojson({test: 500}),
+        healthMonitoringIntervals: tojson({values: [{type: "test", interval: NumberInt(500)}]}),
         progressMonitor:
             tojson({interval: PROGRESS_TIMEOUT_SECONDS, deadline: PROGRESS_TIMEOUT_SECONDS}),
         featureFlagHealthMonitoring: true

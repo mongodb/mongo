@@ -72,25 +72,26 @@ structs:
                 type: array<HealthObserverIntensitySetting>
                 optional: true
 
+    HealthObserverIntervalSetting:
+        description: "One health observer check interval setting, in milliseconds"
+        strict: true
+        fields:
+            type:
+                type: HealthObserverType
+                optional: false
+            interval:
+                type: int
+                optional: false
+                validator: { gt: 0 }
+
     HealthObserverIntervals:
         description: "A struct representing the interval in milliseconds for each health observer."
         strict: true
         fields:
-            dns:
-                description: "DNS health check interval."
-                type: int
-                default: 1000
-                validator: { gt: 0 }
-            ldap:
-                description: "LDAP health check interval."
-                type: int
-                default: 10000
-                validator: { gt: 0 }
-            test:
-                description: "Test health observer health check interval."
-                type: int
-                default: 10
-                validator: { gt: 0 }
+            values:
+                description: "Array of health observer intervals settings"
+                type: array<HealthObserverIntervalSetting>
+                optional: true
             
     HealthObserverProgressMonitorConfig:
         description: "A struct representing configuration for health observer liveness checks." 
