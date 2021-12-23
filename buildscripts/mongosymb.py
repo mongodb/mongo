@@ -20,6 +20,7 @@ but emits json instead of plain text.
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -405,7 +406,14 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path, dsym_hint, i
         frames = preprocess_frames(dbg_path_resolver, trace_doc, input_format)
 
     if not symbolizer_path:
-        symbolizer_path = os.environ.get("MONGOSYMB_SYMBOLIZER_PATH", "llvm-symbolizer")
+        symbolizer_path_env = "MONGOSYMB_SYMBOLIZER_PATH"
+        default_symbolizer_path = "llvm-symbolizer"
+        symbolizer_path = os.environ.get(symbolizer_path_env)
+        if not symbolizer_path:
+            print(
+                f"Env value for '{symbolizer_path_env}' not found, using '{default_symbolizer_path}' "
+                f"as a defualt executable path.")
+            symbolizer_path = default_symbolizer_path
 
     symbolizer_args = [symbolizer_path]
     for dh in dsym_hint:
@@ -493,6 +501,7 @@ def make_argument_parser(parser=None, **kwargs):
     parser.add_argument('--src-dir-to-move', action="store", type=str, default=None,
                         help="Specify a src dir to move to /data/mci/{original_buildid}/src")
 
+    parser.add_argument('--live', action='store_true')
     s3_group = parser.add_argument_group(
         "s3 options", description='Options used with \'--debug-file-resolver s3\'')
     s3_group.add_argument('--s3-cache-dir')
@@ -514,8 +523,56 @@ def make_argument_parser(parser=None, **kwargs):
     return parser
 
 
+def substitute_stdin(options, resolver):
+    """Accept stdin stream as source of logs and symbolize it."""
+
+    # Ignore Ctrl-C. When the process feeding the pipe exits, `stdin` will be closed.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    print("Live mode activated, waiting for input...")
+    while True:
+        backtrace_indicator = '{"backtrace":'
+        line = sys.stdin.readline()
+        if not line:
+            return
+
+        line = line.strip()
+
+        if 'Frame: 0x' in line:
+            continue
+
+        if backtrace_indicator in line:
+            backtrace_index = line.index(backtrace_indicator)
+            prefix = line[:backtrace_index]
+            backtrace = line[backtrace_index:]
+            trace_doc = json.loads(backtrace)
+            if not trace_doc["backtrace"]:
+                print("Trace is empty, skipping...")
+                continue
+            frames = symbolize_frames(trace_doc, resolver, options.symbolizer_path, [],
+                                      options.output_format)
+            print(prefix)
+            print("Symbolizing...")
+            classic_output(frames, sys.stdout, indent=2)
+        else:
+            print(line)
+
+
 def main(options):
     """Execute Main program."""
+
+    resolver = None
+    if options.debug_file_resolver == 'path':
+        resolver = PathDbgFileResolver(options.path_to_executable)
+    elif options.debug_file_resolver == 's3':
+        resolver = S3BuildidDbgFileResolver(options.s3_cache_dir, options.s3_bucket)
+    elif options.debug_file_resolver == 'pr':
+        resolver = PathResolver(host=options.pr_host, cache_dir=options.pr_cache_dir)
+
+    if options.live:
+        print("Entering live mode")
+        substitute_stdin(options, resolver)
+        sys.exit(0)
 
     # Skip over everything before the first '{' since it is likely to be log line prefixes.
     # Additionally, using raw_decode() to ignore extra data after the closing '}' to allow maximal
@@ -552,14 +609,6 @@ def main(options):
         output_fn = json.dump
     if options.output_format == 'classic':
         output_fn = classic_output
-
-    resolver = None
-    if options.debug_file_resolver == 'path':
-        resolver = PathDbgFileResolver(options.path_to_executable)
-    elif options.debug_file_resolver == 's3':
-        resolver = S3BuildidDbgFileResolver(options.s3_cache_dir, options.s3_bucket)
-    elif options.debug_file_resolver == 'pr':
-        resolver = PathResolver(host=options.pr_host, cache_dir=options.pr_cache_dir)
 
     frames = preprocess_frames(resolver, trace_doc, options.input_format)
 
