@@ -27,8 +27,12 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/platform/basic.h"
 
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/thread_context.h"
 
 #include <boost/optional.hpp>
@@ -66,28 +70,43 @@ struct Counters {
 };
 
 synchronized_value gCounters{Counters{0, 0, 0}};
+AtomicWord<bool> gTestDecorationEnabled{false};
 
 /**
  * This decoration increments a set of global counters on creation and destruction.
  */
 class TestDecoration {
 public:
-    TestDecoration() {
-        ASSERT(!ThreadContext::get())
-            << "ThreadContext decorations should be created before the ThreadContext is set";
+    TestDecoration() : _enabled(gTestDecorationEnabled.load()) {
+        invariant(!ThreadContext::get());
 
-        ++gCounters->created;
-    };
-
-    ~TestDecoration() {
-        ++gCounters->destroyed;
-
-        if (ThreadContext::get()) {
-            // We should only be able to reference a ThreadContext in our destructor if our
-            // lifetime was extended to be off thread.
-            ++gCounters->destroyedOffThread;
+        if (_enabled) {
+            // Thread name is not available here, so log the ID for diagnostic purposes.
+            LOGV2_INFO(6173200,
+                       "Incrementing creation counter",
+                       "threadId"_attr = ProcessId::getCurrentThreadId());
+            ++gCounters->created;
         }
     }
+
+    ~TestDecoration() {
+        if (_enabled) {
+            // Thread name might not be available here, so log the ID for diagnostic purposes.
+            LOGV2_INFO(6173201,
+                       "Incrementing destruction counter(s)",
+                       "threadId"_attr = ProcessId::getCurrentThreadId());
+            ++gCounters->destroyed;
+
+            if (ThreadContext::get()) {
+                // We should only be able to reference a ThreadContext in our destructor if our
+                // lifetime was extended to be off thread.
+                ++gCounters->destroyedOffThread;
+            }
+        }
+    }
+
+private:
+    bool _enabled;
 };
 
 const auto getThreadTestDecoration = ThreadContext::declareDecoration<TestDecoration>();
@@ -98,11 +117,13 @@ public:
         ThreadContext::get();  // Ensure a ThreadContext for the main thread.
         _monitor.emplace();
         *gCounters = {0, 0, 0};
+        gTestDecorationEnabled.store(true);
     }
 
     void tearDown() override {
         _monitor->notifyDone();
         _monitor.reset();
+        gTestDecorationEnabled.store(false);
         auto endCount = gCounters.get();
         ASSERT_EQ(endCount.created, endCount.destroyed);
         ASSERT_GTE(endCount.destroyed, endCount.destroyedOffThread);
@@ -116,6 +137,12 @@ public:
 
         ASSERT(context);
         ASSERT(context->isAlive());
+
+        // Log the thread ID for diagnostic purposes, so it can be associated with
+        // the thread name and cross-referenced with other logging statements here.
+        LOGV2_INFO(6173202,
+                   "Retrieving thread context",
+                   "threadId"_attr = ProcessId::getCurrentThreadId());
 
         return context;
     }
