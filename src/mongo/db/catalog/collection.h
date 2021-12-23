@@ -161,9 +161,14 @@ private:
  * associated with all of the Collection instances for a collection, sharing whatever data may
  * decorate it across all point in time views of the collection.
  */
-class SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {};
+class SharedCollectionDecorations : public Decorable<SharedCollectionDecorations> {
+public:
+    SharedCollectionDecorations() = default;
+    SharedCollectionDecorations(const SharedCollectionDecorations&) = delete;
+    SharedCollectionDecorations& operator=(const SharedCollectionDecorations&) = delete;
+};
 
-class Collection : public DecorableCopyable<Collection> {
+class Collection : public Decorable<Collection> {
 public:
     enum class StoreDeletedDoc { Off, On };
 

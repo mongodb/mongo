@@ -40,9 +40,6 @@ class DecorationRegistry;
 template <typename DecoratedType>
 class Decorable;
 
-template <typename DecoratedType>
-class DecorableCopyable;
-
 /**
  * An container for decorations.
  */
@@ -64,7 +61,6 @@ public:
         friend DecorationContainer;
         friend DecorationRegistry<DecoratedType>;
         friend Decorable<DecoratedType>;
-        friend DecorableCopyable<DecoratedType>;
 
         explicit DecorationDescriptor(size_t index) : _index(index) {}
 
@@ -85,7 +81,6 @@ public:
         friend DecorationContainer;
         friend DecorationRegistry<DecoratedType>;
         friend Decorable<DecoratedType>;
-        friend DecorableCopyable<DecoratedType>;
 
         explicit DecorationDescriptorWithType(DecorationDescriptor raw) : _raw(std::move(raw)) {}
 
@@ -108,28 +103,7 @@ public:
         // buffer to the type which owns those decorations.  We place a pointer to ourselves, a
         // "back link" in the front of this storage buffer, as this is the easiest "well known
         // location" to compute.
-        Decorable<DecoratedType>** const backLink =
-            reinterpret_cast<Decorable<DecoratedType>**>(_decorationData.get());
-        *backLink = decorated;
-        _registry->construct(this);
-    }
-
-    /**
-     * Constructs a copyable decorable built based on the given "registry."
-     *
-     * See above for more details
-     */
-    explicit DecorationContainer(DecorableCopyable<DecoratedType>* const decorated,
-                                 const DecorationRegistry<DecoratedType>* const registry)
-        : _registry(registry),
-          _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
-        // Because the decorations live in the externally allocated storage buffer at
-        // `_decorationData`, there needs to be a way to get back from a known location within this
-        // buffer to the type which owns those decorations.  We place a pointer to ourselves, a
-        // "back link" in the front of this storage buffer, as this is the easiest "well known
-        // location" to compute.
-        DecorableCopyable<DecoratedType>** const backLink =
-            reinterpret_cast<DecorableCopyable<DecoratedType>**>(_decorationData.get());
+        auto const backLink = reinterpret_cast<Decorable<DecoratedType>**>(_decorationData.get());
         *backLink = decorated;
         _registry->construct(this);
     }
@@ -139,7 +113,7 @@ public:
      *
      * All decorations are copy constructed from provided DecorationContainer.
      */
-    explicit DecorationContainer(DecorableCopyable<DecoratedType>* const decorated,
+    explicit DecorationContainer(Decorable<DecoratedType>* const decorated,
                                  const DecorationRegistry<DecoratedType>* const registry,
                                  const DecorationContainer& other)
         : _registry(registry),
@@ -149,8 +123,7 @@ public:
         // buffer to the type which owns those decorations.  We place a pointer to ourselves, a
         // "back link" in the front of this storage buffer, as this is the easiest "well known
         // location" to compute.
-        DecorableCopyable<DecoratedType>** const backLink =
-            reinterpret_cast<DecorableCopyable<DecoratedType>**>(_decorationData.get());
+        auto const backLink = reinterpret_cast<Decorable<DecoratedType>**>(_decorationData.get());
         *backLink = decorated;
         _registry->copyConstruct(this, &other);
     }
