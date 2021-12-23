@@ -38,4 +38,5 @@ feature_flags:
     featureFlagHealthMonitoring:
         description: Feature flag for enabling fault facet support.
         cpp_varname: gFeatureFlagHealthMonitoring
-        default: false
+        default: true
+        version: 5.2
