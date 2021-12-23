@@ -21,7 +21,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/process_health_feature_flag',
+        'process_health_feature_flag',
     ],
 )
 

@@ -32,10 +32,10 @@
 
 #include "mongo/db/process_health/fault_manager.h"
 
+#include "mongo/db/process_health/health_monitoring_feature_flag.h"
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -98,7 +98,7 @@ public:
 class FaultManagerTest : public unittest::Test {
 public:
     void setUp() override {
-        RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
+        feature_flags::gFeatureFlagHealthMonitoring = true;
         init();
     }
 
@@ -153,7 +153,7 @@ public:
     }
 
     void startHealthCheckThread() {
-        RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
+        feature_flags::gFeatureFlagHealthMonitoring = true;
         manager().schedulePeriodicHealthCheckThreadTest();
         advanceTime(Milliseconds(60));
     }

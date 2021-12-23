@@ -34,6 +34,7 @@
 #include "mongo/db/process_health/fault_manager.h"
 
 #include "mongo/db/process_health/fault_impl.h"
+#include "mongo/db/process_health/health_monitoring_feature_flag.h"
 #include "mongo/db/process_health/health_monitoring_gen.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -84,8 +85,7 @@ FaultManager::FaultManager(ServiceContext* svcCtx,
     : _svcCtx(svcCtx), _taskExecutor(taskExecutor) {}
 
 void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
-    if (!feature_flags::gFeatureFlagHealthMonitoring.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!feature_flags::gFeatureFlagHealthMonitoring) {
         return;
     }
 
