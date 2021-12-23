@@ -126,6 +126,8 @@ last-continuous:
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-57766
       test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-61666
+      test_file: jstests/replsets/tenant_migration_transaction_boundary.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -395,6 +397,8 @@ last-lts:
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-57766
       test_file: jstests/sharding/resharding_metrics.js
+    - ticket: SERVER-61666
+      test_file: jstests/replsets/tenant_migration_transaction_boundary.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
