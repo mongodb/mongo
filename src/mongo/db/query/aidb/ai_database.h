@@ -50,9 +50,11 @@ public:
 
     void createCollection(const NamespaceString& collectionNamespace);
 
-    void createIndexOnEmptyCollection(const NamespaceString& collectionNamespace,
-                                      BSONObj indexKey,
-                                      StringData indexName);
+    void ensureCollection(const NamespaceString& collectionNamespace);
+
+    void createIndex(const NamespaceString& collectionNamespace,
+                     BSONObj indexKey,
+                     StringData indexName);
 
     void insertDocuments(const NamespaceString& collectionNamespace,
                          const std::vector<BSONObj>& docs);

@@ -38,13 +38,13 @@ IndexAccessor::IndexAccessor(OperationContext* opCtx,
                              const NamespaceString& collectionNamespace,
                              StringData indexName)
     : _opCtx{opCtx}, _autoColl{opCtx, collectionNamespace} {
+    uassert(7777710, "collection not found", _autoColl);
     const IndexDescriptor* indexDescriptor =
         _autoColl->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    uassert(7777711, "index not found", indexDescriptor);
     _indexEntry = indexDescriptor->getEntry()->shared_from_this();
-    invariant(_indexEntry);
 
     _recordStore = _autoColl.getCollection()->getRecordStore();
-    invariant(_recordStore);
 }
 
 std::vector<BSONObj> IndexAccessor::findAll(const BSONObj& key) {

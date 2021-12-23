@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/util/invariant.h"
 
 namespace mongo::ai {
@@ -59,18 +60,43 @@ void Database::createCollection(const NamespaceString& collectionNamespace) {
     wuow.commit();
 }
 
-void Database::createIndexOnEmptyCollection(const NamespaceString& collectionNamespace,
-                                            BSONObj indexKey,
-                                            StringData indexName) {
+void Database::ensureCollection(const NamespaceString& collectionNamespace) {
+    auto opCtx = operationContext();
+
+    CollectionOptions options;
+
+    AutoGetCollection autoColl(opCtx, collectionNamespace, MODE_IX);
+    if (!autoColl) {
+        auto* db = autoColl.ensureDbExists();
+        WriteUnitOfWork wuow(opCtx);
+        invariant(db->createCollection(opCtx, collectionNamespace, options));
+        wuow.commit();
+    }
+}
+
+void Database::createIndex(const NamespaceString& collectionNamespace,
+                           BSONObj indexKey,
+                           StringData indexName) {
     OperationContext* opCtx = operationContext();
     BSONObj indexSpec = makeIndexSpec(indexKey, indexName);
 
     AutoGetCollection autoColl{opCtx, collectionNamespace, MODE_X};
-    WriteUnitOfWork wuow{opCtx};
-    Collection* collection = autoColl.getWritableCollection();
-    IndexCatalog* indexCatalog = collection->getIndexCatalog();
-    invariant(indexCatalog->createIndexOnEmptyCollection(opCtx, collection, indexSpec));
-    wuow.commit();
+    uassert(7777720, "collection not found", autoColl);
+
+    if (autoColl->isEmpty(opCtx)) {
+        WriteUnitOfWork wuow{opCtx};
+        Collection* collection = autoColl.getWritableCollection();
+        IndexCatalog* indexCatalog = collection->getIndexCatalog();
+        uassertStatusOK(indexCatalog->createIndexOnEmptyCollection(opCtx, collection, indexSpec));
+        wuow.commit();
+    } else {
+        IndexBuildsCoordinator* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+        indexBuildsCoordinator->createIndex(opCtx,
+                                            autoColl->uuid(),
+                                            indexSpec,
+                                            IndexBuildsManager::IndexConstraints::kEnforce,
+                                            /*fromMigrate*/ false);
+    }
 }
 
 void Database::insertDocuments(const NamespaceString& collectionNamespace,

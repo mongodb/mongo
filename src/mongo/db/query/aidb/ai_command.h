@@ -88,7 +88,7 @@ public:
         return "demo";
     }
     std::string help() const override {
-        return "demo";
+        return "demo <collection_name> <number_of_documents>";
     }
 
     Status execute(OperationContext* opCtx, std::istream& commandStream) override;
@@ -130,4 +130,63 @@ public:
     Status execute(OperationContext* opCtx, std::istream& commandStream) override;
 };
 
+class CollectionInfoCommand : public Command {
+public:
+    std::string name() const override {
+        return "collectionInfo";
+    }
+    std::string help() const override {
+        return "collectionInfo <collection>";
+    }
+
+    Status execute(OperationContext* opCtx, std::istream& commandStream) override;
+};
+
+class IndexScanCommand : public Command {
+public:
+    std::string name() const override {
+        return "indexScan";
+    }
+    std::string help() const override {
+        return "indexScan <collection> <indexName> <query>";
+    }
+
+    Status execute(OperationContext* opCtx, std::istream& commandStream) override;
+};
+
+class CollectionScanCommand : public Command {
+public:
+    std::string name() const override {
+        return "collectionScan";
+    }
+    std::string help() const override {
+        return "collectionScan <collection> <query>";
+    }
+
+    Status execute(OperationContext* opCtx, std::istream& commandStream) override;
+};
+
+class CreateCollectionCommand : public Command {
+public:
+    std::string name() const override {
+        return "createCollection";
+    }
+    std::string help() const override {
+        return "createCollection <collectionName>";
+    }
+
+    Status execute(OperationContext* opCtx, std::istream& commandStream) override;
+};
+
+class CreateIndexCommand : public Command {
+public:
+    std::string name() const override {
+        return "createIndex";
+    }
+    std::string help() const override {
+        return "createIndex <collectionName> <indexName> <pattern>";
+    }
+
+    Status execute(OperationContext* opCtx, std::istream& commandStream) override;
+};
 }  // namespace mongo::ai
