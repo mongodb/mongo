@@ -50,4 +50,7 @@ env.Library(
         'health_monitoring.idl',
         'health_monitoring_feature_flag.cpp',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
