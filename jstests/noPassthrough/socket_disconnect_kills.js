@@ -44,7 +44,9 @@ function check(client, pre, post) {
             try {
                 pre(conn);
             } catch (e) {
-                throw e;
+                if (isNetworkError(e)) {
+                    throw e;
+                }
             }
         }, [], "error doing query: failed: network error while attempting");
 
@@ -183,13 +185,8 @@ function runTests(client) {
 
     [[checkClosedEarly, runCommand({count: "test"})],
      [checkClosedEarly, runCommand({distinct: "test", key: "x"})],
-     [checkClosedEarly, runCommand({authenticate: "test", user: "x", pass: "y"})],
-     [checkClosedEarly, runCommand({getnonce: 1})],
-     [checkClosedEarly, runCommand({saslStart: 1})],
-     [checkClosedEarly, runCommand({saslContinue: 1})],
      [checkClosedEarly, runCommand({hello: 1})],
      [checkClosedEarly, runCommand({listCollections: 1})],
-     [checkClosedEarly, runCommand({listDatabases: 1})],
      [checkClosedEarly, runCommand({listIndexes: "test"})],
     ].forEach(runWithCmdFailPointEnabled(client));
 }
