@@ -231,6 +231,8 @@ public:
     // NOTE: This is not quite able to disable all `std::function` conversions on MSVC, at this
     // time.
     template <typename Signature>
+    operator std::function<Signature>() = delete;
+    template <typename Signature>
     operator std::function<Signature>() const = delete;
 
 private:
