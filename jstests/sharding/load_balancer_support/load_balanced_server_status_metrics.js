@@ -1,5 +1,5 @@
 /**
- * @tags: [featureFlagLoadBalancer]
+ * @tags: [requires_fcv_51, featureFlagLoadBalancer]
  *
  * Tests that load-balanced connections are reported correctly in server status metrics.
  */
