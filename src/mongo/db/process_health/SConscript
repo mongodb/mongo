@@ -52,5 +52,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
