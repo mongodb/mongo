@@ -237,4 +237,17 @@ boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const BSONObj query,
                                                   const BSONObj collation);
+
+/**
+ * Determines the shard(s) to which the given query will be targeted, and builds a separate
+ * versioned copy of the command object for each such shard.
+ */
+std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const BSONObj& query,
+    const BSONObj& collation);
+
 }  // namespace mongo

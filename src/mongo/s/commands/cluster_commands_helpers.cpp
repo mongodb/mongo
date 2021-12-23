@@ -637,4 +637,24 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
     return {routingInfo.db().primaryId()};
 }
 
+std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const BSONObj& cmdObj,
+    const BSONObj& query,
+    const BSONObj& collation) {
+    std::vector<std::pair<ShardId, BSONObj>> requests;
+    auto ars_requests =
+        buildVersionedRequestsForTargetedShards(opCtx, routingInfo, cmdObj, query, collation);
+    std::transform(std::make_move_iterator(ars_requests.begin()),
+                   std::make_move_iterator(ars_requests.end()),
+                   std::back_inserter(requests),
+                   [](auto&& ars) {
+                       return std::pair<ShardId, BSONObj>(std::move(ars.shardId),
+                                                          std::move(ars.cmdObj));
+                   });
+    return requests;
+}
+
 }  // namespace mongo
