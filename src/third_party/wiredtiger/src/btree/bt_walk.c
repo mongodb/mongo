@@ -254,15 +254,8 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
     restart_sleep = restart_yield = 0;
     empty_internal = false;
 
-    /*
-     * We're not supposed to walk trees without root pages. As this has not always been the case,
-     * assert to debug that change.
-     */
-    WT_ASSERT(session, btree->root.page != NULL);
-
-    /* Check whether deleted pages can be skipped. */
-    if (!LF_ISSET(WT_READ_DELETED_SKIP))
-        LF_SET(WT_READ_DELETED_CHECK);
+    /* All current tree walks skip deleted pages. */
+    LF_SET(WT_READ_SKIP_DELETED);
 
     /*
      * !!!
@@ -426,18 +419,20 @@ descend:
 
             if (LF_ISSET(WT_READ_CACHE)) {
                 /*
-                 * Only look at unlocked pages in memory: fast-path some common cases.
+                 * Only look at unlocked pages in memory.
                  */
                 if (LF_ISSET(WT_READ_NO_WAIT) && current_state != WT_REF_MEM)
                     break;
+            } else if (current_state == WT_REF_DELETED) {
+                /*
+                 * Try to skip deleted pages visible to us.
+                 */
+                if (__wt_delete_page_skip(session, ref, false))
+                    break;
             } else if (LF_ISSET(WT_READ_TRUNCATE)) {
                 /*
-                 * Avoid pulling a deleted page back in to try to delete it again.
-                 */
-                if (current_state == WT_REF_DELETED && __wt_delete_page_skip(session, ref, false))
-                    break;
-                /*
-                 * If deleting a range, try to delete the page without instantiating it.
+                 * If deleting a range, try to delete the page without instantiating it. (Note this
+                 * test follows the check to skip the page entirely if it's already deleted.)
                  */
                 WT_ERR(__wt_delete_page(session, ref, &skip));
                 if (skip)
@@ -446,12 +441,6 @@ descend:
             } else if (skip_func != NULL) {
                 WT_ERR(skip_func(session, ref, func_cookie, &skip));
                 if (skip)
-                    break;
-            } else {
-                /*
-                 * Try to skip deleted pages visible to us.
-                 */
-                if (current_state == WT_REF_DELETED && __wt_delete_page_skip(session, ref, false))
                     break;
             }
 
