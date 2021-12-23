@@ -553,6 +553,7 @@ mongos = env.Program(
         'db/logical_session_cache',
         'db/logical_session_cache_impl',
         'db/logical_time_metadata_hook',
+        'db/process_health/fault_manager',
         'db/read_write_concern_defaults',
         'db/server_options',
         'db/server_options_base',
