@@ -95,6 +95,7 @@ std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std:
         std::make_unique<DBClientCursor>(_getConnection(),
                                          std::move(findRequest),
                                          ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
+    uassert(6138500, "find one by UUID failed", cursor->init());
     BSONObj result = cursor->more() ? cursor->nextSafe() : BSONObj{};
     NamespaceString nss = cursor->getNamespaceString();
     return {std::move(result), std::move(nss)};
