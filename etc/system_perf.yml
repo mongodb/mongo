@@ -1123,7 +1123,7 @@ buildvariants:
     modules: *modules
     expansions:
       mongodb_setup: single-replica-15gbwtcache
-      infrastructure_provisioning: replica
+      infrastructure_provisioning: single
       platform: linux
       project_dir: *project_dir
       authentication: enabled
