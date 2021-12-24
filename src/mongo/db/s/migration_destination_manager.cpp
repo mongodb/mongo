@@ -1230,8 +1230,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 WriteConcernResult ignoreResult;
                 auto latestOpTime =
                     repl::ReplClientInfo::forClient(outerOpCtx->getClient()).getLastOp();
-                uassertStatusOK(waitForWriteConcern(
-                    outerOpCtx, latestOpTime, WriteConcerns::kMajorityWriteConcern, &ignoreResult));
+                uassertStatusOK(
+                    waitForWriteConcern(outerOpCtx,
+                                        latestOpTime,
+                                        WriteConcerns::kMajorityWriteConcernShardingTimeout,
+                                        &ignoreResult));
             });
 
             timing->done(3);

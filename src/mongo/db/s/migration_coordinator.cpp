@@ -126,7 +126,7 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     donorDeletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
     migrationutil::persistRangeDeletionTaskLocally(
-        opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcern);
+        opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcernShardingTimeout);
 }
 
 void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {

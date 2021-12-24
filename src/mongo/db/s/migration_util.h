@@ -164,7 +164,7 @@ void persistAbortDecision(OperationContext* opCtx,
 void deleteRangeDeletionTaskLocally(
     OperationContext* opCtx,
     const UUID& deletionTaskId,
-    const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern);
+    const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernShardingTimeout);
 
 /**
  * Deletes the range deletion task document with the specified id from config.rangeDeletions on the

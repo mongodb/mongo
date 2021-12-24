@@ -45,11 +45,16 @@ using namespace fmt::literals;
 
 namespace WriteConcerns {
 
-const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSharding};
+const WriteConcernOptions kMajorityWriteConcernShardingTimeout{
+    WriteConcernOptions::kMajority,
+    WriteConcernOptions::SyncMode::UNSET,
+    WriteConcernOptions::kWriteConcernTimeoutSharding};
 
-}
+const WriteConcernOptions kMajorityWriteConcernNoTimeout{WriteConcernOptions::kMajority,
+                                                         WriteConcernOptions::SyncMode::UNSET,
+                                                         WriteConcernOptions::kNoTimeout};
+
+}  // namespace WriteConcerns
 
 template <typename T>
 class PersistentTaskStore {
@@ -61,7 +66,8 @@ public:
      */
     void add(OperationContext* opCtx,
              const T& task,
-             const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+             const WriteConcernOptions& writeConcern =
+                 WriteConcerns::kMajorityWriteConcernShardingTimeout) {
         DBDirectClient dbClient(opCtx);
 
         const auto commandResponse = dbClient.runCommand([&] {
@@ -85,7 +91,8 @@ public:
     void update(OperationContext* opCtx,
                 const BSONObj& filter,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern =
+                    WriteConcerns::kMajorityWriteConcernShardingTimeout) {
         _update(opCtx, filter, update, /* upsert */ false, writeConcern);
     }
 
@@ -96,7 +103,8 @@ public:
     void upsert(OperationContext* opCtx,
                 const BSONObj& filter,
                 const BSONObj& update,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern =
+                    WriteConcerns::kMajorityWriteConcernShardingTimeout) {
         _update(opCtx, filter, update, /* upsert */ true, writeConcern);
     }
 
@@ -105,7 +113,8 @@ public:
      */
     void remove(OperationContext* opCtx,
                 const BSONObj& filter,
-                const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                const WriteConcernOptions& writeConcern =
+                    WriteConcerns::kMajorityWriteConcernShardingTimeout) {
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.runCommand([&] {
@@ -170,7 +179,8 @@ private:
                  const BSONObj& filter,
                  const BSONObj& update,
                  bool upsert,
-                 const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcern) {
+                 const WriteConcernOptions& writeConcern =
+                     WriteConcerns::kMajorityWriteConcernShardingTimeout) {
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.update([&] {
