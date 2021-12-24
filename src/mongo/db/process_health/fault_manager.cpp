@@ -45,6 +45,7 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/future_util.h"
 
 namespace mongo {
 
@@ -88,21 +89,24 @@ FaultManager::TransientFaultDeadline::TransientFaultDeadline(
     FaultManager* faultManager,
     std::shared_ptr<executor::TaskExecutor> executor,
     Milliseconds timeout)
-    : cancelActiveFaultTransition(CancellationSource()),
-      activeFaultTransition(
-          executor->sleepFor(timeout, cancelActiveFaultTransition.token())
-              .thenRunOn(executor)
-              .then([faultManager]() { faultManager->transitionToState(FaultState::kActiveFault); })
-              .onError([](Status status) {
-                  LOGV2_WARNING(5937001,
-                                "The Fault Manager transient fault deadline was disabled.",
-                                "status"_attr = status);
-              })) {}
+    : activeFaultTransition(sleepFor(executor, timeout)
+                                .thenRunOn(executor)
+                                .then([faultManager, cancelled = cancelActiveFaultTransition]() {
+                                    // `faultManager` waits for all tasks scheduled in the executor
+                                    // to be canceled or complete, so this check is safe.
+                                    if (!cancelled->load()) {
+                                        faultManager->transitionToState(FaultState::kActiveFault);
+                                    }
+                                })
+                                .onError([](Status status) {
+                                    LOGV2_WARNING(
+                                        5937001,
+                                        "The Fault Manager transient fault deadline was disabled.",
+                                        "status"_attr = status);
+                                })) {}
 
 FaultManager::TransientFaultDeadline::~TransientFaultDeadline() {
-    if (!cancelActiveFaultTransition.token().isCanceled()) {
-        cancelActiveFaultTransition.cancel();
-    }
+    cancelActiveFaultTransition->store(true);
 }
 
 FaultManager::FaultManager(ServiceContext* svcCtx,

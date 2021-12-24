@@ -154,8 +154,10 @@ private:
         virtual ~TransientFaultDeadline();
 
     protected:
-        // Cancel timer for transitioning to ActiveFault
-        CancellationSource cancelActiveFaultTransition;
+        // Cancel timer for transitioning to ActiveFault.
+        // In later versions, this is using the cancellation token.
+        std::shared_ptr<AtomicWord<bool>> cancelActiveFaultTransition =
+            std::make_shared<AtomicWord<bool>>();
 
         // Fufilled when we should transition to ActiveFault
         ExecutorFuture<void> activeFaultTransition;
