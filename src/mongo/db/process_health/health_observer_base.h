@@ -68,13 +68,13 @@ public:
     // Every observer should implement periodicCheckImpl() for specific tests.
     void periodicCheck(FaultFacetsContainerFactory& factory,
                        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                       CancellationToken token) override;
+                       std::shared_ptr<AtomicWord<bool>> cancellationToken) override;
 
     HealthObserverLivenessStats getStats() const override;
 
 protected:
     struct PeriodicHealthCheckContext {
-        CancellationToken cancellationToken;
+        std::shared_ptr<AtomicWord<bool>> cancellationToken;
         std::shared_ptr<executor::TaskExecutor> taskExecutor;
     };
 

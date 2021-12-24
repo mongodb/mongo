@@ -41,7 +41,7 @@ HealthObserverBase::HealthObserverBase(ServiceContext* svcCtx) : _svcCtx(svcCtx)
 
 void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
                                        std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                                       CancellationToken token) {
+                                       std::shared_ptr<AtomicWord<bool>> cancellationToken) {
     // TODO(SERVER-59368): fix this for runtime options support.
     if (getIntensity() == HealthObserverIntensity::kOff) {
         return;
@@ -65,8 +65,8 @@ void HealthObserverBase::periodicCheck(FaultFacetsContainerFactory& factory,
     }
 
     // Do the health check.
-    taskExecutor->schedule([this, &factory, token, taskExecutor](Status status) {
-        periodicCheckImpl({token, taskExecutor})
+    taskExecutor->schedule([this, &factory, cancellationToken, taskExecutor](Status status) {
+        periodicCheckImpl({cancellationToken, taskExecutor})
             .then([this, &factory](HealthCheckStatus&& checkStatus) mutable {
                 const auto severity = checkStatus.getSeverity();
                 factory.updateWithCheckStatus(std::move(checkStatus));

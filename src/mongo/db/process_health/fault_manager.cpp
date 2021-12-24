@@ -158,7 +158,7 @@ void FaultManager::schedulePeriodicHealthCheckThread(bool immediately) {
 }
 
 FaultManager::~FaultManager() {
-    _managerShuttingDownCancellationSource.cancel();
+    _managerShuttingDownCancellation->store(true);
     _taskExecutor->shutdown();
 
     LOGV2(5936601, "Shutting down periodic health checks");
@@ -230,9 +230,8 @@ void FaultManager::healthCheck() {
     std::vector<HealthObserver*> observers = FaultManager::getHealthObservers();
 
     // Start checks outside of lock.
-    auto token = _managerShuttingDownCancellationSource.token();
     for (auto observer : observers) {
-        observer->periodicCheck(*this, _taskExecutor, token);
+        observer->periodicCheck(*this, _taskExecutor, _managerShuttingDownCancellation);
     }
 
     // Garbage collect all resolved fault facets.

@@ -148,7 +148,9 @@ private:
     AtomicWord<bool> _firstTimeInitExecuted{false};
     // This source is canceled before the _taskExecutor shutdown(). It
     // can be used to check for the start of the shutdown sequence.
-    CancellationSource _managerShuttingDownCancellationSource;
+    // In later versions, this is using the cancellation token.
+    std::shared_ptr<AtomicWord<bool>> _managerShuttingDownCancellation =
+        std::make_shared<AtomicWord<bool>>();
     // Manager owns all observer instances.
     std::vector<std::unique_ptr<HealthObserver>> _observers;
     boost::optional<executor::TaskExecutor::CallbackHandle> _periodicHealthCheckCbHandle;

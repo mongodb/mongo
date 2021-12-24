@@ -87,7 +87,7 @@ public:
      */
     virtual void periodicCheck(FaultFacetsContainerFactory& factory,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
-                               CancellationToken token) = 0;
+                               std::shared_ptr<AtomicWord<bool>> cancellationToken) = 0;
 
     /**
      * @return HealthObserverIntensity
