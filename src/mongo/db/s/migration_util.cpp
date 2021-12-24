@@ -518,7 +518,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
 void dropRangeDeletionsCollection(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     client.dropCollection(NamespaceString::kRangeDeletionNamespace.toString(),
-                          WriteConcerns::kMajorityWriteConcern);
+                          WriteConcerns::kMajorityWriteConcernShardingTimeout);
 }
 
 template <typename Callable>
@@ -1109,7 +1109,8 @@ void persistMigrationRecipientRecoveryDocument(
     PersistentTaskStore<MigrationRecipientRecoveryDocument> store(
         NamespaceString::kMigrationRecipientsNamespace);
     try {
-        store.add(opCtx, migrationRecipientDoc, WriteConcerns::kMajorityWriteConcern);
+        store.add(
+            opCtx, migrationRecipientDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // Convert a DuplicateKey error to an anonymous error.
         uasserted(6064502,

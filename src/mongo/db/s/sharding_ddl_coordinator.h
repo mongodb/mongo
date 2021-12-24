@@ -110,7 +110,7 @@ protected:
 
         auto opCtx = cc().makeOperationContext();
         PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcern);
+        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
 
         return std::move(newDoc);
     }
@@ -122,7 +122,7 @@ protected:
         store.update(opCtx,
                      BSON(StateDoc::kIdFieldName << newDoc.getId().toBSON()),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcern);
+                     WriteConcerns::kMajorityWriteConcernShardingTimeout);
         return std::move(newDoc);
     }
 
