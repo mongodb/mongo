@@ -218,8 +218,8 @@ public:
     }
 
     HealthObserverBase::PeriodicHealthCheckContext checkContext() {
-        HealthObserverBase::PeriodicHealthCheckContext ctx{CancellationToken::uncancelable(),
-                                                           _executor};
+        std::shared_ptr<AtomicWord<bool>> cancellation = std::make_shared<AtomicWord<bool>>();
+        HealthObserverBase::PeriodicHealthCheckContext ctx{cancellation, _executor};
         return ctx;
     }
 
