@@ -665,7 +665,6 @@ TEST(ReplSetConfig, ParseFailsWithNonObjectSettingsField) {
 }
 
 TEST(ReplSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
-    ReplSetConfig config;
     ASSERT_THROWS(ReplSetConfig::parse(BSON("_id"
                                             << "rs0"
                                             << "version" << 1 << "protocolVersion" << 1 << "members"
@@ -674,7 +673,7 @@ TEST(ReplSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
                                             << "settings"
                                             << BSON("getLastErrorDefaults" << BSON("fsync"
                                                                                    << "seven")))),
-                  ExceptionFor<ErrorCodes::FailedToParse>);
+                  ExceptionFor<ErrorCodes::TypeMismatch>);
 }
 
 TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {

@@ -46,16 +46,14 @@ TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnInvalidJValue) {
     auto status = WriteConcernOptions::parse(BSON("j"
                                                   << "abc"))
                       .getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("j must be numeric or a boolean value", status.reason());
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnInvalidFSyncValue) {
     auto status = WriteConcernOptions::parse(BSON("fsync"
                                                   << "abc"))
                       .getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("fsync must be numeric or a boolean value", status.reason());
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfBothJAndFSyncAreTrue) {
@@ -106,8 +104,7 @@ TEST(WriteConcernOptionsTest, ParseLeavesSyncModeAsUnsetIfFSyncIsFalse) {
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNotNumberOrString) {
     auto status = WriteConcernOptions::parse(BSON("w" << BSONObj())).getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("w has to be a number or a string", status.reason());
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNegativeOrExceedsMaxMembers) {
@@ -126,17 +123,6 @@ TEST(WriteConcernOptionsTest, ParseSetsWNumNodesIfWIsANumber) {
     ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
     ASSERT_EQUALS(3, options.wNumNodes);
     ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
-}
-
-TEST(WriteConcernOptionsTest, ParseSetsWTimeoutToZeroIfWTimeoutIsNotANumber) {
-    auto sw = WriteConcernOptions::parse(BSON("wtimeout"
-                                              << "abc"));
-    ASSERT_OK(sw.getStatus());
-    WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
     ASSERT_EQUALS(0, options.wTimeout);
 }
 
@@ -174,8 +160,7 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnUnknownField) {
     auto status = WriteConcernOptions::parse(BSON("x" << 123)).getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_EQUALS("unrecognized write concern field: x", status.reason());
+    ASSERT_NOT_OK(status);
 }
 
 void _testIgnoreWriteConcernField(const char* fieldName) {
@@ -191,8 +176,6 @@ TEST(WriteConcernOptionsTest, ParseIgnoresSpecialFields) {
     _testIgnoreWriteConcernField("wElectionId");
     _testIgnoreWriteConcernField("wOpTime");
     _testIgnoreWriteConcernField("getLastError");
-    _testIgnoreWriteConcernField("getlasterror");
-    _testIgnoreWriteConcernField("GETLastErrOR");
 }
 
 }  // namespace

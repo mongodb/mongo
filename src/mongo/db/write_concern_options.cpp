@@ -106,90 +106,58 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
         return Status(ErrorCodes::FailedToParse, "write concern object cannot be empty");
     }
 
-    BSONElement jEl;
-    BSONElement fsyncEl;
-    BSONElement wEl;
-    int wTimeout = 0;
+    try {
+        WriteConcernOptions writeConcern;
+        writeConcern.usedDefaultConstructedWC = false;
 
-    WriteConcernOptions writeConcern;
-
-    for (auto e : obj) {
-        const auto fieldName = e.fieldNameStringData();
-        if (fieldName == kJFieldName) {
-            jEl = e;
-            if (!jEl.isNumber() && jEl.type() != Bool) {
-                return Status(ErrorCodes::FailedToParse, "j must be numeric or a boolean value");
+        auto writeConcernIdl = WriteConcernIdl::parse(IDLParserErrorContext("writeConcern"), obj);
+        auto parsedW = writeConcernIdl.getWriteConcernW();
+        if (!parsedW.usedDefaultConstructedW1()) {
+            writeConcern.notExplicitWValue = false;
+            auto wVal = parsedW.getValue();
+            if (auto wNum = stdx::get_if<std::int64_t>(&wVal)) {
+                if (*wNum < 0 ||
+                    *wNum > static_cast<std::decay_t<decltype(*wNum)>>(
+                                repl::ReplSetConfig::kMaxMembers)) {
+                    uasserted(ErrorCodes::FailedToParse,
+                              str::stream()
+                                  << "w has to be a non-negative number and not greater than "
+                                  << repl::ReplSetConfig::kMaxMembers);
+                }
+                writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(*wNum);
+            } else {
+                auto wMode = stdx::get_if<std::string>(&wVal);
+                invariant(wMode);
+                writeConcern.wNumNodes = 0;  // Have to reset from default 1.
+                writeConcern.wMode = std::move(*wMode);
             }
-            writeConcern.usedDefaultConstructedWC = false;
-        } else if (fieldName == kFSyncFieldName) {
-            fsyncEl = e;
-            if (!fsyncEl.isNumber() && fsyncEl.type() != Bool) {
-                return Status(ErrorCodes::FailedToParse,
-                              "fsync must be numeric or a boolean value");
-            }
-            writeConcern.usedDefaultConstructedWC = false;
-        } else if (fieldName == kWFieldName) {
-            wEl = e;
-            writeConcern.usedDefaultConstructedWC = false;
-        } else if (fieldName == kWTimeoutFieldName) {
-            wTimeout = e.safeNumberLong();
-            writeConcern.usedDefaultConstructedWC = false;
-        } else if (fieldName == kWElectionIdFieldName) {
-            // Ignore.
-        } else if (fieldName == kWOpTimeFieldName) {
-            // Ignore.
-        } else if (fieldName.equalCaseInsensitive(kGetLastErrorFieldName)) {
-            // Ignore GLE field.
-        } else if (fieldName == ReadWriteConcernProvenance::kSourceFieldName) {
-            try {
-                writeConcern._provenance = ReadWriteConcernProvenance::parse(
-                    IDLParserErrorContext("WriteConcernOptions::parse"), obj);
-            } catch (const DBException&) {
-                return exceptionToStatus();
-            }
-        } else {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "unrecognized write concern field: " << fieldName);
         }
-    }
 
-    const bool j = jEl.trueValue();
-    const bool fsync = fsyncEl.trueValue();
-    if (j && fsync) {
-        return Status(ErrorCodes::FailedToParse, "fsync and j options cannot be used together");
-    }
-
-    if (j) {
-        writeConcern.syncMode = SyncMode::JOURNAL;
-    } else if (fsync) {
-        writeConcern.syncMode = SyncMode::FSYNC;
-    } else if (!jEl.eoo()) {
-        writeConcern.syncMode = SyncMode::NONE;
-    }
-
-    if (wEl.isNumber()) {
-        auto wNumNodes = wEl.safeNumberLong();
-        if (wNumNodes < 0 ||
-            wNumNodes > static_cast<decltype(wNumNodes)>(repl::ReplSetConfig::kMaxMembers)) {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "w has to be a non-negative number and not greater than "
-                                        << repl::ReplSetConfig::kMaxMembers);
+        auto j = writeConcernIdl.getJ();
+        auto fsync = writeConcernIdl.getFsync();
+        if (j && fsync && *j && *fsync) {
+            // If j and fsync are both set to true
+            return Status{ErrorCodes::FailedToParse, "fsync and j options cannot be used together"};
         }
-        writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(wNumNodes);
-        writeConcern.notExplicitWValue = false;
-    } else if (wEl.type() == String) {
-        writeConcern.wNumNodes = 0;
-        writeConcern.wMode = wEl.valuestrsafe();
-        writeConcern.notExplicitWValue = false;
-    } else if (wEl.eoo() || wEl.type() == jstNULL || wEl.type() == Undefined) {
-        writeConcern.wNumNodes = 1;
-    } else {
-        return Status(ErrorCodes::FailedToParse, "w has to be a number or a string");
+
+        if (j && *j) {
+            writeConcern.syncMode = SyncMode::JOURNAL;
+        } else if (fsync && *fsync) {
+            writeConcern.syncMode = SyncMode::FSYNC;
+        } else if (j) {
+            // j has been set to false
+            writeConcern.syncMode = SyncMode::NONE;
+        }
+
+        writeConcern.wTimeout = writeConcernIdl.getWtimeout();
+        if (auto source = writeConcernIdl.getSource()) {
+            writeConcern._provenance = ReadWriteConcernProvenance(*source);
+        }
+
+        return writeConcern;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-
-    writeConcern.wTimeout = wTimeout;
-
-    return writeConcern;
 }
 
 WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) {
@@ -220,68 +188,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
         return WriteConcernOptions();
     }
 
-    // Ensure that the write concern document complies with the strict IDL definition, found in
-    // idl/basic_types.idl.
-    try {
-        auto writeConcernIdl =
-            WriteConcernIdl::parse(IDLParserErrorContext("writeConcern"), writeConcernObj);
-        // Convert the IDL parsed WriteConcern into a WriteConcernOptions object.
-        auto sw = convertFromIdl(writeConcernIdl);
-        if (!sw.isOK()) {
-            return sw.getStatus();
-        }
-        auto writeConcernOptions = sw.getValue();
-        writeConcernOptions.usedDefaultConstructedWC = false;
-        return writeConcernOptions;
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-}
-
-StatusWith<WriteConcernOptions> WriteConcernOptions::convertFromIdl(
-    const WriteConcernIdl& writeConcernIdl) {
-    WriteConcernOptions writeConcern;
-    auto parsedW = writeConcernIdl.getWriteConcernW();
-    if (!parsedW.usedDefaultConstructedW1()) {
-        writeConcern.notExplicitWValue = false;
-        auto wVal = parsedW.getValue();
-        if (auto wNum = stdx::get_if<std::int64_t>(&wVal)) {
-            if (*wNum < 0 ||
-                *wNum >
-                    static_cast<std::decay_t<decltype(*wNum)>>(repl::ReplSetConfig::kMaxMembers)) {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "w has to be a non-negative number and not greater than "
-                                        << repl::ReplSetConfig::kMaxMembers);
-            }
-            writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(*wNum);
-        } else {
-            auto wMode = stdx::get_if<std::string>(&wVal);
-            invariant(wMode);
-            writeConcern.wNumNodes = 0;  // Have to reset from default 1.
-            writeConcern.wMode = std::move(*wMode);
-        }
-    }
-
-    auto j = writeConcernIdl.getJ();
-    auto fsync = writeConcernIdl.getFsync();
-    if (j && fsync && *j && *fsync) {
-        // If j and fsync are both set to true
-        return Status{ErrorCodes::FailedToParse, "fsync and j options cannot be used together"};
-    }
-    if (j && *j) {
-        writeConcern.syncMode = SyncMode::JOURNAL;
-    } else if (fsync && *fsync) {
-        writeConcern.syncMode = SyncMode::FSYNC;
-    } else if (j) {
-        // j has been set to false
-        writeConcern.syncMode = SyncMode::NONE;
-    }
-
-    writeConcern.wTimeout = writeConcernIdl.getWtimeout();
-    if (auto source = writeConcernIdl.getSource()) {
-        writeConcern._provenance = ReadWriteConcernProvenance(*source);
-    }
-    return writeConcern;
+    return parse(writeConcernObj);
 }
 
 BSONObj WriteConcernOptions::toBSON() const {

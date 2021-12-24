@@ -232,7 +232,7 @@ types:
         cpp_type: "mongo::IDLAnyType"
         serializer: mongo::IDLAnyType::serializeToBSON
         deserializer: mongo::IDLAnyType::parseFromBSON
-    
+
     IDLAnyTypeOwned:
         bson_serialization_type: any
         description: "Holds a BSONElement of any type. Does not require the backing BSON to stay
@@ -309,16 +309,16 @@ structs:
         strict: false
         fields:
             ok:
-                type: safeDouble 
+                type: safeDouble
                 validator: { gte: 0.0, lte: 0.0 }
                 unstable: false
-            code: 
+            code:
                 type: int
                 unstable: false
-            codeName: 
+            codeName:
                 type: string
                 unstable: false
-            errmsg: 
+            errmsg:
                 type: string
                 unstable: false
             errorLabels:
