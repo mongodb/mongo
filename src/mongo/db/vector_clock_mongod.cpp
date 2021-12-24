@@ -350,7 +350,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
             store.upsert(opCtx,
                          QUERY(VectorClockDocument::k_idFieldName << vcd.get_id()),
                          vcd.toBSON(),
-                         WriteConcerns::kMajorityWriteConcern);
+                         WriteConcerns::kMajorityWriteConcernNoTimeout);
             return vectorTime;
         })
         .getAsync([this, promise = std::move(p)](StatusWith<VectorTime> swResult) mutable {

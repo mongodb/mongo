@@ -515,7 +515,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
 void dropRangeDeletionsCollection(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     client.dropCollection(NamespaceString::kRangeDeletionNamespace.toString(),
-                          WriteConcerns::kMajorityWriteConcern);
+                          kMajorityWriteConcern);
 }
 
 template <typename Callable>

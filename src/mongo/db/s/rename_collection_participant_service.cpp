@@ -198,12 +198,12 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
 
     if (_doc.getPhase() == Phase::kUnset) {
-        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcern);
+        store.add(opCtx.get(), newDoc, WriteConcerns::kMajorityWriteConcernShardingTimeout);
     } else {
         store.update(opCtx.get(),
                      BSON(StateDoc::kFromNssFieldName << fromNss().ns()),
                      newDoc.toBSON(),
-                     WriteConcerns::kMajorityWriteConcern);
+                     WriteConcerns::kMajorityWriteConcernShardingTimeout);
     }
 
     _doc = std::move(newDoc);
@@ -219,7 +219,7 @@ void RenameParticipantInstance::_removeStateDocument(OperationContext* opCtx) {
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
     store.remove(opCtx,
                  BSON(StateDoc::kFromNssFieldName << fromNss().ns()),
-                 WriteConcerns::kMajorityWriteConcern);
+                 WriteConcerns::kMajorityWriteConcernShardingTimeout);
 
     _doc = {};
 }

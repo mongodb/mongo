@@ -122,7 +122,7 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
                                                        : CleanWhenEnum::kDelayed);
     donorDeletionTask.setPending(true);
     migrationutil::persistRangeDeletionTaskLocally(
-        opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcern);
+        opCtx, donorDeletionTask, WriteConcerns::kMajorityWriteConcernShardingTimeout);
 }
 
 void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
