@@ -99,7 +99,7 @@ st.rs0.restart(0, {
     remember: true,
     appendOptions: true,
     startClean: false,
-    setParameter: {rangeDeleterBatchDelayMS: 60000}
+    setParameter: {rangeDeleterBatchDelayMS: 60000, rangeDeleterBatchSize: 128}
 });
 
 st.rs1.restart(0, {
