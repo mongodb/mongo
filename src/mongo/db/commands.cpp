@@ -472,13 +472,18 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,
                                         WriteConcernOptions::SyncMode::UNSET,
                                         wc["wtimeout"].Number());
         }
-    } else if (!defaultWC.usedDefaultConstructedWC) {
-        auto minimumAcceptableWTimeout = newWC.wTimeout;
-        newWC = defaultWC;
-        newWC.wMode = "majority";
-        if (defaultWC.wTimeout < minimumAcceptableWTimeout) {
-            newWC.wTimeout = minimumAcceptableWTimeout;
-        }
+    } else if (!defaultWC.isDefaultConstructed()) {
+        auto minimumAcceptableWTimeout = newWC.wTimeout();
+        newWC = [&]() {
+            auto source = defaultWC.getProvenance().getSource();
+            auto wc = WriteConcernOptions(WriteConcernOptions::kMajority,
+                                          defaultWC.syncMode(),
+                                          defaultWC.wTimeout() < minimumAcceptableWTimeout
+                                              ? minimumAcceptableWTimeout
+                                              : defaultWC.wTimeout());
+            wc.getProvenance().setSource(source);
+            return wc;
+        }();
     }
 
     // Append all original fields except the writeConcern field to the new command.

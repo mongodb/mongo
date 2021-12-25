@@ -241,7 +241,7 @@ public:
             // Propagate the user's wTimeout if one was given.
             auto timeout = opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
                 ? INT_MAX
-                : opCtx->getWriteConcern().wTimeout;
+                : opCtx->getWriteConcern().wTimeout();
             WriteConcernResult res;
             auto waitForWCStatus = waitForWriteConcern(
                 opCtx,

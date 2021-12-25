@@ -80,10 +80,7 @@
 namespace mongo {
 
 using repl::OpTime;
-using std::set;
-using std::shared_ptr;
 using std::string;
-using std::unique_ptr;
 using std::vector;
 using str::stream;
 
@@ -811,8 +808,8 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
             }
             writeConcern = sw.getValue();
 
-            if ((writeConcern.wNumNodes != 1) &&
-                (writeConcern.wMode != WriteConcernOptions::kMajority)) {
+            if ((writeConcern.wNumNodes() != 1) &&
+                (writeConcern.wMode() != WriteConcernOptions::kMajority)) {
                 return {ErrorCodes::InvalidOptions,
                         str::stream() << "Invalid replication write concern. User management write "
                                          "commands may only use w:1 or w:'majority', got: "
@@ -820,8 +817,14 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
             }
         }
 
-        writeConcern.wMode = WriteConcernOptions::kMajority;
-        writeConcern.wNumNodes = 0;
+        // ensure majority write concern
+        writeConcern = [&]() {
+            auto source = writeConcern.getProvenance().getSource();
+            auto wc = WriteConcernOptions(
+                WriteConcernOptions::kMajority, writeConcern.syncMode(), writeConcern.wTimeout());
+            wc.getProvenance().setSource(source);
+            return wc;
+        }();
 
         BSONObjBuilder modifiedCmd;
         if (!initialCmdHadWriteConcern) {
@@ -897,7 +900,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
                                                           repl::ReadConcernLevel readConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               (readConcern == repl::ReadConcernLevel::kMajorityReadConcern &&
-               writeConcern.wMode == WriteConcernOptions::kMajority));
+               writeConcern.wMode() == WriteConcernOptions::kMajority));
     BSONObj cmd =
         BSON("applyOps" << updateOps << "preCondition" << preCondition
                         << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());

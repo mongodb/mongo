@@ -66,40 +66,40 @@ TEST(WriteConcernOptionsTest, ParseSetsSyncModeToJournelIfJIsTrue) {
     auto sw = WriteConcernOptions::parse(BSON("j" << true));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::JOURNAL == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::JOURNAL == options.syncMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseSetsSyncModeToFSyncIfFSyncIsTrue) {
     auto sw = WriteConcernOptions::parse(BSON("fsync" << true));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::FSYNC == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::FSYNC == options.syncMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseSetsSyncModeToNoneIfJIsFalse) {
     auto sw = WriteConcernOptions::parse(BSON("j" << false));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::NONE == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::NONE == options.syncMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseLeavesSyncModeAsUnsetIfFSyncIsFalse) {
     auto sw = WriteConcernOptions::parse(BSON("fsync" << false));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNotNumberOrString) {
@@ -120,20 +120,20 @@ TEST(WriteConcernOptionsTest, ParseSetsWNumNodesIfWIsANumber) {
     auto sw = WriteConcernOptions::parse(BSON("w" << 3));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(3, options.wNumNodes);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode());
+    ASSERT_EQUALS(3, options.wNumNodes());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseWTimeoutAsNumber) {
     auto sw = WriteConcernOptions::parse(BSON("wtimeout" << 123));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(123, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS(123, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
@@ -141,10 +141,10 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
     auto sw = WriteConcernOptions::parse(BSON("wtimeout" << nan));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 
 TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
@@ -152,10 +152,10 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
     auto sw = WriteConcernOptions::parse(BSON("wtimeout" << 2999999999.0));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_LESS_THAN(options.wTimeout, 0);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_LESS_THAN(options.wTimeout(), 0);
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnUnknownField) {
@@ -167,10 +167,10 @@ void _testIgnoreWriteConcernField(const char* fieldName) {
     auto sw = WriteConcernOptions::parse(BSON(fieldName << 1));
     ASSERT_OK(sw.getStatus());
     WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS("", options.wMode);
-    ASSERT_EQUALS(1, options.wNumNodes);
-    ASSERT_EQUALS(0, options.wTimeout);
+    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode());
+    ASSERT_EQUALS("", options.wMode());
+    ASSERT_EQUALS(1, options.wNumNodes());
+    ASSERT_EQUALS(0, options.wTimeout());
 }
 TEST(WriteConcernOptionsTest, ParseIgnoresSpecialFields) {
     _testIgnoreWriteConcernField("wElectionId");

@@ -92,9 +92,21 @@ StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteC
     }
 
     if (writeConcern.needToWaitForOtherNodes() &&
-        writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+        writeConcern.wTimeout() == WriteConcernOptions::kNoTimeout) {
         // Don't allow no timeout
-        writeConcern.wTimeout = durationCount<Milliseconds>(kDefaultWriteTimeoutForMigration);
+        writeConcern = [&]() {
+            auto source = writeConcern.getProvenance().getSource();
+            auto wc = writeConcern.wMode().empty()
+                ? WriteConcernOptions(writeConcern.wNumNodes(),
+                                      writeConcern.syncMode(),
+                                      durationCount<Milliseconds>(kDefaultWriteTimeoutForMigration))
+                : WriteConcernOptions(
+                      writeConcern.wMode().toString(),
+                      writeConcern.syncMode(),
+                      durationCount<Milliseconds>(kDefaultWriteTimeoutForMigration));
+            wc.getProvenance().setSource(source);
+            return wc;
+        }();
     }
 
     return writeConcern;

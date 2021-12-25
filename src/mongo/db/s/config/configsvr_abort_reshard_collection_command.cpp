@@ -109,7 +109,7 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             uassert(ErrorCodes::InvalidOptions,
                     "_configsvrAbortReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             const auto reshardingUUID = retrieveReshardingUUID(opCtx, ns());
 

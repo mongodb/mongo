@@ -343,8 +343,8 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << getName() << " must be called with majority writeConcern, got "
-                              << opCtx->getWriteConcern().wMode,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                              << opCtx->getWriteConcern().wMode(),
+                opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
         const auto sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
 

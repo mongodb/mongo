@@ -89,10 +89,10 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithSimpleWriteConce
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(2, writeConcern.wNumNodes);
+    ASSERT_EQ(2, writeConcern.wNumNodes());
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::UNSET),
-              static_cast<int>(writeConcern.syncMode));
-    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
+              static_cast<int>(writeConcern.syncMode()));
+    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout());
 }
 
 TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithCompleteWriteConcern) {
@@ -104,10 +104,10 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithCompleteWriteCon
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(3, writeConcern.wNumNodes);
+    ASSERT_EQ(3, writeConcern.wNumNodes());
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::JOURNAL),
-              static_cast<int>(writeConcern.syncMode));
-    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
+              static_cast<int>(writeConcern.syncMode()));
+    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout());
 }
 
 TEST(MigrationSecondaryThrottleOptions, DisabledInCommandBSON) {
@@ -141,10 +141,10 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithSimpleWriteCo
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(2, writeConcern.wNumNodes);
+    ASSERT_EQ(2, writeConcern.wNumNodes());
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::UNSET),
-              static_cast<int>(writeConcern.syncMode));
-    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
+              static_cast<int>(writeConcern.syncMode()));
+    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout());
 }
 
 TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithCompleteWriteConcern) {
@@ -155,10 +155,10 @@ TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigWithCompleteWrite
     ASSERT(options.isWriteConcernSpecified());
 
     WriteConcernOptions writeConcern = options.getWriteConcern();
-    ASSERT_EQ(3, writeConcern.wNumNodes);
+    ASSERT_EQ(3, writeConcern.wNumNodes());
     ASSERT_EQ(static_cast<int>(WriteConcernOptions::SyncMode::JOURNAL),
-              static_cast<int>(writeConcern.syncMode));
-    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout);
+              static_cast<int>(writeConcern.syncMode()));
+    ASSERT_EQ(WriteConcernOptions::kNoTimeout, writeConcern.wTimeout());
 }
 
 TEST(MigrationSecondaryThrottleOptions, DisabledInBalancerConfig) {

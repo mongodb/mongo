@@ -78,7 +78,7 @@ public:
                 str::stream()
                     << "_shardsvrCreateCollection must be called with majority writeConcern, got "
                     << request().toBSON(BSONObj()),
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             uassert(ErrorCodes::NotImplemented,
                     "Create Collection path has not been implemented",

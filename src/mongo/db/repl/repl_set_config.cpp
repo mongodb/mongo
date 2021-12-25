@@ -410,8 +410,8 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
 
 Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
-    if (!writeConcern.wMode.empty() && writeConcern.wMode != WriteConcernOptions::kMajority) {
-        StatusWith<ReplSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode);
+    if (!writeConcern.wMode().empty() && writeConcern.wMode() != WriteConcernOptions::kMajority) {
+        StatusWith<ReplSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode());
         if (!tagPatternStatus.isOK()) {
             return tagPatternStatus.getStatus();
         }
@@ -431,9 +431,9 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
         // write concern mode.
         return Status(ErrorCodes::UnsatisfiableWriteConcern,
                       str::stream() << "Not enough nodes match write concern mode \""
-                                    << writeConcern.wMode << "\"");
+                                    << writeConcern.wMode() << "\"");
     } else {
-        int nodesRemaining = writeConcern.wNumNodes;
+        int nodesRemaining = writeConcern.wNumNodes();
         for (size_t j = 0; j < getMembers().size(); ++j) {
             if (!getMembers()[j].isArbiter()) {  // Only count data-bearing nodes
                 --nodesRemaining;
@@ -694,8 +694,8 @@ bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
     // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
     // customized through getLastErrorDefaults is if it's different from { w: 1, wtimeout: 0 }.
     const auto& getLastErrorDefaults = getDefaultWriteConcern();
-    return !(getLastErrorDefaults.wNumNodes == 1 && getLastErrorDefaults.wTimeout == 0 &&
-             getLastErrorDefaults.syncMode == WriteConcernOptions::SyncMode::UNSET);
+    return !(getLastErrorDefaults.wNumNodes() == 1 && getLastErrorDefaults.wTimeout() == 0 &&
+             getLastErrorDefaults.syncMode() == WriteConcernOptions::SyncMode::UNSET);
 }
 
 MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {

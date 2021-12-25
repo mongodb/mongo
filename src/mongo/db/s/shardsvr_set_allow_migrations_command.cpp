@@ -76,7 +76,7 @@ public:
                     str::stream() << Request::kCommandName
                                   << " must be called with majority writeConcern, got "
                                   << request().toBSON(BSONObj()),
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             SetAllowMigrationsRequest setAllowMigationsCmdRequest =
                 request().getSetAllowMigrationsRequest();

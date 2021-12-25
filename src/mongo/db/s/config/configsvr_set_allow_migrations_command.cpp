@@ -58,7 +58,7 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             uassert(ErrorCodes::InvalidOptions,
                     "_configsvrSetAllowMigrations must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             // Set the operation context read concern level to local for reads into the config
             // database.

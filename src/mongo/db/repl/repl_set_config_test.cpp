@@ -92,8 +92,8 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(1, config.getConfigTerm());
     ASSERT_EQUALS(1, config.getNumMembers());
     ASSERT_EQUALS(MemberId(0), config.membersBegin()->getId());
-    ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
-    ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
+    ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes());
+    ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode());
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
     ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatTimeoutPeriod,
                   config.getHeartbeatTimeoutPeriod());
@@ -1271,8 +1271,8 @@ bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
         a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
         a.getConfigServer() == b.getConfigServer() &&
-        a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
-        a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
+        a.getDefaultWriteConcern().wNumNodes() == b.getDefaultWriteConcern().wNumNodes() &&
+        a.getDefaultWriteConcern().wMode() == b.getDefaultWriteConcern().wMode() &&
         a.getProtocolVersion() == b.getProtocolVersion() &&
         a.getReplicaSetId() == b.getReplicaSetId();
 }
@@ -1427,35 +1427,37 @@ TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
                     "valid" << BSON("dc" << 2 << "rack" << 3) << "invalidNotEnoughValues"
                             << BSON("dc" << 3) << "invalidNotEnoughNodes" << BSON("rack" << 6)))));
 
-    WriteConcernOptions validNumberWC;
-    validNumberWC.wNumNodes = 5;
+    WriteConcernOptions validNumberWC(
+        5, WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validNumberWC));
 
-    WriteConcernOptions invalidNumberWC;
-    invalidNumberWC.wNumNodes = 6;
+    WriteConcernOptions invalidNumberWC(
+        6, WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidNumberWC));
 
-    WriteConcernOptions majorityWC;
-    majorityWC.wMode = "majority";
+    WriteConcernOptions majorityWC(
+        "majority", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(majorityWC));
 
-    WriteConcernOptions validModeWC;
-    validModeWC.wMode = "valid";
+    WriteConcernOptions validModeWC(
+        "valid", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validModeWC));
 
-    WriteConcernOptions fakeModeWC;
-    fakeModeWC.wMode = "fake";
+    WriteConcernOptions fakeModeWC(
+        "fake", WriteConcernOptions::SyncMode::UNSET, WriteConcernOptions::kNoTimeout);
     ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(fakeModeWC));
 
-    WriteConcernOptions invalidModeNotEnoughValuesWC;
-    invalidModeNotEnoughValuesWC.wMode = "invalidNotEnoughValues";
+    WriteConcernOptions invalidModeNotEnoughValuesWC("invalidNotEnoughValues",
+                                                     WriteConcernOptions::SyncMode::UNSET,
+                                                     WriteConcernOptions::kNoTimeout);
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughValuesWC));
 
-    WriteConcernOptions invalidModeNotEnoughNodesWC;
-    invalidModeNotEnoughNodesWC.wMode = "invalidNotEnoughNodes";
+    WriteConcernOptions invalidModeNotEnoughNodesWC("invalidNotEnoughNodes",
+                                                    WriteConcernOptions::SyncMode::UNSET,
+                                                    WriteConcernOptions::kNoTimeout);
     ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
 }

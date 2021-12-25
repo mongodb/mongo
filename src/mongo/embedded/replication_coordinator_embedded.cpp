@@ -137,7 +137,7 @@ bool ReplicationCoordinatorEmbedded::isReplEnabled() const {
 WriteConcernOptions ReplicationCoordinatorEmbedded::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
     WriteConcernOptions writeConcern(wc);
-    writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
+    writeConcern._syncMode = WriteConcernOptions::SyncMode::NONE;
     return writeConcern;
 }
 

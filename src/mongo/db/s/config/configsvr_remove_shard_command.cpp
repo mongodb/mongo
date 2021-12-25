@@ -102,7 +102,7 @@ public:
             ErrorCodes::InvalidOptions,
             str::stream() << "_configsvrRemoveShard must be called with majority writeConcern, got "
                           << cmdObj,
-            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =

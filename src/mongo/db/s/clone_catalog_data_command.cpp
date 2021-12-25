@@ -99,7 +99,7 @@ public:
                 str::stream()
                     << "_shardsvrCloneCatalogData must be called with majority writeConcern, got "
                     << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
         const auto cloneCatalogDataRequest =
             CloneCatalogData::parse(IDLParserErrorContext("_shardsvrCloneCatalogData"), cmdObj);

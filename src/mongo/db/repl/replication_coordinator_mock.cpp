@@ -638,11 +638,11 @@ void ReplicationCoordinatorMock::createWMajorityWriteAvailabilityDateWaiter(OpTi
 
 WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
-    if (wc.syncMode == WriteConcernOptions::SyncMode::UNSET) {
-        if (wc.wMode == WriteConcernOptions::kMajority) {
-            wc.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
+    if (wc.syncMode() == WriteConcernOptions::SyncMode::UNSET) {
+        if (wc.wMode() == WriteConcernOptions::kMajority) {
+            wc._syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         } else {
-            wc.syncMode = WriteConcernOptions::SyncMode::NONE;
+            wc._syncMode = WriteConcernOptions::SyncMode::NONE;
         }
     }
     return wc;

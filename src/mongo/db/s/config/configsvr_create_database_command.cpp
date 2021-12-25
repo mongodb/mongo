@@ -74,7 +74,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     str::stream()
                         << "_configsvrCreateDatabase must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             // Set the operation context read concern level to local for reads into the config
             // database.

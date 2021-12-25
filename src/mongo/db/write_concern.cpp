@@ -93,9 +93,9 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
     WriteConcernOptions writeConcern = wcResult.getValue();
 
     // This is the WC extracted from the command object, so the CWWC or implicit default hasn't been
-    // applied yet, which is why "usedDefaultConstructedWC" flag can be used an indicator of whether
+    // applied yet, which is why the "isDefaultConstructed" flag can be used an indicator of whether
     // the client supplied a WC or not.
-    bool clientSuppliedWriteConcern = !writeConcern.usedDefaultConstructedWC;
+    bool clientSuppliedWriteConcern = !writeConcern.isDefaultConstructed();
     bool customDefaultWasApplied = false;
 
     // If no write concern is specified in the command, then use the cluster-wide default WC (if
@@ -132,11 +132,6 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             }
             return writeConcern;
         })();
-        if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
-            writeConcern.wNumNodes = 1;
-        }
-
-        writeConcern.notExplicitWValue = true;
     }
 
     // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
@@ -177,7 +172,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 }
 
 Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& writeConcern) {
-    if (writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL &&
+    if (writeConcern.syncMode() == WriteConcernOptions::SyncMode::JOURNAL &&
         !opCtx->getServiceContext()->getStorageEngine()->isDurable()) {
         return Status(ErrorCodes::BadValue,
                       "cannot use 'j' option when a host does not have journaling enabled");
@@ -185,14 +180,14 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
 
     const auto replMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
 
-    if (replMode == repl::ReplicationCoordinator::modeNone && writeConcern.wNumNodes > 1) {
+    if (replMode == repl::ReplicationCoordinator::modeNone && writeConcern.wNumNodes() > 1) {
         return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
     }
 
-    if (replMode != repl::ReplicationCoordinator::modeReplSet && !writeConcern.wMode.empty() &&
-        writeConcern.wMode != WriteConcernOptions::kMajority) {
+    if (replMode != repl::ReplicationCoordinator::modeReplSet && !writeConcern.wMode().empty() &&
+        writeConcern.wMode() != WriteConcernOptions::kMajority) {
         return Status(ErrorCodes::BadValue,
-                      string("cannot use non-majority 'w' mode ") + writeConcern.wMode +
+                      string("cannot use non-majority 'w' mode ") + writeConcern.wMode() +
                           " when a host is not a member of a replica set");
     }
 
@@ -284,7 +279,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
 
     // Waiting for durability (flushing the journal or all files to disk) can throw on interruption.
     try {
-        switch (writeConcernWithPopulatedSyncMode.syncMode) {
+        switch (writeConcernWithPopulatedSyncMode.syncMode()) {
             case WriteConcernOptions::SyncMode::UNSET:
                 LOGV2_FATAL(34410,
                             "Attempting to wait on a WriteConcern with an unset sync option");

@@ -114,7 +114,7 @@ public:
             ErrorCodes::InvalidOptions,
             str::stream() << "_shardsvrMovePrimary must be called with majority writeConcern, got "
                           << cmdObj,
-            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+            opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
         ON_BLOCK_EXIT(
             [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });

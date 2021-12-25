@@ -86,7 +86,6 @@ constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutMigration;
 constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutSharding;
 constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutUserCommand;
 
-
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, int timeout)
     : WriteConcernOptions(numNodes, sync, Milliseconds(timeout)) {}
 
@@ -94,12 +93,21 @@ WriteConcernOptions::WriteConcernOptions(const std::string& mode, SyncMode sync,
     : WriteConcernOptions(mode, sync, Milliseconds(timeout)) {}
 
 WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout)
-    : syncMode(sync), wNumNodes(numNodes), wTimeout(durationCount<Milliseconds>(timeout)) {}
+    : _wNumNodes(numNodes),
+      _syncMode(sync),
+      _wTimeout(durationCount<Milliseconds>(timeout)),
+      _defaultConstructed(false),
+      _explicitWValue(true) {}
 
 WriteConcernOptions::WriteConcernOptions(const std::string& mode,
                                          SyncMode sync,
                                          Milliseconds timeout)
-    : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(durationCount<Milliseconds>(timeout)) {}
+    : _wNumNodes(0),
+      _wMode(mode),
+      _syncMode(sync),
+      _wTimeout(durationCount<Milliseconds>(timeout)),
+      _defaultConstructed(false),
+      _explicitWValue(true) {}
 
 StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
     if (obj.isEmpty()) {
@@ -107,13 +115,16 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
     }
 
     try {
-        WriteConcernOptions writeConcern;
-        writeConcern.usedDefaultConstructedWC = false;
-
         auto writeConcernIdl = WriteConcernIdl::parse(IDLParserErrorContext("writeConcern"), obj);
         auto parsedW = writeConcernIdl.getWriteConcernW();
+
+        WriteConcernOptions writeConcern;
+        writeConcern._defaultConstructed = parsedW.usedDefaultConstructedW1() &&
+            !writeConcernIdl.getJ() && !writeConcernIdl.getFsync() &&
+            writeConcernIdl.getWtimeout() == 0;
+
         if (!parsedW.usedDefaultConstructedW1()) {
-            writeConcern.notExplicitWValue = false;
+            writeConcern._explicitWValue = true;
             auto wVal = parsedW.getValue();
             if (auto wNum = stdx::get_if<std::int64_t>(&wVal)) {
                 if (*wNum < 0 ||
@@ -124,12 +135,12 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
                                   << "w has to be a non-negative number and not greater than "
                                   << repl::ReplSetConfig::kMaxMembers);
                 }
-                writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(*wNum);
+                writeConcern._wNumNodes = static_cast<decltype(writeConcern._wNumNodes)>(*wNum);
             } else {
                 auto wMode = stdx::get_if<std::string>(&wVal);
                 invariant(wMode);
-                writeConcern.wNumNodes = 0;  // Have to reset from default 1.
-                writeConcern.wMode = std::move(*wMode);
+                writeConcern._wNumNodes = 0;  // Have to reset from default 1.
+                writeConcern._wMode = std::move(*wMode);
             }
         }
 
@@ -141,15 +152,15 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
         }
 
         if (j && *j) {
-            writeConcern.syncMode = SyncMode::JOURNAL;
+            writeConcern._syncMode = SyncMode::JOURNAL;
         } else if (fsync && *fsync) {
-            writeConcern.syncMode = SyncMode::FSYNC;
+            writeConcern._syncMode = SyncMode::FSYNC;
         } else if (j) {
             // j has been set to false
-            writeConcern.syncMode = SyncMode::NONE;
+            writeConcern._syncMode = SyncMode::NONE;
         }
 
-        writeConcern.wTimeout = writeConcernIdl.getWtimeout();
+        writeConcern._wTimeout = writeConcernIdl.getWtimeout();
         if (auto source = writeConcernIdl.getSource()) {
             writeConcern._provenance = ReadWriteConcernProvenance(*source);
         }
@@ -194,21 +205,21 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 BSONObj WriteConcernOptions::toBSON() const {
     BSONObjBuilder builder;
 
-    if (wMode.empty()) {
-        builder.append("w", wNumNodes);
+    if (_wMode.empty()) {
+        builder.append("w", _wNumNodes);
     } else {
-        builder.append("w", wMode);
+        builder.append("w", _wMode);
     }
 
-    if (syncMode == SyncMode::FSYNC) {
+    if (_syncMode == SyncMode::FSYNC) {
         builder.append("fsync", true);
-    } else if (syncMode == SyncMode::JOURNAL) {
+    } else if (_syncMode == SyncMode::JOURNAL) {
         builder.append("j", true);
-    } else if (syncMode == SyncMode::NONE) {
+    } else if (_syncMode == SyncMode::NONE) {
         builder.append("j", false);
     }
 
-    builder.append("wtimeout", wTimeout);
+    builder.append("wtimeout", _wTimeout);
 
     _provenance.serialize(&builder);
 
@@ -216,13 +227,13 @@ BSONObj WriteConcernOptions::toBSON() const {
 }
 
 bool WriteConcernOptions::needToWaitForOtherNodes() const {
-    return !wMode.empty() || wNumNodes > 1;
+    return !_wMode.empty() || _wNumNodes > 1;
 }
 
 bool WriteConcernOptions::operator==(const WriteConcernOptions& other) const {
-    return syncMode == other.syncMode && wMode == other.wMode && wNumNodes == other.wNumNodes &&
-        wDeadline == other.wDeadline && wTimeout == other.wTimeout &&
-        _provenance == other._provenance;
+    return _syncMode == other._syncMode && _wMode == other._wMode &&
+        _wNumNodes == other._wNumNodes && _wDeadline == other._wDeadline &&
+        _wTimeout == other._wTimeout && _provenance == other._provenance;
 }
 
 }  // namespace mongo

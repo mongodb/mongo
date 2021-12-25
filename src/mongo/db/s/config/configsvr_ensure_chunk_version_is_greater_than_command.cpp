@@ -55,7 +55,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "_configsvrEnsureChunkVersionIsGreaterThan must be called with majority "
                     "writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
             ShardingCatalogManager::get(opCtx)->ensureChunkVersionIsGreaterThan(
                 opCtx,
                 request().getCollectionUUID(),

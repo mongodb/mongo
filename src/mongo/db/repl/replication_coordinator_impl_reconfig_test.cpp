@@ -881,11 +881,8 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCFromW1toWMajWithoutCWWCSetFails) {
 
 TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    wc.usedDefaultConstructedWC = false;
-    wc.notExplicitWValue = false;
-    newDefaults.setDefaultWriteConcern(wc);
+    auto writeConcern = WriteConcernOptions::parse(WriteConcernOptions::Majority).getValue();
+    newDefaults.setDefaultWriteConcern(writeConcern);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
     assertStartSuccess(BSON("_id"
@@ -944,11 +941,8 @@ TEST_F(ReplCoordTest, ReconfigThatChangesIDWCWMajToW1WithCWWCSetPasses) {
 
 TEST_F(ReplCoordTest, ReconfigThatChangesIDWCW1ToWMajWithCWWCSetPasses) {
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    wc.usedDefaultConstructedWC = false;
-    wc.notExplicitWValue = false;
-    newDefaults.setDefaultWriteConcern(wc);
+    auto writeConcern = WriteConcernOptions::parse(WriteConcernOptions::Majority).getValue();
+    newDefaults.setDefaultWriteConcern(writeConcern);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
     assertStartSuccess(BSON("_id"
@@ -2270,11 +2264,8 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
 
 TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
     RWConcernDefault newDefaults;
-    WriteConcernOptions wc;
-    wc.wMode = "majority";
-    wc.usedDefaultConstructedWC = false;
-    wc.notExplicitWValue = false;
-    newDefaults.setDefaultWriteConcern(wc);
+    auto writeConcern = WriteConcernOptions::parse(WriteConcernOptions::Majority).getValue();
+    newDefaults.setDefaultWriteConcern(writeConcern);
     lookupMock.setLookupCallReturnValue(std::move(newDefaults));
 
     setUpNewlyAddedFieldTest();

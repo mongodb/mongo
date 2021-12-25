@@ -230,7 +230,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
     }
     auto timeout = opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
         ? WriteConcernOptions::kNoTimeout
-        : opCtx->getWriteConcern().wTimeout;
+        : opCtx->getWriteConcern().wTimeout();
     auto newWC = WriteConcernOptions(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout);
     updateCmd.append(WriteConcernOptions::kWriteConcernField, newWC.toBSON());

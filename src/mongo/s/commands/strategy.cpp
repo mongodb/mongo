@@ -660,9 +660,9 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     // This is the WC extracted from the command object, so the CWWC or implicit default hasn't been
-    // applied yet, which is why "usedDefaultConstructedWC" flag can be used an indicator of whether
+    // applied yet, which is why "isDefaultConstructed" flag can be used an indicator of whether
     // the client supplied a WC or not.
-    bool clientSuppliedWriteConcern = !_parc->_wc->usedDefaultConstructedWC;
+    bool clientSuppliedWriteConcern = !_parc->_wc->isDefaultConstructed();
     bool customDefaultWriteConcernWasApplied = false;
     bool isInternalClient =
         (opCtx->getClient()->session() &&

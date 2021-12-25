@@ -320,7 +320,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
     // The user-supplied wTimeout should be used when waiting for majority write concern.
     const auto& userWriteConcern = opCtx->getWriteConcern();
     const auto wTimeout = !userWriteConcern.isImplicitDefaultWriteConcern()
-        ? Milliseconds{userWriteConcern.wTimeout}
+        ? Milliseconds{userWriteConcern.wTimeout()}
         : duration_cast<Milliseconds>(Minutes(10));
 
     // This is used to wait for the collection drops to replicate to a majority of the replica
@@ -344,7 +344,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
     auto result = replCoord->awaitReplication(opCtx, awaitOpTime, dropDatabaseWriteConcern);
 
     // If the user-provided write concern is weaker than majority, this is effectively a no-op.
-    if (result.status.isOK() && !userWriteConcern.usedDefaultConstructedWC) {
+    if (result.status.isOK() && !userWriteConcern.isDefaultConstructed()) {
         LOGV2(20341,
               "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
               "{userWriteConcern}",

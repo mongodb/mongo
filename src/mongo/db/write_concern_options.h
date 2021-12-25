@@ -37,6 +37,15 @@
 
 namespace mongo {
 
+namespace repl {
+class ReplicationCoordinatorImpl;
+class ReplicationCoordinatorMock;
+}  // namespace repl
+
+namespace embedded {
+class ReplicationCoordinatorEmbedded;
+}
+
 class Status;
 
 struct WriteConcernOptions {
@@ -64,25 +73,11 @@ public:
     static constexpr Seconds kWriteConcernTimeoutSharding{60};
     static constexpr Seconds kWriteConcernTimeoutUserCommand{60};
 
-    // It is assumed that a default-constructed WriteConcernOptions will be populated with the
-    // default options. If it is subsequently populated with non-default options, it is the caller's
-    // responsibility to set the usedDefaultConstructedWC and notExplicitWValue flag correctly.
-    WriteConcernOptions()
-        : syncMode(SyncMode::UNSET),
-          wNumNodes(1),
-          wMode(""),
-          wTimeout(0),
-          usedDefaultConstructedWC(true),
-          notExplicitWValue(true) {}
-
+    WriteConcernOptions() = default;
     WriteConcernOptions(int numNodes, SyncMode sync, int timeout);
-
     WriteConcernOptions(int numNodes, SyncMode sync, Milliseconds timeout);
-
     WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout);
-
     WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
-
     static StatusWith<WriteConcernOptions> parse(const BSONObj& obj);
 
     /**
@@ -116,7 +111,6 @@ public:
     BSONObj toBSON() const;
 
     bool operator==(const WriteConcernOptions& other) const;
-
     bool operator!=(const WriteConcernOptions& other) const {
         return !operator==(other);
     }
@@ -127,51 +121,88 @@ public:
      *      - Implicit default majority WC is being used.
      */
     bool isImplicitDefaultWriteConcern() const {
-        return usedDefaultConstructedWC || _provenance.isImplicitDefault();
+        return isDefaultConstructed() || _provenance.isImplicitDefault();
     }
 
-    SyncMode syncMode;
+    /**
+     * True if the default constructed WC ({w:1}) was used.
+     *      - Implicit default WC when value of w is {w:1}.
+     *      - Internal commands set empty WC ({writeConcern: {}}), then default constructed WC (w:1)
+     *        is used.
+     * False otherwise:
+     *      - Implicit default WC when value of w is {w:"majority"}.
+     *      - Cluster-wide WC.
+     *          - with (w) value set, for example ({writeConcern: {w:1}}).
+     *          - without (w) value set, for example ({writeConcern: {j: true}}).
+     *      - Client-supplied WC.
+     *          - with (w) value set, for example ({writeConcern: {w:1}}).
+     *          - without (w) value set, for example ({writeConcern: {j: true}}).
+     */
+    bool isDefaultConstructed() const {
+        return _defaultConstructed;
+    }
+
+    /**
+     * True if the (w) value of the write concern is set explicitly by client
+     * False if:
+     *      - Default constructed WC ({w:1})
+     *      - Implicit default majority WC.
+     *      - Cluster-wide WC.
+     *          - with (w) value set, for example ({writeConcern: {w:1}}).
+     *          - without (w) value set, for example ({writeConcern: {j: true}}).
+     *      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
+     *      - Internal commands set empty WC ({writeConcern: {}}).
+     */
+    bool hasExplicitWValue() const {
+        return _explicitWValue;
+    };
+
+    SyncMode syncMode() const {
+        return _syncMode;
+    }
 
     // The w parameter for this write concern. The wMode represents the string format and
     // takes precedence over the numeric format wNumNodes.
-    int wNumNodes;
-    std::string wMode;
+    int wNumNodes() const {
+        return _wNumNodes;
+    }
 
-    // Timeout in milliseconds.
-    int wTimeout;
-    // Deadline. If this is set to something other than Date_t::max(), this takes precedence over
-    // wTimeout.
-    Date_t wDeadline = Date_t::max();
+    StringData wMode() const {
+        return _wMode;
+    }
 
-    // True if the default constructed WC ({w:1}) was used.
-    //      - Implicit default WC when value of w is {w:1}.
-    //      - Internal commands set empty WC ({writeConcern: {}}), then default constructed WC (w:1)
-    //        is used.
-    // False otherwise:
-    //      - Implicit default WC when value of w is {w:"majority"}.
-    //      - Cluster-wide WC.
-    //          - with (w) value set, for example ({writeConcern: {w:1}}).
-    //          - without (w) value set, for example ({writeConcern: {j: true}}).
-    //      - Client-supplied WC.
-    //          - with (w) value set, for example ({writeConcern: {w:1}}).
-    //          - without (w) value set, for example ({writeConcern: {j: true}}).
-    bool usedDefaultConstructedWC = false;
+    int wTimeout() const {
+        return _wTimeout;
+    }
 
-    // Used only for tracking opWriteConcernCounters metric.
-    // True if the (w) value of the write concern used is not set explicitly by client:
-    //      - Default constructed WC ({w:1})
-    //      - Implicit default majority WC.
-    //      - Cluster-wide WC.
-    //          - with (w) value set, for example ({writeConcern: {w:1}}).
-    //          - without (w) value set, for example ({writeConcern: {j: true}}).
-    //      - Client-supplied WC without (w) value set, for example ({writeConcern: {j: true}}).
-    //      - Internal commands set empty WC ({writeConcern: {}}).
-    bool notExplicitWValue = false;
+    Date_t wDeadline() const {
+        return _wDeadline;
+    }
 
-    CheckCondition checkCondition = CheckCondition::OpTime;
+    void setDeadline_forTest(const Date_t& deadline) {
+        _wDeadline = deadline;
+    }
+
+    CheckCondition checkCondition() const {
+        return _checkCondition;
+    }
 
 private:
+    friend class repl::ReplicationCoordinatorImpl;
+    friend class repl::ReplicationCoordinatorMock;
+    friend class embedded::ReplicationCoordinatorEmbedded;
+
+    int _wNumNodes{1};
+    std::string _wMode;
+    SyncMode _syncMode{SyncMode::UNSET};
+    int _wTimeout{kNoTimeout};
+    // Deadline. If this is set to something other than Date_t::max(), this takes precedence over
+    // wTimeout.
+    Date_t _wDeadline = Date_t::max();
+    CheckCondition _checkCondition{CheckCondition::OpTime};
     ReadWriteConcernProvenance _provenance;
+    bool _defaultConstructed{true};
+    bool _explicitWValue{false};
 };
 
 }  // namespace mongo

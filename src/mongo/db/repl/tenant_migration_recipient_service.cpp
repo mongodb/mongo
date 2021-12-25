@@ -583,7 +583,7 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
 
     WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
                                      WriteConcernOptions::SyncMode::NONE,
-                                     opCtx->getWriteConcern().wTimeout);
+                                     opCtx->getWriteConcern().wTimeout());
     uassertStatusOK(replCoord->awaitReplication(opCtx, lastOpAfterUpdate, writeConcern).status);
 
     _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp, opCtx);

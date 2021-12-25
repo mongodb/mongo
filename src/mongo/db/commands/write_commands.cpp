@@ -105,9 +105,9 @@ void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
 
 bool shouldSkipOutput(OperationContext* opCtx) {
     const WriteConcernOptions& writeConcern = opCtx->getWriteConcern();
-    return writeConcern.wMode.empty() && writeConcern.wNumNodes == 0 &&
-        (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
-         writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
+    return writeConcern.wMode().empty() && writeConcern.wNumNodes() == 0 &&
+        (writeConcern.syncMode() == WriteConcernOptions::SyncMode::NONE ||
+         writeConcern.syncMode() == WriteConcernOptions::SyncMode::UNSET);
 }
 
 /**

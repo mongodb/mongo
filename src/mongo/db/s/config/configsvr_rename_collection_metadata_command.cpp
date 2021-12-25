@@ -77,7 +77,7 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             uassert(ErrorCodes::InvalidOptions,
                     "_configsvrRenameCollectionMetadata must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 

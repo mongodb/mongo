@@ -75,7 +75,7 @@ public:
                     str::stream() << "_shardsvrCreateCollectionParticipant must be called with "
                                      "majority writeConcern, got "
                                   << request().toBSON(BSONObj()),
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 

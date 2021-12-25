@@ -63,7 +63,7 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
             uassert(ErrorCodes::InvalidOptions,
                     "_shardsvrCommitReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             std::vector<SharedSemiFuture<void>> futuresToWait;
 

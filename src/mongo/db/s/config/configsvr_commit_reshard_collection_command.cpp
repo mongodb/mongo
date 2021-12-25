@@ -82,7 +82,7 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     format(FMT_STRING("{} must be called with majority writeConcern"),
                            definition()->getName()),
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+                    opCtx->getWriteConcern().wMode() == WriteConcernOptions::kMajority);
 
             UUID reshardingUUID = retrieveReshardingUUID(opCtx, ns());
 

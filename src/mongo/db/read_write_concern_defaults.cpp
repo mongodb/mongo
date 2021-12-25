@@ -91,7 +91,7 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const ReadConcern& rc) 
 void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc) {
     uassert(ErrorCodes::BadValue,
             "Unacknowledged write concern is not suitable for the default write concern",
-            !(wc.wMode.empty() && wc.wNumNodes < 1));
+            !(wc.wMode().empty() && wc.wNumNodes() < 1));
     uassert(ErrorCodes::BadValue,
             str::stream() << "'" << ReadWriteConcernProvenance::kSourceFieldName
                           << "' must be unset in default write concern",
@@ -115,7 +115,7 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
         checkSuitabilityAsDefault(*rc);
         rwc.setDefaultReadConcern(rc);
     }
-    if (wc && !wc->usedDefaultConstructedWC) {
+    if (wc && !wc->isDefaultConstructed()) {
         checkSuitabilityAsDefault(*wc);
         rwc.setDefaultWriteConcern(wc);
     }
@@ -134,11 +134,11 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
     }
     // If the setDefaultRWConcern command tries to unset the global default write concern when it
     // has already been set, throw an error.
-    // wc->usedDefaultConstructedWC indicates that the defaultWriteConcern given in the
+    // wc->isDefaultConstructed() indicates that the defaultWriteConcern given in the
     // setDefaultRWConcern command was empty (i.e. {defaultWriteConcern: {}})
     // If current->getDefaultWriteConcern exists, that means the global default write concern has
     // already been set.
-    if (wc && wc->usedDefaultConstructedWC && current) {
+    if (wc && wc->isDefaultConstructed() && current) {
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "The global default write concern cannot be unset once it is set.",
                 !current->getDefaultWriteConcern());
@@ -240,7 +240,7 @@ ReadWriteConcernDefaults::RWConcernDefaultAndTime ReadWriteConcernDefaults::getD
     // already been set through the config server.
     if (!cached.getDefaultWriteConcernSource()) {
         const bool isCWWCSet = cached.getDefaultWriteConcern() &&
-            !cached.getDefaultWriteConcern().get().usedDefaultConstructedWC;
+            !cached.getDefaultWriteConcern().get().isDefaultConstructed();
         if (isCWWCSet) {
             cached.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kGlobal);
         } else {
@@ -285,7 +285,7 @@ boost::optional<ReadWriteConcernDefaults::WriteConcern> ReadWriteConcernDefaults
     OperationContext* opCtx) {
     auto cached = _getDefaultCWRWCFromDisk(opCtx);
     if (cached && cached.get().getDefaultWriteConcern() &&
-        !cached.get().getDefaultWriteConcern().get().usedDefaultConstructedWC) {
+        !cached.get().getDefaultWriteConcern().get().isDefaultConstructed()) {
         return cached.get().getDefaultWriteConcern().get();
     }
 

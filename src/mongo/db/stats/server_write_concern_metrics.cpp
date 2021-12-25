@@ -108,25 +108,36 @@ BSONObj ServerWriteConcernMetrics::toBSON() const {
 
 void ServerWriteConcernMetrics::WriteConcernCounters::recordWriteConcern(
     const WriteConcernOptions& writeConcernOptions, size_t numOps) {
-    if (!writeConcernOptions.wMode.empty()) {
-        if (writeConcernOptions.wMode == WriteConcernOptions::kMajority) {
+    if (!writeConcernOptions.wMode().empty()) {
+        if (writeConcernOptions.wMode() == WriteConcernOptions::kMajority) {
             wMajorityCount += numOps;
             return;
         }
 
-        wTagCounts[writeConcernOptions.wMode] += numOps;
+        auto mode = writeConcernOptions.wMode().toString();
+        wTagCounts[mode] += numOps;
         return;
     }
 
-    wNumCounts[writeConcernOptions.wNumNodes] += numOps;
+    wNumCounts[writeConcernOptions.wNumNodes()] += numOps;
 }
 
 void ServerWriteConcernMetrics::WriteConcernMetricsForOperationType::recordWriteConcern(
     const WriteConcernOptions& writeConcernOptions, size_t numOps) {
-    if (writeConcernOptions.notExplicitWValue) {
-        if (writeConcernOptions.getProvenance().isCustomDefault()) {
+    auto provenance = writeConcernOptions.getProvenance();
+    if (!provenance.isClientSupplied()) {
+        if (provenance.isCustomDefault()) {
             cWWC.recordWriteConcern(writeConcernOptions, numOps);
-        } else {
+        } else if (provenance.isImplicitDefault()) {
+            implicitDefaultWC.recordWriteConcern(writeConcernOptions, numOps);
+        }
+
+        notExplicitWCount += numOps;
+        return;
+    }
+
+    if (!writeConcernOptions.hasExplicitWValue()) {
+        if (!provenance.isCustomDefault()) {
             // Provenance is either:
             //  - "implicitDefault" : implicit default WC (w:1 or w:"majority") is used.
             //  - "clientSupplied"  : set without "w" value, so implicit default WC (w:1) is used.

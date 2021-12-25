@@ -229,8 +229,13 @@ bool opReplicatedEnough(OperationContext* opCtx,
 
     // Enforce the user specified write concern after "majority" so it covers the union of the 2
     // write concerns in case the user's write concern is stronger than majority
-    WriteConcernOptions userWriteConcern(writeConcern);
-    userWriteConcern.wTimeout = -1;
+    WriteConcernOptions userWriteConcern = writeConcern.wMode().empty()
+        ? WriteConcernOptions(
+              writeConcern.wNumNodes(), writeConcern.syncMode(), WriteConcernOptions::kNoWaiting)
+        : WriteConcernOptions(writeConcern.wMode().toString(),
+                              writeConcern.syncMode(),
+                              WriteConcernOptions::kNoWaiting);
+    userWriteConcern.getProvenance().setSource(writeConcern.getProvenance().getSource());
     writeConcernResult.wTimedOut = false;
 
     Status userStatus =

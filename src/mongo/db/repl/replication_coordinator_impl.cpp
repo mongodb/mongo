@@ -1896,15 +1896,15 @@ bool ReplicationCoordinatorImpl::_haveTaggedNodesSatisfiedCommitQuorum(
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     // The syncMode cannot be unset.
-    invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
+    invariant(writeConcern.syncMode() != WriteConcernOptions::SyncMode::UNSET);
 
-    const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
-    if (writeConcern.wMode.empty()) {
+    const bool useDurableOpTime = writeConcern.syncMode() == WriteConcernOptions::SyncMode::JOURNAL;
+    if (writeConcern.wMode().empty()) {
         return _topCoord->haveNumNodesReachedOpTime(
-            opTime, writeConcern.wNumNodes, useDurableOpTime);
+            opTime, writeConcern.wNumNodes(), useDurableOpTime);
     }
     StringData patternName;
-    if (writeConcern.wMode == WriteConcernOptions::kMajority) {
+    if (writeConcern.wMode() == WriteConcernOptions::kMajority) {
         if (_externalState->snapshotsEnabled() && !gTestingSnapshotBehaviorInIsolation) {
             // Make sure we have a valid "committed" snapshot up to the needed optime.
             if (!_currentCommittedSnapshot) {
@@ -1954,13 +1954,13 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
         // *** Needed for J:True, writeConcernMajorityShouldJournal:False (appliedOpTime snapshot).
         patternName = ReplSetConfig::kMajorityWriteConcernModeName;
     } else {
-        patternName = writeConcern.wMode;
+        patternName = writeConcern.wMode();
     }
     auto tagPattern = uassertStatusOK(_rsConfig.findCustomWriteMode(patternName));
-    if (writeConcern.checkCondition == WriteConcernOptions::CheckCondition::OpTime) {
+    if (writeConcern.checkCondition() == WriteConcernOptions::CheckCondition::OpTime) {
         return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern, useDurableOpTime);
     } else {
-        invariant(writeConcern.checkCondition == WriteConcernOptions::CheckCondition::Config);
+        invariant(writeConcern.checkCondition() == WriteConcernOptions::CheckCondition::Config);
         auto pred = _topCoord->makeConfigPredicate();
         return _topCoord->haveTaggedNodesSatisfiedCondition(pred, tagPattern);
     }
@@ -1986,14 +1986,14 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
 
     const auto wTimeoutDate = [&]() -> const Date_t {
         auto clockSource = opCtx->getServiceContext()->getFastClockSource();
-        if (writeConcern.wDeadline != Date_t::max()) {
-            return writeConcern.wDeadline;
+        if (writeConcern.wDeadline() != Date_t::max()) {
+            return writeConcern.wDeadline();
         }
-        if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
+        if (writeConcern.wTimeout() == WriteConcernOptions::kNoTimeout) {
             return Date_t::max();
         }
         return clockSource->now() + clockSource->getPrecision() +
-            Milliseconds{writeConcern.wTimeout};
+            Milliseconds{writeConcern.wTimeout()};
     }();
 
     const auto opCtxDeadline = opCtx->getDeadline();
@@ -2034,8 +2034,8 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeo
 
     // The returned future won't account for wTimeout or wDeadline, so reject any write concerns
     // with either option to avoid misuse.
-    invariant(fixedWriteConcern.wDeadline == Date_t::max());
-    invariant(fixedWriteConcern.wTimeout == WriteConcernOptions::kNoTimeout);
+    invariant(fixedWriteConcern.wDeadline() == Date_t::max());
+    invariant(fixedWriteConcern.wTimeout() == WriteConcernOptions::kNoTimeout);
 
     stdx::lock_guard lg(_mutex);
     return _startWaitingForReplication(lg, opTime, fixedWriteConcern);
@@ -2120,7 +2120,7 @@ SharedSemiFuture<void> ReplicationCoordinatorImpl::_startWaitingForReplication(
     }
 
     if (!writeConcern.needToWaitForOtherNodes() &&
-        writeConcern.syncMode != WriteConcernOptions::SyncMode::JOURNAL) {
+        writeConcern.syncMode() != WriteConcernOptions::SyncMode::JOURNAL) {
         // We are only waiting for our own lastApplied, add this to _opTimeWaiterList instead. This
         // is because waiters in _replicationWaiterList are not notified on self's lastApplied
         // updates.
@@ -3235,7 +3235,7 @@ WriteConcernOptions ReplicationCoordinatorImpl::_getConfigReplicationWriteConcer
     WriteConcernOptions configWriteConcern(ReplSetConfig::kConfigMajorityWriteConcernModeName,
                                            WriteConcernOptions::SyncMode::NONE,
                                            WriteConcernOptions::kNoTimeout);
-    configWriteConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+    configWriteConcern._checkCondition = WriteConcernOptions::CheckCondition::Config;
     return configWriteConcern;
 }
 
@@ -5892,12 +5892,12 @@ WriteConcernOptions ReplicationCoordinatorImpl::populateUnsetWriteConcernOptions
 WriteConcernOptions ReplicationCoordinatorImpl::_populateUnsetWriteConcernOptionsSyncMode(
     WithLock lk, WriteConcernOptions wc) {
     WriteConcernOptions writeConcern(wc);
-    if (writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET) {
-        if (writeConcern.wMode == WriteConcernOptions::kMajority &&
+    if (writeConcern.syncMode() == WriteConcernOptions::SyncMode::UNSET) {
+        if (writeConcern.wMode() == WriteConcernOptions::kMajority &&
             getWriteConcernMajorityShouldJournal_inlock()) {
-            writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
+            writeConcern._syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         } else {
-            writeConcern.syncMode = WriteConcernOptions::SyncMode::NONE;
+            writeConcern._syncMode = WriteConcernOptions::SyncMode::NONE;
         }
     }
     return writeConcern;
