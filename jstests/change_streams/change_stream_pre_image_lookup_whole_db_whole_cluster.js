@@ -29,7 +29,7 @@ if (!canRecordPreImagesInConfigDb && FixtureHelpers.isMongos(db)) {
 }
 
 if (canRecordPreImagesInConfigDb &&
-    (jsTestOptions().shardMixedBinVersionss || jsTestOptions().mixedBinVersions)) {
+    (jsTestOptions().shardMixedBinVersions || jsTestOptions().mixedBinVersions)) {
     jsTestLog("Skipping test because multiversion test-suite is unsupported when flag " +
               "'featureFlagChangeStreamPreAndPostImages' enabled");
     return;
