@@ -275,8 +275,14 @@ void buildArrayAccessByConstantIndex(ExpressionVisitorContext* context,
                                      int32_t index) {
     context->ensureArity(1);
 
-    auto array = context->popExpr();
-
+    // It's important that we project the array to a slot here. If we didn't do this, then the
+    // view of the array element could potentially outlive the array itself (which could result
+    // in use-after-free bugs).
+    auto [arraySlot, stage] = projectEvalExpr(context->popEvalExpr(),
+                                              context->extractCurrentEvalStage(),
+                                              context->planNodeId,
+                                              context->state.slotIdGenerator);
+    auto array = makeVariable(arraySlot);
     auto frameId = context->state.frameId();
     auto binds = sbe::makeEs(std::move(array));
     sbe::EVariable arrayRef{frameId, 0};
@@ -292,8 +298,8 @@ void buildArrayAccessByConstantIndex(ExpressionVisitorContext* context,
                                              exprName + " argument must be an array")},
         makeFunction("getElement", arrayRef.clone(), std::move(indexExpr)));
 
-    context->pushExpr(
-        sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
+    context->pushExpr(sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)),
+                      std::move(stage));
 }
 
 /**
@@ -920,7 +926,15 @@ public:
         _context->ensureArity(2);
 
         auto index = _context->popExpr();
-        auto array = _context->popExpr();
+
+        // It's important that we project the array to a slot here. If we didn't do this, then the
+        // view of the array element could potentially outlive the array itself (which could result
+        // in use-after-free bugs).
+        auto [arraySlot, stage] = projectEvalExpr(_context->popEvalExpr(),
+                                                  _context->extractCurrentEvalStage(),
+                                                  _context->planNodeId,
+                                                  _context->state.slotIdGenerator);
+        auto array = makeVariable(arraySlot);
 
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(std::move(array), std::move(index));
@@ -961,7 +975,8 @@ public:
             makeFunction("getElement", arrayRef.clone(), std::move(int32Index)));
 
         _context->pushExpr(
-            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(arrayElemAtExpr)));
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(arrayElemAtExpr)),
+            std::move(stage));
     }
     void visit(const ExpressionFirst* expr) final {
         buildArrayAccessByConstantIndex(_context, expr->getOpName(), 0);
