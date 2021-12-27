@@ -438,12 +438,14 @@ void FaultManager::healthCheck(HealthObserver* observer, std::shared_ptr<AtomicW
                                 1,
                                 "Fault manager received an error",
                                 "status"_attr = cbData.status);
-                    if (ErrorCodes::isA<ErrorCategory::CancellationError>(cbData.status.code())) {
+                    if (ErrorCodes::isA<ErrorCategory::CancelationError>(cbData.status.code())) {
                         return;
                     }
                     // continue health checking otherwise
                 }
-                healthCheck(observer, token);
+                if (!token->load()) {
+                    healthCheck(observer, token);
+                }
             });
 
         if (!periodicThreadCbHandleStatus.isOK()) {
