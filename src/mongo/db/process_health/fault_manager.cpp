@@ -324,8 +324,7 @@ void FaultManager::setInitialHealthCheckComplete(FaultState,
 }
 
 void FaultManager::schedulePeriodicHealthCheckThread() {
-    if (!feature_flags::gFeatureFlagHealthMonitoring) {
-        _config->periodicChecksDisabledForTests();
+    if (!feature_flags::gFeatureFlagHealthMonitoring || _config->periodicChecksDisabledForTests()) {
         return;
     }
 
