@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
 #include "mongo/db/process_health/test_health_observer.h"
+#include "mongo/base/init.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/util/fail_point.h"

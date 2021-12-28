@@ -44,7 +44,8 @@ assert.eq(result.state, "Ok");
 // result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;
 // assert.eq(result.state, "TransientFault");
 // assert(
-//     result.faultInformation.facets.kTestObserver.description.includes("InternalError: test msg"));
+//     result.faultInformation.facets.kTestObserver.description.includes("InternalError: test
+//     msg"));
 
 st.stop();
 })();
