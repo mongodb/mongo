@@ -43,7 +43,9 @@ ReshardCollectionCoordinator::ReshardCollectionCoordinator(
     OperationContext* opCtx, const ShardsvrReshardCollection& reshardCollectionParams)
     : ShardingDDLCoordinator_NORESILIENT(opCtx, reshardCollectionParams.getCommandParameter()),
       _serviceContext(opCtx->getServiceContext()),
-      _request(reshardCollectionParams),
+      _requestObj(reshardCollectionParams.serialize({})),
+      _request(ShardsvrReshardCollection::parse(IDLParserErrorContext("_shardsvrReshardCollection"),
+                                                _requestObj)),
       _nss(_request.getCommandParameter()) {}
 
 SemiFuture<void> ReshardCollectionCoordinator::runImpl(
