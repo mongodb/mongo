@@ -56,7 +56,8 @@ public:
         return {kUnshardedCollection};
     }
     ScopedCollectionFilter getOwnershipFilter(OperationContext*,
-                                              OrphanCleanupPolicy orphanCleanupPolicy) override {
+                                              OrphanCleanupPolicy orphanCleanupPolicy,
+                                              bool supportNonVersionedOperations) override {
         return {kUnshardedCollection};
     }
     void checkShardVersionOrThrow(OperationContext*) override {}

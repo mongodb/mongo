@@ -96,8 +96,10 @@ bool skipWriteToOrphanDocument(OperationContext* opCtx,
     }
 
     const auto css{CollectionShardingState::get(opCtx, nss)};
-    const auto collFilter{css->getOwnershipFilter(
-        opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup)};
+    const auto collFilter{
+        css->getOwnershipFilter(opCtx,
+                                CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
+                                true /* supportNonVersionedOperations */)};
 
     if (!collFilter.isSharded()) {
         // NOTE: Sharded collections queried by direct writes are identified by CSS as unsharded

@@ -123,7 +123,11 @@ public:
      * destroyed. The intended users of this mode are read operations, which need to yield the
      * collection lock, but still perform filtering.
      *
-     * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
+     * The 'supportNonVersionedOperations' parameter states whether this function should consider
+     * operations that don't have a shard version.
+     * If the request doesn't have a shard version:
+     *    - this function will invariant if !supportNonVersionedOperations (default value)
+     *    - the collection will be treated as UNSHARDED otherwise.
      *
      * Use 'getCollectionDescription' for other cases, like obtaining information about
      * sharding-related properties of the collection are necessary that won't change under
@@ -132,8 +136,10 @@ public:
      * The returned object *is safe* to access even after the collection lock has been dropped.
      */
     enum class OrphanCleanupPolicy { kDisallowOrphanCleanup, kAllowOrphanCleanup };
-    virtual ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
-                                                      OrphanCleanupPolicy orphanCleanupPolicy) = 0;
+    virtual ScopedCollectionFilter getOwnershipFilter(
+        OperationContext* opCtx,
+        OrphanCleanupPolicy orphanCleanupPolicy,
+        bool supportNonVersionedOperations = false) = 0;
 
     /**
      * Checks whether the shard version in the operation context is compatible with the shard

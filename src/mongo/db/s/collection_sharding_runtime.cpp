@@ -39,7 +39,6 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/duration.h"
 
@@ -97,13 +96,11 @@ CollectionShardingRuntime* CollectionShardingRuntime::get(CollectionShardingStat
 }
 
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
-    OperationContext* opCtx, OrphanCleanupPolicy orphanCleanupPolicy) {
-    bool migrationRecipientCriticalSectionEnabled =
-        feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility);
-
+    OperationContext* opCtx,
+    OrphanCleanupPolicy orphanCleanupPolicy,
+    bool supportNonVersionedOperations) {
     boost::optional<ChunkVersion> optReceivedShardVersion = boost::none;
-    if (!migrationRecipientCriticalSectionEnabled) {
+    if (!supportNonVersionedOperations) {
         optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
         // No operations should be calling getOwnershipFilter without a shard version
         invariant(optReceivedShardVersion,
@@ -113,7 +110,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     auto metadata = _getMetadataWithVersionCheckAt(
         opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
 
-    if (!migrationRecipientCriticalSectionEnabled) {
+    if (!supportNonVersionedOperations) {
         invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
                       !metadata->get().allowMigrations() || !metadata->get().isSharded(),
                   "For sharded collections getOwnershipFilter cannot be relied on without a valid "

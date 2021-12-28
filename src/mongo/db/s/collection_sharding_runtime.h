@@ -73,7 +73,8 @@ public:
     static CollectionShardingRuntime* get(CollectionShardingState* css);
 
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
-                                              OrphanCleanupPolicy orphanCleanupPolicy) override;
+                                              OrphanCleanupPolicy orphanCleanupPolicy,
+                                              bool supportNonVersionedOperations) override;
 
     ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override;
 
