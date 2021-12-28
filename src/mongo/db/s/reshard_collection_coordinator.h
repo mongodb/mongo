@@ -45,6 +45,8 @@ private:
     SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
 
     ServiceContext* _serviceContext;
+    const OpMsgRequest _requestObj;  // Owned object to guarantee the lifetime of the objects
+                                     // referenced by the parsed request '_request'
     const ShardsvrReshardCollection _request;
     const NamespaceString& _nss;
 };
