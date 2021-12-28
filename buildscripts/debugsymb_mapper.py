@@ -80,7 +80,7 @@ class Mapper:
     # pylint: disable=too-many-instance-attributes
     # This amount of attributes are necessary.
 
-    default_web_service_base_url: str = "https://symbolizer-service.server-tig.staging.corp.mongodb.com"
+    default_web_service_base_url: str = "https://symbolizer-service.server-tig.prod.corp.mongodb.com"
     default_cache_dir = os.path.join(os.getcwd(), 'build', 'symbols_cache')
     selected_binaries = ('mongos.debug', 'mongod.debug', 'mongo.debug')
     default_client_credentials_scope = "servertig-symbolizer-fullaccess"

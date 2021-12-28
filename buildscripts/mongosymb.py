@@ -161,7 +161,7 @@ class PathResolver(object):
     # This amount of attributes are necessary.
 
     # the main (API) sever that we'll be sending requests to
-    default_host = 'https://symbolizer-service.server-tig.staging.corp.mongodb.com'
+    default_host = 'https://symbolizer-service.server-tig.prod.corp.mongodb.com'
     default_cache_dir = os.path.join(os.getcwd(), 'build', 'symbolizer_downloads_cache')
     default_creds_file_path = os.path.join(os.getcwd(), '.symbolizer_credentials.json')
     default_client_credentials_scope = "servertig-symbolizer-fullaccess"
