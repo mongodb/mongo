@@ -232,8 +232,8 @@ public:
         // Parse the command BSON to a QueryRequest.
         const bool isExplain = false;
         // Pass parseNs to makeFromFindCommand in case cmdObj does not have a UUID.
-        auto qrStatus = QueryRequest::makeFromFindCommand(
-            NamespaceString(parseNs(dbname, cmdObj)), cmdObj, isExplain);
+        const NamespaceString parsedNss(parseNs(dbname, cmdObj));
+        auto qrStatus = QueryRequest::makeFromFindCommand(parsedNss, cmdObj, isExplain);
         uassertStatusOK(qrStatus.getStatus());
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -245,10 +245,21 @@ public:
                     !(session->inActiveOrKilledMultiDocumentTransaction() && qr->isTailable()));
 
         // Validate term before acquiring locks, if provided.
-        if (auto term = qr->getReplicationTerm()) {
+        auto term = qr->getReplicationTerm();
+        if (term) {
             Status status = replCoord->updateTerm(opCtx, *term);
             // Note: updateTerm returns ok if term stayed the same.
             uassertStatusOK(status);
+        }
+
+        // The presence of a term in the request indicates that this is an internal replication
+        // oplog read request.
+        if (term && parsedNss == NamespaceString::kRsOplogNamespace) {
+            // We do not want to take tickets for internal (replication) oplog reads. Stalling
+            // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
+            // data reaching secondaries in order to proceed; and secondaries may get stalled
+            // replicating because of an inability to acquire a read ticket.
+            opCtx->lockState()->skipAcquireTicket();
         }
 
         // Acquire locks. If the query is on a view, we release our locks and convert the query

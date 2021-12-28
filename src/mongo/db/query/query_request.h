@@ -74,7 +74,7 @@ public:
      * Returns a heap allocated QueryRequest on success or an error if 'cmdObj' is not well
      * formed.
      */
-    static StatusWith<std::unique_ptr<QueryRequest>> makeFromFindCommand(NamespaceString nss,
+    static StatusWith<std::unique_ptr<QueryRequest>> makeFromFindCommand(const NamespaceString& nss,
                                                                          const BSONObj& cmdObj,
                                                                          bool isExplain);
 

@@ -223,12 +223,23 @@ public:
         auto curOp = CurOp::get(opCtx);
         curOp->debug().cursorid = request.cursorid;
 
-        // Validate term before acquiring locks, if provided.
         if (request.term) {
+            // Validate term before acquiring locks, if provided.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             Status status = replCoord->updateTerm(opCtx, *request.term);
             // Note: updateTerm returns ok if term stayed the same.
             uassertStatusOK(status);
+
+            // If this is an oplog request, then this is a getMore for replication oplog
+            // fetching. The term field is only allowed for internal clients (see
+            // checkAuthForGetMore).
+            if (request.nss == NamespaceString::kRsOplogNamespace) {
+                // We do not want to take tickets for internal (replication) oplog reads.
+                // Stalling on ticket acquisition can cause complicated deadlocks. Primaries may
+                // depend on data reaching secondaries in order to proceed; and secondaries may
+                // get stalled replicating because of an inability to acquire a read ticket.
+                opCtx->lockState()->skipAcquireTicket();
+            }
         }
 
         // Cursors come in one of two flavors:
