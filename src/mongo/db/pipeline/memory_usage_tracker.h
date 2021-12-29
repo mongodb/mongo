@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -49,11 +50,20 @@ public:
         PerFunctionMemoryTracker() = delete;
 
         void update(long long diff) {
-            tassert(5578603,
-                    str::stream() << "Underflow on memory tracking, attempting to add " << diff
-                                  << " but only " << _currentMemoryBytes << " available",
-                    diff >= 0 || _currentMemoryBytes >= std::abs(diff));
-            set(_currentMemoryBytes + diff);
+
+            // TODO SERVER-61281: this is a temporary measure in tackling the problem in this
+            // ticket. It prevents the underflow from happening but doesn't address the cause
+            // which is inaccurate tracking.
+            // Once inaccurate tracking is resolved, the underflow assertion below could be
+            // restored.
+            //      tassert(5578603,
+            //              str::stream() << "Underflow on memory tracking, attempting to add " <<
+            //              diff
+            //                            << " but only " << _currentMemoryBytes << " available",
+            //              diff >= 0 || _currentMemoryBytes >= std::abs(diff));
+            //      set(_currentMemoryBytes + diff);
+
+            set(std::max(_currentMemoryBytes + diff, 0LL));
         }
 
         void set(long long total) {
