@@ -243,7 +243,7 @@ thread_flush_run(void *arg)
      */
     (void)unlink(sentinel_file);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;; ++i) {
+    for (i = 0;;) {
         sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
         sleep(sleep_time);
         testutil_check(td->conn->query_timestamp(td->conn, ts_string, "get=last_checkpoint"));
@@ -264,7 +264,7 @@ thread_flush_run(void *arg)
          * Create the sentinel file so that the parent process knows the desired number of
          * flush_tier calls have finished and can start its timer.
          */
-        if (i == flush_calls) {
+        if (++i == flush_calls) {
             testutil_assert_errno((fp = fopen(sentinel_file, "w")) != NULL);
             testutil_assert_errno(fclose(fp) == 0);
         }
