@@ -6862,6 +6862,7 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - func: "set up venv"
+  - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - command: subprocess.exec
     type: test
@@ -6869,6 +6870,11 @@ tasks:
       binary: bash
       args:
         - "./src/evergreen/commit_message_validate.sh"
+      env:
+        JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+        JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+        JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+        JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
 
 - name: check_for_todos
   tags: []
