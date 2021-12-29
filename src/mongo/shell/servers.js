@@ -1029,7 +1029,7 @@ MongoRunner.stopMongod = function(conn, signal, opts, waitpid) {
     if (!waitpid) {
         return 0;
     }
-    if (allowedExitCode !== returnCode) {
+    if (allowedExitCode !== returnCode && !opts.skipValidatingExitCode) {
         throw new MongoRunner.StopError(returnCode);
     } else if (returnCode !== MongoRunner.EXIT_CLEAN) {
         print("MongoDB process on port " + port + " intentionally exited with error code ",

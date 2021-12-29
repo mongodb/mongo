@@ -52,8 +52,7 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSucce
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     std::vector<FaultFacetType> faultFacetTypes{FaultFacetType::kMock1, FaultFacetType::kMock2};
 
-    // TODO(SERVER-62280): fix this
-    // ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
 
     // send successful health check response from each
     for (auto faultFacetType : faultFacetTypes) {
