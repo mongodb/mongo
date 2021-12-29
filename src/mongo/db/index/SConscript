@@ -113,7 +113,9 @@ env.Library(
     ],
 )
 
-env.Library(
+serveronlyEnv = env.Clone()
+serveronlyEnv.InjectThirdParty(libraries=['snappy'])
+serveronlyEnv.Library(
     target="index_access_method",
     source=[
         "index_access_method.cpp"
@@ -124,7 +126,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/sorter/sorter',
+        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/execution_context',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',

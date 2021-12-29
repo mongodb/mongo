@@ -50,7 +50,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/sorter/factory.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
@@ -83,12 +82,12 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-sorter::Options makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName) {
-    sorter::Options options;
-    options.tempDir = storageGlobalParams.dbpath + "/_tmp";
-    options.maxMemoryUsageBytes = maxMemoryUsageBytes;
-    options.dbName = dbName.toString();
-    return options;
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName) {
+    return SortOptions()
+        .TempDir(storageGlobalParams.dbpath + "/_tmp")
+        .ExtSortAllowed()
+        .MaxMemoryUsageBytes(maxMemoryUsageBytes)
+        .DBName(dbName.toString());
 }
 
 MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPathsVec) {
@@ -102,12 +101,14 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
     return multikeyPaths;
 }
 
-auto btreeExternalSortComparison = [](const std::pair<KeyString::Value, sorter::NullValue>& lhs,
-                                      const std::pair<KeyString::Value, sorter::NullValue>& rhs) {
-    return lhs.first.compare(rhs.first);
-};
-
 }  // namespace
+
+struct BtreeExternalSortComparison {
+    typedef std::pair<KeyString::Value, mongo::NullValue> Data;
+    int operator()(const Data& l, const Data& r) const {
+        return l.first.compare(r.first);
+    }
+};
 
 AbstractIndexAccessMethod::AbstractIndexAccessMethod(const IndexCatalogEntry* btreeState,
                                                      std::unique_ptr<SortedDataInterface> btree)
@@ -520,7 +521,7 @@ public:
      * Inserts all multikey metadata keys cached during the BulkBuilder's lifetime into the
      * underlying Sorter, finalizes it, and returns an iterator over the sorted dataset.
      */
-    std::unique_ptr<Sorter::Iterator> done() final;
+    Sorter::Iterator* done() final;
 
     int64_t getKeysInserted() const final;
 
@@ -529,7 +530,7 @@ public:
 private:
     void _insertMultikeyMetadataKeysIntoSorter();
 
-    std::unique_ptr<Sorter> _makeSorter(
+    Sorter* _makeSorter(
         size_t maxMemoryUsageBytes,
         StringData dbName,
         boost::optional<StringData> fileName = boost::none,
@@ -644,7 +645,7 @@ Status AbstractIndexAccessMethod::BulkBuilderImpl::insert(
     }
 
     for (const auto& keyString : *keys) {
-        _sorter->add(keyString, sorter::NullValue());
+        _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
 
@@ -663,10 +664,10 @@ bool AbstractIndexAccessMethod::BulkBuilderImpl::isMultikey() const {
     return _isMultiKey;
 }
 
-std::unique_ptr<IndexAccessMethod::BulkBuilder::Sorter::Iterator>
+IndexAccessMethod::BulkBuilder::Sorter::Iterator*
 AbstractIndexAccessMethod::BulkBuilderImpl::done() {
     _insertMultikeyMetadataKeysIntoSorter();
-    return _sorter->done(Sorter::Iterator::ReturnPolicy::kCopy);
+    return _sorter->done();
 }
 
 int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
@@ -681,7 +682,7 @@ AbstractIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
 
 void AbstractIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
     for (const auto& keyString : _multikeyMetadataKeys) {
-        _sorter->add(keyString, sorter::NullValue());
+        _sorter->add(keyString, mongo::NullValue());
         ++_keysInserted;
     }
 
@@ -693,27 +694,24 @@ void AbstractIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysInto
 AbstractIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
 AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
     return std::pair<KeyString::Value::SorterDeserializeSettings,
-                     sorter::NullValue::SorterDeserializeSettings>(
+                     mongo::NullValue::SorterDeserializeSettings>(
         {_indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion()}, {});
 }
 
-std::unique_ptr<AbstractIndexAccessMethod::BulkBuilderImpl::Sorter>
+AbstractIndexAccessMethod::BulkBuilderImpl::Sorter*
 AbstractIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     size_t maxMemoryUsageBytes,
     StringData dbName,
     boost::optional<StringData> fileName,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
-    return fileName ? sorter::makeFromExistingRanges<KeyString::Value, sorter::NullValue>(
-                          fileName->toString(),
-                          *ranges,
-                          makeSortOptions(maxMemoryUsageBytes, dbName),
-                          btreeExternalSortComparison,
-                          _makeSorterSettings())
-                    : sorter::make<KeyString::Value, sorter::NullValue>(
-                          "index",
-                          makeSortOptions(maxMemoryUsageBytes, dbName),
-                          btreeExternalSortComparison,
-                          _makeSorterSettings());
+    return fileName ? Sorter::makeFromExistingRanges(fileName->toString(),
+                                                     *ranges,
+                                                     makeSortOptions(maxMemoryUsageBytes, dbName),
+                                                     BtreeExternalSortComparison(),
+                                                     _makeSorterSettings())
+                    : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName),
+                                   BtreeExternalSortComparison(),
+                                   _makeSorterSettings());
 }
 
 void AbstractIndexAccessMethod::_yieldBulkLoad(OperationContext* opCtx,
@@ -759,7 +757,7 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     auto ns = _indexCatalogEntry->getNSSFromCatalog(opCtx);
 
-    auto it = bulk->done();
+    std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->done());
 
     static constexpr char message[] = "Index Build: inserting keys from external sorter into index";
     ProgressMeterHolder pm;
@@ -964,6 +962,23 @@ SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {
     return _newInterface.get();
 }
 
+/**
+ * Generates a new file name on each call using a static, atomic and monotonically increasing
+ * number. Each name is suffixed with a random number generated at startup, to prevent name
+ * collisions when the index build external sort files are preserved across restarts.
+ *
+ * Each user of the Sorter must implement this function to ensure that all temporary files that the
+ * Sorter instances produce are uniquely identified using a unique file name extension with separate
+ * atomic variable. This is necessary because the sorter.cpp code is separately included in multiple
+ * places, rather than compiled in one place and linked, and so cannot provide a globally unique ID.
+ */
+std::string nextFileName() {
+    static AtomicWord<unsigned> indexAccessMethodFileCounter;
+    static const int64_t randomSuffix = SecureRandom().nextInt64();
+    return str::stream() << "extsort-index." << indexAccessMethodFileCounter.fetchAndAdd(1) << '-'
+                         << randomSuffix;
+}
+
 Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
                                                       const KeyString::Value& dataKey,
                                                       const RecordIdHandlerFn& onDuplicateRecord) {
@@ -982,3 +997,6 @@ Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
                                   _descriptor->collation());
 }
 }  // namespace mongo
+
+#include "mongo/db/sorter/sorter.cpp"
+MONGO_CREATE_SORTER(mongo::KeyString::Value, mongo::NullValue, mongo::BtreeExternalSortComparison);

@@ -30,8 +30,13 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/sorter/sorted_data_iterator.h"
-#include "mongo/db/sorter/sorter.h"
+
+namespace mongo {
+template <typename Key, typename Value>
+class SortIteratorInterface;
+template <typename Key, typename Value>
+class Sorter;
+}  // namespace mongo
 
 namespace mongo::sbe {
 /**
@@ -90,8 +95,7 @@ protected:
 private:
     void makeSorter();
 
-    using SorterIterator =
-        sorter::SortedDataIterator<value::MaterializedRow, value::MaterializedRow>;
+    using SorterIterator = SortIteratorInterface<value::MaterializedRow, value::MaterializedRow>;
     using SorterData = std::pair<value::MaterializedRow, value::MaterializedRow>;
 
     const value::SlotVector _obs;
@@ -108,7 +112,7 @@ private:
     std::unique_ptr<SorterIterator> _mergeIt;
     SorterData _mergeData;
     SorterData* _mergeDataIt{&_mergeData};
-    std::unique_ptr<sorter::Sorter<value::MaterializedRow, value::MaterializedRow>> _sorter;
+    std::unique_ptr<Sorter<value::MaterializedRow, value::MaterializedRow>> _sorter;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
