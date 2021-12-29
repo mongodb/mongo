@@ -1287,7 +1287,8 @@ wiredtiger_open_common =\
             choices=['dsync', 'fsync', 'none']),
         ]),
     Config('verify_metadata', 'false', r'''
-        open connection and verify any WiredTiger metadata. This API
+        open connection and verify any WiredTiger metadata. Not compatible when
+        opening a connection from a backup. This API
         allows verification and detection of corruption in WiredTiger metadata.''',
         type='boolean'),
     Config('write_through', '', r'''

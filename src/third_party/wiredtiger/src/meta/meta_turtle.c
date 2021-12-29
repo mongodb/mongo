@@ -223,7 +223,7 @@ __wt_turtle_exists(WT_SESSION_IMPL *session, bool *existp)
  *     Check the turtle file and create if necessary.
  */
 int
-__wt_turtle_init(WT_SESSION_IMPL *session)
+__wt_turtle_init(WT_SESSION_IMPL *session, bool verify_meta)
 {
     WT_DECL_RET;
     char *metaconf, *unused_value;
@@ -306,6 +306,15 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
     if (load) {
         if (exist_incr)
             F_SET(S2C(session), WT_CONN_WAS_BACKUP);
+
+        /*
+         * Verifying the metadata is incompatible with restarting from a backup because the verify
+         * call will rewrite the metadata's checkpoint and could lead to skipping recovery. Test
+         * here before creating the metadata file and reading in the backup file.
+         */
+        if (verify_meta && exist_backup)
+            WT_RET_MSG(
+              session, EINVAL, "restoring a backup is incompatible with metadata verification");
 
         /* Create the metadata file. */
         WT_RET(__metadata_init(session));
