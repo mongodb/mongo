@@ -41,4 +41,4 @@ server_parameters:
     set_at: [ startup ]
     description: Feature flag for enabling process health checking support.
     cpp_varname: gFeatureFlagHealthMonitoring
-    default: false
+    default: true
