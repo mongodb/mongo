@@ -424,7 +424,7 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
     return std::move(qr);
 }
 
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
+StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(const NamespaceString& nss,
                                                                        const BSONObj& cmdObj,
                                                                        bool isExplain) {
     BSONElement first = cmdObj.firstElement();

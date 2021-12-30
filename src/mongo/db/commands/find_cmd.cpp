@@ -271,11 +271,10 @@ public:
 
             // Parse the command BSON to a QueryRequest. Pass in the parsedNss in case _request.body
             // does not have a UUID.
-            auto parsedNss =
+            const auto parsedNss =
                 NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, _request.body)};
             const bool isExplain = false;
-            auto qr =
-                parseCmdObjectToQueryRequest(opCtx, std::move(parsedNss), _request.body, isExplain);
+            auto qr = parseCmdObjectToQueryRequest(opCtx, parsedNss, _request.body, isExplain);
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
