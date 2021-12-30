@@ -225,5 +225,11 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx);
  */
 void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss);
 
+/**
+ * Recovers all unfinished migrations pending recovery.
+ * Note: This method assumes its caller is preventing new migrations from starting.
+ */
+void drainMigrationsPendingRecovery(OperationContext* opCtx);
+
 }  // namespace migrationutil
 }  // namespace mongo
