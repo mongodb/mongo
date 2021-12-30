@@ -2952,7 +2952,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_config_gets(session, cfg, "verify_metadata", &cval));
     verify_meta = cval.val;
 
-    /* Only verify the metadata file first. We will verify the history store table later. */
+    /* Verify the metadata file. */
     if (verify_meta) {
         wt_session = &session->iface;
         ret = wt_session->verify(wt_session, WT_METAFILE_URI, NULL);
