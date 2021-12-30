@@ -398,8 +398,6 @@ int
 __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
   WT_CELL_UNPACK_KV *vpack, WT_UPDATE_SELECT *upd_select)
 {
-    WT_DECL_ITEM(tmp);
-    WT_DECL_RET;
     WT_PAGE *page;
     WT_TIME_WINDOW *select_tw;
     WT_UPDATE *first_txn_upd, *first_upd, *onpage_upd, *upd, *last_upd, *tombstone;
@@ -651,7 +649,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
              * freed when it is written to the disk image in the previous eviction.
              */
             if (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
-                WT_ERR(__rec_append_orig_value(session, page, tombstone, vpack));
+                WT_RET(__rec_append_orig_value(session, page, tombstone, vpack));
 
                 /*
                  * We may have updated the global transaction concurrently and the tombstone is now
@@ -710,7 +708,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
       upd_select->upd;
 
     /* Check the update chain for conditions that could prevent it's eviction. */
-    WT_ERR(__rec_validate_upd_chain(session, r, onpage_upd, select_tw, vpack));
+    WT_RET(__rec_validate_upd_chain(session, r, onpage_upd, select_tw, vpack));
 
     /*
      * Fixup any out of order timestamps, assert that checkpoint wasn't running when this round of
@@ -724,7 +722,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
         /* Catch this case in diagnostic builds. */
         WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_ooo_checkpoint_race_3);
         WT_ASSERT(session, false);
-        WT_ERR(EBUSY);
+        WT_RET(EBUSY);
     }
 
     /*
@@ -742,7 +740,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
         supd_restore = F_ISSET(r, WT_REC_EVICT) &&
           (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
 
-        WT_ERR(__rec_update_save(session, r, ins, rip, onpage_upd, supd_restore, upd_memsize));
+        WT_RET(__rec_update_save(session, r, ins, rip, onpage_upd, supd_restore, upd_memsize));
 
         /*
          * Mark the selected update (and potentially the tombstone preceding it) as being destined
@@ -788,10 +786,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      */
     if (upd_select->upd != NULL && vpack != NULL && vpack->type != WT_CELL_DEL &&
       !vpack->tw.prepare && (upd_saved || F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)))
-        WT_ERR(__rec_append_orig_value(session, page, upd_select->upd, vpack));
+        WT_RET(__rec_append_orig_value(session, page, upd_select->upd, vpack));
 
     __wt_rec_time_window_clear_obsolete(session, upd_select, NULL, r);
-err:
-    __wt_scr_free(session, &tmp);
-    return (ret);
+
+    return (0);
 }
