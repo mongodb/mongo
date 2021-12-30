@@ -243,7 +243,7 @@ class search_near_03 : public test_harness::test {
             random_index = random_generator::instance().generate_integer(
               static_cast<size_t>(0), prefixes_map.at(coll.id).size() - 1);
             prefix_key = get_prefix_from_key(prefixes_map.at(coll.id).at(random_index));
-            logger::log_msg(LOG_INFO,
+            logger::log_msg(LOG_TRACE,
               type_string(tc->type) +
                 " thread: Perform unique index insertions with existing prefix key " + prefix_key +
                 ".");
