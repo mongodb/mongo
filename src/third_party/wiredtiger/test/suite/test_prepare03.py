@@ -192,8 +192,7 @@ class test_prepare03(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction("commit_timestamp=2b")
         self.session.timestamp_transaction("durable_timestamp=2b")
         self.session.commit_transaction()
-        # There is a bug with search_near operation when no key is set.
-        # This fix is being tracked in WT-3918.
+        # FIXME-WT-3682: There is a bug with search_near operation when no key is set.
         if self.uri == 'lsm':
             cursor.set_key(self.genkey(self.nentries))
         cursor.search_near()
