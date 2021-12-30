@@ -37,7 +37,6 @@ class test_row_store_empty_values(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 
     # Smoke test empty row-store values.
-    @unittest.skip("Skipping, to be removed or updated in future ticket")
     def test_row_store_empty_values(self):
         nentries = 25000
         uri = 'file:test_empty_values'          # This is a btree layer test.
