@@ -55,6 +55,10 @@ GenAutoconfVersion(){
 	VERSION_NOPATCH=${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}
 	AC_SUBST(VERSION_NOPATCH)
 	END
+
+    echo "Building $rpmspec"
+    sed -e "s/Version:	.*/Version:	${dotted_version}/" $rpmspec	\
+        > $tmp_file && mv $tmp_file $rpmspec
 }
 
 GenCmakeVersion(){
@@ -79,7 +83,3 @@ GenCmakeVersion(){
 
 GenAutoconfVersion
 GenCmakeVersion
-
-echo "Building $rpmspec"
-sed -e "s/Version:	.*/Version:	${dotted_version}/" $rpmspec	\
-        > $tmp_file && mv $tmp_file $rpmspec
