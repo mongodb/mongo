@@ -132,6 +132,8 @@ last-continuous:
       test_file: jstests/auth/dbcheck.js
     - ticket: SERVER-61666
       test_file: jstests/replsets/tenant_migration_transaction_boundary.js
+    - ticket: SERVER-62245
+      test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
     - ticket: SERVER-62212
       test_file: jstests/replsets/dbcheck_write_concern.js
     - ticket: SERVER-62296
@@ -409,6 +411,8 @@ last-lts:
       test_file: jstests/auth/dbcheck.js
     - ticket: SERVER-61666
       test_file: jstests/replsets/tenant_migration_transaction_boundary.js
+    - ticket: SERVER-62245
+      test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
     - ticket: SERVER-62296
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
 

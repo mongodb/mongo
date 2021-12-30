@@ -816,7 +816,12 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
     hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);
-    store.update(opCtx, query, update);
+    try {
+        store.update(opCtx, query, update);
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        // If we are recovering the migration, the range-deletion may have already finished. So its
+        // associated document may already have been removed.
+    }
 
     if (hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
         hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
@@ -884,16 +889,6 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
     store.forEach(opCtx,
                   BSONObj{},
                   [&opCtx, &unfinishedMigrationsCount](const MigrationCoordinatorDocument& doc) {
-                      // MigrationCoordinators are only created under the MigrationBlockingGuard,
-                      // which means that only one can possibly exist on an instance at a time.
-                      // Furthermore, recovery of an incomplete MigrationCoordator also acquires the
-                      // MigrationBlockingGuard. Because of this it is not possible to have more
-                      // than one unfinished migration.
-                      invariant(unfinishedMigrationsCount == 0,
-                                str::stream()
-                                    << "Upon step-up a second migration coordinator was found"
-                                    << redact(doc.toBSON()));
-
                       unfinishedMigrationsCount++;
                       LOGV2_DEBUG(4798511,
                                   3,
@@ -908,14 +903,8 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                           CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
                       }
 
-                      auto mbg = std::make_shared<MigrationBlockingGuard>(
-                          opCtx,
-                          str::stream() << "Recovery of migration session "
-                                        << doc.getMigrationSessionId().toString()
-                                        << " on collection " << nss);
-
                       ExecutorFuture<void>(getMigrationUtilExecutor(opCtx->getServiceContext()))
-                          .then([serviceContext = opCtx->getServiceContext(), nss, mbg] {
+                          .then([serviceContext = opCtx->getServiceContext(), nss] {
                               ThreadClient tc("TriggerMigrationRecovery", serviceContext);
                               {
                                   stdx::lock_guard<Client> lk(*tc.get());
