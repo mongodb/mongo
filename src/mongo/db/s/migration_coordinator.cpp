@@ -90,7 +90,7 @@ MigrationCoordinator::MigrationCoordinator(MigrationSessionId sessionId,
       _waitForDelete(waitForDelete) {}
 
 MigrationCoordinator::MigrationCoordinator(const MigrationCoordinatorDocument& doc)
-    : _migrationInfo(doc) {}
+    : _migrationInfo(doc), _recoveringMigration(true) {}
 
 MigrationCoordinator::~MigrationCoordinator() = default;
 
@@ -208,10 +208,26 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
         "lsid"_attr = _migrationInfo.getLsid(),
         "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
         "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::advanceTransactionOnRecipient(opCtx,
-                                                 _migrationInfo.getRecipientShardId(),
-                                                 _migrationInfo.getLsid(),
-                                                 _migrationInfo.getTxnNumber());
+    try {
+        migrationutil::advanceTransactionOnRecipient(opCtx,
+                                                     _migrationInfo.getRecipientShardId(),
+                                                     _migrationInfo.getLsid(),
+                                                     _migrationInfo.getTxnNumber());
+    } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>& ex) {
+        // TODO: SERVER-62316: No longer catch after 6.0 branches out
+        if (_recoveringMigration) {
+            LOGV2_WARNING(6224500,
+                          "Transaction number on recipient shard was already advanced by a later "
+                          "migration that started before this one finished recovery",
+                          "namespace"_attr = _migrationInfo.getNss(),
+                          "migrationId"_attr = _migrationInfo.getId(),
+                          "lsid"_attr = _migrationInfo.getLsid(),
+                          "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
+                          "error"_attr = redact(ex));
+        } else {
+            throw;
+        }
+    }
 
     hangBeforeSendingCommitDecision.pauseWhileSet();
 
@@ -293,8 +309,21 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                     "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
                     "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
                     "error"_attr = exShardNotFound);
+    } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>& ex) {
+        // TODO: SERVER-62316: No longer catch after 6.0 branches out
+        if (_recoveringMigration) {
+            LOGV2_WARNING(6224501,
+                          "Transaction number on recipient shard was already advanced by a later "
+                          "migration that started before this one finished recovery",
+                          "namespace"_attr = _migrationInfo.getNss(),
+                          "migrationId"_attr = _migrationInfo.getId(),
+                          "lsid"_attr = _migrationInfo.getLsid(),
+                          "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
+                          "error"_attr = redact(ex));
+        } else {
+            throw;
+        }
     }
-
     LOGV2_DEBUG(23902,
                 2,
                 "Marking range deletion task on recipient as ready for processing",

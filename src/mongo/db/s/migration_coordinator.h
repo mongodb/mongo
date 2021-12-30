@@ -125,6 +125,8 @@ private:
     MigrationCoordinatorDocument _migrationInfo;
     bool _waitForDelete = false;
     boost::optional<ExecutorFuture<void>> _releaseRecipientCriticalSectionFuture;
+    const bool _recoveringMigration =
+        false;  // TODO: SERVER-62316: Can be removed after 6.0 branches out
 };
 
 }  // namespace migrationutil
