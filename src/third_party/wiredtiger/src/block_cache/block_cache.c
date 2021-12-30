@@ -363,7 +363,7 @@ __wt_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_siz
             if (blkcache_item->freq_rec_counter < 0)
                 blkcache_item->freq_rec_counter = 0;
             blkcache_item->freq_rec_counter++;
-            blkcache_item->ref_count++;
+            (void)__wt_atomic_addv32(&blkcache_item->ref_count, 1);
             break;
         }
     }
