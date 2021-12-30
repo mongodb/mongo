@@ -191,6 +191,7 @@ TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) 
 
 TEST_F(FaultManagerTest, OneFacetIsResolved) {
     feature_flags::gFeatureFlagHealthMonitoring = true;
+    mongo::gActiveFaultDurationSecs.store(5);
     registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
     registerMockHealthObserver(FaultFacetType::kMock2, [] { return 1.1; });
 
