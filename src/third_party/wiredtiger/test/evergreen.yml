@@ -2955,23 +2955,6 @@ tasks:
         vars:
           format_test_script_args: -a -t 30
 
-  - name: many-dhandle-stress-test
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          configure_env_vars:
-            CXX=/opt/mongodbtoolchain/v3/bin/g++
-            PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/bench/workgen/runner"
-          script: |
-            set -o errexit
-            set -o verbose
-            export "PATH=/opt/mongodbtoolchain/v3/bin:$PATH"
-            ./workgen_perf_check.sh many-dhandle-stress.py output.log 50 500 500
-
   - name: many-collection-test
     commands:
       - command: timeout.update
@@ -4187,7 +4170,6 @@ buildvariants:
     upload_source_dir: mongo-tests/largescale/many-collection/dbpath/diagnostic.data
     upload_filename: diagnostic.data.tgz
   tasks:
-    - name: many-dhandle-stress-test
     - name: many-collection-test
       distros: ubuntu2004-wt-large
 
