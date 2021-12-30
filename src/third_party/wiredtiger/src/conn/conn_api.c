@@ -2949,9 +2949,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      * THE TURTLE FILE MUST BE THE LAST FILE CREATED WHEN INITIALIZING THE DATABASE HOME, IT'S WHAT
      * WE USE TO DECIDE IF WE'RE CREATING OR NOT.
      */
-    WT_ERR(__wt_turtle_init(session));
     WT_ERR(__wt_config_gets(session, cfg, "verify_metadata", &cval));
     verify_meta = cval.val;
+    WT_ERR(__wt_turtle_init(session, verify_meta));
 
     /* Verify the metadata file. */
     if (verify_meta) {

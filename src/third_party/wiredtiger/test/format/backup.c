@@ -65,7 +65,7 @@ check_copy(void)
 
     /* Now setup and open the path for real. */
     testutil_check(__wt_snprintf(path, len, "%s/BACKUP", g.home));
-    wts_open(path, &conn, &session, true);
+    wts_open(path, &conn, &session, false);
 
     /* Verify the objects. */
     tables_apply(wts_verify, conn);

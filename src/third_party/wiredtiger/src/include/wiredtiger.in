@@ -3138,9 +3138,9 @@ struct __wt_connection {
  * "read"\, \c "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c
  * "shared_cache"\, \c "split"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\,
  * \c "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
- * @config{verify_metadata, open connection and verify any WiredTiger metadata.  This API allows
- * verification and detection of corruption in WiredTiger metadata., a boolean flag; default \c
- * false.}
+ * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not compatible when
+ * opening a connection from a backup.  This API allows verification and detection of corruption in
+ * WiredTiger metadata., a boolean flag; default \c false.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to files.  Ignored on
  * non-Windows systems.  Options are given as a list\, such as <code>"write_through=[data]"</code>.
  * Configuring \c write_through requires care\, see @ref tuning_system_buffer_cache_direct_io for
