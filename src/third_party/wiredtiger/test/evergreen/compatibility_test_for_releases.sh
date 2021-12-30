@@ -256,10 +256,68 @@ upgrade_downgrade()
         done
 }
 
+#############################################################
+# test_upgrade_to_branch:
+#       arg1: release branch name
+#       arg2: path to test data folder
+#############################################################
+test_upgrade_to_branch()
+{
+        cd $1/test/checkpoint
+
+        for FILE in $2/*; do
+            # Run actual test.
+            echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+            echo "Upgrading $FILE database to $1..."
+
+            # Disable exit on non 0
+            set +e
+
+            output="$(./t -t r -D -v -h $FILE)"
+            test_res=$?
+
+            # Enable exit on non 0
+            set -e
+
+            # Validate test result.
+            if [[ "$FILE" =~ "4.4."[0-6]"_unclean"$ ]]; then
+                echo "Databases generated with unclean shutdown from versions 4.4.[0-6] must fail."
+                if [[ "$test_res" == 0 ]]; then
+                    echo "$output"
+                    echo "Error: Upgrade of $FILE database to $1 has not failed!"
+                    exit 1
+                fi
+            elif [[ "$test_res" != 0 ]]; then
+                echo "$output"
+                echo "Error: Upgrade of $FILE database to $1 failed! Test result is $test_res."
+                exit 1
+            fi
+
+            echo "Success!"
+            echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        done
+}
+
+#############################################################
+# prepare_test_data_wt_8395:
+#############################################################
+prepare_test_data_wt_8395()
+{
+        echo "Preparing test data..."
+        git clone --quiet --depth 1 --filter=blob:none --no-checkout https://github.com/wiredtiger/mongo-tests.git
+        cd mongo-tests
+        git checkout --quiet master -- WT-8395 &> /dev/null
+        cd WT-8395
+
+        for FILE in *; do tar -zxf $FILE; done
+        rm *.tar.gz; cd ../..
+}
+
 # Only one of below flags will be set by the 1st argument of the script.
 older=false
 newer=false
 wt_standalone=false
+upgrade_to_latest=false
 
 # Branches in below 2 arrays should be put in newer-to-older order.
 #
@@ -276,9 +334,13 @@ older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
 # configuration file. 
 compatible_upgrade_downgrade_release_branches=(mongodb-4.4 mongodb-4.2)
 
+# This array is used to configure the release branches we'd like to run upgrade to latest test.
+upgrade_to_latest_upgrade_downgrade_release_branches=(mongodb-5.0 mongodb-4.4)
+
 declare -A scopes
 scopes[newer]="newer stable release branches"
 scopes[older]="older stable release branches"
+scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of the codebase"
 scopes[wt_standalone]="WiredTiger standalone releases"
 
 #############################################################
@@ -286,9 +348,10 @@ scopes[wt_standalone]="WiredTiger standalone releases"
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-w]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-u|-w]"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
     echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
+    echo -e "\t-u\trun compatibility tests for ${scopes[upgrade_to_latest]}"
     echo -e "\t-w\trun compatibility tests for ${scopes[wt_standalone]}"
     exit 1
 }
@@ -311,6 +374,12 @@ case $1 in
     echo "Performing compatibility tests for ${scopes[older]}"
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 ;;
+"-u")
+    upgrade_to_latest=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[upgrade_to_latest]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
 "-w")
     wt_standalone=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -327,6 +396,22 @@ top="test-compatibility-run"
 rm -rf "$top" && mkdir "$top"
 cd "$top"
 
+if [ "$upgrade_to_latest" = true ]; then
+    test_root=$(pwd)
+    test_data_root="$test_root/mongo-tests"
+    test_data="$test_root/mongo-tests/WT-8395"
+
+    for b in ${upgrade_to_latest_upgrade_downgrade_release_branches[@]}; do
+        # prepare test data and test upgrade to the branch b.
+        (prepare_test_data_wt_8395) && \
+        (build_branch $b) && \
+        (test_upgrade_to_branch $b $test_data)
+
+        # cleanup.
+        cd $test_root
+        rm -rf $test_data_root
+    done
+fi
 
 # Build the branches.
 if [ "$newer" = true ]; then
