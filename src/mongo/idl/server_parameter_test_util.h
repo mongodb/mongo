@@ -27,8 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/idl/feature_flag.h"
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/server_parameter.h"
 
 namespace mongo {
@@ -43,15 +45,15 @@ public:
      * Constructor setting the server parameter to the specified value.
      */
     template <typename T>
-    RAIIServerParameterControllerForTest(const std::string& paramName, T value)
-        : _serverParam(_getServerParameter(paramName)) {
+    RAIIServerParameterControllerForTest(const std::string& name, T value)
+        : _serverParam(ServerParameterSet::getNodeParameterSet()->get(name)) {
         // Save the old value
         BSONObjBuilder bob;
-        _serverParam->appendSupportingRoundtrip(nullptr, bob, paramName);
+        _serverParam->appendSupportingRoundtrip(nullptr, bob, name);
         _oldValue = bob.obj();
 
         // Set to the new value
-        uassertStatusOK(_serverParam->set(BSON(paramName << value).firstElement()));
+        uassertStatusOK(_serverParam->set(BSON(name << value).firstElement()));
     }
 
     /**
@@ -64,21 +66,7 @@ public:
     }
 
 private:
-    /**
-     * Returns a server parameter if exists, otherwise triggers an invariant.
-     */
-    ServerParameter* _getServerParameter(const std::string& paramName) {
-        const auto& spMap = ServerParameterSet::getGlobal()->getMap();
-        const auto& spIt = spMap.find(paramName);
-        invariant(spIt != spMap.end());
-
-        auto* sp = spIt->second;
-        invariant(sp);
-        return sp;
-    }
-
     ServerParameter* _serverParam;
-
     BSONObj _oldValue;
 };
 

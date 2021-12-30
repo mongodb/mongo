@@ -149,19 +149,20 @@ Status validateBaseOptions(const moe::Environment& params) {
             globalFailPointRegistry().registerAllFailPointsAsServerParameters();
         } else {
             // Deregister test-only parameters.
-            ServerParameterSet::getGlobal()->disableTestParameters();
+            ServerParameterSet::getNodeParameterSet()->disableTestParameters();
         }
 
         // Must come after registerAllFailPointsAsServerParameters() above.
-        const auto& spMap = ServerParameterSet::getGlobal()->getMap();
+        auto* paramSet = ServerParameterSet::getNodeParameterSet();
         for (const auto& setParam : parameters) {
-            const auto it = spMap.find(setParam.first);
+            auto* param = paramSet->getIfExists(setParam.first);
 
-            if (it == spMap.end()) {
+            if (!param) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "Unknown --setParameter '" << setParam.first << "'"};
             }
-            if (!enableTestCommandsValue && it->second->isTestOnly()) {
+
+            if (!enableTestCommandsValue && param->isTestOnly()) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "--setParameter '" << setParam.first
                                       << "' only available when used with 'enableTestCommands'"};
@@ -416,9 +417,8 @@ Status storeBaseOptions(const moe::Environment& params) {
         for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
              parametersIt != parameters.end();
              parametersIt++) {
-            const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
-            auto iter = serverParams.find(parametersIt->first);
-            ServerParameter* parameter = (iter == serverParams.end()) ? nullptr : iter->second;
+            auto* parameter =
+                ServerParameterSet::getNodeParameterSet()->getIfExists(parametersIt->first);
             if (nullptr == parameter) {
                 StringBuilder sb;
                 sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";

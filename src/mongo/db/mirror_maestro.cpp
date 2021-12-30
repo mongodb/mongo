@@ -478,8 +478,8 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
     _executor->startup();
     _topologyVersionObserver.init(serviceContext);
 
-    _params =
-        ServerParameterSet::getGlobal()->get<MirroredReadsServerParameter>(kMirroredReadsParamName);
+    _params = ServerParameterSet::getNodeParameterSet()->get<MirroredReadsServerParameter>(
+        kMirroredReadsParamName);
     invariant(_params);
 
     // Set _initGuard.liveness to kRunning

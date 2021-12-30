@@ -307,15 +307,14 @@ Status storeMongoShellOptions(const moe::Environment& params,
 
     if (params.count("setShellParameter")) {
         auto ssp = params["setShellParameter"].as<std::map<std::string, std::string>>();
-        auto map = ServerParameterSet::getGlobal()->getMap();
+        auto* paramSet = ServerParameterSet::getNodeParameterSet();
         for (auto it : ssp) {
             const auto& name = it.first;
-            auto paramIt = map.find(name);
-            if (paramIt == map.end() || !kSetShellParameterAllowlist.count(name)) {
+            auto param = paramSet->getIfExists(name);
+            if (!param || !kSetShellParameterAllowlist.count(name)) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "Unknown --setShellParameter '" << name << "'"};
             }
-            auto* param = paramIt->second;
             if (!param->allowedToChangeAtStartup()) {
                 return {ErrorCodes::BadValue,
                         str::stream()

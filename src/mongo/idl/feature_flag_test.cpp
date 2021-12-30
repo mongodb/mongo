@@ -40,13 +40,7 @@ namespace mongo {
 namespace {
 
 ServerParameter* getServerParameter(const std::string& name) {
-    const auto& spMap = ServerParameterSet::getGlobal()->getMap();
-    const auto& spIt = spMap.find(name);
-    ASSERT(spIt != spMap.end());
-
-    auto* sp = spIt->second;
-    ASSERT(sp);
-    return sp;
+    return ServerParameterSet::getNodeParameterSet()->get(name);
 }
 
 class FeatureFlagTest : public unittest::Test {

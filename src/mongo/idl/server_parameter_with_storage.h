@@ -196,16 +196,24 @@ public:
         static_assert(thread_safe || notRuntime, "Runtime server parameters must be thread safe");
     }
 
-    /**
-     * Convenience wrapper for storing a value.
-     */
-    Status setValue(const element_type& newValue) {
+    Status validateValue(const element_type& newValue) const {
         for (const auto& validator : _validators) {
             const auto status = validator(newValue);
             if (!status.isOK()) {
                 return status;
             }
         }
+        return Status::OK();
+    }
+
+    /**
+     * Convenience wrapper for storing a value.
+     */
+    Status setValue(const element_type& newValue) {
+        if (auto status = validateValue(newValue); !status.isOK()) {
+            return status;
+        }
+
         SW::store(_storage, newValue);
 
         if (_onUpdate) {
@@ -234,6 +242,17 @@ public:
         } else {
             b.append(name, getValue());
         }
+    }
+
+    Status validate(const BSONElement& newValueElement) const final {
+        element_type newValue;
+
+        if (auto status = newValueElement.tryCoerce(&newValue); !status.isOK()) {
+            return {status.code(),
+                    str::stream() << "Failed validating " << name() << ": " << status.reason()};
+        }
+
+        return validateValue(newValue);
     }
 
     /**

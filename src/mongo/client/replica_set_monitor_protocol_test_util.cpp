@@ -50,7 +50,7 @@ void ReplicaSetMonitorProtocolTestUtil::resetRSMProtocol() {
 
 ServerParameter::Map::const_iterator
 ReplicaSetMonitorProtocolTestUtil::findRSMProtocolServerParameter() {
-    const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
+    const auto& parameterMap = ServerParameterSet::getNodeParameterSet()->getMap();
     invariant(parameterMap.size());
     return parameterMap.find(kRSMProtocolFieldName);
 }

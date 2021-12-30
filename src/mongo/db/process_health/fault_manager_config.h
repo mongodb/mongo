@@ -199,18 +199,18 @@ public:
 
 private:
     static HealthMonitoringIntensitiesServerParameter* _getHealthObserverIntensities() {
-        return ServerParameterSet::getGlobal()->get<HealthMonitoringIntensitiesServerParameter>(
-            "healthMonitoringIntensities");
+        return ServerParameterSet::getNodeParameterSet()
+            ->get<HealthMonitoringIntensitiesServerParameter>("healthMonitoringIntensities");
     }
 
     static PeriodicHealthCheckIntervalsServerParameter* _getHealthObserverIntervals() {
-        return ServerParameterSet::getGlobal()->get<PeriodicHealthCheckIntervalsServerParameter>(
-            "healthMonitoringIntervals");
+        return ServerParameterSet::getNodeParameterSet()
+            ->get<PeriodicHealthCheckIntervalsServerParameter>("healthMonitoringIntervals");
     }
 
     static HealthMonitoringProgressMonitorServerParameter* _getLivenessConfig() {
-        return ServerParameterSet::getGlobal()->get<HealthMonitoringProgressMonitorServerParameter>(
-            "progressMonitor");
+        return ServerParameterSet::getNodeParameterSet()
+            ->get<HealthMonitoringProgressMonitorServerParameter>("progressMonitor");
     }
 
     static Milliseconds _getDefaultObserverInterval(FaultFacetType type);

@@ -140,35 +140,30 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
     if (params.count("setParameter")) {
         std::map<std::string, std::string> parameters =
             params["setParameter"].as<std::map<std::string, std::string>>();
-        for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
-             parametersIt != parameters.end();
-             parametersIt++) {
-            const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
-            auto iter = serverParams.find(parametersIt->first);
-            ServerParameter* parameter = (iter == serverParams.end()) ? nullptr : iter->second;
+        auto* paramSet = ServerParameterSet::getNodeParameterSet();
+        for (const auto& it : parameters) {
+            auto parameter = paramSet->getIfExists(it.first);
             if (nullptr == parameter) {
-                StringBuilder sb;
-                sb << "Illegal --setParameter parameter: \"" << parametersIt->first << "\"";
-                return Status(ErrorCodes::BadValue, sb.str());
+                return {ErrorCodes::BadValue,
+                        str::stream()
+                            << "Illegal --setParameter parameter: \"" << it.first << "\""};
             }
             if (!parameter->allowedToChangeAtStartup()) {
-                StringBuilder sb;
-                sb << "Cannot use --setParameter to set \"" << parametersIt->first
-                   << "\" at startup";
-                return Status(ErrorCodes::BadValue, sb.str());
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Cannot use --setParameter to set \"" << it.first
+                                      << "\" at startup"};
             }
-            Status status = parameter->setFromString(parametersIt->second);
+            Status status = parameter->setFromString(it.second);
             if (!status.isOK()) {
-                StringBuilder sb;
-                sb << "Bad value for parameter \"" << parametersIt->first
-                   << "\": " << status.reason();
-                return Status(ErrorCodes::BadValue, sb.str());
+                return {ErrorCodes::BadValue,
+                        str::stream() << "Bad value for parameter \"" << it.first
+                                      << "\": " << status.reason()};
             }
 
             LOGV2(4539300,
                   "Setting server parameter",
-                  "parameter"_attr = parametersIt->first,
-                  "value"_attr = parametersIt->second);
+                  "parameter"_attr = it.first,
+                  "value"_attr = it.second);
         }
     }
 

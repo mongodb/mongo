@@ -4376,10 +4376,9 @@ TEST_F(InitialSyncerTest, OplogOutOfOrderOnOplogFetchFinish) {
 TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("collectionClonerBatchSize")
-                  ->second->setFromString("1"));
+    ASSERT_OK(ServerParameterSet::getNodeParameterSet()
+                  ->get("collectionClonerBatchSize")
+                  ->setFromString("1"));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
 
@@ -4531,10 +4530,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("collectionClonerBatchSize")
-                  ->second->setFromString("1"));
+    ASSERT_OK(ServerParameterSet::getNodeParameterSet()
+                  ->get("collectionClonerBatchSize")
+                  ->setFromString("1"));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), 2U));

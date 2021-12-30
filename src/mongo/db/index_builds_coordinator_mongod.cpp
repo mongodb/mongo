@@ -98,11 +98,10 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
 
     // Change the 'setOnUpdate' function for the server parameter to signal the condition variable
     // when the value changes.
-    ServerParameter* serverParam =
-        ServerParameterSet::getGlobal()->get(kMaxNumActiveUserIndexBuildsServerParameterName);
-    static_cast<
-        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>*>(
-        serverParam)
+    using ParamT =
+        IDLServerParameterWithStorage<ServerParameterType::kStartupAndRuntime, AtomicWord<int>>;
+    ServerParameterSet::getNodeParameterSet()
+        ->get<ParamT>(kMaxNumActiveUserIndexBuildsServerParameterName)
         ->setOnUpdate([this](const int) -> Status {
             _indexBuildFinished.notify_all();
             return Status::OK();

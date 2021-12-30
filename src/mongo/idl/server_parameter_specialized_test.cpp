@@ -38,9 +38,7 @@ namespace test {
 
 template <typename T = ServerParameter>
 T* getServerParameter(StringData name) {
-    auto* sp = ServerParameterSet::getGlobal()->get<T>(name);
-    ASSERT(sp);
-    return sp;
+    return ServerParameterSet::getNodeParameterSet()->get<T>(name);
 }
 
 template <typename Validator>
@@ -308,6 +306,39 @@ TEST(SpecializedServerParameter, withOptions) {
     ASSERT_OK(dswo->setFromString("third value"));
     ASSERT_EQ(gSWO, "third value");
     ASSERT_APPENDED_STRING(dswo, "###");
+}
+
+void SpecializedRuntimeOnly::append(OperationContext*, BSONObjBuilder&, const std::string&) {}
+
+Status SpecializedRuntimeOnly::setFromString(const std::string& value) {
+    return Status::OK();
+}
+
+TEST(SpecializedServerParameter, withScope) {
+    using SPT = ServerParameterType;
+
+    auto* nodeSet = ServerParameterSet::getNodeParameterSet();
+    auto* clusterSet = ServerParameterSet::getClusterParameterSet();
+
+    constexpr auto kSpecializedWithOptions = "specializedWithOptions"_sd;
+    auto* nodeSWO = nodeSet->getIfExists(kSpecializedWithOptions);
+    ASSERT(nullptr != nodeSWO);
+    ASSERT(nullptr == clusterSet->getIfExists(kSpecializedWithOptions));
+
+    auto* clusterSWO = new SpecializedWithOptions(kSpecializedWithOptions, SPT::kClusterWide);
+    ASSERT(clusterSWO != nodeSWO);
+    ASSERT(clusterSWO == clusterSet->getIfExists(kSpecializedWithOptions));
+
+    // Duplicate key
+    ASSERT_THROWS_CODE(new SpecializedWithOptions(kSpecializedWithOptions, SPT::kClusterWide),
+                       DBException,
+                       6225104);
+
+    // Require runtime only.
+    constexpr auto kSpecializedRuntimeOnly = "specializedRuntimeOnly"_sd;
+    auto* clusterSRO = new SpecializedRuntimeOnly(kSpecializedRuntimeOnly, SPT::kClusterWide);
+    ASSERT(nullptr != clusterSRO);
+    // Pointer now belongs to ServerParameterSet, no need to delete.
 }
 
 }  // namespace test

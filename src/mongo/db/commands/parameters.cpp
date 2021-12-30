@@ -57,7 +57,7 @@ using logv2::LogSeverity;
 
 void appendParameterNames(std::string* help) {
     *help += "supported:\n";
-    for (const auto& kv : ServerParameterSet::getGlobal()->getMap()) {
+    for (const auto& kv : ServerParameterSet::getNodeParameterSet()->getMap()) {
         *help += "  ";
         *help += kv.first;
         *help += '\n';
@@ -226,10 +226,9 @@ public:
 
         int before = result.len();
 
-        const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
-        for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
-            if (all || cmdObj.hasElement(i->first.c_str())) {
-                i->second->append(opCtx, result, i->second->name());
+        for (const auto& param : ServerParameterSet::getNodeParameterSet()->getMap()) {
+            if (all || cmdObj.hasElement(param.first.c_str())) {
+                param.second->append(opCtx, result, param.second->name());
             }
         }
 
@@ -275,7 +274,8 @@ public:
         int numSet = 0;
         bool found = false;
 
-        const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
+        const ServerParameter::Map& parameterMap =
+            ServerParameterSet::getNodeParameterSet()->getMap();
 
         // First check that we aren't setting the same parameter twice and that we actually are
         // setting parameters that we have registered and can change at runtime

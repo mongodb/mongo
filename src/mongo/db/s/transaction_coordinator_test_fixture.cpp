@@ -55,10 +55,9 @@ HostAndPort makeHostAndPort(const ShardId& shardId) {
 void TransactionCoordinatorTestFixture::setUp() {
     ShardServerTestFixture::setUp();
 
-    ASSERT_OK(ServerParameterSet::getGlobal()
-                  ->getMap()
-                  .find("logComponentVerbosity")
-                  ->second->setFromString("{transaction: {verbosity: 3}}"));
+    ASSERT_OK(ServerParameterSet::getNodeParameterSet()
+                  ->get("logComponentVerbosity")
+                  ->setFromString("{transaction: {verbosity: 3}}"));
 
     for (const auto& shardId : kThreeShardIdList) {
         auto shardTargeter = RemoteCommandTargeterMock::get(

@@ -87,3 +87,7 @@ server_parameters:
         test_only: false
         condition: { expr: true }
         deprecated_name: deprecatedWithOptions
+    specializedRuntimeOnly:
+        description: "Only settable at runtime."
+        set_at: runtime
+        cpp_class: SpecializedRuntimeOnly

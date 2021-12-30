@@ -206,12 +206,9 @@ public:
         result.append(HelloCommandReply::kMinWireVersionFieldName,
                       wireSpec->incomingExternalClient.minWireVersion);
 
-        {
-            const auto& serverParams = ServerParameterSet::getGlobal()->getMap();
-            auto iter = serverParams.find(kAutomationServiceDescriptorFieldName);
-            if (iter != serverParams.end() && iter->second) {
-                iter->second->append(opCtx, result, kAutomationServiceDescriptorFieldName);
-            }
+        if (auto sp = ServerParameterSet::getNodeParameterSet()->getIfExists(
+                kAutomationServiceDescriptorFieldName)) {
+            sp->append(opCtx, result, kAutomationServiceDescriptorFieldName);
         }
 
         MessageCompressorManager::forSession(opCtx->getClient()->session())

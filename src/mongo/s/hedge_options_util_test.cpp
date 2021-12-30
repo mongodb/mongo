@@ -50,15 +50,11 @@ protected:
      * Set the given server parameters.
      */
     void setParameters(const BSONObj& parameters) {
-        const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
+        auto* paramSet = ServerParameterSet::getNodeParameterSet();
         BSONObjIterator parameterIterator(parameters);
-
         while (parameterIterator.more()) {
             BSONElement parameter = parameterIterator.next();
-            std::string parameterName = parameter.fieldName();
-
-            ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
-            uassertStatusOK(foundParameter->second->set(parameter));
+            uassertStatusOK(paramSet->get(parameter.fieldName())->set(parameter));
         }
     }
 

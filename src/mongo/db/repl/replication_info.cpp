@@ -454,10 +454,9 @@ public:
 
         result.append(HelloCommandReply::kReadOnlyFieldName, storageGlobalParams.readOnly);
 
-        const auto& params = ServerParameterSet::getGlobal()->getMap();
-        if (auto iter = params.find(kAutomationServiceDescriptorFieldName);
-            iter != params.end() && iter->second) {
-            iter->second->append(opCtx, result, kAutomationServiceDescriptorFieldName);
+        if (auto param = ServerParameterSet::getNodeParameterSet()->getIfExists(
+                kAutomationServiceDescriptorFieldName)) {
+            param->append(opCtx, result, kAutomationServiceDescriptorFieldName);
         }
 
         if (opCtx->getClient()->session()) {
