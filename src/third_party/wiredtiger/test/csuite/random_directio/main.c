@@ -806,9 +806,9 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
         large_arr[th] = dcalloc(LARGE_WRITE_SIZE, 1);
         large_buf(large_arr[th], LARGE_WRITE_SIZE, th, true);
     }
-    testutil_check(__wt_snprintf(checkdir, sizeof(checkdir), "%s.CHECK", home));
-    testutil_check(__wt_snprintf(dbgdir, sizeof(savedir), "%s.DEBUG", home));
-    testutil_check(__wt_snprintf(savedir, sizeof(savedir), "%s.SAVE", home));
+    testutil_check(__wt_snprintf(checkdir, sizeof(checkdir), "../%s.CHECK", home));
+    testutil_check(__wt_snprintf(dbgdir, sizeof(savedir), "../%s.DEBUG", home));
+    testutil_check(__wt_snprintf(savedir, sizeof(savedir), "../%s.SAVE", home));
 
     /*
      * We make a copy of the directory (possibly using direct I/O) for recovery and checking, and an
@@ -1051,7 +1051,7 @@ main(int argc, char *argv[])
     char *arg, *p;
     char args[1024], buf[1024];
     const char *method, *working_dir;
-    bool populate_only, rand_th, rand_time, verify_only;
+    bool populate_only, preserve, rand_th, rand_time, verify_only;
 
     (void)testutil_set_progname(argv);
 
@@ -1062,7 +1062,7 @@ main(int argc, char *argv[])
     timeout = MIN_TIME;
     interval = DEFAULT_INTERVAL;
     flags = 0;
-    populate_only = verify_only = false;
+    populate_only = preserve = verify_only = false;
     working_dir = "WT_TEST.random-directio";
     method = "none";
     pid = 0;
@@ -1111,6 +1111,9 @@ main(int argc, char *argv[])
             break;
         case 'p':
             populate_only = true;
+            break;
+        case 'P':
+            preserve = true;
             break;
         case 'S':
             p = __wt_optarg;
@@ -1251,5 +1254,11 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
     printf("SUCCESS\n");
+
+    if (!preserve) {
+        testutil_clean_test_artifacts(home);
+        testutil_clean_work_dir(home);
+    }
+
     return (EXIT_SUCCESS);
 }

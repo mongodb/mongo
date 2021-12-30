@@ -802,7 +802,9 @@ main(int argc, char *argv[])
     int ch, ncheckpoints, nreopens, status;
     const char *backup_verbose, *working_dir;
     char conf[1024], home[1024], backup_check[1024], backup_dir[1024], command[4096];
+    bool preserve;
 
+    preserve = false;
     ncheckpoints = nreopens = 0;
     (void)testutil_set_progname(argv);
     custom_die = die; /* Set our own abort handler */
@@ -811,10 +813,13 @@ main(int argc, char *argv[])
 
     working_dir = "WT_TEST.incr_backup";
 
-    while ((ch = __wt_getopt(progname, argc, argv, "h:S:v:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "h:pS:v:")) != EOF)
         switch (ch) {
         case 'h':
             working_dir = __wt_optarg;
+            break;
+        case 'p':
+            preserve = true;
             break;
         case 'S':
             seed = (uint64_t)atoll(__wt_optarg);
@@ -836,8 +841,8 @@ main(int argc, char *argv[])
         rnd.v = seed;
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "%s.BACKUP", home));
-    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "%s.CHECK", home));
+    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "../%s.BACKUP", home));
+    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "../%s.CHECK", home));
     printf("Seed: %" PRIu64 "\n", seed);
 
     testutil_check(
@@ -950,5 +955,10 @@ main(int argc, char *argv[])
     tables_free(&tinfo);
 
     printf("Success.\n");
-    return (0);
+    if (!preserve) {
+        testutil_clean_test_artifacts(home);
+        testutil_clean_work_dir(home);
+    }
+
+    return (EXIT_SUCCESS);
 }

@@ -322,13 +322,14 @@ run(int argc, char *argv[])
     WT_RAND_STATE rnd;
     u_int i, n;
     int ch;
-    bool default_home;
+    bool default_home, preserve;
 
     (void)testutil_set_progname(argv);
     __wt_random_init_seed(NULL, &rnd);
 
     default_home = true;
-    while ((ch = __wt_getopt(argv[0], argc, argv, "vh:")) != EOF) {
+    preserve = false;
+    while ((ch = __wt_getopt(argv[0], argc, argv, "vh:p")) != EOF) {
         switch (ch) {
         case 'v':
             verbose = true;
@@ -337,6 +338,9 @@ run(int argc, char *argv[])
             strncpy(home, __wt_optarg, HOME_LEN);
             home[HOME_LEN - 1] = '\0';
             default_home = false;
+            break;
+        case 'p':
+            preserve = true;
             break;
         default:
             fprintf(stderr, "usage: %s [-v]\n", argv[0]);
@@ -358,6 +362,8 @@ run(int argc, char *argv[])
 
     uri_teardown();
 
+    if (!preserve)
+        testutil_clean_work_dir(home);
     return (EXIT_SUCCESS);
 }
 
