@@ -19,6 +19,7 @@ post:
   - func: "cleanup"
 timeout:
   - func: "run wt hang analyzer"
+exec_timeout_secs: 21600 # 6 hrs
 
 #######################################
 #            Functions                #
