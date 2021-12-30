@@ -521,15 +521,6 @@ void FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp() {
 }
 
 
-/**
- * Read-only server parameter for featureCompatibilityVersion.
- */
-// No ability to specify 'none' as set_at type,
-// so use 'startup' in the IDL file, then override to none here.
-FeatureCompatibilityVersionParameter::FeatureCompatibilityVersionParameter(StringData name,
-                                                                           ServerParameterType)
-    : ServerParameter(ServerParameterSet::getGlobal(), name, false, false) {}
-
 void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
                                                   BSONObjBuilder& b,
                                                   const std::string& name) {

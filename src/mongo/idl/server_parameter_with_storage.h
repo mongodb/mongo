@@ -190,13 +190,10 @@ public:
     using element_type = typename SW::type;
 
     IDLServerParameterWithStorage(StringData name, T& storage)
-        : ServerParameter(ServerParameterSet::getGlobal(),
-                          name,
-                          paramType == SPT::kStartupOnly || paramType == SPT::kStartupAndRuntime,
-                          paramType == SPT::kRuntimeOnly || paramType == SPT::kStartupAndRuntime),
-          _storage(storage) {
-        static_assert(thread_safe || paramType == SPT::kStartupOnly,
-                      "Runtime server parameters must be thread safe");
+        : ServerParameter(name, paramType), _storage(storage) {
+        constexpr bool notRuntime =
+            (paramType == SPT::kStartupOnly) || (paramType == SPT::kReadOnly);
+        static_assert(thread_safe || notRuntime, "Runtime server parameters must be thread safe");
     }
 
     /**

@@ -32,11 +32,9 @@ global:
 server_parameters:
     featureCompatibilityVersion:
         description: 'Read-only view of current Feature Compatability Version'
-        # Actually, never.
-        set_at: startup
+        set_at: 'readonly'
         cpp_class:
             name: FeatureCompatibilityVersionParameter
-            override_ctor: true
     internalValidateFeaturesAsPrimary:
         deprecated_name: "internalValidateFeaturesAsMaster"
         description: >

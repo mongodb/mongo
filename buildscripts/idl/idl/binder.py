@@ -1320,6 +1320,10 @@ def _bind_server_parameter_set_at(ctxt, param):
     # type: (errors.ParserContext, syntax.ServerParameter) -> str
     """Translate set_at options to C++ enum value."""
 
+    if param.set_at == ['readonly']:
+        # Readonly may not be mixed with startup or runtime
+        return "ServerParameterType::kReadOnly"
+
     set_at = 0
     for psa in param.set_at:
         if psa.lower() == 'startup':

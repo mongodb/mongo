@@ -33,10 +33,9 @@ global:
 server_parameters:
     authSchemaVersion:
         description: 'Read-only value describing the current auth schema version'
-        set_at: startup # Actually, never.
+        set_at: 'readonly'
         cpp_class:
             name: AuthzVersionParameter
-            override_ctor: true
     startupAuthSchemaValidation:
         description: 'Validate auth schema on startup'
         set_at: startup

@@ -41,29 +41,12 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
                         ("BeginServerParameterRegistration"),
                         ("BeginStartupOptionHandling"))
 
+ServerParameter::ServerParameter(StringData name, ServerParameterType spt, NoRegistrationTag)
+    : _name(name.toString()), _type(spt) {}
+
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
-    : ServerParameter(ServerParameterSet::getGlobal(),
-                      name,
-                      spt != SPT::kRuntimeOnly,
-                      spt != SPT::kStartupOnly) {}
-
-ServerParameter::ServerParameter(ServerParameterSet* sps,
-                                 StringData name,
-                                 bool allowedToChangeAtStartup,
-                                 bool allowedToChangeAtRuntime)
-    : _name(name.toString()),
-      _allowedToChangeAtStartup(allowedToChangeAtStartup),
-      _allowedToChangeAtRuntime(allowedToChangeAtRuntime) {
-    if (sps) {
-        sps->add(this);
-    }
-}
-
-ServerParameter::ServerParameter(ServerParameterSet* sps, StringData name)
-    : _name(name.toString()), _allowedToChangeAtStartup(true), _allowedToChangeAtRuntime(true) {
-    if (sps) {
-        sps->add(this);
-    }
+    : ServerParameter(name, spt, NoRegistrationTag{}) {
+    ServerParameterSet::getGlobal()->add(this);
 }
 
 namespace {
@@ -119,11 +102,7 @@ void ServerParameterSet::remove(const std::string& name) {
 
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,
                                                                      ServerParameter* sp)
-    : ServerParameter(ServerParameterSet::getGlobal(),
-                      name,
-                      sp->allowedToChangeAtStartup(),
-                      sp->allowedToChangeAtRuntime()),
-      _sp(sp) {
+    : ServerParameter(name, sp->getServerParameterType()), _sp(sp) {
     if (_sp->isTestOnly()) {
         setTestOnly();
     }
@@ -173,9 +152,7 @@ public:
     DisabledTestParameter() = delete;
 
     DisabledTestParameter(ServerParameter* sp)
-        : ServerParameter(
-              nullptr, sp->name(), sp->allowedToChangeAtStartup(), sp->allowedToChangeAtRuntime()),
-          _sp(sp) {
+        : ServerParameter(sp->name(), sp->getServerParameterType(), NoRegistrationTag{}), _sp(sp) {
         setTestOnly();
     }
 

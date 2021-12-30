@@ -87,7 +87,7 @@ void FeatureFlag::set(bool enabled) {
 }
 
 FeatureFlagServerParameter::FeatureFlagServerParameter(StringData name, FeatureFlag& storage)
-    : ServerParameter(ServerParameterSet::getGlobal(), name, true, false), _storage(storage) {}
+    : ServerParameter(name, ServerParameterType::kStartupOnly), _storage(storage) {}
 
 void FeatureFlagServerParameter::append(OperationContext* opCtx,
                                         BSONObjBuilder& b,

@@ -78,15 +78,6 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
     return Status::OK();
 }
 
-// WiredTiger parameter exported read-only via the getParameter mechanism.
-// The IDL has no ability to specify 'none' as set_at type,
-// so use 'startup' in the IDL file, then override to none here.
-WiredTigerDirectoryForIndexesParameter::WiredTigerDirectoryForIndexesParameter(StringData name,
-                                                                               ServerParameterType)
-    : ServerParameter(
-          ServerParameterSet::getGlobal(), name, false /* allowedToChangeAtStartup */, false
-          /* allowedToChangeAtRuntime */) {}
-
 Status WiredTigerDirectoryForIndexesParameter::setFromString(const std::string&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};

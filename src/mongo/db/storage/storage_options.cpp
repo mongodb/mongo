@@ -64,14 +64,6 @@ void StorageGlobalParams::reset() {
 
 StorageGlobalParams storageGlobalParams;
 
-// Storage global parameters exported read-only via the getParameter mechanism.
-// The IDL has no ability to specify 'none' as set_at type,
-// so use 'startup' in the IDL file, then override to none here.
-StorageDirectoryPerDbParameter::StorageDirectoryPerDbParameter(StringData name, ServerParameterType)
-    : ServerParameter(
-          ServerParameterSet::getGlobal(), name, false /* allowedToChangeAtStartup */, false
-          /* allowedToChangeAtRuntime */) {}
-
 Status StorageDirectoryPerDbParameter::setFromString(const std::string&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};

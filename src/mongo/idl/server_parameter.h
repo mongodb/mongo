@@ -56,6 +56,10 @@ namespace mongo {
  * At runtime, { setParameter : 1, ...} is used.
  */
 enum class ServerParameterType {
+    /**
+     * May not be set at any time.
+     */
+    kReadOnly,
 
     /**
      * Parameter can only be set via runCommand.
@@ -82,11 +86,6 @@ public:
     using Map = std::map<std::string, ServerParameter*>;
 
     ServerParameter(StringData name, ServerParameterType spt);
-    ServerParameter(ServerParameterSet* sps,
-                    StringData name,
-                    bool allowedToChangeAtStartup,
-                    bool allowedToChangeAtRuntime);
-    ServerParameter(ServerParameterSet* sps, StringData name);
     virtual ~ServerParameter() = default;
 
     std::string name() const {
@@ -97,16 +96,21 @@ public:
      * @return if you can set on command line or config file
      */
     bool allowedToChangeAtStartup() const {
-        return _allowedToChangeAtStartup;
+        return (_type == ServerParameterType::kStartupOnly) ||
+            (_type == ServerParameterType::kStartupAndRuntime);
     }
 
     /**
      * @param if you can use (get|set)Parameter
      */
     bool allowedToChangeAtRuntime() const {
-        return _allowedToChangeAtRuntime;
+        return (_type == ServerParameterType::kRuntimeOnly) ||
+            (_type == ServerParameterType::kStartupAndRuntime);
     }
 
+    ServerParameterType getServerParameterType() const {
+        return _type;
+    }
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
 
@@ -132,10 +136,13 @@ protected:
     // Helper for translating setParameter values from BSON to string.
     StatusWith<std::string> coerceToString(const BSONElement&, bool redact);
 
+    // Used by DisabledTestParameter to avoid re-registering the server parameter.
+    struct NoRegistrationTag {};
+    ServerParameter(StringData name, ServerParameterType spt, NoRegistrationTag);
+
 private:
     std::string _name;
-    bool _allowedToChangeAtStartup;
-    bool _allowedToChangeAtRuntime;
+    ServerParameterType _type;
     bool _testOnly = false;
 };
 
