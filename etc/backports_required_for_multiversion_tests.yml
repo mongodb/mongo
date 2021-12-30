@@ -134,6 +134,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_transaction_boundary.js
     - ticket: SERVER-62212
       test_file: jstests/replsets/dbcheck_write_concern.js
+    - ticket: SERVER-62296
+      test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -407,6 +409,8 @@ last-lts:
       test_file: jstests/auth/dbcheck.js
     - ticket: SERVER-61666
       test_file: jstests/replsets/tenant_migration_transaction_boundary.js
+    - ticket: SERVER-62296
+      test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
