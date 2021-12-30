@@ -1177,5 +1177,23 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
                 "ongoingRecipientCritSecCount"_attr = ongoingMigrationRecipientsCount);
 }
 
+void drainMigrationsPendingRecovery(OperationContext* opCtx) {
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+
+    while (store.count(opCtx)) {
+        store.forEach(opCtx, BSONObj(), [opCtx](const MigrationCoordinatorDocument& doc) {
+            try {
+                onShardVersionMismatch(opCtx, doc.getNss(), boost::none);
+            } catch (DBException& ex) {
+                ex.addContext(str::stream() << "Failed to recover pending migration for document "
+                                            << doc.toBSON());
+                throw;
+            }
+            return true;
+        });
+    }
+}
+
 }  // namespace migrationutil
 }  // namespace mongo

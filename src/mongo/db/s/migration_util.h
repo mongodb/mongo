@@ -254,5 +254,11 @@ void deleteMigrationRecipientRecoveryDocument(OperationContext* opCtx, const UUI
  */
 void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx);
 
+/**
+ * Recovers all unfinished migrations pending recovery.
+ * Note: This method assumes its caller is preventing new migrations from starting.
+ */
+void drainMigrationsPendingRecovery(OperationContext* opCtx);
+
 }  // namespace migrationutil
 }  // namespace mongo

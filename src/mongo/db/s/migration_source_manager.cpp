@@ -176,6 +176,18 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     // command.
     onShardVersionMismatch(_opCtx, _args.getNss(), boost::none);
 
+    // Complete any unfinished migration pending recovery
+    {
+        migrationutil::drainMigrationsPendingRecovery(opCtx);
+
+        // Since the moveChunk command is holding the ActiveMigrationRegistry and we just drained
+        // all migrations pending recovery, now there cannot be any document in
+        // config.migrationCoordinators.
+        PersistentTaskStore<MigrationCoordinatorDocument> store(
+            NamespaceString::kMigrationCoordinatorsNamespace);
+        invariant(store.count(opCtx) == 0);
+    }
+
     // Snapshot the committed metadata from the time the migration starts
     const auto [collectionMetadata, collectionUUID] = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
