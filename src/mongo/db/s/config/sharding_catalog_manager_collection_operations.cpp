@@ -287,10 +287,8 @@ std::pair<std::vector<BSONObj>, std::vector<BSONObj>> makeChunkAndTagUpdatesForR
 void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const ShardKeyPattern& newShardKeyPattern) {
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
-    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
-    // move chunks on different collections to proceed in parallel.
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
+    // strictly monotonously increasing collection versions
     Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
     Lock::ExclusiveLock zoneLk(opCtx, opCtx->lockState(), _kZoneOpLock);
 
@@ -650,10 +648,8 @@ void ShardingCatalogManager::renameShardedMetadata(
     const NamespaceString& to,
     const WriteConcernOptions& writeConcern,
     boost::optional<CollectionType> optFromCollType) {
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-    // migrations. Take _kZoneOpLock in exclusive mode to prevent concurrent zone operations.
-    // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
-    // move chunks on different collections to proceed in parallel.
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
+    // strictly monotonously increasing collection versions
     Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
     Lock::ExclusiveLock zoneLk(opCtx, opCtx->lockState(), _kZoneOpLock);
 
