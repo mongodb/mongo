@@ -266,7 +266,7 @@ public:
             uassertStatusOK(userAllowedCreateNS(opCtx, kDurableHistoryTestNss));
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx);
             uassertStatusOK(
                 db->userCreateNS(opCtx, kDurableHistoryTestNss, defaultCollectionOptions));
             wuow.commit();

@@ -220,7 +220,7 @@ public:
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(_opCtx);
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(_opCtx);
             ASSERT(db->createCollection(_opCtx, nss)) << nss;
             wunit.commit();
         });

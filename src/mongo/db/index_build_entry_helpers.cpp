@@ -171,7 +171,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
         NamespaceString::kIndexBuildEntryNamespace.ns(),
         [&]() -> void {
             AutoGetDb autoDb(opCtx, NamespaceString::kIndexBuildEntryNamespace.db(), MODE_X);
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx);
 
             // Ensure the database exists.
             invariant(db);

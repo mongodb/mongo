@@ -83,12 +83,12 @@ public:
 
         WriteUnitOfWork wuow(operationContext());
         AutoGetDb autoDb(operationContext(), "db", MODE_X);
-        _db = autoDb.ensureDbExists();
+        _db = autoDb.ensureDbExists(operationContext());
         invariant(_db);
 
         // Create any additional databases used throughout the test.
-        ASSERT(AutoGetDb(operationContext(), "db1", MODE_X).ensureDbExists());
-        ASSERT(AutoGetDb(operationContext(), "db2", MODE_X).ensureDbExists());
+        ASSERT(AutoGetDb(operationContext(), "db1", MODE_X).ensureDbExists(operationContext()));
+        ASSERT(AutoGetDb(operationContext(), "db2", MODE_X).ensureDbExists(operationContext()));
 
         auto durableViewCatalogUnique = std::make_unique<DurableViewCatalogImpl>(_db);
         durableViewCatalog = durableViewCatalogUnique.get();

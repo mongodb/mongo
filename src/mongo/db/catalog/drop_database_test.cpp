@@ -183,7 +183,7 @@ void DropDatabaseTest::tearDown() {
 void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
     writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);

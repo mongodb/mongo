@@ -1818,7 +1818,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         coll = CollectionCatalog::get(_opCtx.get())
                    ->lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t"));
         if (!coll) {
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(_opCtx.get());
             coll = db->createCollection(_opCtx.get(), NamespaceString("test.t"), options);
         }
         ASSERT(coll);

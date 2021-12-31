@@ -107,7 +107,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
         coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
             opCtx, CollectionCatalog::LifetimeMode::kInplace, NamespaceString(ns));
         if (!coll) {
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
             coll = db->createCollection(opCtx, NamespaceString(ns));
         }
@@ -165,7 +165,7 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     const bool doShardVersionCheck = false;
 
     _clientContext.emplace(opCtx, _nss.ns(), doShardVersionCheck);
-    auto db = _autoDb->ensureDbExists();
+    auto db = _autoDb->ensureDbExistsopCtx);
     invariant(db, _nss.ns());
     invariant(db == _clientContext->db());
 

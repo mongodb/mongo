@@ -73,10 +73,9 @@ public:
     /**
      * Returns the database, creating it if it does not exist.
      */
-    Database* ensureDbExists();
+    Database* ensureDbExists(OperationContext* opCtx);
 
 private:
-    OperationContext* _opCtx;
     std::string _dbName;
 
     Lock::DBLock _dbLock;
@@ -139,7 +138,7 @@ public:
      * Returns the database, creating it if it does not exist.
      */
     Database* ensureDbExists() {
-        return _autoDb.ensureDbExists();
+        return _autoDb.ensureDbExists(_opCtx);
     }
 
     /**

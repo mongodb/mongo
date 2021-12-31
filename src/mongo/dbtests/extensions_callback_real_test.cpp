@@ -54,7 +54,7 @@ public:
 
     void setUp() final {
         AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
-        auto database = autoDb.ensureDbExists();
+        auto database = autoDb.ensureDbExists(&_opCtx);
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT(database->createCollection(&_opCtx, _nss));

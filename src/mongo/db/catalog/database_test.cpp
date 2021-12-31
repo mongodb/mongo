@@ -117,7 +117,7 @@ void DatabaseTest::tearDown() {
 TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPendingState) {
     writeConflictRetry(_opCtx.get(), "testSetDropPending", _nss.ns(), [this] {
         AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
         ASSERT_FALSE(db->isDropPending(_opCtx.get()));
@@ -140,7 +140,7 @@ TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPending
     writeConflictRetry(
         _opCtx.get(), "testÇreateCollectionWhenDatabaseIsInADropPendingState", _nss.ns(), [this] {
             AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(_opCtx.get());
             ASSERT_TRUE(db);
 
             db->setDropPending(_opCtx.get(), true);
@@ -172,7 +172,7 @@ void _testDropCollection(OperationContext* opCtx,
         writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
             WriteUnitOfWork wuow(opCtx);
             AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx);
             ASSERT_TRUE(db);
             ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
             wuow.commit();
@@ -181,7 +181,7 @@ void _testDropCollection(OperationContext* opCtx,
 
     writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
 
         WriteUnitOfWork wuow(opCtx);
@@ -246,7 +246,7 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
     auto opCtx = _opCtx.get();
     auto nss = _nss;
     AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
-    auto db = autoDb.ensureDbExists();
+    auto db = autoDb.ensureDbExists(opCtx);
     writeConflictRetry(opCtx, "testDropOpTimeWithReplicated", nss.ns(), [&] {
         ASSERT_TRUE(db);
 
@@ -290,7 +290,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
                                                                    const NamespaceString& nss) {
     writeConflictRetry(opCtx, "testDropCollectionWithIndexesInProgress", nss.ns(), [opCtx, nss] {
         AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
 
         Collection* collection = nullptr;
@@ -348,7 +348,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
     ASSERT_NOT_EQUALS(fromNss, toNss);
 
     AutoGetDb autoDb(opCtx, fromNss.db(), MODE_X);
-    auto db = autoDb.ensureDbExists();
+    auto db = autoDb.ensureDbExists(opCtx);
     ASSERT_TRUE(db);
 
     auto fromUuid = UUID::gen();
@@ -390,7 +390,7 @@ TEST_F(DatabaseTest,
        MakeUniqueCollectionNamespaceReturnsFailedToParseIfModelDoesNotContainPercentSign) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
         AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
         ASSERT_EQUALS(
             ErrorCodes::FailedToParse,
@@ -401,7 +401,7 @@ TEST_F(DatabaseTest,
 TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandomCharacters) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
         AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
         auto model = "tmp%%%%"_sd;
@@ -443,7 +443,7 @@ TEST_F(
     MakeUniqueCollectionNamespaceReturnsNamespaceExistsIfGeneratedNamesMatchExistingCollections) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
         AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
         auto model = "tmp%"_sd;
@@ -525,7 +525,7 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
                        _nss.ns(),
                        [this] {
                            AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-                           auto db = autoDb.ensureDbExists();
+                           auto db = autoDb.ensureDbExists(_opCtx.get());
                            ASSERT_TRUE(db);
 
                            WriteUnitOfWork wuow(_opCtx.get());

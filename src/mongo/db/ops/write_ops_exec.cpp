@@ -242,7 +242,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx);
             uassertStatusOK(db->userCreateNS(opCtx, ns, defaultCollectionOptions));
             wuow.commit();
         }

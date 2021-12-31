@@ -245,7 +245,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         {
             // Create the collection.
             WriteUnitOfWork wunit(opCtx.get());
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx.get());
             fassert(40332, db->createCollection(opCtx.get(), nss, options, false));
             wunit.commit();
         }
@@ -475,7 +475,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const BSONObj& idIndexSpec) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
         AutoGetDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
-        auto db = databaseWriteGuard.ensureDbExists();
+        auto db = databaseWriteGuard.ensureDbExists(opCtx);
         invariant(db);
         if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
             return Status(ErrorCodes::NamespaceExists,

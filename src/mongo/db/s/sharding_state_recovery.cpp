@@ -168,7 +168,7 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
             write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
         updateReq.setUpsert();
 
-        UpdateResult result = update(opCtx, autoGetDb->ensureDbExists(), updateReq);
+        UpdateResult result = update(opCtx, autoGetDb->ensureDbExists(opCtx), updateReq);
         invariant(result.numDocsModified == 1 || !result.upsertedId.isEmpty());
         invariant(result.numMatched <= 1);
 

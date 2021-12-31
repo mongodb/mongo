@@ -156,7 +156,7 @@ Status _createView(OperationContext* opCtx,
             NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
 
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(opCtx);
 
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
@@ -280,7 +280,7 @@ Status _createTimeseries(OperationContext* opCtx,
                               str::stream() << "Collection already exists. NS: " << ns);
             }
 
-            auto db = autoDb.ensureDbExists();
+            auto db = autoDb.ensureDbExists(opCtx);
             if (auto view = ViewCatalog::get(db)->lookup(opCtx, ns); view) {
                 if (view->timeseries()) {
                     return Status(ErrorCodes::NamespaceExists,
@@ -448,7 +448,7 @@ Status _createCollection(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection already exists. NS: " << nss);
         }
-        auto db = autoDb.ensureDbExists();
+        auto db = autoDb.ensureDbExists(opCtx);
         if (auto view = ViewCatalog::get(db)->lookup(opCtx, nss); view) {
             if (view->timeseries()) {
                 return Status(ErrorCodes::NamespaceExists,
