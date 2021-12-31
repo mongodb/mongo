@@ -28,6 +28,9 @@ TestData.skipCheckOrphans = true;
 // @tags: [live_record_incompatible]
 TestData.disableImplicitSessions = true;
 
+(function() {
+'use strict';
+
 var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});
@@ -89,8 +92,6 @@ function authDBUsers(conn) {
 // is received, and refreshing requires communication with the primary to obtain the newest version.
 // Read from the secondaries once before taking down primaries to ensure they have loaded the
 // routing table into memory.
-// TODO SERVER-30148: replace this with calls to awaitReplication() on each shard owning data for
-// the sharded collection once secondaries refresh proactively.
 var mongosSetupConn = new Mongo(mongos.host);
 authDBUsers(mongosSetupConn);
 mongosSetupConn.setReadPref("secondary");
@@ -306,3 +307,4 @@ gc();  // Clean up new connections
 
 jsTest.log("DONE!");
 st.stop();
+})();
