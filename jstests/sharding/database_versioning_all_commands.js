@@ -602,6 +602,7 @@ let testCases = {
             }
         }
     },
+    repairShardedCollectionChunksHistory: {skip: "always targets the config server"},
     replSetGetStatus: {skip: "not supported in mongos"},
     reshardCollection: {skip: "does not forward command to primary shard"},
     revokePrivilegesFromRole: {skip: "always targets the config server"},

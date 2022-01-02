@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -69,6 +67,7 @@
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -548,7 +547,7 @@ void executeMetadataChangesInTxn(
 }
 
 BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
-    auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
+    auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
     return cmd.toBSON(

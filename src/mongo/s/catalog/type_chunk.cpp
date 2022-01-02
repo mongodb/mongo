@@ -59,6 +59,7 @@ const BSONField<Date_t> ChunkType::lastmod("lastmod");
 const BSONField<OID> ChunkType::epoch("lastmodEpoch");
 const BSONField<Timestamp> ChunkType::timestamp("lastmodTimestamp");
 const BSONField<BSONObj> ChunkType::history("history");
+const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
 
 namespace {
 
