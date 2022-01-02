@@ -72,6 +72,7 @@ env.Library(
         'cluster_profile_cmd.cpp',
         'cluster_remove_shard_cmd.cpp',
         'cluster_remove_shard_from_zone_cmd.cpp',
+        'cluster_repair_sharded_collection_chunks_history_cmd.cpp',
         'cluster_repl_set_get_status_cmd.cpp',
         'cluster_reset_error_cmd.cpp',
         'cluster_restart_catalog_command.cpp',

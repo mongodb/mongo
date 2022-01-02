@@ -55,9 +55,9 @@ namespace {
 class FlushRoutingTableCacheUpdatesCmd final
     : public TypedCommand<FlushRoutingTableCacheUpdatesCmd> {
 public:
-    using Request = _flushRoutingTableCacheUpdates;
+    using Request = FlushRoutingTableCacheUpdates;
 
-    // Support deprecated name 'forceRoutingTableRefresh' for backwards compatibility with 3.6.0.
+    // Support deprecated name 'forceRoutingTableRefresh' for backwards compatibility with 4.0
     FlushRoutingTableCacheUpdatesCmd()
         : TypedCommand<FlushRoutingTableCacheUpdatesCmd>(Request::kCommandName,
                                                          "forceRoutingTableRefresh") {}
@@ -104,11 +104,12 @@ public:
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Can't issue _flushRoutingTableCacheUpdates from 'eval'",
+                    str::stream() << "Can't issue " << Request::kCommandName << " from 'eval'",
                     !opCtx->getClient()->isInDirectClient());
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Can't call _flushRoutingTableCacheUpdates if in read-only mode",
+                    str::stream() << "Can't call " << Request::kCommandName
+                                  << " if in read-only mode",
                     !storageGlobalParams.readOnly);
 
             auto& oss = OperationShardingState::get(opCtx);

@@ -430,6 +430,18 @@ public:
 
     Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
 
+    //
+    // Upgrade/downgrade
+    //
+
+    /**
+     * Upgrade the chunk metadata to include the history field.
+     */
+    void upgradeChunksHistory(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const OID& collectionEpoch,
+                              const Timestamp validAfter);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version

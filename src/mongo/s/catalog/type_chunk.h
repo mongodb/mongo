@@ -186,6 +186,7 @@ public:
     static const BSONField<Date_t> lastmod;
     static const BSONField<OID> epoch;
     static const BSONField<BSONObj> history;
+    static const BSONField<bool> historyIsAt40;
 
     ChunkType();
     ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);

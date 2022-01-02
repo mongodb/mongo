@@ -56,6 +56,7 @@ const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::lastmod("lastmod");
 const BSONField<OID> ChunkType::epoch("lastmodEpoch");
 const BSONField<BSONObj> ChunkType::history("history");
+const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
 
 namespace {
 
