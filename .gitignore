@@ -76,25 +76,27 @@ docs/latex
 docs/doxygen
 32bit
 scratch
+/multiversion_binaries
 
 # binaries
-/docgen
-/loadgen
-/mongo
-/mongobridge
-/mongocryptd
-/mongod
-/mongoed
-/mongogrid
-/mongokerberos
-/mongoldap
-/mongoperf
-/mongos
-/mongoshim
-/mongosniff
-/mongotmock
-/mongotrafficreader
-/wt
+/docgen*
+/loadgen*
+/mongo*
+/mongobridge*
+/mongocryptd*
+/mongod*
+/mongoed*
+/mongogrid*
+/mongokerberos*
+/mongoldap*
+/mongoperf*
+/mongos*
+/mongoshim*
+/mongosniff*
+/mongotmock*
+/mongotrafficreader*
+/mqlrun*
+/wt*
 
 *.tgz
 *.zip
