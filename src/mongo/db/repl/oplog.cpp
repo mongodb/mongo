@@ -1927,14 +1927,51 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
 
-                invariant(mode == OplogApplication::Mode::kInitialSync);
-                abortIndexBuilds(
-                    opCtx, entry.getCommandType(), ns, "Aborting index builds during initial sync");
-                LOGV2_DEBUG(4665901,
-                            1,
-                            "Conflicting DDL operation encountered during initial sync; "
-                            "aborting index build and retrying",
-                            "namespace"_attr = ns);
+                // TODO (SERVER-61481): Once kLastLTS is 6.0, this error will only be possible in
+                // mode kInitialSync.
+                if (mode == OplogApplication::Mode::kInitialSync) {
+                    abortIndexBuilds(opCtx,
+                                     entry.getCommandType(),
+                                     ns,
+                                     "Aborting index builds during initial sync");
+                    LOGV2_DEBUG(4665901,
+                                1,
+                                "Conflicting DDL operation encountered during initial sync; "
+                                "aborting index build and retrying",
+                                logAttrs(ns));
+                } else {
+                    auto lockState = opCtx->lockState();
+                    Locker::LockSnapshot lockSnapshot;
+                    auto locksReleased = lockState->saveLockStateAndUnlock(&lockSnapshot);
+
+                    ScopeGuard guard{[&] {
+                        if (locksReleased) {
+                            invariant(!lockState->isLocked());
+                            lockState->restoreLockState(lockSnapshot);
+                        }
+                    }};
+
+                    auto swUUID = entry.getUuid();
+                    if (!swUUID) {
+                        LOGV2_ERROR(21261,
+                                    "Failed command during oplog application. Expected a UUID",
+                                    "command"_attr = redact(o),
+                                    logAttrs(ns));
+                    }
+                    IndexBuildsCoordinator::get(opCtx)->awaitNoIndexBuildInProgressForCollection(
+                        opCtx, swUUID.get());
+
+                    opCtx->recoveryUnit()->abandonSnapshot();
+                    opCtx->checkForInterrupt();
+
+                    LOGV2_DEBUG(
+                        51775,
+                        1,
+                        "Acceptable error during oplog application: background operation in "
+                        "progress for namespace",
+                        logAttrs(ns),
+                        "oplogEntry"_attr = redact(entry.toBSONForLogging()));
+                }
 
                 break;
             }
