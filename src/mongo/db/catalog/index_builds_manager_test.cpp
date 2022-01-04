@@ -81,7 +81,7 @@ std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::stri
 
 TEST_F(IndexBuildsManagerTest, IndexBuildsManagerSetUpAndTearDown) {
     AutoGetCollection autoColl(operationContext(), _nss, MODE_X);
-    CollectionWriter collection(autoColl);
+    CollectionWriter collection(operationContext(), autoColl);
 
     auto specs = makeSpecs(_nss, {"a", "b"});
     ASSERT_OK(_indexBuildsManager.setUpIndexBuild(

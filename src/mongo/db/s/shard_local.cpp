@@ -150,7 +150,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
             options.uuid = UUID::gen();
             writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
-                auto db = autoColl.ensureDbExists();
+                auto db = autoColl.ensureDbExists(opCtx);
                 collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
                           str::stream() << "Failed to create collection " << ns.ns()

@@ -59,7 +59,7 @@ public:
 
     void setUp() final {
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(_opCtx.get());
 
         WriteUnitOfWork wuow(_opCtx.get());
         ASSERT(db->createCollection(_opCtx.get(), _nss));

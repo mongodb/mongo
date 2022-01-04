@@ -44,7 +44,7 @@ class ImplicitCollectionCreationTest : public ShardServerTestFixture {};
 TEST_F(ImplicitCollectionCreationTest, ImplicitCreateDisallowedByDefault) {
     NamespaceString nss("ImplicitCreateDisallowedByDefaultDB.TestColl");
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    auto db = autoColl.ensureDbExists();
+    auto db = autoColl.ensureDbExists(operationContext());
     WriteUnitOfWork wuow(operationContext());
     ASSERT_THROWS_CODE(
         uassertStatusOK(db->userCreateNS(operationContext(), nss, CollectionOptions{})),
@@ -58,7 +58,7 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         operationContext());
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
-    auto db = autoColl.ensureDbExists();
+    auto db = autoColl.ensureDbExists(operationContext());
     WriteUnitOfWork wuow(operationContext());
     ASSERT_OK(db->userCreateNS(operationContext(), nss, CollectionOptions{}));
     wuow.commit();

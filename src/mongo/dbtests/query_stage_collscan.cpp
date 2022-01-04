@@ -182,7 +182,7 @@ public:
         AutoGetCollection autoColl(&_opCtx, ns, MODE_IX);
 
         {
-            auto db = autoColl.ensureDbExists();
+            auto db = autoColl.ensureDbExists(&_opCtx);
 
             WriteUnitOfWork wuow(&_opCtx);
             CollectionOptions collOptions;

@@ -162,7 +162,7 @@ public:
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
         }
 
-        CollectionWriter collection(autoColl);
+        CollectionWriter collection(opCtx, autoColl);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 

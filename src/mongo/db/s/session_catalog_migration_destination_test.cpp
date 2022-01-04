@@ -1988,10 +1988,10 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
     auto lastOpTimeBeforeMigrate = getLastWriteOpTime();
 
     {
+        // Empty the oplog collection.
         AutoGetCollection oplogColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(
-            oplogColl.getWritableCollection()->truncate(opCtx));  // Empties the oplog collection.
+        ASSERT_OK(oplogColl.getWritableCollection(opCtx)->truncate(opCtx));
         wuow.commit();
     }
 

@@ -85,7 +85,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                 // The opCtx is accessed indirectly through _secondaryIndexesBlock.
                 UnreplicatedWritesBlock uwb(_opCtx.get());
                 // This enforces the buildIndexes setting in the replica set configuration.
-                CollectionWriter collWriter(*_collection);
+                CollectionWriter collWriter(_opCtx.get(), *_collection);
                 auto indexCatalog = collWriter.getWritableCollection()->getIndexCatalog();
                 auto specs = indexCatalog->removeExistingIndexesNoChecks(
                     _opCtx.get(), collWriter.get(), secondaryIndexSpecs);
@@ -245,11 +245,11 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    auto status =
-                        _secondaryIndexesBlock->commit(_opCtx.get(),
-                                                       _collection->getWritableCollection(),
-                                                       MultiIndexBlock::kNoopOnCreateEachFn,
-                                                       MultiIndexBlock::kNoopOnCommitFn);
+                    auto status = _secondaryIndexesBlock->commit(
+                        _opCtx.get(),
+                        _collection->getWritableCollection(_opCtx.get()),
+                        MultiIndexBlock::kNoopOnCreateEachFn,
+                        MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -308,10 +308,11 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    auto status = _idIndexBlock->commit(_opCtx.get(),
-                                                        _collection->getWritableCollection(),
-                                                        MultiIndexBlock::kNoopOnCreateEachFn,
-                                                        MultiIndexBlock::kNoopOnCommitFn);
+                    auto status =
+                        _idIndexBlock->commit(_opCtx.get(),
+                                              _collection->getWritableCollection(_opCtx.get()),
+                                              MultiIndexBlock::kNoopOnCreateEachFn,
+                                              MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -343,14 +344,14 @@ Status CollectionBulkLoaderImpl::commit() {
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
     if (_secondaryIndexesBlock) {
-        CollectionWriter collWriter(*_collection);
+        CollectionWriter collWriter(_opCtx.get(), *_collection);
         _secondaryIndexesBlock->abortIndexBuild(
             _opCtx.get(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
         _secondaryIndexesBlock.reset();
     }
 
     if (_idIndexBlock) {
-        CollectionWriter collWriter(*_collection);
+        CollectionWriter collWriter(_opCtx.get(), *_collection);
         _idIndexBlock->abortIndexBuild(_opCtx.get(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
         _idIndexBlock.reset();
     }

@@ -137,8 +137,8 @@ public:
     /**
      * Returns the database, creating it if it does not exist.
      */
-    Database* ensureDbExists() {
-        return _autoDb.ensureDbExists(_opCtx);
+    Database* ensureDbExists(OperationContext* opCtx) {
+        return _autoDb.ensureDbExists(opCtx);
     }
 
     /**
@@ -174,12 +174,9 @@ public:
      * the original Collection pointer.
      */
     Collection* getWritableCollection(
+        OperationContext* opCtx,
         CollectionCatalog::LifetimeMode mode =
             CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
-
-    OperationContext* getOperationContext() const {
-        return _opCtx;
-    }
 
 protected:
     template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
@@ -192,7 +189,6 @@ protected:
         return _coll;
     }
 
-    OperationContext* _opCtx = nullptr;
     AutoGetDb _autoDb;
     boost::optional<Lock::CollectionLock> _collLock;
     CollectionPtr _coll = nullptr;
@@ -361,7 +357,8 @@ public:
                      CollectionCatalog::LifetimeMode mode =
                          CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
     // Acts as an adaptor for AutoGetCollection
-    CollectionWriter(AutoGetCollection& autoCollection,
+    CollectionWriter(OperationContext* opCtx,
+                     AutoGetCollection& autoCollection,
                      CollectionCatalog::LifetimeMode mode =
                          CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
     // Acts as an adaptor for a writable Collection that has been retrieved elsewhere

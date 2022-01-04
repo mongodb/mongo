@@ -142,8 +142,8 @@ void dropIndex(OperationContext* opCtx, const NamespaceString& nss, const std::s
 
     auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     ASSERT(indexDescriptor);
-    ASSERT_OK(collection.getWritableCollection()->getIndexCatalog()->dropIndex(
-        opCtx, collection.getWritableCollection(), indexDescriptor));
+    ASSERT_OK(collection.getWritableCollection(opCtx)->getIndexCatalog()->dropIndex(
+        opCtx, collection.getWritableCollection(opCtx), indexDescriptor));
 
     ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(
         repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp() + 1));

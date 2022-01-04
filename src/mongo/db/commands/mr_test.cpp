@@ -540,8 +540,10 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
             _opCtx.get(), "ReplacingExistingOutputCollectionPreservesIndexes", outputNss.ns(), [&] {
                 WriteUnitOfWork wuow(_opCtx.get());
                 ASSERT_OK(
-                    coll.getWritableCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                        _opCtx.get(), coll.getWritableCollection(), indexSpec));
+                    coll.getWritableCollection(_opCtx.get())
+                        ->getIndexCatalog()
+                        ->createIndexOnEmptyCollection(
+                            _opCtx.get(), coll.getWritableCollection(_opCtx.get()), indexSpec));
                 wuow.commit();
             });
     }

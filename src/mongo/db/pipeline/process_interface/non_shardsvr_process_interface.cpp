@@ -146,7 +146,7 @@ StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::
 void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     AutoGetCollection autoColl(opCtx, ns, MODE_X);
-    CollectionWriter collection(autoColl);
+    CollectionWriter collection(opCtx, autoColl);
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
             uassert(ErrorCodes::DatabaseDropPending,

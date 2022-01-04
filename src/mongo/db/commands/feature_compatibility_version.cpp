@@ -247,7 +247,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 boost::optional<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
-    invariant(autoColl.ensureDbExists(), NamespaceString::kServerConfigurationNamespace.ns());
+    invariant(autoColl.ensureDbExists(opCtx), NamespaceString::kServerConfigurationNamespace.ns());
 
     const auto query = BSON("_id" << multiversion::kParameterName);
     const auto swFcv = repl::StorageInterface::get(opCtx)->findById(

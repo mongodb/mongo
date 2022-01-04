@@ -80,7 +80,7 @@ public:
         const bool createIdIndex = !clustered;
 
         AutoGetCollection autoColl(&_opCtx, _nss, MODE_IX);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(&_opCtx);
         ASSERT_TRUE(db) << _nss;
 
         WriteUnitOfWork wuow(&_opCtx);

@@ -174,9 +174,9 @@ public:
             WriteUnitOfWork wunit(opCtx);
             AutoGetCollection collRaii(opCtx, nss, LockMode::MODE_X);
             if (collRaii) {
-                invariant(collRaii.getWritableCollection()->truncate(opCtx).isOK());
+                invariant(collRaii.getWritableCollection(opCtx)->truncate(opCtx).isOK());
             } else {
-                auto db = collRaii.ensureDbExists();
+                auto db = collRaii.ensureDbExists(opCtx);
                 invariant(db->createCollection(opCtx, nss));
             }
             wunit.commit();

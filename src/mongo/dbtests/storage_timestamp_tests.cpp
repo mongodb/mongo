@@ -243,18 +243,18 @@ public:
 
             if (collRaii) {
                 WriteUnitOfWork wunit(_opCtx);
-                invariant(collRaii.getWritableCollection()->truncate(_opCtx).isOK());
+                invariant(collRaii.getWritableCollection(_opCtx)->truncate(_opCtx).isOK());
                 if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                     ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
                 }
-                collRaii.getWritableCollection()->getIndexCatalog()->dropAllIndexes(
-                    _opCtx, collRaii.getWritableCollection(), false);
+                collRaii.getWritableCollection(_opCtx)->getIndexCatalog()->dropAllIndexes(
+                    _opCtx, collRaii.getWritableCollection(_opCtx), false);
                 wunit.commit();
                 return;
             }
 
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            auto db = autoColl.ensureDbExists();
+            auto db = autoColl.ensureDbExists(_opCtx);
             WriteUnitOfWork wunit(_opCtx);
             if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                 ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
@@ -2085,7 +2085,7 @@ public:
         reset(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter coll(autoColl);
+        CollectionWriter coll(_opCtx, autoColl);
 
         RecordId catalogId = autoColl.getCollection()->getCatalogId();
 
@@ -2148,7 +2148,7 @@ public:
             // timestamp.
             ASSERT_OK(
                 indexer.commit(_opCtx,
-                               autoColl.getWritableCollection(),
+                               autoColl.getWritableCollection(_opCtx),
                                [&](const BSONObj& indexSpec) {
                                    if (SimulatePrimary) {
                                        // The timestamping responsibility for each index is placed
@@ -2216,7 +2216,7 @@ public:
         reset(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter collection(autoColl);
+        CollectionWriter collection(_opCtx, autoColl);
 
         // Build an index on `{a: 1}`.
         MultiIndexBlock indexer;
@@ -2708,7 +2708,7 @@ public:
         reset(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter coll(autoColl);
+        CollectionWriter coll(_opCtx, autoColl);
 
         const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
         {
@@ -2783,7 +2783,7 @@ public:
         reset(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter coll(autoColl);
+        CollectionWriter coll(_opCtx, autoColl);
 
         const LogicalTime insertTimestamp = _clock->tickClusterTime(1);
         {
@@ -2930,7 +2930,7 @@ public:
         reset(nss);
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter collection(autoColl);
+        CollectionWriter collection(_opCtx, autoColl);
 
         // Indexing of parallel arrays is not allowed, so these are deemed "bad".
         const auto badDoc1 =
@@ -3488,7 +3488,7 @@ public:
         RAIIServerParameterControllerForTest storeImageInSideCollection(
             "storeFindAndModifyImagesInSideCollection", true);
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter collection(autoColl);
+        CollectionWriter collection(_opCtx, autoColl);
         const auto newObj = BSON("_id" << 0 << "a" << 1 << "b" << 1);
         CollectionUpdateArgs args;
         args.stmtIds = {1};
@@ -3550,7 +3550,7 @@ public:
         // Enable in-place mutation for this document
         ASSERT_EQUALS(mmb::Document::kInPlaceEnabled, doc.getCurrentInPlaceMode());
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter collection(autoColl);
+        CollectionWriter collection(_opCtx, autoColl);
         const auto newObj = BSON("_id" << 0 << "a" << 0);
         CollectionUpdateArgs args;
         args.stmtIds = {1};
@@ -3598,7 +3598,7 @@ public:
         RAIIServerParameterControllerForTest storeImageInSideCollection(
             "storeFindAndModifyImagesInSideCollection", true);
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
-        CollectionWriter collection(autoColl);
+        CollectionWriter collection(_opCtx, autoColl);
         const auto bsonObj = BSON("_id" << 0 << "a" << 1);
 
         {

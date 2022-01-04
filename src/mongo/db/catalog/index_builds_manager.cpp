@@ -419,7 +419,7 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
                 AutoGetCollection autoColl(opCtx, lostAndFoundNss, MODE_IX);
 
                 // Ensure the database exists.
-                auto db = autoColl.ensureDbExists();
+                auto db = autoColl.ensureDbExists(opCtx);
                 invariant(db, lostAndFoundNss.ns());
 
                 WriteUnitOfWork wuow(opCtx);

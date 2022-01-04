@@ -65,7 +65,7 @@ public:
 
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
         WriteUnitOfWork wuow(_opCtx);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(_opCtx);
         ASSERT(db->createCollection(_opCtx, _nss)) << _nss;
         wuow.commit();
     }
@@ -75,7 +75,7 @@ public:
 
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
         WriteUnitOfWork wuow(_opCtx);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(_opCtx);
         ASSERT_OK(db->dropCollection(_opCtx, _nss, {})) << _nss;
         wuow.commit();
     }
@@ -132,7 +132,7 @@ class InsertBuildIgnoreUnique : public IndexBuildBase {
 public:
     void run() {
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(_opCtx);
         ASSERT(db) << _nss;
         auto& coll = collection();
         {
@@ -186,7 +186,7 @@ public:
         // Create a new collection.
         {
             AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
-            auto db = autoColl.ensureDbExists();
+            auto db = autoColl.ensureDbExists(_opCtx);
             ASSERT(db) << _nss;
 
             auto& coll = collection();
@@ -242,7 +242,7 @@ public:
     void run() {
         {
             AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
-            auto db = autoColl.ensureDbExists();
+            auto db = autoColl.ensureDbExists(_opCtx);
             ASSERT(db) << _nss;
 
             auto& coll = collection();
@@ -292,7 +292,7 @@ public:
         {
             // Recreate the collection as capped, without an _id index.
             AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
-            auto db = autoColl.ensureDbExists();
+            auto db = autoColl.ensureDbExists(_opCtx);
 
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(db->dropCollection(_opCtx, _nss));

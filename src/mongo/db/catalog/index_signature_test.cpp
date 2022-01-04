@@ -48,9 +48,9 @@ public:
         // Build the specified index on the collection.
         WriteUnitOfWork wuow(opCtx());
         // Get the index catalog associated with the test collection.
-        auto* indexCatalog = _coll->getWritableCollection()->getIndexCatalog();
+        auto* indexCatalog = _coll->getWritableCollection(opCtx())->getIndexCatalog();
         auto status = indexCatalog->createIndexOnEmptyCollection(
-            opCtx(), _coll->getWritableCollection(), spec);
+            opCtx(), _coll->getWritableCollection(opCtx()), spec);
         if (!status.isOK()) {
             return status.getStatus();
         }

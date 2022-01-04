@@ -228,7 +228,7 @@ void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData i
     auto opCtx = operationContext();
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(opCtx);
         WriteUnitOfWork wuow(opCtx);
         ASSERT(db->createCollection(opCtx, nss));
         wuow.commit();
@@ -237,7 +237,7 @@ void CollectionTest::makeCollectionForMultikey(NamespaceString nss, StringData i
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
         WriteUnitOfWork wuow(opCtx);
-        auto collWriter = autoColl.getWritableCollection();
+        auto collWriter = autoColl.getWritableCollection(opCtx);
         ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
             opCtx, collWriter, BSON("v" << 2 << "name" << indexName << "key" << BSON("a" << 1))));
         wuow.commit();

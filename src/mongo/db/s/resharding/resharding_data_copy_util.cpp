@@ -66,7 +66,7 @@ void ensureCollectionExists(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wuow(opCtx);
-        coll.ensureDbExists()->createCollection(opCtx, nss, options);
+        coll.ensureDbExists(opCtx)->createCollection(opCtx, nss, options);
         wuow.commit();
     });
 }

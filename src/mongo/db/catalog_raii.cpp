@@ -78,8 +78,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      LockMode modeColl,
                                      AutoGetCollectionViewMode viewMode,
                                      Date_t deadline)
-    : _opCtx(opCtx),
-      _autoDb(opCtx,
+    : _autoDb(opCtx,
               !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
               isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
               deadline) {
@@ -179,27 +178,26 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
 }
 
-Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::LifetimeMode mode) {
+Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx,
+                                                     CollectionCatalog::LifetimeMode mode) {
     // Acquire writable instance if not already available
     if (!_writableColl) {
 
-        auto catalog = CollectionCatalog::get(_opCtx);
+        auto catalog = CollectionCatalog::get(opCtx);
         _writableColl =
-            catalog->lookupCollectionByNamespaceForMetadataWrite(_opCtx, mode, _resolvedNss);
+            catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, mode, _resolvedNss);
         if (mode != CollectionCatalog::LifetimeMode::kInplace) {
             // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
             // the write unit of work finishes so we re-fetches and re-clones the Collection if a
             // new write unit of work is opened.
-            _opCtx->recoveryUnit()->registerChange(
-                [this](boost::optional<Timestamp> commitTime) {
-                    _coll = CollectionPtr(
-                        getOperationContext(), _coll.get(), LookupCollectionForYieldRestore());
+            opCtx->recoveryUnit()->registerChange(
+                [this, opCtx](boost::optional<Timestamp> commitTime) {
+                    _coll = CollectionPtr(opCtx, _coll.get(), LookupCollectionForYieldRestore());
                     _writableColl = nullptr;
                 },
-                [this, originalCollection = _coll.get()]() {
-                    _coll = CollectionPtr(getOperationContext(),
-                                          originalCollection,
-                                          LookupCollectionForYieldRestore());
+                [this, originalCollection = _coll.get(), opCtx]() {
+                    _coll =
+                        CollectionPtr(opCtx, originalCollection, LookupCollectionForYieldRestore());
                     _writableColl = nullptr;
                 });
         }
@@ -337,16 +335,17 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx,
     };
 }
 
-CollectionWriter::CollectionWriter(AutoGetCollection& autoCollection,
+CollectionWriter::CollectionWriter(OperationContext* opCtx,
+                                   AutoGetCollection& autoCollection,
                                    CollectionCatalog::LifetimeMode mode)
     : _collection(&autoCollection.getCollection()),
-      _opCtx(autoCollection.getOperationContext()),
+      _opCtx(opCtx),
       _mode(mode),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
-    _sharedImpl->_writableCollectionInitializer =
-        [&autoCollection](CollectionCatalog::LifetimeMode mode) {
-            return autoCollection.getWritableCollection(mode);
-        };
+    _sharedImpl->_writableCollectionInitializer = [&autoCollection,
+                                                   opCtx](CollectionCatalog::LifetimeMode mode) {
+        return autoCollection.getWritableCollection(opCtx, mode);
+    };
 }
 
 CollectionWriter::CollectionWriter(Collection* writableCollection)

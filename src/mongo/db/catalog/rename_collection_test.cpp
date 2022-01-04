@@ -471,10 +471,10 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                      << BSON("a" << 1) << "name" << indexName);
 
         WriteUnitOfWork wuow(opCtx);
-        auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
+        auto indexCatalog = collection.getWritableCollection(opCtx)->getIndexCatalog();
         ASSERT_OK(indexCatalog
                       ->createIndexOnEmptyCollection(
-                          opCtx, collection.getWritableCollection(), indexInfoObj)
+                          opCtx, collection.getWritableCollection(opCtx), indexInfoObj)
                       .getStatus());
         wuow.commit();
     });

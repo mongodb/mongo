@@ -369,7 +369,7 @@ Status _createTimeseries(OperationContext* opCtx,
                           str::stream() << "Collection already exists. NS: " << ns);
         }
 
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(opCtx);
         if (auto view = ViewCatalog::get(db)->lookup(opCtx, ns)) {
             if (view->timeseries()) {
                 return {ErrorCodes::NamespaceExists,

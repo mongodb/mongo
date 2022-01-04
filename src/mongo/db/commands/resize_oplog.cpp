@@ -97,7 +97,8 @@ public:
 
             if (auto sizeMB = params.getSize()) {
                 const long long sizeBytes = *sizeMB * 1024 * 1024;
-                uassertStatusOK(coll.getWritableCollection()->updateCappedSize(opCtx, sizeBytes));
+                uassertStatusOK(
+                    coll.getWritableCollection(opCtx)->updateCappedSize(opCtx, sizeBytes));
             }
 
             if (auto minRetentionHoursOpt = params.getMinRetentionHours()) {

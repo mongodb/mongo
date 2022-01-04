@@ -259,19 +259,21 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         if (options.capped) {
             WriteUnitOfWork wunit(opCtx.get());
             if (!idIndexSpec.isEmpty()) {
-                auto status = autoColl->getWritableCollection()
-                                  ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(
-                                      opCtx.get(), autoColl->getWritableCollection(), idIndexSpec);
+                auto status =
+                    autoColl->getWritableCollection(opCtx.get())
+                        ->getIndexCatalog()
+                        ->createIndexOnEmptyCollection(
+                            opCtx.get(), autoColl->getWritableCollection(opCtx.get()), idIndexSpec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
             }
             for (auto&& spec : secondaryIndexSpecs) {
-                auto status = autoColl->getWritableCollection()
-                                  ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(
-                                      opCtx.get(), autoColl->getWritableCollection(), spec);
+                auto status =
+                    autoColl->getWritableCollection(opCtx.get())
+                        ->getIndexCatalog()
+                        ->createIndexOnEmptyCollection(
+                            opCtx.get(), autoColl->getWritableCollection(opCtx.get()), spec);
                 if (!status.getStatus().isOK()) {
                     return status.getStatus();
                 }
@@ -553,7 +555,7 @@ Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        const auto status = autoColl.getWritableCollection()->truncate(opCtx);
+        const auto status = autoColl.getWritableCollection(opCtx)->truncate(opCtx);
         if (!status.isOK()) {
             return status;
         }

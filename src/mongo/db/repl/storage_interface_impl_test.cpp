@@ -133,11 +133,12 @@ int _createIndexOnEmptyCollection(OperationContext* opCtx, NamespaceString nss, 
     AutoGetCollection coll(opCtx, nss, MODE_X);
 
     WriteUnitOfWork wunit(opCtx);
-    auto indexCatalog = coll.getWritableCollection()->getIndexCatalog();
+    auto indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
     ASSERT(indexCatalog);
 
     ASSERT_OK(
-        indexCatalog->createIndexOnEmptyCollection(opCtx, coll.getWritableCollection(), indexSpec)
+        indexCatalog
+            ->createIndexOnEmptyCollection(opCtx, coll.getWritableCollection(opCtx), indexSpec)
             .getStatus());
     wunit.commit();
 

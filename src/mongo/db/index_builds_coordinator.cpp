@@ -855,7 +855,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
             invariant(coll,
                       str::stream() << "Collection with UUID " << collUUID << " was dropped.");
 
-            IndexCatalog* indexCatalog = coll.getWritableCollection()->getIndexCatalog();
+            IndexCatalog* indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
 
             const bool includeUnfinished = false;
             for (const auto& spec : oplogEntry.indexSpecs) {
@@ -866,7 +866,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
 
                 if (auto desc = indexCatalog->findIndexByName(opCtx, name, includeUnfinished)) {
                     uassertStatusOK(
-                        indexCatalog->dropIndex(opCtx, coll.getWritableCollection(), desc));
+                        indexCatalog->dropIndex(opCtx, coll.getWritableCollection(opCtx), desc));
                 }
             }
 
@@ -1737,7 +1737,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     // AutoGetCollection throws an exception if it is unable to look up the collection by UUID.
     NamespaceStringOrUUID nssOrUuid{dbName.toString(), collectionUUID};
     AutoGetCollection autoColl(opCtx, nssOrUuid, MODE_X);
-    CollectionWriter collection(autoColl);
+    CollectionWriter collection(opCtx, autoColl);
 
     const auto& ns = collection.get()->ns();
     auto css = CollectionShardingState::get(opCtx, ns);
@@ -1822,7 +1822,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
     const NamespaceStringOrUUID nssOrUuid{replState->dbName, replState->collectionUUID};
 
     AutoGetCollection coll(opCtx, nssOrUuid, MODE_X);
-    CollectionWriter collection(coll);
+    CollectionWriter collection(opCtx, coll);
     CollectionShardingState::get(opCtx, collection->ns())->checkShardVersionOrThrow(opCtx);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);

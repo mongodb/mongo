@@ -74,7 +74,7 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
             });
 
         // Change the value of "expireAfterSeconds" on disk.
-        autoColl->getWritableCollection()->updateTTLSetting(
+        autoColl->getWritableCollection(opCtx)->updateTTLSetting(
             opCtx, idx->indexName(), indexExpireAfterSeconds);
         return;
     }
@@ -84,7 +84,7 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
     *oldExpireSecs = oldExpireSecsElement.safeNumberLong();
     if (**oldExpireSecs != indexExpireAfterSeconds) {
         // Change the value of "expireAfterSeconds" on disk.
-        autoColl->getWritableCollection()->updateTTLSetting(
+        autoColl->getWritableCollection(opCtx)->updateTTLSetting(
             opCtx, idx->indexName(), indexExpireAfterSeconds);
     }
 }
@@ -102,7 +102,7 @@ void _processCollModIndexRequestHidden(OperationContext* opCtx,
     *oldHidden = idx->hidden();
     // Make sure when we set 'hidden' to false, we can remove the hidden field from catalog.
     if (*oldHidden != *newHidden) {
-        autoColl->getWritableCollection()->updateHiddenSetting(
+        autoColl->getWritableCollection(opCtx)->updateHiddenSetting(
             opCtx, idx->indexName(), indexHidden);
     }
 }
@@ -185,7 +185,7 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
     }
 
     *newUnique = true;
-    autoColl->getWritableCollection()->updateUniqueSetting(opCtx, idx->indexName());
+    autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName());
 }
 
 }  // namespace
@@ -251,8 +251,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
     // Notify the index catalog that the definition of this index changed. This will invalidate the
     // local idx pointer. On rollback of this WUOW, the local var idx pointer will be valid again.
-    autoColl->getWritableCollection()->getIndexCatalog()->refreshEntry(
-        opCtx, autoColl->getWritableCollection(), idx, flags);
+    autoColl->getWritableCollection(opCtx)->getIndexCatalog()->refreshEntry(
+        opCtx, autoColl->getWritableCollection(opCtx), idx, flags);
 
     opCtx->recoveryUnit()->onCommit(
         [oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result](

@@ -731,8 +731,10 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Handle collMod operation type appropriately.
         if (cmd.getExpireAfterSeconds()) {
-            _setClusteredExpireAfterSeconds(
-                opCtx, oldCollOptions, coll.getWritableCollection(), *cmd.getExpireAfterSeconds());
+            _setClusteredExpireAfterSeconds(opCtx,
+                                            oldCollOptions,
+                                            coll.getWritableCollection(opCtx),
+                                            *cmd.getExpireAfterSeconds());
         }
 
         // Handle index modifications.
@@ -745,20 +747,20 @@ Status _collModInternal(OperationContext* opCtx,
                                    mode);
 
         if (cmrNew.collValidator) {
-            coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);
+            coll.getWritableCollection(opCtx)->setValidator(opCtx, *cmrNew.collValidator);
         }
         if (cmrNew.collValidationAction)
-            uassertStatusOKWithContext(coll.getWritableCollection()->setValidationAction(
+            uassertStatusOKWithContext(coll.getWritableCollection(opCtx)->setValidationAction(
                                            opCtx, *cmrNew.collValidationAction),
                                        "Failed to set validationAction");
         if (cmrNew.collValidationLevel) {
-            uassertStatusOKWithContext(coll.getWritableCollection()->setValidationLevel(
+            uassertStatusOKWithContext(coll.getWritableCollection(opCtx)->setValidationLevel(
                                            opCtx, *cmrNew.collValidationLevel),
                                        "Failed to set validationLevel");
         }
 
         if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
-            coll.getWritableCollection()->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+            coll.getWritableCollection(opCtx)->setRecordPreImages(opCtx, cmrNew.recordPreImages);
         }
 
         // TODO SERVER-58584: remove the feature flag.
@@ -766,7 +768,7 @@ Status _collModInternal(OperationContext* opCtx,
             cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
             *cmrNew.changeStreamPreAndPostImagesOptions !=
                 oldCollOptions.changeStreamPreAndPostImagesOptions) {
-            coll.getWritableCollection()->setChangeStreamPreAndPostImages(
+            coll.getWritableCollection(opCtx)->setChangeStreamPreAndPostImages(
                 opCtx, *cmrNew.changeStreamPreAndPostImagesOptions);
         }
 
@@ -776,21 +778,21 @@ Status _collModInternal(OperationContext* opCtx,
             uassertStatusOK(res);
             auto [newOptions, changed] = res.getValue();
             if (changed) {
-                coll.getWritableCollection()->setTimeseriesOptions(opCtx, newOptions);
+                coll.getWritableCollection(opCtx)->setTimeseriesOptions(opCtx, newOptions);
             }
         }
 
         // Remove any invalid index options for indexes belonging to this collection.
         std::vector<std::string> indexesWithInvalidOptions =
-            coll.getWritableCollection()->removeInvalidIndexOptions(opCtx);
+            coll.getWritableCollection(opCtx)->removeInvalidIndexOptions(opCtx);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
             const IndexDescriptor* desc =
                 coll->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);
             invariant(desc);
 
             // Notify the index catalog that the definition of this index changed.
-            coll.getWritableCollection()->getIndexCatalog()->refreshEntry(
-                opCtx, coll.getWritableCollection(), desc, CreateIndexEntryFlags::kIsReady);
+            coll.getWritableCollection(opCtx)->getIndexCatalog()->refreshEntry(
+                opCtx, coll.getWritableCollection(opCtx), desc, CreateIndexEntryFlags::kIsReady);
         }
 
         // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from or downgrading to
@@ -803,15 +805,16 @@ Status _collModInternal(OperationContext* opCtx,
             // time-series collections that are missing the flag. This indicates that the
             // time-series collection existed in earlier server versions and may have mixed-schema
             // data.
-            coll.getWritableCollection()->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx, true);
+            coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx,
+                                                                                          true);
         } else if (coll->getTimeseriesBucketsMayHaveMixedSchemaData() &&
                    serverGlobalParams.featureCompatibility
                        .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
             // While downgrading the FCV from 5.2, collMod is called as part of the downgrade
             // process to remove the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry
             // flag for time-series collections that have the flag.
-            coll.getWritableCollection()->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx,
-                                                                                     boost::none);
+            coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(
+                opCtx, boost::none);
         }
 
         // Only observe non-view collMods, as view operations are observed as operations on the

@@ -416,7 +416,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
     ParsedUpdate* parsedUpdate) {
 
     AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
-    Database* db = autoColl.ensureDbExists();
+    Database* db = autoColl.ensureDbExists(opCtx);
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());

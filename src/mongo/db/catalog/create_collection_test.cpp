@@ -102,7 +102,7 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
 
     return writeConflictRetry(opCtx.get(), "create", newNss.ns(), [&] {
         AutoGetCollection autoColl(opCtx.get(), newNss, MODE_IX);
-        auto db = autoColl.ensureDbExists();
+        auto db = autoColl.ensureDbExists(opCtx.get());
         ASSERT_TRUE(db) << "Cannot create collection " << newNss << " because database "
                         << newNss.db() << " does not exist.";
 

@@ -203,7 +203,7 @@ protected:
 
         Lock::DBLock dbLock(opCtx(), nss.db(), MODE_X);
         AutoGetCollection autoColl(opCtx(), nss, MODE_X);
-        CollectionWriter coll(autoColl);
+        CollectionWriter coll(opCtx(), autoColl);
 
         MultiIndexBlock indexer;
         ScopeGuard abortOnExit(
