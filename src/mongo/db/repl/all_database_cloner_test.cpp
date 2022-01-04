@@ -295,59 +295,7 @@ TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButRollBackIdChanges) {
     ASSERT_EQ(Minutes(60), getSharedData()->getTotalTimeUnreachable(WithLock::withoutLock()));
 }
 
-TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButSourceNodeIsDowngraded) {
-    _mockClient->setWireVersions(WireVersion::RESUMABLE_INITIAL_SYNC,
-                                 WireVersion::RESUMABLE_INITIAL_SYNC);
-    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
-    _mockServer->setCommandReply("listDatabases", fromjson("{ok:1, databases:[]}"));
-
-    // Stop at the listDatabases stage.
-    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
-
-    auto cloner = makeAllDatabaseCloner();
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        ASSERT_NOT_OK(cloner->run());
-    });
-
-    // Wait until we get to the listDatabases stage.
-    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
-
-    // Bring the server down.
-    _mockServer->shutdown();
-
-    auto beforeRBIDFailPoint =
-        globalFailPointRegistry().find("hangBeforeCheckingRollBackIdClonerStage");
-    auto timesEnteredRBID = beforeRBIDFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'AllDatabaseCloner', stage: 'listDatabases'}"));
-    beforeStageFailPoint->setMode(FailPoint::off, 0);
-    beforeRBIDFailPoint->waitForTimesEntered(timesEnteredRBID + 1);
-    _clock.advance(Minutes(60));
-
-    // Bring the server up, but change the wire version to an older one.
-    LOGV2(21053, "Bringing mock server back up.");
-    _mockClient->setWireVersions(WireVersion::SHARDED_TRANSACTIONS,
-                                 WireVersion::SHARDED_TRANSACTIONS);
-    _mockServer->reboot();
-
-    // Allow the cloner to finish.
-    beforeRBIDFailPoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-
-    // Total retries and outage time should be available.
-    ASSERT_EQ(0, getSharedData()->getRetryingOperationsCount(WithLock::withoutLock()));
-    ASSERT_EQ(1, getSharedData()->getTotalRetries(WithLock::withoutLock()));
-    ASSERT_EQ(Minutes(60), getSharedData()->getTotalTimeUnreachable(WithLock::withoutLock()));
-}
-
 TEST_F(AllDatabaseClonerTest, RetriesListDatabasesButInitialSyncIdChanges) {
-    // Initial Sync Ids are not checked before wire version RESUMABLE_INITIAL_SYNC.
-    _mockClient->setWireVersions(WireVersion::RESUMABLE_INITIAL_SYNC,
-                                 WireVersion::RESUMABLE_INITIAL_SYNC);
     auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
     _mockServer->setCommandReply("listDatabases", fromjson("{ok:1, databases:[]}"));

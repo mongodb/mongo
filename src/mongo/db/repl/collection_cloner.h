@@ -226,12 +226,6 @@ private:
      */
     void runQuery();
 
-    /**
-     * Used to terminate the clone when we encounter a fatal error during a non-resumable query.
-     * Throws.
-     */
-    void abortNonResumableClone(const Status& status);
-
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
@@ -265,9 +259,6 @@ private:
     // Putting _dbWorkTaskRunner last ensures anything the database work threads depend on,
     // like _documentsToInsert, is destroyed after those threads exit.
     TaskRunner _dbWorkTaskRunner;  // (R)
-
-    // Does the sync source support resumable queries? (wire version 4.4+)
-    bool _resumeSupported = false;  // (X)
 
     // The resumeToken used to resume after network error.
     boost::optional<BSONObj> _resumeToken;  // (X)

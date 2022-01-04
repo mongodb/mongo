@@ -104,27 +104,14 @@ void InitialSyncBaseCloner::handleStageAttemptFailed(BaseClonerStage* stage, Sta
 }
 
 Status InitialSyncBaseCloner::checkSyncSourceIsStillValid() {
+    auto status = checkInitialSyncIdIsUnchanged();
+    if (!status.isOK())
+        return status;
 
-    WireVersion wireVersion;
-    {
-        stdx::lock_guard<ReplSyncSharedData> lk(*getSharedData());
-        auto wireVersionOpt = getSharedData()->getSyncSourceWireVersion(lk);
-        // The wire version should always have been set by the time this is called.
-        invariant(wireVersionOpt);
-        wireVersion = *wireVersionOpt;
-    }
-    if (wireVersion >= WireVersion::RESUMABLE_INITIAL_SYNC) {
-        auto status = checkInitialSyncIdIsUnchanged();
-        if (!status.isOK())
-            return status;
-    }
     return checkRollBackIdIsUnchanged();
 }
 
 Status InitialSyncBaseCloner::checkInitialSyncIdIsUnchanged() {
-    uassert(ErrorCodes::InitialSyncFailure,
-            "Sync source was downgraded and no longer supports resumable initial sync",
-            getClient()->getMaxWireVersion() >= WireVersion::RESUMABLE_INITIAL_SYNC);
     BSONObj initialSyncId;
     try {
         initialSyncId = getClient()->findOne(

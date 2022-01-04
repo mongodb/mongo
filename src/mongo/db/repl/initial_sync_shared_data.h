@@ -61,20 +61,6 @@ public:
     }
 
     /**
-     * Sets the wire version of the sync source.
-     */
-    void setSyncSourceWireVersion(WithLock, WireVersion wireVersion) {
-        _syncSourceWireVersion = wireVersion;
-    }
-
-    /**
-     * Returns the wire version of the sync source, if previously set.
-     */
-    boost::optional<WireVersion> getSyncSourceWireVersion(WithLock) {
-        return _syncSourceWireVersion;
-    }
-
-    /**
      * Sets the initial sync ID of the sync source.
      */
     void setInitialSyncSourceId(WithLock, boost::optional<UUID> syncSourceId) {
@@ -208,9 +194,6 @@ private:
 
     // Operation that may currently be retrying.
     RetryableOperation _retryableOp;
-
-    // The sync source wire version at the start of data cloning.
-    boost::optional<WireVersion> _syncSourceWireVersion;
 
     // The initial sync ID on the source at the start of data cloning.
     boost::optional<UUID> _initialSyncSourceId;

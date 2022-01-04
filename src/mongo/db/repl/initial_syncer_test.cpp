@@ -51,6 +51,7 @@
 #include "mongo/db/repl/oplog_fetcher_mock.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
@@ -384,6 +385,10 @@ protected:
         // of databases.
         _mockServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
         _options1.uuid = UUID::gen();
+
+        _mockServer->insert(
+            ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace.toString(),
+            BSON("_id" << UUID::gen()));
 
         reset();
 

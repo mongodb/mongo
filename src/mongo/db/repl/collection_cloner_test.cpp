@@ -79,9 +79,6 @@ protected:
         };
         _storageInterface.createCollectionForBulkFn = _standardCreateCollectionFn;
 
-
-        _mockClient->setWireVersions(WireVersion::RESUMABLE_INITIAL_SYNC,
-                                     WireVersion::RESUMABLE_INITIAL_SYNC);
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
         _mockServer->setCommandReply("replSetGetRBID",
                                      BSON("ok" << 1 << "rbid" << getSharedData()->getRollBackId()));
@@ -143,17 +140,6 @@ class CollectionClonerTestResumable : public CollectionClonerTest {
     void setUp() final {
         CollectionClonerTest::setUp();
         setInitialSyncId();
-    }
-};
-
-class CollectionClonerTestNonResumable : public CollectionClonerTest {
-    void setUp() final {
-        CollectionClonerTest::setUp();
-        // Set client wireVersion to 4.2, where we do not yet support resumable cloning.
-        _mockClient->setWireVersions(WireVersion::SHARDED_TRANSACTIONS,
-                                     WireVersion::SHARDED_TRANSACTIONS);
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
-        getSharedData()->setSyncSourceWireVersion(lk, WireVersion::SHARDED_TRANSACTIONS);
     }
 };
 
@@ -579,73 +565,6 @@ TEST_F(CollectionClonerTestResumable, DoNotCreateIDIndexIfAutoIndexIdUsed) {
     ASSERT_EQ(collOptions.autoIndexId, CollectionOptions::NO);
     ASSERT_EQ(0UL, collIndexSpecs.size());
     ASSERT_EQ(collNss, _nss);
-}
-
-TEST_F(CollectionClonerTestNonResumable, NonResumableQuerySuccess) {
-    // Set client wireVersion to 4.2, where we do not yet support resumable cloning.
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    // The collection cloner pre-stage makes a remote call to collStats to store in-progress
-    // metrics.
-    setMockServerReplies(BSON("size" << 10),
-                         createCountResponse(3),
-                         createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    auto cloner = makeCollectionCloner();
-
-    ASSERT_OK(cloner->run());
-
-    ASSERT_EQUALS(3, _collectionStats->insertCount);
-    ASSERT_TRUE(_collectionStats->commitCalled);
-    auto stats = cloner->getStats();
-    ASSERT_EQUALS(3u, stats.documentsCopied);
-}
-
-TEST_F(CollectionClonerTestNonResumable, NonResumableQueryFailure) {
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    // The collection cloner pre-stage makes a remote call to collStats to store in-progress
-    // metrics.
-    setMockServerReplies(BSON("size" << 10),
-                         createCountResponse(3),
-                         createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
-
-    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    auto cloner = makeCollectionCloner();
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        auto status = cloner->run();
-        ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, status);
-        ASSERT_STRING_CONTAINS(status.reason(), "Collection clone failed and is not resumable");
-    });
-
-    // Wait until we get to the query stage.
-    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
-
-    // Bring the server down.
-    _mockServer->shutdown();
-
-    // Let us begin with the query stage.
-    beforeStageFailPoint->setMode(FailPoint::off, 0);
-
-    clonerThread.join();
 }
 
 // We will retry our query without having yet obtained a resume token.
@@ -1087,147 +1006,6 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     ASSERT_EQUALS(7u, stats.documentsCopied);
 }
 
-// We receive a QueryPlanKilled error, then a NamespaceNotFound error, indicating that the
-// collection no longer exists in the database.
-TEST_F(CollectionClonerTestNonResumable, NonResumableCursorErrorDropOK) {
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    setMockServerReplies(BSON("size" << 10),
-                         createCountResponse(3),
-                         createCursorResponse(_nss.ns(), BSON_ARRAY(idIndexSpec)));
-
-    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
-
-    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
-    auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    auto cloner = makeCollectionCloner();
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        ASSERT_OK(cloner->run());
-    });
-
-    // Wait until we get to the query stage.
-    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
-
-    // This will cause the next batch to fail once (transiently), but we do not support resume.
-    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'QueryPlanKilled'}"));
-
-    // Let us begin with the query stage.
-    beforeStageFailPoint->setMode(FailPoint::off, 0);
-    beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
-
-    // Follow-up the QueryPlanKilled error with a NamespaceNotFound.
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'NamespaceNotFound'}"));
-
-    beforeRetryFailPoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-}
-
-// We receive an OperationFailed error, but the next error we receive is _not_ NamespaceNotFound,
-// which means the collection still exists in the database, but we cannot resume the query.
-TEST_F(CollectionClonerTestNonResumable, NonResumableCursorErrorThenOtherError) {
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    setMockServerReplies(BSON("size" << 10),
-                         createCountResponse(3),
-                         createCursorResponse(_nss.ns(), BSON_ARRAY(idIndexSpec)));
-
-    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
-
-    auto beforeRetryFailPoint = globalFailPointRegistry().find("hangBeforeRetryingClonerStage");
-    auto timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    auto cloner = makeCollectionCloner();
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        auto status = cloner->run();
-        ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, status);
-        ASSERT_STRING_CONTAINS(status.reason(), "Collection clone failed and is not resumable");
-    });
-
-    // Wait until we get to the query stage.
-    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
-
-    // This will cause the next batch to fail once (transiently), but we do not support resume.
-    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'OperationFailed'}"));
-
-    // Let us begin with the query stage.
-    beforeStageFailPoint->setMode(FailPoint::off, 0);
-    beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
-
-    // Follow-up the QueryPlanKilled error with a NamespaceNotFound.
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'UnknownError'}"));
-
-    beforeRetryFailPoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-}
-
-// We receive a CursorNotFound error, but the next query succeeds, indicating that the
-// collection still exists in the database, but we cannot resume the query.
-TEST_F(CollectionClonerTestNonResumable, NonResumableCursorErrorThenSuccessEqualsFailure) {
-    // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
-    setMockServerReplies(BSON("size" << 10),
-                         createCountResponse(3),
-                         createCursorResponse(_nss.ns(), BSON_ARRAY(idIndexSpec)));
-
-    auto beforeStageFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    auto timesEnteredBeforeStage = beforeStageFailPoint->setMode(
-        FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
-
-    // Set up documents to be returned from upstream node.
-    _mockServer->insert(_nss.ns(), BSON("_id" << 1));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 2));
-    _mockServer->insert(_nss.ns(), BSON("_id" << 3));
-
-    auto cloner = makeCollectionCloner();
-    cloner->setBatchSize_forTest(2);
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
-        auto status = cloner->run();
-        ASSERT_EQUALS(ErrorCodes::InitialSyncFailure, status);
-        ASSERT_STRING_CONTAINS(status.reason(), "Collection clone failed and is not resumable");
-    });
-
-    // Wait until we get to the query stage.
-    beforeStageFailPoint->waitForTimesEntered(timesEnteredBeforeStage + 1);
-
-    // This will cause the next batch to fail once (transiently), but we do not support resume.
-    auto failNextBatch = globalFailPointRegistry().find("mockCursorThrowErrorOnGetMore");
-    failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'CursorNotFound'}"));
-
-    // Let us begin with the query stage. We let the next retry succeed this time.
-    beforeStageFailPoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-}
 
 }  // namespace repl
 }  // namespace mongo

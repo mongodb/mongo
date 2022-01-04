@@ -122,15 +122,6 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::connectStage() {
 }
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
-    auto wireVersion = static_cast<WireVersion>(getClient()->getMaxWireVersion());
-    {
-        stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
-        getSharedData()->setSyncSourceWireVersion(lk, wireVersion);
-    }
-
-    // Wire versions prior to resumable initial sync don't have a sync source id.
-    if (wireVersion < WireVersion::RESUMABLE_INITIAL_SYNC)
-        return kContinueNormally;
     auto initialSyncId = getClient()->findOne(
         NamespaceString{ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace},
         BSONObj{});
