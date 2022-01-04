@@ -17,6 +17,8 @@ SUITE_BLACKLIST = [
     "CheckReplOplogs",
     "CleanEveryN",
     "ContinuousStepdown",
+    "ValidateCollections",
+    "CheckOrphansDeleted",
 ]
 
 
@@ -30,6 +32,12 @@ def _sanitize_hooks(hooks):
         return list(filter(lambda x: x['class'] not in SUITE_BLACKLIST, hooks))
     else:
         raise RuntimeError('Unknown structure in hook. File a TIG ticket.')
+
+
+def _sanitize_test_data(test_data):
+    if test_data.get("useStepdownPermittedFile", None):
+        test_data["useStepdownPermittedFile"] = False
+    return test_data
 
 
 _SUITES_PATH = os.path.join("buildscripts", "resmokeconfig", "suites")
@@ -64,6 +72,24 @@ def _generate(suite_name: str) -> None:
 
     try:
         suite["executor"]["hooks"] = _sanitize_hooks(suite["executor"]["hooks"])
+    except KeyError:
+        # pass, don't care
+        pass
+    except TypeError:
+        pass
+
+    try:
+        suite["executor"]["config"]["shell_options"]["global_vars"][
+            "TestData"] = _sanitize_test_data(
+                suite["executor"]["config"]["shell_options"]["global_vars"]["TestData"])
+    except KeyError:
+        # pass, don't care
+        pass
+    except TypeError:
+        pass
+
+    try:
+        suite["executor"]["config"]["shell_options"]["eval"] += "jsTestLog = Function.prototype;"
     except KeyError:
         # pass, don't care
         pass

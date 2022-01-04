@@ -4,6 +4,9 @@ EXPOSE 27017
 EXPOSE 27018
 EXPOSE 27019
 
+RUN mkdir -p /scripts
+RUN mkdir -p /var/log/resmoke
+
 # tzdata will block waiting for interactive input. Ensure that dpkg gets run
 # in a non-interactive fashion by preseeding tzdata
 COPY preseed.txt /tmp/preseed.txt
@@ -27,11 +30,8 @@ COPY src /resmoke
 
 RUN bash -c "cd /resmoke && python3.9 -m venv python3-venv && . python3-venv/bin/activate && pip install --upgrade pip wheel && pip install -r ./buildscripts/requirements.txt && ./buildscripts/antithesis_suite.py generate-all"
 
-COPY init.sh /resmoke/init.sh
 COPY mongo /usr/bin
 RUN chmod +x /usr/bin/mongo
 COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version
-
-ENTRYPOINT /resmoke/init.sh

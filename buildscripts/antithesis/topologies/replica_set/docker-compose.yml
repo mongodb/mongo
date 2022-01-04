@@ -4,8 +4,8 @@ services:
         database1:
                 container_name: database1
                 hostname: database1
-                build: ./database
-                image: database:evergreen-latest-master
+                image: mongo-binaries:evergreen-latest-master
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
                 volumes:
                   - ./logs/database1:/var/log/mongodb/
                 networks:
@@ -17,8 +17,8 @@ services:
         database2:
                 container_name: database2
                 hostname: database2
-                build: ./database
-                image: database:evergreen-latest-master
+                image: mongo-binaries:evergreen-latest-master
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
                 volumes:
                   - ./logs/database2:/var/log/mongodb/
                 networks:
@@ -30,8 +30,8 @@ services:
         database3:
                 container_name: database3
                 hostname: database3
-                build: ./database
-                image: database:evergreen-latest-master
+                image: mongo-binaries:evergreen-latest-master
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
                 volumes:
                   - ./logs/database3:/var/log/mongodb/
                 networks:
@@ -43,8 +43,11 @@ services:
         workload:
                 container_name: workload
                 hostname: workload
-                build: ./workload
                 image: workload:evergreen-latest-master
+                command: /bin/bash /scripts/workload_init.sh
+                volumes:
+                  - ./logs/workload:/var/log/resmoke/
+                  - ./scripts:/scripts/
                 depends_on:
                         - "database1"
                         - "database2"

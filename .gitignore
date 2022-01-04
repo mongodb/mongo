@@ -224,7 +224,7 @@ default.profraw
 /rpm/tmp
 
 # antithesis image building assets
-/buildscripts/antithesis/database/dist-test
-/buildscripts/antithesis/workload/src
-/buildscripts/antithesis/workload/mongo
+/buildscripts/antithesis/base_images/mongo_binaries/dist-test
+/buildscripts/antithesis/base_images/workload/src
+/buildscripts/antithesis/base_images/workload/mongo
 /buildscripts/resmokeconfig/suites/antithesis_*.yml

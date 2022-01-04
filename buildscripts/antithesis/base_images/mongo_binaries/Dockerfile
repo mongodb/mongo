@@ -6,7 +6,9 @@ EXPOSE 27019
 
 # prep the environment
 RUN mkdir -p /data/db
+RUN mkdir -p /data/configdb
 RUN mkdir -p /var/log/mongodb
+RUN mkdir -p /scripts
 
 # Install dependencies of MongoDB Server
 RUN apt-get update
@@ -21,5 +23,3 @@ RUN chmod +x /usr/bin/*
 COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version
-
-CMD /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1

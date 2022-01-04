@@ -1,0 +1,170 @@
+version: '3.0'
+
+services:
+        configsvr1:
+                container_name: configsvr1
+                hostname: configsvr1
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                  - ./logs/configsvr1:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --configsvr --replSet ConfigServerReplSet --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1 --setParameter reshardingMinimumOperationDurationMillis=30000 --wiredTigerCacheSizeGB 1 --oplogSize 256
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.6
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+
+        configsvr2:
+                container_name: configsvr2
+                hostname: configsvr2
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                        - ./logs/configsvr2:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --configsvr --replSet ConfigServerReplSet --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1 --setParameter reshardingMinimumOperationDurationMillis=30000 --wiredTigerCacheSizeGB 1 --oplogSize 256
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.7
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+
+        configsvr3:
+                container_name: configsvr3
+                hostname: configsvr3
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                        - ./logs/configsvr3:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --configsvr --replSet ConfigServerReplSet --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1 --setParameter reshardingMinimumOperationDurationMillis=30000 --wiredTigerCacheSizeGB 1 --oplogSize 256
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.8
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+
+        database1:
+                container_name: database1
+                hostname: database1
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                  - ./logs/database1:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard1 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.3
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+        database2:
+                container_name: database2
+                hostname: database2
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                  - ./logs/database2:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard1 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.4
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+        database3:
+                container_name: database3
+                hostname: database3
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                  - ./logs/database3:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard1 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.5
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+
+        database4:
+                container_name: database4
+                hostname: database4
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                        - ./logs/database4:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard2 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.10
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+        database5:
+                container_name: database5
+                hostname: database5
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                        - ./logs/database5:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard2 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.11
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+                                #
+        database6:
+                container_name: database6
+                hostname: database6
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                        - ./logs/database6:/var/log/mongodb/
+                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard2 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.12
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+
+        mongos:
+                container_name: mongos
+                hostname: mongos
+                image: mongo-binaries:evergreen-latest-master
+                volumes:
+                  - ./logs/mongos:/var/log/mongodb/
+                  - ./scripts:/scripts/
+                command: /bin/bash /scripts/mongos_init.sh
+                depends_on:
+                        - "configsvr1"
+                        - "configsvr2"
+                        - "configsvr3"
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.9
+                                # The subnet provided here is an example
+                                # An alternative subnet can be used
+        workload:
+                container_name: workload
+                hostname: workload
+                image: workload:evergreen-latest-master
+                volumes:
+                  - ./logs/workload:/var/log/resmoke/
+                  - ./scripts:/scripts/
+                command: /bin/bash /scripts/workload_init.sh
+                depends_on:
+                        - "database1"
+                        - "database2"
+                        - "database3"
+                        - "database4"
+                        - "database5"
+                        - "database6"
+                        - "configsvr1"
+                        - "configsvr2"
+                        - "configsvr3"
+                        - "mongos"
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.130
+                                # The subnet provided here is an example
+                                # An alternative subnet can be used
+networks:
+        antithesis-net:
+                driver: bridge
+                ipam:
+                        config:
+                        - subnet: 10.20.20.0/24
