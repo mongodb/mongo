@@ -8857,14 +8857,15 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: enterprise-windows-msvs2022-experimental
+- &enterprise-windows-msvs2022-experimental-template
+  name: enterprise-windows-msvs2022-experimental
   display_name: "~ Enterprise Windows MSVS 2022"
   cron: "0 12 * * *" # Every day starting at 12:00
   modules:
     - enterprise
   run_on:
     - windows-vsCurrent-2022-small
-  expansions:
+  expansions: &enterprise-windows-msvs2022-experimental-expansions-template
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
@@ -8910,6 +8911,13 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer !.multiversion
+
+- <<: *enterprise-windows-msvs2022-experimental-template
+  name: enterprise-windows-msvs2022-cxx20-debug-experimental
+  display_name: "~ Enterprise Windows MSVS 2022 C++20 DEBUG"
+  expansions:
+    <<: *enterprise-windows-msvs2022-experimental-expansions-template
+    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 MSVC_VERSION=14.3 --cxx-std=20
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
