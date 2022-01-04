@@ -92,39 +92,6 @@ struct conjunction<B> : B {};
 template <typename B1, typename... B>
 struct conjunction<B1, B...> : std::conditional_t<bool(B1::value), stdx::conjunction<B...>, B1> {};
 
-namespace detail {
-template <typename Func,
-          typename... Args,
-          typename = typename std::result_of<Func && (Args && ...)>::type>
-auto is_invocable_impl(Func&& func, Args&&... args) -> std::true_type;
-auto is_invocable_impl(...) -> std::false_type;
-}  // namespace detail
-
-template <typename Func, typename... Args>
-struct is_invocable
-    : decltype(detail::is_invocable_impl(std::declval<Func>(), std::declval<Args>()...)) {};
-
-namespace detail {
-
-// This helps solve the lack of regular void problem, when passing a 'conversion target' as a
-// parameter.
-
-template <typename R,
-          typename Func,
-          typename... Args,
-          typename ComputedResult = typename std::result_of<Func && (Args && ...)>::type>
-auto is_invocable_r_impl(stdx::type_identity<R>, Func&& func, Args&&... args) ->
-    typename stdx::disjunction<std::is_void<R>,
-                               std::is_same<ComputedResult, R>,
-                               std::is_convertible<ComputedResult, R>>::type;
-auto is_invocable_r_impl(...) -> std::false_type;
-}  // namespace detail
-
-template <typename R, typename Func, typename... Args>
-struct is_invocable_r
-    : decltype(detail::is_invocable_r_impl(
-          stdx::type_identity<R>(), std::declval<Func>(), std::declval<Args>()...)) {};
-
 }  // namespace stdx
 }  // namespace mongo
 

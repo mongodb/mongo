@@ -95,7 +95,7 @@ public:
         // requirements are met.  They must be concrete parameters not template parameters to work
         // around bugs in some compilers that we presently use.  We may be able to revisit this
         // design after toolchain upgrades for C++17.
-        std::enable_if_t<stdx::is_invocable_r<RetType, Functor, Args...>::value, TagType> =
+        std::enable_if_t<std::is_invocable_r<RetType, Functor, Args...>::value, TagType> =
             makeTag(),
         std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = makeTag(),
         std::enable_if_t<!std::is_same<std::decay_t<Functor>, unique_function>::value, TagType> =
