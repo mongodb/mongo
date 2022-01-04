@@ -2100,6 +2100,12 @@ elif env.TargetOSIs('windows'):
         "_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING",
         "_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING",
         "_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING",
+
+        # TODO(SERVER-60151): Until we are fully in C++20 mode, it is
+        # easier to simply suppress C++20 deprecations. After we have
+        # switched over we should address any actual deprecated usages
+        # and then remove this flag.
+        "_SILENCE_ALL_CXX20_DEPRECATION_WARNINGS",
     ])
 
     # /EHsc exception handling style for visual studio
