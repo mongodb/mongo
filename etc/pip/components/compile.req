@@ -1,6 +1,6 @@
 # Mongo compile
-Cheetah3 # src/mongo/base/generate_error_codes.py
-packaging
-regex
-requirements_parser
+Cheetah3 <= 3.2.6.post1 # src/mongo/base/generate_error_codes.py
+packaging <= 21.3
+regex <= 2021.11.10
+requirements_parser <= 0.3.1
 setuptools
