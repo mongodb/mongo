@@ -696,9 +696,16 @@ Status runAggregate(OperationContext* opCtx,
             // views, we use the request's collation.
             auto timeSeriesCollator =
                 ctx->getView()->timeseries() ? request.getCollation() : boost::none;
-            auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
-                                                    ->getViewCatalog(opCtx, nss.db())
-                                                    ->resolveView(opCtx, nss, timeSeriesCollator));
+
+            // Check that the database/view catalog still exist, in case this is a lock-free
+            // operation. It's possible for a view to disappear after we release locks below, so
+            // it's safe to quit early if the view disappears while running lock-free.
+            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Namespace '" << nss << "' no longer exists",
+                    viewCatalog);
+            auto resolvedView =
+                uassertStatusOK(viewCatalog->resolveView(opCtx, nss, timeSeriesCollator));
 
             // With the view & collation resolved, we can relinquish locks.
             ctx.reset();
