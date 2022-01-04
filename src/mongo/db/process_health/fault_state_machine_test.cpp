@@ -46,8 +46,8 @@ namespace {
 
 TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSuccessful) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
-    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 0; });
-    registerMockHealthObserver(FaultFacetType::kMock2, [] { return 0; });
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kOk; });
+    registerMockHealthObserver(FaultFacetType::kMock2, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     std::vector<FaultFacetType> faultFacetTypes{FaultFacetType::kMock1, FaultFacetType::kMock2};
@@ -71,12 +71,12 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSucce
 TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkAfterFailureThenSuccess) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     advanceTime(Milliseconds(100));
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
     ASSERT(hasFault());
@@ -92,7 +92,7 @@ TEST_F(FaultManagerTest, TransitionsFromOkToTransientFaultAfterSuccessThenFailur
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
 
     const auto faultFacetType = FaultFacetType::kMock1;
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
@@ -104,7 +104,7 @@ TEST_F(FaultManagerTest, TransitionsFromOkToTransientFaultAfterSuccessThenFailur
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
     ASSERT(initialHealthCheckFuture.isReady());
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     advanceTime(Milliseconds(100));
     assertSoon([this]() {
         return hasFault() && manager().getFaultState() == FaultState::kTransientFault;
@@ -114,7 +114,7 @@ TEST_F(FaultManagerTest, TransitionsFromOkToTransientFaultAfterSuccessThenFailur
 TEST_F(FaultManagerTest, StaysInOkOnSuccess) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
@@ -136,7 +136,7 @@ TEST_F(FaultManagerTest, StaysInOkOnSuccess) {
 TEST_F(FaultManagerTest, StaysInTransientFault) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
@@ -148,13 +148,13 @@ TEST_F(FaultManagerTest, StaysInTransientFault) {
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
     ASSERT(initialHealthCheckFuture.isReady());
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     advanceTime(Milliseconds(100));
     assertSoon([this]() {
         return hasFault() && manager().getFaultState() == FaultState::kTransientFault;
     });
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     advanceTime(Milliseconds(100));
     assertSoon([this]() {
         return hasFault() && manager().getFaultState() == FaultState::kTransientFault;
@@ -164,7 +164,7 @@ TEST_F(FaultManagerTest, StaysInTransientFault) {
 TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     const auto faultFacetType = FaultFacetType::kMock1;
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
@@ -176,7 +176,7 @@ TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) 
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
     ASSERT(initialHealthCheckFuture.isReady());
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     advanceTime(Milliseconds(100));
     assertSoon([this]() {
         return hasFault() && manager().getFaultState() == FaultState::kTransientFault;
@@ -191,16 +191,19 @@ TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) 
 
 TEST_F(FaultManagerTest, OneFacetIsResolved) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
-    registerMockHealthObserver(FaultFacetType::kMock1, [] { return 1.1; });
-    registerMockHealthObserver(FaultFacetType::kMock2, [] { return 1.1; });
+    registerMockHealthObserver(FaultFacetType::kMock1, [] { return Severity::kFailure; });
+    registerMockHealthObserver(FaultFacetType::kMock2, [] { return Severity::kFailure; });
 
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
-    manager().acceptTest(HealthCheckStatus(FaultFacetType::kMock1, 1.1, "failing health check 1"));
-    manager().acceptTest(HealthCheckStatus(FaultFacetType::kMock2, 1.1, "failing health check 2"));
+    manager().acceptTest(
+        HealthCheckStatus(FaultFacetType::kMock1, Severity::kFailure, "failing health check 1"));
+    manager().acceptTest(
+        HealthCheckStatus(FaultFacetType::kMock2, Severity::kFailure, "failing health check 2"));
     assertSoon([this] { return manager().getOrCreateFaultTest()->getFacets().size() == 2; });
+
     manager().acceptTest(HealthCheckStatus(FaultFacetType::kMock1));
     assertSoon([this] {
         return manager().getOrCreateFaultTest()->getFacets().front()->getType() ==
@@ -213,12 +216,12 @@ DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromTransient
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
-    registerMockHealthObserver(faultFacetType, [] { return 1.1; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     ASSERT(manager().getFaultState() == FaultState::kOk);
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT(manager().getFaultState() == FaultState::kTransientFault);
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
@@ -233,12 +236,12 @@ TEST_F(FaultManagerTest,
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kNonCritical);
     resetManager(std::move(config));
 
-    registerMockHealthObserver(faultFacetType, [] { return 1.1; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     ASSERT(manager().getFaultState() == FaultState::kOk);
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT(manager().getFaultState() == FaultState::kTransientFault);
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
@@ -251,9 +254,9 @@ DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromStartupCh
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
-    registerMockHealthObserver(faultFacetType, [] { return 1.1; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
@@ -268,9 +271,9 @@ TEST_F(FaultManagerTest,
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kNonCritical);
     resetManager(std::move(config));
 
-    registerMockHealthObserver(faultFacetType, [] { return 1.1; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
 
     advanceTime(Seconds(kActiveFaultDurationSecs) * 10);
@@ -283,12 +286,12 @@ TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
 
-    registerMockHealthObserver(faultFacetType, [] { return 1.1; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     ASSERT(manager().getFaultState() == FaultState::kOk);
 
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT(manager().getFaultState() == FaultState::kTransientFault);
 
     advanceTime(Seconds(kActiveFaultDurationSecs / 2));
@@ -306,13 +309,16 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
     resetManager(std::move(config));
 
-    registerMockHealthObserver(faultFacetType, [] { return 1.0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     // kSystem is enabled.
-    registerMockHealthObserver(FaultFacetType::kSystem, [] { return 0; });
+    registerMockHealthObserver(FaultFacetType::kSystem, [] { return Severity::kOk; });
 
     ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
+    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
+    advanceTime(Milliseconds(100));
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
     ASSERT(initialHealthCheckFuture.isReady());
 }
@@ -324,7 +330,7 @@ TEST_F(FaultManagerTest, AllOffFacetsSkipStartupCheck) {
     config->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
     resetManager(std::move(config));
 
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
@@ -339,7 +345,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
     auto configPtr = config.get();
     resetManager(std::move(config));
 
-    registerMockHealthObserver(faultFacetType, [] { return 0; });
+    registerMockHealthObserver(faultFacetType, [] { return Severity::kOk; });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
@@ -352,7 +358,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
     ASSERT(initialHealthCheckFuture.isReady());
 
     configPtr->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
-    manager().acceptTest(HealthCheckStatus(faultFacetType, 1.0, "error"));
+    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT(manager().getFaultState() == FaultState::kOk);
 }
 

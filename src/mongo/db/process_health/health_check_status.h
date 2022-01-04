@@ -38,30 +38,30 @@
 namespace mongo {
 namespace process_health {
 
+enum class Severity { kOk, kFailure };
+static const StringData SeverityStrings[] = {"kOk", "kFailure"};
 
+inline StringBuilder& operator<<(StringBuilder& s, const Severity& sev) {
+    return s << SeverityStrings[static_cast<int>(sev)];
+}
+
+inline std::ostream& operator<<(std::ostream& s, const Severity& sev) {
+    return s << SeverityStrings[static_cast<int>(sev)];
+}
 /**
  * Immutable class representing current status of an ongoing fault tracked by facet.
  */
 class HealthCheckStatus {
 public:
-    static constexpr double kResolvedSeverity = 0;
-    // The range for active fault is inclusive: [ 1, Inf ).
-    static constexpr double kActiveFaultSeverity = 1.0;
-    // We chose to subtract a small 'epsilon' value from 1.0 to
-    // avoid rounding problems and be sure that severity of 1.0 is guaranteed to be an active fault.
-    static constexpr double kActiveFaultSeverityEpsilon = 0.000001;
-
-    using Severity = double;
-
     HealthCheckStatus(FaultFacetType type, Severity severity, StringData description)
         : _type(type), _severity(severity), _description(description) {}
 
     // Constructs a resolved status (no fault detected).
     explicit HealthCheckStatus(FaultFacetType type)
-        : _type(type), _severity(0), _description("resolved"_sd) {}
+        : _type(type), _severity(Severity::kOk), _description("resolved"_sd) {}
 
     explicit HealthCheckStatus(HealthObserverTypeEnum type)
-        : _type(toFaultFacetType(type)), _severity(0), _description("resolved"_sd) {}
+        : _type(toFaultFacetType(type)), _severity(Severity::kOk), _description("resolved"_sd) {}
 
     HealthCheckStatus(const HealthCheckStatus&) = default;
     HealthCheckStatus& operator=(const HealthCheckStatus&) = default;
@@ -96,17 +96,12 @@ public:
 
     // Helpers for severity levels.
 
-    static bool isResolved(double severity) {
-        return severity <= kResolvedSeverity;
+    static bool isResolved(Severity severity) {
+        return severity == Severity::kOk;
     }
 
-    static bool isTransientFault(double severity) {
-        return severity > kResolvedSeverity && severity < kActiveFaultSeverity;
-    }
-
-    static bool isActiveFault(double severity) {
-        // Range is inclusive.
-        return severity >= 1.0;
+    static bool isActiveFault(Severity severity) {
+        return severity == Severity::kFailure;
     }
 
     bool isActiveFault() const {
@@ -119,7 +114,7 @@ private:
 
 
     FaultFacetType _type;
-    double _severity;
+    Severity _severity;
     std::string _description;
 };
 

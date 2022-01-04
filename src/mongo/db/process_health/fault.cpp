@@ -41,21 +41,6 @@ UUID Fault::getId() const {
     return _id;
 }
 
-double Fault::getSeverity() const {
-    auto facets = getFacets();
-
-    // Simple algo to compute aggregate severity: take the max from all facets.
-    double severity = 0;
-    for (auto& facet : facets) {
-        invariant(facet);
-        HealthCheckStatus status = facet->getStatus();
-        if (status.getSeverity() > severity) {
-            severity = status.getSeverity();
-        }
-    }
-    return severity;
-}
-
 Milliseconds Fault::getDuration() const {
     return Milliseconds(_clockSource->now() - _startTime);
 }
@@ -115,7 +100,6 @@ void Fault::garbageCollectResolvedFacets() {
 
 void Fault::appendDescription(BSONObjBuilder* builder) const {
     builder->append("id", getId().toBSON());
-    builder->append("severity", getSeverity());
     builder->append("duration", getDuration().toBSON());
     BSONObjBuilder facetsBuilder;
     for (auto& facet : _facets) {

@@ -44,7 +44,7 @@ class HealthObserverMock : public HealthObserverBase {
 public:
     HealthObserverMock(FaultFacetType mockType,
                        ServiceContext* svcCtx,
-                       std::function<double()> getSeverityCallback,
+                       std::function<Severity()> getSeverityCallback,
                        Milliseconds observerTimeout)
         : HealthObserverBase(svcCtx),
           _mockType(mockType),
@@ -91,7 +91,7 @@ protected:
 
 private:
     const FaultFacetType _mockType;
-    std::function<double()> _getSeverityCallback;
+    std::function<Severity()> _getSeverityCallback;
     const Milliseconds _observerTimeout;
 };
 

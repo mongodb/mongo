@@ -68,13 +68,12 @@ TEST_F(FaultTest, TimeSourceWorks) {
 }
 
 TEST_F(FaultTest, SeverityLevelHelpersWork) {
-    FaultFacetMock resolvedFacet(FaultFacetType::kMock1, &clockSource(), [] { return 0; });
+    FaultFacetMock resolvedFacet(
+        FaultFacetType::kMock1, &clockSource(), [] { return Severity::kOk; });
     ASSERT_TRUE(HealthCheckStatus::isResolved(resolvedFacet.getStatus().getSeverity()));
 
-    FaultFacetMock transientFacet(FaultFacetType::kMock1, &clockSource(), [] { return 0.99; });
-    ASSERT_TRUE(HealthCheckStatus::isTransientFault(transientFacet.getStatus().getSeverity()));
-
-    FaultFacetMock faultyFacet(FaultFacetType::kMock1, &clockSource(), [] { return 1.0; });
+    FaultFacetMock faultyFacet(
+        FaultFacetType::kMock1, &clockSource(), [] { return Severity::kFailure; });
     ASSERT_TRUE(HealthCheckStatus::isActiveFault(faultyFacet.getStatus().getSeverity()));
 }
 
@@ -82,8 +81,8 @@ TEST_F(FaultTest, FindFacetByType) {
     ASSERT_EQ(0, fault().getFacets().size());
     ASSERT_FALSE(fault().getFaultFacet(FaultFacetType::kMock1));
 
-    FaultFacetPtr newFacet =
-        std::make_shared<FaultFacetMock>(FaultFacetType::kMock1, &clockSource(), [] { return 0; });
+    FaultFacetPtr newFacet = std::make_shared<FaultFacetMock>(
+        FaultFacetType::kMock1, &clockSource(), [] { return Severity::kOk; });
     fault().upsertFacet(newFacet);
     auto facet = fault().getFaultFacet(FaultFacetType::kMock1);
     ASSERT_TRUE(facet);
@@ -92,11 +91,11 @@ TEST_F(FaultTest, FindFacetByType) {
 }
 
 TEST_F(FaultTest, CanCreateAndGarbageCollectFacets) {
-    AtomicDouble severity{0.1};
+    auto severity = synchronized_value<Severity>(Severity::kFailure);
 
     ASSERT_EQ(0, fault().getFacets().size());
     FaultFacetPtr newFacet = std::make_shared<FaultFacetMock>(
-        FaultFacetType::kMock1, &clockSource(), [&severity] { return severity.load(); });
+        FaultFacetType::kMock1, &clockSource(), [&severity] { return *severity; });
     fault().upsertFacet(newFacet);
     // New facet was added successfully.
     ASSERT_EQ(1, fault().getFacets().size());
@@ -105,7 +104,7 @@ TEST_F(FaultTest, CanCreateAndGarbageCollectFacets) {
     fault().garbageCollectResolvedFacets();
     ASSERT_EQ(1, fault().getFacets().size());
 
-    severity.store(0);
+    *severity = Severity::kOk;
     fault().garbageCollectResolvedFacets();
     ASSERT_EQ(0, fault().getFacets().size());
 }

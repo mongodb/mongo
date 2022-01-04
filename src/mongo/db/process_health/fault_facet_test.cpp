@@ -57,16 +57,17 @@ private:
 };
 
 TEST_F(FaultFacetTestWithMock, FacetWithFailure) {
-    startMock([] { return 0.5; });
-    auto status = getStatus();
-    ASSERT_APPROX_EQUAL(0.5, status.getSeverity(), 0.001);
+    startMock([] { return Severity::kFailure; });
+    ASSERT_EQUALS(Severity::kFailure, getStatus().getSeverity());
 }
 
 // Using the FaultFacetImpl.
 class FaultFacetImplTest : public unittest::Test {
 public:
-    static inline const auto kNoFailures = HealthCheckStatus(FaultFacetType::kMock1, 0.0, "test");
-    static inline const auto kFailure = HealthCheckStatus(FaultFacetType::kMock1, 0.5, "test");
+    static inline const auto kNoFailures =
+        HealthCheckStatus(FaultFacetType::kMock1, Severity::kOk, "test");
+    static inline const auto kFailure =
+        HealthCheckStatus(FaultFacetType::kMock1, Severity::kFailure, "test");
 
     void setUp() {
         _svcCtx = ServiceContext::make();
@@ -103,7 +104,7 @@ private:
 TEST_F(FaultFacetImplTest, Simple) {
     createWithStatus(kFailure);
     const auto status = getStatus();
-    ASSERT_GT(status.getSeverity(), 0);
+    ASSERT_GT(status.getSeverity(), Severity::kOk);
     ASSERT_EQ(status.getType(), FaultFacetType::kMock1);
     ASSERT_EQ(status.getShortDescription(), "test"_sd);
 }
@@ -111,7 +112,7 @@ TEST_F(FaultFacetImplTest, Simple) {
 TEST_F(FaultFacetImplTest, Update) {
     createWithStatus(kFailure);
     update(kNoFailures);
-    ASSERT_EQ(getStatus().getSeverity(), 0);
+    ASSERT_EQ(getStatus().getSeverity(), Severity::kOk);
 }
 
 }  // namespace

@@ -176,7 +176,7 @@ public:
     }
 
     void registerMockHealthObserver(FaultFacetType mockType,
-                                    std::function<double()> getSeverityCallback,
+                                    std::function<Severity()> getSeverityCallback,
                                     Milliseconds timeout) {
         HealthObserverRegistration::registerObserverFactory(
             [mockType, getSeverityCallback, timeout](ServiceContext* svcCtx) {
@@ -186,7 +186,7 @@ public:
     }
 
     void registerMockHealthObserver(FaultFacetType mockType,
-                                    std::function<double()> getSeverityCallback) {
+                                    std::function<Severity()> getSeverityCallback) {
         registerMockHealthObserver(mockType, getSeverityCallback, Milliseconds(Seconds(30)));
     }
 
