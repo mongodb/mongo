@@ -37,6 +37,7 @@ const ImplicitlyShardAccessCollSettings = (function() {
 'use strict';
 
 load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
+load("jstests/libs/fixture_helpers.js");                    // For 'FixtureHelpers'.
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -135,9 +136,12 @@ DB.prototype.createCollection = function() {
         return createCollResult;
     }
 
-    const parameterResult = this.adminCommand({getParameter: 1, featureFlagShardedTimeSeries: 1});
+    const parameterResults = FixtureHelpers.runCommandOnEachPrimary({
+        db: this.getSiblingDB('admin'),
+        cmdObj: {getParameter: 1, featureFlagShardedTimeSeries: 1}
+    });
     const isTimeseriesShardingEnabled =
-        parameterResult.ok && parameterResult.featureFlagShardedTimeSeries.value;
+        parameterResults.every(result => result.ok && result.featureFlagShardedTimeSeries.value);
     if (!isTimeseriesShardingEnabled) {
         return createCollResult;
     }
