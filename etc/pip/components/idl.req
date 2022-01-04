@@ -1,2 +1,2 @@
-unittest-xml-reporting>=2.2.0
-typing
+unittest-xml-reporting >= 2.2.0, <= 3.0.4
+typing <= 3.7.4.3

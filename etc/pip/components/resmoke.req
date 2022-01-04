@@ -1,8 +1,8 @@
 PyKMIP == 0.4.0 # It's now 0.8.0. We're far enough back to have API conflicts.
 evergreen.py == 2.1.0
-jinja2
+jinja2 <= 2.11.3
 MarkupSafe == 1.1.0  # See SERVER-57036, this is a transitive dependency of jinja2
-mock
+mock <= 4.0.3
 shrub.py == 1.1.0
 ocspresponder == 0.5.0
 flask == 1.1.1
