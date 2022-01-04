@@ -1,6 +1,6 @@
 # TIG jira integration
-jira
-requests-oauth
-PyJWT # https://github.com/pycontribs/jira/issues/247
+jira <= 3.1.1
+requests-oauth <= 0.4.1
+PyJWT <= 2.3.0 # https://github.com/pycontribs/jira/issues/247
 cryptography == 2.3 # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
 # We are omitting pycrypto based on https://github.com/pycontribs/jira/pull/629
