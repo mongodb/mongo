@@ -343,6 +343,7 @@ class GDBDumper(Dumper):
         mongo_printers_script = os.path.join(gdb_dir, "mongo_printers.py")
         mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
 
+        add_venv_sys_path = f"py sys.path.extend({sys.path})"  # Makes venv packages available in GDB
         source_mongo = "source %s" % mongo_script
         source_mongo_printers = "source %s" % mongo_printers_script
         source_mongo_lock = "source %s" % mongo_lock_script
@@ -351,6 +352,7 @@ class GDBDumper(Dumper):
             "set interactive-mode off",
             "set print thread-events off",  # Suppress GDB messages of threads starting/finishing.
             "set python print-stack full",
+            add_venv_sys_path,
             source_mongo,
             source_mongo_printers,
             source_mongo_lock,
