@@ -64,7 +64,7 @@ private:
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FaultFacetImpl::_mutex");
-    double _severity = 0;
+    Severity _severity = Severity::kOk;
     std::string _description;
 };
 

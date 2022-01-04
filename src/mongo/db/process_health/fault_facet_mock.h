@@ -45,7 +45,7 @@ namespace process_health {
 class FaultFacetMock : public FaultFacet {
 public:
     // Testing callback to fill up mocked values.
-    using MockCallback = std::function<double()>;
+    using MockCallback = std::function<Severity()>;
 
     FaultFacetMock(FaultFacetType mockType, ClockSource* clockSource, MockCallback callback)
         : _mockType(mockType), _clockSource(clockSource), _callback(callback) {
@@ -59,7 +59,7 @@ public:
     }
 
     HealthCheckStatus getStatus() const override {
-        const double severity = _callback();
+        const Severity severity = _callback();
 
         auto healthCheckStatus = HealthCheckStatus(_mockType, severity, "Mock facet");
         LOGV2(5956702, "Mock fault facet status", "status"_attr = healthCheckStatus);

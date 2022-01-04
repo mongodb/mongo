@@ -57,14 +57,13 @@ assert(result.enteredStateAtTime);
 assert(result.faultInformation);
 
 const faultInformation = result.faultInformation;
-assert.eq(faultInformation.severity, 1);
+// TODO: SERVER-60973 check fault severity
 assert(faultInformation.duration);
 assert(faultInformation.facets);
 assert.eq(faultInformation.numFacets, 1);
 assert(faultInformation.facets.kTestObserver);
 
 const kTestObserverFacet = faultInformation.facets.kTestObserver;
-assert.eq(kTestObserverFacet.severity, faultInformation.severity);
 assert.eq(kTestObserverFacet.duration, faultInformation.duration);
 assert(kTestObserverFacet.description.includes("InternalError: test msg"));
 

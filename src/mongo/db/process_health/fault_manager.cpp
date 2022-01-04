@@ -552,7 +552,8 @@ void FaultManager::healthCheck(HealthObserver* observer, CancellationToken token
     };
 
     auto acceptNotOKStatus = [this, observer](Status s) {
-        auto healthCheckStatus = HealthCheckStatus(observer->getType(), 1.0, s.reason());
+        auto healthCheckStatus =
+            HealthCheckStatus(observer->getType(), Severity::kFailure, s.reason());
         LOGV2_ERROR(
             6007901, "Unexpected failure during health check", "status"_attr = healthCheckStatus);
         accept(healthCheckStatus);

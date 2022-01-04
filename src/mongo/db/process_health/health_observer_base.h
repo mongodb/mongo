@@ -65,7 +65,8 @@ public:
         std::shared_ptr<executor::TaskExecutor> taskExecutor, CancellationToken token) override;
 
     HealthCheckStatus makeHealthyStatus() const;
-    HealthCheckStatus makeSimpleFailedStatus(double severity, std::vector<Status>&& failures) const;
+    HealthCheckStatus makeSimpleFailedStatus(Severity severity,
+                                             std::vector<Status>&& failures) const;
 
     HealthObserverLivenessStats getStats() const override;
     Milliseconds healthCheckJitter() const override;

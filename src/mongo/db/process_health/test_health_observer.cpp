@@ -50,7 +50,8 @@ Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
             auto code = data["code"].checkAndGetStringData();
             auto msg = data["msg"].checkAndGetStringData();
             result = Future<HealthCheckStatus>::makeReady(makeSimpleFailedStatus(
-                1.0, {Status(ErrorCodes::fromString(code.toString()), msg.toString())}));
+                Severity::kFailure,
+                {Status(ErrorCodes::fromString(code.toString()), msg.toString())}));
         },
         [&](const BSONObj& data) { return !data.isEmpty(); });
 

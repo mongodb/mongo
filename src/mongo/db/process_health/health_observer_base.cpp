@@ -86,11 +86,11 @@ HealthCheckStatus HealthObserverBase::makeHealthyStatus() const {
     return HealthCheckStatus(getType());
 }
 
-HealthCheckStatus HealthObserverBase::makeSimpleFailedStatus(double severity,
+HealthCheckStatus HealthObserverBase::makeSimpleFailedStatus(Severity severity,
                                                              std::vector<Status>&& failures) const {
-    if (severity <= 0) {
+    if (severity == Severity::kOk) {
         LOGV2_WARNING(6007903,
-                      "Creating faulty health check status requires positive severity",
+                      "Creating faulty health check status requires non-ok severity",
                       "observerType"_attr = getType());
     }
     StringBuilder sb;

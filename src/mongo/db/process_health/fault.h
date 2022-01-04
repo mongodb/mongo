@@ -55,17 +55,6 @@ public:
     UUID getId() const;
 
     /**
-     * The fault severity value is an aggregate severity calculated
-     * from all facets currently owned by this instance.
-     *
-     * @return Current fault severity. The expected values:
-     *         0: Ok
-     *         (0, 1.0): Transient fault condition
-     *         [1.0, Inf): Active fault condition
-     */
-    double getSeverity() const;
-
-    /**
      * @return The lifetime of this fault from the moment it was created.
      *         Invariant: getDuration() >= getActiveFaultDuration()
      */
