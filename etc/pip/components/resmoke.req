@@ -1,9 +1,9 @@
 curatorbin == 1.2.3
 PyKMIP == 0.10.0
 evergreen.py == 3.2.0
-jinja2
+jinja2 <= 2.11.3
 MarkupSafe == 1.1.0  # See SERVER-57036, this is a transitive dependency of jinja2
-mock
+mock <= 4.0.3
 shrub.py == 1.1.4
 ocspresponder == 0.5.0
 flask == 1.1.1
@@ -13,6 +13,6 @@ grpcio-tools == 1.37.0; platform_machine == "x86_64" or platform_machine == "aar
 googleapis-common-protos == 1.53.0
 blackduck == 1.0.1
 PyGithub == 1.53
-urllib3 >= 1.26.0
+urllib3 >= 1.26.0, <= 1.26.7
 distro == 1.5.0
 dnspython == 2.1.0
