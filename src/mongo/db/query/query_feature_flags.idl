@@ -82,13 +82,6 @@ feature_flags:
       cpp_varname: gFeatureFlagSbePlanCache
       default: false
 
-    featureFlagFill:
-        description: >
-          When disabled, this flag does not allow $fill, $locf or the linear interpolation window function
-          to parse. It will be removed when PM-1935 is complete
-        cpp_varname: gFlagFill
-        default: false
-
     featureFlagSortArray:
         description: "Feature flag for allowing use of the $sortArray aggregation expression"
         cpp_varname: gFeatureFlagSortArray
@@ -99,6 +92,18 @@ feature_flags:
       description: "Feature flag for enabling improved change streams visibility"
       cpp_varname: gFeatureFlagChangeStreamsVisibility
       default: false
+
+    featureFlagLocf:
+        description: "Feature flag for allowing $locf window function"
+        cpp_varname: gFeatureFlagLocf
+        default: true
+        version: 5.2
+
+    featureFlagFill:
+        description: "Feature flag for allowing $fill and $linearFill window functions"
+        cpp_varname: gFeatureFlagFill
+        default: true
+        version: 5.3
 
     featureFlagPerShardCursor:
       description: "Feature flag for enabling a per-shard cursor via mongos"

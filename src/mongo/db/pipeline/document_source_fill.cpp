@@ -44,8 +44,8 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(fill,
                                        document_source_fill::createFromBson,
                                        AllowedWithApiStrict::kNeverInVersion1,
                                        AllowedWithClientType::kAny,
-                                       multiversion::FeatureCompatibilityVersion::kVersion_5_2,
-                                       feature_flags::gFlagFill.isEnabledAndIgnoreFCV());
+                                       feature_flags::gFeatureFlagFill.getVersion(),
+                                       feature_flags::gFeatureFlagFill.isEnabledAndIgnoreFCV());
 namespace document_source_fill {
 
 std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(

@@ -12,6 +12,11 @@ load("jstests/aggregation/extras/window_function_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 
+if (!FeatureFlagUtil.isEnabled(db, "Locf")) {
+    jsTestLog("Skipping as featureFlagLocf is not enabled");
+    return;
+}
+
 const coll = db[jsTestName()];
 coll.drop();
 
