@@ -94,9 +94,11 @@ bool shouldStopSendingRecipientForgetMigrationCommand(Status status) {
           ErrorCodes::isInterruption(status));
 }
 
-bool shouldStopSendingRecipientSyncDataCommand(Status status) {
+bool shouldStopSendingRecipientSyncDataCommand(Status status, MigrationProtocolEnum protocol) {
+    auto isRetriable =
+        ErrorCodes::isRetriableError(status) && protocol != MigrationProtocolEnum::kShardMerge;
     return status.isOK() ||
-        !(ErrorCodes::isRetriableError(status) ||
+        !(isRetriable ||
           // Returned if findHost() is unable to target the recipient in 15 seconds, which may
           // happen after a failover.
           status == ErrorCodes::FailedToSatisfyReadPreference);
@@ -726,9 +728,11 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                });
                        });
                })
-        .until([token, cmdObj, isRecipientSyncDataCmd](Status status) {
+        .until([this, self = shared_from_this(), token, cmdObj, isRecipientSyncDataCmd](
+                   Status status) {
             if (isRecipientSyncDataCmd) {
-                return shouldStopSendingRecipientSyncDataCommand(status);
+                stdx::lock_guard<Latch> lg(_mutex);
+                return shouldStopSendingRecipientSyncDataCommand(status, getProtocol());
             } else {
                 // If the recipient command is not 'recipientSyncData', it must be
                 // 'recipientForgetMigration'.

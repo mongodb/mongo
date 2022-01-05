@@ -88,11 +88,17 @@ using namespace fmt;
 const std::string kTTLIndexName = "TenantMigrationRecipientTTLIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 constexpr StringData kOplogBufferPrefix = "repl.migration.oplog_"_sd;
+constexpr StringData kDonatedFilesPrefix = "donatedFiles."_sd;
 constexpr int kBackupCursorFileFetcherRetryAttempts = 10;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
     return NamespaceString(NamespaceString::kConfigDb,
                            kOplogBufferPrefix + migrationUUID.toString());
+}
+
+NamespaceString getDonatedFilesNs(const UUID& migrationUUID) {
+    return NamespaceString(NamespaceString::kConfigDb,
+                           kDonatedFilesPrefix + migrationUUID.toString());
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {
@@ -905,18 +911,18 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
 }
 
 void TenantMigrationRecipientService::Instance::_killBackupCursor(WithLock lk) {
-    if (!_backupCursorId || _backupCursorNamespaceString.isEmpty()) {
+    if (!_donorFilenameBackupCursorId || _donorFilenameBackupCursorNamespaceString.isEmpty()) {
         return;
     }
 
-    // TODO (SERVER-61131) likely want to cancel getMore/keepalive here as well
+    // TODO (SERVER-61132) likely want to cancel getMore/keepalive here as well
 
-    executor::RemoteCommandRequest request(_client->getServerHostAndPort(),
-                                           _backupCursorNamespaceString.db().toString(),
-                                           BSON("killCursors"
-                                                << _backupCursorNamespaceString.coll().toString()
-                                                << "cursors" << BSON_ARRAY(_backupCursorId)),
-                                           nullptr);
+    executor::RemoteCommandRequest request(
+        _client->getServerHostAndPort(),
+        _donorFilenameBackupCursorNamespaceString.db().toString(),
+        BSON("killCursors" << _donorFilenameBackupCursorNamespaceString.coll().toString()
+                           << "cursors" << BSON_ARRAY(_donorFilenameBackupCursorId)),
+        nullptr);
     request.sslMode = transport::kGlobalSSLMode;
 
     auto scheduleResult =
@@ -942,7 +948,7 @@ void TenantMigrationRecipientService::Instance::_killBackupCursor(WithLock lk) {
     }
 }
 
-ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetcher(
+ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenames(
     const CancellationToken& token) {
     stdx::lock_guard lk(_mutex);
     LOGV2_DEBUG(6113000,
@@ -959,33 +965,27 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetch
         return aggRequest.toBSON(BSONObj());
     }();
 
-    // TODO (SERVER-61131) store or pass in returnedFiles so that we can access it when this
-    // work is done
-    auto returnedFiles = std::make_shared<std::vector<BSONObj>>();
-
     auto fetchStatus = std::make_shared<boost::optional<Status>>();
-    auto fetcherCallback = [this, self = shared_from_this(), fetchStatus, returnedFiles, token](
+    auto fetcherCallback = [this, self = shared_from_this(), fetchStatus, token](
                                const Fetcher::QueryResponseStatus& dataStatus,
                                Fetcher::NextAction* nextAction,
                                BSONObjBuilder* getMoreBob) {
         if (!dataStatus.isOK()) {
             *fetchStatus = dataStatus.getStatus();
-            returnedFiles->clear();
             LOGV2_ERROR(6113003, "backup cursor failed", "error"_attr = dataStatus.getStatus());
             return;
         }
 
         if (token.isCanceled()) {
             *fetchStatus = Status(ErrorCodes::CallbackCanceled, "backup cursor interrupted");
-            returnedFiles->clear();
             return;
         }
 
         stdx::lock_guard lk(_mutex);
 
         const auto& data = dataStatus.getValue();
-        _backupCursorId = data.cursorId;
-        _backupCursorNamespaceString = data.nss;
+        _donorFilenameBackupCursorId = data.cursorId;
+        _donorFilenameBackupCursorNamespaceString = data.nss;
 
         for (const BSONObj& doc : data.documents) {
             if (doc["metadata"]) {
@@ -993,7 +993,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetch
                 const auto& metadata = doc["metadata"].Obj();
                 auto startApplyingDonorOpTime =
                     OpTime(metadata["checkpointTimestamp"].timestamp(), OpTime::kUninitializedTerm);
-                // TODO (SERVER-61131) Uncomment the following lines when we skip
+                // TODO (SERVER-61132) Uncomment the following lines when we skip
                 // _getStartopTimesFromDonor entirely
                 // _stateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
                 // _stateDoc.setStartFetchingDonorOpTime(startApplyingDonorOpTime);
@@ -1009,7 +1009,42 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetch
                             "migrationId"_attr = _stateDoc.getId(),
                             "filename"_attr = doc["filename"].String(),
                             "backupCursorId"_attr = data.cursorId);
-                returnedFiles->emplace_back(doc.getOwned());
+
+                auto uniqueOpCtx = cc().makeOperationContext();
+                auto opCtx = uniqueOpCtx.get();
+                auto donatedFilesNs = getDonatedFilesNs(getMigrationUUID());
+                auto status = writeConflictRetry(
+                    opCtx,
+                    "insertBackupCursorEntry",
+                    donatedFilesNs.ns(),
+                    [opCtx, donatedFilesNs, doc]() -> Status {
+                        Lock::GlobalWrite lk(opCtx);
+                        AutoGetDb autoDb(opCtx, donatedFilesNs.db(), mongo::MODE_X);
+                        auto db = autoDb.ensureDbExists(opCtx);
+                        CollectionPtr collection =
+                            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                                opCtx, donatedFilesNs);
+                        WriteUnitOfWork wuow(opCtx);
+                        if (!collection) {
+                            CollectionOptions emptyCollOptions;
+                            uassertStatusOK(
+                                db->userCreateNS(opCtx, donatedFilesNs, emptyCollOptions));
+                            collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                                opCtx, donatedFilesNs);
+                        }
+                        invariant(collection);
+
+                        auto obj =
+                            doc.addField(BSON("_id" << OID::gen()).firstElement()).getOwned();
+
+                        OpDebug* const nullOpDebug = nullptr;
+                        uassertStatusOK(collection->insertDocument(
+                            opCtx, InsertStatement(obj), nullOpDebug, false));
+                        wuow.commit();
+
+                        return Status::OK();
+                    });
+                uassertStatusOK(status);
             }
         }
 
@@ -1026,7 +1061,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetch
         getMoreBob->append("collection", data.nss.coll());
     };
 
-    _backupCursorFileFetcher = std::make_unique<Fetcher>(
+    _donorFilenameBackupCursorFileFetcher = std::make_unique<Fetcher>(
         (**_scopedExecutor).get(),
         _client->getServerHostAndPort(),
         NamespaceString::kAdminDb.toString(),
@@ -1039,27 +1074,17 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_createFileFetch
             kBackupCursorFileFetcherRetryAttempts, executor::RemoteCommandRequest::kNoTimeout),
         transport::kGlobalSSLMode);
 
-    uassertStatusOK(_backupCursorFileFetcher->schedule());
+    uassertStatusOK(_donorFilenameBackupCursorFileFetcher->schedule());
 
-    return _backupCursorFileFetcher->onCompletion()
+    return _donorFilenameBackupCursorFileFetcher->onCompletion()
         .thenRunOn(**_scopedExecutor)
-        .then([this, self = shared_from_this(), fetchStatus] {
+        .then([fetchStatus] {
             if (!*fetchStatus) {
                 // the callback was never invoked
                 uasserted(6113007, "Internal error running cursor callback in command");
             }
 
-            auto status = fetchStatus->get();
-            if (!status.isOK() && status.code() != 50915) {
-                // In the event of 50915: A checkpoint took place while
-                // opening a backup cursor, we should retry and *not* cancel
-                // migration. See https://jira.mongodb.org/browse/SERVER-61964
-                // TODO (SERVER-61964): remove conditional check for 50915 error
-                // and cancel migration if !status.isOK()
-                this->cancelMigration();
-            }
-
-            uassertStatusOK(status);
+            uassertStatusOK(fetchStatus->get());
         });
 }
 
@@ -1073,8 +1098,8 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
 
     // We only expect to already have start optimes populated if we are not
     // resuming a migration and this is a multitenant migration.
-    // TODO (SERVER-61131) Eventually we'll skip _getStartopTimesFromDonor entirely
-    // for shard merge, but currently _createFileFetcher will populate optimes for
+    // TODO (SERVER-61132) Eventually we'll skip _getStartopTimesFromDonor entirely
+    // for shard merge, but currently _getDonorFilenames will populate optimes for
     // the shard merge case. We can just overwrite here since we aren't doing anything
     // with the backup cursor results yet.
     auto isShardMerge = _stateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge;
@@ -2100,8 +2125,8 @@ void TenantMigrationRecipientService::Instance::_interrupt(Status status,
 
     _cancelRemainingWork(lk);
 
-    if (_backupCursorFileFetcher) {
-        _backupCursorFileFetcher->shutdown();
+    if (_donorFilenameBackupCursorFileFetcher) {
+        _donorFilenameBackupCursorFileFetcher->shutdown();
     }
 
     // If the task is running, then setting promise result will be taken care by the main task
@@ -2191,8 +2216,8 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
         swap(savedTenantOplogApplier, _tenantOplogApplier);
         swap(savedWriterPool, _writerPool);
 
-        _backupCursorId = 0;
-        _backupCursorFileFetcher = nullptr;
+        _donorFilenameBackupCursorId = 0;
+        _donorFilenameBackupCursorFileFetcher = nullptr;
     }
 
     // Perform join outside the lock to avoid deadlocks.
@@ -2510,7 +2535,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
 
                        return AsyncTry([this, self = shared_from_this(), token] {
-                                  return _createFileFetcher(token);
+                                  return _getDonorFilenames(token);
                               })
                            .until([](Status status) {
                                if (status.code() == 50915) {
@@ -2530,11 +2555,19 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            .on(**_scopedExecutor, token);
                    })
                    .then([this, self = shared_from_this()] {
-                       // TODO (SERVER-61131) temporarily stop fetcher/backup cursor here for
+                       if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
+                           return;
+                       }
+
+                       stdx::lock_guard lk(_mutex);
+                       _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
+                   })
+                   .then([this, self = shared_from_this()] {
+                       stdx::lock_guard lk(_mutex);
+                       // TODO (SERVER-61133) temporarily stop fetcher/backup cursor here for
                        // now. We shut down the backup cursor in onCompletion continuation, but
                        // some tests fail unless we do this here, punting on dealing with those
                        // tests until later ticket(s)
-                       stdx::lock_guard lk(_mutex);
                        _killBackupCursor(lk);
                        _getStartOpTimesFromDonor(lk);
                        return _updateStateDocForMajority(lk);
@@ -2700,7 +2733,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             if (_taskState.isInterrupted()) {
                 status = _taskState.getInterruptStatus();
             }
-            if ((ErrorCodes::isRetriableError(status) || isRetriableOplogFetcherError(status)) &&
+
+            // shard merge is not resumable for any replica set state transitions or network errors
+            if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge &&
+                (ErrorCodes::isRetriableError(status) || isRetriableOplogFetcherError(status)) &&
                 !_taskState.isExternalInterrupt() &&
                 _stateDocPersistedPromise.getFuture().isReady()) {
                 // Reset the task state and clear the interrupt status.

@@ -125,7 +125,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                                 << "Bad state " << TenantMigrationRecipientState_serializer(state)
                                 << " for protocol '" << MigrationProtocol_serializer(protocol)
                                 << "'",
-                            protocol == MigrationProtocolEnum::kMultitenantMigrations);
+                            protocol == MigrationProtocolEnum::kShardMerge);
                     break;
                 case TenantMigrationRecipientStateEnum::kStarted:
                     createAccessBlockerIfNeeded(opCtx, recipientStateDoc);

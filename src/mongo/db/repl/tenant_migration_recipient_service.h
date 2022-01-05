@@ -371,7 +371,7 @@ public:
         /**
          * Creates a backup cursor wrapped in a Fetcher.
          */
-        ExecutorFuture<void> _createFileFetcher(const CancellationToken& token);
+        ExecutorFuture<void> _getDonorFilenames(const CancellationToken& token);
 
         /**
          * Kills the Donor backup cursor
@@ -578,9 +578,9 @@ public:
         std::unique_ptr<DBClientConnection> _client;              // (S)
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
-        CursorId _backupCursorId;                           // (M)
-        NamespaceString _backupCursorNamespaceString;       // (M)
-        std::unique_ptr<Fetcher> _backupCursorFileFetcher;  // (M)
+        CursorId _donorFilenameBackupCursorId;                           // (M)
+        NamespaceString _donorFilenameBackupCursorNamespaceString;       // (M)
+        std::unique_ptr<Fetcher> _donorFilenameBackupCursorFileFetcher;  // (M)
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
             std::make_unique<CreateOplogFetcherFn>();                               // (M)

@@ -594,10 +594,19 @@ TenantMigrationTest.DonorState = {
 };
 
 TenantMigrationTest.RecipientState = {
+    kUninitialized: "uninitialized",
     kStarted: "started",
     kConsistent: "consistent",
     kDone: "done",
+    kLearnedFilenames: "learned filenames",
+    kCopiedFiles: "copied files",
 };
+
+TenantMigrationTest.RecipientStateEnum =
+    Object.keys(TenantMigrationTest.RecipientState).reduce((acc, key, idx) => {
+        acc[key] = idx;
+        return acc;
+    }, {});
 
 TenantMigrationTest.State = TenantMigrationTest.DonorState;
 

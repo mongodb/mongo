@@ -25,13 +25,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-// An object that mirrors the recipient migration states.
-const migrationStates = {
-    kStarted: 1,
-    kConsistent: 2,
-    kDone: 3
-};
-
 const kMigrationId = UUID();
 const kTenantId = 'testTenantId';
 const kReadPreference = {
@@ -44,6 +37,9 @@ const migrationOpts = {
 };
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+const shardMergeIsEnabled =
+    TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"));
 
 // Initial inserts to test cloner stats.
 const dbsToClone = ["db0", "db1", "db2"];
@@ -134,7 +130,7 @@ fpAfterPersistingStateDoc.wait();
 let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
 checkStandardFieldsOK(res);
 let currOp = res.inprog[0];
-assert.eq(currOp.state, migrationStates.kStarted, res);
+assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
@@ -157,7 +153,13 @@ res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient mi
 checkStandardFieldsOK(res);
 currOp = res.inprog[0];
 assert.gt(new Date(), currOp.receiveStart, tojson(res));
-assert.eq(currOp.state, migrationStates.kStarted, res);
+
+if (shardMergeIsEnabled) {
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
+} else {
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
+}
+
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
@@ -185,7 +187,13 @@ fpAfterCollectionCloner.wait();
 res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
 checkStandardFieldsOK(res);
 currOp = res.inprog[0];
-assert.eq(currOp.state, migrationStates.kStarted, res);
+
+if (shardMergeIsEnabled) {
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
+} else {
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
+}
+
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -228,7 +236,7 @@ checkStandardFieldsOK(res);
 checkPostConsistentFieldsOK(res);
 currOp = res.inprog[0];
 // State should have changed.
-assert.eq(currOp.state, migrationStates.kConsistent, res);
+assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -242,7 +250,7 @@ checkStandardFieldsOK(res);
 checkPostConsistentFieldsOK(res);
 currOp = res.inprog[0];
 // State should have changed.
-assert.eq(currOp.state, migrationStates.kConsistent, res);
+assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -268,7 +276,7 @@ res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient mi
 checkStandardFieldsOK(res);
 checkPostConsistentFieldsOK(res);
 currOp = res.inprog[0];
-assert.eq(currOp.state, migrationStates.kConsistent, res);
+assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
 assert.eq(currOp.migrationCompleted, false, res);
 // dataSyncCompleted should have changed.
 assert.eq(currOp.dataSyncCompleted, true, res);
@@ -284,7 +292,7 @@ checkPostConsistentFieldsOK(res);
 currOp = res.inprog[0];
 assert.eq(currOp.dataSyncCompleted, true, res);
 // State, completion status and expireAt should have changed.
-assert.eq(currOp.state, migrationStates.kDone, res);
+assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kDone, res);
 assert.eq(currOp.migrationCompleted, true, res);
 assert(currOp.hasOwnProperty("expireAt") && currOp.expireAt instanceof Date, res);
 assert(currOp.hasOwnProperty("databases"));

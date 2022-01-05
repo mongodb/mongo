@@ -1,5 +1,5 @@
 /**
- * Tests that the recipient will abort a shard merge on donor failure
+ * Tests recipient behavior for shard merge
  *
  * @tags: [
  *   incompatible_with_eft,
@@ -30,7 +30,8 @@ load("jstests/replsets/libs/tenant_migration_util.js");
         return;
     }
 
-    jsTestLog("Test that a shard merge is aborted in the event of a donor failure");
+    jsTestLog(
+        "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
     const tenantId = "testTenantId";
     const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
     const collName = "testColl";
@@ -41,7 +42,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
     tenantMigrationTest.insertDonorDB(tenantDB, collName);
 
-    const failpoint = "fpAfterComparingRecipientAndDonorFCV";
+    const failpoint = "fpAfterRetrievingStartOpTimesMigrationRecipientInstance";
     const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
 
     const migrationUuid = UUID();
@@ -55,22 +56,15 @@ load("jstests/replsets/libs/tenant_migration_util.js");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
     waitInFailPoint.wait();
-    jsTestLog("Stopping the donor primary");
-    donorRst.stop(donorPrimary);
 
-    // wait until the completion path has started after the abort
-    const hangBeforeTaskCompletion =
-        configureFailPoint(recipientPrimary, "hangBeforeTaskCompletion", {action: "hang"});
-
+    const res =
+        recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
+    assert.eq(res.inprog.length, 1);
+    const [currOp] = res.inprog;
+    assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kLearnedFilenames, res);
     waitInFailPoint.off();
-    hangBeforeTaskCompletion.wait();
 
-    // step up a secondary so that the migration will complete and the
-    // waitForMigrationToComplete call to the donor primary succeeds
-    assert.commandWorked(donorSecondary.adminCommand({replSetStepUp: 1}));
-    hangBeforeTaskCompletion.off();
-
-    TenantMigrationTest.assertAborted(
+    TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     tenantMigrationTest.stop();

@@ -79,8 +79,14 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     jsTestLog(
         "Test sending donorAbortMigration during a tenant migration while recipientSyncData " +
         "command repeatedly fails with retryable errors.");
-
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+
+    if (TenantMigrationUtil.isShardMergeEnabled(
+            tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
+        tenantMigrationTest.stop();
+        jsTestLog("Skipping test, Shard Merge does not support retry");
+        return;
+    }
 
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     let fp = configureFailPoint(recipientPrimary, "failCommand", {
@@ -114,8 +120,14 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 (() => {
     jsTestLog("Test sending donorAbortMigration during a tenant migration while find command " +
               "against admin.system.keys repeatedly fails with retryable errors.");
-
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+
+    if (TenantMigrationUtil.isShardMergeEnabled(
+            tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
+        tenantMigrationTest.stop();
+        jsTestLog("Skipping test, Shard Merge does not support retry");
+        return;
+    }
 
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
     let fp = configureFailPoint(recipientPrimary, "failCommand", {
@@ -520,6 +532,9 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
         let findRes = oplog.findOne({op: "n", "o.msg": "NoSuchTenantMigration error"});
         assert(findRes);
     });
+
+    TenantMigrationTest.assertCommitted(
+        tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     tenantMigrationTest.stop();
     donorRst.stopSet();
