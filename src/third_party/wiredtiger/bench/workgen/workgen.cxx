@@ -911,7 +911,7 @@ pareto_calculation(uint32_t randint, uint64_t recno_max, ParetoOptions &pareto)
     // of the time, depending on pareto_param.  For param of 0, it is
     // never out of range, for param of 100, 19.2%. For the default
     // pareto_param of 20, it will be out of range 2.7% of the time.
-    // Out of range values are channelled into the first key,
+    // Out of range values are channeled into the first key,
     // making it "hot".  Unfortunately, that means that using a higher
     // param can get a lot lumped into the first bucket.
     //
@@ -2269,14 +2269,14 @@ Workload::Workload(Context *context, const ThreadListWrapper &tlw)
     : options(), stats(), _context(context), _threads(tlw._threads)
 {
     if (context == NULL)
-        THROW("Workload contructor requires a Context");
+        THROW("Workload constructor requires a Context");
 }
 
 Workload::Workload(Context *context, const Thread &thread)
     : options(), stats(), _context(context), _threads()
 {
     if (context == NULL)
-        THROW("Workload contructor requires a Context");
+        THROW("Workload constructor requires a Context");
     _threads.push_back(thread);
 }
 

@@ -30,7 +30,7 @@
 
 /*
  * Class that defines operations that do nothing as an example. This shows how database operations
- * can be overriden and customized.
+ * can be overridden and customized.
  */
 class example_test : public test_harness::test {
     public:
