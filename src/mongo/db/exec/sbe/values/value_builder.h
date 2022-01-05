@@ -357,7 +357,7 @@ private:
                     return {true, ksTag, ksVal};
                 }
                 case TypeTags::RecordId: {
-                    auto ridValue = buf.read<int64_t>();
+                    int64_t ridValue = buf.read<LittleEndian<int64_t>>();
                     return {false, TypeTags::RecordId, bitcastFrom<int64_t>(ridValue)};
                 }
                 default:
