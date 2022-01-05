@@ -1,7 +1,8 @@
 /**
  * Test the syntax of $fill.
  * @tags: [
- *   requires_fcv_52,
+ *   requires_fcv_53,
+ *   do_not_wrap_aggregations_in_facets,
  * ]
  */
 
@@ -189,6 +190,7 @@ const testCases = [
         ]
 
     ],  // 7
+    // Test with first element in partition having a null fill field.
     [
         [
             {$set: {linear: {$cond: [{$eq: ["$linear", 1]}, null, "$linear"]}}},
@@ -212,7 +214,77 @@ const testCases = [
             {_id: 8, linear: 3, other: 5, part: 2},
             {_id: 10, linear: null, other: 5, part: 2}
         ]
-    ],  // 8 Test with first element in partition having a null fill field.
+    ],  // 8
+    // Test $fill with arbitrary values.
+    [
+        [
+            {$match: {part: 1}},
+            {$project: {linear: 0, part: 0}},
+            {$fill: {sortBy: {_id: 1}, output: {other: {value: "$_id"}}}}
+        ],
+        [
+            {_id: 1, other: 1},
+            {_id: 3, other: 3},
+            {_id: 5, other: 10},
+            {_id: 7, other: 7},
+            {_id: 9, other: 15},
+        ]
+    ],  // 9
+    [
+        [
+            {$match: {part: 1}},
+            {$project: {linear: 0, part: 0}},
+            {$fill: {sortBy: {_id: 1}, output: {other: {value: -1}}}}
+        ],
+        [
+            {_id: 1, other: 1},
+            {_id: 3, other: -1},
+            {_id: 5, other: 10},
+            {_id: 7, other: -1},
+            {_id: 9, other: 15},
+        ]
+    ],  // 10
+    [
+        [
+            {$match: {part: 1}},
+            {
+                $fill: {
+                    sortBy: {_id: 1},
+                    output: {other: {value: -1}, linear: {value: {$add: ["$part", 1]}}}
+                }
+            },
+            {$project: {part: 0}},
+        ],
+        [
+            {_id: 1, other: 1, linear: 1},
+            {_id: 3, other: -1, linear: 2},
+            {_id: 5, other: 10, linear: 5},
+            {_id: 7, other: -1, linear: 2},
+            {_id: 9, other: 15, linear: 7},
+        ]
+    ],  // 11
+    // Verify behavior if the filling expression can evaluate to missing or null.
+    [
+        [
+            {$match: {part: 1}},
+            {$project: {part: 0}},
+            {$unionWith: {pipeline: [{$documents: [{_id: 2}, {_id: 4}]}]}},
+            {$fill: {sortBy: {_id: 1}, output: {other: {value: "$linear"}}}},
+            {$project: {linear: 0}},
+        ],
+        [
+            {_id: 1, other: 1},
+            {_id: 2},
+            {_id: 3, other: null},
+            {_id: 4},
+            {_id: 5, other: 10},
+            {_id: 7, other: null},
+            {_id: 9, other: 15},
+
+        ]
+
+    ],  // 12
+
 ];
 
 for (let i = 0; i < testCases.length; i++) {

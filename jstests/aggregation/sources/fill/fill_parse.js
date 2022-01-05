@@ -79,14 +79,22 @@ let testCases = [
             }
         ],
         []
-    ],                                                                                     // 1
-    [{$fill: {output: {val: {value: 5}}}}, [{"$addFields": {"val": {"$const": 5}}}], []],  // 2
-    [{$fill: {output: {val: {value: "$test"}}}}, [{"$addFields": {"val": "$test"}}], []],  // 3
+    ],  // 1
+    [
+        {$fill: {output: {val: {value: 5}}}},
+        [{"$addFields": {"val": {$ifNull: ["$val", {"$const": 5}]}}}],
+        []
+    ],  // 2
+    [
+        {$fill: {output: {val: {value: "$test"}}}},
+        [{"$addFields": {"val": {$ifNull: ["$val", "$test"]}}}],
+        []
+    ],  // 3
     [
         {$fill: {output: {val: {value: "$test"}, second: {method: "locf"}}}},
         [
             {"$_internalSetWindowFields": {"output": {"second": {"$locf": "$second"}}}},
-            {"$addFields": {"val": "$test"}}
+            {"$addFields": {"val": {$ifNull: ["$val", "$test"]}}}
         ],
         []
     ],  // 4
@@ -106,7 +114,12 @@ let testCases = [
                 "$_internalSetWindowFields":
                     {"output": {"second": {"$locf": "$second"}, "fourth": {"$locf": "$fourth"}}}
             },
-            {"$addFields": {"val": "$test", "third": {"$add": ["$val", "$second"]}}}
+            {
+                "$addFields": {
+                    "val": {$ifNull: ["$val", "$test"]},
+                    "third": {$ifNull: ["$third", {"$add": ["$val", "$second"]}]}
+                }
+            }
         ],
         []
     ],  // 5
@@ -195,7 +208,7 @@ let testCases = [
                 }
             },
             {"$project": {"UUIDPLACEHOLDER": false, "_id": true}},
-            {"$addFields": {"second": {"$const": 7}}}
+            {"$addFields": {"second": {$ifNull: ["$second", {"$const": 7}]}}}
         ],
         [
             [0, "$addFields", true],
@@ -235,8 +248,8 @@ function modifyObjectAtPath(orig, path) {
 
 for (let i = 0; i < testCases.length; i++) {
     let result = desugarSingleStageAggregation(db, coll, testCases[i][0]);
-    // $setWindowFields generates random fieldnames. Use the paths in the test case to replace the
-    // UUID with "UUIDPLACEHOLDER".
+    // $setWindowFields generates random fieldnames. Use the paths in the test case to
+    // replace the UUID with "UUIDPLACEHOLDER".
     if (testCases[i][2].length != 0) {
         for (let pathNum = 0; pathNum < testCases[i][2].length; pathNum++) {
             result = modifyObjectAtPath(result, testCases[i][2][pathNum]);

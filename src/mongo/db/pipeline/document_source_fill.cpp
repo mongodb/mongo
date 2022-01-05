@@ -96,8 +96,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         }
         if (auto&& unparsedValueExpr = parsedSpec.getValue()) {
             // Value fields are BSONAnyType.
-            auto valueObj = unparsedValueExpr.value().getElement().wrap(fieldName);
-            addFieldsSpec.appendElements(valueObj);
+            auto valueElem = unparsedValueExpr.value().getElement();
+            BSONObj fullFieldSpec =
+                BSON(fieldName << BSON("$ifNull" << BSON_ARRAY("$" + fieldName << valueElem)));
+            addFieldsSpec.appendElements(fullFieldSpec);
         }
     }
     setWindowFieldsOutputSpec.done();
