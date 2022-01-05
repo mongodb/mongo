@@ -15,12 +15,13 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 // Since this test is timing sensitive, retry on failures since they could be transient.
 // If broken, this would *always* fail so if it ever passes this build is fine (or time went
 // backwards).
-const tryFiveTimes = function(name, f) {
+const retryOnFailureUpToFiveTimes = function(name, f) {
     jsTestLog(`Starting test ${name}`);
 
-    for (var trial = 1; trial <= 5; trial++) {
+    for (let trial = 1; trial <= 5; trial++) {
         try {
             f();
+            break;
         } catch (e) {
             if (trial < 5) {
                 jsTestLog(`Ignoring error during trial ${trial} of test ${name}`);
@@ -60,13 +61,13 @@ const runTest = function() {
 };
 
 testColl.insert({_id: 1}, {writeConcern: {w: 2}});
-tryFiveTimes("totally unsharded", runTest);
+retryOnFailureUpToFiveTimes("totally unsharded", runTest);
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-tryFiveTimes("sharded db", runTest);
+retryOnFailureUpToFiveTimes("sharded db", runTest);
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
-tryFiveTimes("sharded collection", runTest);
+retryOnFailureUpToFiveTimes("sharded collection", runTest);
 
 st.stop();
 })();
