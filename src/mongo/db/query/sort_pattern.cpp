@@ -151,4 +151,18 @@ void SortPattern::addDependencies(DepsTracker* deps) const {
         }
     }
 }
+
+bool SortPattern::isExtensionOf(const SortPattern& other) const {
+    // If the other is longer, this cannot be an extension of it.
+    if (_sortPattern.size() < other._sortPattern.size()) {
+        return false;
+    }
+    // For each sortPatternPart in the other sort pattern, make sure we have it as well in order.
+    for (unsigned int i = 0; i < other._sortPattern.size(); ++i) {
+        if (_sortPattern[i] != other._sortPattern[i]) {
+            return false;
+        }
+    }
+    return true;
+}
 }  // namespace mongo

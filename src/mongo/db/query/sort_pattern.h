@@ -105,8 +105,17 @@ public:
         return _sortPattern[idx];
     }
 
+    /**
+     * Returns true if this SortPattern is an extension of the other.
+     */
+    bool isExtensionOf(const SortPattern& other) const;
+
     bool operator==(const SortPattern& other) const {
         return _sortPattern == other._sortPattern && _paths == other._paths;
+    }
+
+    bool operator!=(const SortPattern& other) const {
+        return !(*this == other);
     }
 
     std::vector<SortPatternPart>::const_iterator begin() const {

@@ -432,13 +432,23 @@ function collectionExists(coll) {
  * pipeline from the explain results regardless of cluster topology.
  */
 function desugarSingleStageAggregation(db, coll, stage) {
-    const result = coll.explain().aggregate([
-        // prevent stages from being absorbed into the .find() layer
-        {$_internalInhibitOptimization: {}},
-        stage,
-    ]);
+    return getExplainedPipelineFromAggregation(db, coll, [stage]);
+}
+
+/**
+ * Runs and asserts an explain command for an aggregation with the given pipeline. Returns just the
+ * pipeline from the explain results regardless of cluster topology.
+ */
+function getExplainedPipelineFromAggregation(db, coll, pipeline) {
+    // Prevent stages from being absorbed into the .find() layer
+    pipeline.unshift({$_internalInhibitOptimization: {}});
+    const result = coll.explain().aggregate(pipeline);
 
     assert.commandWorked(result);
+    return getExplainPipelineFromAggregationResult(db, result);
+}
+
+function getExplainPipelineFromAggregationResult(db, result) {
     // We proceed by cases based on topology.
     if (!FixtureHelpers.isMongos(db)) {
         assert(Array.isArray(result.stages), result);

@@ -392,6 +392,9 @@ public:
 
     GetNextResult doGetNext() final;
 
+protected:
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
 
 private:
     enum class ValComparedToRange {
@@ -530,6 +533,10 @@ private:
     void createDocGenerator(DensifyValue min, RangeStatement range) {
         createDocGenerator(min, range, boost::none, boost::none);
     }
+
+
+    Pipeline::SourceContainer::iterator combineSorts(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container);
 
     boost::optional<DocGenerator> _docGenerator = boost::none;
 
