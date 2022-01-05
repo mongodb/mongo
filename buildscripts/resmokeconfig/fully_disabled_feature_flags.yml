@@ -4,3 +4,6 @@
 # by modifying their respective definitions in evergreen.yml.
 
 - featureFlagFryer
+# Disable featureFlagRequireTenantID until all paths pass tenant id to TenantNamespace
+# and TenantDatabase constructors.
+- featureFlagRequireTenantID
