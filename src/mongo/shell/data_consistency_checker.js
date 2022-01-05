@@ -335,7 +335,13 @@ var {DataConsistencyChecker} = (function() {
                         collectionPrinted, sourceCollInfos, syncingCollInfos, collName);
                     const shouldIgnoreFailure =
                         this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName);
-                    success = shouldIgnoreFailure;
+                    if (shouldIgnoreFailure) {
+                        prettyPrint(
+                            `Collection diff in ${dbName}.${collName} can be ignored: ${dbHashesMsg}
+                            . Inconsistencies in the image collection can be expected in certain
+                            restart scenarios.`);
+                    }
+                    success = shouldIgnoreFailure && success;
                 }
             });
 
