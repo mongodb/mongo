@@ -100,14 +100,14 @@ function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = [])
         if (!dl.hasOwnProperty(propertyName))
             continue;
 
+        if (fieldsToSkip.includes(propertyName))
+            continue;
+
         // The documents aren't equal if they don't both have the property.
         if (!dr.hasOwnProperty(propertyName)) {
             debug('documentEq: dr doesn\'t have property ' + propertyName);
             return false;
         }
-
-        if (fieldsToSkip.includes(propertyName))
-            continue;
 
         if (!anyEq(dl[propertyName], dr[propertyName], verbose, valueComparator, fieldsToSkip)) {
             return false;
@@ -117,6 +117,9 @@ function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = [])
     // Now make sure that dr doesn't have any extras that dl doesn't have.
     for (let propertyName in dr) {
         if (!dr.hasOwnProperty(propertyName))
+            continue;
+
+        if (fieldsToSkip.includes(propertyName))
             continue;
 
         // If dl doesn't have this they are not equal; if it does, we compared it above and know it
