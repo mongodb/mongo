@@ -795,24 +795,25 @@ Status _collModInternal(OperationContext* opCtx,
                 opCtx, coll.getWritableCollection(opCtx), desc, CreateIndexEntryFlags::kIsReady);
         }
 
-        // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from or downgrading to
-        // kLastLTS (5.0).
-        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade/downgrade code.
+        // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
+        // upgrade/downgrade code.
+        const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
         if (coll->getTimeseriesOptions() && !coll->getTimeseriesBucketsMayHaveMixedSchemaData() &&
-            serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
-            // While upgrading the FCV to 5.2+, collMod is called as part of the upgrade process to
-            // add the 'timeseriesBucketsMayHaveMixedSchemaData=true' catalog entry flag for
-            // time-series collections that are missing the flag. This indicates that the
-            // time-series collection existed in earlier server versions and may have mixed-schema
-            // data.
+            (currentVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
+             currentVersion == multiversion::GenericFCV::kLatest)) {
+            // (Generic FCV reference): While upgrading the FCV from kLastLTS to kLatest, collMod is
+            // called as part of the upgrade process to add the
+            // 'timeseriesBucketsMayHaveMixedSchemaData=true' catalog entry flag for time-series
+            // collections that are missing the flag. This indicates that the time-series collection
+            // existed in earlier server versions and may have mixed-schema data.
             coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(opCtx,
                                                                                           true);
         } else if (coll->getTimeseriesBucketsMayHaveMixedSchemaData() &&
-                   serverGlobalParams.featureCompatibility
-                       .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
-            // While downgrading the FCV from 5.2, collMod is called as part of the downgrade
-            // process to remove the 'timeseriesBucketsMayHaveMixedSchemaData' catalog entry
-            // flag for time-series collections that have the flag.
+                   (currentVersion == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS ||
+                    currentVersion == multiversion::GenericFCV::kLastLTS)) {
+            // (Generic FCV reference): While downgrading the FCV to kLastLTS, collMod is called as
+            // part of the downgrade process to remove the 'timeseriesBucketsMayHaveMixedSchemaData'
+            // catalog entry flag for time-series collections that have the flag.
             coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(
                 opCtx, boost::none);
         }

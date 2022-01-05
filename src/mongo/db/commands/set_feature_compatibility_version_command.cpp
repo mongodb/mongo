@@ -426,9 +426,9 @@ private:
             Lock::GlobalLock lk(opCtx, MODE_S);
         }
 
-        // TODO SERVER-60911: When kLatest is 5.3, only check when upgrading from kLastLTS (5.0).
-        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated upgrade code.
-        if (serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest()) {
+        // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
+        // upgrade code.
+        if (requestedVersion == multiversion::GenericFCV::kLatest) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
@@ -539,10 +539,9 @@ private:
             Lock::GlobalLock lk(opCtx, MODE_S);
         }
 
-        // TODO SERVER-60911: When kLatest is 5.3, only check when downgrading to kLastLTS (5.0).
-        // TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated downgrade code.
-        if (serverGlobalParams.featureCompatibility
-                .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
+        // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
+        // downgrade code.
+        if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
@@ -550,16 +549,6 @@ private:
                     dbName,
                     MODE_X,
                     [&](const CollectionPtr& collection) {
-                        // Fail to downgrade if there exists a collection with
-                        // 'changeStreamPreAndPostImages' enabled.
-                        // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
-                        uassert(ErrorCodes::CannotDowngrade,
-                                str::stream() << "Cannot downgrade the cluster as collection "
-                                              << collection->ns()
-                                              << " has 'changeStreamPreAndPostImages' enabled",
-                                preImagesFeatureFlagDisabledOnDowngradeVersion &&
-                                    !collection->isChangeStreamPreAndPostImagesEnabled());
-
                         invariant(collection->getTimeseriesOptions());
 
                         auto indexCatalog = collection->getIndexCatalog();
@@ -631,11 +620,36 @@ private:
                         return true;
                     },
                     [&](const CollectionPtr& collection) {
+                        return collection->getTimeseriesOptions() != boost::none;
+                    });
+            }
+        }
+
+        if (serverGlobalParams.featureCompatibility
+                .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_X,
+                    [&](const CollectionPtr& collection) {
+                        // Fail to downgrade if there exists a collection with
+                        // 'changeStreamPreAndPostImages' enabled.
+                        // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
+                        uassert(ErrorCodes::CannotDowngrade,
+                                str::stream() << "Cannot downgrade the cluster as collection "
+                                              << collection->ns()
+                                              << " has 'changeStreamPreAndPostImages' enabled",
+                                preImagesFeatureFlagDisabledOnDowngradeVersion &&
+                                    !collection->isChangeStreamPreAndPostImagesEnabled());
+                        return true;
+                    },
+                    [&](const CollectionPtr& collection) {
                         // TODO SERVER-61770: Remove 'changeStreamPreAndPostImages' check once
                         // FCV 6.0 becomes last-lts.
-                        return collection->getTimeseriesOptions() != boost::none ||
-                            (preImagesFeatureFlagDisabledOnDowngradeVersion &&
-                             collection->isChangeStreamPreAndPostImagesEnabled());
+                        return preImagesFeatureFlagDisabledOnDowngradeVersion &&
+                            collection->isChangeStreamPreAndPostImagesEnabled();
                     });
             }
 
