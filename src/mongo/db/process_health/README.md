@@ -71,4 +71,3 @@ When a failure is detected, and the observer is configured as *critical*, the se
    ```
    mongos --setParameter "progressMonitor={ \"interval\" : 1000, \"deadline\" : 300 }"
    ```
-
