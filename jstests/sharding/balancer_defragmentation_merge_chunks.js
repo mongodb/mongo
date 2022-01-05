@@ -20,6 +20,8 @@ const st = new ShardingTest({
     other: {
         enableBalancer: true,
         enableAutoSplit: true,
+        // Set global max chunk size to 1MB
+        chunkSize: 1,
         configOptions: {setParameter: {logComponentVerbosity: tojson({sharding: {verbosity: 2}})}},
     }
 });
@@ -29,14 +31,6 @@ assert.commandWorked(st.s.adminCommand({enableSharding: 'db'}));
 const db = st.getDB('db');
 const collName = 'testColl';
 let collCounter = 0;
-
-// Set global max chunk size to 1MB
-assert.soonNoExcept(() => {
-    let configDB = st.s.getDB('config');
-    assert.commandWorked(
-        configDB["settings"].update({_id: "chunksize"}, {$set: {value: 1}}, {upsert: true}));
-    return true;
-});
 
 // Shorten time between balancer rounds for faster initial balancing
 st.forEachConfigServer((conn) => {
@@ -65,6 +59,12 @@ function setupCollection() {
     collCounter++;
     const fullNs = coll.getFullName();
     assert.commandWorked(st.s.adminCommand({shardCollection: fullNs, key: {key: 1}}));
+
+    // "startBalancer" only guarantee that all the shards will EVENTUALLY enable the autosplitter.
+    // In order to ensure that all the shards have ALREADY enabled the autosplitter, we use the
+    // configureCollectionAutoSplitter command instead.
+    assert.commandWorked(
+        st.s.adminCommand({configureCollectionAutoSplitter: fullNs, enableAutoSplitter: true}));
 
     let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < 12 * 128; i++) {
