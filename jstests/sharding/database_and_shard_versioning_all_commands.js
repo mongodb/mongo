@@ -416,6 +416,7 @@
                 assert(mongosConn.getDB(dbName).getCollection(collName + "_renamed").drop());
             }
         },
+        repairShardedCollectionChunksHistory: {skip: "always targets the config server"},
         replSetGetStatus: {skip: "not supported in mongos"},
         resetError: {skip: "not on a user database"},
         restartCatalog: {skip: "not on a user database"},

@@ -248,9 +248,8 @@ public:
 
                     for (const auto& coll : collections) {
                         if (!coll.getDropped()) {
-                            uassertStatusOK(
-                                ShardingCatalogManager::get(opCtx)->upgradeChunksHistory(
-                                    opCtx, coll.getNs(), coll.getEpoch(), clusterTime));
+                            ShardingCatalogManager::get(opCtx)->upgradeChunksHistory(
+                                opCtx, coll.getNs(), coll.getEpoch(), clusterTime);
                         }
                     }
                 }
@@ -344,12 +343,12 @@ public:
 
                     for (const auto& coll : collections) {
                         if (!coll.getDropped()) {
-                            uassertStatusOK(
-                                ShardingCatalogManager::get(opCtx)->downgradeChunksHistory(
-                                    opCtx, coll.getNs(), coll.getEpoch()));
+                            ShardingCatalogManager::get(opCtx)->downgradeChunksHistory(
+                                opCtx, coll.getNs());
                         }
                     }
                 }
+
                 // Now that new metadata are written out to disk flush the local in memory state.
                 Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
             }

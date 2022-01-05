@@ -434,17 +434,15 @@ public:
     /**
      * Upgrade the chunk metadata to include the history field.
      */
-    Status upgradeChunksHistory(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const OID& collectionEpoch,
-                                const Timestamp validAfter);
+    void upgradeChunksHistory(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const OID& collectionEpoch,
+                              const Timestamp validAfter);
 
     /**
      * Remove the history field from the chunk metadata.
      */
-    Status downgradeChunksHistory(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const OID& collectionEpoch);
+    void downgradeChunksHistory(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     /**
