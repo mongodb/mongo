@@ -143,7 +143,7 @@ assert.commandWorked(st.s1.adminCommand(
 result = st.s1.adminCommand({"getParameter": 1, "progressMonitor": 1});
 assert.eq(result.progressMonitor.deadline, CUSTOM_DEADLINE + 1);
 // Setting only one sub-field will reset others to their default.
-assert.eq(result.progressMonitor.interval, 50);
+assert.eq(result.progressMonitor.interval, 1000);
 
 assert.commandWorked(st.s1.adminCommand({
     "setParameter": 1,

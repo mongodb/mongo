@@ -100,7 +100,7 @@ structs:
             interval:
                 description: "Interval between liveness checks in milliseconds."
                 type: int
-                default: 50
+                default: 1000
                 validator: { gt: 0 }
             deadline:
                 description: "Deadline for liveness checks, after which process should exit, in seconds."

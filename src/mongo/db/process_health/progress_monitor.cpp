@@ -124,11 +124,17 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
 
 void ProgressMonitor::_progressMonitorLoop() {
     Client::initThread("FaultManagerProgressMonitor"_sd, _svcCtx, nullptr);
+    static const int kSleepsPerInterval = 10;
 
     while (!_terminate.load()) {
         progressMonitorCheck(_crashCb);
 
-        sleepFor(_faultManager->getConfig().getPeriodicLivenessCheckInterval());
+        const auto interval =
+            Microseconds(_faultManager->getConfig().getPeriodicLivenessCheckInterval());
+        // Breaking up the sleeping interval to check for `_terminate` more often.
+        for (int i = 0; i < kSleepsPerInterval && !_terminate.load(); ++i) {
+            sleepFor(interval / kSleepsPerInterval);
+        }
     }
 }
 
