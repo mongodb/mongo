@@ -1393,7 +1393,7 @@ __wt_txn_modify_check(
         }
 
         WT_STAT_CONN_DATA_INCR(session, txn_update_conflict);
-        ret = __wt_txn_rollback_required(session, "conflict between concurrent operations");
+        ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CONFLICT);
     }
 
     /*
