@@ -17,11 +17,3 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_GNU_SOURCE" CACHE STRING "" FORCE)
 
 # Linux requires buffers aligned to 4KB boundaries for O_DIRECT to work.
 set(WT_BUFFER_ALIGNMENT_DEFAULT "4096" CACHE STRING "")
-
-# Allow assembler to detect '.sx' file extensions.
-list(APPEND CMAKE_ASM_SOURCE_FILE_EXTENSION "sx")
-
-# Our ASM-based checksum utility 'crc32.sx' triggers unused-macros diagnostic errors
-# when compiling. To avoid editing the original source, override the usage '-Wunused-macros'
-# for this specific file.
-set_source_files_properties(src/checksum/power8/crc32.sx PROPERTIES COMPILE_FLAGS -Wno-unused-macros)

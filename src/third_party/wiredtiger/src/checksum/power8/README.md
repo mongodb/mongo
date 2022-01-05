@@ -34,17 +34,52 @@ to mitigate any I/O induced variability.
 Quick start
 -----------
 
+There's two different versions of crc32. They are, basically, the same
+algorithm. The only difference is that one is implemented in pure assembly
+(crc32.S) and the other in C using gcc (power8) vector intrinsics and
+builtins (vec_crc32.c) to make the compiler generate the asm instructions
+instead.
+
 - Modify CRC and OPTIONS in the Makefile. There are examples for the two most
   common crc32s.
 
 - Type make to create the constants (crc32_constants.h)
 
-- Import the code into your application (crc32.sx crc32_wrapper.c
-  crc32_constants.h ppc-opcode.h) and call the CRC:
+**If you will use the pure asm version**
+
+- Import the code into your application (crc32.S crc32_wrapper.c
+  crc32_constants.h ppc-opcode.h)
+
+**If you will use the C version**
+
+- Import the code into your application (vec_crc32.c crc32_constants.h)
+
+- Call the CRC:
+
 
 ```
 unsigned int crc32_vpmsum(unsigned int crc, unsigned char *p, unsigned long len);
 ```
+
+Advanced Usage
+--------------
+
+Occasionally you may have a number of CRC32 polynomial implementations.
+
+To do this you'll need to compile the C or assembler implementation with a
+different constants header file and change the function names to avoid linker
+conflicts.
+
+To facilitate this optional defines can be introduced:
+
+- CRC32_CONSTANTS_HEADER to be set to the *quoted* header filename.
+
+- CRC32_FUNCTION to be set to the crc32 function name (instead of crc32_vpmsum)
+
+- CRC32_FUNCTION_ASM (asm version only) to be set to the assember function name used
+by crc32_wrapper.c (defaults to __crc32_vpmsum).
+
+An example of this is with crc32_two_implementations as found in the Makefile.
 
 CRC background
 --------------
@@ -201,8 +236,39 @@ Examples
 
 - final_fold2: A second method of reduction
 
+Run time detection
+------------------
+
+The kernel sets the PPC_FEATURE2_VEC_CRYPTO bit in the HWCAP2 field
+when the vpmsum instructions are available. An example of run time
+detection:
+
+```
+#include <sys/auxv.h>
+
+#ifndef PPC_FEATURE2_VEC_CRYPTO
+#define PPC_FEATURE2_VEC_CRYPTO	0x02000000
+#endif
+
+#ifndef AT_HWCAP2
+#define AT_HWCAP2	26
+#endif
+
+...
+
+	if (getauxval(AT_HWCAP2) & PPC_FEATURE2_VEC_CRYPTO) {
+		/* Use crc32-vpmsum optimised version */
+	} else {
+		/* fall back to non accelerated version */
+	}
+```
+
 Acknowledgements
 ----------------
 
 Thanks to Michael Gschwind, Jeff Derby, Lorena Pesantez and Stewart Smith
 for their ideas and assistance.
+
+Thanks Rogerio Alves for writing the C implementation.
+
+Thanks Daniel Black for cleanup and testing.

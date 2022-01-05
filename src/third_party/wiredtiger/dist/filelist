@@ -48,8 +48,8 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/checksum/arm64/crc32-arm64.c	ARM64_HOST
-src/checksum/power8/crc32.sx		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
+src/checksum/power8/vec_crc32.c		POWERPC_HOST
 src/checksum/riscv64/crc32-riscv64.c	RISCV64_HOST
 src/checksum/software/checksum.c
 src/checksum/x86/crc32-x86-alt.c	X86_HOST
