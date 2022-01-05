@@ -52,7 +52,7 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSucce
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     std::vector<FaultFacetType> faultFacetTypes{FaultFacetType::kMock1, FaultFacetType::kMock2};
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
 
     // send successful health check response from each
     for (auto faultFacetType : faultFacetTypes) {
@@ -60,7 +60,7 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkWhenAllObserversAreSucce
         advanceTime(Milliseconds(100));
         ASSERT(!hasFault());
         if (faultFacetType != faultFacetTypes.back()) {
-            ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+            ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
         }
     }
 
@@ -75,10 +75,10 @@ TEST_F(FaultManagerTest, TransitionsFromStartupCheckToOkAfterFailureThenSuccess)
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     advanceTime(Milliseconds(100));
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     ASSERT(hasFault());
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     advanceTime(Milliseconds(100));
@@ -96,7 +96,7 @@ TEST_F(FaultManagerTest, TransitionsFromOkToTransientFaultAfterSuccessThenFailur
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     advanceTime(Milliseconds(100));
     ASSERT(!hasFault());
@@ -118,7 +118,7 @@ TEST_F(FaultManagerTest, StaysInOkOnSuccess) {
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     advanceTime(Milliseconds(100));
     ASSERT(!hasFault());
@@ -140,7 +140,7 @@ TEST_F(FaultManagerTest, StaysInTransientFault) {
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     advanceTime(Milliseconds(100));
     ASSERT(!hasFault());
@@ -168,7 +168,7 @@ TEST_F(FaultManagerTest, TransitionsFromTransientFaultToOkOnFailureThenSuccess) 
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     advanceTime(Milliseconds(100));
     ASSERT(!hasFault());
@@ -197,7 +197,7 @@ TEST_F(FaultManagerTest, OneFacetIsResolved) {
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(
         HealthCheckStatus(FaultFacetType::kMock1, Severity::kFailure, "failing health check 1"));
     manager().acceptTest(
@@ -209,7 +209,7 @@ TEST_F(FaultManagerTest, OneFacetIsResolved) {
         return manager().getOrCreateFaultTest()->getFacets().front()->getType() ==
             FaultFacetType::kMock2;
     });
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
 }
 
 DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromTransientFault, "Fatal") {
@@ -219,10 +219,10 @@ DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromTransient
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType));
-    ASSERT(manager().getFaultState() == FaultState::kOk);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kOk);
 
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    ASSERT(manager().getFaultState() == FaultState::kTransientFault);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kTransientFault);
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
     waitForTransitionIntoState(FaultState::kActiveFault);
@@ -239,15 +239,15 @@ TEST_F(FaultManagerTest,
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType));
-    ASSERT(manager().getFaultState() == FaultState::kOk);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kOk);
 
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    ASSERT(manager().getFaultState() == FaultState::kTransientFault);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kTransientFault);
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
     // Should be enough time to move to Active fault if we were going to crash.
     sleepFor(Seconds(1));
-    ASSERT(manager().getFaultState() == FaultState::kTransientFault);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kTransientFault);
 }
 
 DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromStartupCheck, "Fatal") {
@@ -257,7 +257,7 @@ DEATH_TEST_F(FaultManagerTest, TransitionsToActiveFaultAfterTimeoutFromStartupCh
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
     waitForTransitionIntoState(FaultState::kActiveFault);
@@ -274,12 +274,12 @@ TEST_F(FaultManagerTest,
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
 
     advanceTime(Seconds(kActiveFaultDurationSecs) * 10);
     // Should be enough time to move to Active fault if we were going to crash.
     sleepFor(Seconds(1));
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
 }
 
 TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
@@ -289,17 +289,17 @@ TEST_F(FaultManagerTest, DoesNotTransitionToActiveFaultIfResolved) {
     registerMockHealthObserver(faultFacetType, [] { return Severity::kFailure; });
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     manager().acceptTest(HealthCheckStatus(faultFacetType));
-    ASSERT(manager().getFaultState() == FaultState::kOk);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kOk);
 
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    ASSERT(manager().getFaultState() == FaultState::kTransientFault);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kTransientFault);
 
     advanceTime(Seconds(kActiveFaultDurationSecs / 2));
     manager().acceptTest(HealthCheckStatus(faultFacetType));
 
     advanceTime(Seconds(kActiveFaultDurationSecs));
 
-    ASSERT(manager().getFaultState() == FaultState::kOk);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kOk);
 }
 
 TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
@@ -313,12 +313,9 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFault) {
     // kSystem is enabled.
     registerMockHealthObserver(FaultFacetType::kSystem, [] { return Severity::kOk; });
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
-    manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    advanceTime(Milliseconds(100));
     assertSoon([this]() { return manager().getFaultState() == FaultState::kOk; });
     ASSERT(initialHealthCheckFuture.isReady());
 }
@@ -349,7 +346,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
 
-    ASSERT(manager().getFaultState() == FaultState::kStartupCheck);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kStartupCheck);
     manager().acceptTest(HealthCheckStatus(faultFacetType));
     advanceTime(Milliseconds(100));
     ASSERT(!hasFault());
@@ -359,7 +356,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
 
     configPtr->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
-    ASSERT(manager().getFaultState() == FaultState::kOk);
+    ASSERT_EQ(manager().getFaultState(), FaultState::kOk);
 }
 
 }  // namespace
