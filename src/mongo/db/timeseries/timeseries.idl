@@ -27,6 +27,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/timeseries/timeseries_global_options.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -47,12 +49,10 @@ server_parameters:
         default: 128000 # 125KB
         validator: { gte: 1 }
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
-        description: "The threshold for bucket catalog memory usage above which idle buckets will be
-                      expired"
+        description: "The threshold in bytes for bucket catalog memory usage above which idle
+                      buckets will be expired"
         set_at: [ startup, runtime ]
-        cpp_vartype: "AtomicWord<std::int32_t>"
-        cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThreshold"
-        default:  104857600 # 100MB
+        cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
         validator: { gte: 1 }
     "timeseriesBucketsCollectionClusterById":
         description: "When true, newly-created time-series buckets collections are clustered by _id"

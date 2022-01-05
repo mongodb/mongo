@@ -14,7 +14,8 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod(
+    {setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600}});
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");

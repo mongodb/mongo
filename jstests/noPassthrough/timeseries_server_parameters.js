@@ -62,15 +62,4 @@ testNumericServerParameter('timeseriesBucketMaxSize',
                            0 /*lowerOutOfBounds*/,
                            false /*hasUpperBound*/,
                            "unused" /*upperOutOfBounds*/);
-
-// Valid parameter values are in the range [0, infinity).
-testNumericServerParameter('timeseriesIdleBucketExpiryMemoryUsageThreshold',
-                           true /*isStartupParameter*/,
-                           false /*isRuntimeParameter*/,
-                           1024 * 1024 * 100 /*defaultValue*/,
-                           1024 /*nonDefaultValidValue*/,
-                           true /*hasLowerBound*/,
-                           0 /*lowerOutOfBounds*/,
-                           false /*hasUpperBound*/,
-                           "unused" /*upperOutOfBounds*/);
 })();

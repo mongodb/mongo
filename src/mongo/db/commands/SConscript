@@ -271,7 +271,7 @@ env.Library(
         'create_command_validation.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_idl',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

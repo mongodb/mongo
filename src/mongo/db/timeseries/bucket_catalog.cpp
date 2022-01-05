@@ -194,7 +194,6 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
 
     return {bucketId, roundedTime};
 }
-
 }  // namespace
 
 const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::kEmptyStats{
@@ -633,8 +632,8 @@ void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
 
     // As long as we still need space and have entries, close idle buckets.
     while (!_idleBuckets.empty() &&
-           _memoryUsage.load() >
-               static_cast<std::uint64_t>(gTimeseriesIdleBucketExpiryMemoryUsageThreshold.load())) {
+           _memoryUsage.load() > static_cast<std::uint64_t>(
+                                     gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.load())) {
         Bucket* bucket = _idleBuckets.back();
 
         lk.unlock();

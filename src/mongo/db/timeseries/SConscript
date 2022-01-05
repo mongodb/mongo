@@ -5,13 +5,17 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='timeseries_idl',
+    target='timeseries_options',
     source=[
         'timeseries.idl',
+        'timeseries_global_options.cpp',
+        'timeseries_options.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/util/processinfo',
     ],
 )
 
@@ -27,7 +31,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/util/fail_point',
-        'timeseries_idl',
         'timeseries_options',
     ],
 )
@@ -51,7 +54,7 @@ env.Library(
         'timeseries_index_schema_conversion_functions.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        'timeseries_idl',
+        'timeseries_options',
     ],
 )
 
@@ -64,7 +67,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/namespace_string',
-        'timeseries_idl',
+        'timeseries_options',
     ],
 )
 
@@ -80,22 +83,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        'timeseries_idl',
-        'timeseries_index_schema_conversion_functions'
-    ],
-)
-
-env.Library(
-    target='timeseries_options',
-    source=[
-        'timeseries_options.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'timeseries_idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        'timeseries_index_schema_conversion_functions',
+        'timeseries_options',
     ],
 )
 
