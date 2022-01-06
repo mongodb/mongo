@@ -40,11 +40,11 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 
-class BatchedCommandRequest;
-class BatchedCommandResponse;
 class OperationContext;
 class RemoteCommandTargeter;
 

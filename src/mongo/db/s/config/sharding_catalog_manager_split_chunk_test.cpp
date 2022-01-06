@@ -296,7 +296,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
                                               ChunkRange(chunkMin, chunkMax),
                                               splitPoints,
                                               "shard0000");
-    ASSERT_EQ(ErrorCodes::IllegalOperation, splitStatus);
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata, splitStatus);
 }
 
 TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {

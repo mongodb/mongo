@@ -598,6 +598,7 @@ let testCases = {
             }
         }
     },
+    repairShardedCollectionChunksHistory: {skip: "always targets the config server"},
     replSetGetStatus: {skip: "not supported in mongos"},
     resetError: {skip: "not on a user database"},
     revokePrivilegesFromRole: {skip: "always targets the config server"},

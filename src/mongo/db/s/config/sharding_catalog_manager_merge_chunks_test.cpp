@@ -895,7 +895,7 @@ TEST_F(MergeChunkTest, NonExistingNamespaceWithLegacyMethod) {
                                               chunkBoundaries,
                                               "shard0000",
                                               validAfter);
-    ASSERT_EQ(ErrorCodes::IllegalOperation, mergeStatus);
+    ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata, mergeStatus);
 }
 
 TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrorsWithLegacyMethod) {

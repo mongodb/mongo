@@ -446,6 +446,18 @@ public:
      */
     static void clearForTests(ServiceContext* serviceContext);
 
+    //
+    // Upgrade/downgrade
+    //
+
+    /**
+     * Upgrade the chunk metadata to include the history field.
+     */
+    void upgradeChunksHistory(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const OID& collectionEpoch,
+                              const Timestamp validAfter);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version
@@ -537,6 +549,13 @@ private:
     StatusWith<ChunkType> _findChunkOnConfig(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const BSONObj& key);
+
+    /**
+     * Retrieve the the latest collection version from the config.
+     */
+    StatusWith<ChunkVersion> _findCollectionVersion(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const OID& collectionEpoch);
 
     /**
      * Returns true if the zone with the given name has chunk ranges associated with it and the

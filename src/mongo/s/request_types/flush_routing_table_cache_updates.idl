@@ -26,8 +26,6 @@
 # it in the license file.
 #
 
-# _flushRoutingTableCacheUpdates IDL File
-
 global:
     cpp_namespace: "mongo"
 
@@ -36,6 +34,7 @@ imports:
 
 commands:
     _flushRoutingTableCacheUpdates:
+        cpp_name: FlushRoutingTableCacheUpdates
         description: "An internal command to wait for the last routing table cache refresh for a particular namespace to be persisted to disk"
         strict: true
         namespace: type

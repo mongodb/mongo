@@ -38,6 +38,9 @@ selector:
   # 'clientOperationKey' which is not recognizable on 'last-stable' shards.
   - jstests/sharding/lookup_on_shard.js
   - jstests/sharding/lookup_stale_mongos.js
+  # Enable when SERVER-62065 is released in 4.2
+  - jstests/sharding/repair_sharded_collection_history.js
+
 
   # This tag file can be created using ./buildscripts/evergreen_gen_multiversion_tests.py
   # or downloaded from the evergreen task.

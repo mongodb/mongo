@@ -67,7 +67,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
@@ -312,11 +311,10 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const Namespace
 
             // This is a best-effort attempt to refresh the shard 'shardEntry'. Fire and forget an
             // asynchronous '_flushRoutingTableCacheUpdates' request.
-            shard->runFireAndForgetCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                NamespaceString::kAdminDb.toString(),
-                BSON(_flushRoutingTableCacheUpdates::kCommandName << nss.ns()));
+            shard->runFireAndForgetCommand(opCtx,
+                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                           NamespaceString::kAdminDb.toString(),
+                                           BSON("_flushRoutingTableCacheUpdates" << nss.ns()));
         }
     }
 }
