@@ -61,8 +61,6 @@ REGISTER_WINDOW_FUNCTION_CONDITIONALLY(linearFill,
                                        (ExpressionLinearFill::parse),
                                        feature_flags::gFeatureFlagFill.getVersion(),
                                        feature_flags::gFeatureFlagFill.isEnabledAndIgnoreFCV());
-// TODO SERVER-52247 Replace boost::none with 'gFeatureFlagExactTopNAccumulator.getVersion()' below
-// once 'gFeatureFlagExactTopNAccumulator' is set to true by default and is configured with an FCV.
 REGISTER_WINDOW_FUNCTION_CONDITIONALLY(
     minN,
     (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse),
