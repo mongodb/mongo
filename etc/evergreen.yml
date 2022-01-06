@@ -9000,14 +9000,14 @@ buildvariants:
   display_name: macOS
   cron: "0 12 * * *" # Every day starting at 12:00
   run_on:
-  - macos-1014
+  - macos-1100
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
     push_arch: x86_64
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
   tasks:
@@ -9053,11 +9053,11 @@ buildvariants:
   display_name: "* Shared Library macOS DEBUG"
   cron: "0 */4 * * *" # Every 4 hours starting at midnight
   run_on:
-  - macos-1014
+  - macos-1100
   expansions: &macos-debug-expansions
     test_flags: --excludeWithAnyTags=incompatible_with_macos
     resmoke_jobs_max: 6
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic
     num_scons_link_jobs_available: 0.99
   tasks:
@@ -9084,7 +9084,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - macos-1014
+  - macos-1100
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
@@ -9092,7 +9092,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: macos
     push_arch: x86_64-enterprise
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
     resmoke_jobs_max: 6
   tasks:
@@ -9115,35 +9115,6 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
-  - name: .csfle
-
-- name: enterprise-macos-xcode-current
-  display_name: "~ Enterprise macOS Xcode Current"
-  cron: "0 12 * * *" # Every day starting at 12:00
-  modules:
-  - enterprise
-  run_on:
-  - macos-1015
-  expansions:
-    test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-    compile_env: DEVELOPER_DIR=/Applications/Xcode12.4.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --link-model=dynamic --variables-files=etc/scons/xcode_macosx.vars
-    resmoke_jobs_max: 6
-    num_scons_link_jobs_available: 0.99
-  tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: build_variant_gen
-  - name: audit
-  - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
-  - name: .jscore .common !.decimal !.sharding
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
-  - name: mqlrun
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: sasl
   - name: .csfle
 
 - name: enterprise-macos-rosetta-2
@@ -9174,13 +9145,13 @@ buildvariants:
   - name: sasl
   - name: .csfle
 
-- name: enterprise-macos-rosetta-2-cxx20
-  display_name: "Enterprise macOS Via Rosetta 2 C++20 DEBUG"
+- name: enterprise-macos-cxx20
+  display_name: "Enterprise macOS C++20 DEBUG"
   cron: "0 12 * * *" # Every day starting at 12:00
   modules:
   - enterprise
   run_on:
-  - macos-1100-arm64
+  - macos-1100
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -9225,12 +9196,12 @@ buildvariants:
 - name: embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
-  - macos-1014
+  - macos-1100
   cron: "0 0 * * 0" # Every week starting 00:00 on Sunday
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
-    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: >-
       --lto
       --variables-files=etc/scons/xcode_macosx.vars

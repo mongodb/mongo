@@ -2713,7 +2713,7 @@ def doConfigure(myenv):
             }
             """ % (compiler_minimum_string, compiler_minimum_string))
         else:
-            compiler_minimum_string = "clang 7.0 (or Apple XCode 10.2)"
+            compiler_minimum_string = "clang 7.0 (or Apple XCode 13.0)"
             compiler_test_body = textwrap.dedent(
             """
             #if !defined(__clang__)
@@ -2721,7 +2721,7 @@ def doConfigure(myenv):
             #endif
 
             #if defined(__apple_build_version__)
-            #if __apple_build_version__ < 10010046
+            #if __apple_build_version__ < 13000029
             #error %s or newer is required to build MongoDB
             #endif
             #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
