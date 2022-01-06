@@ -575,7 +575,8 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
             if isinstance(new_field_type,
                           syntax.Type) and "any" in new_field_type.bson_serialization_type:
                 # If 'any' is not explicitly allowed as the bson_serialization_type.
-                if allow_name not in ALLOW_ANY_TYPE_LIST:
+                any_allow = allow_name in ALLOW_ANY_TYPE_LIST or new_field_type.name == 'optionalBool'
+                if not any_allow:
                     ctxt.add_reply_field_bson_any_not_allowed_error(
                         cmd_name, new_field.name, new_field_type.name, new_idl_file_path)
 
@@ -864,19 +865,23 @@ def check_command_params_or_type_struct_fields(
             if new_field.name == old_field.name:
                 newly_added = False
 
-        if newly_added and not new_field.optional and not new_field.unstable:
-            ctxt.add_new_param_or_command_type_field_added_required_error(
-                cmd_name, new_field.name, new_idl_file_path, new_struct.name, is_command_parameter)
-
-        # Check that a new field does not have an unallowed use of 'any' as the bson_serialization_type.
         if newly_added:
+            new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
+            new_field_optional = new_field.optional or (new_field_type
+                                                        and new_field_type.name == 'optionalBool')
+            if not new_field_optional and not new_field.unstable:
+                ctxt.add_new_param_or_command_type_field_added_required_error(
+                    cmd_name, new_field.name, new_idl_file_path, new_struct.name,
+                    is_command_parameter)
+
+            # Check that a new field does not have an unallowed use of 'any' as the bson_serialization_type.
             any_allow_name: str = (cmd_name + "-param-" + new_field.name
                                    if is_command_parameter else cmd_name)
-            new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
             if isinstance(new_field_type,
                           syntax.Type) and "any" in new_field_type.bson_serialization_type:
                 # If 'any' is not explicitly allowed as the bson_serialization_type.
-                if any_allow_name not in ALLOW_ANY_TYPE_LIST:
+                any_allow = any_allow_name in ALLOW_ANY_TYPE_LIST or new_field_type.name == 'optionalBool'
+                if not any_allow:
                     ctxt.add_command_or_param_type_bson_any_not_allowed_error(
                         cmd_name, new_field_type.name, old_idl_file_path, new_field.name,
                         is_command_parameter)
