@@ -249,7 +249,6 @@ functions:
           set -o verbose
 
           /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 "${workdir}/compile_venv"
-          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
           source "${workdir}/compile_venv/bin/activate"
 
           python -m pip install -r etc/pip/compile-requirements.txt
