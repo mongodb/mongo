@@ -43,6 +43,10 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
     // only important since 'setFeatureCompatibilityVersion' is known to implicitly call internal
     // reconfigs as part of upgrade/downgrade behavior.
     rollbackTest.getTestFixture().waitForConfigReplication(primary);
+    // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
+    // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
+    // it into the node's majority committed snapshot.
+    rollbackTest.getTestFixture().awaitLastOpCommitted(undefined /* timeout */, [secondary]);
 
     jsTestLog("Testing rolling back FCV from {version: " + lastLTSFCV +
               ", targetVersion: " + fromFCV + "} to {version: " + toFCV + "}");
@@ -83,6 +87,10 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
 
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
+    // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
+    // it into the node's majority committed snapshot.
+    rollbackTest.getTestFixture().awaitLastOpCommitted(undefined /* timeout */, [secondary]);
 
     jsTestLog("Testing rolling back FCV from {version: " + fromFCV +
               "} to {version: " + lastLTSFCV + ", targetVersion: " + fromFCV + "}");
