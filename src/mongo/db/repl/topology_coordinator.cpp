@@ -329,7 +329,8 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
                                        now,
                                        lastOpTimeFetched,
                                        readPreference,
-                                       attempts == 0 /* firstAttempt */)) {
+                                       attempts == 0 /* firstAttempt */,
+                                       true /* shouldCheckStaleness */)) {
                 // Node is not a viable sync source candidate.
                 continue;
             }
@@ -406,7 +407,8 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                                                 Date_t now,
                                                 const OpTime& lastOpTimeFetched,
                                                 ReadPreference readPreference,
-                                                const bool firstAttempt) const {
+                                                const bool firstAttempt,
+                                                const bool shouldCheckStaleness) const {
     // Don't consider ourselves.
     if (candidateIndex == _selfIndex) {
         return false;
@@ -464,16 +466,19 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                         "syncSourceCandidate"_attr = syncSourceCandidate);
             return false;
         }
-        // Candidates cannot be excessively behind.
-        const auto oldestSyncOpTime = _getOldestSyncOpTime();
-        if (memberData.getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
-            LOGV2_DEBUG(3873110,
-                        2,
-                        "Cannot select sync source because it is too far behind",
-                        "syncSourceCandidate"_attr = syncSourceCandidate,
-                        "syncSourceCandidateOpTime"_attr = memberData.getHeartbeatAppliedOpTime(),
-                        "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
-            return false;
+        // Candidates cannot be excessively behind, if we are checking for staleness.
+        if (shouldCheckStaleness) {
+            const auto oldestSyncOpTime = _getOldestSyncOpTime();
+            if (memberData.getHeartbeatAppliedOpTime() < oldestSyncOpTime) {
+                LOGV2_DEBUG(3873110,
+                            2,
+                            "Cannot select sync source because it is too far behind",
+                            "syncSourceCandidate"_attr = syncSourceCandidate,
+                            "syncSourceCandidateOpTime"_attr =
+                                memberData.getHeartbeatAppliedOpTime(),
+                            "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
+                return false;
+            }
         }
         // Candidate must not have a configured delay larger than ours.
         if (_selfConfig().getSecondaryDelay() < memberConfig.getSecondaryDelay()) {
@@ -497,8 +502,8 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
             return false;
         }
     }
-    // Only select a candidate that is ahead of me.
-    if (memberData.getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
+    // Only select a candidate that is ahead of me, if we are checking for staleness.
+    if (shouldCheckStaleness && memberData.getHeartbeatAppliedOpTime() <= lastOpTimeFetched) {
         LOGV2_DEBUG(3873113,
                     1,
                     "Cannot select sync source which is not ahead of me",
@@ -3110,40 +3115,74 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
     if (MONGO_unlikely(disableMaxSyncSourceLagSecs.shouldFail())) {
         LOGV2(
             21833,
-            "disableMaxSyncSourceLagSecs fail point enabled - not checking the most recent "
-            "OpTime, {currentSyncSourceOpTime}, of our current sync source, {syncSource}, against "
-            "the OpTimes of the other nodes in this replica set.",
             "disableMaxSyncSourceLagSecs fail point enabled - not checking the most recent OpTime "
             "of our current sync source against the OpTimes of the other nodes in this replica set",
             "currentSyncSourceOpTime"_attr = currentSourceOpTime.toString(),
             "syncSource"_attr = currentSource);
     } else {
-        unsigned int currentSecs = currentSourceOpTime.getSecs();
-        unsigned int goalSecs = currentSecs + durationCount<Seconds>(_options.maxSyncSourceLagSecs);
+        unsigned int currentSourceOpTimeSecs = currentSourceOpTime.getSecs();
+        unsigned int currentSourceLagThresholdSecs =
+            currentSourceOpTimeSecs + durationCount<Seconds>(_options.maxSyncSourceLagSecs);
 
-        for (std::vector<MemberData>::const_iterator it = _memberData.begin();
-             it != _memberData.end();
-             ++it) {
-            const int itIndex = indexOfIterator(_memberData, it);
-            const MemberConfig& candidateConfig = _rsConfig.getMemberAt(itIndex);
-            if (it->up() && (candidateConfig.isVoter() || !_selfConfig().isVoter()) &&
-                (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
-                it->getState().readable() && !_memberIsDenylisted(candidateConfig, now) &&
-                goalSecs < it->getHeartbeatAppliedOpTime().getSecs()) {
+        for (size_t i = 0; i < _memberData.size(); i++) {
+            const auto& member = _memberData[i];
+            if (currentSourceLagThresholdSecs < member.getHeartbeatAppliedOpTime().getSecs() &&
+                _isEligibleSyncSource(i,
+                                      now,
+                                      lastOpTimeFetched,
+                                      ReadPreference::Nearest,
+                                      true /* firstAttempt */,
+                                      true /* shouldCheckStaleness */)) {
+                invariant(i != (size_t)_selfIndex,
+                          str::stream()
+                              << "Node " << i << " was eligible as a sync source for itself");
                 LOGV2(21834,
-                      "Choosing new sync source because the most recent OpTime of our sync "
-                      "source, {syncSource}, is {syncSourceOpTime} which is more than "
-                      "{maxSyncSourceLagSecs} behind member {otherMember} "
-                      "whose most recent OpTime is {otherMemberHearbeatAppliedOpTime}",
                       "Choosing new sync source because the most recent OpTime of our sync source "
                       "is more than maxSyncSourceLagSecs behind another member",
                       "syncSource"_attr = currentSource,
                       "syncSourceOpTime"_attr = currentSourceOpTime.toString(),
                       "maxSyncSourceLagSecs"_attr = _options.maxSyncSourceLagSecs,
-                      "otherMember"_attr = candidateConfig.getHostAndPort().toString(),
+                      "otherMember"_attr = member.getHostAndPort().toString(),
                       "otherMemberHearbeatAppliedOpTime"_attr =
-                          it->getHeartbeatAppliedOpTime().toString());
-                invariant(itIndex != _selfIndex);
+                          member.getHeartbeatAppliedOpTime().toString());
+                return true;
+            }
+        }
+    }
+
+    // Change sync source if our current sync source is not a preferred sync source node choice due
+    // to non-staleness issues, such as being a non-voter when we are a voter, or being hidden, or
+    // any of the other conditions checked in _isEligibleSyncSource with firstAttempt=true, and
+    // another eligible node exists which does meet these criteria. Note that while we bypass
+    // staleness checks for our current node, we should not do this for a potential new node,
+    // because we could end up with a situation where shouldChangeSyncSource returns true, causing
+    // the sync source to be cleared, but then being reset to our previous sync source repeatedly
+    // because the new source is not actually valid. Note that _isEligibleSyncSource only checks for
+    // ReadPreference::Secondary*, so any choice besides those for the read preference is fine.
+    if (!_isEligibleSyncSource(currentSourceIndex,
+                               now,
+                               lastOpTimeFetched,
+                               ReadPreference::Nearest,
+                               true /* firstAttempt */,
+                               false /* shouldCheckStaleness */)) {
+
+        for (size_t i = 0; i < _memberData.size(); i++) {
+            if (_isEligibleSyncSource(i,
+                                      now,
+                                      lastOpTimeFetched,
+                                      ReadPreference::Nearest,
+                                      true /* firstAttempt */,
+                                      true /* shouldCheckStaleness */)) {
+                invariant(i != (size_t)_selfIndex,
+                          str::stream()
+                              << "Node " << i << " was eligible as a sync source for itself");
+                LOGV2(5929000,
+                      "Choosing new sync source because our current sync source does not satisfy "
+                      "our strict criteria for candidates, but there is another member which does "
+                      "satisfy these criteria",
+                      "currentSyncSource"_attr = currentSource,
+                      "eligibleCandidateSyncSource"_attr =
+                          _rsConfig.getMemberAt(i).getHostAndPort().toString());
                 return true;
             }
         }
@@ -3235,7 +3274,8 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
                                   now,
                                   previousOpTimeFetched,
                                   readPreference,
-                                  true /* firstAttempt */)) {
+                                  true /* firstAttempt */,
+                                  true /* shouldCheckStaleness */)) {
             LOGV2(4744901,
                   "Choosing new sync source because we have found another potential sync "
                   "source that is significantly closer than our current sync source",

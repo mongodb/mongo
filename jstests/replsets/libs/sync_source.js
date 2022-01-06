@@ -64,6 +64,17 @@ const forceSyncSource = (rst, node, syncSource) => {
     return forceSyncSource;
 };
 
+/**
+ * Asserts that the sync source of the given node will match syncSourceName soon. Additional
+ * arguments are passed to the assert.soon.
+ */
+const assertSyncSourceMatchesSoon = (node, syncSourceName, ...assertSoonArgs) => {
+    return assert.soon(() => {
+        const res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+        return res.syncSourceHost === syncSourceName;
+    }, ...assertSoonArgs);
+};
+
 const DataCenter = class {
     constructor(name, nodes) {
         this.name = name;
