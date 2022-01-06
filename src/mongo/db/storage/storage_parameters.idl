@@ -130,7 +130,8 @@ feature_flags:
     featureFlagYieldingSupportForSBE:
         description: "Enable retaining valid cursor across query yield"
         cpp_varname: feature_flags::gYieldingSupportForSBE
-        default: false
+        default: true
+        version: 5.3
     featureFlagCollModIndexUnique:
         description: "When enabled, collMod supports making an index unique"
         cpp_varname: feature_flags::gCollModIndexUnique
