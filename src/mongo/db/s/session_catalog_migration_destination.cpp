@@ -449,19 +449,18 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                 uassertStatusOK(
                     waitForWriteConcern(opCtx, lastResult.oplogTime, kMajorityWC, &unusedWCResult));
 
-                // We depleted the buffer at least once, transition to ready for commit.
-                LOGV2(
-                    5087101,
-                    "Recipient finished draining oplog entries for retryable writes and "
-                    "transactions from donor for the first time, before receiving _recvChunkCommit",
-                    "namespace"_attr = _nss,
-                    "migrationSessionId"_attr = _migrationSessionId,
-                    "fromShard"_attr = _fromShard);
-
                 {
                     stdx::lock_guard<Latch> lk(_mutex);
                     // Note: only transition to "ready to commit" if state is not error/force stop.
                     if (_state == State::Migrating) {
+                        // We depleted the buffer at least once, transition to ready for commit.
+                        LOGV2(5087101,
+                              "Recipient finished draining oplog entries for retryable writes and "
+                              "transactions from donor for the first time, before receiving "
+                              "_recvChunkCommit",
+                              "namespace"_attr = _nss,
+                              "migrationSessionId"_attr = _migrationSessionId,
+                              "fromShard"_attr = _fromShard);
                         _state = State::ReadyToCommit;
                     }
                 }
