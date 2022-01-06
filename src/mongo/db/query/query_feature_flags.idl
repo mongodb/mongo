@@ -109,3 +109,8 @@ feature_flags:
       description: "Feature flag for enabling a per-shard cursor via mongos"
       cpp_varname: gFeatureFlagPerShardCursor
       default: false
+
+    featureFlagLastPointQuery:
+      description : "Feature flag for optimizing Last Point queries on time-series collections"
+      cpp_varname: gfeatureFlagLastPointQuery
+      default: false
