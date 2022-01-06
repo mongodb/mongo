@@ -298,9 +298,6 @@ struct __wt_txn {
     /* Scratch buffer for in-memory log records. */
     WT_ITEM *logrec;
 
-    /* Requested notification when transactions are resolved. */
-    WT_TXN_NOTIFY *notify;
-
     /* Checkpoint status. */
     WT_LSN ckpt_lsn;
     uint32_t ckpt_nsnapshot;

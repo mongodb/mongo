@@ -836,11 +836,6 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
     conn->extension_api.spin_lock = __wt_ext_spin_lock;
     conn->extension_api.spin_unlock = __wt_ext_spin_unlock;
     conn->extension_api.spin_destroy = __wt_ext_spin_destroy;
-    conn->extension_api.transaction_id = __wt_ext_transaction_id;
-    conn->extension_api.transaction_isolation_level = __wt_ext_transaction_isolation_level;
-    conn->extension_api.transaction_notify = __wt_ext_transaction_notify;
-    conn->extension_api.transaction_oldest = __wt_ext_transaction_oldest;
-    conn->extension_api.transaction_visible = __wt_ext_transaction_visible;
     conn->extension_api.version = wiredtiger_version;
 
     /* Streaming pack/unpack API */

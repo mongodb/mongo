@@ -157,18 +157,6 @@ data_source_error(int v)
 }
 
 static int
-data_source_notify(WT_TXN_NOTIFY *handler, WT_SESSION *session, uint64_t txnid, int committed)
-{
-    /* Unused parameters */
-    (void)handler;
-    (void)session;
-    (void)txnid;
-    (void)committed;
-
-    return (0);
-}
-
-static int
 my_cursor_next(WT_CURSOR *wtcursor)
 {
     (void)wtcursor;
@@ -206,53 +194,6 @@ my_cursor_insert(WT_CURSOR *wtcursor)
 
     /* Unused parameters */
     (void)wtcursor;
-
-    {
-        int is_snapshot_isolation, isolation_level;
-        /*! [WT_EXTENSION transaction isolation level] */
-        isolation_level = wt_api->transaction_isolation_level(wt_api, session);
-        if (isolation_level == WT_TXN_ISO_SNAPSHOT)
-            is_snapshot_isolation = 1;
-        else
-            is_snapshot_isolation = 0;
-        /*! [WT_EXTENSION transaction isolation level] */
-        (void)is_snapshot_isolation;
-    }
-
-    {
-        /*! [WT_EXTENSION transaction ID] */
-        uint64_t transaction_id;
-
-        transaction_id = wt_api->transaction_id(wt_api, session);
-        /*! [WT_EXTENSION transaction ID] */
-        (void)transaction_id;
-    }
-
-    {
-        /*! [WT_EXTENSION transaction oldest] */
-        uint64_t transaction_oldest;
-
-        transaction_oldest = wt_api->transaction_oldest(wt_api);
-        /*! [WT_EXTENSION transaction oldest] */
-        (void)transaction_oldest;
-    }
-
-    {
-        /*! [WT_EXTENSION transaction notify] */
-        WT_TXN_NOTIFY handler;
-        handler.notify = data_source_notify;
-        error_check(wt_api->transaction_notify(wt_api, session, &handler));
-        /*! [WT_EXTENSION transaction notify] */
-    }
-
-    {
-        uint64_t transaction_id = 1;
-        int is_visible;
-        /*! [WT_EXTENSION transaction visible] */
-        is_visible = wt_api->transaction_visible(wt_api, session, transaction_id);
-        /*! [WT_EXTENSION transaction visible] */
-        (void)is_visible;
-    }
 
     {
         const char *key1 = NULL, *key2 = NULL;
