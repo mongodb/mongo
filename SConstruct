@@ -950,8 +950,8 @@ env_vars.Add('MSVC_USE_SCRIPT',
     help='Sets the script used to setup Visual Studio.')
 
 env_vars.Add('MSVC_VERSION',
-    help='Sets the version of Visual C++ to use (e.g. 14.1 for VS2017, 14.2 for VS2019)',
-    default="14.2")
+    help='Sets the version of Visual C++ to use (e.g. 14.2 for VS2019, 14.3 for VS2022)',
+    default="14.3")
 
 env_vars.Add('NINJA_PREFIX',
     default="build",
@@ -2617,14 +2617,14 @@ def doConfigure(myenv):
     # bare compilers, and we should re-check at the very end that TryCompile and TryLink still
     # work with the flags we have selected.
     if myenv.ToolchainIs('msvc'):
-        compiler_minimum_string = "Microsoft Visual Studio 2019 16.4"
+        compiler_minimum_string = "Microsoft Visual Studio 2022 17.0"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(_MSC_VER)
         #error
         #endif
 
-        #if _MSC_VER < 1924
+        #if _MSC_VER < 1930
         #error %s or newer is required to build MongoDB
         #endif
 

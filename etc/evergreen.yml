@@ -8871,19 +8871,18 @@ buildvariants:
     distros:
     - rhel70-small
 
-- &enterprise-windows-msvs2022-experimental-template
-  name: enterprise-windows-msvs2022-experimental
-  display_name: "~ Enterprise Windows MSVS 2022"
+- name: enterprise-windows-cxx20-debug-experimental
+  display_name: "~ Enterprise Windows C++20 DEBUG"
   cron: "0 12 * * *" # Every day starting at 12:00
   modules:
     - enterprise
   run_on:
-    - windows-vsCurrent-2022-small
-  expansions: &enterprise-windows-msvs2022-experimental-expansions-template
+    - windows-vsCurrent-small
+  expansions:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 MSVC_VERSION=14.3
+    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 --cxx-std=20
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
@@ -8891,13 +8890,13 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 3
-    large_distro_name: windows-vsCurrent-2022-large
+    large_distro_name: windows-vsCurrent-large
     test_flags: *windows_common_test_excludes
     exec_timeout_secs: 14400 # 3 hour timeout
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-vsCurrent-2022-large
+    - windows-vsCurrent-large
   - name: build_variant_gen
 #  - name: .aggfuzzer # Disabled for FCV 5.3
   - name: .aggregation !.auth !.encrypt !.unwind
@@ -8908,7 +8907,7 @@ buildvariants:
     # with more RAM for these suites.
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common !.debug_only
     distros:
-      - windows-vsCurrent-2022-large
+      - windows-vsCurrent-large
   - name: .concurrency .common
   - name: disk_wiredtiger
   - name: .jscore .common !.auth
@@ -8925,13 +8924,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer !.multiversion
-
-- <<: *enterprise-windows-msvs2022-experimental-template
-  name: enterprise-windows-msvs2022-cxx20-debug-experimental
-  display_name: "~ Enterprise Windows MSVS 2022 C++20 DEBUG"
-  expansions:
-    <<: *enterprise-windows-msvs2022-experimental-expansions-template
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10 MSVC_VERSION=14.3 --cxx-std=20
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
