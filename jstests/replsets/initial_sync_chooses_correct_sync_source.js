@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/libs/sync_source.js");  // assertSyncSourceMatchesSoon
 
 const waitForHeartbeats = initialSyncNode => {
     // Hang the node before it undergoes sync source selection.
@@ -174,10 +175,7 @@ initialSyncNode.adminCommand(
 
 // Once we become secondary, the secondary read preference no longer matters and we choose the
 // primary because chaining is disallowed.
-assert.soon(function() {
-    let res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
-    return res.syncSourceHost == primary.host;
-});
+assertSyncSourceMatchesSoon(initialSyncNode, primary.host);
 
 primary.delayMessagesFrom(initialSyncNode, 0);
 TestData.skipCollectionAndIndexValidation = false;

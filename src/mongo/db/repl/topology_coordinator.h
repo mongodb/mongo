@@ -936,7 +936,8 @@ private:
                                Date_t now,
                                const OpTime& lastOpTimeFetched,
                                ReadPreference readPreference,
-                               bool firstAttempt) const;
+                               bool firstAttempt,
+                               bool shouldCheckStaleness) const;
 
     // Returns the current "ping" value for the given member by their address.
     Milliseconds _getPing(const HostAndPort& host);
