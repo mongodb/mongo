@@ -2765,13 +2765,23 @@ tasks:
     - *f_expansions_write
     - func: "scons compile"
       vars:
-        targets: install-mongo-csfle
+        targets: archive-mongo-csfle-dev
         task_compile_flags: >-
           --allocator=system
           --enable-free-mon=off
           --js-engine=none
           --link-model=dynamic-sdk
           DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/mongo-csfle-dev.${ext|tgz}"
+        remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1-${version}.${ext|tgz}"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Mongo CSFLE Library"
 
 - name: compile_benchmarks
   tags: []
@@ -7909,7 +7919,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: snmp
   - name: .stitch
-  - name: .csfle
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless !.multiversion
