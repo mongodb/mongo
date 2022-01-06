@@ -652,7 +652,10 @@ void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateA
         // Swap 'cbStateArg->callback' with temporary copy before running callback for exception
         // safety.
         TaskExecutor::CallbackFn callback;
-        std::swap(cbStateArg->callback, callback);
+        {
+            auto lk = stdx::lock_guard(_mutex);
+            std::swap(cbStateArg->callback, callback);
+        }
         callback(std::move(args));
     }
     cbStateArg->isFinished.store(true);
@@ -822,12 +825,16 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
 
     if (!cbState->isFinished.load()) {
         TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {};
-        std::swap(cbState->callback, callback);
+        {
+            auto lk = stdx::lock_guard(_mutex);
+            std::swap(cbState->callback, callback);
+        }
         callback(std::move(args));
 
         // Leave the empty callback function if the request has been marked canceled or finished
         // while running the callback to avoid leaking resources.
         if (!cbState->canceled.load() && !cbState->isFinished.load()) {
+            auto lk = stdx::lock_guard(_mutex);
             std::swap(callback, cbState->callback);
         }
     }
