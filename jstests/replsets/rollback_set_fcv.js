@@ -38,6 +38,11 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
     // Ensure the cluster starts at the correct FCV.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
 
+    // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
+    // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
+    // it into the node's majority committed snapshot.
+    rollbackTest.getTestFixture().awaitLastOpCommitted(undefined /* timeout */, [secondary]);
+
     jsTestLog("Testing rolling back FCV from {version: " + lastStableFCV +
               ", targetVersion: " + fromFCV + "} to {version: " + toFCV + "}");
 
@@ -77,6 +82,10 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
 
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
+    // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
+    // it into the node's majority committed snapshot.
+    rollbackTest.getTestFixture().awaitLastOpCommitted(undefined /* timeout */, [secondary]);
 
     jsTestLog("Testing rolling back FCV from {version: " + fromFCV +
               "} to {version: " + lastStableFCV + ", targetVersion: " + fromFCV + "}");
