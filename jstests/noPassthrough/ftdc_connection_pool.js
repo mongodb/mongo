@@ -26,6 +26,7 @@ assert(stats.hasOwnProperty('totalInUse'));
 assert(stats.hasOwnProperty('totalAvailable'));
 assert(stats.hasOwnProperty('totalCreated'));
 assert(stats.hasOwnProperty('totalRefreshing'));
+assert(stats.hasOwnProperty('totalRefreshed'));
 assert("hello" in stats["replicaSetMonitor"]);
 const helloStats = stats["replicaSetMonitor"]["hello"];
 assert(helloStats.hasOwnProperty('currentlyActive'));
