@@ -11,7 +11,6 @@ from buildscripts.resmokelib.run import RunPlugin
 from buildscripts.resmokelib.setup_multiversion import SetupMultiversionPlugin
 from buildscripts.resmokelib.symbolizer import SymbolizerPlugin
 from buildscripts.resmokelib.undodb import UndoDbPlugin
-from buildscripts.resmokelib.bisect import BisectPlugin
 
 _PLUGINS = [
     RunPlugin(),
@@ -20,7 +19,6 @@ _PLUGINS = [
     SetupMultiversionPlugin(),
     PowercyclePlugin(),
     SymbolizerPlugin(),
-    BisectPlugin(),
     GenerateFCVConstantsPlugin(),
 ]
 

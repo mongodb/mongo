@@ -17,5 +17,7 @@ def main(argv):
         argv[1:], start_time=__start_time,
         usage="Resmoke is MongoDB's correctness testing orchestrator.\n"
         "For more information, see the help message for each subcommand.\n"
-        "For example: resmoke.py run -h\n")
+        "For example: resmoke.py run -h\n"
+        "Note: bisect subcommand has been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n"
+    )
     subcommand.execute()
