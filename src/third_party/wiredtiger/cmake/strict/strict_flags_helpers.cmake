@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
-
 # get_gnu_base_flags(flags)
 # Helper function that generates a set of common GNU flags for a given language.
 #   flags - list of flags.
