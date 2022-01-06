@@ -8275,7 +8275,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon-build
+    large_distro_name: amazon2-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
