@@ -304,8 +304,24 @@ public:
                    const BSONObj& jsobj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        Timer timer;
+        auto hasMin = jsobj.hasField("min");
+        auto hasMax = jsobj.hasField("max");
 
+        uassert(ErrorCodes::BadValue,
+                hasMin ? "max must be set if min is set" : "min must be set if max is set",
+                hasMin == hasMax);
+
+        if (hasMin) {
+            uassert(ErrorCodes::BadValue,
+                    "min key must be an object",
+                    jsobj["min"].type() == BSONType::Object);
+
+            uassert(ErrorCodes::BadValue,
+                    "max key must be an object",
+                    jsobj["max"].type() == BSONType::Object);
+        }
+
+        Timer timer;
         std::string ns = jsobj.firstElement().String();
         BSONObj min = jsobj.getObjectField("min");
         BSONObj max = jsobj.getObjectField("max");
