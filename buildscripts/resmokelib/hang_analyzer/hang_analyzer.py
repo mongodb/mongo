@@ -124,7 +124,7 @@ class HangAnalyzer(Subcommand):
                         dump_pids = {**err.dump_pids, **dump_pids}
                     except Exception as err:  # pylint: disable=broad-except
                         self.root_logger.info("Error encountered when invoking debugger %s", err)
-                    trapped_exceptions.append(traceback.format_exc())
+                        trapped_exceptions.append(traceback.format_exc())
                 else:
                     self.root_logger.info(
                         "Not enough space for a core dump, skipping %s processes with PIDs %s",
