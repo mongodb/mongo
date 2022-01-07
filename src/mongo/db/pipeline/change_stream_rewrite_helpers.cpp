@@ -49,6 +49,32 @@ using AggExpressionRewrite =
 
 namespace {
 /**
+ * Helpers to clone an expression to the same type and rename the fields to which it applies.
+ */
+std::unique_ptr<PathMatchExpression> cloneWithSubstitution(
+    const PathMatchExpression* predicate, const StringMap<std::string>& renameList) {
+    auto clonedPred = std::unique_ptr<PathMatchExpression>(
+        static_cast<PathMatchExpression*>(predicate->shallowClone().release()));
+    clonedPred->applyRename(renameList);
+    return clonedPred;
+}
+boost::intrusive_ptr<ExpressionFieldPath> cloneWithSubstitution(
+    const ExpressionFieldPath* expr, const StringMap<std::string>& renameList) {
+    return static_cast<ExpressionFieldPath*>(expr->copyWithSubstitution(renameList).release());
+}
+
+/**
+ * Helper to resolve a predicate on a non-existent field to either AlwaysTrue or AlwaysFalse.
+ */
+std::unique_ptr<MatchExpression> resolvePredicateOnNonExistentField(
+    const PathMatchExpression* predicate) {
+    if (predicate->matchesSingleElement({})) {
+        return std::make_unique<AlwaysTrueMatchExpression>();
+    }
+    return std::make_unique<AlwaysFalseMatchExpression>();
+}
+
+/**
  * Rewrites filters on 'operationType' in a format that can be applied directly to the oplog.
  * Returns nullptr if the predicate cannot be rewritten.
  *
@@ -67,9 +93,9 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
             str::stream() << "Unexpected predicate on " << predicate->path(),
             predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kOperationTypeField);
 
-    // If the query is on a subfield of operationType, it will never match.
+    // If the query is on a subfield of operationType, it will always be missing.
     if (predicate->fieldRef()->numParts() > 1) {
-        return std::make_unique<AlwaysFalseMatchExpression>();
+        return resolvePredicateOnNonExistentField(predicate);
     }
 
     static const auto kExistsTrue = Document{{"$exists", true}};
@@ -223,8 +249,7 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
     // Helper to generate a filter on the 'op' field for the specified type. This filter will also
     // include a copy of 'predicate' with the path renamed to apply to the oplog.
     auto generateFilterForOp = [&](StringData op, const StringMap<std::string>& renameList) {
-        auto renamedPredicate = predicate->shallowClone();
-        static_cast<PathMatchExpression*>(renamedPredicate.get())->applyRename(renameList);
+        auto renamedPredicate = cloneWithSubstitution(predicate, renameList);
 
         auto andExpr = std::make_unique<AndMatchExpression>();
         andExpr->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value(op)));
@@ -235,13 +260,31 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
     // The MatchExpression which will contain the final rewritten predicate.
     auto rewrittenPredicate = std::make_unique<OrMatchExpression>();
 
+    // Handle the case of non-CRUD events. The 'documentKey' field never exists for such events, so
+    // we evaluate the predicate against a non-existent field to see whether it matches.
+    if (predicate->matchesSingleElement({})) {
+        auto nonCRUDCase = MatchExpressionParser::parseAndNormalize(
+            fromjson("{$nor: [{op: 'i'}, {op: 'u'}, {op: 'd'}]}"), expCtx);
+        rewrittenPredicate->add(std::move(nonCRUDCase));
+    }
+
     // Handle update, replace and delete. The predicate path can simply be renamed.
     rewrittenPredicate->add(generateFilterForOp("u"_sd, {{"documentKey", "o2"}}));
     rewrittenPredicate->add(generateFilterForOp("d"_sd, {{"documentKey", "o"}}));
 
-    // If the path is a subfield of 'documentKey', inserts can also be handled by renaming.
+    // If the path is a subfield of 'documentKey', inserts can also be handled by renaming, as long
+    // as the path starts with _id or the predicate does not match a missing field.
     if (predicate->fieldRef()->numParts() > 1) {
-        rewrittenPredicate->add(generateFilterForOp("i"_sd, {{"documentKey", "o"}}));
+        // If the predicate matches against a missing field and is on a field which exists in the
+        // full document but not the documentKey, then applying that predicate to the 'o' field in
+        // the oplog will discard entries that would have matched the eventual change stream event.
+        if (pathStartsWithDKId || !predicate->matchesSingleElement({})) {
+            rewrittenPredicate->add(generateFilterForOp("i"_sd, {{"documentKey", "o"}}));
+        } else {
+            // We can't rewrite the predicate, so we have to match all {op: "i"} events.
+            rewrittenPredicate->add(
+                std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
+        }
         return rewrittenPredicate;
     }
 
@@ -340,18 +383,16 @@ boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
     std::vector<BSONObj> opCases;
 
     // Cases for 'insert' and 'delete'.
-    auto insertAndDeletePath =
-        static_cast<ExpressionFieldPath*>(expr->copyWithSubstitution({{"documentKey", "o"}}).get())
-            ->getFieldPathWithoutCurrentPrefix()
-            .fullPathWithPrefix();
+    auto insertAndDeletePath = cloneWithSubstitution(expr, {{"documentKey", "o"}})
+                                   ->getFieldPathWithoutCurrentPrefix()
+                                   .fullPathWithPrefix();
     opCases.push_back(
         fromjson("{case: {$in: ['$op', ['i', 'd']]}, then: '" + insertAndDeletePath + "'}"));
 
     // Cases for 'update' and 'replace'.
-    auto updateAndReplacePath =
-        static_cast<ExpressionFieldPath*>(expr->copyWithSubstitution({{"documentKey", "o2"}}).get())
-            ->getFieldPathWithoutCurrentPrefix()
-            .fullPathWithPrefix();
+    auto updateAndReplacePath = cloneWithSubstitution(expr, {{"documentKey", "o2"}})
+                                    ->getFieldPathWithoutCurrentPrefix()
+                                    .fullPathWithPrefix();
     opCases.push_back(
         fromjson("{case: {$eq: ['$op', 'u']}, then: '" + updateAndReplacePath + "'}"));
 
@@ -397,7 +438,7 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     //   {$or: [
     //     {$and: [{op: 'u'}, {'o._id': {$exists: false}}]},
     //     {$and: [
-    //       {$or: [{op: 'i'}, {op: 'u'}]},
+    //       {$or: [{op: 'i'}, {op: 'u', 'o._id': {$exists: true}}]},
     //       {o: <predicate>}
     //     ]},
     //     // The following predicates are only present if the predicate matches a missing field
@@ -418,14 +459,11 @@ std::unique_ptr<MatchExpression> matchRewriteFullDocument(
     // cases, because the full document is present in the oplog.
     auto insertOrReplaceCase = std::make_unique<AndMatchExpression>();
 
-    auto insertOrReplaceOpFilter = std::make_unique<OrMatchExpression>();
-    insertOrReplaceOpFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
-    insertOrReplaceOpFilter->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    auto insertOrReplaceOpFilter = MatchExpressionParser::parseAndNormalize(
+        fromjson("{$or: [{op: 'i'}, {op: 'u', 'o._id': {$exists: true}}]}"), expCtx);
     insertOrReplaceCase->add(std::move(insertOrReplaceOpFilter));
 
-    auto predForInsertOrReplace = predicate->shallowClone();
-    static_cast<PathMatchExpression*>(predForInsertOrReplace.get())
-        ->applyRename({{"fullDocument", "o"}});
+    auto predForInsertOrReplace = cloneWithSubstitution(predicate, {{"fullDocument", "o"}});
     insertOrReplaceCase->add(std::move(predForInsertOrReplace));
 
     rewrittenPredicate->add(std::move(insertOrReplaceCase));
@@ -458,136 +496,193 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
             predicate->fieldRef()->getPart(0) ==
                 DocumentSourceChangeStream::kUpdateDescriptionField);
 
-    // Check that this is a non-replacement update, i.e. {op: "u", "o._id": {$exists: false}}.
-    auto rewrittenPredicate = std::make_unique<AndMatchExpression>();
-    rewrittenPredicate->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
-    rewrittenPredicate->add(
-        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"_sd)));
-
-    // For predicates on a non-dotted subfield of 'updateDescription.updatedFields' we can generate
-    // a rewritten predicate that matches exactly like so:
-    //
-    //   {updateDescription.updatedFields.<fieldName>: <pred>}
-    //     =>
-    //   {$and: [
-    //     {op: "u"},
-    //     {"o._id": {$exists: false}},
-    //     {$or: [
-    //       {o.diff.i.<fieldName>: <pred>},
-    //       {o.diff.u.<fieldName>: <pred>},
-    //       {o.$set.<fieldName>: <pred>}
-    //     ]}
-    //   ]}
-    if (predicate->fieldRef()->numParts() == 3 &&
-        predicate->fieldRef()->getPart(1) == "updatedFields"_sd) {
-        // The oplog field corresponding to "updateDescription.updatedFields" can be in any one of
-        // three locations. Construct an $or filter to match against them all.
-        static const std::vector<std::string> oplogFields = {"o.diff.i", "o.diff.u", "o.$set"};
-        auto updatedFieldsOr = std::make_unique<OrMatchExpression>();
-        for (auto&& oplogField : oplogFields) {
-            auto updateRewrite = predicate->shallowClone();
-            static_cast<PathMatchExpression*>(updateRewrite.get())
-                ->applyRename({{"updateDescription.updatedFields", oplogField}});
-            updatedFieldsOr->add(std::move(updateRewrite));
+    // We can't determine whether we can perform a strict rewrite until we examine the predicate. We
+    // wrap this in a helper function that we can call while building the filter. We try to rewrite
+    // the predicate assuming that it will only be applied to non-replacement update oplog events.
+    auto tryExactRewriteForUpdateEvents = [](auto predicate) -> std::unique_ptr<MatchExpression> {
+        // $exists and null-equality checks on 'updateDescription' or its immediate subfields are
+        // AlwaysTrue or AlwaysFalse, since these fields are always present in the update event.
+        static const std::set<std::string> existentFields = {"updateDescription",
+                                                             "updateDescription.updatedFields",
+                                                             "updateDescription.removedFields",
+                                                             "updateDescription.truncatedArrays"};
+        if (existentFields.count(predicate->path().toString())) {
+            // An {$exists:true} predicate will always match against any of these fields.
+            if (predicate->matchType() == MatchExpression::EXISTS) {
+                return std::make_unique<AlwaysTrueMatchExpression>();
+            }
+            // We check whether this is a ComparisonMatchExpression to ensure that the predicate is
+            // type-bracketed, which means that it will *only* match missing, null, or undefined.
+            // None of these fields will ever be null or undefined in the change stream event.
+            if (ComparisonMatchExpression::isComparisonMatchExpression(predicate) &&
+                predicate->matchesSingleElement({})) {
+                return std::make_unique<AlwaysFalseMatchExpression>();
+            }
         }
-        // Add the $or into the final rewritten predicate and return.
-        rewrittenPredicate->add(std::move(updatedFieldsOr));
-        return rewrittenPredicate;
-    }
 
-    // For $eq predicates and $in predicates on 'updateDescription.removedFields' we can generate
-    // a rewritten predicate that matches exactly like so:
-    //
-    //   {updateDescription.removedFields: {$eq: <fieldName>}}
-    //     =>
-    //   {$and: [
-    //     {op: "u"},
-    //     {"o._id": {$exists: false}},
-    //     {$or: [
-    //       {o.diff.d.<fieldName>: {$exists: true}},
-    //       {o.$unset.<fieldName>: {$exists: true}}
-    //     ]}
-    //   ]}
-    //
-    //   {updateDescription.removedFields: {$in: [<fieldName1>, <fieldName2>, ..]}}
-    //     =>
-    //   {$and: [
-    //     {op: "u"},
-    //     {"o._id": {$exists: false}},
-    //     {$or: [
-    //       {o.diff.d.<fieldName1>: {$exists: true}},
-    //       {o.$unset.<fieldName1>: {$exists: true}},
-    //       {o.diff.d.<fieldName2>: {$exists: true}},
-    //       {o.$unset.<fieldName2>: {$exists: true}},
-    //       ..
-    //     ]}
-    //   ]}
-    if (predicate->fieldRef()->numParts() == 2 &&
-        predicate->fieldRef()->getPart(1) == "removedFields"_sd) {
-        // Helper to rewrite an equality on "updateDescription.removedFields" into the oplog.
-        auto rewriteEqualityForOplog = [](auto& rhsElem) -> std::unique_ptr<MatchExpression> {
-            // We can only rewrite equality matches on strings.
-            if (rhsElem.type() != BSONType::String) {
-                return nullptr;
-            }
-            // We can only rewrite top-level fields, i.e. no dotted subpaths.
-            auto fieldName = rhsElem.str();
-            if (FieldRef(fieldName).numParts() > 1) {
-                return nullptr;
-            }
-            // The oplog field corresponding to "updateDescription.removedFields" can be in either
-            // of two locations. Construct an $or filter to match against them both.
-            static const std::vector<std::string> oplogFields = {"o.diff.d", "o.$unset"};
-            auto removedFieldsOr = std::make_unique<OrMatchExpression>();
-            for (auto&& oplogField : oplogFields) {
-                removedFieldsOr->add(
-                    std::make_unique<ExistsMatchExpression>(oplogField + "." + fieldName));
-            }
-            return removedFieldsOr;
-        };
-
-        // We can only match against a limited number of predicates here, $eq and $in.
-        switch (predicate->matchType()) {
-            case MatchExpression::EQ: {
-                // Try to rewrite the predicate on "updateDescription.removedFields".
-                auto eqME = static_cast<const EqualityMatchExpression*>(predicate);
-                if (auto removedRewrite = rewriteEqualityForOplog(eqME->getData())) {
-                    rewrittenPredicate->add(std::move(removedRewrite));
-                    return rewrittenPredicate;
+        // For predicates on a non-dotted subfield of 'updateDescription.updatedFields' we can
+        // generate a rewritten predicate that matches exactly like so:
+        //
+        //   {updateDescription.updatedFields.<fieldName>: <pred>}
+        //     =>
+        //   {$and: [
+        //     {op: "u"},
+        //     {"o._id": {$exists: false}},
+        //     {$or: [
+        //       {o.diff.i.<fieldName>: <pred>},
+        //       {o.diff.u.<fieldName>: <pred>},
+        //       {o.$set.<fieldName>: <pred>}
+        //     ]}
+        //   ]}
+        if (predicate->fieldRef()->numParts() == 3 &&
+            predicate->fieldRef()->getPart(1) == "updatedFields"_sd) {
+            // The oplog field corresponding to "updateDescription.updatedFields" can be in any one
+            // of three locations. We will attempt to construct a filter to match against them all.
+            static const std::vector<std::string> oplogFields = {"o.diff.i", "o.diff.u", "o.$set"};
+            // If this predicate matches against a missing field, then we must apply an $and to all
+            // three potential locations, since at least two of them will always be missing. If not,
+            // then we build an $or to match if the field is present at any of the locations.
+            auto rewrittenUserPredicate = [predicate]() -> std::unique_ptr<ListOfMatchExpression> {
+                if (predicate->matchesSingleElement({})) {
+                    return std::make_unique<AndMatchExpression>();
                 }
-                break;
+                return std::make_unique<OrMatchExpression>();
+            }();
+            // Rewrite the predicate for each of the three potential oplog locations.
+            for (auto&& oplogField : oplogFields) {
+                rewrittenUserPredicate->add(cloneWithSubstitution(
+                    predicate, {{"updateDescription.updatedFields", oplogField}}));
             }
-            case MatchExpression::MATCH_IN: {
-                // If this $in includes any regexes, we can't proceed with the rewrite.
-                auto inME = static_cast<const InMatchExpression*>(predicate);
-                if (!inME->getRegexes().empty()) {
+            // Return the final rewritten predicate.
+            return rewrittenUserPredicate;
+        }
+
+        // For $eq predicates and $in predicates on 'updateDescription.removedFields' we can
+        // generate a rewritten predicate that matches exactly like so:
+        //
+        //   {updateDescription.removedFields: {$eq: <fieldName>}}
+        //     =>
+        //   {$and: [
+        //     {op: "u"},
+        //     {"o._id": {$exists: false}},
+        //     {$or: [
+        //       {o.diff.d.<fieldName>: {$exists: true}},
+        //       {o.$unset.<fieldName>: {$exists: true}}
+        //     ]}
+        //   ]}
+        //
+        //   {updateDescription.removedFields: {$in: [<fieldName1>, <fieldName2>, ..]}}
+        //     =>
+        //   {$and: [
+        //     {op: "u"},
+        //     {"o._id": {$exists: false}},
+        //     {$or: [
+        //       {o.diff.d.<fieldName1>: {$exists: true}},
+        //       {o.$unset.<fieldName1>: {$exists: true}},
+        //       {o.diff.d.<fieldName2>: {$exists: true}},
+        //       {o.$unset.<fieldName2>: {$exists: true}},
+        //       ..
+        //     ]}
+        //   ]}
+        if (predicate->fieldRef()->numParts() == 2 &&
+            predicate->fieldRef()->getPart(1) == "removedFields"_sd) {
+            // Helper to rewrite an equality on "updateDescription.removedFields" into the oplog.
+            auto rewriteEqOnRemovedFields = [](auto& rhsElem) -> std::unique_ptr<MatchExpression> {
+                // We can only rewrite equality matches on strings.
+                if (rhsElem.type() != BSONType::String) {
                     return nullptr;
                 }
-                // An empty '$in' should never match anything.
-                if (inME->getEqualities().empty()) {
-                    return std::make_unique<AlwaysFalseMatchExpression>();
+                // We can only rewrite top-level fields, i.e. no dotted subpaths.
+                auto fieldName = rhsElem.str();
+                if (FieldRef(fieldName).numParts() > 1) {
+                    return nullptr;
                 }
-                // Try to rewrite the $in as an $or of equalities on the oplog. If any individual
-                // rewrite fails, we must abandon the entire rewrite.
-                auto inRemovedOr = std::make_unique<OrMatchExpression>();
-                for (const auto& rhsElem : inME->getEqualities()) {
-                    if (auto removedRewrite = rewriteEqualityForOplog(rhsElem)) {
-                        inRemovedOr->add(std::move(removedRewrite));
-                    } else {
+                // The oplog field corresponding to "updateDescription.removedFields" can be in
+                // either of two locations. Construct an $or filter to match against them both.
+                // Because we have already validated that this is an equality string match, we do
+                // not need to check whether the predicate matches a missing field in this case.
+                static const std::vector<std::string> oplogFields = {"o.diff.d", "o.$unset"};
+                auto rewrittenEquality = std::make_unique<OrMatchExpression>();
+                for (auto&& oplogField : oplogFields) {
+                    rewrittenEquality->add(
+                        std::make_unique<ExistsMatchExpression>(oplogField + "." + fieldName));
+                }
+                return rewrittenEquality;
+            };
+
+            // We can only match against a limited number of predicates here, $eq and $in.
+            switch (predicate->matchType()) {
+                case MatchExpression::EQ: {
+                    // Try to rewrite the predicate on "updateDescription.removedFields".
+                    auto eqME = static_cast<const EqualityMatchExpression*>(predicate);
+                    return rewriteEqOnRemovedFields(eqME->getData());
+                }
+                case MatchExpression::MATCH_IN: {
+                    // If this $in includes any regexes, we can't proceed with the rewrite.
+                    auto inME = static_cast<const InMatchExpression*>(predicate);
+                    if (!inME->getRegexes().empty()) {
                         return nullptr;
                     }
+                    // An empty '$in' should never match anything.
+                    if (inME->getEqualities().empty()) {
+                        return std::make_unique<AlwaysFalseMatchExpression>();
+                    }
+                    // Try to rewrite the $in as an $or of equalities on the oplog. If any
+                    // individual rewrite fails, we must abandon the entire rewrite.
+                    auto rewrittenUserPredicate = std::make_unique<OrMatchExpression>();
+                    for (const auto& rhsElem : inME->getEqualities()) {
+                        if (auto rewrittenEquality = rewriteEqOnRemovedFields(rhsElem)) {
+                            rewrittenUserPredicate->add(std::move(rewrittenEquality));
+                        } else {
+                            return nullptr;
+                        }
+                    }
+                    // Return the final rewritten predicate.
+                    return rewrittenUserPredicate;
                 }
-                // Add the rewritten $in to the final rewritten predicate and return.
-                rewrittenPredicate->add(std::move(inRemovedOr));
-                return rewrittenPredicate;
+                default:
+                    break;
             }
-            default:
-                break;
         }
+        // If we reach here, we cannot rewrite this predicate.
+        return nullptr;
+    };
+
+    // Try to rewrite the user predicate. If we can't, then we may not be able to continue.
+    auto rewrittenUserPredicate = tryExactRewriteForUpdateEvents(predicate);
+
+    // If a strict rewrite is required and we could not rewrite the predicate, return nullptr. We
+    // also return nullptr if the predicate matches a missing field, since it is pointless to try
+    // to continue; we would have to return all updates, because we don't know whether they will
+    // match, and all non-updates, because they will always match.
+    if (!rewrittenUserPredicate && (!allowInexact || predicate->matchesSingleElement({}))) {
+        return nullptr;
     }
 
-    // If we reach here, we cannot perform a rewrite.
-    return nullptr;
+    // If we are here, then either we were able to rewrite the predicate, or we were not but an
+    // inexact rewrite is permissible. First write a predicate to check that this is an update
+    // that is not a full-document replacement, i.e. {op: "u", "o._id": {$exists: false}}.
+    std::unique_ptr<ListOfMatchExpression> finalPredicate = std::make_unique<AndMatchExpression>();
+    finalPredicate->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("u"_sd)));
+    finalPredicate->add(
+        std::make_unique<NotMatchExpression>(std::make_unique<ExistsMatchExpression>("o._id"_sd)));
+
+    // If we were able to rewrite the user predicate, add it into the final predicate.
+    if (rewrittenUserPredicate) {
+        finalPredicate->add(std::move(rewrittenUserPredicate));
+    }
+
+    // Handle the case of non-update events. The 'updateDescription' field never exists for these
+    // events, so we evaluate the predicate against a non-existent field to see whether it matches.
+    if (predicate->matchesSingleElement({})) {
+        auto nonUpdateCase = MatchExpressionParser::parseAndNormalize(
+            fromjson("{$or: [{op: {$ne: 'u'}}, {op: 'u', 'o._id': {$exists: true}}]}"), expCtx);
+        finalPredicate = std::make_unique<OrMatchExpression>(std::move(finalPredicate), nullptr);
+        finalPredicate->add(std::move(nonUpdateCase));
+    }
+
+    // Finally, we return the complete rewritten predicate.
+    return finalPredicate;
 }
 
 // Helper to rewrite predicates on any change stream namespace field of the form {db: "dbName",
@@ -1222,7 +1317,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
 
         // Some paths can be rewritten just by renaming the path.
         if (renameRegistry.contains(firstPath)) {
-            return fieldExpr->copyWithSubstitution(renameRegistry).release();
+            return cloneWithSubstitution(fieldExpr, renameRegistry);
         }
 
         // Other paths have custom rewrite logic.
@@ -1363,9 +1458,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
 
                 // Some paths can be rewritten just by renaming the path.
                 if (renameRegistry.contains(firstPath)) {
-                    auto renamedME = pathME->shallowClone();
-                    static_cast<PathMatchExpression*>(renamedME.get())->applyRename(renameRegistry);
-                    return renamedME;
+                    return cloneWithSubstitution(pathME, renameRegistry);
                 }
 
                 // Other paths have custom rewrite logic.
@@ -1386,27 +1479,33 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
 std::unique_ptr<MatchExpression> rewriteFilterForFields(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
-    std::set<std::string> fields) {
+    std::set<std::string> includeFields,
+    std::set<std::string> excludeFields) {
     // If we get null in, we return null immediately.
     if (!userMatch) {
         return nullptr;
     }
 
     // If the specified 'fields' set is empty, we rewrite every possible field.
-    if (fields.empty()) {
+    if (includeFields.empty()) {
         for (auto& rename : renameRegistry) {
-            fields.insert(rename.first);
+            includeFields.insert(rename.first);
         }
         for (auto& meRewrite : matchRewriteRegistry) {
-            fields.insert(meRewrite.first);
+            includeFields.insert(meRewrite.first);
         }
         for (auto& exprRewrite : exprRewriteRegistry) {
-            fields.insert(exprRewrite.first);
+            includeFields.insert(exprRewrite.first);
         }
     }
 
+    // Remove any fields which are present in the "excludeFields" list.
+    for (auto&& excludeField : excludeFields) {
+        includeFields.erase(excludeField);
+    }
+
     // Attempt to rewrite the tree. Predicates on unknown or unrequested fields will be discarded.
-    return rewriteMatchExpressionTree(expCtx, userMatch, fields, true /* allowInexact */);
+    return rewriteMatchExpressionTree(expCtx, userMatch, includeFields, true /* allowInexact */);
 }
 }  // namespace change_stream_rewrite
 }  // namespace mongo

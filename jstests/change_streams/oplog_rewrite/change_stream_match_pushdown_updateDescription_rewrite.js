@@ -141,6 +141,26 @@ for (const reverseShards of [false, true]) {
               [[op, 2, 0]],
               [2, 2] /* expectedOplogCursorReturnedDocs */);
 
+    // Test out an $eq:null predicate on the full 'updateDescription' field.
+    verifyOps({$match: {operationType: op, updateDescription: {$eq: null}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out a negated $exists predicate on the full 'updateDescription' field.
+    verifyOps({$match: {operationType: op, updateDescription: {$exists: false}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out an $eq:null predicate on 'updateDescription.updatedFields'.
+    verifyOps({$match: {operationType: op, "updateDescription.updatedFields": {$eq: null}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out a negated $exists predicate on 'updateDescription.updatedFields'.
+    verifyOps({$match: {operationType: op, "updateDescription.updatedFields": {$exists: false}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
+
     // Test out an $eq predicate on 'updateDescription.updatedFields.f'.
     verifyOps({$match: {operationType: op, "updateDescription.updatedFields.f": "b"}},
               [[op, 3, 0]],
@@ -170,6 +190,16 @@ for (const reverseShards of [false, true]) {
     verifyOps({$match: {operationType: op, "updateDescription.updatedFields.0": "d"}},
               [[op, 3, 1]],
               [0, 1] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out an $eq:null predicate on 'updateDescription.removedFields'.
+    verifyOps({$match: {operationType: op, "updateDescription.removedFields": {$eq: null}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out a negated $exists predicate on 'updateDescription.removedFields'.
+    verifyOps({$match: {operationType: op, "updateDescription.removedFields": {$exists: false}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
 
     // Test out a non-dotted string $eq predicate on 'updateDescription.removedFields'.
     verifyOps({$match: {operationType: op, "updateDescription.removedFields": "z"}},
@@ -217,6 +247,11 @@ for (const reverseShards of [false, true]) {
         {$match: {operationType: op, "updateDescription.updatedFields.g": {$not: {$exists: true}}}},
         [[op, 2, 0], [op, 3, 0], [op, 3, 1]],
         [2, 1] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out an {$eq:null} predicate on 'updateDescription.updatedFields.g'.
+    verifyOps({$match: {operationType: op, "updateDescription.updatedFields.g": {$eq: null}}},
+              [[op, 2, 0], [op, 3, 0], [op, 3, 1]],
+              [2, 1] /* expectedOplogCursorReturnedDocs */);
 
     // Test out a negated $eq predicate on 'updateDescription.removedFields'.
     verifyOps({$match: {operationType: op, "updateDescription.removedFields": {$not: {$eq: "z"}}}},

@@ -135,6 +135,12 @@ for (const op of ["insert", "update", "replace", "delete"]) {
               [[op, 3, 0], [op, 3, 1]],
               [1, 1] /* expectedOplogCursorReturnedDocs */);
 
+    // Test out an {$eq: null} predicate on 'documentKey._id'.
+    verifyOps(resumeAfterToken,
+              {$match: {operationType: op, "documentKey._id": {$eq: null}}},
+              [],
+              [0, 0] /* expectedOplogCursorReturnedDocs */);
+
     // Test out a negated predicate on 'documentKey.shard'. It's not possible to rewrite this
     // predicate and make it part of the oplog filter, so we expect the oplog cursor to return 2
     // docs on each shard.
@@ -147,6 +153,13 @@ for (const op of ["insert", "update", "replace", "delete"]) {
     // that does exist in some of the underlying documents.
     verifyOps(resumeAfterToken,
               {$match: {operationType: op, "documentKey.z": {$exists: false}}},
+              [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
+              [2, 2] /* expectedOplogCursorReturnedDocs */);
+
+    // Test out the '{$eq: null}' predicate on a field that doesn't exist in 'documentKey' but that
+    // does exist in some of the underlying documents.
+    verifyOps(resumeAfterToken,
+              {$match: {operationType: op, "documentKey.z": {$eq: null}}},
               [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
               [2, 2] /* expectedOplogCursorReturnedDocs */);
 

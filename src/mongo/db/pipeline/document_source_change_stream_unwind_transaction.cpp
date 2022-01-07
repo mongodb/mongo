@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/transaction_history_iterator.h"
 
@@ -385,9 +386,10 @@ void DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::
 
 namespace change_stream_filter {
 /**
- * Build a filter, similar to the optimized oplog filter, designed to reject oplog entries that we
- * know would eventually get rejected by the 'userMatch' filter if they continued through the rest
- * of the pipeline.
+ * Build a filter, similar to the optimized oplog filter, designed to reject individual transaction
+ * entries that we know would eventually get rejected by the 'userMatch' filter if they continued
+ * through the rest of the pipeline. We must also adjust the filter slightly for user rewrites, as
+ * events within a transaction do not have certain fields that are common to other oplog entries.
  *
  * NB: The new filter may contain references to strings in the BSONObj that 'userMatch' originated
  * from. Callers that keep the new filter long-term should serialize and re-parse it to guard
@@ -395,11 +397,21 @@ namespace change_stream_filter {
  */
 std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const MatchExpression* userMatch) {
-    // The current implementation of the transaction filter is the same as the "operation filter"
-    // applied to oplog entries that can be filtered early (CRUD operations and non-invalidating
-    // commands). This filter includes a namespace filter, ensuring it will filter out all documents
-    // that would be filtered out by the default 'ns' filter this stage gets initialized with.
-    return change_stream_filter::buildOperationFilter(expCtx, userMatch);
+    // The transaction unwind filter is the same as the operation filter applied to the oplog. This
+    // includes a namespace filter, which ensures that it will discard all documents that would be
+    // filtered out by the default 'ns' filter this stage gets initialized with.
+    auto unwindFilter = std::make_unique<AndMatchExpression>(buildOperationFilter(expCtx, nullptr));
+
+    // Attempt to rewrite the user's filter and combine it with the standard operation filter. We do
+    // this separately because we need to exclude certain fields from the user's filters. Unwound
+    // transaction events do not have these fields until we populate them from the commitTransaction
+    // event. We already applied these predicates during the oplog scan, so we know that they match.
+    static const std::set<std::string> excludedFields = {"clusterTime", "lsid", "txnNumber"};
+    if (auto rewrittenMatch =
+            change_stream_rewrite::rewriteFilterForFields(expCtx, userMatch, {}, excludedFields)) {
+        unwindFilter->add(std::move(rewrittenMatch));
+    }
+    return MatchExpression::optimize(std::move(unwindFilter));
 }
 }  // namespace change_stream_filter
 
