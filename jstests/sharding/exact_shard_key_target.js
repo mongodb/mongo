@@ -28,39 +28,20 @@ st.printShardingStatus();
 coll.remove({});
 assert.commandWorked(coll.insert({_id: 1, a: {b: -1}}));
 assert.commandWorked(coll.insert({_id: 2, a: {b: 1}}));
-// Need orphaned data to see the impact
-assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: 3, a: {b: 1}}));
-assert.eq(1, coll.remove({a: {b: 1}}, {justOne: true}).nRemoved);
-assert.eq(2,
-          st.shard0.getCollection(coll.toString()).count() +
-              st.shard1.getCollection(coll.toString()).count());
+var explainOutput = coll.explain().remove({a: {b: 1}}, {justOne: true});
+assert.eq(1, explainOutput.queryPlanner.winningPlan.shards.length);
 
 //
 // Non-multi update
 coll.remove({});
-// When the 'featureFlagNoChangeStreamEventsDueToOrphans' is enabled, orphaned documents are not
-// actually removed by the 'remove' command to avoid unexpected events on change streams. In this
-// scenario, it is necessary to remove them explicitly from the shards that own them.
-const clusterParams = assert.commandWorked(st.configRS.getPrimary().adminCommand(
-    {getParameter: 1, featureFlagNoChangeStreamEventsDueToOrphans: 1}));
-if (clusterParams.featureFlagNoChangeStreamEventsDueToOrphans.value) {
-    assert.commandWorked(st.shard0.getCollection(coll.toString()).remove({_id: 3}));
-}
 assert.commandWorked(coll.insert({_id: 1, a: {b: 1}}));
 assert.commandWorked(coll.insert({_id: 2, a: {b: -1}}));
-// Need orphaned data to see the impact
-assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: 3, a: {b: 1}}));
-assert.eq(1, coll.update({a: {b: 1}}, {$set: {updated: true}}, {multi: false}).nMatched);
-assert.eq(1,
-          st.shard0.getCollection(coll.toString()).count({updated: true}) +
-              st.shard1.getCollection(coll.toString()).count({updated: true}));
+explainOutput = coll.explain().update({a: {b: 1}}, {$set: {updated: true}}, {multi: false});
+assert.eq(1, explainOutput.queryPlanner.winningPlan.shards.length);
 
 //
 // Successive upserts (replacement-style)
 coll.remove({});
-if (clusterParams.featureFlagNoChangeStreamEventsDueToOrphans.value) {
-    assert.commandWorked(st.shard0.getCollection(coll.toString()).remove({_id: 3}));
-}
 assert.commandWorked(coll.update({a: {b: 1}}, {a: {b: 1}}, {upsert: true}));
 assert.commandWorked(coll.update({a: {b: 1}}, {a: {b: 1}}, {upsert: true}));
 assert.eq(1,
