@@ -65,6 +65,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
@@ -334,8 +335,14 @@ public:
                 if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
                         actualVersion) &&
                     !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                         .isEnabledOnVersion(requestedVersion))
-                    drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
+                         .isEnabledOnVersion(requestedVersion)) {
+                    drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionDowngrade");
+
+                    // At this point, because we are holding the MigrationBlockingGuard, no new
+                    // migrations can start and there are no active ongoing ones. Still, there could
+                    // be migrations pending recovery. Drain them.
+                    migrationutil::drainMigrationsPendingRecovery(opCtx);
+                }
 
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
@@ -375,8 +382,14 @@ public:
             if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
                     actualVersion) &&
                 feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                    requestedVersion))
+                    requestedVersion)) {
                 drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
+
+                // At this point, because we are holding the MigrationBlockingGuard, no new
+                // migrations can start and there are no active ongoing ones. Still, there could
+                // be migrations pending recovery. Drain them.
+                migrationutil::drainMigrationsPendingRecovery(opCtx);
+            }
 
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.
