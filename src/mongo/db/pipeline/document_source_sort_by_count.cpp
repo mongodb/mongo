@@ -75,7 +75,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONObj groupObj = BSON("$group" << groupExprBuilder.obj());
     BSONObj sortObj = BSON("$sort" << BSON("count" << -1));
 
-    pExpCtx->sbeCompatible = false;
     auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
     auto sortSource = DocumentSourceSort::createFromBson(sortObj.firstElement(), pExpCtx);
 

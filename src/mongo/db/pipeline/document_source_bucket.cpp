@@ -71,7 +71,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     BSONElement groupByField;
     Value defaultValue;
 
-    pExpCtx->sbeCompatible = false;
     bool outputFieldSpecified = false;
     for (auto&& argument : bucketObj) {
         const auto argName = argument.fieldNameStringData();
