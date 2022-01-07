@@ -525,9 +525,11 @@ assert.commandWorked(otherForeign.insert([{_id: -1, c: 2}, {_id: 1, c: 1}, {_id:
                                          {writeConcern: {w: 'majority'}}));
 
 // Set a failpoint on the first aggregate to be run against the nested $lookup's foreign collection.
+let parallelTestComment = "lookup_foreign_becomes_sharded";
 const data = {
     ns: otherForeign.getFullName(),
-    commands: ['aggregate']
+    commands: ['aggregate'],
+    comment: parallelTestComment
 };
 let failPoint = configureFailPoint(st.shard0, "waitAfterCommandFinishesExecution", data);
 
@@ -565,8 +567,8 @@ const parallelScript = (pipeline, expectedRes, comment) =>
 
 // Start a parallel shell to run the nested $lookup.
 clearLogs();
-let awaitShell = startParallelShell(
-    parallelScript(pipeline, expectedRes, "lookup_foreign_becomes_sharded"), st.s.port);
+let awaitShell =
+    startParallelShell(parallelScript(pipeline, expectedRes, parallelTestComment), st.s.port);
 
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Shard 'foreign' to verify that $lookup execution changes correctly mid-query.
@@ -586,7 +588,7 @@ let expectedRouting = {
     subPipelineLocal: [1, 0],
     subPipelineRemote: [2, 2]
 };
-assertProfilerEntriesMatch(expectedRouting, "lookup_foreign_becomes_sharded", pipeline);
+assertProfilerEntriesMatch(expectedRouting, parallelTestComment, pipeline);
 
 //
 // Test $lookup where the primary is moved in the middle of the query.
@@ -596,12 +598,15 @@ assertProfilerEntriesMatch(expectedRouting, "lookup_foreign_becomes_sharded", pi
 assert(foreign.drop());
 assert.commandWorked(foreign.insert([{_id: -1, b: 2}, {_id: 1, b: 1}, {_id: 2, b: 3}],
                                     {writeConcern: {w: 'majority'}}));
+
+parallelTestComment = "lookup_primary_is_moved";
+data.comment = parallelTestComment;
 failPoint = configureFailPoint(st.shard0, "waitAfterCommandFinishesExecution", data);
 
 // Start a parallel shell to run the nested $lookup.
 clearLogs();
 awaitShell =
-    startParallelShell(parallelScript(pipeline, expectedRes, "lookup_primary_is_moved"), st.s.port);
+    startParallelShell(parallelScript(pipeline, expectedRes, parallelTestComment), st.s.port);
 
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Move the primary to the other shard to verify that $lookup execution changes correctly mid-query.
@@ -619,7 +624,7 @@ expectedRouting = {
     subPipelineLocal: [1, 0],
     subPipelineRemote: [0, 2]
 };
-assertProfilerEntriesMatch(expectedRouting, "lookup_primary_is_moved", pipeline);
+assertProfilerEntriesMatch(expectedRouting, parallelTestComment, pipeline);
 
 //
 // Test $graphLookup where the primary is moved in the middle of the query.
@@ -650,11 +655,13 @@ pipeline = [
     }},
 ];
 
+parallelTestComment = "graphLookup_becomes_primary";
+data.comment = parallelTestComment;
 failPoint = configureFailPoint(st.shard1, "waitAfterCommandFinishesExecution", data);
 
 // Start a parallel shell to run the $graphLookup.
-awaitShell = startParallelShell(
-    parallelScript(pipeline, expectedRes, "graphLookup_becomes_primary"), st.s.port);
+awaitShell =
+    startParallelShell(parallelScript(pipeline, expectedRes, parallelTestComment), st.s.port);
 
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Move the primary to the shard executing $graphLookup to verify that we still get correct results.

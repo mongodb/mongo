@@ -1034,8 +1034,8 @@ void RunCommandImpl::_epilogue() {
     auto& behaviors = *execContext->behaviors;
 
     // This fail point blocks all commands which are running on the specified namespace, or which
-    // are present in the given list of commands.If no namespace or command list are provided,then
-    // the failpoint will block all commands.
+    // are present in the given list of commands, or which match a given comment. If no namespace,
+    // command list, or comment are provided, then the failpoint will block all commands.
     waitAfterCommandFinishesExecution.executeIf(
         [&](const BSONObj& data) {
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -1045,14 +1045,20 @@ void RunCommandImpl::_epilogue() {
             auto ns = data["ns"].valueStringDataSafe();
             auto commands =
                 data.hasField("commands") ? data["commands"].Array() : std::vector<BSONElement>();
+            bool requestMatchesComment = data.hasField("comment")
+                ? data.getField("comment").woCompare(request.body.getField("comment")) == 0
+                : true;
 
-            // If 'ns' or 'commands' is not set, block for all the namespaces or commands
-            // respectively.
+            // If 'ns', 'commands', or 'comment' is not set, block for all the namespaces, commands,
+            // or comments respectively.
             return (ns.empty() || _ecd->getInvocation()->ns().ns() == ns) &&
                 (commands.empty() ||
-                 std::any_of(commands.begin(), commands.end(), [&request](auto& element) {
-                     return element.valueStringDataSafe() == request.getCommandName();
-                 }));
+                 std::any_of(commands.begin(),
+                             commands.end(),
+                             [&request](auto& element) {
+                                 return element.valueStringDataSafe() == request.getCommandName();
+                             })) &&
+                requestMatchesComment;
         });
 
     behaviors.waitForLinearizableReadConcern(opCtx);
