@@ -1,6 +1,7 @@
 /**
- * Test the shard merge rollback-to-stable algorithm. This test was written before we implemented
- * file copy, so the script opens a backup cursor and copies files itself.
+ * Test that the shard merge is resilient to WriteConflict exception thrown while importing
+ * collections. We will get WriteConflict exception if we try to import the files with timestamp
+ * older than the stable timestamp.
  *
  * TODO (SERVER-61133): Adapt or delete this test once file copy works.
  *
@@ -25,6 +26,7 @@ TestData.skipCheckDBHashes = true;
 
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/libs/fail_point_util.js");
 
 const migrationId = UUID();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -83,6 +85,12 @@ for (let f of cursor.firstBatch) {
 jsTestLog("Kill backup cursor");
 donorPrimary.adminCommand({killCursors: "$cmd.aggregate", cursors: [cursor.id]});
 })();
+
+// Enable Failpoints to simulate WriteConflict exception while importing donor files.
+configureFailPoint(
+    recipientPrimary, "WTWriteConflictExceptionForImportCollection", {} /* data */, {times: 1});
+configureFailPoint(
+    recipientPrimary, "WTWriteConflictExceptionForImportIndex", {} /* data */, {times: 1});
 
 jsTestLog("Run migration");
 // The old multitenant migrations won't copy myDatabase since it doesn't start with testTenantId,

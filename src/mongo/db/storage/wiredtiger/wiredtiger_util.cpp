@@ -1074,7 +1074,8 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
 }
 
 StatusWith<std::string> WiredTigerUtil::generateImportString(const StringData& ident,
-                                                             const BSONObj& storageMetadata) {
+                                                             const BSONObj& storageMetadata,
+                                                             const ImportOptions& importOptions) {
     if (!storageMetadata.hasField(ident)) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Missing the storage metadata for ident " << ident << " in "
@@ -1111,9 +1112,11 @@ StatusWith<std::string> WiredTigerUtil::generateImportString(const StringData& i
 
     std::stringstream ss;
     ss << tableMetadata.String();
-    ss << ",import=(enabled=true,repair=false,file_metadata=(";
-    ss << fileMetadata.String();
-    ss << "))";
+    ss << ",import=(enabled=true,repair=false,";
+    if (importOptions.importTimestampRule == ImportOptions::ImportTimestampRule::kStable) {
+        ss << "compare_timestamp=stable,";
+    }
+    ss << "file_metadata=(" << fileMetadata.String() << "))";
 
     return StatusWith<std::string>(ss.str());
 }

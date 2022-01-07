@@ -78,7 +78,8 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
 
 Status KVEngine::importRecordStore(OperationContext* opCtx,
                                    StringData ident,
-                                   const BSONObj& storageMetadata) {
+                                   const BSONObj& storageMetadata,
+                                   const ImportOptions& importOptions) {
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return Status::OK();
@@ -142,7 +143,8 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
 
 Status KVEngine::importSortedDataInterface(OperationContext* opCtx,
                                            StringData ident,
-                                           const BSONObj& storageMetadata) {
+                                           const BSONObj& storageMetadata,
+                                           const ImportOptions& importOptions) {
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = false;
     return Status::OK();

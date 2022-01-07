@@ -118,7 +118,7 @@ public:
                                               const NamespaceString& nss,
                                               const BSONObj& metadata,
                                               const BSONObj& storageMetadata,
-                                              ImportCollectionUUIDOption uuidOption) override;
+                                              const ImportOptions& importOptions) override;
 
     Status renameCollection(OperationContext* opCtx,
                             RecordId catalogId,

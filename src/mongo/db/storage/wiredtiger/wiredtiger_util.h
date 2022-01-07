@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -187,7 +188,8 @@ public:
      * Returns the FailedToParse status if the storage engine metadata object is malformed.
      */
     static StatusWith<std::string> generateImportString(const StringData& ident,
-                                                        const BSONObj& storageMetadata);
+                                                        const BSONObj& storageMetadata,
+                                                        const ImportOptions& importOptions);
 
     /**
      * Appends information about the storage engine's currently available snapshots and the settings

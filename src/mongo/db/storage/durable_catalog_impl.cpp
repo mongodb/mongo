@@ -699,7 +699,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     const NamespaceString& nss,
     const BSONObj& metadata,
     const BSONObj& storageMetadata,
-    DurableCatalogImpl::ImportCollectionUUIDOption uuidOption) {
+    const ImportOptions& importOptions) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     invariant(nss.coll().size() > 0);
 
@@ -717,7 +717,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
             metadata.hasField("ident"));
 
     const auto& catalogEntry = [&] {
-        if (uuidOption == ImportCollectionUUIDOption::kGenerateNew) {
+        if (importOptions.importCollectionUUIDOption ==
+            ImportOptions::ImportCollectionUUIDOption::kGenerateNew) {
             // Generate a new UUID for the collection.
             md.options.uuid = UUID::gen();
             BSONObjBuilder catalogEntryBuilder;
@@ -766,18 +767,6 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
         return swEntry.getStatus();
     Entry& entry = swEntry.getValue();
 
-    auto kvEngine = _engine->getEngine();
-    Status status = kvEngine->importRecordStore(opCtx, entry.ident, storageMetadata);
-    if (!status.isOK())
-        return status;
-
-    for (const std::string& indexIdent : indexIdents) {
-        status = kvEngine->importSortedDataInterface(opCtx, indexIdent, storageMetadata);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
     opCtx->recoveryUnit()->onRollback(
         [opCtx, catalog = this, ident = entry.ident, indexIdents = indexIdents]() {
             catalog->_engine->getEngine()->dropIdentForImport(opCtx, ident);
@@ -785,6 +774,19 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
                 catalog->_engine->getEngine()->dropIdentForImport(opCtx, indexIdent);
             }
         });
+
+    auto kvEngine = _engine->getEngine();
+    Status status = kvEngine->importRecordStore(opCtx, entry.ident, storageMetadata, importOptions);
+    if (!status.isOK())
+        return status;
+
+    for (const std::string& indexIdent : indexIdents) {
+        status =
+            kvEngine->importSortedDataInterface(opCtx, indexIdent, storageMetadata, importOptions);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
 
     auto rs = _engine->getEngine()->getRecordStore(opCtx, nss.ns(), entry.ident, md.options);
     invariant(rs);

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -162,12 +163,12 @@ public:
         std::unique_ptr<RecordStore> rs;
         UUID uuid;
     };
-    enum class ImportCollectionUUIDOption { kKeepOld, kGenerateNew };
+
     virtual StatusWith<ImportResult> importCollection(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const BSONObj& metadata,
                                                       const BSONObj& storageMetadata,
-                                                      ImportCollectionUUIDOption uuidOption) = 0;
+                                                      const ImportOptions& importOptions) = 0;
 
     virtual Status renameCollection(OperationContext* opCtx,
                                     RecordId catalogId,

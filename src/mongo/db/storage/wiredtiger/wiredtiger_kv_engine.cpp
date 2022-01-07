@@ -122,6 +122,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(WTPauseStableTimestamp);
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
+MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportCollection);
+MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
@@ -1414,12 +1416,21 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
 
 Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
                                              StringData ident,
-                                             const BSONObj& storageMetadata) {
+                                             const BSONObj& storageMetadata,
+                                             const ImportOptions& importOptions) {
     _ensureIdentPath(ident);
     WiredTigerSession session(_conn);
 
-    std::string config =
-        uassertStatusOK(WiredTigerUtil::generateImportString(ident, storageMetadata));
+    if (MONGO_unlikely(WTWriteConflictExceptionForImportCollection.shouldFail())) {
+        LOGV2(6177300,
+              "Failpoint WTWriteConflictExceptionForImportCollection enabled. Throwing "
+              "WriteConflictException",
+              "ident"_attr = ident);
+        throw WriteConflictException();
+    }
+
+    std::string config = uassertStatusOK(
+        WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
 
     string uri = _uri(ident);
     WT_SESSION* s = session.getSession();
@@ -1428,6 +1439,7 @@ Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
                 "WiredTigerKVEngine::importRecordStore",
                 "uri"_attr = uri,
                 "config"_attr = config);
+
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
 
@@ -1603,11 +1615,20 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
 
 Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
                                                      StringData ident,
-                                                     const BSONObj& storageMetadata) {
+                                                     const BSONObj& storageMetadata,
+                                                     const ImportOptions& importOptions) {
     _ensureIdentPath(ident);
 
-    std::string config =
-        uassertStatusOK(WiredTigerUtil::generateImportString(ident, storageMetadata));
+    if (MONGO_unlikely(WTWriteConflictExceptionForImportIndex.shouldFail())) {
+        LOGV2(6177301,
+              "Failpoint WTWriteConflictExceptionForImportIndex enabled. Throwing "
+              "WriteConflictException",
+              "ident"_attr = ident);
+        throw WriteConflictException();
+    }
+
+    std::string config = uassertStatusOK(
+        WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
 
     LOGV2_DEBUG(5095103,
                 2,

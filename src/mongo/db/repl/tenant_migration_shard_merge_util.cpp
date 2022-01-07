@@ -129,12 +129,15 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             // Create Collection object
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto durableCatalog = storageEngine->getCatalog();
-            auto importResult = uassertStatusOK(DurableCatalog::get(opCtx)->importCollection(
-                opCtx,
-                collectionMetadata.ns,
-                collectionMetadata.catalogObject,
-                storageMetadata.done(),
-                DurableCatalog::ImportCollectionUUIDOption::kKeepOld));
+            ImportOptions importOptions(ImportOptions::ImportCollectionUUIDOption::kKeepOld);
+            importOptions.importTimestampRule = ImportOptions::ImportTimestampRule::kStable;
+
+            auto importResult = uassertStatusOK(
+                DurableCatalog::get(opCtx)->importCollection(opCtx,
+                                                             collectionMetadata.ns,
+                                                             collectionMetadata.catalogObject,
+                                                             storageMetadata.done(),
+                                                             importOptions));
             const auto md = durableCatalog->getMetaData(opCtx, importResult.catalogId);
             for (const auto& index : md->indexes) {
                 uassert(6114301, "Cannot import non-ready indexes", index.ready);
