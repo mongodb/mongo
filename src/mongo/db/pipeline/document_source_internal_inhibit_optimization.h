@@ -61,7 +61,8 @@ public:
                 FacetRequirement::kAllowed,
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed};
+                UnionRequirement::kAllowed,
+                ChangeStreamRequirement::kAllowlist};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

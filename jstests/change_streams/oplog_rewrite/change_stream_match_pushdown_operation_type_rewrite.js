@@ -141,6 +141,13 @@ verifyNonInvalidatingOps(resumeAfterToken,
                          [] /* expectedOps */,
                          0 /* expectedOplogRetDocsForEachShard */);
 
+// Ensure that the '$eq: null' on operation type sub-field can be rewritten to the oplog format. The
+// oplog cursor should return all documents for each shard.
+verifyNonInvalidatingOps(resumeAfterToken,
+                         {$match: {"operationType.subField": {$eq: null}}},
+                         ["insert", "update", "replace", "delete"] /* expectedOps */,
+                         4 /* expectedOplogRetDocsForEachShard */);
+
 // Ensure that the '$match' on the operation type with '$in' is rewritten correctly.
 verifyNonInvalidatingOps(resumeAfterToken,
                          {$match: {operationType: {$in: ["insert", "update"]}}},

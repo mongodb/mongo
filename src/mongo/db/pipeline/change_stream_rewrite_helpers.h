@@ -40,13 +40,14 @@ namespace change_stream_rewrite {
  * 'userMatch' filter, reducing the amount of work that subsequent change streams stage will have to
  * do.
  *
- * The rewrite splits out only the part of 'userMatch' that just needs those fields that are
- * indicated in the 'fields' set. When 'fields' is the empty set, the rewrite includes all paths
- * that can be rewritten.
+ * The rewrites will only be performed on fields which are present in the 'includeFields' set and
+ * absent from the 'excludeFields' set. When 'includeFields' is the empty set, the rewrite defaults
+ * to including all paths that can be rewritten.
  */
 std::unique_ptr<MatchExpression> rewriteFilterForFields(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
-    std::set<std::string> fields = {});
+    std::set<std::string> includeFields = {},
+    std::set<std::string> excludeFields = {});
 }  // namespace change_stream_rewrite
 }  // namespace mongo
