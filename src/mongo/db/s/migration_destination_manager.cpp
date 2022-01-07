@@ -1092,7 +1092,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
     if (!skipToCritSecTaken) {
         timing.emplace(
-            outerOpCtx, "to", _nss.ns(), _min, _max, 7 /* steps */, &_errmsg, _toShard, _fromShard);
+            outerOpCtx, "to", _nss.ns(), _min, _max, 8 /* steps */, &_errmsg, _toShard, _fromShard);
 
         LOGV2(
             22000,
@@ -1554,6 +1554,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             return;
         }
 
+        timing->done(7);
+        migrateThreadHangAtStep7.pauseWhileSet();
+
         if (_acquireCSOnRecipient) {
             const auto critSecReason = criticalSectionReason(*_sessionId);
 
@@ -1622,8 +1625,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     _setState(DONE);
 
     if (timing) {
-        timing->done(7);
-        migrateThreadHangAtStep7.pauseWhileSet();
+        timing->done(8);
     }
 }
 
