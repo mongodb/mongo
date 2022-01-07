@@ -297,6 +297,7 @@ variables:
   - name: auth_audit_gen
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
+  - name: .csfle
   - name: .encrypt !.aggregation !.gcm
   - name: external_auth
   - name: external_auth_aws
@@ -8562,6 +8563,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
     distros:
       - windows-vsCurrent-large
+  - name: .csfle
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
@@ -8629,6 +8631,7 @@ buildvariants:
     - name: causally_consistent_jscore_txns_passthrough
       distros:
         - windows-vsCurrent-large
+    - name: .csfle
     - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
     - name: external_auth
     - name: external_auth_aws
@@ -8836,6 +8839,7 @@ buildvariants:
     distros:
       - windows-vsCurrent-large
   - name: .concurrency .common
+  - name: .csfle
   - name: disk_wiredtiger
   - name: .jscore .common !.auth
   - name: json_schema
