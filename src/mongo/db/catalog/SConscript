@@ -563,6 +563,28 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='collection_uuid_mismatch_info',
+    source=[
+        'collection_uuid_mismatch_info.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='collection_uuid_mismatch',
+    source=[
+        'collection_uuid_mismatch.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        'collection_catalog',
+        'collection_uuid_mismatch_info',
+    ],
+)
+
 if wiredtiger:
     env.CppUnitTest(
         target='db_catalog_test',
