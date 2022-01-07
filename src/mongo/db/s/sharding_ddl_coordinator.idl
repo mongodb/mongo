@@ -51,6 +51,8 @@ enums:
             kRefineCollectionShardKey: "refineCollectionShardKey"
             kSetAllowMigrations: "setAllowMigrations"
             kCollMod: "collMod"
+            kReshardCollection: "reshardCollection"
+            kReshardCollectionNoResilient: "reshardCollectionNoResilient"
 
 types:
     ForwardableOperationMetadata:

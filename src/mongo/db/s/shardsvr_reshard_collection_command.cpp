@@ -33,10 +33,11 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace {
@@ -82,16 +83,30 @@ public:
                 "Resharding is not supported for this version, please update the FCV to latest.",
                 !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
-            DistLockManager::ScopedDistLock dbDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx, ns().db(), "reshardCollection", DistLockManager::kDefaultLockTimeout)));
-            DistLockManager::ScopedDistLock collDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx, ns().ns(), "reshardCollection", DistLockManager::kDefaultLockTimeout)));
+            const auto reshardCollectionCoordinatorCompletionFuture =
+                [&]() -> SharedSemiFuture<void> {
+                FixedFCVRegion fixedFcvRegion(opCtx);
+                const auto coordinatorType =
+                    resharding::gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
+                        .isEnabled(serverGlobalParams.featureCompatibility)
+                    ? DDLCoordinatorTypeEnum::kReshardCollection
+                    : DDLCoordinatorTypeEnum::kReshardCollectionNoResilient;
 
-            auto reshardCollectionCoordinator =
-                std::make_shared<ReshardCollectionCoordinator>(opCtx, request());
-            reshardCollectionCoordinator->run(opCtx).get(opCtx);
+                ReshardCollectionRequest reshardCollectionRequest =
+                    request().getReshardCollectionRequest();
+
+                auto coordinatorDoc = ReshardCollectionCoordinatorDocument();
+                coordinatorDoc.setReshardCollectionRequest(std::move(reshardCollectionRequest));
+                coordinatorDoc.setShardingDDLCoordinatorMetadata({{ns(), coordinatorType}});
+
+                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto reshardCollectionCoordinator =
+                    checked_pointer_cast<ReshardCollectionCoordinator>(
+                        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                return reshardCollectionCoordinator->getCompletionFuture();
+            }();
+
+            reshardCollectionCoordinatorCompletionFuture.get(opCtx);
         }
 
     private:

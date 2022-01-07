@@ -49,6 +49,7 @@
 #include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
+#include "mongo/db/s/reshard_collection_coordinator.h"
 #include "mongo/db/s/set_allow_migrations_coordinator.h"
 
 namespace mongo {
@@ -84,6 +85,13 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             break;
         case DDLCoordinatorTypeEnum::kCollMod:
             return std::make_shared<CollModCoordinator>(service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kReshardCollection:
+            return std::make_shared<ReshardCollectionCoordinator>(service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kReshardCollectionNoResilient:
+            return std::make_shared<ReshardCollectionCoordinator_NORESILIENT>(
+                service, std::move(initialState));
             break;
         default:
             uasserted(ErrorCodes::BadValue,

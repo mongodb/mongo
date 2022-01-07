@@ -326,22 +326,4 @@ void ShardingDDLCoordinator::_performNoopRetryableWriteOnAllShardsAndConfigsvr(
     sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shardsAndConfigsvr, osi, executor);
 }
 
-ShardingDDLCoordinator_NORESILIENT::ShardingDDLCoordinator_NORESILIENT(OperationContext* opCtx,
-                                                                       const NamespaceString& ns)
-    : _nss(ns), _forwardableOpMetadata(opCtx) {}
-
-SemiFuture<void> ShardingDDLCoordinator_NORESILIENT::run(OperationContext* opCtx) {
-    if (!_nss.isConfigDB()) {
-        // Check that the operation context has a database version for this namespace
-        const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(_nss.db());
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Request sent without attaching database version",
-                clientDbVersion);
-
-        // Checks that this is the primary shard for the namespace's db
-        DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, _nss.db());
-    }
-    return runImpl(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
-}
-
 }  // namespace mongo

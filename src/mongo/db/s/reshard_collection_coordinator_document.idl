@@ -26,24 +26,36 @@
 # it in the license file.
 #
 
-# Feature flag for resharding.
+# This file defines the format of documents stored in config.system.sharding_ddl_coordinators, used
+# by the shard coordinator to guarantee resilience in the event of stepdowns while resharding
+# collections.
 
 global:
-    cpp_namespace: "mongo::resharding"
+    cpp_namespace: "mongo"
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/request_types/sharded_ddl_commands.idl"
 
-feature_flags:
-    featureFlagResharding:
-        description: When enabled, allows users to reshard their sharded collections.
-        cpp_varname: gFeatureFlagResharding
-        default: true
-        version: 5.0
+enums:
+    ReshardCollectionCoordinatorPhase:
+        description: "Current reshard collection coordinator's operation state."
+        type: string
+        values:
+            kUnset: "unset"
+            kReshard: "reshard"
 
-    featureFlagRecoverableShardsvrReshardCollectionCoordinator:
-        description: When enabled, the db primary shard will use a recoverable
-            ShardingDDLCoordinator that ensures proper serialization of resharding and other DDL
-            operations even in the event of primary shard stepdowns.
-        cpp_varname: gFeatureFlagRecoverableShardsvrReshardCollectionCoordinator
-        default: false
+structs:
+    ReshardCollectionCoordinatorDocument:
+        description: "Represents a reshard collection operation on the coordinator shard."
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            ReshardCollectionRequest: ReshardCollectionRequest
+        fields:
+            phase:
+                type: ReshardCollectionCoordinatorPhase
+                description: "Coordinator phase."
+                default: kUnset

@@ -150,6 +150,37 @@ structs:
                 description: "The index specification document to use as the new shard key."
                 optional: false
 
+    ReshardCollectionRequest:
+        description: "Parameters for the reshard collection command"
+        strict: false
+        fields:
+            key:
+                type: object
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint."
+                optional: true
+            numInitialChunks:
+                type: safeInt64
+                description: "The number of chunks to create initially."
+                optional: true
+            collation:
+                type: object
+                description: "The collation to use for the shard key index."
+                optional: true
+            zones:
+                type: array<ReshardingZoneType>
+                description: "The zones associated with the new shard key."
+                optional: true
+            _presetReshardedChunks:
+                type: array<ReshardedChunk>
+                description: >-
+                    "Mapping of chunk ranges to be used as the initial split output. This is only
+                    for testing purposes."
+                optional: true
+
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"
         strict: false
@@ -268,33 +299,8 @@ commands:
         namespace: type
         api_version: ""
         type: namespacestring
-        fields:
-            key:
-                type: object
-                description: "The index specification document to use as the new shard key."
-                optional: false
-            unique:
-                type: bool
-                description: "Whether the shard key index should enforce a unique constraint."
-                optional: true
-            numInitialChunks:
-                type: safeInt64
-                description: "The number of chunks to create initially."
-                optional: true
-            collation:
-                type: object
-                description: "The collation to use for the shard key index."
-                optional: true
-            zones:
-                type: array<ReshardingZoneType>
-                description: "The zones associated with the new shard key."
-                optional: true
-            _presetReshardedChunks:
-                type: array<ReshardedChunk>
-                description: >-
-                    "Mapping of chunk ranges to be used as the initial split output. This is only for 
-                    testing purposes."
-                optional: true
+        chained_structs:
+            ReshardCollectionRequest: ReshardCollectionRequest
 
     _shardsvrRefineCollectionShardKey:
         description: "Parser for the _shardsvrRefineCollectionShardKey command"

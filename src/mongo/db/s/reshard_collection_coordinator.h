@@ -29,25 +29,67 @@
 
 #pragma once
 
+#include "mongo/db/s/reshard_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
-class ReshardCollectionCoordinator final
-    : public ShardingDDLCoordinator_NORESILIENT,
-      public std::enable_shared_from_this<ReshardCollectionCoordinator> {
+class ReshardCollectionCoordinator : public ShardingDDLCoordinator {
 public:
-    ReshardCollectionCoordinator(OperationContext* opCtx,
-                                 const ShardsvrReshardCollection& reshardCollectionParams);
+    using StateDoc = ReshardCollectionCoordinatorDocument;
+    using Phase = ReshardCollectionCoordinatorPhaseEnum;
+
+    ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                 const BSONObj& initialState);
+
+    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+
+protected:
+    ReshardCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                 const BSONObj& initialState,
+                                 bool persistCoordinatorDocument);
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ShardingDDLCoordinatorMetadata const& metadata() const override {
+        return _doc.getShardingDDLCoordinatorMetadata();
+    }
 
-    ServiceContext* _serviceContext;
-    const OpMsgRequest _requestObj;  // Owned object to guarantee the lifetime of the objects
-                                     // referenced by the parsed request '_request'
-    const ShardsvrReshardCollection _request;
-    const NamespaceString& _nss;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
+
+    template <typename Func>
+    auto _executePhase(const Phase& newPhase, Func&& func) {
+        return [=] {
+            const auto& currPhase = _doc.getPhase();
+
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return func();
+        };
+    }
+
+    void _enterPhase(Phase newPhase);
+
+    const BSONObj _initialState;
+    ReshardCollectionCoordinatorDocument _doc;
+    const bool _persistCoordinatorDocument;  // TODO: SERVER-62338 remove this then 6.0 branches out
 };
+
+// TODO: SERVER-62338 remove this then 6.0 branches out
+class ReshardCollectionCoordinator_NORESILIENT : public ReshardCollectionCoordinator {
+public:
+    ReshardCollectionCoordinator_NORESILIENT(ShardingDDLCoordinatorService* service,
+                                             const BSONObj& initialState);
+};
+
 }  // namespace mongo

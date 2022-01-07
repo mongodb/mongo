@@ -55,14 +55,21 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             const auto& nss = ns();
-            ShardsvrReshardCollection shardsvrReshardCollection(nss, request().getKey());
+
+            ShardsvrReshardCollection shardsvrReshardCollection(nss);
             shardsvrReshardCollection.setDbName(request().getDbName());
-            shardsvrReshardCollection.setUnique(request().getUnique());
-            shardsvrReshardCollection.setCollation(request().getCollation());
-            shardsvrReshardCollection.set_presetReshardedChunks(
+
+            ReshardCollectionRequest reshardCollectionRequest;
+            reshardCollectionRequest.setKey(request().getKey());
+            reshardCollectionRequest.setUnique(request().getUnique());
+            reshardCollectionRequest.setCollation(request().getCollation());
+            reshardCollectionRequest.set_presetReshardedChunks(
                 request().get_presetReshardedChunks());
-            shardsvrReshardCollection.setZones(request().getZones());
-            shardsvrReshardCollection.setNumInitialChunks(request().getNumInitialChunks());
+            reshardCollectionRequest.setZones(request().getZones());
+            reshardCollectionRequest.setNumInitialChunks(request().getNumInitialChunks());
+
+            shardsvrReshardCollection.setReshardCollectionRequest(
+                std::move(reshardCollectionRequest));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));

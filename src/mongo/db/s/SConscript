@@ -338,6 +338,7 @@ env.Library(
         'refine_collection_shard_key_coordinator.cpp',
         'refine_collection_shard_key_coordinator_document.idl',
         'reshard_collection_coordinator.cpp',
+        'reshard_collection_coordinator_document.idl',
         'resharding_test_commands.cpp',
         'resharding_test_commands.idl',
         'set_allow_migrations_coordinator.cpp',
