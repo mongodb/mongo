@@ -51,6 +51,8 @@ public:
         LogFormat format{LogFormat::kDefault};
         const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr;
 
+        std::string backtraceFilePath;
+
         void makeDisabled();
     };
 

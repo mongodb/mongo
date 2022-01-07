@@ -96,7 +96,11 @@ void logBacktraceObject(const BSONObj& bt, StackTraceSink* sink, bool withHumanR
     if (sink) {
         *sink << fmt::format(FMT_STRING("BACKTRACE: {}\n"), tojson(bt, ExtendedRelaxedV2_0_0));
     } else {
-        LOGV2_OPTIONS(31380, {logv2::LogTruncation::Disabled}, "BACKTRACE", "bt"_attr = bt);
+        LOGV2_OPTIONS(
+            31380,
+            mongo::logv2::LogOptions(logv2::LogTag::kBacktraceLog, logv2::LogTruncation::Disabled),
+            "BACKTRACE",
+            "bt"_attr = bt);
     }
     if (withHumanReadable) {
         if (auto elem = bt.getField("backtrace"); !elem.eoo()) {

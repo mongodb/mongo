@@ -72,6 +72,8 @@ struct LogDomainGlobal::Impl {
     typedef CompositeBackend<FileRotateSink, RamLogSink, RamLogSink, UserAssertSink>
         RotatableFileBackend;
 
+    typedef CompositeBackend<FileRotateSink> BacktraceBackend;
+
     Impl(LogDomainGlobal& parent);
     Status configure(LogDomainGlobal::ConfigurationOptions const& options);
     Status rotate(bool rename, StringData renameSuffix, std::function<void(Status)> onMinorError);
@@ -85,6 +87,7 @@ struct LogDomainGlobal::Impl {
     ConfigurationOptions _config;
     boost::shared_ptr<boost::log::sinks::unlocked_sink<ConsoleBackend>> _consoleSink;
     boost::shared_ptr<boost::log::sinks::unlocked_sink<RotatableFileBackend>> _rotatableFileSink;
+    boost::shared_ptr<boost::log::sinks::unlocked_sink<BacktraceBackend>> _backtraceSink;
 #ifndef _WIN32
     boost::shared_ptr<boost::log::sinks::unlocked_sink<SyslogBackend>> _syslogSink;
 #endif
@@ -185,6 +188,28 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         _rotatableFileSink.reset();
     }
 
+    if (!options.backtraceFilePath.empty()) {
+        auto backend = boost::make_shared<BacktraceBackend>(
+            boost::make_shared<FileRotateSink>(options.timestampFormat));
+        Status ret = backend->lockedBackend<0>()->addFile(
+            options.backtraceFilePath,
+            options.fileOpenMode == ConfigurationOptions::OpenMode::kAppend ? true : false);
+        if (!ret.isOK())
+            return ret;
+
+        backend->lockedBackend<0>()->auto_flush(true);
+
+        backend->setFilter<0>(
+            TaggedSeverityFilter(_parent, {LogTag::kBacktraceLog}, LogSeverity::Log()));
+
+        _backtraceSink =
+            boost::make_shared<boost::log::sinks::unlocked_sink<BacktraceBackend>>(backend);
+        boost::log::core::get()->add_sink(_backtraceSink);
+    } else {
+        boost::log::core::get()->remove_sink(_backtraceSink);
+        _backtraceSink.reset();
+    }
+
     auto setFormatters = [this](auto&& mkFmt) {
         _consoleSink->set_formatter(mkFmt());
         if (_rotatableFileSink)
@@ -193,6 +218,8 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         if (_syslogSink)
             _syslogSink->set_formatter(mkFmt());
 #endif
+        if (_backtraceSink)
+            _backtraceSink->set_formatter(mkFmt());
     };
 
     switch (options.format) {

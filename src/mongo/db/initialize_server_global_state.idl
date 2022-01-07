@@ -57,3 +57,9 @@ server_parameters:
     condition:
       preprocessor: '!defined(_WIN32)'
 
+  backtraceLogFile:
+    description: >
+        File path to log backtraces to if test proctor is enabled.
+    set_at: startup
+    cpp_varname: gBacktraceLogFile
+    cpp_vartype: std::string

@@ -56,6 +56,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -286,8 +287,51 @@ void forkServerOrDie() {
         quickExit(EXIT_FAILURE);
 }
 
+namespace {
+
+bool checkAndMoveLogFile(const std::string& absoluteLogpath) {
+    bool exists;
+
+    try {
+        exists = boost::filesystem::exists(absoluteLogpath);
+    } catch (boost::filesystem::filesystem_error& e) {
+        uasserted(ErrorCodes::FileNotOpen,
+                  str::stream() << "Failed probe for \"" << absoluteLogpath
+                                << "\": " << e.code().message());
+    }
+
+    if (exists) {
+        if (boost::filesystem::is_directory(absoluteLogpath)) {
+            uasserted(ErrorCodes::FileNotOpen,
+                      str::stream() << "logpath \"" << absoluteLogpath
+                                    << "\" should name a file, not a directory.");
+        }
+
+        if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
+            std::string renameTarget = absoluteLogpath + "." + terseCurrentTimeForFilename();
+            boost::system::error_code ec;
+            boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
+            if (!ec) {
+                LOGV2(20697,
+                      "Moving existing log file \"{oldLogPath}\" to \"{newLogPath}\"",
+                      "Renamed existing log file",
+                      "oldLogPath"_attr = absoluteLogpath,
+                      "newLogPath"_attr = renameTarget);
+            } else {
+                uasserted(ErrorCodes::FileRenameFailed,
+                          str::stream() << "Could not rename preexisting log file \""
+                                        << absoluteLogpath << "\" to \"" << renameTarget
+                                        << "\"; run with --logappend or manually remove file: "
+                                        << ec.message());
+            }
+        }
+    }
+    return exists;
+}
+}  // namespace
+
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                          ("EndStartupOptionHandling", "ForkServer"),
+                          ("EndStartupOptionHandling", "ForkServer", "TestingDiagnostics"),
                           ("default"))
 (InitializerContext*) {
     // Hook up this global into our logging encoder
@@ -311,42 +355,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
             boost::filesystem::absolute(serverGlobalParams.logpath, serverGlobalParams.cwd)
                 .string();
 
-        bool exists;
-
-        try {
-            exists = boost::filesystem::exists(absoluteLogpath);
-        } catch (boost::filesystem::filesystem_error& e) {
-            uasserted(ErrorCodes::FileNotOpen,
-                      str::stream() << "Failed probe for \"" << absoluteLogpath
-                                    << "\": " << e.code().message());
-        }
-
-        if (exists) {
-            if (boost::filesystem::is_directory(absoluteLogpath)) {
-                uasserted(ErrorCodes::FileNotOpen,
-                          str::stream() << "logpath \"" << absoluteLogpath
-                                        << "\" should name a file, not a directory.");
-            }
-
-            if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
-                std::string renameTarget = absoluteLogpath + "." + terseCurrentTimeForFilename();
-                boost::system::error_code ec;
-                boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
-                if (!ec) {
-                    LOGV2(20697,
-                          "Moving existing log file \"{oldLogPath}\" to \"{newLogPath}\"",
-                          "Renamed existing log file",
-                          "oldLogPath"_attr = absoluteLogpath,
-                          "newLogPath"_attr = renameTarget);
-                } else {
-                    uasserted(ErrorCodes::FileRenameFailed,
-                              str::stream() << "Could not rename preexisting log file \""
-                                            << absoluteLogpath << "\" to \"" << renameTarget
-                                            << "\"; run with --logappend or manually remove file: "
-                                            << ec.message());
-                }
-            }
-        }
+        bool exists = checkAndMoveLogFile(absoluteLogpath);
 
         lv2Config.consoleEnabled = false;
         lv2Config.fileEnabled = true;
@@ -361,6 +370,15 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         if (serverGlobalParams.logAppend && exists) {
             writeServerRestartedAfterLogConfig = true;
         }
+    }
+
+    if (TestingProctor::instance().isEnabled() && !gBacktraceLogFile.empty()) {
+        std::string absoluteLogpath =
+            boost::filesystem::absolute(gBacktraceLogFile, serverGlobalParams.cwd).string();
+
+        /* ignore */ checkAndMoveLogFile(absoluteLogpath);
+
+        lv2Config.backtraceFilePath = absoluteLogpath;
     }
 
     lv2Config.timestampFormat = serverGlobalParams.logTimestampFormat;
