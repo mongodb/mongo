@@ -2500,6 +2500,7 @@ if wiredtiger:
             'session_catalog_mongod_test.cpp',
             'session_catalog_test.cpp',
             'startup_warnings_mongod_test.cpp',
+            'tenant_database_name_test.cpp',
             'tenant_namespace_test.cpp',
             'thread_client_test.cpp',
             'time_proof_service_test.cpp',
