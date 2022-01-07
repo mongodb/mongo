@@ -36,13 +36,11 @@
 namespace mongo {
 namespace executor {
 
-ConnectionStatsPer::ConnectionStatsPer(
-    size_t nInUse, size_t nAvailable, size_t nCreated, size_t nRefreshing, size_t nRefreshed)
-    : inUse(nInUse),
-      available(nAvailable),
-      created(nCreated),
-      refreshing(nRefreshing),
-      refreshed(nRefreshed) {}
+ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
+                                       size_t nAvailable,
+                                       size_t nCreated,
+                                       size_t nRefreshing)
+    : inUse(nInUse), available(nAvailable), created(nCreated), refreshing(nRefreshing) {}
 
 ConnectionStatsPer::ConnectionStatsPer() = default;
 
@@ -51,7 +49,6 @@ ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& oth
     available += other.available;
     created += other.created;
     refreshing += other.refreshing;
-    refreshed += other.refreshed;
 
     return *this;
 }
@@ -77,7 +74,6 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
     totalAvailable += newStats.available;
     totalCreated += newStats.created;
     totalRefreshing += newStats.refreshing;
-    totalRefreshed += newStats.refreshed;
 }
 
 void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
@@ -85,7 +81,6 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
     result.appendNumber("totalAvailable", static_cast<long long>(totalAvailable));
     result.appendNumber("totalCreated", static_cast<long long>(totalCreated));
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
-    result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
 
     if (forFTDC) {
         BSONObjBuilder poolBuilder(result.subobjStart("connectionsInUsePerPool"));
@@ -103,7 +98,6 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
         return;
     }
 
-    // Process pools stats.
     {
         if (strategy) {
             result.append("replicaSetMatchingStrategy", matchingStrategyToString(*strategy));
@@ -117,7 +111,6 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             poolInfo.appendNumber("poolAvailable", static_cast<long long>(poolStats.available));
             poolInfo.appendNumber("poolCreated", static_cast<long long>(poolStats.created));
             poolInfo.appendNumber("poolRefreshing", static_cast<long long>(poolStats.refreshing));
-            poolInfo.appendNumber("poolRefreshed", static_cast<long long>(poolStats.refreshed));
 
             for (const auto& host : poolStats.statsByHost) {
                 BSONObjBuilder hostInfo(poolInfo.subobjStart(host.first.toString()));
@@ -126,12 +119,9 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                 hostInfo.appendNumber("available", static_cast<long long>(hostStats.available));
                 hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
                 hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
-                hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
             }
         }
     }
-
-    // Processes hosts stats.
     {
         BSONObjBuilder hostBuilder(result.subobjStart("hosts"));
         for (auto&& host : statsByHost) {
@@ -141,7 +131,6 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             hostInfo.appendNumber("available", static_cast<long long>(hostStats.available));
             hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
             hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
-            hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
         }
     }
 }
