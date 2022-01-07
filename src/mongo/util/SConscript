@@ -291,6 +291,28 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='tracing_support',
+    source=[
+        'tracing_support.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.CppUnitTest(
+    target='tracing_support_test',
+    source=[
+        'tracing_support_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/tracing_support',
+    ],
+)
+
+
 env.CppUnitTest(
     target='thread_safety_context_test',
     source=[
