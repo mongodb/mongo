@@ -60,8 +60,8 @@ TimeseriesTest.run((insert) => {
                   ", buckets: " + tojson(bucketsIndexSpec));
 
         // Check that the index is usable.
-        assert.gt(timeseriescoll.find(timeseriesFindQuery).hint(bucketsIndexSpec).toArray().length,
-                  0);
+        assert.gt(
+            timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length, 0);
         assert.gt(bucketscoll.find(bucketsFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
 
         // Check that listIndexes returns expected results.
@@ -71,7 +71,7 @@ TimeseriesTest.run((insert) => {
         // hint.
         assert.commandWorked(timeseriescoll.hideIndex(timeseriesIndexSpec));
         assert.commandFailedWithCode(
-            assert.throws(() => timeseriescoll.find().hint(bucketsIndexSpec).toArray()),
+            assert.throws(() => timeseriescoll.find().hint(timeseriesIndexSpec).toArray()),
                          ErrorCodes.BadValue);
         assert.commandFailedWithCode(
             assert.throws(() => bucketscoll.find().hint(bucketsIndexSpec).toArray()),
@@ -82,8 +82,8 @@ TimeseriesTest.run((insert) => {
 
         // Unhide the index and check that the find cmd with 'bucketsIndexSpec' works again.
         assert.commandWorked(timeseriescoll.unhideIndex(timeseriesIndexSpec));
-        assert.gt(timeseriescoll.find(timeseriesFindQuery).hint(bucketsIndexSpec).toArray().length,
-                  0);
+        assert.gt(
+            timeseriescoll.find(timeseriesFindQuery).hint(timeseriesIndexSpec).toArray().length, 0);
         assert.gt(bucketscoll.find(bucketsFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
     }
 
@@ -137,17 +137,13 @@ TimeseriesTest.run((insert) => {
 
     hideUnhideListIndexes(sparseTimeseriesIndexSpec, sparseBucketsIndexSpec);
 
-    // Check that only 1 of the 2 entries are returned. Note: index hints on a time-series
-    // collection only work with the underlying buckets collection's index spec.
+    // Check that only 1 of the 2 entries are returned.
     assert.eq(1,
-              timeseriescoll.find().hint(sparseBucketsIndexSpec).toArray().length,
-              "Failed to use index: " + tojson(sparseBucketsIndexSpec));
+              timeseriescoll.find().hint(sparseTimeseriesIndexSpec).toArray().length,
+              "Failed to use index: " + tojson(sparseTimeseriesIndexSpec));
     assert.eq(1,
               bucketscoll.find().hint(sparseBucketsIndexSpec).toArray().length,
               "Failed to use index: " + tojson(sparseBucketsIndexSpec));
-    assert.commandFailedWithCode(
-        assert.throws(() => timeseriescoll.find().hint(sparseTimeseriesIndexSpec).toArray()),
-                     ErrorCodes.BadValue);
     assert.eq(2, timeseriescoll.find().toArray().length, "Failed to see all time-series documents");
 
     /**
@@ -332,17 +328,11 @@ TimeseriesTest.run((insert) => {
     const wildcardBucketsResults =
         bucketscoll.find({'meta.c.d': 1}).hint(wildcardBucketsIndexSpec).toArray();
     assert.eq(2, wildcardBucketsResults.length, "Query results: " + tojson(wildcardBucketsResults));
-    const wildcardTimeseriesResults =
-        timeseriescoll.find({[metaFieldName + '.c.d']: 1}).hint(wildcardBucketsIndexSpec).toArray();
+    const wildcardTimeseriesResults = timeseriescoll.find({[metaFieldName + '.c.d']: 1})
+                                          .hint(wildcardTimeseriesIndexSpec)
+                                          .toArray();
     assert.eq(
         2, wildcardTimeseriesResults.length, "Query results: " + tojson(wildcardTimeseriesResults));
-
-    // The time-series index spec does not work as a hint.
-    assert.commandFailedWithCode(
-        assert.throws(() => timeseriescoll.find({[metaFieldName + '.c.d']: 1})
-                                .hint(wildcardTimeseriesIndexSpec)
-                                .toArray()),
-                     ErrorCodes.BadValue);
 
     hideUnhideListIndexes(wildcardTimeseriesIndexSpec,
                           wildcardBucketsIndexSpec,
@@ -366,8 +356,8 @@ TimeseriesTest.run((insert) => {
     };
     assert.commandWorked(timeseriescoll.insert(wildcardMultikeyDoc));
 
-    assert.eq(1,
-              timeseriescoll.find({'mm.d.zip': '01234'}).hint(wildcardBucketsIndexSpec).itcount());
+    assert.eq(
+        1, timeseriescoll.find({'mm.d.zip': '01234'}).hint(wildcardTimeseriesIndexSpec).itcount());
     const wildcardFindExplain = assert.commandWorked(
         bucketscoll.find({'meta.d.zip': '01234'}).hint(wildcardBucketsIndexSpec).explain());
     const planWildcardStage =

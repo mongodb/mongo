@@ -720,100 +720,97 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
     boost::optional<BSONObj> timeSeriesCollator) const {
     _requireValidCatalog();
 
-    // Keep looping until the resolution completes. If the catalog is invalidated during the
-    // resolution, we start over from the beginning.
-    while (true) {
-        // Points to the name of the most resolved namespace.
-        const NamespaceString* resolvedNss = &nss;
+    // Points to the name of the most resolved namespace.
+    const NamespaceString* resolvedNss = &nss;
 
-        // Holds the combination of all the resolved views.
-        std::vector<BSONObj> resolvedPipeline;
+    // Holds the combination of all the resolved views.
+    std::vector<BSONObj> resolvedPipeline;
 
-        // If the catalog has not been tampered with, all views seen during the resolution will have
-        // the same collation. As an optimization, we fill out the collation spec only once.
-        boost::optional<BSONObj> collation;
+    // If the catalog has not been tampered with, all views seen during the resolution will have
+    // the same collation. As an optimization, we fill out the collation spec only once.
+    boost::optional<BSONObj> collation;
 
-        // The last seen view definition, which owns the NamespaceString pointed to by
-        // 'resolvedNss'.
-        std::shared_ptr<ViewDefinition> lastViewDefinition;
+    // The last seen view definition, which owns the NamespaceString pointed to by
+    // 'resolvedNss'.
+    std::shared_ptr<ViewDefinition> lastViewDefinition;
 
-        std::vector<NamespaceString> dependencyChain{nss};
+    std::vector<NamespaceString> dependencyChain{nss};
 
-        int depth = 0;
-        boost::optional<bool> mixedData = boost::none;
-        for (; depth < ViewGraph::kMaxViewDepth; depth++) {
-            auto view =
-                _lookup(opCtx, *resolvedNss, ViewCatalogLookupBehavior::kValidateDurableViews);
-            if (!view) {
-                // Return error status if pipeline is too large.
-                int pipelineSize = 0;
-                for (auto obj : resolvedPipeline) {
-                    pipelineSize += obj.objsize();
-                }
-                if (pipelineSize > ViewGraph::kMaxViewPipelineSizeBytes) {
-                    return {ErrorCodes::ViewPipelineMaxSizeExceeded,
-                            str::stream() << "View pipeline exceeds maximum size; maximum size is "
-                                          << ViewGraph::kMaxViewPipelineSizeBytes};
-                }
-
-                auto curOp = CurOp::get(opCtx);
-                curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
-
-                return StatusWith<ResolvedView>(
-                    {*resolvedNss,
-                     std::move(resolvedPipeline),
-                     collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec,
-                     mixedData});
+    int depth = 0;
+    boost::optional<bool> mixedData = boost::none;
+    boost::optional<TimeseriesOptions> tsOptions = boost::none;
+    for (; depth < ViewGraph::kMaxViewDepth; depth++) {
+        auto view = _lookup(opCtx, *resolvedNss, ViewCatalogLookupBehavior::kValidateDurableViews);
+        if (!view) {
+            // Return error status if pipeline is too large.
+            int pipelineSize = 0;
+            for (auto obj : resolvedPipeline) {
+                pipelineSize += obj.objsize();
+            }
+            if (pipelineSize > ViewGraph::kMaxViewPipelineSizeBytes) {
+                return {ErrorCodes::ViewPipelineMaxSizeExceeded,
+                        str::stream() << "View pipeline exceeds maximum size; maximum size is "
+                                      << ViewGraph::kMaxViewPipelineSizeBytes};
             }
 
-            resolvedNss = &view->viewOn();
+            auto curOp = CurOp::get(opCtx);
+            curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
 
-            if (view->timeseries()) {
-                // Use the lock-free collection lookup, to ensure compatibility with lock-free read
-                // operations.
-                auto tsCollection =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx,
-                                                                                      *resolvedNss);
-                uassert(6067201,
-                        str::stream() << "expected time-series buckets collection " << *resolvedNss
-                                      << " to exist",
-                        tsCollection);
-                if (tsCollection) {
-                    mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();
-                }
-            }
+            return StatusWith<ResolvedView>(
+                {*resolvedNss,
+                 std::move(resolvedPipeline),
+                 collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec,
+                 tsOptions,
+                 mixedData});
+        }
 
-            dependencyChain.push_back(*resolvedNss);
-            if (!collation) {
-                if (timeSeriesCollator) {
-                    collation = *timeSeriesCollator;
-                } else {
-                    collation = view->defaultCollator()
-                        ? view->defaultCollator()->getSpec().toBSON()
-                        : CollationSpec::kSimpleSpec;
-                }
-            }
+        resolvedNss = &view->viewOn();
 
-            // Prepend the underlying view's pipeline to the current working pipeline.
-            const std::vector<BSONObj>& toPrepend = view->pipeline();
-            resolvedPipeline.insert(resolvedPipeline.begin(), toPrepend.begin(), toPrepend.end());
-
-            // If the first stage is a $collStats, then we return early with the viewOn namespace.
-            if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
-                auto curOp = CurOp::get(opCtx);
-                curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
-
-                return StatusWith<ResolvedView>(
-                    {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
+        if (view->timeseries()) {
+            // Use the lock-free collection lookup, to ensure compatibility with lock-free read
+            // operations.
+            auto tsCollection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(
+                opCtx, *resolvedNss);
+            uassert(6067201,
+                    str::stream() << "expected time-series buckets collection " << *resolvedNss
+                                  << " to exist",
+                    tsCollection);
+            if (tsCollection) {
+                mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();
+                tsOptions = tsCollection->getTimeseriesOptions();
             }
         }
 
-        if (depth >= ViewGraph::kMaxViewDepth) {
-            return {ErrorCodes::ViewDepthLimitExceeded,
-                    str::stream() << "View depth too deep or view cycle detected; maximum depth is "
-                                  << ViewGraph::kMaxViewDepth};
+        dependencyChain.push_back(*resolvedNss);
+        if (!collation) {
+            if (timeSeriesCollator) {
+                collation = *timeSeriesCollator;
+            } else {
+                collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()
+                                                    : CollationSpec::kSimpleSpec;
+            }
         }
-    };
+
+        // Prepend the underlying view's pipeline to the current working pipeline.
+        const std::vector<BSONObj>& toPrepend = view->pipeline();
+        resolvedPipeline.insert(resolvedPipeline.begin(), toPrepend.begin(), toPrepend.end());
+
+        // If the first stage is a $collStats, then we return early with the viewOn namespace.
+        if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
+            auto curOp = CurOp::get(opCtx);
+            curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
+
+            return StatusWith<ResolvedView>(
+                {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
+        }
+    }
+
+    if (depth >= ViewGraph::kMaxViewDepth) {
+        return {ErrorCodes::ViewDepthLimitExceeded,
+                str::stream() << "View depth too deep or view cycle detected; maximum depth is "
+                              << ViewGraph::kMaxViewDepth};
+    }
+
     MONGO_UNREACHABLE;
 }
 

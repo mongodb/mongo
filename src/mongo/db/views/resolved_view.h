@@ -47,10 +47,12 @@ public:
     ResolvedView(const NamespaceString& collectionNs,
                  std::vector<BSONObj> pipeline,
                  BSONObj defaultCollation,
+                 boost::optional<TimeseriesOptions> timeseriesOptions = boost::none,
                  boost::optional<bool> timeseriesMayContainMixedData = boost::none)
         : _namespace(collectionNs),
           _pipeline(std::move(pipeline)),
           _defaultCollation(std::move(defaultCollation)),
+          _timeseriesOptions(timeseriesOptions),
           _timeseriesMayContainMixedData(timeseriesMayContainMixedData) {}
 
     static ResolvedView fromBSON(const BSONObj& commandResponseObj);
@@ -77,6 +79,7 @@ public:
     // ErrorExtraInfo API
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     static constexpr StringData kTimeseriesMayContainMixedData = "timeseriesMayContainMixedData"_sd;
+    static constexpr StringData kTimeseriesOptions = "timeseriesOptions"_sd;
     void serialize(BSONObjBuilder* bob) const final;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
@@ -92,6 +95,7 @@ private:
     // on the view which specify any other collation fail with a user error.
     BSONObj _defaultCollation;
 
+    boost::optional<TimeseriesOptions> _timeseriesOptions;
     boost::optional<bool> _timeseriesMayContainMixedData;
 };
 

@@ -50,14 +50,14 @@ TimeseriesTest.run((insert) => {
      * The second key pattern is what we can expect to use as a hint when querying the bucket
      * collection.
      */
-    const runTest = function(keyForCreate, hint) {
+    const runTest = function(spec, bucketSpec) {
         const coll = db.getCollection(collNamePrefix + collCountPostfix++);
         const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         coll.drop();  // implicitly drops bucketsColl.
 
         jsTestLog('Running test: collection: ' + coll.getFullName() +
-                  ';\nindex spec key for createIndexes: ' + tojson(keyForCreate) +
-                  ';\nindex spec key for query hint: ' + tojson(hint));
+                  ';\nindex spec key for createIndexes: ' + tojson(spec) +
+                  ';\nindex spec for buckets collection: ' + tojson(bucketSpec));
 
         assert.commandWorked(db.createCollection(
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
@@ -74,12 +74,11 @@ TimeseriesTest.run((insert) => {
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
-        assert.commandWorked(coll.createIndex(keyForCreate),
-                             'failed to create index: ' + tojson(keyForCreate));
+        assert.commandWorked(coll.createIndex(spec), 'failed to create index: ' + tojson(spec));
 
         // Check that the buckets collection was created, the index on it is usable and the document
         // is present in the expected format.
-        const bucketDocs = bucketsColl.find().hint(hint).toArray();
+        const bucketDocs = bucketsColl.find().hint(bucketSpec).toArray();
         assert.eq(1, bucketDocs.length, bucketDocs);
 
         const bucketDoc = bucketDocs[0];
@@ -94,92 +93,88 @@ TimeseriesTest.run((insert) => {
         let cursorDoc = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor;
         assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
         assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
-        assert.contains(keyForCreate, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
+        assert.contains(spec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
         // Check that listIndexes against the buckets collection returns the index as hinted
         cursorDoc =
             assert.commandWorked(db.runCommand({listIndexes: bucketsColl.getName()})).cursor;
         assert.eq(bucketsColl.getFullName(), cursorDoc.ns, tojson(cursorDoc));
         assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
-        assert.contains(hint, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
+        assert.contains(bucketSpec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
         // Drop the index on the time-series collection and then check that the underlying buckets
         // collection index was dropped properly.
-        assert.commandWorked(coll.dropIndex(keyForCreate),
-                             'failed to drop index: ' + tojson(keyForCreate));
-        assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(hint).toArray()),
+        assert.commandWorked(coll.dropIndex(spec), 'failed to drop index: ' + tojson(spec));
+        assert.commandFailedWithCode(
+            assert.throws(() => bucketsColl.find().hint(bucketSpec).toArray()),
+                         ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
 
         // Check that we are able to drop the index by name (single name and array of names).
-        assert.commandWorked(coll.createIndex(keyForCreate, {name: 'myindex1'}),
-                             'failed to create index: ' + tojson(keyForCreate));
+        assert.commandWorked(coll.createIndex(spec, {name: 'myindex1'}),
+                             'failed to create index: ' + tojson(spec));
         assert.commandWorked(coll.dropIndex('myindex1'), 'failed to drop index: myindex1');
-        assert.commandWorked(coll.createIndex(keyForCreate, {name: 'myindex2'}),
-                             'failed to create index: ' + tojson(keyForCreate));
+        assert.commandWorked(coll.createIndex(spec, {name: 'myindex2'}),
+                             'failed to create index: ' + tojson(spec));
         assert.commandWorked(coll.dropIndexes(['myindex2']), 'failed to drop indexes: [myindex2]');
 
         // Check that we are able to hide and unhide the index by name.
-        assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide1'}),
-                             'failed to create index: ' + tojson(keyForCreate));
-        assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-        assert.eq(1, coll.find().hint(hint).toArray().length);
+        assert.commandWorked(coll.createIndex(spec, {name: 'hide1'}),
+                             'failed to create index: ' + tojson(spec));
+        assert.eq(1, bucketsColl.find().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
         assert.commandWorked(coll.hideIndex('hide1'), 'failed to hide index: hide1');
-        assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(keyForCreate).toArray()),
+        assert.commandFailedWithCode(
+            assert.throws(() => bucketsColl.find().hint(bucketSpec).toArray()),
+                         ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
         assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
-        assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-        assert.eq(1, coll.find().hint(hint).toArray().length);
+        assert.eq(1, bucketsColl.find().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
         assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
 
         // Check that we are able to hide and unhide the index by key.
-        assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide2'}),
-                             'failed to create index: ' + tojson(keyForCreate));
-        assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-        assert.eq(1, coll.find().hint(hint).toArray().length);
-        assert.commandWorked(coll.hideIndex(keyForCreate), 'failed to hide index: hide2');
-        assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
+        assert.commandWorked(coll.createIndex(spec, {name: 'hide2'}),
+                             'failed to create index: ' + tojson(spec));
+        assert.eq(1, bucketsColl.find().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
+        assert.commandWorked(coll.hideIndex(spec), 'failed to hide index: hide2');
+        assert.commandFailedWithCode(
+            assert.throws(() => bucketsColl.find().hint(bucketSpec).toArray()),
+                         ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(hint).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide2');
-        assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-        assert.eq(1, coll.find().hint(hint).toArray().length);
+        assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide2');
+        assert.eq(1, bucketsColl.find().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
         assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
 
         // Check that we are able to create the index as hidden.
-        assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide3', hidden: true}),
-                             'failed to create index: ' + tojson(keyForCreate));
-        assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
+        assert.commandWorked(coll.createIndex(spec, {name: 'hide3', hidden: true}),
+                             'failed to create index: ' + tojson(spec));
+        assert.commandFailedWithCode(
+            assert.throws(() => bucketsColl.find().hint(bucketSpec).toArray()),
+                         ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(hint).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide3');
-        assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-        assert.eq(1, coll.find().hint(hint).toArray().length);
+        assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide3');
+        assert.eq(1, bucketsColl.find().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
         assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide3');
 
         // Check that user hints on queries will be allowed and will reference the indexes on the
         // buckets collection directly.
-        assert.commandWorked(coll.createIndex(keyForCreate, {name: 'index_for_hint_test'}),
-                             'failed to create index index_for_hint_test: ' + tojson(keyForCreate));
+        assert.commandWorked(coll.createIndex(spec, {name: 'index_for_hint_test'}),
+                             'failed to create index index_for_hint_test: ' + tojson(spec));
         // Specifying the index by name should work on both the time-series collection and the
         // underlying buckets collection.
         assert.eq(1, bucketsColl.find().hint('index_for_hint_test').toArray().length);
         assert.eq(1, coll.find().hint('index_for_hint_test').toArray().length);
-        // Specifying the index by key pattern should work when we use the underlying buckets
-        // collection's schema.
-        assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-        assert.eq(1, coll.find().hint(hint).toArray().length);
-        // Specifying the index by key pattern on the time-series collection should not work.
-        assert.commandFailedWithCode(
-            assert.throws(() => bucketsColl.find().hint(keyForCreate).toArray()),
-                         ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(keyForCreate).toArray()),
-                                                  ErrorCodes.BadValue);
+        // Specifying the index by key pattern should work.
+        assert.eq(1, bucketsColl.find().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
         assert.commandWorked(coll.dropIndex('index_for_hint_test'),
                              'failed to drop index: index_for_hint_test');
     };
