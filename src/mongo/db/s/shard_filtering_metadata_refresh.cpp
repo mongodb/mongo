@@ -114,7 +114,12 @@ bool joinShardVersionOperation(OperationContext* opCtx,
             opCtx->runWithDeadline(
                 deadline, ErrorCodes::ExceededTimeLimit, [&] { critSecSignal->get(opCtx); });
         } else {
-            inRecoverOrRefresh->get(opCtx);
+            try {
+                inRecoverOrRefresh->get(opCtx);
+            } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
+                // The ongoing refresh has finished, although it was canceled by a
+                // 'clearFilteringMetadata'.
+            }
         }
 
         return true;
@@ -127,8 +132,10 @@ bool joinShardVersionOperation(OperationContext* opCtx,
 
 SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext,
                                                   const NamespaceString nss,
-                                                  bool runRecover) {
-    return ExecutorFuture<void>(Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor())
+                                                  bool runRecover,
+                                                  CancellationToken cancellationToken) {
+    auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
+    return ExecutorFuture<void>(executor)
         .then([=] {
             ThreadClient tc("RecoverRefreshThread", serviceContext);
             {
@@ -140,7 +147,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
                 hangInRecoverRefreshThread.pauseWhileSet();
             }
 
-            auto opCtxHolder = tc->makeOperationContext();
+            const auto opCtxHolder =
+                CancelableOperationContext(tc->makeOperationContext(), cancellationToken, executor);
             auto const opCtx = opCtxHolder.get();
 
             boost::optional<CollectionMetadata> currentMetadataToInstall;
@@ -156,18 +164,21 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
                 auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
-                if (currentMetadataToInstall) {
-                    csr->setFilteringMetadata(opCtx, *currentMetadataToInstall);
+                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+                // cancellationToken needs to be checked under the CSR lock before overwriting the
+                // filtering metadata to serialize with other threads calling
+                // 'clearFilteringMetadata'
+                if (currentMetadataToInstall && !cancellationToken.isCanceled()) {
+                    csr->setFilteringMetadata_withLock(opCtx, *currentMetadataToInstall, csrLock);
                 }
 
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
                 csr->resetShardVersionRecoverRefreshFuture(csrLock);
             });
 
             if (runRecover) {
                 auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
                 if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
-                    migrationutil::recoverMigrationCoordinations(opCtx, nss);
+                    migrationutil::recoverMigrationCoordinations(opCtx, nss, cancellationToken);
                 }
             }
 
@@ -209,6 +220,17 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             // successfully do we want to install the current metadata.
             currentMetadataToInstall = std::move(currentMetadata);
         })
+        .onCompletion([=](Status status) {
+            // Check the cancellation token here to ensure we throw in all cancelation events,
+            // including those where the cancelation was noticed on the ON_BLOCK_EXIT above (where
+            // we cannot throw).
+            if (cancellationToken.isCanceled() &&
+                (status.isOK() || status == ErrorCodes::Interrupted)) {
+                uasserted(ErrorCodes::ShardVersionRefreshCanceled,
+                          "Shard version refresh canceled by a 'clearFilteringMetadata'");
+            }
+            return status;
+        })
         .semi()
         .share();
 }
@@ -245,52 +267,67 @@ void onShardVersionMismatch(OperationContext* opCtx,
         ? Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load())
         : Milliseconds::max();
 
-    boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
     while (true) {
-        boost::optional<Lock::DBLock> dbLock;
-        boost::optional<Lock::CollectionLock> collLock;
-        dbLock.emplace(opCtx, nss.db(), MODE_IS);
-        collLock.emplace(opCtx, nss, MODE_IS);
+        boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
+        {
+            boost::optional<Lock::DBLock> dbLock;
+            boost::optional<Lock::CollectionLock> collLock;
+            dbLock.emplace(opCtx, nss.db(), MODE_IS);
+            collLock.emplace(opCtx, nss, MODE_IS);
 
-        auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-        boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
-            CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+            boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
+                CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-        if (joinShardVersionOperation(
-                opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
-            continue;
-        }
+            if (joinShardVersionOperation(
+                    opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
+                continue;
+            }
 
-        auto metadata = csr->getCurrentMetadataIfKnown();
-        if (metadata) {
-            // Check if the current shard version is fresh enough
-            if (shardVersionReceived) {
-                const auto currentShardVersion = metadata->getShardVersion();
-                // Don't need to remotely reload if the requested version is smaller than the
-                // known one. This means that the remote side is behind.
-                if (shardVersionReceived->isOlderOrEqualThan(currentShardVersion)) {
-                    return;
+            auto metadata = csr->getCurrentMetadataIfKnown();
+            if (metadata) {
+                // Check if the current shard version is fresh enough
+                if (shardVersionReceived) {
+                    const auto currentShardVersion = metadata->getShardVersion();
+                    // Don't need to remotely reload if the requested version is smaller than the
+                    // known one. This means that the remote side is behind.
+                    if (shardVersionReceived->isOlderOrEqualThan(currentShardVersion)) {
+                        return;
+                    }
                 }
+            }
+
+            csrLock.reset();
+            csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
+
+            // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
+            // thread and associate it to the CSR.
+            if (!joinShardVersionOperation(
+                    opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
+                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
+                const bool runRecover = metadata ? false : true;
+                CancellationSource cancellationSource;
+                CancellationToken cancellationToken = cancellationSource.token();
+                csr->setShardVersionRecoverRefreshFuture(
+                    recoverRefreshShardVersion(
+                        opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
+                    std::move(cancellationSource),
+                    *csrLock);
+                inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
+            } else {
+                continue;
             }
         }
 
-        csrLock.reset();
-        csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
-
-        // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
-        // thread and associate it to the CSR.
-        if (!joinShardVersionOperation(
-                opCtx, csr, &dbLock, &collLock, &csrLock, criticalSectionMaxWait)) {
-            // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-            const bool runRecover = metadata ? false : true;
-            csr->setShardVersionRecoverRefreshFuture(
-                recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover), *csrLock);
-            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-            break;
+        try {
+            inRecoverOrRefresh->get(opCtx);
+        } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
+            // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
+            continue;
         }
-    }
 
-    inRecoverOrRefresh->get(opCtx);
+        break;
+    }
 }
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,

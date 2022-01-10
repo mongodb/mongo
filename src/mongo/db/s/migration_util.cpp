@@ -937,7 +937,9 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
                 "unfinishedMigrationsCount"_attr = unfinishedMigrationsCount);
 }
 
-void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss) {
+void recoverMigrationCoordinations(OperationContext* opCtx,
+                                   NamespaceString nss,
+                                   CancellationToken cancellationToken) {
     LOGV2_DEBUG(4798501, 2, "Starting migration recovery", "namespace"_attr = nss);
 
     unsigned migrationRecoveryCount = 0;
@@ -950,7 +952,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
     store.forEach(
         opCtx,
         BSON(MigrationCoordinatorDocument::kNssFieldName << nss.toString()),
-        [&opCtx, &migrationRecoveryCount, acquireCSOnRecipient](
+        [&opCtx, &migrationRecoveryCount, acquireCSOnRecipient, &cancellationToken](
             const MigrationCoordinatorDocument& doc) {
             LOGV2_DEBUG(4798502,
                         2,
@@ -991,7 +993,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                           "simulate an error response for forceShardFilteringMetadataRefresh");
             }
 
-            auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc]() {
+            auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
                 AutoGetDb autoDb(opCtx, doc.getNss().db(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
                 auto* const csr = CollectionShardingRuntime::get(opCtx, doc.getNss());
@@ -999,7 +1001,10 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                 auto optMetadata = csr->getCurrentMetadataIfKnown();
                 invariant(!optMetadata);
 
-                csr->setFilteringMetadata(opCtx, std::move(currentMetadata));
+                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+                if (!cancellationToken.isCanceled()) {
+                    csr->setFilteringMetadata_withLock(opCtx, std::move(currentMetadata), csrLock);
+                }
             };
 
             if (!currentMetadata.isSharded() ||

@@ -459,6 +459,8 @@ error_codes:
 
     - {code: 359, name: CannotEnableIndexConstraint, extra: CannotEnableIndexConstraintInfo}
 
+    - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

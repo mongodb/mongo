@@ -37,6 +37,7 @@
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_state_lock.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -103,6 +104,10 @@ public:
      * locks itself.
      */
     void setFilteringMetadata(OperationContext* opCtx, CollectionMetadata newMetadata);
+
+    void setFilteringMetadata_withLock(OperationContext* opCtx,
+                                       CollectionMetadata newMetadata,
+                                       const CSRLock& csrExclusiveLock);
 
     /**
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
@@ -190,7 +195,9 @@ public:
      *
      * To invoke this method, the criticalSectionSignal must not be hold by a different thread.
      */
-    void setShardVersionRecoverRefreshFuture(SharedSemiFuture<void> future, const CSRLock&);
+    void setShardVersionRecoverRefreshFuture(SharedSemiFuture<void> future,
+                                             CancellationSource cancellationSource,
+                                             const CSRLock&);
 
     /**
      * If there an ongoing shard version recover/refresh, it returns the shared semifuture to be
@@ -210,6 +217,19 @@ public:
 
 private:
     friend CSRLock;
+
+    struct ShardVersionRecoverOrRefresh {
+    public:
+        ShardVersionRecoverOrRefresh(SharedSemiFuture<void> future,
+                                     CancellationSource cancellationSource)
+            : future(std::move(future)), cancellationSource(std::move(cancellationSource)){};
+
+        // Tracks ongoing shard version recover/refresh.
+        SharedSemiFuture<void> future;
+
+        // Cancellation source to cancel the ongoing recover/refresh shard version.
+        CancellationSource cancellationSource;
+    };
 
     /**
      * Returns the latest version of collection metadata with filtering configured for
@@ -260,8 +280,9 @@ private:
     // Used for testing to check the number of times a new MetadataManager has been installed.
     std::uint64_t _numMetadataManagerChanges{0};
 
-    // Tracks ongoing shard version recover/refresh. Eventually set to the semifuture to wait on.
-    boost::optional<SharedSemiFuture<void>> _shardVersionInRecoverOrRefresh;
+    // Tracks ongoing shard version recover/refresh. Eventually set to the semifuture to wait on and
+    // a CancellationSource to cancel it
+    boost::optional<ShardVersionRecoverOrRefresh> _shardVersionInRecoverOrRefresh;
 };
 
 /**
