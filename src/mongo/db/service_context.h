@@ -37,6 +37,7 @@
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_id.h"
+#include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -408,6 +409,13 @@ public:
         _storageEngine = nullptr;
     }
 
+    /**
+     * Return the storage change lock.
+     */
+    StorageChangeLock& getStorageChangeLock() {
+        return _storageChangeLk;
+    }
+
     //
     // Global operation management.  This may not belong here and there may be too many methods
     // here.
@@ -696,6 +704,11 @@ private:
      * The storage engine, if any.
      */
     SyncUnique<StorageEngine> _storageEngine;
+
+    /**
+     * The lock that protects changing out the storage engine.
+     */
+    StorageChangeLock _storageChangeLk;
 
     /**
      * Vector of registered observers.
