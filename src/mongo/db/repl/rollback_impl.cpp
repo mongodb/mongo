@@ -76,6 +76,7 @@ using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(rollbackHangAfterTransitionToRollback);
 MONGO_FAIL_POINT_DEFINE(rollbackToTimestampHangCommonPointBeforeReplCommitPoint);
+MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeTransitioningToRollback);
 
 namespace {
 
@@ -316,6 +317,7 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
 
     LOGV2(21593, "Transition to ROLLBACK");
     {
+        rollbackHangBeforeTransitioningToRollback.pauseWhileSet(opCtx);
         ReplicationStateTransitionLockGuard rstlLock(
             opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
