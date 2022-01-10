@@ -74,8 +74,8 @@ Status HealthMonitoringIntensitiesServerParameter::setFromString(const std::stri
     auto newValue = HealthObserverIntensities::parse(
         IDLParserErrorContext("health monitoring intensities"), fromjson(value));
     newValue = mergeConfigValues(oldValue, newValue);
-    process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
     **_data = newValue;
+    process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
     return Status::OK();
 }
 
@@ -84,8 +84,8 @@ Status HealthMonitoringIntensitiesServerParameter::set(const BSONElement& newVal
     auto newValue = HealthObserverIntensities::parse(
         IDLParserErrorContext("health monitoring intensities"), newValueElement.Obj());
     newValue = mergeConfigValues(oldValue, newValue);
-    process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
     **_data = newValue;
+    process_health::FaultManager::healthMonitoringIntensitiesUpdated(oldValue, newValue);
     return Status::OK();
 }
 
