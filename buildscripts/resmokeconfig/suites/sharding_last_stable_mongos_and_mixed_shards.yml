@@ -45,6 +45,7 @@ selector:
   - jstests/sharding/change_stream_show_migration_events.js
   - jstests/sharding/prepare_transaction_then_migrate.js
   - jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+  - jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
   # Enable after SERVER-40258 gets backported and available in the official 4.2 binaries.
   - jstests/sharding/prepared_txn_metadata_refresh.js
   # Enable after SERVER-38691 gets backported to 4.2 and becomes the last stable.
