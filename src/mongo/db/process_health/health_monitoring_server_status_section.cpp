@@ -47,19 +47,18 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         auto* fault_manager = process_health::FaultManager::get(getGlobalServiceContext());
-        BSONObjBuilder result;
-        StringBuilder os;
-        os << fault_manager->getFaultState();
-
-        result.append("state", os.str());
-        result.appendDate("enteredStateAtTime", fault_manager->getLastTransitionTime());
-
-        auto fault = fault_manager->currentFault();
-        if (fault) {
-            BSONObjBuilder sub_result;
-            fault->appendDescription(&sub_result);
-            result.append("faultInformation", sub_result.obj());
+        if (!fault_manager) {
+            return BSONObj();
         }
+
+        BSONObjBuilder result;
+
+        bool appendDetails = false;
+        if (configElement.type() == BSONType::Object && configElement.Obj().hasElement("details")) {
+            appendDetails = configElement.Obj()["details"].trueValue();
+        }
+
+        fault_manager->appendDescription(&result, appendDetails);
 
         return result.obj();
     }

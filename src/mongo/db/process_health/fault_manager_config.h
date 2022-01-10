@@ -63,7 +63,7 @@ std::ostream& operator<<(std::ostream& os, const FaultState& state);
  */
 enum class FaultFacetType { kSystem, kMock1, kMock2, kTestObserver, kLdap, kDns };
 static const StringData FaultFacetTypeStrings[] = {
-    "kSystem", "kMock1", "kMock2", "kTestObserver", "kLdap", "kDns"};
+    "systemObserver", "mock1", "mock2", "testObserver", "LDAP", "DNS"};
 
 FaultFacetType toFaultFacetType(HealthObserverTypeEnum type);
 

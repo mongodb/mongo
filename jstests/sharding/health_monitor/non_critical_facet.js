@@ -49,8 +49,7 @@ sleep(ACTIVE_FAULT_DURATION_SECS * 2000);
 // Still in transient fault.
 result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;
 assert.eq(result.state, "TransientFault");
-assert(
-    result.faultInformation.facets.kTestObserver.description.includes("InternalError: test msg"));
+assert(result.faultInformation.facets.testObserver.description.includes("InternalError: test msg"));
 
 st.stop();
 })();
