@@ -679,6 +679,38 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
     ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
 }
 
+TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithHigherEpochNoRWCChangeNoMessage) {
+    createDefaults(false /* isImplicitWCMajority */);
+
+    RWConcernDefault newDefaults;
+    newDefaults.setUpdateOpTime(Timestamp(1, 2));
+    newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
+    _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+    ASSERT(!isCWWCSet());
+    auto defaults = getDefault();
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
+
+    RWConcernDefault newDefaults2;
+    newDefaults2.setUpdateOpTime(Timestamp(3, 4));
+    newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(5678));
+    _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
+
+    startCapturingLogMessages();
+    ReadWriteConcernDefaults::get(getServiceContext()).refreshIfNecessary(_opCtx);
+
+    ASSERT(!isCWWCSet());
+    auto defaults2 = getDefault();
+    ASSERT_EQ(Timestamp(3, 4), *defaults2.getUpdateOpTime());
+    ASSERT_EQ(5678, defaults2.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT(defaults.getDefaultWriteConcernSource() == DefaultWriteConcernSourceEnum::kImplicit);
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(0, countTextFormatLogLinesContaining("Refreshed RWC defaults"));
+}
+
 /**
  * ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk() uses the current clusterTime and wall
  * clock time (for epoch and setTime/localSetTime), so testing it requires a fixture with a logical
