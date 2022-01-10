@@ -462,9 +462,9 @@ void ShardRegistry::reload(OperationContext* opCtx) {
     } else {
         AsyncTry([=]() mutable {
             ThreadClient tc("ShardRegistry::reload", getGlobalServiceContext());
-            auto opCtx = tc->makeOperationContext();
+            auto innerOpCtx = tc->makeOperationContext();
 
-            _reloadInternal(opCtx.get());
+            _reloadInternal(innerOpCtx.get());
         })
             .until([](Status status) mutable {
                 return status != ErrorCodes::ReadConcernMajorityNotAvailableYet;
