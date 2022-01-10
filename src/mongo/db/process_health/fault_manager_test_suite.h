@@ -239,7 +239,7 @@ public:
     static inline const Seconds kWaitTimeout{10};
     static inline const Milliseconds kSleepTime{1};
 
-    static inline const int kActiveFaultDurationSecs = 1;
+    static inline const int kActiveFaultDurationSecs = 5;
 
     RAIIServerParameterControllerForTest serverParamController{"activeFaultDurationSecs",
                                                                kActiveFaultDurationSecs};
