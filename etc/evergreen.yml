@@ -2780,7 +2780,7 @@ tasks:
         remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1-${version}.${ext|tgz}"
         bucket: mciuploads
         permissions: public-read
-        content_type: application/tar
+        content_type: ${content_type|application/tar}
         display_name: "Mongo CSFLE Library"
 
 - name: compile_benchmarks
