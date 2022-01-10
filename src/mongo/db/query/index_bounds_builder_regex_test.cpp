@@ -109,15 +109,6 @@ TEST_F(IndexBoundsBuilderTest, RootedLiteral) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
-TEST_F(IndexBoundsBuilderTest, RootedLiteralWithExtra) {
-    auto testIndex = buildSimpleIndexEntry();
-    IndexBoundsBuilder::BoundsTightness tightness;
-    std::string prefix =
-        IndexBoundsBuilder::simpleRegex("^\\Qasdf\\E.*", "", testIndex, &tightness);
-    ASSERT_EQUALS(prefix, "asdf");
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
-}
-
 TEST_F(IndexBoundsBuilderTest, RootedLiteralNoEnd) {
     auto testIndex = buildSimpleIndexEntry();
     IndexBoundsBuilder::BoundsTightness tightness;
@@ -329,6 +320,32 @@ TEST_F(IndexBoundsBuilderTest, SimplePrefixRegex) {
         Interval::INTERVAL_EQUALS,
         oil.intervals[1].compare(Interval(fromjson("{'': /^foo/, '': /^foo/}"), true, true)));
     ASSERT(tightness == IndexBoundsBuilder::EXACT);
+}
+
+// Using exact index bounds for prefix regex in the form ^[].*
+TEST_F(IndexBoundsBuilderTest, RootedLiteralWithExtra) {
+    auto testIndex = buildSimpleIndexEntry();
+    IndexBoundsBuilder::BoundsTightness tightness;
+    std::string prefix =
+        IndexBoundsBuilder::simpleRegex("^\\Qasdf\\E.*", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "asdf");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, PrefixRegex) {
+    auto testIndex = buildSimpleIndexEntry();
+    IndexBoundsBuilder::BoundsTightness tightness;
+    std::string prefix = IndexBoundsBuilder::simpleRegex("^abc.*", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "abc");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST_F(IndexBoundsBuilderTest, RegexWithCharactersFollowingPrefix) {
+    auto testIndex = buildSimpleIndexEntry();
+    IndexBoundsBuilder::BoundsTightness tightness;
+    std::string prefix = IndexBoundsBuilder::simpleRegex("^abc.*f", "", testIndex, &tightness);
+    ASSERT_EQUALS(prefix, "abc");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_COVERED);
 }
 
 }  // namespace

@@ -260,6 +260,16 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
             }
         } else if (strchr("^$.[()+{", c)) {
             // list of "metacharacters" from man pcrepattern
+            // For prefix patterns ending in '.*' (ex. /^abc.*/) we can build exact index bounds.
+            if (!multilineOK && (c == '.')) {
+                c = *(regex++);
+                if (c == '*' && *regex == 0) {
+                    *tightnessOut = IndexBoundsBuilder::EXACT;
+                    return ss;
+                } else {
+                    c = *(regex--);
+                }
+            }
             r = ss;
             break;
         } else if (extended && c == '#') {
