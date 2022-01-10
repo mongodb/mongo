@@ -68,12 +68,12 @@ Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
     if (commitQuorumElement.isNumber()) {
         auto cNumNodes = commitQuorumElement.safeNumberLong();
         if (cNumNodes < 0 ||
-            cNumNodes > static_cast<decltype(cNumNodes)>(repl::ReplSetConfig::kMaxVotingMembers)) {
+            cNumNodes > static_cast<decltype(cNumNodes)>(repl::ReplSetConfig::kMaxMembers)) {
             return Status(
                 ErrorCodes::FailedToParse,
                 str::stream()
                     << "commitQuorum has to be a non-negative number and not greater than "
-                    << repl::ReplSetConfig::kMaxVotingMembers);
+                    << repl::ReplSetConfig::kMaxMembers);
         }
         numNodes = static_cast<decltype(numNodes)>(cNumNodes);
     } else if (commitQuorumElement.type() == String) {
