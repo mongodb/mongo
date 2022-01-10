@@ -767,9 +767,17 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         _fallBackOnRollbackViaRefetch(opCtx, source, requiredRBID, &localOplog, getConnection);
     }
 
-    // Reset the producer to clear the sync source and the last optime fetched.
-    stop(true);
-    startProducerIfStopped();
+    {
+        // Reset the producer to clear the sync source and the last optime fetched.
+        stdx::lock_guard<Latch> lock(_mutex);
+        auto oldProducerState = _state;
+        _stop(lock, true);
+        // Start the producer only if it was already running, because a concurrent stepUp could have
+        // caused rollback to fail, so we avoid restarting the producer if we have become primary.
+        if (oldProducerState != ProducerState::Stopped) {
+            setState(lock, ProducerState::Starting);
+        }
+    }
 }
 
 void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
@@ -844,9 +852,7 @@ void BackgroundSync::clearSyncTarget() {
     _syncSourceHost = HostAndPort();
 }
 
-void BackgroundSync::stop(bool resetLastFetchedOptime) {
-    stdx::lock_guard<Latch> lock(_mutex);
-
+void BackgroundSync::_stop(WithLock lock, bool resetLastFetchedOptime) {
     setState(lock, ProducerState::Stopped);
     LOGV2(21107, "Stopping replication producer");
 
@@ -864,6 +870,11 @@ void BackgroundSync::stop(bool resetLastFetchedOptime) {
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();
     }
+}
+
+void BackgroundSync::stop(bool resetLastFetchedOptime) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    _stop(lock, resetLastFetchedOptime);
 }
 
 void BackgroundSync::start(OperationContext* opCtx) {
