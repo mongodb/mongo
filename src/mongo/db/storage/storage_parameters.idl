@@ -136,3 +136,7 @@ feature_flags:
         description: "When enabled, collMod supports making an index unique"
         cpp_varname: feature_flags::gCollModIndexUnique
         default: false
+    featureFlagCommandsAcceptCollectionUUID:
+        description: "When enabled, support specifying collection UUID for commands"
+        cpp_varname: feature_flags::gCommandsAcceptCollectionUUID
+        default: false
