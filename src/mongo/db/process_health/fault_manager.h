@@ -120,6 +120,14 @@ public:
     // Gets the timestamp of the last transition
     Date_t getLastTransitionTime() const;
 
+    /**
+     * Generate the `serverStatus` section for the fault manager.
+     * @param appendDetails is true when the section is generated with:
+     *     health: {details: true}
+     * thus it is ok to add any verbose information here.
+     */
+    void appendDescription(BSONObjBuilder* builder, bool appendDetails) const;
+
 protected:
     // Returns all health observers not configured as Off
     std::vector<HealthObserver*> getActiveHealthObservers() const;

@@ -56,15 +56,16 @@ print("---RESULT 2---");
 print(tojson(result));
 assert(result.enteredStateAtTime);
 assert(result.faultInformation);
+assert(result.testObserver.intensity);
 
 const faultInformation = result.faultInformation;
 assert.eq(faultInformation.severity, 1);
 assert(faultInformation.duration);
 assert(faultInformation.facets);
 assert.eq(faultInformation.numFacets, 1);
-assert(faultInformation.facets.kTestObserver);
+assert(faultInformation.facets.testObserver);
 
-const kTestObserverFacet = faultInformation.facets.kTestObserver;
+const kTestObserverFacet = faultInformation.facets.testObserver;
 assert.eq(kTestObserverFacet.severity, faultInformation.severity);
 assert.eq(kTestObserverFacet.duration, faultInformation.duration);
 assert(kTestObserverFacet.description.includes("InternalError: test msg"));
@@ -78,11 +79,22 @@ assert.soon(() => {
     return result.state == "Ok";
 });
 
-result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;
 print("---RESULT 3---");
+result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1})).health;
 print(tojson(result));
 assert.eq(result.state, "Ok");
 assert(result.enteredStateAtTime);
+
+print("---RESULT 4 with details---");
+result =
+    assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+print(tojson(result));
+const testObserver = result.testObserver;
+assert(testObserver.totalChecks);
+assert(testObserver.totalChecks >= 1);
+assert(testObserver.totalChecksWithFailure >= 1);
+assert(testObserver.timeSinceLastCheckStartedMs >= 1);
+assert(testObserver.timeSinceLastCheckCompletedMs >= 1);
 
 st.stop();
 })();

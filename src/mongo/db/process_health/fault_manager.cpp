@@ -675,6 +675,53 @@ HealthObserver* FaultManager::getHealthObserver(FaultFacetType type) const {
     return nullptr;
 }
 
+void FaultManager::appendDescription(BSONObjBuilder* result, bool appendDetails) const {
+    static constexpr auto kDurationThreshold = Hours{24};
+    const auto now = _svcCtx->getFastClockSource()->now();
+    StringBuilder faultStateStr;
+    faultStateStr << getFaultState();
+
+    result->append("state", faultStateStr.str());
+    result->appendDate("enteredStateAtTime", getLastTransitionTime());
+
+    auto fault = currentFault();
+    if (fault) {
+        BSONObjBuilder sub_result;
+        fault->appendDescription(&sub_result);
+        result->append("faultInformation", sub_result.obj());
+    }
+
+    auto allObservers = getHealthObservers();
+    for (auto observer : allObservers) {
+        if (!appendDetails && !_config->isHealthObserverEnabled(observer->getType())) {
+            continue;
+        }
+        BSONObjBuilder sub_result;
+        sub_result.append("intensity",
+                          HealthObserverIntensity_serializer(
+                              _config->getHealthObserverIntensity(observer->getType())));
+
+        HealthObserverLivenessStats stats = observer->getStats();
+        sub_result.append("totalChecks", stats.completedChecksCount);
+        if (appendDetails) {
+            sub_result.append("totalChecksWithFailure", stats.completedChecksWithFaultCount);
+            if (now - stats.lastTimeCheckStarted < kDurationThreshold) {
+                sub_result.append("timeSinceLastCheckStartedMs",
+                                  durationCount<Milliseconds>(now - stats.lastTimeCheckStarted));
+                sub_result.append("timeSinceLastCheckCompletedMs",
+                                  durationCount<Milliseconds>(now - stats.lastTimeCheckCompleted));
+            }
+        }
+        // Report how long the current check is running, if it's longer than 10% of deadline.
+        if (stats.currentlyRunningHealthCheck &&
+            now - stats.lastTimeCheckStarted > getConfig().getPeriodicLivenessDeadline() / 10) {
+            sub_result.append("runningCheckForMs",
+                              durationCount<Milliseconds>(now - stats.lastTimeCheckStarted));
+        }
+        result->append(FaultFacetType_serializer(observer->getType()), sub_result.obj());
+    }
+}
+
 void FaultManager::progressMonitorCheckForTests(std::function<void(std::string cause)> crashCb) {
     _progressMonitor->progressMonitorCheck(crashCb);
 }
