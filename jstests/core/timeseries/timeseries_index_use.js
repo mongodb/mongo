@@ -377,6 +377,32 @@ const generateTest = (useHint) => {
                            {[metaFieldName + '.b']: -1},
                            {},
                            collation);
+
+        /*********************************** Tests $expr predicates
+         * *********************************/
+        resetCollections();
+        assert.commandWorked(insert(coll, [
+            {_id: 0, [timeFieldName]: ISODate('1990-01-01 00:00:00.000Z'), [metaFieldName]: 2},
+            {_id: 1, [timeFieldName]: ISODate('2000-01-01 00:00:00.000Z'), [metaFieldName]: 3},
+            {_id: 2, [timeFieldName]: ISODate('2010-01-01 00:00:00.000Z'), [metaFieldName]: 2}
+        ]));
+
+        if (!FixtureHelpers.isSharded(bucketsColl)) {
+            // Skip if the collection is implicitly sharded: it may use the implicitly created
+            // index.
+            testAggregationUsesIndex([{
+                                         $match: {
+                                             $expr: {
+                                                 $and: [
+                                                     {$gt: ["$" + timeFieldName, timeDate]},
+                                                     {$eq: ["$" + metaFieldName, 2]}
+                                                 ]
+                                             }
+                                         }
+                                     }],
+                                     1,
+                                     {[timeFieldName]: 1, [metaFieldName]: 1});
+        }
     };
 };
 

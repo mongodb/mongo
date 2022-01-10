@@ -304,9 +304,9 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
     // map the predicate on 'x' to a predicate on the control field.
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$and: [{$or: [ {'control.min.x': {$_internalExprLte: 1}},"
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {$or: [ {'control.min.x': {$_internalExprLte: 1}},"
                                "{$or: [ {$expr: {$ne: [ {$type: [ \"$control.min.x\" ]},"
-                               "{$type: [ \"$control.max.x\" ]} ]}} ]} ]} ]}}"),
+                               "{$type: [ \"$control.max.x\" ]} ]}} ]} ]}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(unpack, serialized[1]);
     ASSERT_BSONOBJ_EQ(match, serialized[2]);

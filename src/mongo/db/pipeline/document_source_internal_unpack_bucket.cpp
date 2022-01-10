@@ -685,6 +685,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
 
     switch (matchExpr->matchType()) {
         case MatchExpression::EQ:
+        case MatchExpression::INTERNAL_EXPR_EQ:
             // For $eq, make both a $lte against 'control.min' and a $gte predicate against
             // 'control.max'.
             //
@@ -696,6 +697,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // addition, we include a {'control.min' : {$gte: 'time - bucketMaxSpanSeconds'}} and
             // a {'control.max' : {$lte: 'time + bucketMaxSpanSeconds'}} predicate which will be
             // helpful in reducing bounds for index scans on 'time' field and routing on mongos.
+            //
+            // The same procedure applies to aggregation expressions of the form
+            // {$expr: {$eq: [...]}} that can be rewritten to use $_internalExprEq.
             return isTimeField
                 ? makePredicate(
                       MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
@@ -721,6 +725,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
 
         case MatchExpression::GT:
+        case MatchExpression::INTERNAL_EXPR_GT:
             // For $gt, make a $gt predicate against 'control.max'. In addition, if the comparison
             // is against the 'time' field, include a predicate against the _id field which is
             // converted to the maximum for the corresponding range of ObjectIds and is adjusted
@@ -728,9 +733,11 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // addition, we include a {'control.min' : {$gt: 'time - bucketMaxSpanSeconds'}}
             // predicate which will be helpful in reducing bounds for index scans on 'time' field
             // and routing on mongos.
+            //
+            // The same procedure applies to aggregation expressions of the form
+            // {$expr: {$gt: [...]}} that can be rewritten to use $_internalExprGt.
             return isTimeField
                 ? makePredicate(
-
                       MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
                       MatchExprPredicate<InternalExprGTMatchExpression>(minPath,
                                                                         minTime.firstElement()),
@@ -744,6 +751,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
 
         case MatchExpression::GTE:
+        case MatchExpression::INTERNAL_EXPR_GTE:
             // For $gte, make a $gte predicate against 'control.max'. In addition, if the comparison
             // is against the 'time' field, include a predicate against the _id field which is
             // converted to the minimum for the corresponding range of ObjectIds and is adjusted
@@ -751,9 +759,11 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             // addition, we include a {'control.min' : {$gte: 'time - bucketMaxSpanSeconds'}}
             // predicate which will be helpful in reducing bounds for index scans on 'time' field
             // and routing on mongos.
+            //
+            // The same procedure applies to aggregation expressions of the form
+            // {$expr: {$gte: [...]}} that can be rewritten to use $_internalExprGte.
             return isTimeField
                 ? makePredicate(
-
                       MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
                       MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
                                                                          minTime.firstElement()),
@@ -767,12 +777,16 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
 
         case MatchExpression::LT:
+        case MatchExpression::INTERNAL_EXPR_LT:
             // For $lt, make a $lt predicate against 'control.min'. In addition, if the comparison
             // is against the 'time' field, include a predicate against the _id field which is
             // converted to the minimum for the corresponding range of ObjectIds. In
             // addition, we include a {'control.max' : {$lt: 'time + bucketMaxSpanSeconds'}}
             // predicate which will be helpful in reducing bounds for index scans on 'time' field
             // and routing on mongos.
+            //
+            // The same procedure applies to aggregation expressions of the form
+            // {$expr: {$lt: [...]}} that can be rewritten to use $_internalExprLt.
             return isTimeField
                 ? makePredicate(
                       MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
@@ -788,12 +802,16 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                           pExpCtx, matchExprPath, assumeNoMixedSchemaData)));
 
         case MatchExpression::LTE:
+        case MatchExpression::INTERNAL_EXPR_LTE:
             // For $lte, make a $lte predicate against 'control.min'. In addition, if the comparison
             // is against the 'time' field, include a predicate against the _id field which is
             // converted to the maximum for the corresponding range of ObjectIds. In
             // addition, we include a {'control.max' : {$lte: 'time + bucketMaxSpanSeconds'}}
             // predicate which will be helpful in reducing bounds for index scans on 'time' field
             // and routing on mongos.
+            //
+            // The same procedure applies to aggregation expressions of the form
+            // {$expr: {$lte: [...]}} that can be rewritten to use $_internalExprLte.
             return isTimeField
                 ? makePredicate(
                       MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
@@ -827,10 +845,14 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
                 andMatchExpr->add(std::move(child));
             }
         }
+        if (andMatchExpr->numChildren() == 1) {
+            return andMatchExpr->releaseChild(0);
+        }
         if (andMatchExpr->numChildren() > 0) {
             return andMatchExpr;
         }
-    } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr)) {
+    } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr) ||
+               ComparisonMatchExpressionBase::isInternalExprComparison(matchExpr->matchType())) {
         return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
                                          _bucketUnpacker.bucketSpec(),
                                          _bucketMaxSpanSeconds,
@@ -1054,7 +1076,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
-    // Optimize the pipeline after this stage to merge $match stages and push them forward.
+    // Optimize the pipeline after this stage to merge $match stages and push them forward, and to
+    // take advantage of $expr rewrite optimizations.
     if (!_optimizedEndOfPipeline) {
         _optimizedEndOfPipeline = true;
 
