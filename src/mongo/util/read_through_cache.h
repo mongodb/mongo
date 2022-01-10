@@ -307,7 +307,8 @@ public:
      * Acquires the latest value from the cache, or an empty ValueHandle if the key is not present
      * in the cache.
      *
-     * Doesn't attempt to lookup, and so doesn't block.
+     * Doesn't attempt to lookup, and so doesn't block, but this means it will ignore any
+     * in-progress keys or keys whose time in store is newer than what is currently cached.
      */
     TEMPLATE(typename KeyType)
     REQUIRES(IsComparable<KeyType>)
@@ -316,128 +317,17 @@ public:
     }
 
     /**
-     * Invalidates the given 'key' and immediately replaces it with a new value.
+     * Returns a vector of the latest values from the cache which satisfy the predicate.
      *
-     * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
-     * (since the time never changes).
-     */
-    void insertOrAssign(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
-        stdx::lock_guard lg(_mutex);
-        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidateAndCancelCurrentLookupRound(lg);
-        _cache.insertOrAssign(key, {std::move(newValue), updateWallClockTime});
-    }
-
-    void insertOrAssign(const Key& key,
-                        Value&& newValue,
-                        Date_t updateWallClockTime,
-                        const Time& time) {
-        stdx::lock_guard lg(_mutex);
-        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidateAndCancelCurrentLookupRound(lg);
-        _cache.insertOrAssign(key, {std::move(newValue), updateWallClockTime}, time);
-    }
-
-    /**
-     * Invalidates the given 'key' and immediately replaces it with a new value, returning a handle
-     * to the new value.
-     *
-     * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
-     * (since the time never changes).
-     */
-    ValueHandle insertOrAssignAndGet(const Key& key, Value&& newValue, Date_t updateWallClockTime) {
-        stdx::lock_guard lg(_mutex);
-        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidateAndCancelCurrentLookupRound(lg);
-        return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime});
-    }
-
-    ValueHandle insertOrAssignAndGet(const Key& key,
-                                     Value&& newValue,
-                                     Date_t updateWallClockTime,
-                                     const Time& time) {
-        stdx::lock_guard lg(_mutex);
-        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidateAndCancelCurrentLookupRound(lg);
-        return _cache.insertOrAssignAndGet(key, {std::move(newValue), updateWallClockTime}, time);
-    }
-
-    /**
-     * Indicates to the cache that the backing store has a newer version of 'key', corresponding to
-     * 'newTime'. Subsequent calls to 'acquireAsync' with a causal consistency set to 'LatestKnown'
-     * will block and perform refresh until the cached value reaches 'newTime'.
-     *
-     * With respect to causal consistency, the 'LookupFn' used for this cache must provide the
-     * guarantee that if 'advanceTimeInStore' is called with a 'newTime', a subsequent call to
-     * 'LookupFn' for 'key' must return at least 'newTime' or later.
-     *
-     * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
-     * value or if no value is cached for 'key'.
-     */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    bool advanceTimeInStore(const KeyType& key, const Time& newTime) {
-        stdx::lock_guard lg(_mutex);
-        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->advanceTimeInStore(lg, newTime);
-        return _cache.advanceTimeInStore(key, newTime);
-    }
-
-    /**
-     * The invalidate methods below guarantee the following:
-     *  - All affected keys already in the cache (or returned to callers) will be invalidated and
-     *    removed from the cache
-     *  - All affected keys, which are in the process of being loaded (i.e., acquireAsync has not
-     *    yet completed) will be internally interrupted and rescheduled again, as if 'acquireAsync'
-     *    was called *after* the call to invalidate
-     *
-     * In essence, the invalidate calls serve as a "barrier" for the affected keys.
-     */
-    TEMPLATE(typename KeyType)
-    REQUIRES(IsComparable<KeyType>)
-    void invalidate(const KeyType& key) {
-        stdx::lock_guard lg(_mutex);
-        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
-            it->second->invalidateAndCancelCurrentLookupRound(lg);
-        _cache.invalidate(key);
-    }
-
-    /**
-     * Invalidates all cached entries and in progress lookups with keys that matches the preidcate.
+     * Doesn't attempt to lookup, and so doesn't block, but this means it will ignore any
+     * in-progress keys or keys whose time in store is newer than what is currently cached.
      */
     template <typename Pred>
-    void invalidateKeyIf(const Pred& predicate) {
-        stdx::lock_guard lg(_mutex);
-        for (auto& entry : _inProgressLookups) {
-            if (predicate(entry.first))
-                entry.second->invalidateAndCancelCurrentLookupRound(lg);
-        }
-        _cache.invalidateIf([&](const Key& key, const StoredValue*) { return predicate(key); });
-    }
-
-    /**
-     * Invalidates all cached entries with stored values that matches the preidcate.
-     */
-    template <typename Pred>
-    void invalidateCachedValueIf(const Pred& predicate) {
-        stdx::lock_guard lg(_mutex);
-        _cache.invalidateIf(
-            [&](const Key&, const StoredValue* value) { return predicate(value->value); });
-    }
-
-    void invalidateAll() {
-        invalidateKeyIf([](const Key&) { return true; });
-    }
-
-    /**
-     * Returns a vector of ValueHandles for all of the keys that satisfy matchPredicate.
-     */
-    template <typename Pred>
-    std::vector<ValueHandle> getValueHandlesIfKey(const Pred& matchPredicate) {
-        auto invalidatingCacheValues = [&]() {
+    std::vector<ValueHandle> peekLatestCachedIf(const Pred& pred) {
+        auto invalidatingCacheValues = [&] {
             stdx::lock_guard lg(_mutex);
-            return _cache.getEntriesIf(
-                [&](const Key& key, const StoredValue*) { return matchPredicate(key); });
+            return _cache.getLatestCachedIf(
+                [&](const Key& key, const StoredValue* value) { return pred(key, value->value); });
         }();
 
         std::vector<ValueHandle> valueHandles;
@@ -450,6 +340,130 @@ public:
                        });
 
         return valueHandles;
+    }
+
+    /**
+     * Invalidates the given 'key' and immediately replaces it with a new value.
+     *
+     * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
+     * (since the time never changes).
+     */
+    void insertOrAssign(const Key& key, Value&& value, Date_t updateWallClockTime) {
+        MONGO_STATIC_ASSERT_MSG(
+            !isCausallyConsistent<Time>,
+            "Time must be passed to insertOrAssign on causally consistent caches");
+        insertOrAssign(key, std::move(value), updateWallClockTime, Time());
+    }
+
+    void insertOrAssign(const Key& key,
+                        Value&& value,
+                        Date_t updateWallClockTime,
+                        const Time& time) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
+        _cache.insertOrAssign(key, {std::move(value), updateWallClockTime}, time);
+    }
+
+    /**
+     * Invalidates the given 'key' and immediately replaces it with a new value, returning a handle
+     * to the new value.
+     *
+     * The 'time' parameter is mandatory for causally-consistent caches, but not needed otherwise
+     * (since the time never changes).
+     */
+    ValueHandle insertOrAssignAndGet(const Key& key, Value&& value, Date_t updateWallClockTime) {
+        MONGO_STATIC_ASSERT_MSG(
+            !isCausallyConsistent<Time>,
+            "Time must be passed to insertOrAssign on causally consistent caches");
+        return insertOrAssignAndGet(key, std::move(value), updateWallClockTime, Time());
+    }
+
+    ValueHandle insertOrAssignAndGet(const Key& key,
+                                     Value&& value,
+                                     Date_t updateWallClockTime,
+                                     const Time& time) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
+        return _cache.insertOrAssignAndGet(key, {std::move(value), updateWallClockTime}, time);
+    }
+
+    /**
+     * Indicates to the cache that the backing store has a newer version of 'key', corresponding to
+     * 'newTime'. Subsequent calls to 'acquireAsync' with a causal consistency set to 'LatestKnown'
+     * will block and perform refresh until the cached value reaches 'newTime'.
+     *
+     * With respect to causal consistency, the 'LookupFn' used for this cache must provide the
+     * guarantee that if 'advanceTimeInStore' is called with a 'newTime', a subsequent call to
+     * 'LookupFn' for 'key' must return at least 'newTime' or later.
+     *
+     * Returns true if the passed 'newTimeInStore' is greater than the time of the currently cached
+     * value or if no value is cached for 'key'.
+     */
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    bool advanceTimeInStore(const KeyType& key, const Time& newTime) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->advanceTimeInStore(lg, newTime);
+        return _cache.advanceTimeInStore(key, newTime);
+    }
+
+    /**
+     * The invalidate+ methods below guarantee the following:
+     *  - All affected keys already in the cache (or returned to callers) will be invalidated and
+     *    removed from the cache
+     *  - All affected keys, which are in the process of being loaded (i.e., acquireAsync has not
+     *    yet completed) will be internally interrupted and rescheduled again, as if 'acquireAsync'
+     *    was called *after* the call to invalidate
+     *
+     * In essence, the invalidate+ calls serve as an externally induced "barrier" for the affected
+     * keys.
+     */
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    void invalidateKey(const KeyType& key) {
+        stdx::lock_guard lg(_mutex);
+        if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
+            it->second->invalidateAndCancelCurrentLookupRound(lg);
+        _cache.invalidate(key);
+    }
+
+    /**
+     * Invalidates only the entries whose key is matched by the predicate.
+     */
+    template <typename Pred>
+    void invalidateKeyIf(const Pred& pred) {
+        stdx::lock_guard lg(_mutex);
+        for (auto& entry : _inProgressLookups) {
+            if (pred(entry.first))
+                entry.second->invalidateAndCancelCurrentLookupRound(lg);
+        }
+        _cache.invalidateIf([&](const Key& key, const StoredValue*) { return pred(key); });
+    }
+
+    /**
+     * Invalidates all entries.
+     */
+    void invalidateAll() {
+        invalidateKeyIf([](const Key&) { return true; });
+    }
+
+    /**
+     * The method below guarantees only that the affected key/value(s) already in the cache (or
+     * returned to callers) will be invalidated and removed from the cache. However, any affected
+     * keys, which are in the process of being loaded (i.e., acquireAsync has not yet completed)
+     * will not be interrupted and will eventually end-up on the cache.
+     *
+     * Because the behaviour described above does not provide any guarantees about the in-progress
+     * lookups, it should be considered as "best-effort".
+     */
+    template <typename Pred>
+    void invalidateLatestCachedValueIf_IgnoreInProgress(const Pred& pred) {
+        stdx::lock_guard lg(_mutex);
+        _cache.invalidateIf(
+            [&](const Key& key, const StoredValue* value) { return pred(key, value->value); });
     }
 
     /**

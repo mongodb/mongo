@@ -145,7 +145,7 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateAndRefetch) {
             ASSERT(cache.acquire(_opCtx, "TestKey"));
             ASSERT_EQ(i, cache.countLookups);
 
-            cache.invalidate("TestKey");
+            cache.invalidateKey("TestKey");
         }
     };
 
@@ -221,8 +221,10 @@ TEST_F(ReadThroughCacheTest, FetchInvalidateValueAndRefetch) {
             ASSERT(cache.acquire(_opCtx, "TestKey"));
             ASSERT_EQ(i, cache.countLookups);
 
-            cache.invalidateCachedValueIf(
-                [i](const CachedValue& value) { return value.counter == 100 * i; });
+            cache.invalidateLatestCachedValueIf_IgnoreInProgress(
+                [i](const std::string&, const CachedValue& value) {
+                    return value.counter == 100 * i;
+                });
         }
     };
 
@@ -284,7 +286,7 @@ TEST_F(ReadThroughCacheTest, InvalidateCacheSizeZeroReissuesLookup) {
         ASSERT_EQ(1000, cache.acquire(_opCtx, "TestKey")->counter);
         ASSERT_EQ(1, cache.countLookups);
 
-        cache.invalidate("TestKey");
+        cache.invalidateKey("TestKey");
         auto valueAfterInvalidate = cache.acquire(_opCtx, "TestKey");
         ASSERT(!value.isValid());
         ASSERT(valueAfterInvalidate);
@@ -535,7 +537,7 @@ TEST_F(ReadThroughCacheAsyncTest, InvalidateReissuesLookup) {
     // Wait for the first lookup attempt to start and invalidate it before letting it proceed
     lookupStartedBarriers[0].countDownAndWait();
     ASSERT_EQ(1, countLookups.load());
-    cache.invalidate("TestKey");
+    cache.invalidateKey("TestKey");
     ASSERT(!future.isReady());
     completeLookupBarriers[0].countDownAndWait();  // Lets lookup attempt 1 proceed
     ASSERT(!future.isReady());
@@ -543,7 +545,7 @@ TEST_F(ReadThroughCacheAsyncTest, InvalidateReissuesLookup) {
     // Wait for the second lookup attempt to start and invalidate it before letting it proceed
     lookupStartedBarriers[1].countDownAndWait();
     ASSERT_EQ(2, countLookups.load());
-    cache.invalidate("TestKey");
+    cache.invalidateKey("TestKey");
     ASSERT(!future.isReady());
     completeLookupBarriers[1].countDownAndWait();  // Lets lookup attempt 2 proceed
     ASSERT(!future.isReady());
@@ -604,7 +606,7 @@ TEST_F(ReadThroughCacheAsyncTest, ShutdownWithConcurrentInvalidate) {
     auto future = cache.acquireAsync("async", CacheCausalConsistency::kLatestCached);
 
     lookupStartedBarrier.countDownAndWait();
-    cache.invalidate("async");
+    cache.invalidateKey("async");
     completeLookupBarrier.countDownAndWait();
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InterruptedAtShutdown);

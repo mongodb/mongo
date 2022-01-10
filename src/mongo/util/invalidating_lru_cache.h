@@ -431,6 +431,33 @@ public:
     }
 
     /**
+     * Returns a vector of the latest values from the cache which satisfy the predicate. Uses the
+     * 'kLatestCached' causal consistency model.
+     */
+    template <typename Pred>
+    std::vector<ValueHandle> getLatestCachedIf(Pred predicate) {
+        stdx::lock_guard lg(_mutex);
+        std::vector<ValueHandle> entries;
+        entries.reserve(_cache.size() + _evictedCheckedOutValues.size());
+
+        for (const auto& kv : _cache) {
+            if (predicate(kv.first, &kv.second->value)) {
+                entries.push_back(ValueHandle(kv.second));
+            }
+        }
+
+        for (const auto& kv : _evictedCheckedOutValues) {
+            if (auto storedValue = kv.second.lock()) {
+                if (predicate(kv.first, &storedValue->value)) {
+                    entries.push_back(ValueHandle(std::move(storedValue)));
+                }
+            }
+        }
+
+        return entries;
+    }
+
+    /**
      * Indicates to the cache that the backing store contains a new value for the specified key,
      * with a timestamp of 'newTimeInStore'.
      *
@@ -533,32 +560,6 @@ public:
                 it++;
             }
         }
-    }
-
-    /**
-     * Returns a vector of ValueHandles for all of the entries that satisfy matchPredicate.
-     */
-    template <typename Pred>
-    std::vector<ValueHandle> getEntriesIf(Pred matchPredicate) {
-        std::vector<ValueHandle> entries;
-        entries.reserve(_cache.size() + _evictedCheckedOutValues.size());
-        {
-            stdx::lock_guard lg(_mutex);
-            for (const auto& entry : _cache) {
-                if (matchPredicate(entry.first, &entry.second->value)) {
-                    entries.push_back(ValueHandle(entry.second));
-                }
-            }
-
-            for (const auto& entry : _evictedCheckedOutValues) {
-                if (auto storedValue = entry.second.lock()) {
-                    if (matchPredicate(entry.first, &storedValue->value)) {
-                        entries.push_back(ValueHandle(std::move(storedValue)));
-                    }
-                }
-            }
-        }
-        return entries;
     }
 
     struct CachedItemInfo {

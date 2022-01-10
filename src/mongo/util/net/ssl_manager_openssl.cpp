@@ -2108,7 +2108,7 @@ Future<void> SSLManagerOpenSSL::ocspClientVerification(SSL* ssl, const ExecutorP
         auto timeNow = Date_t::now();
 
         if (validatedResponse.second.get() < timeNow) {
-            cache.invalidate(cacheKey);
+            cache.invalidateKey(cacheKey);
             auto semifuture = cache.acquireAsync(cacheKey);
             return convert(std::move(semifuture))
                 .onCompletion(validate)

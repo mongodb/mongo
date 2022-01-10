@@ -679,7 +679,7 @@ void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
     _authSchemaVersionCache.invalidateAll();
     // Invalidate the named User, assuming no externally provided roles. When roles are defined
     // externally, there exists no user document which may become invalid.
-    _userCache.invalidate(UserRequest(userName, boost::none));
+    _userCache.invalidateKey(UserRequest(userName, boost::none));
 }
 
 void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx, StringData dbname) {
@@ -700,8 +700,10 @@ void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
 Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
     LOGV2_DEBUG(5914801, 2, "Refreshing all users from the $external database");
     // First, get a snapshot of the UserHandles in the cache.
-    std::vector<UserHandle> cachedUsers = _userCache.getValueHandlesIfKey(
-        [&](const UserRequest& userRequest) { return userRequest.name.getDB() == "$external"_sd; });
+    auto cachedUsers =
+        _userCache.peekLatestCachedIf([&](const UserRequest& userRequest, const User&) {
+            return userRequest.name.getDB() == "$external"_sd;
+        });
 
     // Then, retrieve the corresponding Users from the backing store for users in the $external
     // database. Compare each of these user objects with the cached user object and call
@@ -713,7 +715,7 @@ Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
         if (!storedUserStatus.isOK()) {
             // If the user simply is not found, then just invalidate the cached user and continue.
             if (storedUserStatus.getStatus().code() == ErrorCodes::UserNotFound) {
-                _userCache.invalidate(request);
+                _userCache.invalidateKey(request);
                 continue;
             } else {
                 return storedUserStatus.getStatus();

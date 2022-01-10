@@ -362,7 +362,7 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                   "version"_attr = version.toBSONForLogging());
         _databaseCache.advanceTimeInStore(dbName, version);
     } else {
-        _databaseCache.invalidate(dbName);
+        _databaseCache.invalidateKey(dbName);
     }
 }
 
@@ -403,27 +403,28 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
                 "Invalidating databases and collections referencing a specific shard",
                 "shardId"_attr = shardId);
 
-    _databaseCache.invalidateCachedValueIf(
-        [&](const DatabaseType& dbt) { return dbt.getPrimary() == shardId; });
+    _databaseCache.invalidateLatestCachedValueIf_IgnoreInProgress(
+        [&](const std::string&, const DatabaseType& dbt) { return dbt.getPrimary() == shardId; });
 
     // Invalidate collections which contain data on this shard.
-    _collectionCache.invalidateCachedValueIf([&](const OptionalRoutingTableHistory& ort) {
-        if (!ort.optRt)
-            return false;
-        const auto& rt = *ort.optRt;
+    _collectionCache.invalidateLatestCachedValueIf_IgnoreInProgress(
+        [&](const NamespaceString&, const OptionalRoutingTableHistory& ort) {
+            if (!ort.optRt)
+                return false;
+            const auto& rt = *ort.optRt;
 
-        std::set<ShardId> shardIds;
-        rt.getAllShardIds(&shardIds);
+            std::set<ShardId> shardIds;
+            rt.getAllShardIds(&shardIds);
 
-        LOGV2_DEBUG(22647,
-                    3,
-                    "Invalidating cached collection {namespace} that has data "
-                    "on shard {shardId}",
-                    "Invalidating cached collection",
-                    "namespace"_attr = rt.nss(),
-                    "shardId"_attr = shardId);
-        return shardIds.find(shardId) != shardIds.end();
-    });
+            LOGV2_DEBUG(22647,
+                        3,
+                        "Invalidating cached collection {namespace} that has data "
+                        "on shard {shardId}",
+                        "Invalidating cached collection",
+                        "namespace"_attr = rt.nss(),
+                        "shardId"_attr = shardId);
+            return shardIds.find(shardId) != shardIds.end();
+        });
 
     LOGV2(22648,
           "Finished invalidating databases and collections with data on shard: {shardId}",
@@ -432,7 +433,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 }
 
 void CatalogCache::purgeDatabase(StringData dbName) {
-    _databaseCache.invalidate(dbName);
+    _databaseCache.invalidateKey(dbName);
     _collectionCache.invalidateKeyIf(
         [&](const NamespaceString& nss) { return nss.db() == dbName; });
 }
@@ -487,11 +488,11 @@ void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opC
 }
 
 void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName) {
-    _databaseCache.invalidate(dbName);
+    _databaseCache.invalidateKey(dbName);
 }
 
 void CatalogCache::invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss) {
-    _collectionCache.invalidate(nss);
+    _collectionCache.invalidateKey(nss);
 }
 
 void CatalogCache::Stats::report(BSONObjBuilder* builder) const {

@@ -174,7 +174,7 @@ void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationConte
 }
 
 void ReadWriteConcernDefaults::invalidate() {
-    _defaults.invalidate(Type::kReadWriteConcernEntry);
+    _defaults.invalidateKey(Type::kReadWriteConcernEntry);
 }
 
 void ReadWriteConcernDefaults::setDefault(OperationContext* opCtx, RWConcernDefault&& rwc) {
