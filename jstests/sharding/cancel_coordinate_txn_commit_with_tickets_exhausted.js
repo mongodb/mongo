@@ -52,6 +52,10 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, {key: 1}
     {min: {key: 0}, max: {key: MaxKey}, shard: st.shard1.shardName},
 ]);
 
+const isTxnCoordinatorShardLatest = MongoRunner.areBinVersionsTheSame(
+    MongoRunner.getBinVersionFor("latest"),
+    MongoRunner.getBinVersionFor(txnCoordinator.fullOptions.binVersion));
+
 const removeOperationThreads = Array.from({length: kNumWriteTickets}).map(() => {
     return new Thread(function removeOperation(host, dbName, collName, insertLatch) {
         const conn = new Mongo(host);
@@ -98,8 +102,9 @@ const transactionThread = new Thread(
         }, () => `Timed out waiting for the remove operations: ${tojson(currentOp())}`);
 
         // After here all of the WiredTiger write tickets should be taken.
-        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(
+            session.commitTransaction_forTesting(),
+            [ErrorCodes.NoSuchTransaction, ErrorCodes.TransactionCoordinatorReachedAbortDecision]);
     },
     st.s.host,
     dbName,
@@ -112,22 +117,29 @@ transactionThread.start();
 
 removeOperationThreads.forEach(thread => thread.start());
 
-let twoPhaseCommitCoordinatorServerStatus;
-assert.soon(
-    () => {
-        twoPhaseCommitCoordinatorServerStatus =
-            txnCoordinator.getDB(dbName).serverStatus().twoPhaseCommitCoordinator;
-        const {deletingCoordinatorDoc, waitingForDecisionAcks, writingDecision} =
-            twoPhaseCommitCoordinatorServerStatus.currentInSteps;
-        return deletingCoordinatorDoc.toNumber() === 1 || waitingForDecisionAcks.toNumber() === 1 ||
-            writingDecision.toNumber() === 1;
-    },
-    () => `Failed to find 1 total transactions in a state past kWaitingForVotes: ${
-        tojson(twoPhaseCommitCoordinatorServerStatus)}`);
+// if transaction coordinator is v4.4 then it will get blocked due to the NoSuchTransaction error
+if (isTxnCoordinatorShardLatest) {
+    let twoPhaseCommitCoordinatorServerStatus;
+    assert.soon(
+        () => {
+            twoPhaseCommitCoordinatorServerStatus =
+                txnCoordinator.getDB(dbName).serverStatus().twoPhaseCommitCoordinator;
+            const {deletingCoordinatorDoc, waitingForDecisionAcks, writingDecision} =
+                twoPhaseCommitCoordinatorServerStatus.currentInSteps;
+            return deletingCoordinatorDoc.toNumber() === 1 ||
+                waitingForDecisionAcks.toNumber() === 1 || writingDecision.toNumber() === 1;
+        },
+        () => `Failed to find 1 total transactions in a state past kWaitingForVotes: ${
+            tojson(twoPhaseCommitCoordinatorServerStatus)}`);
 
-hangWithLockDuringBatchRemoveFp.off();
+    hangWithLockDuringBatchRemoveFp.off();
 
-transactionThread.join();
+    transactionThread.join();
+} else {
+    transactionThread.join();
+    hangWithLockDuringBatchRemoveFp.off();
+}
+
 removeOperationThreads.forEach((thread) => {
     thread.join();
 });
