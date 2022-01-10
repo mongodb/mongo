@@ -158,6 +158,7 @@ private:
     // Production thread inner loop.
     void _runProducer();
     void _produce();
+    void _stop(WithLock, bool resetLastFetchedOptime);
 
     /**
      * Checks current background sync state before pushing operations into blocking queue and

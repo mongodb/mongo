@@ -138,6 +138,8 @@ last-continuous:
       test_file: jstests/replsets/dbcheck_write_concern.js
     - ticket: SERVER-62296
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
+    - ticket: SERVER-61977
+      test_file: jstests/replsets/rollback_during_step_up.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -415,6 +417,8 @@ last-lts:
       test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
     - ticket: SERVER-62296
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
+    - ticket: SERVER-61977
+      test_file: jstests/replsets/rollback_during_step_up.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
