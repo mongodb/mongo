@@ -512,6 +512,7 @@ env.Library(
         'write_concern_options',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/storage_change_lock',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
 )

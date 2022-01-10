@@ -248,6 +248,9 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         }
     });
 
+    // We must prevent changing the storage engine while setting a new opCtx on the client.
+    auto sharedStorageChangeToken = _storageChangeLk.acquireSharedStorageChangeToken();
+
     onCreate(opCtx.get(), _clientObservers);
     ScopeGuard onCreateGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
 

@@ -292,6 +292,16 @@ env.Library(
 )
 
 env.Library(
+    target='storage_change_lock',
+    source=[
+        'storage_change_lock.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='storage_engine_common',
     source=[
         'storage_engine_init.cpp',
@@ -302,6 +312,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
+        'storage_change_lock',
         'storage_control',
         'storage_engine_lock_file',
         'storage_engine_metadata',

@@ -357,9 +357,6 @@ public:
         opCtx->setLockState(std::make_unique<LockerImpl>());
 
         auto service = opCtx->getServiceContext();
-        // We must prevent storage engine changes while setting the recovery unit on the opCtx.
-        auto sharedStorageChangeToken =
-            StorageEngineChangeContext::get(service)->acquireSharedStorageChangeToken();
 
         // There are a few cases where we don't have a storage engine available yet when creating an
         // operation context.
