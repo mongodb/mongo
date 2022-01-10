@@ -274,4 +274,35 @@ results = coll.aggregate(pipeline).toArray();
 assert.sameMembers(results, [
     {_id: 3, a: 4, x: {y: {type: "Point", coordinates: [2, 1]}}, time: now, meta: {sensorId: 100}}
 ]);
+
+// Test some parse errors.
+{
+    coll.drop();
+
+    pipeline = [{$match: {$_internalBucketGeoWithin: {}}}];
+    let err = assert.throws(() => coll.explain().aggregate(pipeline));
+    assert.eq(err.code, ErrorCodes.FailedToParse, err);
+
+    pipeline = [{
+        $match: {
+            $_internalBucketGeoWithin: {
+                withinRegion: 7,
+                field: 'loc',
+            }
+        }
+    }];
+    err = assert.throws(() => coll.explain().aggregate(pipeline));
+    assert.eq(err.code, ErrorCodes.TypeMismatch, err);
+
+    pipeline = [{
+        $match: {
+            $_internalBucketGeoWithin: {
+                withinRegion: {},
+                field: 'loc',
+            }
+        }
+    }];
+    err = assert.throws(() => coll.explain().aggregate(pipeline));
+    assert.eq(err.code, ErrorCodes.BadValue, err);
+}
 }());

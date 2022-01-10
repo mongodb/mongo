@@ -1037,7 +1037,7 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
 
     auto subobj = elem.embeddedObject();
 
-    std::shared_ptr<GeometryContainer> geoContainer = std::make_shared<GeometryContainer>();
+    std::shared_ptr<GeometryContainer> geoContainer;
     if (!subobj.hasField("withinRegion") || !subobj.hasField("field")) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << InternalBucketGeoWithinMatchExpression::kName
@@ -1055,9 +1055,15 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
     while (geoIt.more()) {
         BSONElement elt = geoIt.next();
         // The element must be a geo specifier. "$box", "$center", "$geometry", etc.
+        geoContainer = std::make_shared<GeometryContainer>();
         Status status = geoContainer->parseFromQuery(elt);
         if (!status.isOK())
             return status;
+    }
+    if (!geoContainer) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                                    << "'s 'withinRegion' can't be an empty object");
     }
 
     if (subobj["field"].type() != BSONType::String) {
