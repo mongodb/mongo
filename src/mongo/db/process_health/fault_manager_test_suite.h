@@ -106,7 +106,7 @@ public:
         progressMonitorCheckForTests(crashCb);
     }
 
-    FaultManagerConfig getConfigTest() {
+    const FaultManagerConfig& getConfigTest() {
         return getConfig();
     }
 

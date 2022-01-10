@@ -90,7 +90,7 @@ void FaultManager::set(ServiceContext* svcCtx, std::unique_ptr<FaultManager> new
 
 
 bool FaultManager::isInitialized() {
-    stdx::lock_guard lock(_stateMutex);
+    stdx::lock_guard lock(_mutex);
     return _initialized;
 }
 
@@ -611,33 +611,38 @@ void FaultManager::updateWithCheckStatus(HealthCheckStatus&& checkStatus) {
         type, _svcCtx->getFastClockSource(), std::move(checkStatus)));
 }
 
-FaultManagerConfig FaultManager::getConfig() const {
+const FaultManagerConfig& FaultManager::getConfig() const {
     auto lk = stdx::lock_guard(_mutex);
     return *_config;
 }
 
 void FaultManager::_init() {
-    auto lk = stdx::lock_guard(_mutex);
+    std::set<FaultFacetType> allTypes;
+    std::vector<std::unique_ptr<HealthObserver>>::size_type observersSize = _observers.size();
+    {
+        auto lk = stdx::lock_guard(_mutex);
 
-    _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx);
+        _observers = HealthObserverRegistration::instantiateAllObservers(_svcCtx);
+
+        for (const auto& observer : _observers) {
+            allTypes.insert(observer->getType());
+        }
+        observersSize = _observers.size();
+    }
 
     // Verify that all observer types are unique.
-    std::set<FaultFacetType> allTypes;
-    for (const auto& observer : _observers) {
-        allTypes.insert(observer->getType());
-    }
-    invariant(allTypes.size() == _observers.size());
+    invariant(allTypes.size() == observersSize);
 
     // Start the monitor thread after all observers are initialized.
     _progressMonitor = std::make_unique<ProgressMonitor>(this, _svcCtx, _crashCb);
 
-    auto lk2 = stdx::lock_guard(_stateMutex);
     _initialized = true;
+
     LOGV2_DEBUG(5956701,
                 1,
                 "Instantiated health observers",
                 "managerState"_attr = str::stream() << state(),
-                "observersCount"_attr = _observers.size());
+                "observersCount"_attr = observersSize);
 }
 
 std::vector<HealthObserver*> FaultManager::getHealthObservers() const {

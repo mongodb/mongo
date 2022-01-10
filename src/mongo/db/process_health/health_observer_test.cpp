@@ -144,15 +144,15 @@ TEST_F(FaultManagerTest, HealthCheckRunsPeriodically) {
                                          << "interval" << 1)))};
     RAIIServerParameterControllerForTest _controller{"featureFlagHealthMonitoring", true};
     auto faultFacetType = FaultFacetType::kMock1;
-    auto severity = Severity::kOk;
-    registerMockHealthObserver(faultFacetType, [&severity] { return severity; });
+    AtomicWord<Severity> severity{Severity::kOk};
+    registerMockHealthObserver(faultFacetType, [&severity] { return severity.load(); });
 
     assertSoon([this] { return (manager().getFaultState() == FaultState::kStartupCheck); });
 
     auto initialHealthCheckFuture = manager().startPeriodicHealthChecks();
     assertSoon([this] { return (manager().getFaultState() == FaultState::kOk); });
 
-    severity = Severity::kFailure;
+    severity.store(Severity::kFailure);
     assertSoon([this] { return (manager().getFaultState() == FaultState::kTransientFault); });
     resetManager();  // Before fields above go out of scope.
 }

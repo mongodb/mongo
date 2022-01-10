@@ -133,6 +133,7 @@ public:
             } else {
                 // TODO SERVER-61944: this is for kMock1 & kMock2. Remove this branch once mock
                 // types are deleted.
+                stdx::lock_guard lock(_mutex);
                 if (_facetToIntensityMapForTest.contains(type)) {
                     return _facetToIntensityMapForTest.at(type);
                 }
@@ -143,11 +144,12 @@ public:
         return getIntensity(type);
     }
 
-    bool isHealthObserverEnabled(FaultFacetType type) {
+    bool isHealthObserverEnabled(FaultFacetType type) const {
         return getHealthObserverIntensity(type) != HealthObserverIntensityEnum::kOff;
     }
 
     void setIntensityForType(FaultFacetType type, HealthObserverIntensityEnum intensity) {
+        stdx::lock_guard lock(_mutex);
         _facetToIntensityMapForTest.insert({type, intensity});
     }
 
@@ -245,6 +247,8 @@ private:
     bool _periodicChecksDisabledForTests = false;
 
     stdx::unordered_map<FaultFacetType, HealthObserverIntensityEnum> _facetToIntensityMapForTest;
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManagerConfig::_mutex");
 };
 
 }  // namespace process_health

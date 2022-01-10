@@ -115,7 +115,7 @@ public:
     std::vector<HealthObserver*> getHealthObservers() const;
 
     // Gets the aggregate configuration for all process health environment.
-    FaultManagerConfig getConfig() const;
+    const FaultManagerConfig& getConfig() const;
 
     // Gets the timestamp of the last transition
     Date_t getLastTransitionTime() const;
