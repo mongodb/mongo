@@ -100,13 +100,24 @@ extern uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t);
  */
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
 {
+    static uint32_t (*crc32c_func)(const void *, size_t);
 #if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
-    unsigned long caps = getauxval(AT_HWCAP);
+    unsigned long caps;
+#endif
 
+    /*
+     * This function calls slow hardware functions; if the application doesn't realize that, they
+     * may call it repeatedly rather than caching the result.
+     */
+    if (crc32c_func != NULL)
+        return (crc32c_func);
+
+#if defined(__linux__) && !defined(HAVE_NO_CRC32_HARDWARE)
+    caps = getauxval(AT_HWCAP);
     if (caps & HWCAP_CRC32)
-        return (__wt_checksum_hw);
-    return (__wt_checksum_sw);
+        return (crc32c_func = __wt_checksum_hw);
+    return (crc32c_func = __wt_checksum_sw);
 #else
-    return (__wt_checksum_sw);
+    return (crc32c_func = __wt_checksum_sw);
 #endif
 }
