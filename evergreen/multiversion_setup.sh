@@ -7,6 +7,7 @@ set -o errexit
 set -o verbose
 
 activate_venv
+$python -m pip --disable-pip-version-check install "db-contrib-tool==0.1.6"
 
 rm -rf /data/install /data/multiversion
 
@@ -14,13 +15,13 @@ edition="${multiversion_edition}"
 platform="${multiversion_platform}"
 architecture="${multiversion_architecture}"
 
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 4.0
+  4.0
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
@@ -39,13 +40,13 @@ if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
   architecture="${multiversion_architecture_42_or_later}"
 fi
 
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest 4.2
+  4.2
 
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
@@ -75,12 +76,11 @@ if [[ -n "${last_continuous_evg_version_id}" ]]; then
   last_continuous_arg="${last_continuous_evg_version_id}"
 fi
 
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest \
   $last_lts_arg \
   $last_continuous_arg 4.4 5.1

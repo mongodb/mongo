@@ -7,6 +7,7 @@ set -o errexit
 set -o verbose
 
 activate_venv
+$python -m pip --disable-pip-version-check install "db-contrib-tool==0.1.6"
 
 rm -rf /data/install dist-test/bin
 
@@ -36,10 +37,10 @@ fi
 
 # This is primarily for tests for infrastructure which don't always need the latest
 # binaries.
-$python buildscripts/resmoke.py setup-multiversion \
+db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir dist-test/bin \
   --edition $edition \
   --platform $platform \
   --architecture $architecture \
-  --useLatest master
+  master
