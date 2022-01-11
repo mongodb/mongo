@@ -142,6 +142,12 @@ private:
      */
     void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
 
+    void _applyActionResult(OperationContext* opCtx,
+                            const UUID& uuid,
+                            const NamespaceString& nss,
+                            const DefragmentationAction& action,
+                            const DefragmentationActionResponse& response);
+
     void _processEndOfAction(WithLock, OperationContext* opCtx);
 
     Mutex _streamingMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_streamingMutex");

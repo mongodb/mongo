@@ -134,6 +134,23 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAddEmptyCollectionDoesNotTriggerDe
     ASSERT_FALSE(future.isReady());
 }
 
+TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionWhenCollectionRemovedFailsGracefully) {
+    CollectionType coll(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid);
+    coll.setKeyPattern(kShardKeyPattern);
+    coll.setBalancerShouldMergeChunks(true);
+    // Collection entry is not persisted (to simulate collection dropped), defragmentation should
+    // not begin.
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    auto configDoc = findOneOnConfigCollection(operationContext(),
+                                               CollectionType::ConfigNS,
+                                               BSON(CollectionType::kUuidFieldName << kUuid));
+    ASSERT_EQ(configDoc.getStatus(), Status(ErrorCodes::NoMatchingDocument, "No document found"));
+}
+
+// Phase 1 tests.
+
 TEST_F(BalancerDefragmentationPolicyTest, TestAddSingleChunkCollectionTriggersDataSize) {
     auto coll = makeConfigCollectionEntry();
     makeConfigChunkEntry();
@@ -211,8 +228,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAcknowledgeFinalDataSizeActionEnds
     ASSERT_FALSE(configCollDoc.hasField(CollectionType::kDefragmentationPhaseFieldName));
 }
 
-// TODO (SERVER-61533) add tests to distinguish recoverable VS unrecoverable errors.
-TEST_F(BalancerDefragmentationPolicyTest, TestFailedDataSizeActionGetsReissued) {
+TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsReissued) {
     auto coll = makeConfigCollectionEntry();
     makeConfigChunkEntry();
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
@@ -241,6 +257,36 @@ TEST_F(BalancerDefragmentationPolicyTest, TestFailedDataSizeActionGetsReissued) 
 
     future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future.isReady());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest,
+       TestNonRetriableErrorEndsDefragmentationButLeavesPersistedFields) {
+    auto coll = makeConfigCollectionEntry();
+    makeConfigChunkEntry();
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(future.get());
+
+    _defragmentationPolicy.acknowledgeDataSizeResult(
+        operationContext(),
+        failingDataSizeAction,
+        Status(ErrorCodes::NamespaceNotFound, "Testing error response"));
+
+    // Defragmentation should have stopped on the collection
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    // There should be no new actions.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+    // The defragmentation flags should still be present
+    auto configDoc = findOneOnConfigCollection(operationContext(),
+                                               CollectionType::ConfigNS,
+                                               BSON(CollectionType::kUuidFieldName << kUuid))
+                         .getValue();
+    ASSERT_TRUE(configDoc.getBoolField(CollectionType::kBalancerShouldMergeChunksFieldName));
+    auto storedDefragmentationPhase = DefragmentationPhase_parse(
+        IDLParserErrorContext("BalancerDefragmentationPolicyTest"),
+        configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
+    ASSERT_TRUE(storedDefragmentationPhase == DefragmentationPhaseEnum::kMergeChunks);
 }
 
 

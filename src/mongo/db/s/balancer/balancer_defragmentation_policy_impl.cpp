@@ -35,11 +35,16 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 
+#include <fmt/format.h>
+
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(beforeTransitioningDefragmentationPhase);
+MONGO_FAIL_POINT_DEFINE(afterBuildingNextDefragmentationPhase);
 
 ChunkVersion getShardVersion(OperationContext* opCtx, const ShardId& shardId, const UUID& uuid) {
     auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, uuid);
@@ -55,7 +60,29 @@ ChunkVersion getShardVersion(OperationContext* opCtx, const ShardId& shardId, co
         coll.getTimestamp(),
         repl::ReadConcernLevel::kLocalReadConcern,
         boost::none));
+    uassert(ErrorCodes::BadValue,
+            "No chunks or chunk version in collection",
+            !chunkVector.empty() && chunkVector.front().isVersionSet());
     return chunkVector.front().getVersion();
+}
+
+static bool isRetriableForDefragmentation(const Status& error) {
+    return (ErrorCodes::isA<ErrorCategory::RetriableError>(error) ||
+            error == ErrorCodes::StaleShardVersion || error == ErrorCodes::StaleConfig);
+}
+
+static void handleActionResult(const Status& status,
+                               std::function<void()> onSuccess,
+                               std::function<void()> onRetriableError) {
+    if (status.isOK()) {
+        onSuccess();
+        return;
+    }
+    if (isRetriableForDefragmentation(status)) {
+        onRetriableError();
+    } else {
+        error_details::throwExceptionForStatus(status);
+    }
 }
 
 class MergeChunksPhase : public DefragmentationPhase {
@@ -165,32 +192,39 @@ public:
                 [&](const MergeInfo& mergeAction) {
                     auto& mergeResponse = stdx::get<Status>(response);
                     auto& shardingPendingActions = _pendingActionsByShards[mergeAction.shardId];
-                    if (mergeResponse.isOK()) {
-                        shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                            mergeAction.chunkRange);
-                    } else {
-                        shardingPendingActions.rangesToMerge.emplace_back(mergeAction.chunkRange);
-                    }
+                    handleActionResult(
+                        mergeResponse,
+                        [&]() {
+                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                mergeAction.chunkRange);
+                        },
+                        [&]() {
+                            shardingPendingActions.rangesToMerge.emplace_back(
+                                mergeAction.chunkRange);
+                        });
                 },
                 [&](const DataSizeInfo& dataSizeAction) {
                     auto& dataSizeResponse = stdx::get<StatusWith<DataSizeResponse>>(response);
-                    if (dataSizeResponse.isOK()) {
-                        ChunkType chunk(dataSizeAction.uuid,
-                                        dataSizeAction.chunkRange,
-                                        dataSizeAction.version,
-                                        dataSizeAction.shardId);
-                        auto catalogManager = ShardingCatalogManager::get(opCtx);
-                        catalogManager->setChunkEstimatedSize(
-                            opCtx,
-                            chunk,
-                            dataSizeResponse.getValue().sizeBytes,
-                            ShardingCatalogClient::kMajorityWriteConcern);
-                    } else {
-                        auto& shardingPendingActions =
-                            _pendingActionsByShards[dataSizeAction.shardId];
-                        shardingPendingActions.rangesWithoutDataSize.emplace_back(
-                            dataSizeAction.chunkRange);
-                    }
+                    handleActionResult(
+                        dataSizeResponse.getStatus(),
+                        [&]() {
+                            ChunkType chunk(dataSizeAction.uuid,
+                                            dataSizeAction.chunkRange,
+                                            dataSizeAction.version,
+                                            dataSizeAction.shardId);
+                            auto catalogManager = ShardingCatalogManager::get(opCtx);
+                            catalogManager->setChunkEstimatedSize(
+                                opCtx,
+                                chunk,
+                                dataSizeResponse.getValue().sizeBytes,
+                                ShardingCatalogClient::kMajorityWriteConcern);
+                        },
+                        [&]() {
+                            auto& shardingPendingActions =
+                                _pendingActionsByShards[dataSizeAction.shardId];
+                            shardingPendingActions.rangesWithoutDataSize.emplace_back(
+                                dataSizeAction.chunkRange);
+                        });
                 },
                 [&](const AutoSplitVectorInfo& _) {
                     uasserted(ErrorCodes::BadValue, "Unexpected action type");
@@ -249,9 +283,8 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
             }
         }
     } else if (!coll.getBalancerShouldMergeChunks() && _defragmentationStates.contains(uuid)) {
-        _clearDataSizeInformation(opCtx, uuid);
+        _transitionPhases(opCtx, coll, DefragmentationPhaseEnum::kFinished);
         _defragmentationStates.erase(uuid);
-        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kFinished, uuid);
     }
 }
 
@@ -274,23 +307,32 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextS
     // TODO (SERVER-61635) validate fairness through collections
     for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
         auto& currentCollectionDefragmentationState = it->second;
-        // Phase transition if needed
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, it->first);
-        while (currentCollectionDefragmentationState &&
-               currentCollectionDefragmentationState->isComplete()) {
-            currentCollectionDefragmentationState = _transitionPhases(
-                opCtx, coll, _getNextPhase(currentCollectionDefragmentationState->getType()));
-        }
-        if (!currentCollectionDefragmentationState) {
+        try {
+            // Phase transition if needed
+            auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, it->first);
+            while (currentCollectionDefragmentationState &&
+                   currentCollectionDefragmentationState->isComplete()) {
+                currentCollectionDefragmentationState = _transitionPhases(
+                    opCtx, coll, _getNextPhase(currentCollectionDefragmentationState->getType()));
+            }
+            if (!currentCollectionDefragmentationState) {
+                it = _defragmentationStates.erase(it, std::next(it));
+                continue;
+            }
+            // Get next action
+            auto nextAction = currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
+            if (nextAction) {
+                return nextAction;
+            }
+            ++it;
+        } catch (DBException& e) {
+            // Catch getCollection errors.
+            LOGV2_ERROR(6153301,
+                        "Error while getting next defragmentation action",
+                        "uuid"_attr = it->first,
+                        "error"_attr = redact(e));
             it = _defragmentationStates.erase(it, std::next(it));
-            continue;
         }
-        // Get next action
-        auto nextAction = currentCollectionDefragmentationState->popNextStreamableAction(opCtx);
-        if (nextAction) {
-            return nextAction;
-        }
-        ++it;
     }
 
     boost::optional<DefragmentationAction> noAction;
@@ -298,6 +340,26 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextS
         noAction = boost::optional<EndOfActionStream>();
     }
     return noAction;
+}
+
+void BalancerDefragmentationPolicyImpl::_applyActionResult(
+    OperationContext* opCtx,
+    const UUID& uuid,
+    const NamespaceString& nss,
+    const DefragmentationAction& action,
+    const DefragmentationActionResponse& response) {
+    try {
+        _defragmentationStates[uuid]->applyActionResult(opCtx, action, response);
+    } catch (DBException& e) {
+        // Non-retriable error for stage found. Destroy the defragmentation state and remove from
+        // state without cleaning up.
+        LOGV2_ERROR(6153302,
+                    "Defragmentation for collection ending because of non-retriable error",
+                    "namespace"_attr = nss,
+                    "uuid"_attr = uuid,
+                    "error"_attr = redact(e));
+        _defragmentationStates.erase(uuid);
+    }
 }
 
 void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext* opCtx,
@@ -309,7 +371,8 @@ void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext*
         return;
     }
 
-    _defragmentationStates[action.uuid]->applyActionResult(opCtx, action, result);
+    _applyActionResult(opCtx, action.uuid, action.nss, action, result);
+
     _processEndOfAction(lk, opCtx);
 }
 
@@ -321,7 +384,8 @@ void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
         return;
     }
 
-    _defragmentationStates[action.uuid]->applyActionResult(opCtx, action, result);
+    _applyActionResult(opCtx, action.uuid, action.nss, action, result);
+
     _processEndOfAction(lk, opCtx);
 }
 
@@ -333,7 +397,8 @@ void BalancerDefragmentationPolicyImpl::acknowledgeAutoSplitVectorResult(
         return;
     }
 
-    _defragmentationStates[action.uuid]->applyActionResult(opCtx, action, result);
+    _applyActionResult(opCtx, action.uuid, action.nss, action, result);
+
     _processEndOfAction(lk, opCtx);
 }
 
@@ -346,7 +411,8 @@ void BalancerDefragmentationPolicyImpl::acknowledgeSplitResult(OperationContext*
         return;
     }
 
-    _defragmentationStates[action.uuid]->applyActionResult(opCtx, action, result);
+    _applyActionResult(opCtx, action.uuid, action.info.nss, action, result);
+
     _processEndOfAction(lk, opCtx);
 }
 
@@ -382,6 +448,9 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
     beforeTransitioningDefragmentationPhase.pauseWhileSet();
     std::unique_ptr<DefragmentationPhase> nextPhaseObject(nullptr);
     try {
+        if (shouldPersistPhase) {
+            _persistPhaseUpdate(opCtx, nextPhase, coll.getUuid());
+        }
         switch (nextPhase) {
             case DefragmentationPhaseEnum::kMergeChunks:
                 nextPhaseObject = MergeChunksPhase::build(opCtx, coll);
@@ -396,9 +465,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
                 _clearDataSizeInformation(opCtx, coll.getUuid());
                 break;
         }
-        if (shouldPersistPhase) {
-            _persistPhaseUpdate(opCtx, nextPhase, coll.getUuid());
-        }
+        afterBuildingNextDefragmentationPhase.pauseWhileSet();
     } catch (const DBException& e) {
         LOGV2_ERROR(6153101,
                     "Error while building defragmentation phase on collection",
@@ -462,7 +529,16 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
         }
         return entry;
     }()});
-    dbClient.update(updateOp);
+    auto response = dbClient.update(updateOp);
+    auto writeErrors = response.getWriteErrors();
+    if (writeErrors) {
+        BSONObj firstWriteError = writeErrors->front();
+        uasserted(ErrorCodes::Error(firstWriteError.getIntField("code")),
+                  firstWriteError.getStringField("errmsg"));
+    }
+    uassert(ErrorCodes::NoMatchingDocument,
+            "Collection {} not found while persisting phase change"_format(uuid.toString()),
+            response.getN() > 0);
 }
 
 void BalancerDefragmentationPolicyImpl::_clearDataSizeInformation(OperationContext* opCtx,
