@@ -492,7 +492,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
 
     // Get the max chunk version for this namespace.
     auto swCollVersion = getCollectionVersion(opCtx, nss);
-
     if (!swCollVersion.isOK()) {
         return swCollVersion.getStatus().withContext(
             str::stream() << "splitChunk cannot split chunk " << range.toString() << ".");
@@ -724,7 +723,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
                                             BSON(CollectionType::kNssFieldName << nss.ns()),
                                             {},
                                             1));
-
     if (findCollResponse.docs.empty()) {
         return {ErrorCodes::Error(5678601),
                 str::stream() << "Collection '" << nss.ns() << "' no longer either exists"};
@@ -870,7 +868,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                                             BSON(ShardType::name(toShard.toString())),
                                             {},
                                             boost::none));
-
     uassert(ErrorCodes::ShardNotFound,
             str::stream() << "Shard " << toShard << " does not exist",
             !shardResult.docs.empty());
@@ -895,6 +892,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Collection does not exist",
             !findCollResponse.docs.empty());
+
     const CollectionType coll(findCollResponse.docs[0]);
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Collection is undergoing changes and chunks cannot be moved",
@@ -943,7 +941,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // Check if chunk still exists and which shard owns it
     auto swCurrentChunk =
         getCurrentChunk(opCtx, coll.getUuid(), coll.getEpoch(), coll.getTimestamp(), migratedChunk);
-
     if (!swCurrentChunk.isOK()) {
         return swCurrentChunk.getStatus();
     }
@@ -1113,6 +1110,141 @@ StatusWith<ChunkType> ShardingCatalogManager::_findChunkOnConfig(OperationContex
     }
 
     return ChunkType::fromConfigBSON(origChunks.front(), epoch, timestamp);
+}
+
+void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  bool force,
+                                                  const Timestamp& validAfter) {
+    auto const catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations.
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto coll = [&] {
+        auto collDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                            opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            CollectionType::ConfigNS,
+                                            BSON(CollectionType::kNssFieldName << nss.ns()),
+                                            {},
+                                            1))
+                            .docs;
+        uassert(ErrorCodes::NamespaceNotFound, "Collection does not exist", !collDocs.empty());
+
+        return CollectionType(collDocs[0].getOwned());
+    }();
+
+    if (force) {
+        LOGV2(620650,
+              "Resetting the 'historyIsAt40' field for all chunks in collection {namespace} in "
+              "order to force all chunks' history to get recreated",
+              "namespace"_attr = nss.ns());
+
+        BatchedCommandRequest request([&] {
+            write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(ChunkType::collectionUUID() << coll.getUuid()));
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                    BSON("$unset" << BSON(ChunkType::historyIsAt40() << ""))));
+                entry.setUpsert(false);
+                entry.setMulti(true);
+                return entry;
+            }()});
+            return updateOp;
+        }());
+        request.setWriteConcern(ShardingCatalogClient::kLocalWriteConcern.toBSON());
+
+        auto response = configShard->runBatchWriteCommand(
+            opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+        uassertStatusOK(response.toStatus());
+
+        uassert(ErrorCodes::Error(5760502),
+                str::stream() << "No chunks found for collection " << nss.ns(),
+                response.getN() > 0);
+    }
+
+    // Find the collection version
+    const auto collVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
+
+    // Find the chunk history
+    const auto allChunksVector = [&] {
+        auto findChunksResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                ChunkType::ConfigNS,
+                                                BSON(ChunkType::collectionUUID() << coll.getUuid()),
+                                                BSONObj(),
+                                                boost::none));
+        uassert(ErrorCodes::Error(5760503),
+                str::stream() << "No chunks found for collection " << nss.ns(),
+                !findChunksResponse.docs.empty());
+        return std::move(findChunksResponse.docs);
+    }();
+
+    // Bump the major version in order to be guaranteed to trigger refresh on every shard
+    ChunkVersion newCollectionVersion(
+        collVersion.majorVersion() + 1, 0, collVersion.epoch(), collVersion.getTimestamp());
+    std::set<ShardId> changedShardIds;
+    for (const auto& chunk : allChunksVector) {
+        auto upgradeChunk = uassertStatusOK(
+            ChunkType::fromConfigBSON(chunk, collVersion.epoch(), collVersion.getTimestamp()));
+        bool historyIsAt40 = chunk[ChunkType::historyIsAt40()].booleanSafe();
+        if (historyIsAt40) {
+            uassert(
+                ErrorCodes::Error(5760504),
+                str::stream() << "Chunk " << upgradeChunk.getName() << " in collection " << nss.ns()
+                              << " indicates that it has been upgraded to version 4.0, but is "
+                                 "missing the history field. This indicates a corrupted routing "
+                                 "table and requires a manual intervention to be fixed.",
+                !upgradeChunk.getHistory().empty());
+            continue;
+        }
+
+        upgradeChunk.setVersion(newCollectionVersion);
+        newCollectionVersion.incMinor();
+        changedShardIds.emplace(upgradeChunk.getShard());
+
+        // Construct the fresh history.
+        upgradeChunk.setHistory({ChunkHistory{validAfter, upgradeChunk.getShard()}});
+
+        // Set the 'historyIsAt40' field so that it gets skipped if the command is re-run
+        BSONObjBuilder chunkObjBuilder(upgradeChunk.toConfigBSON());
+        chunkObjBuilder.appendBool(ChunkType::historyIsAt40(), true);
+
+        // Run the update
+        uassertStatusOK(
+            catalogClient->updateConfigDocument(opCtx,
+                                                ChunkType::ConfigNS,
+                                                BSON(ChunkType::name(upgradeChunk.getName())),
+                                                chunkObjBuilder.obj(),
+                                                false,
+                                                ShardingCatalogClient::kLocalWriteConcern));
+    }
+
+    // Wait for the writes to become majority committed so that the subsequent shard refreshes can
+    // see them
+    const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    WriteConcernResult unusedWCResult;
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, clientOpTime, ShardingCatalogClient::kMajorityWriteConcern, &unusedWCResult));
+
+    for (const auto& shardId : changedShardIds) {
+        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+        uassertStatusOK(
+            Shard::CommandResponse::getEffectiveStatus(shard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
+                Shard::RetryPolicy::kIdempotent)));
+    }
 }
 
 void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
