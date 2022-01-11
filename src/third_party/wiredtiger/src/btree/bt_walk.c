@@ -438,7 +438,10 @@ descend:
                 if (skip)
                     break;
                 empty_internal = false;
-            } else if (skip_func != NULL) {
+            }
+
+            /* See if our caller wants to skip this page. */
+            if (skip_func != NULL) {
                 WT_ERR(skip_func(session, ref, func_cookie, &skip));
                 if (skip)
                     break;
