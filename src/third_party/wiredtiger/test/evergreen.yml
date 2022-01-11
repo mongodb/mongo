@@ -343,11 +343,6 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-
-        if [ "Windows_NT" = "$OS" ]; then
-          export "PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH"
-          export "PYTHONPATH=$(pwd)/../lang/python/wiredtiger):$(cygpath -w $(pwd)/../lang/python)"
-        fi
         if [ ${is_cmake_build|false} = true ]; then
           cd cmake_build
         else
@@ -4273,6 +4268,10 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH
+      PYTHONPATH=($WT_TOPDIR/lang/python/wiredtiger):$(cygpath -w $WT_TOPDIR/lang/python)
     python_binary: 'python'
     scons_smp_command: -j $(echo "$(getconf NPROCESSORS_ONLN 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1) * 2" | bc)
   tasks:
@@ -4288,7 +4287,11 @@ buildvariants:
   expansions:
     python_binary: 'python'
     is_cmake_build: true
-    test_env_vars: WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH
+      PYTHONPATH=($WT_TOPDIR/lang/python/wiredtiger):$(cygpath -w $WT_TOPDIR/lang/python)
     windows_configure_flags: -vcvars_bat "'C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\VC\Auxiliary\Build\vcvars64.bat'"
   tasks:
     - name: compile
