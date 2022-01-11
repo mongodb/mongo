@@ -683,10 +683,9 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': collName},
         profileAssert: (db, profileDoc) => {
-            // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            // Reads the index entry for 'a' to determine uniqueness.
+            // The insert will perform a read to ensure uniqueness of 'a'.
             assert.eq(profileDoc.idxEntryBytesRead, 6);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
             assert.eq(profileDoc.cursorSeeks, 1);
@@ -794,7 +793,7 @@ const operations = [
                 assert.gte(profileDoc.docUnitsRead, 9);
                 assert.gte(profileDoc.cursorSeeks, 4);
             }
-            // Reads index entries on '_id' for the lookup and 'a' to ensure uniqueness.
+            // Reads index entries on '_id' and 'a' to ensure uniqueness.
             assert.eq(profileDoc.idxEntryBytesRead, 10);
             assert.eq(profileDoc.idxEntryUnitsRead, 2);
             if (FixtureHelpers.isReplSet(db)) {

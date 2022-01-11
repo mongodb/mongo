@@ -1407,12 +1407,12 @@ bool WiredTigerIndexUnique::_keyExists(OperationContext* opCtx,
     int cmp;
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search_near(c, &cmp); });
 
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementOneCursorSeek();
+
     if (ret == WT_NOTFOUND)
         return false;
     invariantWTOK(ret);
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneCursorSeek();
 
     if (cmp == 0)
         return true;
@@ -1574,7 +1574,12 @@ StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
             fmt::format("WiredTigerIndexUnique::_insert: remove: {}; uri: {}", _indexName, _uri));
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
-        if (_keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId)) {
+        // The usage of 'prefix_key=true' enables an optimization that allows this search to return
+        // more quickly. See SERVER-56509.
+        c->reconfigure(c, "prefix_key=true");
+        ON_BLOCK_EXIT([c] { c->reconfigure(c, "prefix_key=false"); });
+        auto keyExists = _keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId);
+        if (keyExists) {
             auto key = KeyString::toBson(
                 keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
             auto entry = _desc->getEntry();
