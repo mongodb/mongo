@@ -383,8 +383,8 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         # Make sure the state of global timestamps is what we think.
         expect_query_oldest = self.timestamp_str(self.oldest_ts)
         expect_query_stable = self.timestamp_str(self.stable_ts)
-        query_oldest = self.conn.query_timestamp('get=oldest')
-        query_stable = self.conn.query_timestamp('get=stable')
+        query_oldest = self.conn.query_timestamp('get=oldest_timestamp')
+        query_stable = self.conn.query_timestamp('get=stable_timestamp')
 
         self.assertEquals(expect_query_oldest, query_oldest)
         self.assertEquals(expect_query_stable, query_stable)

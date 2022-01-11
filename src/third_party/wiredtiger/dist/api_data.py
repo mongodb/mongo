@@ -1411,12 +1411,13 @@ methods = {
     Config('import', '', r'''
         configure import of an existing object into the currently running database''',
         type='category', subconfig=[
-        Config('compare_timestamp', 'oldest', r'''
-            Allow importing files with timestamps smaller or equal to the configured
-            global timestamps. Note that the history of the files are not imported
-            together and thus snapshot read of historical data will not work with the
-            option "stable"''',
-            choices=['oldest', 'stable']),
+        Config('compare_timestamp', 'oldest_timestamp', r'''
+            Allow importing files with timestamps smaller or equal to the configured global
+            timestamps. Note the history of the files are not imported together and thus snapshot
+            read of historical data will not work with the option "stable_timestamp". (The \c
+            oldest and \c stable arguments are deprecated short-hand for \c oldest_timestamp
+            and \c stable_timestamp, respectively.)''',
+            choices=['oldest', 'oldest_timestamp', 'stable', 'stable_timestamp']),
         Config('enabled', 'false', r'''
             whether to import the input URI from disk''',
             type='boolean'),
@@ -1938,19 +1939,19 @@ methods = {
 
 'WT_CONNECTION.query_timestamp' : Method([
     Config('get', 'all_durable', r'''
-        specify which timestamp to query:
-        \c all_durable returns the largest timestamp such that all timestamps
-        up to that value have been made durable, \c last_checkpoint returns the
-        timestamp of the most recent stable checkpoint, \c oldest returns the
-        most recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp,
-        \c oldest_reader returns the minimum of the read timestamps of all
-        active readers \c pinned returns the minimum of the \c oldest_timestamp
-        and the read timestamps of all active readers, \c recovery returns the
-        timestamp of the most recent stable checkpoint taken prior to a shutdown
-        and \c stable returns the most recent \c stable_timestamp set with
-        WT_CONNECTION::set_timestamp. See @ref transaction_timestamps''',
-        choices=['all_durable','last_checkpoint',
-            'oldest','oldest_reader','pinned','recovery','stable']),
+        specify which timestamp to query: \c all_durable returns the largest timestamp such that
+        all timestamps up to that value have been made durable, \c last_checkpoint returns the
+        timestamp of the most recent stable checkpoint, \c oldest_timestamp returns the most
+        recent \c oldest_timestamp set with WT_CONNECTION::set_timestamp, \c oldest_reader
+        returns the minimum of the read timestamps of all active readers \c pinned returns
+        the minimum of the \c oldest_timestamp and the read timestamps of all active readers,
+        \c recovery returns the timestamp of the most recent stable checkpoint taken prior to a
+        shutdown and \c stable_timestamp returns the most recent \c stable_timestamp set with
+        WT_CONNECTION::set_timestamp. (The \c oldest and \c stable arguments are deprecated
+        short-hand for \c oldest_timestamp and \c stable_timestamp, respectively.) See @ref
+        transaction_timestamps''',
+        choices=['all_durable','last_checkpoint','oldest',
+            'oldest_reader','oldest_timestamp','pinned','recovery','stable','stable_timestamp']),
 ]),
 
 'WT_CONNECTION.set_timestamp' : Method([

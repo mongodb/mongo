@@ -261,7 +261,8 @@ __create_file(
         if (import) {
             against_stable =
               __wt_config_getones(session, config, "import.compare_timestamp", &cval) == 0 &&
-              WT_STRING_MATCH("stable", cval.str, cval.len);
+              (WT_STRING_MATCH("stable", cval.str, cval.len) ||
+                WT_STRING_MATCH("stable_timestamp", cval.str, cval.len));
             WT_ERR(__check_imported_ts(session, uri, fileconf, against_stable));
         }
     }

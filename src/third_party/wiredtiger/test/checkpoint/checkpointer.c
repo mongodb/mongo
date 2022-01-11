@@ -195,7 +195,7 @@ real_checkpointer(void)
             return (log_print_err("verify_consistency (online)", ret, 1));
 
         if (g.use_timestamps) {
-            testutil_check(g.conn->query_timestamp(g.conn, timestamp_buf, "get=stable"));
+            testutil_check(g.conn->query_timestamp(g.conn, timestamp_buf, "get=stable_timestamp"));
             testutil_timestamp_parse(timestamp_buf, &stable_ts);
             oldest_ts = g.ts_oldest;
             if (stable_ts <= oldest_ts)
