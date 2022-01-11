@@ -89,6 +89,13 @@ public:
      * Timeout value enforced on an individual health check.
      */
     virtual Milliseconds getObserverTimeout() const = 0;
+
+    /**
+     * Returns false if the health observer is missing some configuration it needs for its health
+     * checks. In the case of faulty configuration, make sure to log any helpful messages within
+     * this method.
+     */
+    virtual bool isConfigured() const = 0;
 };
 
 }  // namespace process_health

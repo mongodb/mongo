@@ -38,6 +38,7 @@ namespace mongo {
 namespace process_health {
 MONGO_FAIL_POINT_DEFINE(hangTestHealthObserver);
 MONGO_FAIL_POINT_DEFINE(testHealthObserver);
+MONGO_FAIL_POINT_DEFINE(badConfigTestHealthObserver);
 Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
     PeriodicHealthCheckContext&& periodicCheckContext) {
     LOGV2_DEBUG(5936801, 2, "Test health observer executing");
@@ -57,6 +58,13 @@ Future<HealthCheckStatus> TestHealthObserver::periodicCheckImpl(
 
     LOGV2_DEBUG(5936802, 2, "Test health observer returns", "result"_attr = result.get());
     return result;
+}
+
+bool TestHealthObserver::isConfigured() const {
+    if (badConfigTestHealthObserver.shouldFail()) {
+        return false;
+    }
+    return true;
 }
 
 namespace {

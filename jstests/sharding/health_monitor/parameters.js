@@ -15,8 +15,8 @@ var st = new ShardingTest({
                 healthMonitoringIntensities: tojson({
                     values: [
                         {type: "dns", intensity: "off"},
-                        {type: "ldap", intensity: "critical"},
-                        {type: "test", intensity: "off"}
+                        {type: "ldap", intensity: "off"},
+                        {type: "test", intensity: "critical"}
                     ]
                 }),
             }
@@ -50,11 +50,12 @@ let getIntensity = (result, typeOfObserver) => {
 };
 
 assert.eq(getIntensity(result, "dns"), "off");
-assert.eq(getIntensity(result, "ldap"), "critical");
+assert.eq(getIntensity(result, "ldap"), "off");
+assert.eq(getIntensity(result, "test"), "critical");
 
 assert.commandWorked(st.s0.adminCommand({
     "setParameter": 1,
-    healthMonitoringIntensities: {values: [{type: "dns", intensity: "critical"}]}
+    healthMonitoringIntensities: {values: [{type: "test", intensity: "non-critical"}]}
 }));
 assert.commandFailed(st.s0.adminCommand({
     "setParameter": 1,
@@ -65,16 +66,16 @@ assert.commandFailed(st.s0.adminCommand({
     healthMonitoringIntensities: {values: [{type: "invalid", intensity: "off"}]}
 }));
 
-// Tests that ldap param is unchanged after dns was changed.
+// Tests that test param is unchanged after dns was changed.
 result =
     assert.commandWorked(st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}));
-assert.eq(getIntensity(result, "dns"), "critical");
-assert.eq(getIntensity(result, "ldap"), "critical");
+assert.eq(getIntensity(result, "dns"), "off");
+assert.eq(getIntensity(result, "test"), "non-critical");
 
 assert.commandWorked(st.s0.adminCommand({
     "setParameter": 1,
     healthMonitoringIntensities:
-        {values: [{type: "dns", intensity: 'non-critical'}, {type: "ldap", intensity: 'off'}]}
+        {values: [{type: "dns", intensity: 'non-critical'}, {type: "test", intensity: 'off'}]}
 }));
 result =
     assert.commandWorked(st.s0.adminCommand({"getParameter": 1, healthMonitoringIntensities: 1}));

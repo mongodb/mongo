@@ -51,6 +51,8 @@ protected:
 
     Future<HealthCheckStatus> periodicCheckImpl(
         PeriodicHealthCheckContext&& periodicCheckContext) override;
+
+    bool isConfigured() const override;
 };
 }  // namespace process_health
 }  // namespace mongo
