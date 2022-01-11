@@ -244,7 +244,8 @@ testutil_cleanup(TEST_OPTS *opts)
 
 /*
  * testutil_copy_data --
- *     Copy the data to a backup folder.
+ *     Copy the data to a backup folder. Usually, the data copy is cleaned up by a call to
+ *     testutil_clean_test_artifacts.
  */
 void
 testutil_copy_data(const char *dir)
