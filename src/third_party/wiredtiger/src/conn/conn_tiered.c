@@ -262,9 +262,11 @@ __tier_flush_meta(
     release = true;
     /*
      * Once the flush call succeeds we want to first remove the file: entry from the metadata and
-     * then update the object: metadata to indicate the flush is complete.
+     * then update the object: metadata to indicate the flush is complete. Record the flush
+     * timestamp from the flush call. We know that no new flush_tier call can begin until all work
+     * from the last call completes, so the connection field is correct.
      */
-    __wt_timestamp_to_hex_string(conn->txn_global.last_ckpt_timestamp, hex_timestamp);
+    __wt_timestamp_to_hex_string(conn->flush_ts, hex_timestamp);
     WT_ERR(__wt_metadata_remove(session, local_uri));
     WT_ERR(__wt_metadata_search(session, obj_uri, &obj_value));
     __wt_seconds(session, &now);
