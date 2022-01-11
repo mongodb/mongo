@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 # update is followed by a tombstone.
 class test_hs22(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', key1=1, key2=2, value_format='S')),

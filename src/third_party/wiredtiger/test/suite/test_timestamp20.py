@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 # Exercise fixing up of out-of-order updates in the history store.
 class test_timestamp20(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('string-row', dict(key_format='S', value_format='S')),

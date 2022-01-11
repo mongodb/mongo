@@ -108,7 +108,7 @@ class test_calc_modify(wttest.WiredTigerTestCase):
         self.assertIsNotNone(mods)
 
         c[k] = oldv
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c.set_key(k)
         c.modify(mods)
         self.session.commit_transaction()

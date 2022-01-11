@@ -35,12 +35,11 @@ from wtscenario import make_scenarios
 # Check what happens with RTS if you never set the stable timestamp.
 
 class test_rollback_to_stable31(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
     checkpoint_modes = [
         ('no-checkpoint', dict(checkpoint=False)),

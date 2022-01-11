@@ -36,7 +36,6 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 # Test that rollback to stable does not abort schema operations that are done
 # as they don't have transaction support
 class test_rollback_to_stable09(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     # Don't bother testing FLCS tables as well as they're highly unlikely to
     # behave differently at this level.

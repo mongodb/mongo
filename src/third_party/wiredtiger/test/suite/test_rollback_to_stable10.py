@@ -37,13 +37,12 @@ from wtthread import checkpoint_thread
 # test_rollback_to_stable10.py
 # Test the rollback to stable operation performs sweeping history store.
 class test_rollback_to_stable10(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S', prepare_extraconfig='')),
         ('column_fix', dict(key_format='r', value_format='8t',
             prepare_extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', prepare_extraconfig='')),
+        ('row_integer', dict(key_format='i', value_format='S', prepare_extraconfig='')),
     ]
 
     prepare_values = [
@@ -286,7 +285,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Perform several updates in parallel with checkpoint.
             session_p1 = self.conn.open_session()
             cursor_p1 = session_p1.open_cursor(uri_1)
-            session_p1.begin_transaction('isolation=snapshot')
+            session_p1.begin_transaction()
             self.retry_rollback('update ds1', session_p1,
                            lambda: prepare_range_updates(
                                session_p1, cursor_p1, ds_1, value_e, nrows,
@@ -296,7 +295,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Perform several updates in parallel with checkpoint.
             session_p2 = self.conn.open_session()
             cursor_p2 = session_p2.open_cursor(uri_2)
-            session_p2.begin_transaction('isolation=snapshot')
+            session_p2.begin_transaction()
             self.retry_rollback('update ds2', session_p2,
                            lambda: prepare_range_updates(
                                session_p2, cursor_p2, ds_2, value_e, nrows,

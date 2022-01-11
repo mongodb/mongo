@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 # Verify reverse modify traversal after eviction.
 class test_hs13(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB,eviction=(threads_max=1)'
-    session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
         ('integer-row', dict(key_format='i'))

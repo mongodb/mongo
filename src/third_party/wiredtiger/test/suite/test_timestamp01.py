@@ -34,7 +34,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
 class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
-    session_config = 'isolation=snapshot'
 
     def test_timestamp_range(self):
         # Cannot set a timestamp on a non-running transaction

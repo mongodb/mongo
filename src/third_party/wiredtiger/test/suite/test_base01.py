@@ -40,7 +40,7 @@ class test_base01(wttest.WiredTigerTestCase):
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('string_row', dict(key_format='S')),
+        ('row_string', dict(key_format='S')),
     ]
 
     scenarios = make_scenarios(key_format_values)

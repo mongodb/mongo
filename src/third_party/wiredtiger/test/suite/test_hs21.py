@@ -42,7 +42,6 @@ class test_hs21(wttest.WiredTigerTestCase):
     # Configure handle sweeping to occur within a specific amount of time.
     conn_config = 'file_manager=(close_handle_minimum=0,close_idle_time=2,close_scan_interval=1),' + \
             'statistics=(all),operation_tracking=(enabled=false)'
-    session_config = 'isolation=snapshot'
     file_name = 'test_hs21'
     numfiles = 10
     nrows = 1000

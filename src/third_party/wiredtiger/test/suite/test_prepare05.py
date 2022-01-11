@@ -37,12 +37,11 @@ from wtscenario import make_scenarios
 class test_prepare05(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare05'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='i')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='i')),
+        ('row_integer', dict(key_format='i', value_format='i')),
     ]
 
     scenarios = make_scenarios(format_values)

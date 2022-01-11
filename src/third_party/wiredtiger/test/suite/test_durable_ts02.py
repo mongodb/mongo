@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 # test_durable_ts03.py
 #    Checking visibility and durability of updates with durable_timestamp
 class test_durable_ts03(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('row-string', dict(keyfmt='S', valfmt='S')),

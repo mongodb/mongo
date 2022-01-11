@@ -48,7 +48,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
     format_values = [
         ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     restart_values = [

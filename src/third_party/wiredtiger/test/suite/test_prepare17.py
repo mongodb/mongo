@@ -35,7 +35,6 @@ from helper import simulate_crash_restart
 # previous commit and durable timestamps(for a transaction, say T1), the durable timestamp of T1 changes to
 # the commit timestamp of T2.
 class test_prepare17(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     uri = 'table:test_prepare17'
     nrows = 1000
 

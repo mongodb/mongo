@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 class test_assert05(wttest.WiredTigerTestCase, suite_subprocess):
     base = 'assert05'
     base_uri = 'file:' + base
-    session_config = 'isolation=snapshot'
     uri_always = base_uri + '.always.wt'
     uri_def = base_uri + '.def.wt'
     uri_never = base_uri + '.never.wt'

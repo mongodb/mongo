@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 # damage performance.
 class test_hs14(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column-fix', dict(key_format='r', value_format='8t')),

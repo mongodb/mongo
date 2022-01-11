@@ -38,7 +38,7 @@ class test_prepare_conflict(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)
@@ -63,7 +63,7 @@ class test_prepare_conflict(wttest.WiredTigerTestCase):
         self.reopen_conn()
 
         # Start a transaction.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
 
         # Truncate the middle chunk.
         c1 = self.session.open_cursor(uri, None)

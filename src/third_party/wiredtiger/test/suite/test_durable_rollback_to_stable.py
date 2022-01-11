@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 #    Checking visibility and durability of updates with durable_timestamp and
 #    with rollback to stable.
 class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subprocess):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('row-string', dict(keyfmt='S', valfmt='S')),

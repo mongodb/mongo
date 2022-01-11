@@ -44,7 +44,6 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
 
     tablename = 'test_util01.a'
     nentries = 1000
-    session_config = 'isolation=snapshot'
     stringclass = ''.__class__
 
     def compare_config(self, expected_cfg, actual_cfg):

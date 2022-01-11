@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 #    Check that the checkpoint honors the durable timestamp of updates.
 class test_durable_ts03(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=10MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('integer-row', dict(key_format='i', value_format='u')),

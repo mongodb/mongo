@@ -35,7 +35,6 @@ import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
-    session_config = 'isolation=snapshot'
 
     key_format_values = [
         ('column', dict(key_format='r', usestrings=False)),

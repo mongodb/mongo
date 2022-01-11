@@ -45,7 +45,6 @@ class test_assert01(wttest.WiredTigerTestCase, suite_subprocess):
     cfg_def = ''
     cfg_never = 'verbose=(write_timestamp=true),write_timestamp_usage=never,assert=(write_timestamp=on)'
     cfg_none = 'assert=(write_timestamp=off)'
-    session_config = 'isolation=snapshot'
 
     key_format_values = [
         ('column', dict(key_format='r', usestrings=False)),

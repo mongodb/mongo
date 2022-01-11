@@ -199,7 +199,7 @@ class test_reconfig_fail(wttest.WiredTigerTestCase):
         compat_str = 'compatibility=(release="2.6")'
         self.conn.reconfigure(compat_str)
 
-        self.session.begin_transaction("isolation=snapshot")
+        self.session.begin_transaction()
         c = self.session.open_cursor(uri, None)
         c.set_key(ds.key(20))
         c.set_value("abcde")

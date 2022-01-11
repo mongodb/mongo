@@ -34,7 +34,6 @@ from wtdataset import SimpleDataSet
 # Test that checkpoint cleans the obsolete history store internal pages.
 class test_gc02(test_gc_base):
     conn_config = 'cache_size=1GB,log=(enabled),statistics=(all)'
-    session_config = 'isolation=snapshot'
 
     def test_gc(self):
         nrows = 100000

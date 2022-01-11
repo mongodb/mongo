@@ -34,7 +34,6 @@ from wtdataset import SimpleDataSet
 # Make sure modify fails cleanly on FLCS tables.
 
 class test_flcs04(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     conn_config = 'in_memory=false'
 
     def test_flcs(self):

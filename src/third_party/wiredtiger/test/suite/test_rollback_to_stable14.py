@@ -45,11 +45,10 @@ def append_val(value, char):
 # history store. Since FLCS inherently doesn't support modify, there's no need to run this on
 # FLCS. (Note that self.value_format needs to exist anyway for the base class to use.)
 class test_rollback_to_stable14(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
     value_format='S'
 

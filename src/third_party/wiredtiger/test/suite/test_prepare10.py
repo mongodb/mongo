@@ -38,7 +38,6 @@ from wtscenario import make_scenarios
 class test_prepare10(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = 'cache_size=10MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='u')),

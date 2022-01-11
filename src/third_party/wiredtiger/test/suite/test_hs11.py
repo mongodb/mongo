@@ -34,7 +34,6 @@ from wiredtiger import stat
 # Ensure that updates without timestamps clear the history store records.
 class test_hs11(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,statistics=(all)'
-    session_config = 'isolation=snapshot'
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column-fix', dict(key_format='r', value_format='8t')),
