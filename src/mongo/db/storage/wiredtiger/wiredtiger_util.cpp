@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
 #include "mongo/platform/basic.h"
 
@@ -52,6 +52,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -525,7 +526,103 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     return static_cast<size_t>(cacheSizeMB);
 }
 
+logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
+    const std::string field = "verbose_level_id";
+
+    if (!obj.hasField(field)) {
+        throw std::logic_error("The following field is missing: " + field);
+    }
+
+    BSONElement verbose_level_id_ele = obj[field];
+    if (!verbose_level_id_ele.isNumber()) {
+        throw std::logic_error("The value associated to " + field + " must be a number");
+    }
+
+    // Matching each WiredTiger verbosity level to the equivalent LOGV2 severity level.
+    switch (verbose_level_id_ele.Int()) {
+        case WT_VERBOSE_ERROR:
+            return logv2::LogSeverity::Error();
+        case WT_VERBOSE_WARNING:
+            return logv2::LogSeverity::Warning();
+        case WT_VERBOSE_NOTICE:
+            return logv2::LogSeverity::Info();
+        case WT_VERBOSE_INFO:
+            return logv2::LogSeverity::Log();
+        case WT_VERBOSE_DEBUG:
+            return logv2::LogSeverity::Debug(1);
+        default:
+            return logv2::LogSeverity::Log();
+    }
+}
+
+logv2::LogComponent getWTLOGV2Component(const BSONObj& obj) {
+    const std::string field = "category_id";
+
+    if (!obj.hasField(field)) {
+        throw std::logic_error("The following field is missing: " + field);
+    }
+
+    BSONElement category_id_ele = obj[field];
+    if (!category_id_ele.isNumber()) {
+        throw std::logic_error("The value associated to " + field + " must be a number");
+    }
+
+    switch (category_id_ele.Int()) {
+        case WT_VERB_BACKUP:
+            return logv2::LogComponent::kWiredTigerBackup;
+        case WT_VERB_CHECKPOINT:
+        case WT_VERB_CHECKPOINT_CLEANUP:
+        case WT_VERB_CHECKPOINT_PROGRESS:
+            return logv2::LogComponent::kWiredTigerCheckpoint;
+        case WT_VERB_COMPACT:
+        case WT_VERB_COMPACT_PROGRESS:
+            return logv2::LogComponent::kWiredTigerCompact;
+        case WT_VERB_EVICT:
+            return logv2::LogComponent::kWiredTigerEviction;
+        case WT_VERB_HS:
+        case WT_VERB_HS_ACTIVITY:
+            return logv2::LogComponent::kWiredTigerHS;
+        case WT_VERB_RECOVERY:
+        case WT_VERB_RECOVERY_PROGRESS:
+            return logv2::LogComponent::kWiredTigerRecovery;
+        case WT_VERB_RTS:
+            return logv2::LogComponent::kWiredTigerRTS;
+        case WT_VERB_SALVAGE:
+            return logv2::LogComponent::kWiredTigerSalvage;
+        case WT_VERB_TIERED:
+            return logv2::LogComponent::kWiredTigerTiered;
+        case WT_VERB_TIMESTAMP:
+            return logv2::LogComponent::kWiredTigerTimestamp;
+        case WT_VERB_TRANSACTION:
+            return logv2::LogComponent::kWiredTigerTransaction;
+        case WT_VERB_VERIFY:
+            return logv2::LogComponent::kWiredTigerVerify;
+        case WT_VERB_LOG:
+            return logv2::LogComponent::kWiredTigerWriteLog;
+        default:
+            return logv2::LogComponent::kWiredTiger;
+    }
+}
+
 namespace {
+
+void logWTErrorMessage(int id, int errorCode, const std::string& message) {
+    logv2::LogComponent component = logv2::LogComponent::kWiredTiger;
+    logv2::DynamicAttributes attr;
+    attr.add("error", errorCode);
+
+    try {
+        // Parse the WT JSON message string.
+        BSONObj obj = fromjson(message);
+        attr.add("message", obj);
+        component = getWTLOGV2Component(obj);
+    } catch (...) {
+        // Fall back to default behaviour.
+        attr.add("message", message);
+    }
+    LOGV2_ERROR_OPTIONS(id, logv2::LogOptions{component}, "WiredTiger error message", attr);
+}
+
 int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
                                               WT_SESSION* session,
                                               int errorCode,
@@ -551,11 +648,8 @@ int mdb_handle_error_with_startup_suppression(WT_EVENT_HANDLER* handler,
                 return 0;
             }
         }
-        LOGV2_ERROR(22435,
-                    "WiredTiger error ({error}) {message}",
-                    "WiredTiger error",
-                    "error"_attr = errorCode,
-                    "message"_attr = message);
+
+        logWTErrorMessage(22435, errorCode, message);
 
         // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
         if (storageGlobalParams.repair) {
@@ -573,11 +667,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      int errorCode,
                      const char* message) {
     try {
-        LOGV2_ERROR(22436,
-                    "WiredTiger error ({errorCode}) {message}",
-                    "WiredTiger error",
-                    "error"_attr = errorCode,
-                    "message"_attr = redact(message));
+        logWTErrorMessage(22436, errorCode, std::string(redact(message)));
 
         // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
         if (storageGlobalParams.repair) {
@@ -591,8 +681,23 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
 }
 
 int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const char* message) {
+    logv2::DynamicAttributes attr;
+    logv2::LogSeverity severity = ::mongo::logv2::LogSeverity::Log();
+    logv2::LogOptions options = ::mongo::logv2::LogOptions{MongoLogV2DefaultComponent_component};
+
     try {
-        LOGV2(22430, "WiredTiger message", "message"_attr = redact(message));
+        try {
+            // Parse the WT JSON message string.
+            const BSONObj obj = fromjson(message);
+            severity = getWTLOGV2SeverityLevel(obj);
+            options = logv2::LogOptions{getWTLOGV2Component(obj)};
+            attr.add("message", redact(obj));
+        } catch (...) {
+            // Fall back to default behaviour.
+            attr.add("message", redact(message));
+        }
+
+        LOGV2_IMPL(22430, severity, options, "WiredTiger message", attr);
     } catch (...) {
         std::terminate();
     }
@@ -1048,5 +1153,53 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
     }
     settings.append("min pinned timestamp", minPinned);
 }
+
+std::string WiredTigerUtil::generateWTVerboseConfiguration() {
+    // Mapping between LOGV2 WiredTiger components and their WiredTiger verbose setting counterpart.
+    static const StaticImmortal wtVerboseComponents = std::map<logv2::LogComponent, std::string>{
+        {logv2::LogComponent::kWiredTigerBackup, "backup"},
+        {logv2::LogComponent::kWiredTigerCheckpoint, "checkpoint"},
+        {logv2::LogComponent::kWiredTigerCompact, "compact"},
+        {logv2::LogComponent::kWiredTigerEviction, "evict"},
+        {logv2::LogComponent::kWiredTigerHS, "history_store"},
+        {logv2::LogComponent::kWiredTigerRecovery, "recovery"},
+        {logv2::LogComponent::kWiredTigerRTS, "rts"},
+        {logv2::LogComponent::kWiredTigerSalvage, "salvage"},
+        {logv2::LogComponent::kWiredTigerTiered, "tiered"},
+        {logv2::LogComponent::kWiredTigerTimestamp, "timestamp"},
+        {logv2::LogComponent::kWiredTigerTransaction, "transaction"},
+        {logv2::LogComponent::kWiredTigerVerify, "verify"},
+        {logv2::LogComponent::kWiredTigerWriteLog, "log"},
+    };
+
+    str::stream cfg;
+
+    // Define the verbose level for each component.
+    cfg << "verbose=[";
+
+    // Enable WiredTiger progress messages.
+    cfg << "recovery_progress:1,checkpoint_progress:1,compact_progress:1";
+
+    // Process each LOGV2 WiredTiger component and set the desired verbosity level.
+    for (const auto& [component, componentStr] : *wtVerboseComponents) {
+        auto severity =
+            logv2::LogManager::global().getGlobalSettings().getMinimumLogSeverity(component);
+
+        cfg << ",";
+
+        int level;
+        if (severity.toInt() >= logv2::LogSeverity::Debug(1).toInt())
+            level = WT_VERBOSE_DEBUG;
+        else
+            level = WT_VERBOSE_INFO;
+
+        cfg << componentStr << ":" << level;
+    }
+
+    cfg << "]";
+
+    return cfg;
+}
+
 
 }  // namespace mongo

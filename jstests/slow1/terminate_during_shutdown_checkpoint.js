@@ -119,9 +119,10 @@ const rst = new ReplSetTest({
     nodeOptions: {
         syncdelay: 10,  // Fast checkpoint intervals.
         slowms: 30000,  // Don't log slow queries.
-        setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})},
+        setParameter:
+            {logComponentVerbosity: tojsononeline({storage: {recovery: 2, wt: {wtCheckpoint: 1}}})},
         wiredTigerEngineConfigString:
-            "debug_mode=(slow_checkpoint=true,table_logging=true),verbose=[checkpoint,checkpoint_cleanup,checkpoint_progress]"
+            "debug_mode=(slow_checkpoint=true,table_logging=true),verbose=[checkpoint_cleanup,checkpoint_progress]"
     }
 });
 rst.startSet();

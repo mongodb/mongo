@@ -119,6 +119,8 @@ assert.eq(5, result.accessControl.verbosity);
 })();
 
 // Restore old verbosity values.
+// We need to remove the verbosity settings related to WiredTiger as they cannot be set at runtime.
+delete old.logComponentVerbosity["storage"]["wt"];
 assert.commandWorked(
     db.adminCommand({"setParameter": 1, logComponentVerbosity: old.logComponentVerbosity}));
 

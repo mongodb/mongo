@@ -52,6 +52,7 @@ _CODE_PATTERNS = [
         r"LOGV2(?:\w*)?\s*\(",
         # Forwards a dynamic code to LOGV2
         r"logAndBackoff\(",
+        r"logWTErrorMessage\(",
         # Error coersions
         r"ErrorCodes::Error\s*[({]",
     ]

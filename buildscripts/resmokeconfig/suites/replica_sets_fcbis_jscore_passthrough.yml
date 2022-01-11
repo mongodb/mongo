@@ -65,6 +65,9 @@ executor:
         logComponentVerbosity:
           replication: 3
           command: 2
-          storage: 1
+          storage:
+            recovery: 1
+            journal: 1
+            wt: 0
     num_nodes: 2
     start_initial_sync_node: True

@@ -401,11 +401,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
        << ",close_handle_minimum=" << gWiredTigerFileHandleCloseMinimum << "),";
     ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
 
-    if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, logv2::LogSeverity::Debug(3))) {
-        ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress,recovery],";
-    } else {
-        ss << "verbose=[recovery_progress,checkpoint_progress,compact_progress],";
-    }
+    // Enable JSON output for errors and messages.
+    ss << "json_output=(error,message),";
+
+    // Generate the settings related to the verbose configuration.
+    ss << WiredTigerUtil::generateWTVerboseConfiguration() << ",";
 
     if (kDebugBuild) {
         // Do not abort the process when corruption is found in debug builds, which supports

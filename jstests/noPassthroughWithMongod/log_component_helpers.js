@@ -4,7 +4,7 @@
 "use strict";
 var mongo = db.getMongo();
 
-// Get current log component setttings. We will reset to these later.
+// Get current log component settings. We will reset to these later.
 var originalSettings =
     assert.commandWorked(db.adminCommand({getParameter: 1, logComponentVerbosity: 1}))
         .logComponentVerbosity;
@@ -40,5 +40,7 @@ assert.throws(function() {
 });
 
 // Restore originalSettings
+// We need to remove the verbosity settings related to WiredTiger as they cannot be set at runtime.
+delete originalSettings["storage"]["wt"];
 assert.commandWorked(db.adminCommand({setParameter: 1, logComponentVerbosity: originalSettings}));
 }(db));

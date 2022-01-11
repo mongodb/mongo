@@ -306,6 +306,12 @@ public:
     static Status setTableLogging(WT_SESSION* session, const std::string& uri, bool on);
 
     /**
+     * Generates a WiredTiger connection configuration given the LOGV2 WiredTiger components
+     * verbosity levels.
+     */
+    static std::string generateWTVerboseConfiguration();
+
+    /**
      * Casts unsigned 64-bit statistics value to T.
      * If original value exceeds maximum value of T, return max(T).
      */

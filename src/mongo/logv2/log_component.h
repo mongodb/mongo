@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/config.h"
 
 namespace mongo::logv2 {
 
@@ -74,6 +75,20 @@ namespace mongo::logv2 {
     X(kStorage,                , "storage"               , "STORAGE" , kDefault) \
     X(kStorageRecovery,        , "recovery"              , "RECOVERY", kStorage) \
     X(kJournal,                , "journal"               , "JOURNAL" , kStorage) \
+    X(kWiredTiger,             , "wt"                    , "WT"      , kStorage) \
+    X(kWiredTigerBackup,       , "wtBackup"              , "WTBACKUP", kWiredTiger) \
+    X(kWiredTigerCheckpoint,   , "wtCheckpoint"          , "WTCHKPT" , kWiredTiger) \
+    X(kWiredTigerCompact,      , "wtCompact"             , "WTCMPCT" , kWiredTiger) \
+    X(kWiredTigerEviction,     , "wtEviction"            , "WTEVICT" , kWiredTiger) \
+    X(kWiredTigerHS,           , "wtHS"                  , "WTHS"    , kWiredTiger) \
+    X(kWiredTigerRecovery,     , "wtRecovery"            , "WTRECOV" , kWiredTiger) \
+    X(kWiredTigerRTS,          , "wtRTS"                 , "WTRTS"   , kWiredTiger) \
+    X(kWiredTigerSalvage,      , "wtSalvage"             , "WTSLVG"  , kWiredTiger) \
+    X(kWiredTigerTiered,       , "wtTiered"              , "WTTIER"  , kWiredTiger) \
+    X(kWiredTigerTimestamp,    , "wtTimestamp"           , "WTTS"    , kWiredTiger) \
+    X(kWiredTigerTransaction,  , "wtTransaction"         , "WTTXN"   , kWiredTiger) \
+    X(kWiredTigerVerify,       , "wtVerify"              , "WTVRFY"  , kWiredTiger) \
+    X(kWiredTigerWriteLog,     , "wtWriteLog"            , "WTWRTLOG", kWiredTiger) \
     X(kWrite,                  , "write"                 , "WRITE"   , kDefault) \
     X(kFTDC,                   , "ftdc"                  , "FTDC"    , kDefault) \
     X(kASIO,                   , "asio"                  , "ASIO"    , kNetwork) \

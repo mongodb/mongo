@@ -343,6 +343,15 @@ public:
                 return false;
             }
 
+            // WiredTiger component verbosity levels cannot be changed at runtime.
+            if (parameterName == "logComponentVerbosity") {
+                const BSONObj obj = parameter.Obj();
+                if (obj.hasField("storage") && obj.getObjectField("storage").hasField("wt")) {
+                    errmsg = "Cannot set log component verbosity parameter storage.wt at runtime.";
+                    return false;
+                }
+            }
+
             if (parameterName == "requireApiVersion" && parameter.trueValue() &&
                 (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
                  serverGlobalParams.clusterRole == ClusterRole::ShardServer)) {
