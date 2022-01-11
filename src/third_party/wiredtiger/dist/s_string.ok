@@ -21,6 +21,7 @@ Ailamaki
 Alakuijala
 Alexandrescu's
 Alloc
+Alves
 Async
 AsyncOp
 Athanassoulis
@@ -122,12 +123,14 @@ EACCES
 EAGAIN
 EB
 EBUSY
+EDC
 EEXIST
 EINTR
 EINVAL
 EMSG
 EMail
 ENCRYPTOR
+ENDIAN
 ENOENT
 ENOMEM
 ENOTSUP
@@ -176,6 +179,7 @@ Fsync
 Fuerst
 GBR
 GCC
+GF
 GIDs
 GLIBC
 Gcc
@@ -212,6 +216,7 @@ INMEM
 INPROGRESS
 INSN
 INTL
+INTRINSICS
 INULL
 INUSE
 ISA
@@ -301,6 +306,7 @@ NOLL
 NOLOCK
 NONINFRINGEMENT
 NOOP
+NOP
 NOTFOUND
 NOTREACHED
 NOVALUE
@@ -377,6 +383,7 @@ Redistributions
 Refactor
 Resize
 RocksDB
+Rogerio
 Runtime
 SIMD
 SLIST
@@ -869,6 +876,7 @@ fnv
 foc
 fopen
 formatmessage
+foward
 fp
 fprintf
 fread
@@ -938,6 +946,7 @@ ibackup
 icount
 idlems
 idx
+ie
 ifdef
 ifdef's
 iflag
@@ -978,6 +987,7 @@ intpack
 intptr
 intr
 intrin
+intrinsics
 inuse
 io
 ip
@@ -1007,6 +1017,7 @@ iters
 jjj
 jprx
 json
+kB
 kb
 kbits
 keycmp
@@ -1273,6 +1284,7 @@ pvA
 pwrite
 py
 qdown
+qn
 qqq
 qrrSS
 qsort
@@ -1537,6 +1549,8 @@ valuev
 vanishingly
 variable's
 variadic
+vdata
+vec
 vectorized
 versa
 vfprintf
@@ -1544,6 +1558,7 @@ vh
 vm
 vpack
 vpmsum
+vpmsumd
 vprintf
 vrfy
 vsize
@@ -1584,6 +1599,7 @@ xF
 xdeadbeef
 xff
 xfff
+xxpermdi
 xxxx
 xxxxx
 xxxxxx

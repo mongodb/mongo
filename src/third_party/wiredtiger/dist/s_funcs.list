@@ -1,6 +1,4 @@
 # List of functions that aren't found by s_funcs, but that's OK.
-FUNC_END
-FUNC_START
 WT_CRC32_ENTRY
 WT_CURDUMP_PASS
 __bit_ffs
