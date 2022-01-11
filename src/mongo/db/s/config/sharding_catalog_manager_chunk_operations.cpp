@@ -159,7 +159,7 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
     return preCond.arr();
 }
 
-/*
+/**
  * Check that the chunk still exists and return its metadata.
  */
 StatusWith<ChunkType> getCurrentChunk(OperationContext* opCtx,
@@ -282,7 +282,9 @@ boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
     return uassertStatusOK(ChunkType::fromConfigBSON(response.docs.front(), epoch, timestamp));
 }
 
-// Helper function to find collection version and shard version.
+/**
+ * Helper function to find collection version and shard version.
+ */
 StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
     const CollectionType& coll, const StatusWith<Shard::QueryResponse>& queryResponse) {
 
@@ -303,7 +305,9 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
     return chunk.getVersion();
 }
 
-// Helper function to get the collection version for nss. Always uses kLocalReadConcern.
+/**
+ * Helper function to get the collection version for nss. Always uses kLocalReadConcern.
+ */
 StatusWith<ChunkVersion> getCollectionVersion(OperationContext* opCtx, const NamespaceString& nss) {
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse =
@@ -354,8 +358,6 @@ ChunkVersion getShardVersion(OperationContext* opCtx,
             chunksQuery,
             BSON(ChunkType::lastmod << -1),  // Sort by version.
             1));
-
-
     if (!swDonorShardVersion.isOK()) {
         if (swDonorShardVersion.getStatus().code() == 50577) {
             // The query to find 'nss' chunks belonging to the donor shard didn't return any chunks,
