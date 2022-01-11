@@ -134,8 +134,12 @@ __fstream_printf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va
         va_copy(ap_copy, ap);
         if ((p = buf->mem) != NULL)
             p += buf->size;
-        WT_ASSERT(session, buf->memsize >= buf->size);
         space = buf->memsize - buf->size;
+
+        WT_ASSERT(session, buf->memsize >= buf->size);
+        if (buf->mem == NULL)
+            WT_ASSERT(session, space == 0);
+
         WT_RET(__wt_vsnprintf_len_set(p, space, &len, fmt, ap_copy));
         va_end(ap_copy);
 
