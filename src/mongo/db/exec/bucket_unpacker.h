@@ -167,10 +167,9 @@ private:
     BSONObj _bucket;
 
     // Since the metadata value is the same across all materialized measurements we can cache the
-    // metadata BSONElement in the reset phase and use it to materialize the metadata in each
+    // metadata Value in the reset phase and use it to materialize the metadata in each
     // measurement.
-    BSONElement _metaValue;
-
+    Value _metaValue;
 
     // Map <name, BSONElement> for the computed meta field projections. Updated for
     // every bucket upon reset().
