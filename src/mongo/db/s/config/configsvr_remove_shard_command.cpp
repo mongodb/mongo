@@ -41,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_database.h"
@@ -103,6 +104,10 @@ public:
             str::stream() << "_configsvrRemoveShard must be called with majority writeConcern, got "
                           << cmdObj,
             opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+        ON_BLOCK_EXIT([&opCtx] {
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        });
 
         // Set the operation context read concern level to local for reads into the config database.
         repl::ReadConcernArgs::get(opCtx) =
