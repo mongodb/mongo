@@ -24,6 +24,7 @@ import datetime
 import json
 import logging
 import os
+import sys
 import pathlib
 import shutil
 import traceback
@@ -33,7 +34,10 @@ import SCons
 
 cache_debug_suffix = " (target: %s, cachefile: %s) "
 
-class InvalidChecksum(SCons.Errors.BuildError):
+class ValidateCacheDirError(SCons.Errors.BuildError):
+    pass
+
+class InvalidChecksum(ValidateCacheDirError):
     def __init__(self, src, dst, reason, cache_csig='', computed_csig=''):
         self.message = f"ERROR: md5 checksum {reason} for {src} ({dst})"
         self.cache_csig = cache_csig
@@ -41,14 +45,14 @@ class InvalidChecksum(SCons.Errors.BuildError):
     def __str__(self):
         return self.message
 
-class CacheTransferFailed(SCons.Errors.BuildError):
+class CacheTransferFailed(ValidateCacheDirError):
     def __init__(self, src, dst, reason):
         self.message = f"ERROR: cachedir transfer {reason} while transfering {src} to {dst}"
 
     def __str__(self):
         return self.message
 
-class UnsupportedError(SCons.Errors.BuildError):
+class UnsupportedError(ValidateCacheDirError):
     def __init__(self, class_name, feature):
         self.message = f"{class_name} does not support {feature}"
 
@@ -174,7 +178,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         try:
             return super().push(node)
         except CacheTransferFailed as ex:
-            self.print_cache_issue(node, ex)
+            self.print_push_issue(node, ex)
             return False
 
     def CacheDebugJson(self, json_data, target, cachefile):
@@ -197,6 +201,17 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             self.json_log.write(json.dumps(json_data) + '\n')
 
     def CacheDebug(self, fmt, target, cachefile):
+
+        # Capture exception information for exception types
+        # which may bubble up from SCons proper. Non ValidateCacheDirError
+        # failures which come up from SCons may omit exception information.
+        # if this is a Non ValidateCacheDirError exception, we will emit a ValidateCacheDirError
+        # in place, which will capture the exception information and come back through
+        # this function to be logged in our normal CacheDirValidate process.
+        ex = sys.exc_info()[1]
+        if ex and not isinstance(ex, ValidateCacheDirError):
+            raise CacheTransferFailed(target, cachefile, f"failed: {ex}") from ex
+
         # The target cachefile will live in a directory with the special
         # extension for this cachedir class. Check if this cachefile is
         # in a directory like that and customize the debug logs.
@@ -211,6 +226,14 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         logging.error(msg)
         self.CacheDebug(log_msg + cache_debug_suffix, realnode, cachefile)
         self.CacheDebugJson(json_info, realnode, cachefile)
+
+    def print_push_issue(self, node, ex):
+
+        cksum_dir = pathlib.Path(self.cachepath(node)[1])
+        msg = ('An issue was detected while pushing to the cache:\n' +
+              '    ' + "\n    ".join("".join(traceback.format_exc()).split("\n")))
+
+        self._log(msg, str(ex), {'type': 'push_fail', 'error': msg}, node, cksum_dir)
 
     def print_cache_issue(self, node, ex):
 

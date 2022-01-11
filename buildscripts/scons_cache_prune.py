@@ -24,10 +24,9 @@ GIGBYTES = 1024 * 1024 * 1024
 CacheItem = collections.namedtuple("CacheContents", ["path", "time", "size"])
 
 
-def get_cachefile_size(file_path):
+def get_cachefile_size(file_path, is_cksum):
     """Get the size of the cachefile."""
-
-    if file_path.lower().endswith('.cksum') or file_path.lower().endswith('.cksum.del'):
+    if is_cksum:
         size = 0
         for cksum_path in os.listdir(file_path):
             cksum_path = os.path.join(file_path, cksum_path)
@@ -51,19 +50,26 @@ def collect_cache_contents(cache_path):
             for file_name in os.listdir(path):
                 file_path = os.path.join(path, file_name)
                 # Cache prune script is allowing only directories with this extension
-                # which comes from the validate_cache_dir.py tool in scons, it must match
+                # which comes from the validate_cache_dir.py tool in SCons, it must match
                 # the extension set in that file.
-                if os.path.isdir(file_path) and not file_path.lower().endswith(
-                        '.cksum') and not file_path.lower().endswith('.cksum.del'):
-                    LOGGER.warning(
-                        "cache item %s is a directory and not a file. "
-                        "The cache may be corrupt.", file_path)
-                    continue
+                cksum_type = False
+                if os.path.isdir(file_path):
+                    hash_length = -32
+                    tmp_length = -len('.cksum.tmp') + hash_length
+                    cksum_type = (file_path.lower().endswith('.cksum')
+                                  or file_path.lower().endswith('.cksum.del')
+                                  or file_path.lower()[tmp_length:hash_length] == '.cksum.tmp')
+
+                    if not cksum_type:
+                        LOGGER.warning(
+                            "cache item %s is a directory and not a file. "
+                            "The cache may be corrupt.", file_path)
+                        continue
 
                 try:
 
                     item = CacheItem(path=file_path, time=os.stat(file_path).st_atime,
-                                     size=get_cachefile_size(file_path))
+                                     size=get_cachefile_size(file_path, cksum_type))
 
                     total += item.size
 
