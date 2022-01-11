@@ -567,6 +567,15 @@ functions:
           done
         done
 
+  "compatibility test":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger"
+        script: |
+          set -o errexit
+          set -o verbose
+          test/evergreen/compatibility_test_for_releases.sh ${compat_test_args}
+
   "run-perf-test":
     # Run a performance test
     # Parameterised using the 'perf-test-name' and 'maxruns' variables
@@ -2011,46 +2020,30 @@ tasks:
   - name: compatibility-test-for-newer-releases
     commands:
       - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            test/evergreen/compatibility_test_for_releases.sh -n
+      - func: "compatibility test"
+        vars:
+          compat_test_args: -n
 
   - name: compatibility-test-for-older-releases
     commands:
       - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            test/evergreen/compatibility_test_for_releases.sh -o
+      - func: "compatibility test"
+        vars:
+          compat_test_args: -o
 
   - name: compatibility-test-upgrade-to-latest
     commands:
       - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            test/evergreen/compatibility_test_for_releases.sh -u
+      - func: "compatibility test"
+        vars:
+          compat_test_args: -u
 
   - name: compatibility-test-for-wt-standalone-releases
     commands:
       - func: "get project"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger"
-          script: |
-            set -o errexit
-            set -o verbose
-            test/evergreen/compatibility_test_for_releases.sh -w
+      - func: "compatibility test"
+        vars:
+          compat_test_args: -w
 
   - name: import-compatibility-test
     commands:
