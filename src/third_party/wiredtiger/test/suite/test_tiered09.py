@@ -103,7 +103,7 @@ class test_tiered09(wttest.WiredTigerTestCase):
         self.close_conn()
         self.assertTrue(os.path.exists(self.obj1file))
         self.assertTrue(os.path.exists(self.obj2file))
-        bucket_obj = self.bucket + '/' + self.prefix1 + self.obj1file
+        bucket_obj = os.path.join(self.bucket, self.prefix1 + self.obj1file)
         self.assertTrue(os.path.exists(bucket_obj))
         # Since we've closed and reopened the connection we lost the work units
         # to drop the local objects. Clean them up now to make sure we can open
@@ -132,9 +132,9 @@ class test_tiered09(wttest.WiredTigerTestCase):
         self.session.flush_tier(None)
         self.close_conn()
         # Check each table was created with the correct prefix.
-        bucket_obj = self.bucket + '/' + self.prefix2 + self.obj1second
+        bucket_obj = os.path.join(self.bucket, self.prefix2 + self.obj1second)
         self.assertTrue(os.path.exists(bucket_obj))
-        bucket_obj = self.bucket + '/' + self.prefix1 + self.obj2file
+        bucket_obj = os.path.join(self.bucket, self.prefix1 + self.obj2file)
         self.assertTrue(os.path.exists(bucket_obj))
         # Since we've closed and reopened the connection we lost the work units
         # to drop the local objects. Clean them up now to make sure we can open

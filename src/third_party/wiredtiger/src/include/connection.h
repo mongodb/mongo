@@ -592,6 +592,7 @@ struct __wt_connection_impl {
 #define WT_TIMING_STRESS_SPLIT_5 0x04000u
 #define WT_TIMING_STRESS_SPLIT_6 0x08000u
 #define WT_TIMING_STRESS_SPLIT_7 0x10000u
+#define WT_TIMING_STRESS_TIERED_FLUSH_FINISH 0x20000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
     uint64_t timing_stress_flags;
 
