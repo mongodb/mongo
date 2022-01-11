@@ -7,7 +7,7 @@
 //
 
 (function() {
-let coll = db[jsTestName()];
+let coll = db.datasize_validation;
 coll.drop();
 coll.insertOne({_id: 1});
 coll.insertOne({_id: 2});
