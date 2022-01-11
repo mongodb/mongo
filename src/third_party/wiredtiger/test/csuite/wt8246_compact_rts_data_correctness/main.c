@@ -169,10 +169,6 @@ run_test(bool column_store, const char *uri, bool preserve)
     testutil_assert_errno(waitpid(pid, &status, 0) != -1);
 
     printf("Compact process interrupted and killed...\n");
-
-    /* Copy the data to a separate folder for debugging purpose. */
-    testutil_copy_data(home);
-
     printf("Open database and run recovery\n");
 
     /* Open the connection which forces recovery to be run. */
