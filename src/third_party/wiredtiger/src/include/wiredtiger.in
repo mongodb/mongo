@@ -3663,13 +3663,13 @@ struct __wt_config_parser {
 /*!
  * Return a pointer to a function that calculates a CRC32C checksum.
  *
- * The WiredTiger library CRC32C checksum function uses hardware support where
- * available, else it falls back to a software implementation.
+ * The WiredTiger library CRC32C checksum function uses hardware support where available, else it
+ * falls back to a software implementation. Selecting a CRC32C checksum function can be slow, the
+ * return value should be cached by the caller for repeated use.
  *
  * @snippet ex_all.c Checksum a buffer
  *
- * @returns a pointer to a function that takes a buffer and length and returns
- * the CRC32C checksum
+ * @returns a pointer to a function that takes a buffer and length and returns the CRC32C checksum
  */
 uint32_t (*wiredtiger_crc32c_func(void))(const void *, size_t)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
