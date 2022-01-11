@@ -450,8 +450,8 @@ resolve()
 			    esac
 
 			    # Use the wt utility to recover & verify the object.
-			    echo "verify: $wt_binary -m -R -h $dir verify $uri" >> $log
-			    if  $($wt_binary -m -R -h $dir verify $uri >> $log 2>&1); then
+			    echo "verify: $wt_binary -R -h $dir verify $uri" >> $log
+			    if  $($wt_binary -R -h $dir verify $uri >> $log 2>&1); then
 				continue
 			    fi
 
