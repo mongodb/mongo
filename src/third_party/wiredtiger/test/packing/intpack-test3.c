@@ -31,6 +31,10 @@
 void test_value(int64_t);
 void test_spread(int64_t, int64_t, int64_t);
 
+/*
+ * test_value --
+ *     TODO: Add a comment describing this function.
+ */
 void
 test_value(int64_t val)
 {
@@ -96,6 +100,10 @@ test_value(int64_t val)
     }
 }
 
+/*
+ * test_spread --
+ *     TODO: Add a comment describing this function.
+ */
 void
 test_spread(int64_t start, int64_t before, int64_t after)
 {
@@ -107,6 +115,10 @@ test_spread(int64_t start, int64_t before, int64_t after)
         test_value(i);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(void)
 {

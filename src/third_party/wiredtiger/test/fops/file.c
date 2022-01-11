@@ -30,6 +30,10 @@
 
 static u_int uid = 1;
 
+/*
+ * obj_bulk --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_bulk(void)
 {
@@ -69,6 +73,10 @@ obj_bulk(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_bulk_unique --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_bulk_unique(int force)
 {
@@ -107,6 +115,10 @@ obj_bulk_unique(int force)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_cursor --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_cursor(void)
 {
@@ -129,6 +141,10 @@ obj_cursor(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_create --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_create(void)
 {
@@ -148,6 +164,10 @@ obj_create(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_create_unique --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_create_unique(int force)
 {
@@ -180,6 +200,10 @@ obj_create_unique(int force)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_drop --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_drop(int force)
 {
@@ -210,6 +234,10 @@ obj_drop(int force)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_checkpoint --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_checkpoint(void)
 {
@@ -230,6 +258,10 @@ obj_checkpoint(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_upgrade --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_upgrade(void)
 {
@@ -245,6 +277,10 @@ obj_upgrade(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * obj_verify --
+ *     TODO: Add a comment describing this function.
+ */
 void
 obj_verify(void)
 {

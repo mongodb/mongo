@@ -44,6 +44,10 @@
 
 void populate(TEST_OPTS *opts);
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -147,6 +151,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * populate --
+ *     TODO: Add a comment describing this function.
+ */
 void
 populate(TEST_OPTS *opts)
 {

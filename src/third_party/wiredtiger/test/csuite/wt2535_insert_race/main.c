@@ -80,6 +80,10 @@ get_value(TEST_OPTS *opts, WT_CURSOR *c)
     }
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -148,6 +152,10 @@ main(int argc, char *argv[])
 /*
  * Append to a table in a "racy" fashion - that is attempt to insert the same record another thread
  * is likely to also be inserting.
+ */
+/*
+ * thread_insert_race --
+ *     TODO: Add a comment describing this function.
  */
 void *
 thread_insert_race(void *arg)

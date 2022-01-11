@@ -75,6 +75,10 @@ typedef struct {
     int nfail;
 } THREAD_ARGS;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -214,6 +218,10 @@ main(int argc, char *argv[])
     return (0);
 }
 
+/*
+ * thread_insert --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 thread_insert(void *arg)
 {
@@ -289,6 +297,10 @@ thread_insert(void *arg)
     return (NULL);
 }
 
+/*
+ * thread_get --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 thread_get(void *arg)
 {

@@ -8,6 +8,10 @@
 
 #include "util.h"
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 usage(void)
 {
@@ -18,6 +22,10 @@ usage(void)
     return (1);
 }
 
+/*
+ * util_write --
+ *     TODO: Add a comment describing this function.
+ */
 int
 util_write(WT_SESSION *session, int argc, char *argv[])
 {

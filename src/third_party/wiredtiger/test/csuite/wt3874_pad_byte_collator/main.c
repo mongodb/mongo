@@ -37,6 +37,10 @@
 
 #define KEY_SIZE 20
 
+/*
+ * my_compare --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 my_compare(
   WT_COLLATOR *collator, WT_SESSION *session, const WT_ITEM *v1, const WT_ITEM *v2, int *cmp)
@@ -52,6 +56,10 @@ my_compare(
 
 static WT_COLLATOR my_coll = {my_compare, NULL, NULL};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

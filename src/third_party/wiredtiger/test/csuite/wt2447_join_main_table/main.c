@@ -51,6 +51,10 @@
 
 #define N_RECORDS 10000
 
+/*
+ * get_stat_total --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch, uint64_t *pval)
 {
@@ -79,6 +83,10 @@ get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch, u
     testutil_assert(match);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

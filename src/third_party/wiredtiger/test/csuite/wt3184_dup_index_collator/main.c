@@ -37,12 +37,20 @@
  * a key.
  */
 
+/*
+ * compare_int --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 compare_int(int32_t a, int32_t b)
 {
     return (a < b ? -1 : (a > b ? 1 : 0));
 }
 
+/*
+ * item_to_int --
+ *     TODO: Add a comment describing this function.
+ */
 static int32_t
 item_to_int(const WT_ITEM *item)
 {
@@ -58,6 +66,10 @@ item_to_int(const WT_ITEM *item)
     return ret;
 }
 
+/*
+ * compare_int_items --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 compare_int_items(WT_ITEM *itema, WT_ITEM *itemb)
 {
@@ -66,6 +78,10 @@ compare_int_items(WT_ITEM *itema, WT_ITEM *itemb)
     return (compare_int(item_to_int(itema), item_to_int(itemb)));
 }
 
+/*
+ * print_int_item --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 print_int_item(const char *str, const WT_ITEM *item)
 {
@@ -75,6 +91,10 @@ print_int_item(const char *str, const WT_ITEM *item)
         printf("%s<empty>", str);
 }
 
+/*
+ * index_compare --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 index_compare(
   WT_COLLATOR *collator, WT_SESSION *session, const WT_ITEM *key1, const WT_ITEM *key2, int *cmp)
@@ -108,6 +128,10 @@ index_compare(
 
 static WT_COLLATOR index_coll = {index_compare, NULL, NULL};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

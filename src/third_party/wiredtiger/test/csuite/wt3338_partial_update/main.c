@@ -155,6 +155,10 @@ compare(WT_ITEM *orig, WT_ITEM *local, WT_ITEM *library)
  *	should match the modified value that was used as input to the
  *	calculate-modify API.
  */
+/*
+ * modify_run --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 modify_run(TEST_OPTS *opts)
 {
@@ -240,6 +244,10 @@ modify_run(TEST_OPTS *opts)
     __wt_buf_free(session, &modtmp);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

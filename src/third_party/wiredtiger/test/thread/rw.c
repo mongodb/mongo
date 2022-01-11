@@ -45,6 +45,10 @@ typedef struct {
 
 static INFO *run_info;
 
+/*
+ * rw_start --
+ *     TODO: Add a comment describing this function.
+ */
 void
 rw_start(u_int readers, u_int writers)
 {

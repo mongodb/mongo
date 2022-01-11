@@ -42,6 +42,10 @@ static char *uri_list[750];
 static char home[HOME_LEN];
 extern char *__wt_optarg;
 
+/*
+ * uri_init --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 uri_init(void)
 {
@@ -79,6 +83,10 @@ uri_init(void)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * uri_teardown --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 uri_teardown(void)
 {
@@ -88,6 +96,10 @@ uri_teardown(void)
         free(uri_list[i]);
 }
 
+/*
+ * op --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
 {
@@ -148,6 +160,10 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
     (void)__wt_atomic_add64(&worker, 1);
 }
 
+/*
+ * wthread --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 wthread(void *arg)
 {
@@ -172,6 +188,10 @@ wthread(void *arg)
     return (NULL);
 }
 
+/*
+ * vthread --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 vthread(void *arg)
 {
@@ -210,6 +230,10 @@ vthread(void *arg)
     return (NULL);
 }
 
+/*
+ * on_alarm --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 on_alarm(int signo)
 {
@@ -218,6 +242,10 @@ on_alarm(int signo)
     done = true;
 }
 
+/*
+ * sweep_stats --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 sweep_stats(void)
 {
@@ -246,6 +274,10 @@ sweep_stats(void)
     }
 }
 
+/*
+ * runone --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 runone(bool config_cache)
 {
@@ -298,6 +330,10 @@ runone(bool config_cache)
     testutil_check(conn->close(conn, NULL));
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 run(int argc, char *argv[])
 {
@@ -367,6 +403,10 @@ run(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

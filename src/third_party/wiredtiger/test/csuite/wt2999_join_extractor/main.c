@@ -37,6 +37,10 @@
  * Failure mode: When a custom extractor is used with cursor joins, there are memory leaks at the
  * point where the extractor sets the key.
  */
+/*
+ * custom_extract1 --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 custom_extract1(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key,
   const WT_ITEM *value, WT_CURSOR *result_cursor)
@@ -56,6 +60,10 @@ custom_extract1(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key
     return (result_cursor->insert(result_cursor));
 }
 
+/*
+ * custom_extract2 --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 custom_extract2(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key,
   const WT_ITEM *value, WT_CURSOR *result_cursor)
@@ -78,6 +86,10 @@ custom_extract2(WT_EXTRACTOR *extractor, WT_SESSION *session, const WT_ITEM *key
 static WT_EXTRACTOR custom_extractor1 = {custom_extract1, NULL, NULL};
 static WT_EXTRACTOR custom_extractor2 = {custom_extract2, NULL, NULL};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

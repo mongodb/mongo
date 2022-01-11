@@ -11,6 +11,10 @@
 static int insert(WT_CURSOR *, const char *, bool);
 static int text(WT_SESSION *, const char *);
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 usage(void)
 {
@@ -21,6 +25,10 @@ usage(void)
     return (1);
 }
 
+/*
+ * util_loadtext --
+ *     TODO: Add a comment describing this function.
+ */
 int
 util_loadtext(WT_SESSION *session, int argc, char *argv[])
 {

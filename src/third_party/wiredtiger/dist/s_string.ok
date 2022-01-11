@@ -1205,6 +1205,7 @@ ondisk
 onint
 online
 onpage
+onsig
 oo
 opcode
 openat
@@ -1299,6 +1300,7 @@ rb
 rbrace
 rbracket
 rcursor
+rdlock
 rdonly
 rdtsc
 rduppo
@@ -1342,6 +1344,7 @@ rpc
 rts
 ru
 run's
+runone
 runtime
 rw
 rwlock
@@ -1364,6 +1367,7 @@ setv
 setvbuf
 sfence
 shareability
+sig
 signalled
 sii
 sizeof
@@ -1472,6 +1476,8 @@ trk's
 trun
 trunc
 trylock
+tryrdlock
+trywrlock
 tsc
 tupdate
 tv
@@ -1536,6 +1542,7 @@ usecs
 usedp
 userbad
 usercfg
+usleep
 usr
 utf
 util
@@ -1563,6 +1570,7 @@ vprintf
 vrfy
 vsize
 vsnprintf
+vthread
 vtype
 vunpack
 vxr
@@ -1589,6 +1597,7 @@ wrlock
 wrlsn
 ws
 wtbench
+wthread
 wti
 wtobj
 wtperf

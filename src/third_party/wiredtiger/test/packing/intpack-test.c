@@ -28,6 +28,10 @@
 
 #include "test_util.h"
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(void)
 {

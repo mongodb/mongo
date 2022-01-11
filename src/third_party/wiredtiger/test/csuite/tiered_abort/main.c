@@ -137,6 +137,10 @@ static pthread_rwlock_t ts_lock;
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -420,6 +424,10 @@ rollback:
  * it is killed by the parent.
  */
 static void run_workload(uint32_t, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * run_workload --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run_workload(uint32_t nth, const char *build_dir)
 {
@@ -520,6 +528,10 @@ extern char *__wt_optarg;
 /*
  * Initialize a report structure. Since zero is a valid key we cannot just clear it.
  */
+/*
+ * initialize_rep --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 initialize_rep(REPORT *r)
 {
@@ -530,6 +542,10 @@ initialize_rep(REPORT *r)
 /*
  * Print out information if we detect missing records in the middle of the data of a report
  * structure.
+ */
+/*
+ * print_missing --
+ *     TODO: Add a comment describing this function.
  */
 static void
 print_missing(REPORT *r, const char *fname, const char *msg)
@@ -544,6 +560,10 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 /*
  * Signal handler to catch if the child died unexpectedly.
  */
+/*
+ * handler --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 handler(int sig)
 {
@@ -555,6 +575,10 @@ handler(int sig)
     testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

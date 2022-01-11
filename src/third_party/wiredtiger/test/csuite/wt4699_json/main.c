@@ -33,6 +33,10 @@
  * configure parse error is returned.
  */
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

@@ -69,6 +69,10 @@ static void check(WT_SESSION *session, const char *uri, char *value, int commit_
 /*
  * Signal handler to catch if the child died unexpectedly.
  */
+/*
+ * sig_handler --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 sig_handler(int sig)
 {
@@ -83,6 +87,10 @@ sig_handler(int sig)
 }
 
 /* Methods implementation. */
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -101,6 +109,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * run_compact --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run_compact(WT_SESSION *session, const char *uri)
 {
@@ -110,6 +122,10 @@ run_compact(WT_SESSION *session, const char *uri)
     printf("Compact end...\n");
 }
 
+/*
+ * run_test --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 run_test(bool column_store, const char *uri, bool preserve)
 {
@@ -210,6 +226,10 @@ run_test(bool column_store, const char *uri, bool preserve)
     return (EXIT_SUCCESS);
 }
 
+/*
+ * workload_compact --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 workload_compact(const char *home, const char *table_config, const char *uri)
 {
@@ -272,6 +292,10 @@ workload_compact(const char *home, const char *table_config, const char *uri)
     run_compact(session, uri);
 }
 
+/*
+ * check --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 check(WT_SESSION *session, const char *uri, char *value, int read_ts)
 {
@@ -306,6 +330,10 @@ check(WT_SESSION *session, const char *uri, char *value, int read_ts)
     cursor = NULL;
 }
 
+/*
+ * large_updates --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
 {
@@ -332,6 +360,10 @@ large_updates(WT_SESSION *session, const char *uri, char *value, int commit_ts)
     cursor = NULL;
 }
 
+/*
+ * populate --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 populate(WT_SESSION *session, const char *uri)
 {
@@ -362,6 +394,10 @@ populate(WT_SESSION *session, const char *uri)
     cursor = NULL;
 }
 
+/*
+ * remove_records --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 remove_records(WT_SESSION *session, const char *uri, int commit_ts)
 {

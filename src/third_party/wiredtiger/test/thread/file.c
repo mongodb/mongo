@@ -28,6 +28,10 @@
 
 #include "thread.h"
 
+/*
+ * file_create --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 file_create(const char *name)
 {
@@ -48,6 +52,10 @@ file_create(const char *name)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * load --
+ *     TODO: Add a comment describing this function.
+ */
 void
 load(const char *name)
 {
@@ -90,6 +98,10 @@ load(const char *name)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * verify --
+ *     TODO: Add a comment describing this function.
+ */
 void
 verify(const char *name)
 {

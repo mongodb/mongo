@@ -28,6 +28,10 @@
 
 #include "cursor_order.h"
 
+/*
+ * file_create --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 file_create(SHARED_CONFIG *cfg, const char *name)
 {
@@ -56,6 +60,10 @@ file_create(SHARED_CONFIG *cfg, const char *name)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * load --
+ *     TODO: Add a comment describing this function.
+ */
 void
 load(SHARED_CONFIG *cfg, const char *name)
 {
@@ -102,6 +110,10 @@ load(SHARED_CONFIG *cfg, const char *name)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * verify --
+ *     TODO: Add a comment describing this function.
+ */
 void
 verify(SHARED_CONFIG *cfg, const char *name)
 {

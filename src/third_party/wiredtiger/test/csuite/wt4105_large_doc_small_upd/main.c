@@ -36,6 +36,10 @@ static const char *const uri = "table:large";
 #define NUM_DOCS 2
 
 static void on_alarm(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * on_alarm --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 on_alarm(int signo)
 {
@@ -48,6 +52,10 @@ on_alarm(int signo)
 
 static int ignore_errors = 0;
 
+/*
+ * handle_error --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *message)
 {
@@ -67,6 +75,10 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
 
 static WT_EVENT_HANDLER event_handler = {handle_error, NULL, NULL, NULL};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

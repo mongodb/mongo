@@ -72,6 +72,10 @@ static const char *const ckpt_file = "checkpoint_done";
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -190,6 +194,10 @@ thread_run(void *arg)
  * until it is killed by the parent.
  */
 static void run_workload(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * run_workload --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run_workload(void)
 {
@@ -234,6 +242,10 @@ run_workload(void)
 /*
  * Signal handler to catch if the child died unexpectedly.
  */
+/*
+ * handler --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 handler(int sig)
 {
@@ -248,6 +260,10 @@ handler(int sig)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

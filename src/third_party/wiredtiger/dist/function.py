@@ -2,12 +2,12 @@
 
 # Check the style of WiredTiger C code.
 from __future__ import print_function
-import fnmatch, os, re, sys
-from dist import all_c_files, compare_srcfile, source_files
+import re, sys
+from dist import all_c_files, compare_srcfile
 
 # Complain if a function comment is missing.
 def missing_comment():
-    for f in source_files():
+    for f in all_c_files():
         skip_re = re.compile(r'DO NOT EDIT: automatically built')
         func_re = re.compile(
             r'(/\*(?:[^\*]|\*[^/])*\*/)?\n\w[\w \*]+\n(\w+)', re.DOTALL)

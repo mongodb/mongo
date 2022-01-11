@@ -147,6 +147,10 @@ format_process_env(void)
 
 static bool syntax_check; /* Only checking configuration syntax. */
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

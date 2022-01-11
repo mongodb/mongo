@@ -96,6 +96,10 @@ static void get_compact_progress(
 /*
  * Signal handler to catch if the child died unexpectedly.
  */
+/*
+ * sig_handler --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 sig_handler(int sig)
 {
@@ -110,6 +114,10 @@ sig_handler(int sig)
 }
 
 /* Methods implementation. */
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -128,6 +136,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * run_test --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run_test(bool column_store, bool preserve)
 {
@@ -200,6 +212,10 @@ run_test(bool column_store, bool preserve)
         testutil_clean_work_dir(home);
 }
 
+/*
+ * workload_compact --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 workload_compact(const char *home, const char *table_config)
 {
@@ -276,6 +292,10 @@ workload_compact(const char *home, const char *table_config)
     testutil_check(conn->close(conn, NULL));
 }
 
+/*
+ * populate --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 populate(WT_SESSION *session, uint64_t start, uint64_t end)
 {
@@ -310,6 +330,10 @@ populate(WT_SESSION *session, uint64_t start, uint64_t end)
     testutil_check(cursor_2->close(cursor_2));
 }
 
+/*
+ * remove_records --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 remove_records(WT_SESSION *session, const char *uri, uint64_t start, uint64_t end)
 {
@@ -326,6 +350,10 @@ remove_records(WT_SESSION *session, const char *uri, uint64_t start, uint64_t en
     testutil_check(cursor->close(cursor));
 }
 
+/*
+ * verify_tables_helper --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 verify_tables_helper(WT_SESSION *session, const char *table1, const char *table2)
 {
@@ -366,6 +394,10 @@ verify_tables_helper(WT_SESSION *session, const char *table1, const char *table2
     return (total_keys);
 }
 
+/*
+ * verify_tables --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 verify_tables(WT_SESSION *session)
 {
@@ -383,6 +415,10 @@ verify_tables(WT_SESSION *session)
     printf("%i Keys verified from the two tables. \n", total_keys_1);
 }
 
+/*
+ * get_file_stats --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 get_file_stats(WT_SESSION *session, const char *uri, uint64_t *file_sz, uint64_t *avail_bytes)
 {
@@ -406,6 +442,10 @@ get_file_stats(WT_SESSION *session, const char *uri, uint64_t *file_sz, uint64_t
     cur_stat = NULL;
 }
 
+/*
+ * log_db_size --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 log_db_size(WT_SESSION *session, const char *uri)
 {
@@ -423,6 +463,10 @@ log_db_size(WT_SESSION *session, const char *uri)
       file_sz / WT_MEGABYTE, file_sz, avail_bytes / WT_MEGABYTE, avail_bytes, available_pct);
 }
 
+/*
+ * get_compact_progress --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_reviewed,
   uint64_t *pages_skipped, uint64_t *pages_rewritten)

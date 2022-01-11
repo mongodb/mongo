@@ -198,6 +198,10 @@ typedef struct {
  *     Print usage and exit.
  */
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -337,6 +341,10 @@ gen_table2_name(char *buf, size_t buf_size, uint64_t id, uint32_t threadid, uint
         testutil_check(__wt_snprintf(buf, buf_size, "table:B%" PRIu64 "-%" PRIu32, id, threadid));
 }
 
+/*
+ * schema_operation --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id, uint32_t op, uint32_t flags)
 {
@@ -438,6 +446,10 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id, uint32_t o
  *     Run a writer thread.
  */
 static WT_THREAD_RET thread_run(void *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * thread_run --
+ *     TODO: Add a comment describing this function.
+ */
 static WT_THREAD_RET
 thread_run(void *arg)
 {
@@ -580,6 +592,10 @@ create_db(const char *method)
  */
 static void fill_db(uint32_t, uint32_t, const char *, uint32_t)
   WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * fill_db --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 fill_db(uint32_t nth, uint32_t datasize, const char *method, uint32_t flags)
 {
@@ -687,6 +703,10 @@ check_empty(WT_SESSION *session, const char *uri)
  * check_empty --
  *     Check that the uri exists and has one entry.
  */
+/*
+ * check_one_entry --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 check_one_entry(WT_SESSION *session, const char *uri, const char *key, const char *value)
 {
@@ -709,6 +729,10 @@ check_one_entry(WT_SESSION *session, const char *uri, const char *key, const cha
  * check_schema
  *	Check that the database has the expected schema according to the
  *	last id seen for this thread.
+ */
+/*
+ * check_schema --
+ *     TODO: Add a comment describing this function.
  */
 static void
 check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid, uint32_t flags)
@@ -765,6 +789,10 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid, uint32_t f
     }
 }
 
+/*
+ * kill_child --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 kill_child(pid_t pid)
 {

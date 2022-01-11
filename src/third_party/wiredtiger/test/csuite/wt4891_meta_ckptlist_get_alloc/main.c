@@ -34,6 +34,10 @@
  * this test will cause an error in address sanitized builds.
  */
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

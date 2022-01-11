@@ -50,6 +50,10 @@ static void wt_shutdown(void);
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -176,6 +180,10 @@ shutdown(void)
     testutil_clean_work_dir(home);
 }
 
+/*
+ * handle_error --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *errmsg)
 {
@@ -194,6 +202,10 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
     return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
+/*
+ * handle_message --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {

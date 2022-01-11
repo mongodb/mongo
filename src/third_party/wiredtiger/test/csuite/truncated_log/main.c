@@ -53,6 +53,10 @@ static bool use_columns = false;
  * past that record.
  */
 static void write_and_read_new(WT_SESSION *);
+/*
+ * write_and_read_new --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 write_and_read_new(WT_SESSION *session)
 {
@@ -107,6 +111,10 @@ write_and_read_new(WT_SESSION *session)
 }
 
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -119,6 +127,10 @@ usage(void)
  * switches into log file 2.
  */
 static void fill_db(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * fill_db --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 fill_db(void)
 {
@@ -224,6 +236,10 @@ fill_db(void)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

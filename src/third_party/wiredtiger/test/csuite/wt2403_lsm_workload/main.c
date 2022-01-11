@@ -32,6 +32,10 @@ static const char name[] = "lsm:test";
 #define NUM_DOCS 100000
 #define NUM_QUERIES (NUM_DOCS / 100)
 
+/*
+ * rand_str --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 rand_str(uint64_t i, char *str)
 {
@@ -44,6 +48,10 @@ rand_str(uint64_t i, char *str)
     }
 }
 
+/*
+ * check_str --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 check_str(uint64_t i, char *str, bool mod)
 {
@@ -55,6 +63,10 @@ check_str(uint64_t i, char *str, bool mod)
     testutil_checkfmt(strcmp(str, str2), "strcmp failed, got %s, expected %s", str, str2);
 }
 
+/*
+ * query_docs --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 query_docs(WT_CURSOR *cursor, bool mod)
 {
@@ -70,6 +82,10 @@ query_docs(WT_CURSOR *cursor, bool mod)
     printf("%d documents read\n", NUM_QUERIES);
 }
 
+/*
+ * compact_thread --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 compact_thread(void *args)
 {
@@ -80,6 +96,10 @@ compact_thread(void *args)
     return (NULL);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
