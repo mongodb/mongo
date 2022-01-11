@@ -69,6 +69,10 @@ class test_hs26(wttest.WiredTigerTestCase):
     # Other cases of overlapping the key count are still interesting so we still generate
     # the full product of the scenarios.
 
+    visibility_values = [
+        ('not_globally_visible', dict(ts1_globally_visible=False)),
+        ('globally_visible', dict(ts1_globally_visible=True)),
+    ]
     nrows_values = [
         ('more', dict(nrows_1=103, nrows_2=211)),
         ('same', dict(nrows_1=211, nrows_2=211)),
@@ -85,7 +89,8 @@ class test_hs26(wttest.WiredTigerTestCase):
         ('17', dict(value_modulus_2=17)),
     ]
 
-    scenarios = make_scenarios(nrows_values, value_modulus_1_values, value_modulus_2_values)
+    scenarios = make_scenarios(visibility_values,
+        nrows_values, value_modulus_1_values, value_modulus_2_values)
 
     value_1 = 'a' * 500
     value_2 = 'd' * 500
@@ -171,8 +176,12 @@ class test_hs26(wttest.WiredTigerTestCase):
         # Write the first set of values at timestamp_1.
         self.make_updates(ds.uri, ds, self.value_1, self.value_modulus_1, self.nrows_1, self.timestamp_1)
 
+        # Optionally make the first set of values globally visible (and stable).
+        if self.ts1_globally_visible:
+            self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(self.timestamp_1) +
+                ',stable_timestamp=' + self.timestamp_str(self.timestamp_1))
+
         # Create a long running read transaction in a separate session.
-        # (Is it necessary for it to be separate? Not sure.)
         session_read = self.conn.open_session()
         session_read.begin_transaction('read_timestamp=' + self.timestamp_str(self.timestamp_1))
 
@@ -185,8 +194,6 @@ class test_hs26(wttest.WiredTigerTestCase):
         # Check that the new updates are only seen after the update timestamp.
         self.check(self.session, ds.uri, self.timestamp_1, self.timestamp_1)
         self.check(self.session, ds.uri, self.timestamp_2, self.timestamp_2)
-
-        self.session.breakpoint()
 
         # Now forcibly evict, so that all the pages are RLE-encoded and then read back in.
         # There doesn't seem to be any way to just forcibly evict an entire table, so what
