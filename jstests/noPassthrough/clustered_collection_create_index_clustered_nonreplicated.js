@@ -1,8 +1,5 @@
 /**
- * Tests createIndexes with the 'clustered' option on a replicated collection. Note: there are
- * different restrictions for non-replicated versus replicated clustered collections - eg replicated
- * collections can only be created with cluster key _id whereas non-replicated collections can be
- * created with arbitrary single field cluster keys.
+ * Tests createIndexes with the 'clustered' option on a replicated collection.
  *
  * @tags: [
  *   requires_fcv_52,
@@ -30,11 +27,6 @@ const collName = "coll";
 const nonReplicatedColl = nonReplicatedDB[collName];
 
 CreateIndexesClusteredTest.runBaseTests(nonReplicatedDB, collName);
-
-CreateIndexesClusteredTest.assertCreateIndexesImplicitCreateSucceeds(nonReplicatedDB, collName, {
-    createIndexes: collName,
-    indexes: [{key: {a: 1}, name: "clusterKeyYay", clustered: true, unique: true}]
-});
 
 MongoRunner.stopMongod(conn);
 })();

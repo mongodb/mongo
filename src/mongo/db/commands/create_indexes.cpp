@@ -106,17 +106,9 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
     const auto ns = cmd.getNamespace();
     const bool ignoreUnknownIndexOptions = cmd.getIgnoreUnknownIndexOptions();
 
-    bool containsClusteredIndex = false;
     std::vector<BSONObj> indexSpecs;
     for (const auto& index : cmd.getIndexes()) {
         BSONObj parsedIndexSpec = index;
-        if (parsedIndexSpec.hasField("clustered")) {
-            uassert(6100901,
-                    "A collection may only be clustered by a single index",
-                    !containsClusteredIndex);
-            containsClusteredIndex = true;
-        }
-
         if (ignoreUnknownIndexOptions) {
             parsedIndexSpec = index_key_validate::removeUnknownFields(parsedIndexSpec);
         }
@@ -324,21 +316,16 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
             !db || !ViewCatalog::get(db)->lookup(opCtx, ns));
 
     if (createCollImplicitly) {
+        for (const auto& spec : specs) {
+            uassert(6100900,
+                    "Cannot implicitly create a new collection with createIndex 'clustered' option",
+                    !spec["clustered"]);
+        }
+
         // We need to create the collection.
         BSONObjBuilder builder;
         builder.append("create", ns.coll());
         CollectionOptions options;
-        for (const auto& spec : specs) {
-            if (spec["clustered"] && !ns.isTimeseriesBucketsCollection()) {
-                // Timeseries buckets collections are created differently than standard clustered
-                // indexes.
-                tassert(6100900,
-                        "CollectionOptions are not expected to have a clusteredIndex yet",
-                        !options.clusteredIndex.is_initialized());
-                options.clusteredIndex = clustered_util::createClusteredInfoForNewCollection(spec);
-            }
-        }
-
         builder.appendElements(options.toBSON());
         BSONObj idIndexSpec;
 

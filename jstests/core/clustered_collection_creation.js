@@ -60,7 +60,7 @@ const validateCreateIndexOnClusterKey = function(db, collName, fullCreateOptions
 
     // 'clustered' is not a valid option for an index not on the cluster key.
     assert.commandFailedWithCode(
-        db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6100904);
+        db[collName].createIndex({notMyIndex: 1}, {clustered: true, unique: true}), 6243700);
 
     assert.commandFailedWithCode(db[collName].runCommand({
         createIndexes: collName,
@@ -69,7 +69,7 @@ const validateCreateIndexOnClusterKey = function(db, collName, fullCreateOptions
             {key: {b: 1}, name: "b_1_clustered", clustered: true, unique: true}
         ]
     }),
-                                 6100904);
+                                 6243700);
 
     // The listIndexes output should be unchanged.
     const listIndexes1 = assert.commandWorked(db[collName].runCommand("listIndexes"));

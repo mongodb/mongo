@@ -74,9 +74,10 @@ bool requiresLegacyFormat(const NamespaceString& nss);
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo);
 
 /**
- * Returns true if the BSON object matches the collection's cluster key.
+ * Returns true if the BSON object matches the collection's cluster key. Caller's should ensure
+ * keyPatternObj is the 'key' of the index spec of interest, not the entire index spec BSON.
  */
-bool matchesClusterKey(const BSONObj& obj,
+bool matchesClusterKey(const BSONObj& keyPatternObj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo);
 
 /**

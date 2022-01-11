@@ -1639,25 +1639,9 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
     // Always run single phase index build for empty collection. And, will be coordinated using
     // createIndexes oplog entry.
     for (const auto& spec : specs) {
-        uassert(
-            6100903,
-            "An index may not have the field 'clustered' unless it is on a clustered collection",
-            !spec.hasField("clustered") || collection->isClustered());
-
-        if (collection->isClustered()) {
-            bool matchesClusterKey = clustered_util::matchesClusterKey(
-                spec.getObjectField(IndexDescriptor::kKeyPatternFieldName),
-                collection->getClusteredInfo());
-
-            uassert(6100904,
-                    "'clustered' is not a valid index option for an index that doesn't match the "
-                    "cluster key",
-                    !spec.hasField("clustered") || matchesClusterKey);
-
-            if (matchesClusterKey) {
-                // The index is already built implicitly.
-                continue;
-            }
+        if (spec.hasField("clustered") && spec.getBoolField("clustered")) {
+            // The index is already built implicitly.
+            continue;
         }
 
         // Each index will be added to the mdb catalog using the preceding createIndexes

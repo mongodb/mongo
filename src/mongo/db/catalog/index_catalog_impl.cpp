@@ -898,6 +898,16 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
 
     const BSONObj key = spec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
 
+    // Check if the spec conflicts with the clusteredIndex.
+    if (spec["clustered"]) {
+        uassert(6243700,
+                "Cannot create index with option 'clustered' that does not match an existing "
+                "clustered index",
+                clustered_util::matchesClusterKey(
+                    spec.getObjectField(IndexDescriptor::kKeyPatternFieldName),
+                    collection->getClusteredInfo()));
+    }
+
     {
         // Check whether an index with the specified candidate name already exists in the catalog.
         const IndexDescriptor* desc = findIndexByName(opCtx, name, includeUnfinishedIndexes);

@@ -121,19 +121,30 @@ bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo) {
     return clustered_util::matchesClusterKey(BSON("_id" << 1), collInfo);
 }
 
-bool matchesClusterKey(const BSONObj& obj,
+bool matchesClusterKey(const BSONObj& keyPatternObj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo) {
     if (!collInfo) {
         return false;
     }
 
-    const auto nFields = obj.nFields();
+    if (kDebugBuild) {
+        if (keyPatternObj.hasField("key")) {
+            // Double check the caller didn't accidentally provide the full index spec instead of
+            // key pattern.
+            tassert(6243701,
+                    "matchesClusterKey should be provided the raw key pattern object, not the full "
+                    "index spec",
+                    collInfo->getIndexSpec().getKey().hasField("key"));
+        }
+    }
+
+    const auto nFields = keyPatternObj.nFields();
     invariant(nFields > 0);
     if (nFields > 1) {
         // Clustered key cannot be compound.
         return false;
     }
-    return obj.firstElement().fieldNameStringData() ==
+    return keyPatternObj.firstElement().fieldNameStringData() ==
         collInfo->getIndexSpec().getKey().firstElement().fieldNameStringData();
 }
 
