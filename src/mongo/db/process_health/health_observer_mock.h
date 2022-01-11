@@ -53,6 +53,10 @@ public:
 
     virtual ~HealthObserverMock() = default;
 
+    bool isConfigured() const override {
+        return true;
+    }
+
 protected:
     FaultFacetType getType() const override {
         return _mockType;

@@ -349,6 +349,7 @@ boost::optional<FaultState> FaultManager::handleTransientFault(const OptionalMes
 }
 
 boost::optional<FaultState> FaultManager::handleActiveFault(const OptionalMessageType& message) {
+    invariant(_fault);
     LOGV2_FATAL(5936509, "Halting Process due to ongoing fault", "fault"_attr = *_fault);
     return boost::none;
 }
@@ -418,6 +419,15 @@ void FaultManager::schedulePeriodicHealthCheckThread() {
         listOfActiveObservers << observer->getType() << " ";
 
         auto token = _managerShuttingDownCancellationSource.token();
+        if (!observer->isConfigured()) {
+            // Transition to an active fault if a health observer is not configured properly.
+            updateWithCheckStatus(HealthCheckStatus(
+                observer->getType(),
+                Severity::kFailure,
+                "Health observer failed to start because it was not configured properly."_sd));
+            setState(FaultState::kActiveFault, HealthCheckStatus(observer->getType()));
+            return;
+        }
         healthCheck(observer, token);
     }
     LOGV2(5936804, "Health observers started", "detail"_attr = listOfActiveObservers);
