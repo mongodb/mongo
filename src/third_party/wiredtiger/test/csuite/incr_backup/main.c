@@ -665,7 +665,7 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
             testutil_check(session->open_cursor(session, NULL, cursor, buf, &file_cursor));
             VERBOSE(3, "open_cursor(session, NULL, cursor, \"%s\", &file_cursor)\n", buf);
             while ((ret = file_cursor->next(file_cursor)) == 0) {
-                error_check(file_cursor->get_key(file_cursor, &offset, &size, &type));
+                testutil_check(file_cursor->get_key(file_cursor, &offset, &size, &type));
                 testutil_assert(type == WT_BACKUP_FILE || type == WT_BACKUP_RANGE);
                 if (type == WT_BACKUP_RANGE) {
                     nrange++;

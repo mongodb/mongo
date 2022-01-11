@@ -150,9 +150,9 @@ verify_import(WT_SESSION *session)
     testutil_check(session->open_cursor(session, IMPORT_URI, NULL, NULL, &cursor));
 
     while ((ret = cursor->next(cursor)) == 0) {
-        error_check(cursor->get_key(cursor, &key));
+        testutil_check(cursor->get_key(cursor, &key));
         testutil_assert(key == iteration);
-        error_check(cursor->get_value(cursor, &value));
+        testutil_check(cursor->get_value(cursor, &value));
         testutil_assert(value == iteration);
         iteration++;
     }

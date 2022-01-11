@@ -155,6 +155,8 @@ typedef struct {
  * error_sys_check --
  *     Complain and quit if a function call fails. A special name because it appears in the
  *     documentation. Allow any non-negative values.
+ *
+ * DO NOT USE THIS MACRO IN TEST CODE, IT IS ONLY FOR DOCUMENTATION.
  */
 #define error_sys_check(call)                                                     \
     do {                                                                          \
@@ -168,6 +170,8 @@ typedef struct {
  *     Complain and quit if a function call fails. A special name because it appears in the
  *     documentation. Ignore ENOTSUP to allow library calls which might not be included in any
  *     particular build.
+ *
+ * DO NOT USE THIS MACRO IN TEST CODE, IT IS ONLY FOR DOCUMENTATION.
  */
 #define error_check(call)                                                         \
     do {                                                                          \

@@ -191,10 +191,10 @@ again:
 #if 0
             fprintf(stderr, "Removing file from backup: %s\n", filename);
 #endif
-            error_sys_check(unlink(filename));
+            testutil_assert_errno(unlink(filename) == 0);
             testutil_check(__wt_snprintf(
               filename, sizeof(filename), "%s/BACKUP.copy/%s", g.home, prev->names[prevpos]));
-            error_sys_check(unlink(filename));
+            testutil_assert_errno(unlink(filename) == 0);
         } else {
             /*
              * There is something in the current list not in the prev list. Walk past it in the
@@ -258,21 +258,21 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
                 len = strlen(g.home) + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/%s", g.home, name));
-                error_sys_check(rfd = open(tmp, O_RDONLY, 0644));
+                testutil_assert_errno((rfd = open(tmp, O_RDONLY, 0644)) != -1);
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name));
-                error_sys_check(wfd1 = open(tmp, O_WRONLY | O_CREAT, 0644));
+                testutil_assert_errno((wfd1 = open(tmp, O_WRONLY | O_CREAT, 0644)) != -1);
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name));
-                error_sys_check(wfd2 = open(tmp, O_WRONLY | O_CREAT, 0644));
+                testutil_assert_errno((wfd2 = open(tmp, O_WRONLY | O_CREAT, 0644)) != -1);
                 free(tmp);
                 tmp = NULL;
 
@@ -297,12 +297,12 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
             total = 0;
             while (total < size) {
                 /* Use the read size since we may have read less than the granularity. */
-                error_sys_check(rdsize = read(rfd, tmp, this_size));
+                testutil_assert_errno((rdsize = read(rfd, tmp, this_size)) != -1);
                 /* If we get EOF, we're done. */
                 if (rdsize == 0)
                     break;
-                error_sys_check(write(wfd1, tmp, (size_t)rdsize));
-                error_sys_check(write(wfd2, tmp, (size_t)rdsize));
+                testutil_assert_errno((write(wfd1, tmp, (size_t)rdsize)) != -1);
+                testutil_assert_errno((write(wfd2, tmp, (size_t)rdsize)) != -1);
                 total += (uint64_t)rdsize;
                 offset += (uint64_t)rdsize;
                 this_size = WT_MIN(this_size, size - total);
@@ -334,9 +334,9 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
     testutil_assert(ret == WT_NOTFOUND);
     testutil_check(incr_cur->close(incr_cur));
     if (rfd != -1) {
-        error_sys_check(close(rfd));
-        error_sys_check(close(wfd1));
-        error_sys_check(close(wfd2));
+        testutil_assert_errno(close(rfd) == 0);
+        testutil_assert_errno(close(wfd1) == 0);
+        testutil_assert_errno(close(wfd2) == 0);
     }
     free(tmp);
 }
@@ -449,7 +449,7 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
     len = strlen(g.home) + strlen(BACKUP_INFO_FILE) + 2;
     to_path = dmalloc(len);
     testutil_check(__wt_snprintf(to_path, len, "%s/%s", g.home, BACKUP_INFO_FILE));
-    error_sys_check(rename(from_path, to_path));
+    testutil_assert_errno(rename(from_path, to_path) == 0);
     free(from_path);
     free(to_path);
 }
