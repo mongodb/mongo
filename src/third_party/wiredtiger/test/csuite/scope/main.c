@@ -32,6 +32,10 @@
 
 static int ignore_errors;
 
+/*
+ * handle_error --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *message)
 {
@@ -71,6 +75,10 @@ static WT_EVENT_HANDLER event_handler = {handle_error, NULL, NULL, NULL};
         }                                         \
     } while (0)
 
+/*
+ * cursor_scope_ops --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 cursor_scope_ops(WT_SESSION *session, const char *uri)
 {
@@ -337,6 +345,10 @@ cursor_scope_ops(WT_SESSION *session, const char *uri)
     }
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run(WT_CONNECTION *conn, const char *uri, const char *config)
 {
@@ -348,6 +360,10 @@ run(WT_CONNECTION *conn, const char *uri, const char *config)
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

@@ -59,6 +59,10 @@ static size_t lengths[] = {20,       /* Check configuration */
   0};
 
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -73,6 +77,10 @@ usage(void)
 #define SIZET_FMT "%Iu" /* size_t format string */
 #endif
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 run(CONFIG *cp, int bigkey, size_t bytes)
 {
@@ -135,6 +143,10 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

@@ -10,6 +10,10 @@
 
 static int copy(WT_SESSION *, const char *, const char *);
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 usage(void)
 {
@@ -20,6 +24,10 @@ usage(void)
     return (1);
 }
 
+/*
+ * util_backup --
+ *     TODO: Add a comment describing this function.
+ */
 int
 util_backup(WT_SESSION *session, int argc, char *argv[])
 {
@@ -86,6 +94,10 @@ err:
     return (ret);
 }
 
+/*
+ * copy --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 copy(WT_SESSION *session, const char *directory, const char *name)
 {

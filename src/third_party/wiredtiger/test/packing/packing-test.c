@@ -28,6 +28,10 @@
 
 #include "test_util.h"
 
+/*
+ * check --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 check(const char *fmt, ...)
 {
@@ -54,6 +58,10 @@ check(const char *fmt, ...)
     printf("\n");
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(void)
 {

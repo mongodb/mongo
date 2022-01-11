@@ -8,6 +8,10 @@
 
 #include "util.h"
 
+/*
+ * util_copyright --
+ *     TODO: Add a comment describing this function.
+ */
 void
 util_copyright(void)
 {

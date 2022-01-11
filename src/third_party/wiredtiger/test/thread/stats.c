@@ -32,6 +32,10 @@
  * stats
  *	Dump the database/file statistics.
  */
+/*
+ * stats --
+ *     TODO: Add a comment describing this function.
+ */
 void
 stats(void)
 {

@@ -45,6 +45,10 @@ typedef struct {
 
 static STATS *run_stats;
 
+/*
+ * fop_start --
+ *     TODO: Add a comment describing this function.
+ */
 void
 fop_start(u_int nthreads)
 {

@@ -96,6 +96,10 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
   ",verbose=(\"split\")", ",verbose=(\"transaction\")", ",verbose=(\"verify\")",
   ",verbose=(\"version\")", ",verbose=(\"write\")", ",verbose=()"};
 
+/*
+ * handle_message --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
@@ -112,6 +116,10 @@ static WT_EVENT_HANDLER event_handler = {NULL, handle_message, NULL, NULL};
 static const char *current; /* Current test configuration */
 
 static void on_alarm(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * on_alarm --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 on_alarm(int signo)
 {
@@ -123,6 +131,10 @@ on_alarm(int signo)
     /* NOTREACHED */
 }
 
+/*
+ * reconfig --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 reconfig(TEST_OPTS *opts, WT_SESSION *session, const char *config)
 {
@@ -142,6 +154,10 @@ reconfig(TEST_OPTS *opts, WT_SESSION *session, const char *config)
     (void)alarm(0);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

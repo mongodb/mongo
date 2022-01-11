@@ -56,6 +56,10 @@ void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 extern char *__wt_optarg;
 extern int __wt_optind;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -100,6 +104,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * setup --
+ *     TODO: Add a comment describing this function.
+ */
 void
 setup(void)
 {
@@ -137,6 +145,10 @@ setup(void)
     populate_entries();
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 void
 run(void)
 {
@@ -197,6 +209,10 @@ run(void)
     testutil_check(__wt_bloom_drop(bloomp, NULL));
 }
 
+/*
+ * cleanup --
+ *     TODO: Add a comment describing this function.
+ */
 void
 cleanup(void)
 {
@@ -212,6 +228,10 @@ cleanup(void)
 /*
  * Create and keep all the strings used to populate the bloom filter, so that we can do validation
  * with the same set of entries.
+ */
+/*
+ * populate_entries --
+ *     TODO: Add a comment describing this function.
  */
 void
 populate_entries(void)

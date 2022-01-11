@@ -58,6 +58,10 @@ static int verbose;      /* -v flag */
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -105,6 +109,10 @@ main(int argc, char *argv[])
     return (EXIT_SUCCESS);
 }
 
+/*
+ * t --
+ *     TODO: Add a comment describing this function.
+ */
 void
 t(int r, u_int ptype, int unique)
 {
@@ -143,6 +151,10 @@ t(int r, u_int ptype, int unique)
     }
 }
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 int
 usage(void)
 {
@@ -150,6 +162,10 @@ usage(void)
     return (EXIT_FAILURE);
 }
 
+/*
+ * run --
+ *     TODO: Add a comment describing this function.
+ */
 void
 run(int r)
 {

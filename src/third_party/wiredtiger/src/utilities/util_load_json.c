@@ -559,6 +559,10 @@ out:
  * load_json --
  *     Load from the JSON format produced by 'wt dump -j'.
  */
+/*
+ * util_load_json --
+ *     TODO: Add a comment describing this function.
+ */
 int
 util_load_json(WT_SESSION *session, const char *filename, uint32_t flags)
 {

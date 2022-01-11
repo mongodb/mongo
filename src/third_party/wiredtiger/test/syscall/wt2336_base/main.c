@@ -34,6 +34,10 @@
 
 static void fail(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
+/*
+ * fail --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 fail(int ret)
 {
@@ -43,6 +47,10 @@ fail(int ret)
 
 #define SEPARATOR "--------------"
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

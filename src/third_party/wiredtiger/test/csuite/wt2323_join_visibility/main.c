@@ -85,6 +85,10 @@ static void *thread_insert(void *);
 static void *thread_join(void *);
 static void test_join(TEST_OPTS *, SHARED_OPTS *, bool, bool);
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {
@@ -128,6 +132,10 @@ main(int argc, char *argv[])
     return (0);
 }
 
+/*
+ * test_join --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom, bool sometimes_remove)
 {
@@ -213,6 +221,10 @@ test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom, bool sometimes_r
     testutil_check(session->close(session, NULL));
 }
 
+/*
+ * thread_insert --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 thread_insert(void *arg)
 {
@@ -307,6 +319,10 @@ thread_insert(void *arg)
     return (NULL);
 }
 
+/*
+ * thread_join --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 thread_join(void *arg)
 {

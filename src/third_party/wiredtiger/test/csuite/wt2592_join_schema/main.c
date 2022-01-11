@@ -46,6 +46,10 @@ static POP_RECORD pop_data[] = {{"AU", 1900, 4000000}, {"AU", 1950, 8267337},
   {"UK", 1900, 369000000}, {"UK", 1950, 50127000}, {"UK", 2000, 59522468}, {"USA", 1900, 76212168},
   {"USA", 1950, 150697361}, {"USA", 2000, 301279593}, {"", 0, 0}};
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

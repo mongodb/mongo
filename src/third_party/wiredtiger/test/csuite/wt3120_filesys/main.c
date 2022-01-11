@@ -33,6 +33,10 @@
  * evoke the failure. This test does slightly more than that.
  */
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

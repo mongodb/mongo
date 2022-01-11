@@ -73,6 +73,10 @@ static bool use_columns = false;
  *     Print usage message and exit.
  */
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 usage(void)
 {
@@ -270,6 +274,10 @@ repeat(WT_SESSION *session, WT_CURSOR *c)
  * reset --
  *     Force eviction of the underlying page.
  */
+/*
+ * evict --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 evict(WT_CURSOR *c)
 {
@@ -307,6 +315,10 @@ trace_die(void)
         *__p = '.';                                                                     \
     } while (0)
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

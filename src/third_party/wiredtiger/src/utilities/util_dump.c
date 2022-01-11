@@ -28,6 +28,10 @@ static int dup_json_string(const char *, char **);
 static int print_config(WT_SESSION *, const char *, const char *, bool, bool);
 static int time_pair_to_timestamp(WT_SESSION_IMPL *, char *, WT_ITEM *);
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 usage(void)
 {
@@ -53,6 +57,10 @@ usage(void)
 
 static FILE *fp;
 
+/*
+ * util_dump --
+ *     TODO: Add a comment describing this function.
+ */
 int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
@@ -322,6 +330,10 @@ dump_json_end(WT_SESSION *session)
  * dump_json_begin --
  *     Output a separator between two JSON outputs in a list.
  */
+/*
+ * dump_json_separator --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 dump_json_separator(WT_SESSION *session)
 {
@@ -345,6 +357,10 @@ dump_json_table_end(WT_SESSION *session)
 /*
  * dump_add_config
  *	Add a formatted config string to an output buffer.
+ */
+/*
+ * dump_add_config --
+ *     TODO: Add a comment describing this function.
  */
 static int
 dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp, const char *fmt, ...)
@@ -571,6 +587,10 @@ match:
 
 /*
  * Returns dump type string based on the passed format flags
+ */
+/*
+ * get_dump_type --
+ *     TODO: Add a comment describing this function.
  */
 static const char *
 get_dump_type(bool pretty, bool hex, bool json)

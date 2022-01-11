@@ -158,6 +158,10 @@ die(void)
 /*
  * Get operation type based on the number of changes
  */
+/*
+ * get_operation_type --
+ *     TODO: Add a comment describing this function.
+ */
 static OPERATION_TYPE
 get_operation_type(uint64_t change_count)
 {
@@ -456,6 +460,10 @@ create_table(WT_SESSION *session, WT_RAND_STATE *rand, TABLE_INFO *tinfo, uint32
     tinfo->tables_in_use++;
 }
 
+/*
+ * rename_table --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 rename_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
 {
@@ -473,6 +481,10 @@ rename_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
     tinfo->table[slot].name = uri;
 }
 
+/*
+ * drop_table --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 drop_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
 {
@@ -508,6 +520,10 @@ tables_free(TABLE_INFO *tinfo)
     tinfo->table = NULL;
 }
 
+/*
+ * base_backup --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const char *backup_home,
   TABLE_INFO *tinfo, ACTIVE_FILES *active)
@@ -573,6 +589,10 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
  * Open a file if it isn't already open. The "memory" of the open file name is kept in the buffer
  * passed in.
  */
+/*
+ * reopen_file --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
 {
@@ -588,6 +608,10 @@ reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
 
 /*
  * Perform an incremental backup into an existing backup directory.
+ */
+/*
+ * incr_backup --
+ *     TODO: Add a comment describing this function.
  */
 static void
 incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABLE_INFO *tinfo,
@@ -687,6 +711,10 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
     active_files_move(current_active, &active);
 }
 
+/*
+ * check_table --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 check_table(WT_SESSION *session, TABLE *table)
 {
@@ -763,6 +791,10 @@ check_table(WT_SESSION *session, TABLE *table)
 /*
  * Verify the backup to make sure the proper tables exist and have the correct content.
  */
+/*
+ * check_backup --
+ *     TODO: Add a comment describing this function.
+ */
 static void
 check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinfo)
 {
@@ -790,6 +822,10 @@ check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinf
     testutil_check(conn->close(conn, NULL));
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

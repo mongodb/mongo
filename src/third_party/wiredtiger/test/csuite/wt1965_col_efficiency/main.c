@@ -45,6 +45,10 @@ static uint64_t g_ts = 0;
  * Each thread inserts a set of keys into the record store database. The keys are generated in such
  * a way that there are large gaps in the key range.
  */
+/*
+ * thread_func --
+ *     TODO: Add a comment describing this function.
+ */
 static void *
 thread_func(void *arg)
 {
@@ -96,6 +100,10 @@ thread_func(void *arg)
     return (NULL);
 }
 
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
 int
 main(int argc, char *argv[])
 {

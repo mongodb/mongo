@@ -45,6 +45,10 @@ typedef struct {
 
 static INFO *run_info;
 
+/*
+ * ops_start --
+ *     TODO: Add a comment describing this function.
+ */
 void
 ops_start(SHARED_CONFIG *cfg)
 {

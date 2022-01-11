@@ -21,6 +21,10 @@ static char **cmdconfig;          /* configuration pairs */
 static bool json = false;         /* -j input is JSON format */
 static bool no_overwrite = false; /* -n don't overwrite existing data */
 
+/*
+ * usage --
+ *     TODO: Add a comment describing this function.
+ */
 static int
 usage(void)
 {
@@ -35,6 +39,10 @@ usage(void)
     return (1);
 }
 
+/*
+ * util_load --
+ *     TODO: Add a comment describing this function.
+ */
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {

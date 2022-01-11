@@ -28,6 +28,10 @@
 
 #include "windows_shim.h"
 
+/*
+ * sleep --
+ *     TODO: Add a comment describing this function.
+ */
 int
 sleep(int seconds)
 {
@@ -35,6 +39,10 @@ sleep(int seconds)
     return (0);
 }
 
+/*
+ * usleep --
+ *     TODO: Add a comment describing this function.
+ */
 int
 usleep(useconds_t useconds)
 {
@@ -49,6 +57,10 @@ usleep(useconds_t useconds)
     return (0);
 }
 
+/*
+ * gettimeofday --
+ *     TODO: Add a comment describing this function.
+ */
 int
 gettimeofday(struct timeval *tp, void *tzp)
 {
@@ -66,6 +78,10 @@ gettimeofday(struct timeval *tp, void *tzp)
     return (0);
 }
 
+/*
+ * pthread_rwlock_destroy --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_destroy(pthread_rwlock_t *lock)
 {
@@ -73,6 +89,10 @@ pthread_rwlock_destroy(pthread_rwlock_t *lock)
     return (0);
 }
 
+/*
+ * pthread_rwlock_init --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *ignored)
 {
@@ -83,6 +103,10 @@ pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *ignore
     return (0);
 }
 
+/*
+ * pthread_rwlock_unlock --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
 {
@@ -95,12 +119,20 @@ pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
     return (0);
 }
 
+/*
+ * pthread_rwlock_tryrdlock --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_tryrdlock(pthread_rwlock_t *rwlock)
 {
     return (TryAcquireSRWLockShared(&rwlock->rwlock) ? 0 : EBUSY);
 }
 
+/*
+ * pthread_rwlock_rdlock --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
 {
@@ -108,6 +140,10 @@ pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)
     return (0);
 }
 
+/*
+ * pthread_rwlock_trywrlock --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock)
 {
@@ -119,6 +155,10 @@ pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock)
     return (EBUSY);
 }
 
+/*
+ * pthread_rwlock_wrlock --
+ *     TODO: Add a comment describing this function.
+ */
 int
 pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
 {

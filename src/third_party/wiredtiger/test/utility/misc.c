@@ -293,6 +293,10 @@ testutil_timestamp_parse(const char *str, uint64_t *tsp)
     testutil_assert(p - str <= 16);
 }
 
+/*
+ * testutil_create_backup_directory --
+ *     TODO: Add a comment describing this function.
+ */
 void
 testutil_create_backup_directory(const char *home)
 {
@@ -309,6 +313,10 @@ testutil_create_backup_directory(const char *home)
 /*
  * copy_file --
  *     Copy a single file into the backup directories.
+ */
+/*
+ * testutil_copy_file --
+ *     TODO: Add a comment describing this function.
  */
 void
 testutil_copy_file(WT_SESSION *session, const char *name)
