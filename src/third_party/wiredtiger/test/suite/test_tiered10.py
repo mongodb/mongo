@@ -117,8 +117,8 @@ class test_tiered10(wttest.WiredTigerTestCase):
         session1.flush_tier(None)
         session2.checkpoint()
         session2.flush_tier(None)
-        conn1_obj1 = self.bucket + '/' + self.prefix1 + self.obj1file
-        conn2_obj1 = self.bucket + '/' + self.prefix2 + self.obj1file
+        conn1_obj1 = os.path.join(self.bucket, self.prefix1 + self.obj1file)
+        conn2_obj1 = os.path.join(self.bucket, self.prefix2 + self.obj1file)
         self.assertTrue(os.path.exists(conn1_obj1))
         self.assertTrue(os.path.exists(conn2_obj1))
         conn1.close()
