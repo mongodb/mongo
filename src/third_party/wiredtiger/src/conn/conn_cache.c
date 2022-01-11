@@ -326,7 +326,6 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, cache_eviction_state, cache->flags);
     WT_STAT_SET(session, stats, cache_eviction_aggressive_set, cache->evict_aggressive_score);
     WT_STAT_SET(session, stats, cache_eviction_empty_score, cache->evict_empty_score);
-    WT_STAT_SET(session, stats, cache_hs_score, __wt_cache_hs_score(cache));
 
     WT_STAT_SET(session, stats, cache_eviction_active_workers, conn->evict_threads.current_threads);
     WT_STAT_SET(
@@ -340,9 +339,6 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
         WT_STAT_SET(session, stats, cache_eviction_walks_active, cache->walk_session->nhazard);
 
     WT_STAT_SET(session, stats, rec_maximum_seconds, conn->rec_maximum_seconds);
-
-    /* TODO: WT-5585 Remove lookaside score statistic after MongoDB switches to an alternative. */
-    WT_STAT_SET(session, stats, cache_lookaside_score, 0);
 }
 
 /*
