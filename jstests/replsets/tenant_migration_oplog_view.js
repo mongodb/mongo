@@ -86,7 +86,7 @@ const collection = session.getDatabase(dbName)[collName];
         {query: {_id: "retryableWrite2"}, update: {$inc: {count: 1}}, new: true});
 
     const resultOplogEntry = oplog.find({"o.count": 1}).next();
-    const postImageEntry = oplog.find({"o2._id": "retryableWrite2"}).next();
+    const postImageEntry = oplog.find({"op": "u", "o2._id": "retryableWrite2"}).next();
 
     jsTestLog({
         "oplog entry": resultOplogEntry,

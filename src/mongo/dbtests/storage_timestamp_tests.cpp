@@ -3636,6 +3636,7 @@ class MultiDocumentTransactionTest : public StorageTimestampTest {
 public:
     const StringData dbName = "unittest"_sd;
     const BSONObj doc = BSON("_id" << 1 << "TestValue" << 1);
+    const BSONObj docKey = BSON("_id" << 1);
 
     MultiDocumentTransactionTest(const std::string& collName) : nss(dbName, collName) {
         auto service = _opCtx->getServiceContext();
@@ -3797,6 +3798,7 @@ public:
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
 
         const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
+        const BSONObj doc2Key = BSON("_id" << 2);
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc2));
@@ -3823,11 +3825,12 @@ public:
             // Implicit commit oplog entry should exist at commitEntryTs.
             const auto commitFilter =
                 BSON("ts" << commitEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns" << nss.ns() << "ui"
-                                                                << coll->uuid() << "o" << doc2))
-                                             << "count" << 2));
+                          << BSON("applyOps"
+                                  << BSON_ARRAY(BSON("op"
+                                                     << "i"
+                                                     << "ns" << nss.ns() << "ui" << coll->uuid()
+                                                     << "o" << doc2 << "o2" << doc2Key))
+                                  << "count" << 2));
             assertOplogDocumentExistsAtTimestamp(commitFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(commitFilter, firstOplogEntryTs, false);
@@ -3845,11 +3848,12 @@ public:
             // first oplog entry should exist at firstOplogEntryTs and after it.
             const auto firstOplogEntryFilter =
                 BSON("ts" << firstOplogEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns" << nss.ns() << "ui"
-                                                                << coll->uuid() << "o" << doc))
-                                             << "partialTxn" << true));
+                          << BSON("applyOps"
+                                  << BSON_ARRAY(BSON("op"
+                                                     << "i"
+                                                     << "ns" << nss.ns() << "ui" << coll->uuid()
+                                                     << "o" << doc << "o2" << docKey))
+                                  << "partialTxn" << true));
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
@@ -3934,6 +3938,7 @@ public:
         }
         txnParticipant.unstashTransactionResources(_opCtx, "insert");
         const BSONObj doc2 = BSON("_id" << 2 << "TestValue" << 2);
+        const BSONObj doc2Key = BSON("_id" << 2);
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             insertDocument(autoColl.getCollection(), InsertStatement(doc2));
@@ -4021,11 +4026,12 @@ public:
             // The first oplog entry should exist at firstOplogEntryTs and onwards.
             const auto firstOplogEntryFilter =
                 BSON("ts" << firstOplogEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns" << nss.ns() << "ui"
-                                                                << coll->uuid() << "o" << doc))
-                                             << "partialTxn" << true));
+                          << BSON("applyOps"
+                                  << BSON_ARRAY(BSON("op"
+                                                     << "i"
+                                                     << "ns" << nss.ns() << "ui" << coll->uuid()
+                                                     << "o" << doc << "o2" << docKey))
+                                  << "partialTxn" << true));
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(firstOplogEntryFilter, firstOplogEntryTs, true);
@@ -4035,11 +4041,12 @@ public:
             // The prepare oplog entry should exist at prepareEntryTs and onwards.
             const auto prepareOplogEntryFilter =
                 BSON("ts" << prepareEntryTs << "o"
-                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                                                << "i"
-                                                                << "ns" << nss.ns() << "ui"
-                                                                << coll->uuid() << "o" << doc2))
-                                             << "prepare" << true << "count" << 2));
+                          << BSON("applyOps"
+                                  << BSON_ARRAY(BSON("op"
+                                                     << "i"
+                                                     << "ns" << nss.ns() << "ui" << coll->uuid()
+                                                     << "o" << doc2 << "o2" << doc2Key))
+                                  << "prepare" << true << "count" << 2));
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, firstOplogEntryTs, false);
@@ -4152,13 +4159,13 @@ public:
             }
 
             // The prepare oplog entry should exist at firstOplogEntryTs and onwards.
-            const auto prepareOplogEntryFilter = BSON(
-                "ts" << prepareEntryTs << "o"
-                     << BSON("applyOps"
-                             << BSON_ARRAY(BSON("op"
-                                                << "i"
-                                                << "ns" << nss.ns() << "ui" << ui << "o" << doc))
-                             << "prepare" << true));
+            const auto prepareOplogEntryFilter =
+                BSON("ts" << prepareEntryTs << "o"
+                          << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                                << "i"
+                                                                << "ns" << nss.ns() << "ui" << ui
+                                                                << "o" << doc << "o2" << docKey))
+                                             << "prepare" << true));
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, presentTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, beforeTxnTs, false);
             assertOplogDocumentExistsAtTimestamp(prepareOplogEntryFilter, prepareEntryTs, true);

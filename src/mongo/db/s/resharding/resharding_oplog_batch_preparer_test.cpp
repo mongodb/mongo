@@ -74,7 +74,7 @@ protected:
 
         std::vector<mongo::BSONObj> operations;
         auto insertOp = repl::MutableOplogEntry::makeInsertOperation(
-            NamespaceString("foo.bar"), UUID::gen(), document);
+            NamespaceString("foo.bar"), UUID::gen(), document, document);
 
         BSONObjBuilder applyOpsBuilder;
         applyOpsBuilder.append("applyOps", BSON_ARRAY(insertOp.toBSON()));

@@ -910,8 +910,10 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
+        'bson/dotted_path_support',
         'catalog/collection_options',
         'index/index_descriptor',
+        's/sharding_api_d',
     ],
 )
 

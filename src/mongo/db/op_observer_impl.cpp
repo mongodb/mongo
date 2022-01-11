@@ -36,7 +36,6 @@
 #include <limits>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -64,7 +63,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -82,9 +80,8 @@
 namespace mongo {
 using repl::DurableOplogEntry;
 using repl::MutableOplogEntry;
-const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>
-    documentKeyDecoration =
-        OperationContext::declareDecoration<boost::optional<OpObserverImpl::DocumentKey>>();
+const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration =
+    OperationContext::declareDecoration<boost::optional<repl::DocumentKey>>();
 
 const OperationContext::Decoration<boost::optional<ShardId>> destinedRecipientDecoration =
     OperationContext::declareDecoration<boost::optional<ShardId>>();
@@ -342,42 +339,6 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
 
 }  // namespace
 
-BSONObj OpObserverImpl::DocumentKey::getId() const {
-    return _id;
-}
-
-BSONObj OpObserverImpl::DocumentKey::getShardKeyAndId() const {
-    if (_shardKey) {
-        BSONObjBuilder builder(_shardKey.get());
-        builder.appendElementsUnique(_id);
-        return builder.obj();
-    }
-
-    // _shardKey is not set so just return the _id.
-    return getId();
-}
-
-OpObserverImpl::DocumentKey OpObserverImpl::getDocumentKey(OperationContext* opCtx,
-                                                           NamespaceString const& nss,
-                                                           BSONObj const& doc) {
-    BSONObj id = doc["_id"] ? doc["_id"].wrap() : doc;
-    boost::optional<BSONObj> shardKey;
-
-    // Extract the shard key from the collection description in the CollectionShardingState
-    // if running on standalone or primary. Skip this completely on secondaries since they are
-    // not expected to have the collection metadata cached.
-    if (opCtx->writesAreReplicated()) {
-        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
-        if (collDesc.isSharded()) {
-            shardKey =
-                dotted_path_support::extractElementsBasedOnTemplate(doc, collDesc.getKeyPattern())
-                    .getOwned();
-        }
-    }
-
-    return {std::move(id), std::move(shardKey)};
-}
-
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,
@@ -558,7 +519,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
         for (auto iter = first; iter != last; iter++) {
-            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc);
+            const auto docKey = repl::getDocumentKey(opCtx, nss, iter->doc).getShardKeyAndId();
+            auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
             }
@@ -804,7 +766,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    const UUID& uuid,
                                    BSONObj const& doc) {
-    documentKeyDecoration(opCtx).emplace(getDocumentKey(opCtx, nss, doc));
+    documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, nss, doc));
 
     ShardingWriteRouter shardingWriteRouter(opCtx, nss, Grid::get(opCtx)->catalogCache());
 
@@ -1037,7 +999,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
         oplogEntry.setNss(nss.getCommandNS());
         oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
+        oplogEntry.setObject(repl::makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
         oplogEntry.setObject2(o2Builder.done());
         logOperation(opCtx, &oplogEntry);
     }

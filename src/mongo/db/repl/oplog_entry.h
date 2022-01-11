@@ -147,7 +147,8 @@ public:
     // Helpers to generate ReplOperation.
     static ReplOperation makeInsertOperation(const NamespaceString& nss,
                                              UUID uuid,
-                                             const BSONObj& docToInsert);
+                                             const BSONObj& docToInsert,
+                                             const BSONObj& docKey);
     static ReplOperation makeUpdateOperation(NamespaceString nss,
                                              UUID uuid,
                                              const BSONObj& update,

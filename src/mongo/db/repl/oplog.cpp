@@ -73,6 +73,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_util.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/update.h"
@@ -521,7 +522,9 @@ std::vector<OpTime> logInsertOps(
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
         }
+        const auto docKey = getDocumentKey(opCtx, nss, begin[i].doc).getShardKeyAndId();
         oplogEntry.setObject(begin[i].doc);
+        oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(getDestinedRecipientFn(begin[i].doc));
         addDestinedRecipient.execute([&](const BSONObj& data) {

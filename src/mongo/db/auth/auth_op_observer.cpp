@@ -120,7 +120,7 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
     const auto cmdNss = nss.getCommandNS();
 
     // Create the 'o' field object.
-    const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
+    const auto cmdObj = repl::makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);

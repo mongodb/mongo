@@ -171,12 +171,14 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
 // Static
 ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
                                                      UUID uuid,
-                                                     const BSONObj& docToInsert) {
+                                                     const BSONObj& docToInsert,
+                                                     const BSONObj& docKey) {
     ReplOperation op;
     op.setOpType(OpTypeEnum::kInsert);
     op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(docToInsert.getOwned());
+    op.setObject2(docKey.getOwned());
     return op;
 }
 

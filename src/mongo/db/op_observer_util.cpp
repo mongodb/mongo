@@ -31,9 +31,11 @@
 
 #include "mongo/db/op_observer_util.h"
 
+#include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
-namespace mongo {
+namespace mongo::repl {
 
 /**
  * Given a raw collMod command object and associated collection metadata, create and return the
@@ -71,4 +73,41 @@ BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
     return cmdObjBuilder.obj();
 }
 
-}  // namespace mongo
+BSONObj DocumentKey::getId() const {
+    return _id;
+}
+
+BSONObj DocumentKey::getShardKeyAndId() const {
+    if (_shardKey) {
+        BSONObjBuilder builder(_shardKey.get());
+        builder.appendElementsUnique(_id);
+        return builder.obj();
+    }
+
+    // _shardKey is not set so just return the _id.
+    return getId();
+}
+
+DocumentKey getDocumentKey(OperationContext* opCtx,
+                           NamespaceString const& nss,
+                           BSONObj const& doc) {
+    auto idField = doc["_id"];
+    BSONObj id = idField ? idField.wrap() : doc;
+    boost::optional<BSONObj> shardKey;
+
+    // Extract the shard key from the collection description in the CollectionShardingState
+    // if running on standalone or primary. Skip this completely on secondaries since they are
+    // not expected to have the collection metadata cached.
+    if (opCtx->writesAreReplicated()) {
+        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+        if (collDesc.isSharded()) {
+            shardKey =
+                dotted_path_support::extractElementsBasedOnTemplate(doc, collDesc.getKeyPattern())
+                    .getOwned();
+        }
+    }
+
+    return {std::move(id), std::move(shardKey)};
+}
+
+}  // namespace mongo::repl

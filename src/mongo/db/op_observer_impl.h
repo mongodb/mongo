@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
@@ -48,22 +49,6 @@ class OpObserverImpl : public OpObserver {
 public:
     OpObserverImpl() = default;
     virtual ~OpObserverImpl() = default;
-
-    class DocumentKey {
-    public:
-        DocumentKey(BSONObj id, boost::optional<BSONObj> _shardKey)
-            : _id(id.getOwned()), _shardKey(std::move(_shardKey)) {
-            invariant(!id.isEmpty());
-        }
-
-        BSONObj getId() const;
-
-        BSONObj getShardKeyAndId() const;
-
-    private:
-        BSONObj _id;
-        boost::optional<BSONObj> _shardKey;
-    };
 
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
@@ -216,14 +201,6 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service,
                                      const repl::OpTime& newCommitPoint) final {}
 
-    /**
-     * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
-     * and the _id field, of the given document.
-     */
-    static DocumentKey getDocumentKey(OperationContext* opCtx,
-                                      NamespaceString const& nss,
-                                      BSONObj const& doc);
-
 private:
     virtual void shardObserveAboutToDelete(OperationContext* opCtx,
                                            NamespaceString const& nss,
@@ -257,7 +234,6 @@ private:
     void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };
 
-extern const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>
-    documentKeyDecoration;
+extern const OperationContext::Decoration<boost::optional<repl::DocumentKey>> documentKeyDecoration;
 
 }  // namespace mongo

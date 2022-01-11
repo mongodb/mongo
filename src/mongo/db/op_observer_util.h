@@ -33,8 +33,31 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 
-namespace mongo {
+namespace mongo::repl {
 BSONObj makeCollModCmdObj(const BSONObj& collModCmd,
                           const CollectionOptions& oldCollOptions,
                           boost::optional<IndexCollModInfo> indexInfo);
-}  // namespace mongo
+
+class DocumentKey {
+public:
+    DocumentKey(BSONObj id, boost::optional<BSONObj> _shardKey)
+        : _id(id.getOwned()), _shardKey(std::move(_shardKey)) {
+        invariant(!id.isEmpty());
+    }
+
+    BSONObj getId() const;
+
+    BSONObj getShardKeyAndId() const;
+
+private:
+    BSONObj _id;
+    boost::optional<BSONObj> _shardKey;
+};
+
+/**
+ * Returns a DocumentKey constructed from the shard key fields, if the collection is sharded,
+ * and the _id field, of the given document.
+ */
+DocumentKey getDocumentKey(OperationContext* opCtx, NamespaceString const& nss, BSONObj const& doc);
+
+}  // namespace mongo::repl
