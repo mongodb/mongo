@@ -2769,6 +2769,7 @@ tasks:
         task_compile_flags: >-
           --allocator=system
           --enable-free-mon=off
+          --enterprise-features=fle
           --js-engine=none
           --link-model=dynamic-sdk
           DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
