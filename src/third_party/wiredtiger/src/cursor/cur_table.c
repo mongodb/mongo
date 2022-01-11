@@ -731,8 +731,8 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 
     ctable = (start != NULL) ? start : stop;
     session = CUR2S(ctable);
-    wt_start = &start->iface;
-    wt_stop = &stop->iface;
+    wt_start = start == NULL ? NULL : &start->iface;
+    wt_stop = stop == NULL ? NULL : &stop->iface;
 
     /* Open any indices. */
     WT_RET(__curtable_open_indices(ctable));
