@@ -159,9 +159,18 @@ int
 __wt_session_release_resources(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
+    bool done;
+
+    /*
+     * Called when sessions are reset and closed, and when heavy-weight session methods or functions
+     * complete (for example, checkpoint and compact). If the session has no open cursors discard it
+     * all; if there are cursors, discard what we can safely clean out.
+     */
+    done = TAILQ_FIRST(&session->cursors) == NULL;
 
     /* Transaction cleanup */
-    __wt_txn_release_resources(session);
+    if (done)
+        __wt_txn_release_resources(session);
 
     /* Block manager cleanup */
     if (session->block_manager_cleanup != NULL)
@@ -174,12 +183,11 @@ __wt_session_release_resources(WT_SESSION_IMPL *session)
     /* Stashed memory. */
     __wt_stash_discard(session);
 
-    /*
-     * Discard scratch buffers, error memory; last, just in case a cleanup routine uses scratch
-     * buffers.
-     */
-    __wt_scr_discard(session);
-    __wt_buf_free(session, &session->err);
+    /* Scratch buffers and error memory. */
+    if (done) {
+        __wt_scr_discard(session);
+        __wt_buf_free(session, &session->err);
+    }
 
     return (ret);
 }
