@@ -167,7 +167,7 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const Collectio
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 NamespaceString::kAdminDb.toString(),
-                BSON(_flushRoutingTableCacheUpdates::kCommandName << coll.getNss().ns()));
+                BSON("_flushRoutingTableCacheUpdates" << coll.getNss().ns()));
         }
     }
 }

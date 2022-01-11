@@ -103,11 +103,13 @@ public:
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Can't issue _flushRoutingTableCacheUpdates from 'eval'",
+                    str::stream() << "Can't issue " << Derived::Request::kCommandName
+                                  << " from 'eval'",
                     !opCtx->getClient()->isInDirectClient());
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Can't call _flushRoutingTableCacheUpdates if in read-only mode",
+                    str::stream() << "Can't call " << Derived::Request::kCommandName
+                                  << " if in read-only mode",
                     !storageGlobalParams.readOnly);
 
             auto& oss = OperationShardingState::get(opCtx);
@@ -149,7 +151,7 @@ public:
 class FlushRoutingTableCacheUpdatesCmd
     : public FlushRoutingTableCacheUpdatesCmdBase<FlushRoutingTableCacheUpdatesCmd> {
 public:
-    using Request = _flushRoutingTableCacheUpdates;
+    using Request = FlushRoutingTableCacheUpdates;
 
     static bool supportsWriteConcern() {
         return false;
@@ -161,7 +163,7 @@ class FlushRoutingTableCacheUpdatesCmdWithWriteConcern
     : public FlushRoutingTableCacheUpdatesCmdBase<
           FlushRoutingTableCacheUpdatesCmdWithWriteConcern> {
 public:
-    using Request = _flushRoutingTableCacheUpdatesWithWriteConcern;
+    using Request = FlushRoutingTableCacheUpdatesWithWriteConcern;
 
     static bool supportsWriteConcern() {
         return true;

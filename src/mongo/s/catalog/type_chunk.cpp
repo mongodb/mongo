@@ -59,6 +59,7 @@ const BSONField<OID> ChunkType::epoch("lastmodEpoch");
 const BSONField<Timestamp> ChunkType::timestamp("lastmodTimestamp");
 const BSONField<BSONObj> ChunkType::history("history");
 const BSONField<long long> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
+const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
 
 namespace {
 
@@ -352,9 +353,8 @@ BSONObj ChunkType::toConfigBSON() const {
         builder.append(max.name(), getMax());
     if (_shard)
         builder.append(shard.name(), getShard().toString());
-    if (_version) {
+    if (_version)
         builder.appendTimestamp(lastmod.name(), _version->toLong());
-    }
     if (_estimatedSizeBytes)
         builder.appendNumber(estimatedSizeBytes.name(), *_estimatedSizeBytes);
     if (_jumbo)

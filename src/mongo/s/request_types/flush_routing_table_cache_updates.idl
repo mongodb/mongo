@@ -26,8 +26,6 @@
 # it in the license file.
 #
 
-# _flushRoutingTableCacheUpdates IDL File
-
 global:
     cpp_namespace: "mongo"
 
@@ -40,6 +38,7 @@ commands:
             An internal command to wait for the last routing table cache refresh for a
             particular namespace to be persisted to disk.
         command_name: _flushRoutingTableCacheUpdates
+        cpp_name: FlushRoutingTableCacheUpdates
         strict: true
         namespace: type
         api_version: ""
@@ -55,6 +54,7 @@ commands:
         description: >-
             The same behavior as _flushRoutingTableCacheUpdates but accepts writeConcern.
         command_name: _flushRoutingTableCacheUpdatesWithWriteConcern
+        cpp_name: FlushRoutingTableCacheUpdatesWithWriteConcern
         strict: true
         namespace: type
         api_version: ""

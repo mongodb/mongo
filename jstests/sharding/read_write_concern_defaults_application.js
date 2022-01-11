@@ -111,6 +111,7 @@ let testCases = {
     _configsvrRemoveTags: {skip: "internal command"},
     _configsvrRenameCollection: {skip: "internal command"},
     _configsvrRenameCollectionMetadata: {skip: "internal command"},
+    _configsvrRepairShardedCollectionChunksHistory: {skip: "internal command"},
     _configsvrReshardCollection: {skip: "internal command"},
     _configsvrSetAllowMigrations: {skip: "internal command"},
     _configsvrShardCollection:
@@ -568,6 +569,7 @@ let testCases = {
         checkWriteConcern: true,
     },
     repairDatabase: {skip: "does not accept read or write concern"},
+    repairShardedCollectionChunksHistory: {skip: "does not accept read or write concern"},
     replSetAbortPrimaryCatchUp: {skip: "does not accept read or write concern"},
     replSetFreeze: {skip: "does not accept read or write concern"},
     replSetGetConfig: {skip: "does not accept read or write concern"},

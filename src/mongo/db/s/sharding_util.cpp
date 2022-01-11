@@ -30,9 +30,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
-#include <fmt/format.h>
 
 #include "mongo/db/s/sharding_util.h"
+
+#include <fmt/format.h>
 
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
@@ -48,7 +49,7 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::vector<ShardId>& shardIds,
                                    const NamespaceString& nss,
                                    const std::shared_ptr<executor::TaskExecutor>& executor) {
-    auto cmd = _flushRoutingTableCacheUpdatesWithWriteConcern(nss);
+    auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.db());
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));

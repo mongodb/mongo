@@ -108,6 +108,7 @@ let viewsCommandTests = {
     _configsvrRemoveShard: {skip: isAnInternalCommand},
     _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
     _configsvrRemoveTags: {skip: isAnInternalCommand},
+    _configsvrRepairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     _configsvrReshardCollection: {skip: isAnInternalCommand},
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrShardCollection:
@@ -496,6 +497,13 @@ let viewsCommandTests = {
         }
     ],
     repairDatabase: {skip: isUnrelated},
+    repairShardedCollectionChunksHistory: {
+        command: {repairShardedCollectionChunksHistory: "test.view"},
+        skipStandalone: true,
+        isAdminCommand: true,
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.NamespaceNotFound,
+    },
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},
     replSetGetConfig: {skip: isUnrelated},

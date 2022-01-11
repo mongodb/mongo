@@ -311,6 +311,7 @@ env.Library(
         'config/configsvr_remove_tags_command.cpp',
         'config/configsvr_rename_collection_metadata_command.cpp',
         'config/configsvr_reshard_collection_cmd.cpp',
+        'config/configsvr_repair_sharded_collection_chunks_history_command.cpp',
         'config/configsvr_set_allow_migrations_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',

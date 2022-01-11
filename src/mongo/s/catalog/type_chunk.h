@@ -211,6 +211,7 @@ public:
     static const BSONField<Timestamp> timestamp;
     static const BSONField<BSONObj> history;
     static const BSONField<long long> estimatedSizeBytes;
+    static const BSONField<bool> historyIsAt40;
 
     ChunkType();
     ChunkType(UUID collectionUUID, ChunkRange range, ChunkVersion version, ShardId shardId);
