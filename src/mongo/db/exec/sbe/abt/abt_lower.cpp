@@ -363,7 +363,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ExchangeNode& n,
                                                       const ABT& child,
                                                       const ABT& refs) {
     using namespace std::literals;
-    // TODO: Implement all types of distributions.
     using namespace properties;
 
     // The DOP is obtained from the child (number of producers).
@@ -397,6 +396,10 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ExchangeNode& n,
             break;
 
         case DistributionType::RangePartitioning:
+            // We set 'localPolicy' to 'ExchangePolicy::rangepartition' here, but there is more
+            // that we need to do to actually support the RangePartitioning distribution.
+            // TODO SERVER-62523: Implement real support for the RangePartitioning distribution
+            // and add some test coverage.
             localPolicy = sbe::ExchangePolicy::rangepartition;
             break;
 
