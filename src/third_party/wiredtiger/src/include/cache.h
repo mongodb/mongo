@@ -187,6 +187,13 @@ struct __wt_cache {
      */
     uint32_t evict_empty_score;
 
+    /*
+     * Score of how much pressure storing historical versions is having on eviction. This score
+     * varies between 0, if reconciliation always sees updates that are globally visible and hence
+     * can be discarded, to 100 if no updates are globally visible.
+     */
+    int32_t evict_hs_score;
+
     uint32_t hs_fileid; /* History store table file ID */
 
     /*
