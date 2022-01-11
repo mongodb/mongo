@@ -482,6 +482,10 @@ void BackgroundSync::_produce() {
     {
         auto opCtx = cc().makeOperationContext();
 
+        // Calling getMyLastAppliedOpTime has to be outside bgsync mutex, to preserve proper lock
+        // ordering because it acquires replication coordinator's mutex .
+        auto lastAppliedOpTime = _replCoord->getMyLastAppliedOpTime();
+
         // Check if the producer has been stopped so that we can prevent setting the applied point
         // after step up has already cleared it. We need to acquire the collection lock before the
         // mutex to preserve proper lock ordering.
@@ -499,7 +503,7 @@ void BackgroundSync::_produce() {
             // TODO SERVER-53642: With Lock Free Reads we may have readers on lastAppliedOpTime so
             // we cannot use this timestamp in a write.
             _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
-                opCtx.get(), _replCoord->getMyLastAppliedOpTime(), false);
+                opCtx.get(), lastAppliedOpTime, false);
         }
     }
 
