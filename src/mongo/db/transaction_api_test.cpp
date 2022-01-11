@@ -165,7 +165,7 @@ protected:
 
         _opCtx = makeOperationContext();
 
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
+        auto mockClient = std::make_shared<txn_api::details::MockTransactionClient>();
         _mockClient = mockClient.get();
         _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
             opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
@@ -184,7 +184,7 @@ protected:
     }
 
     void resetTxnWithRetries() {
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
+        auto mockClient = std::make_shared<txn_api::details::MockTransactionClient>();
         _mockClient = mockClient.get();
         _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
             opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));

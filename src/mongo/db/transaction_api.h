@@ -126,7 +126,7 @@ public:
      */
     TransactionWithRetries(OperationContext* opCtx,
                            ExecutorPtr executor,
-                           std::unique_ptr<TransactionClient> txnClient)
+                           std::shared_ptr<TransactionClient> txnClient)
         : _executor(executor),
           _internalTxn(
               std::make_unique<details::Transaction>(opCtx, executor, std::move(txnClient))) {}
@@ -174,7 +174,8 @@ namespace details {
  * Default transaction client that runs given commands through the local process service entry
  * point.
  */
-class SEPTransactionClient : public TransactionClient {
+class SEPTransactionClient : public TransactionClient,
+                             public std::enable_shared_from_this<SEPTransactionClient> {
 public:
     SEPTransactionClient(OperationContext* opCtx, ExecutorPtr executor)
         : _serviceContext(opCtx->getServiceContext()), _executor(executor) {
@@ -242,7 +243,7 @@ public:
     Transaction(OperationContext* opCtx, ExecutorPtr executor)
         : _initialOpCtx(opCtx),
           _executor(executor),
-          _txnClient(std::make_unique<SEPTransactionClient>(opCtx, executor)) {
+          _txnClient(std::make_shared<SEPTransactionClient>(opCtx, executor)) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
     }
@@ -252,7 +253,7 @@ public:
      */
     Transaction(OperationContext* opCtx,
                 ExecutorPtr executor,
-                std::unique_ptr<TransactionClient> txnClient)
+                std::shared_ptr<TransactionClient> txnClient)
         : _initialOpCtx(opCtx), _executor(executor), _txnClient(std::move(txnClient)) {
         _primeTransaction(opCtx);
         _txnClient->injectHooks(_makeTxnMetadataHooks());
@@ -331,7 +332,7 @@ private:
 
     OperationContext* const _initialOpCtx;
     ExecutorPtr _executor;
-    std::unique_ptr<TransactionClient> _txnClient;
+    std::shared_ptr<TransactionClient> _txnClient;
 
     bool _latestResponseHasTransientTransactionErrorLabel{false};
 

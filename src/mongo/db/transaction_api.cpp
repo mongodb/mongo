@@ -206,7 +206,7 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
     auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
     return sep->handleRequest(cancellableOpCtx.get(), requestMessage)
-        .then([this](DbResponse dbResponse) {
+        .then([this, anchor = shared_from_this()](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
             return reply;
@@ -218,7 +218,7 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
     const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
     return runCommand(cmd.getNS().db(), cmd.toBSON())
         .thenRunOn(_executor)
-        .then([this](BSONObj reply) {
+        .then([this, anchor = shared_from_this()](BSONObj reply) {
             uassertStatusOK(getStatusFromCommandResult(reply));
 
             BatchedCommandResponse response;
@@ -239,7 +239,7 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
             cmd.getSingleBatch());
     return runCommand(cmd.getDbName(), cmd.toBSON({}))
         .thenRunOn(_executor)
-        .then([this](BSONObj reply) {
+        .then([this, anchor = shared_from_this()](BSONObj reply) {
             // Will throw if the response has a non OK top level status.
             auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(reply));
             return cursorResponse.releaseBatch();
@@ -250,7 +250,7 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
 SemiFuture<CommitResult> Transaction::commit() {
     return _commitOrAbort(NamespaceString::kAdminDb, CommitTransaction::kCommandName)
         .thenRunOn(_executor)
-        .then([this](BSONObj res) {
+        .then([](BSONObj res) {
             auto wcErrorHolder = getWriteConcernErrorDetailFromBSONObj(res);
             WriteConcernErrorDetail wcError;
             if (wcErrorHolder) {
@@ -264,7 +264,7 @@ SemiFuture<CommitResult> Transaction::commit() {
 SemiFuture<void> Transaction::abort() {
     return _commitOrAbort(NamespaceString::kAdminDb, AbortTransaction::kCommandName)
         .thenRunOn(_executor)
-        .then([this](BSONObj res) {
+        .then([](BSONObj res) {
             uassertStatusOK(getStatusFromCommandResult(res));
             uassertStatusOK(getWriteConcernStatusFromCommandResult(res));
         })
