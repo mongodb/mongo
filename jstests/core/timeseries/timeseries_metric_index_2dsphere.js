@@ -22,8 +22,8 @@ if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
 }
 
 TimeseriesTest.run((insert) => {
-    const testdb = db.getSiblingDB("timeseries_special_indexes_db");
-    const timeseriescoll = testdb.getCollection("timeseries_special_indexes_coll");
+    const testdb = db.getSiblingDB("timeseries_metric_index_2dsphere_db");
+    const timeseriescoll = testdb.getCollection("timeseries_metric_index_2dsphere_coll");
     const bucketscoll = testdb.getCollection('system.buckets.' + timeseriescoll.getName());
 
     const timeFieldName = 'tm';
