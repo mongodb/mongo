@@ -29,9 +29,9 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define TIMEOUT 4
+#define TIMEOUT 1
 
-#define NUM_RECORDS 1200000
+#define NUM_RECORDS 800000
 
 #define ENV_CONFIG_REC "log=(archive=false,recover=on)"
 /* Constants and variables declaration. */
@@ -40,7 +40,8 @@
  * better view on what is happening.
  */
 static const char conn_config[] =
-  "create,cache_size=1GB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true)";
+  "create,cache_size=1GB,timing_stress_for_test=[compact_slow],statistics=(all),statistics_log=("
+  "wait=1,json=true,on_close=true)";
 static const char table_config_row[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=QQQS";
 static const char table_config_col[] =
@@ -149,9 +150,9 @@ run_test(bool column_store, const char *uri, bool preserve)
 
     /* parent */
     /*
-     * Sleep for the configured amount of time before killing the child. Start the timeout from the
-     * time we notice that child process has started compact. That allows the test to run correctly
-     * on really slow machines.
+     * This test uses timing stress in compact so sleep for the configured amount of time before
+     * killing the child. Start the timeout from the time we notice that child process has started
+     * compact. That allows the test to run correctly on really slow machines.
      */
     testutil_check(__wt_snprintf(compact_file, sizeof(compact_file), compact_file_fmt, home));
     while (stat(compact_file, &sb) != 0)
@@ -253,13 +254,17 @@ workload_compact(const char *home, const char *table_config, const char *uri)
     testutil_check(__wt_snprintf(tscfg, sizeof(tscfg), "stable_timestamp=%d", 30));
     testutil_check(conn->set_timestamp(conn, tscfg));
 
-    testutil_check(session->checkpoint(session, NULL));
-
     /*
      * Remove 1/3 of data from the middle of the key range to let compact relocate blocks from the
      * end of the file. Checkpoint the changes after the removal.
      */
     remove_records(session, uri, 60);
+
+    /*
+     * Force checkpoint is the first step in the compact operation, we do the same thing here to
+     * save some time in the compact operation.
+     */
+    testutil_check(session->checkpoint(session, "force"));
 
     /*
      * Create the compact_started file so that the parent process can start its timer.
