@@ -275,7 +275,6 @@ class test_hs27(wttest.WiredTigerTestCase):
             self.initialize(ds.uri, ds)
 
         # Create a long running read transaction in a separate session.
-        # (Is it necessary for it to be separate? Not sure.)
         session_read = self.conn.open_session()
         session_read.begin_transaction('read_timestamp=' + self.timestamp_str(2))
 
@@ -287,8 +286,6 @@ class test_hs27(wttest.WiredTigerTestCase):
 
         # Check that the new updates are appropriately visible.
         self.checkall(self.session, ds.uri, ds)
-
-        self.session.breakpoint()
 
         # Now forcibly evict, so that all the pages are RLE-encoded and then read back in.
         # There doesn't seem to be any way to just forcibly evict an entire table, so what

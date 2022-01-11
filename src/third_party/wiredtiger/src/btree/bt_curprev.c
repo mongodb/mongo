@@ -479,6 +479,10 @@ restart_read:
          * It is only safe to cache the value for other keys in the same RLE cell if it is globally
          * visible. Otherwise, there might be some older timestamp where the value isn't uniform
          * across the cell. Always set cip_saved so it's easy to tell when we change cells.
+         *
+         * Note: it's important that we're checking the on-disk value for global visibility, and not
+         * whatever __wt_txn_read returned, which might be something else. (If it's something else,
+         * we can't cache it; but in that case the on-disk value cannot be globally visible.)
          */
         cbt->cip_saved = cip;
         if (rle > 1 &&
