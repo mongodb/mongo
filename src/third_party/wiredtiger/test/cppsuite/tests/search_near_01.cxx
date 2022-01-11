@@ -37,7 +37,7 @@ using namespace test_harness;
  * In this test, we want to verify that search_near with prefix enabled only traverses the portion
  * of the tree that follows the prefix portion of the search key. The test is composed of a populate
  * phase followed by a read phase. The populate phase will insert a set of random generated keys
- * with a prefix of aaa -> zzz. During the read phase, we have one read thread that peforms:
+ * with a prefix of aaa -> zzz. During the read phase, we have one read thread that performs:
  *  - Spawning multiple threads to perform one prefix search near.
  *  - Waiting on all threads to finish.
  *  - Using WiredTiger statistics to validate that the number of entries traversed is within

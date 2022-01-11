@@ -99,7 +99,7 @@ workload_tracking::do_work()
     /* Take a copy of the oldest so that we sweep with a consistent timestamp. */
     oldest_ts = _tsm.get_oldest_ts();
 
-    /* We need to check if the component is still running to avoid unecessary iterations. */
+    /* We need to check if the component is still running to avoid unnecessary iterations. */
     while (_running && (ret = _sweep_cursor->prev(_sweep_cursor.get())) == 0) {
         testutil_check(_sweep_cursor->get_key(_sweep_cursor.get(), &collection_id, &key, &ts));
         testutil_check(_sweep_cursor->get_value(_sweep_cursor.get(), &op_type, &value));

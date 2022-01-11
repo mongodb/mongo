@@ -89,6 +89,7 @@ Cmvxz
 Cmvz
 Collet
 Comparator
+Compressibility
 Config
 Coverity
 CreateFileMapping
@@ -143,6 +144,7 @@ Encryptor
 Encryptors
 Enqueue
 Eron
+Exponentiate
 FALLOC
 FALLTHROUGH
 FH
@@ -225,6 +227,7 @@ JPEG
 JSON
 Jyrki
 KEYFIRST
+KEYGEN
 KV
 KVS
 Kanowski's
@@ -328,6 +331,7 @@ PPC
 PREDEFINE
 PRId
 PRIu
+PRIuXX
 PRNG
 PTHREAD
 PTR
@@ -385,6 +389,7 @@ SSHH
 SSq
 STAILQ
 STEC
+STL
 STR
 STRUCT
 Scalability
@@ -443,6 +448,7 @@ UTF
 UltraSparc
 Unbuffered
 Unencrypted
+Unhandled
 UnixLib
 UnlockFile
 Unmap
@@ -478,6 +484,7 @@ Wduplicated
 WeakHashLen
 Werror
 Wformat
+Whitespaces
 WideCharToMultiByte
 WinNT
 WiredTiger
@@ -549,6 +556,8 @@ backport
 bal
 basecfg
 basho
+bb
+bba
 bbb
 bcr
 beginthreadex
@@ -610,6 +619,7 @@ cd
 ce
 celsius
 centric
+cerr
 cfg
 cfko
 chacha
@@ -651,11 +661,13 @@ comparator
 comparep
 compat
 compressStream
+compressibility
 concat
 cond
 conf
 confchk
 config
+configs
 conn
 connectionp
 const
@@ -704,6 +716,7 @@ cv
 cval
 cx
 cxa
+cxx
 dT
 data's
 database's
@@ -833,6 +846,7 @@ fgetln
 fgets
 fh
 fhandle
+fileX
 filefrag
 filehandle
 fileid
@@ -999,6 +1013,7 @@ keycmp
 keyid
 keyids
 keylen
+keyrange
 keyv
 kmsid
 kv
@@ -1103,6 +1118,7 @@ mkdir
 mmap
 mmrand
 mnt
+mongod
 movemask
 mrs
 msecs
@@ -1200,6 +1216,7 @@ packv
 pagedump
 pageref
 pagesize
+param
 parens
 pareto
 parserp
@@ -1404,6 +1421,7 @@ syscrypto
 sysinfo
 sz
 t's
+tIf
 tK
 tM
 tV
@@ -1439,6 +1457,7 @@ transactionally
 trecno
 trk
 trk's
+trun
 trunc
 trylock
 tsc
@@ -1580,4 +1599,5 @@ zstd
 zstd's
 zu
 zyxwvutsrqponmlkjihgfedcba
+zz
 zzz

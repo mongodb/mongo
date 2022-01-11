@@ -145,7 +145,7 @@ class search_near_02 : public test_harness::test {
     {
         /*
          * Each read operation performs search_near calls with and without prefix enabled on random
-         * collections. Each prefix is randomly generated. The result of the seach_near call with
+         * collections. Each prefix is randomly generated. The result of the search_near call with
          * prefix enabled is then validated using the search_near call without prefix enabled.
          */
         logger::log_msg(

@@ -46,7 +46,7 @@ check() {
 # List of files to spellchk.
 l=`(cd .. &&
     find bench examples ext src test -name '*.[chsy]' &&
-    find src -name '*.in')`
+    find src -name '*.in' && find test -name '*.cxx')`
 
 usage()
 {
