@@ -218,7 +218,6 @@ src/tiered/tiered_opener.c
 src/tiered/tiered_work.c
 src/txn/txn.c
 src/txn/txn_ckpt.c
-src/txn/txn_ext.c
 src/txn/txn_log.c
 src/txn/txn_recover.c
 src/txn/txn_rollback_to_stable.c

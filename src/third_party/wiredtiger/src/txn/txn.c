@@ -667,7 +667,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
     txn_global = &S2C(session)->txn_global;
 
     WT_ASSERT(session, txn->mod_count == 0);
-    txn->notify = NULL;
 
     /* Clear the transaction's ID from the global table. */
     if (WT_SESSION_IS_CHECKPOINT(session)) {
@@ -1681,10 +1680,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
          */
     }
 
-    /* Commit notification. */
-    if (txn->notify != NULL)
-        WT_ERR(txn->notify->notify(txn->notify, (WT_SESSION *)session, txn->id, 1));
-
     /*
      * We are about to release the snapshot: copy values into any positioned cursors so they don't
      * point to updates that could be freed once we don't have a snapshot. If this transaction is
@@ -2067,10 +2062,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     readonly = txn->mod_count == 0;
 
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
-
-    /* Rollback notification. */
-    if (txn->notify != NULL)
-        WT_TRET(txn->notify->notify(txn->notify, (WT_SESSION *)session, txn->id, 0));
 
     /* Configure the timeout for this rollback operation. */
     WT_RET(__txn_config_operation_timeout(session, cfg, true));

@@ -285,11 +285,4 @@ WT_CONNECTION::set_timestamp.
 | recovery | The stable timestamp used, if any, in the most recent checkpoint prior to the last shutdown. | |
 | stable | Any active transaction with a commit timestamp less than or equal to the current stable timestamp will not be able to modify data, except in the instance of prepared transactions. This timestamp can be set via the API. | stable >= oldest |
 
-@subsection timestamp_extensions Timestamp support in the extension API
-
-The extension API, used by modules that extend WiredTiger via
-WT_CONNECTION::get_extension_api, is not timestamp-aware.  In particular,
-WT_EXTENSION_API::transaction_oldest and
-WT_EXTENSION_API::transaction_visible do not take timestamps into account.
-Extensions relying on these functions may not work correctly with timestamps.
  */
