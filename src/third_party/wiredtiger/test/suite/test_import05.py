@@ -107,12 +107,12 @@ class test_import05(test_import_base):
         # Contruct the config string.
         if self.repair:
             if self.global_ts == 'stable':
-                import_config = 'import=(enabled,repair=true,compare_timestamp=stable)'
+                import_config = 'import=(enabled,repair=true,compare_timestamp=stable_timestamp)'
             else:
                 import_config = 'import=(enabled,repair=true)'
         else:
             if self.global_ts == 'stable':
-                import_config = 'import=(enabled,repair=false,compare_timestamp=stable,file_metadata=(' + \
+                import_config = 'import=(enabled,repair=false,compare_timestamp=stable_timestamp,file_metadata=(' + \
                     original_db_file_config + '))'
             else:
                 import_config = 'import=(enabled,repair=false,file_metadata=(' + \
@@ -120,8 +120,7 @@ class test_import05(test_import_base):
 
         # Create error pattern. Depending on the situation, we substitute a different timestamp into
         # error message to check against.
-        error_pattern = \
-            'import found aggregated {} timestamp newer than the current'
+        error_pattern = 'import found aggregated {} timestamp newer than the current'
 
         # Now begin trying to import the file.
         #

@@ -384,7 +384,7 @@ set_oldest_timestamp(void)
 
     conn = g.wts_conn;
 
-    if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest")) == 0) {
+    if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest_timestamp")) == 0) {
         testutil_timestamp_parse(tsbuf, &oldest_ts);
         g.timestamp = oldest_ts;
         testutil_check(

@@ -192,11 +192,11 @@ run_test(bool column_store, const char *uri, bool preserve)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Get the stable timestamp from the stable timestamp of the last successful checkpoint. */
-    testutil_check(conn->query_timestamp(conn, ts_string, "get=stable"));
+    testutil_check(conn->query_timestamp(conn, ts_string, "get=stable_timestamp"));
     testutil_timestamp_parse(ts_string, &stable_ts);
 
     /* Get the oldest timestamp from the oldest timestamp of the last successful checkpoint. */
-    testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest"));
+    testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest_timestamp"));
     testutil_timestamp_parse(ts_string, &oldest_ts);
 
     /*

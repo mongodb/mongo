@@ -191,7 +191,8 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
         /* Read-only value forever. Make sure we don't used a cached version. */
         WT_BARRIER();
         ts = txn_global->last_ckpt_timestamp;
-    } else if (WT_STRING_MATCH("oldest", cval.str, cval.len)) {
+    } else if (WT_STRING_MATCH("oldest_timestamp", cval.str, cval.len) ||
+      WT_STRING_MATCH("oldest", cval.str, cval.len)) {
         if (!txn_global->has_oldest_timestamp)
             return (WT_NOTFOUND);
         ts = txn_global->oldest_timestamp;
@@ -203,7 +204,8 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
     else if (WT_STRING_MATCH("recovery", cval.str, cval.len))
         /* Read-only value forever. No lock needed. */
         ts = txn_global->recovery_timestamp;
-    else if (WT_STRING_MATCH("stable", cval.str, cval.len)) {
+    else if (WT_STRING_MATCH("stable_timestamp", cval.str, cval.len) ||
+      WT_STRING_MATCH("stable", cval.str, cval.len)) {
         if (!txn_global->has_stable_timestamp)
             return (WT_NOTFOUND);
         ts = txn_global->stable_timestamp;
