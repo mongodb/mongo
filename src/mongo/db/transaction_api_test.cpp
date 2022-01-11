@@ -119,44 +119,6 @@ private:
 
 namespace {
 
-class TxnAPITest : public ServiceContextTest {
-protected:
-    void setUp() final {
-        ServiceContextTest::setUp();
-
-        _opCtx = makeOperationContext();
-
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
-        _mockClient = mockClient.get();
-        _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
-            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
-    }
-
-    OperationContext* opCtx() {
-        return _opCtx.get();
-    }
-
-    txn_api::details::MockTransactionClient* mockClient() {
-        return _mockClient;
-    }
-
-    txn_api::TransactionWithRetries& txnWithRetries() {
-        return *_txnWithRetries;
-    }
-
-    void resetTxnWithRetries() {
-        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
-        _mockClient = mockClient.get();
-        _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
-            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
-    }
-
-private:
-    ServiceContext::UniqueOperationContext _opCtx;
-    txn_api::details::MockTransactionClient* _mockClient;
-    std::shared_ptr<txn_api::TransactionWithRetries> _txnWithRetries;
-};
-
 void assertTxnMetadata(BSONObj obj,
                        TxnNumber txnNumber,
                        boost::optional<TxnRetryCounter> txnRetryCounter,
@@ -195,6 +157,57 @@ void assertTxnMetadata(BSONObj obj,
         ASSERT(obj["writeConcern"].eoo());
     }
 }
+
+class TxnAPITest : public ServiceContextTest {
+protected:
+    void setUp() final {
+        ServiceContextTest::setUp();
+
+        _opCtx = makeOperationContext();
+
+        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
+        _mockClient = mockClient.get();
+        _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
+            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    txn_api::details::MockTransactionClient* mockClient() {
+        return _mockClient;
+    }
+
+    txn_api::TransactionWithRetries& txnWithRetries() {
+        return *_txnWithRetries;
+    }
+
+    void resetTxnWithRetries() {
+        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>();
+        _mockClient = mockClient.get();
+        _txnWithRetries = std::make_shared<txn_api::TransactionWithRetries>(
+            opCtx(), InlineQueuedCountingExecutor::make(), std::move(mockClient));
+    }
+
+    void expectSentAbort(TxnNumber txnNumber,
+                         TxnRetryCounter txnRetryCounter,
+                         BSONObj writeConcern) {
+        auto lastRequest = mockClient()->getLastSentRequest();
+        assertTxnMetadata(lastRequest,
+                          txnNumber,
+                          txnRetryCounter,
+                          boost::none /* startTransaction */,
+                          boost::none /* readConcern */,
+                          writeConcern);
+        ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtx;
+    txn_api::details::MockTransactionClient* _mockClient;
+    std::shared_ptr<txn_api::TransactionWithRetries> _txnWithRetries;
+};
 
 TEST_F(TxnAPITest, OwnSession_AttachesTxnMetadata) {
     auto swResult = txnWithRetries().runSyncNoThrow(
@@ -335,14 +348,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
             });
         ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
 
-        auto lastRequest = mockClient()->getLastSentRequest();
-        assertTxnMetadata(lastRequest,
-                          0 /* txnNumber */,
-                          0 /* txnRetryCounter */,
-                          boost::none /* startTransaction */,
-                          boost::none /* readConcern */,
-                          writeConcern.toBSON() /* writeConcern */);
-        ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+        expectSentAbort(0 /* txnNumber */, 0 /* txnRetryCounter */, writeConcern.toBSON());
     }
 }
 
@@ -431,14 +437,7 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
         });
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
 
-    auto lastRequest = mockClient()->getLastSentRequest();
-    assertTxnMetadata(lastRequest,
-                      0 /* txnNumber */,
-                      0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */,
-                      boost::none /* readConcern */,
-                      WriteConcernOptions().toBSON() /* writeConcern */);
-    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+    expectSentAbort(0 /* txnNumber */, 0 /* txnRetryCounter */, WriteConcernOptions().toBSON());
 }
 
 TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
@@ -456,26 +455,18 @@ TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
     ASSERT(lastRequest.isEmpty());
 }
 
-TEST_F(TxnAPITest, OwnSession_SkipsAbortIfNoCommandsWereRun) {
-    auto swResult = txnWithRetries().runSyncNoThrow(
-        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            // The best effort abort response, the client should not receive this.
-            mockClient()->setNextCommandResponse(kResWithBadValueError);
-
-            uasserted(ErrorCodes::InternalError, "Mock error");
-            return SemiFuture<void>::makeReady();
-        });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
-
-    auto lastRequest = mockClient()->getLastSentRequest();
-    ASSERT(lastRequest.isEmpty());
-}
-
 TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
     int attempt = -1;
     auto swResult = txnWithRetries().runSyncNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
+            if (attempt > 0) {
+                // Verify an abort was sent in between retries.
+                expectSentAbort(attempt - 1 /* txnNumber */,
+                                0 /* txnRetryCounter */,
+                                WriteConcernOptions().toBSON());
+            }
+
             mockClient()->setNextCommandResponse(attempt == 0 ? kNoSuchTransactionResponse
                                                               : kOKInsertResponse);
             auto insertRes = txnClient
@@ -484,6 +475,10 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
                                                   << "foo"
                                                   << "documents" << BSON_ARRAY(BSON("x" << 1))))
                                  .get();
+
+            // The commit or implicit abort response.
+            mockClient()->setNextCommandResponse(kOKCommandResponse);
+
             if (attempt == 0) {
                 uassertStatusOK(getStatusFromWriteCommandReply(insertRes));
             } else {
@@ -496,8 +491,6 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
                               0 /* txnRetryCounter */,
                               true /* startTransaction */);
 
-            // The commit response.
-            mockClient()->setNextCommandResponse(kOKCommandResponse);
             return SemiFuture<void>::makeReady();
         });
     ASSERT(swResult.getStatus().isOK());
@@ -518,6 +511,13 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
     auto swResult = txnWithRetries().runSyncNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
+            if (attempt > 0) {
+                // Verify an abort was sent in between retries.
+                expectSentAbort(attempt - 1 /* txnNumber */,
+                                0 /* txnRetryCounter */,
+                                WriteConcernOptions().toBSON());
+            }
+
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -532,10 +532,11 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
                               attempt /* txnNumber */,
                               0 /* txnRetryCounter */,
                               true /* startTransaction */);
-            uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
 
-            // The commit response.
+            // The commit or implicit abort response.
             mockClient()->setNextCommandResponse(kOKCommandResponse);
+
+            uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt != 0);
             return SemiFuture<void>::makeReady();
         });
     ASSERT(swResult.getStatus().isOK());
@@ -582,15 +583,7 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
     ASSERT(swResult.getValue().wcError.toStatus().isOK());
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
 
-    auto lastRequest = mockClient()->getLastSentRequest();
-    assertTxnMetadata(lastRequest,
-                      0 /* txnNumber */,
-                      0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */,
-                      boost::none /* readConcern */,
-                      WriteConcernOptions().toBSON() /* writeConcern */);
-    // The retry loop will try to best effort abort before returning.
-    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+    expectSentAbort(0 /* txnNumber */, 0 /* txnRetryCounter */, WriteConcernOptions().toBSON());
 }
 
 TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
@@ -598,6 +591,13 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     auto swResult = txnWithRetries().runSyncNoThrow(
         opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             attempt += 1;
+            if (attempt > 0) {
+                // Verify an abort was sent in between retries.
+                expectSentAbort(attempt - 1 /* txnNumber */,
+                                0 /* txnRetryCounter */,
+                                WriteConcernOptions().toBSON());
+            }
+
             mockClient()->setNextCommandResponse(kOKInsertResponse);
             auto insertRes = txnClient
                                  .runCommand("user"_sd,
@@ -613,9 +613,13 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
                               0 /* txnRetryCounter */,
                               true /* startTransaction */);
 
-            // The commit response.
-            mockClient()->setNextCommandResponse(attempt == 0 ? kNoSuchTransactionResponse
-                                                              : kOKCommandResponse);
+            // Set commit and best effort abort response, if necessary.
+            if (attempt == 0) {
+                mockClient()->setNextCommandResponse(kNoSuchTransactionResponse);
+                mockClient()->setSecondCommandResponse(kOKCommandResponse);
+            } else {
+                mockClient()->setNextCommandResponse(kOKCommandResponse);
+            }
             return SemiFuture<void>::makeReady();
         });
     ASSERT(swResult.getStatus().isOK());
@@ -695,14 +699,7 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
     ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::WriteConcernFailed);
 
-    auto lastRequest = mockClient()->getLastSentRequest();
-    assertTxnMetadata(lastRequest,
-                      0 /* txnNumber */,
-                      0 /* txnRetryCounter */,
-                      boost::none /* startTransaction */,
-                      boost::none /* readConcern */,
-                      WriteConcernOptions().toBSON() /* writeConcern */);
-    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+    expectSentAbort(0 /* txnNumber */, 0 /* txnRetryCounter */, WriteConcernOptions().toBSON());
 }
 
 TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {

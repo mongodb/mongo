@@ -211,10 +211,25 @@ private:
  */
 class Transaction {
 public:
+    enum class ExecutionContext {
+        kOwnSession,
+        kClientSession,
+        kClientRetryableWrite,
+        kClientTransaction,
+    };
+
     enum class ErrorHandlingStep {
         kDoNotRetry,
         kRetryTransaction,
         kRetryCommit,
+    };
+
+    enum class TransactionState {
+        kInit,
+        kStarted,
+        kStartedCommit,
+        kStartedAbort,
+        kDone,
     };
 
     Transaction(const Transaction&) = delete;
@@ -269,15 +284,12 @@ public:
      * its execution context, e.g. by updating its txnNumber or txnRetryCounter, and returns the
      * next step for the transaction runner.
      */
-    ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult);
+    ErrorHandlingStep handleError(const StatusWith<CommitResult>& swResult) const;
 
     /**
      * Returns an object with info about the internal transaction for diagnostics.
      */
-    BSONObj reportStateForLog() {
-        return BSON("execContext" << _execContextToString(_execContext) << "sessionInfo"
-                                  << _sessionInfo.toBSON());
-    }
+    BSONObj reportStateForLog() const;
 
     /**
      * Attaches transaction metadata to the given command and updates internal transaction state.
@@ -290,24 +302,17 @@ public:
      */
     void processResponse(const BSONObj& reply);
 
+    /**
+     * Prepares the internal transaction state for a full transaction retry.
+     */
+    void primeForTransactionRetry();
+
+    /**
+     * Prepares the internal transaction state for a retry of commit.
+     */
+    void primeForCommitRetry();
+
 private:
-    enum class TransactionState {
-        kInit,
-        kStarted,
-        kStartedCommit,
-        kStartedAbort,
-        kDone,
-    };
-
-    enum class ExecutionContext {
-        kOwnSession,
-        kClientSession,
-        kClientRetryableWrite,
-        kClientTransaction,
-    };
-
-    std::string _execContextToString(ExecutionContext execContext);
-
     std::unique_ptr<TxnMetadataHooks> _makeTxnMetadataHooks() {
         return std::make_unique<TxnMetadataHooks>(*this);
     }
@@ -323,16 +328,6 @@ private:
      * execution context, e.g. client has no session, client is running a retryable write.
      */
     void _primeTransaction(OperationContext* opCtx);
-
-    /**
-     * Prepares the internal transaction state for a full transaction retry.
-     */
-    void _primeForTransactionRetry();
-
-    /**
-     * Prepares the internal transaction state for a retry of commit.
-     */
-    void _primeForCommitRetry();
 
     OperationContext* const _initialOpCtx;
     ExecutorPtr _executor;
