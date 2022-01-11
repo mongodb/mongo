@@ -39,7 +39,6 @@ from wtdataset import SimpleDataSet
 
 class test_checkpoint08(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
-    session_config = 'isolation=snapshot'
 
     def get_stat(self, uri):
         stat_uri = 'statistics:' + uri

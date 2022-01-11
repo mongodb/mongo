@@ -33,7 +33,6 @@ from wtdataset import SimpleDataSet
 # Verify a locked checkpoint is not removed during garbage collection.
 class test_gc05(test_gc_base):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
-    session_config = 'isolation=snapshot'
 
     def test_gc(self):
         uri = "table:gc05"

@@ -50,12 +50,11 @@ from wiredtiger import stat
 class test_stat10(wttest.WiredTigerTestCase):
     uri = 'table:test_stat10'
     conn_config = 'statistics=(all)'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='u')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('string_row', dict(key_format='S', value_format='u')),
+        ('row_string', dict(key_format='S', value_format='u')),
     ]
 
     oldest_values = [

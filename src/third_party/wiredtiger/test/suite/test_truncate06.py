@@ -41,7 +41,6 @@ from wtscenario import make_scenarios
 
 class test_truncate06(wttest.WiredTigerTestCase):
     conn_config = ''
-    session_config = 'isolation=snapshot'
 
     # Hook to run using remove instead of truncate for reference. This should not alter the
     # behavior... but may if things are broken. Disable the reference version by default as it's
@@ -56,7 +55,7 @@ class test_truncate06(wttest.WiredTigerTestCase):
         ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('column_fix', dict(key_format='r', value_format='8t',
             extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('row_integer', dict(key_format='i', value_format='S', extraconfig='')),
     ]
     munge_values = [
         ('update', dict(munge_with_update=True)),

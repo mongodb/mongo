@@ -34,7 +34,6 @@ from wtscenario import make_scenarios
 # test_prepare_cursor02.py
 #    WT_CURSOR navigation (next/prev) tests with prepared transactions
 class test_prepare_cursor02(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     keyfmt = [
         ('row-store', dict(keyfmt='i', valfmt='S')),

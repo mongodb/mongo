@@ -56,12 +56,12 @@ class test_prepare07(wttest.WiredTigerTestCase):
 
         # Commit some updates.
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 1))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(110))
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 2))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
@@ -70,19 +70,19 @@ class test_prepare07(wttest.WiredTigerTestCase):
         # Prepare a transaction and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         cursor_p.set_key(ds.key(nrows + 3))
         cursor_p.set_value(value_b)
         self.assertEquals(cursor_p.update(), 0)
         session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(130))
 
         # Commit some more updates.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 4))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(140))
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 5))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)
@@ -93,7 +93,7 @@ class test_prepare07(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(155))
 
         # Commit an update newer than the stable timestamp.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 6))
         cursor.set_value(value_b)
         self.assertEquals(cursor.update(), 0)

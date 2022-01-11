@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 # test_rollback_to_stable12.py
 # Test the rollback to stable operation skipping subtrees in during tree walk.
 class test_rollback_to_stable12(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     # This test is slow, and the value of running it on every access method maybe somewhat
     # questionable, since the code for skipping over subtrees during RTS is not dependent on
@@ -47,7 +46,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     prepare_values = [

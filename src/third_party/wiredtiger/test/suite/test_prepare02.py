@@ -34,7 +34,6 @@ from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
 class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
-    session_config = 'isolation=snapshot'
 
     def test_prepare_session_operations(self):
 

@@ -41,7 +41,6 @@ def timestamp_str(t):
 class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_cursor'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     before_ts = timestamp_str(150)
     prepare_ts = timestamp_str(200)
@@ -56,9 +55,9 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Various begin_transaction config
     txncfg = [
-        ('before_ts', dict(txn_config='isolation=snapshot,read_timestamp=' + before_ts, after_ts=False)),
-        ('after_ts', dict(txn_config='isolation=snapshot,read_timestamp=' + after_ts, after_ts=True)),
-        ('no_ts', dict(txn_config='isolation=snapshot', after_ts=True)),
+        ('before_ts', dict(txn_config='read_timestamp=' + before_ts, after_ts=False)),
+        ('after_ts', dict(txn_config='read_timestamp=' + after_ts, after_ts=True)),
+        ('no_ts', dict(txn_config='', after_ts=True)),
     ]
 
     preparecfg = [
@@ -92,7 +91,7 @@ class test_prepare04(wttest.WiredTigerTestCase, suite_subprocess):
 
         # make prepared updates.
         k = 1
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c.set_key(1)
         c.set_value(2)
         c.update()

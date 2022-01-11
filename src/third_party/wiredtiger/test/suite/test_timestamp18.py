@@ -40,7 +40,6 @@ from wtscenario import make_scenarios
 
 class test_timestamp18(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('string-row', dict(key_format='S', value_format='S')),

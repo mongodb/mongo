@@ -40,7 +40,6 @@ from wtdataset import SimpleDataSet
 # this explicitly on VLCS or FLCS.
 class test_rollback_to_stable22(test_rollback_to_stable_base):
     conn_config = 'cache_size=100MB'
-    session_config = 'isolation=snapshot'
     prepare = False
 
     def test_rollback_to_stable(self):

@@ -38,7 +38,6 @@ class test_hs07(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = ('cache_size=50MB,eviction_updates_trigger=95,'
                    'eviction_updates_target=80,log=(enabled)')
-    session_config = 'isolation=snapshot'
 
     format_values = (
         ('column', dict(key_format='r', value_format='S')),

@@ -33,7 +33,6 @@ from wtscenario import make_scenarios
 # Ensure we never reconstruct a reverse modify update in the history store based on the onpage overflow value
 class test_hs20(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,eviction=(threads_max=1)'
-    session_config = 'isolation=snapshot'
 
     # Return the k'th (0-based) key.
     def make_column_key(k):

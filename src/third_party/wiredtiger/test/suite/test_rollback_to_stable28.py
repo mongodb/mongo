@@ -58,7 +58,7 @@ class test_rollback_to_stable28(test_rollback_to_stable_base):
         #('column', dict(key_format='r', value_format='S', extraconfig='')),
         #('column_fix', dict(key_format='r', value_format='8t', 
         #    extraconfig=',allocation_size=512,leaf_page_max=512')),
-        ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('row_integer', dict(key_format='i', value_format='S', extraconfig='')),
     ]
 
     scenarios = make_scenarios(format_values)

@@ -73,35 +73,35 @@ class test_reserve(wttest.WiredTigerTestCase):
 
         # Repeatedly update a record.
         for i in range(1, 5):
-            s.begin_transaction('isolation=snapshot')
+            s.begin_transaction()
             c.set_key(ds.key(100))
             c.set_value(ds.value(100))
             self.assertEquals(c.update(), 0)
             s.commit_transaction()
 
         # Confirm reserve fails if the record doesn't exist.
-        s.begin_transaction('isolation=snapshot')
+        s.begin_transaction()
         c.set_key(ds.key(600))
         self.assertRaises(wiredtiger.WiredTigerError, lambda:c.reserve())
         s.rollback_transaction()
 
         # Repeatedly reserve a record and commit.
         for i in range(1, 5):
-            s.begin_transaction('isolation=snapshot')
+            s.begin_transaction()
             c.set_key(ds.key(100))
             self.assertEquals(c.reserve(), 0)
             s.commit_transaction()
 
         # Repeatedly reserve a record and rollback.
         for i in range(1, 5):
-            s.begin_transaction('isolation=snapshot')
+            s.begin_transaction()
             c.set_key(ds.key(100))
             self.assertEquals(c.reserve(), 0)
             s.rollback_transaction()
 
         # Repeatedly reserve, then update, a record, and commit.
         for i in range(1, 5):
-            s.begin_transaction('isolation=snapshot')
+            s.begin_transaction()
             c.set_key(ds.key(100))
             self.assertEquals(c.reserve(), 0)
             c.set_value(ds.value(100))
@@ -110,7 +110,7 @@ class test_reserve(wttest.WiredTigerTestCase):
 
         # Repeatedly reserve, then update, a record, and rollback.
         for i in range(1, 5):
-            s.begin_transaction('isolation=snapshot')
+            s.begin_transaction()
             c.set_key(ds.key(100))
             self.assertEquals(c.reserve(), 0)
             c.set_value(ds.value(100))
@@ -123,11 +123,11 @@ class test_reserve(wttest.WiredTigerTestCase):
         s2 = self.conn.open_session()
         c2 = s2.open_cursor(uri, None)
         for i in range(1, 2):
-            s.begin_transaction('isolation=snapshot')
+            s.begin_transaction()
             c.set_key(ds.key(100))
             self.assertEquals(c.reserve(), 0)
 
-            s2.begin_transaction('isolation=snapshot')
+            s2.begin_transaction()
             c2.set_key(ds.key(100))
             c2.set_value(ds.value(100))
             self.assertRaises(wiredtiger.WiredTigerError, lambda:c2.update())
@@ -147,7 +147,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ds.populate()
         s = self.conn.open_session()
         c = s.open_cursor(uri, None)
-        s.begin_transaction('isolation=snapshot')
+        s.begin_transaction()
         msg = "/requires key be set/"
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda:c.reserve(), msg)
@@ -175,7 +175,7 @@ class test_reserve(wttest.WiredTigerTestCase):
         ds.populate()
         s = self.conn.open_session()
         c = s.open_cursor(uri, None)
-        s.begin_transaction('isolation=snapshot')
+        s.begin_transaction()
         c.set_key(ds.key(5))
         self.assertEquals(c.reserve(), 0)
         self.assertEqual(c.get_value(), ds.comparable_value(5))

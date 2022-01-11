@@ -49,7 +49,6 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         ('V2', dict(conn_config=',eviction_dirty_trigger=50,eviction_updates_trigger=50,' \
          'log=(enabled)', using_log=True)),
     ]
-    session_config = 'isolation=snapshot'
 
     # Minimum cache_size requirement of lsm is 31MB.
     types = [

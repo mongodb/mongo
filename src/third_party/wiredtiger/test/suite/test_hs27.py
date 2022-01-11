@@ -41,7 +41,6 @@ from wtscenario import make_scenarios
 # making sure they read back correctly. (The eviction is necessary to go through the RLE code.)
 class test_hs27(wttest.WiredTigerTestCase):
     conn_config = ''
-    session_config = 'isolation=snapshot'
 
     nrows = 100
     value_1 = 'a' * 119

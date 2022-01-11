@@ -38,7 +38,7 @@ class test_hs24(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     checkpoint_stress_scenarios = [
@@ -51,7 +51,6 @@ class test_hs24(wttest.WiredTigerTestCase):
     def conn_config(self):
         return 'timing_stress_for_test=({})'.format(self.checkpoint_stress)
 
-    session_config = 'isolation=snapshot'
     uri = 'table:test_hs24'
     numrows = 2000
 

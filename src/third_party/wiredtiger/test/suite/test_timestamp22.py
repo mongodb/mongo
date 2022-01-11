@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 
 class test_timestamp22(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     # Keep the number of rows low, as each additional row does
     # not test any new code paths.

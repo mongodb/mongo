@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 # Attempt to create a snapshot with more than 256 transactions in it.
 class test_bug(wttest.WiredTigerTestCase):
     conn_config = 'session_max=512'
-    session_config = 'isolation=snapshot'
 
     key_format='i'
     value_format='S'

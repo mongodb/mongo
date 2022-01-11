@@ -35,7 +35,6 @@ from wtdataset import SimpleDataSet
 
 class test_checkpoint04(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
-    session_config = 'isolation=snapshot'
 
     def create_tables(self, ntables):
         tables = {}

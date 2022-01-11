@@ -39,12 +39,11 @@ from wtscenario import make_scenarios
 # test_rollback_to_stable18.py
 # Test the rollback to stable shouldn't skip any pages that don't have aggregated time window.
 class test_rollback_to_stable18(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     prepare_values = [

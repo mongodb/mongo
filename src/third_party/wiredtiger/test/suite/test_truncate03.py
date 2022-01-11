@@ -54,7 +54,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # Create a new session and start a transaction to force the upcoming
         # checkpoint operation to write address-deleted cells to disk.
         tmp_session = self.conn.open_session(None)
-        tmp_session.begin_transaction("isolation=snapshot")
+        tmp_session.begin_transaction()
 
         # Truncate a big range of rows; the leaf pages aren't in memory, so
         # leaf page references will be deleted without being read.

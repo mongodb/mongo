@@ -49,7 +49,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
 
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             cursor.set_value(value)
@@ -59,7 +59,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
 
     def removes(self, ds, uri, nrows, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         for i in range(1, nrows):
             cursor.set_key(ds.key(i))
             self.assertEquals(cursor.remove(), 0)
@@ -135,7 +135,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Remove the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
             self.assertEquals(cursor_p.remove(), 0)
@@ -213,7 +213,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Remove the updates from a prepare session and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
             cursor_p.set_value(value_c)
@@ -289,7 +289,7 @@ class test_prepare08(wttest.WiredTigerTestCase):
         # Remove the updates from a prepare session and and keep it open.
         session_p = self.conn.open_session()
         cursor_p = session_p.open_cursor(uri_1)
-        session_p.begin_transaction('isolation=snapshot')
+        session_p.begin_transaction()
         for i in range(1, nrows):
             cursor_p.set_key(ds_1.key(i))
             cursor_p.set_value(value_c)

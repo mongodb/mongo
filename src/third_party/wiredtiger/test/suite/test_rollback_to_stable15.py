@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 # update-list for both fixed length and variable length column store.
 # Eviction is set to false, so that everything persists in memory.
 class test_rollback_to_stable15(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     key_format_values = [
         ('column', dict(key_format='r')),
         ('integer-row', dict(key_format='i')),

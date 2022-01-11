@@ -36,7 +36,6 @@ from wtscenario import make_scenarios
 class test_import09(test_import_base):
     nrows = 100
     ntables = 1
-    session_config = 'isolation=snapshot'
 
     # To test the sodium encryptor, we use secretkey= rather than
     # setting a keyid, because for a "real" (vs. test-only) encryptor,

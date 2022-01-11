@@ -41,7 +41,6 @@ class test_prepare03(wttest.WiredTigerTestCase):
     """
     table_name = 'test_prepare_cursor'
     nentries = 10
-    session_config = 'isolation=snapshot'
 
     scenarios = make_scenarios([
         ('file-col', dict(tablekind='col',uri='file', format='key_format=r,value_format=S')),

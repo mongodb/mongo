@@ -55,7 +55,6 @@ from test_import01 import test_import_base
 
 class test_import04(test_import_base):
     conn_config = 'cache_size=50MB,log=(enabled)'
-    session_config = 'isolation=snapshot'
 
     ntables = 10
     nrows = 100

@@ -32,7 +32,6 @@ import wiredtiger, wttest
 # Test various fast truncate visibility scenarios
 class test_truncate05(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
-    session_config = 'isolation=snapshot'
 
     def test_truncate_read_older_than_newest(self):
         uri = 'table:test_truncate05'

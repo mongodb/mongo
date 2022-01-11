@@ -42,7 +42,7 @@ class test_prepare16(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
         ('column_fix', dict(key_format='r', value_format='8t')),
-        ('string_row', dict(key_format='S', value_format='S')),
+        ('row_string', dict(key_format='S', value_format='S')),
     ]
 
     txn_end_values = [

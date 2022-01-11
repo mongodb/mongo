@@ -35,7 +35,6 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 class test_txn23(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     conn_config = 'cache_size=5MB'
 
     format_values = [

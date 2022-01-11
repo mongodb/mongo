@@ -40,7 +40,6 @@ from wtscenario import make_scenarios
 # pages are still reconciled and that can eliminate the update configuration we're
 # trying to test.
 class test_flcs03(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),

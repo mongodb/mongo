@@ -41,7 +41,6 @@ from wtscenario import make_scenarios
 class test_timestamp17(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp17'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('integer-row', dict(key_format='i', value_format='i')),

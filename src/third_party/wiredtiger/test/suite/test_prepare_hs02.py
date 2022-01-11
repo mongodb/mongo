@@ -39,7 +39,6 @@ from wtscenario import make_scenarios
 class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_cursor'
     uri = 'table:' + tablename
-    txn_config = 'isolation=snapshot'
 
     types = [
         ('col', dict(s_config='key_format=r,value_format=i,log=(enabled=false)')),
@@ -67,7 +66,7 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Scenario: 1
         # Check insert operation
-        self.session.begin_transaction(self.txn_config)
+        self.session.begin_transaction()
         c[1] = 1
         # update the value with in this transaction
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(100))
@@ -86,7 +85,7 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         # Check update operation
         #   update a existing key.
         #   update a newly inserted key with in this transaction
-        self.session.begin_transaction(self.txn_config)
+        self.session.begin_transaction()
         # update a committed value, key 1 is inserted above.
         c[1] = 2
         # update a uncommitted value, insert and update a key.
@@ -109,7 +108,7 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
         #   remove an existing key.
         #   remove a previously updated key.
         #   remove a newly inserted and updated key.
-        self.session.begin_transaction(self.txn_config)
+        self.session.begin_transaction()
         # update a committed value, key 1 is inserted above.
         c.set_key(1)
         c.remove()
@@ -127,7 +126,7 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.rollback_transaction()
 
         # commit some keys, to generate the update chain subsequently.
-        self.session.begin_transaction(self.txn_config)
+        self.session.begin_transaction()
         c[1] = 1
         c[2] = 1
         c[3] = 1
@@ -148,7 +147,7 @@ class test_prepare_hs02(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.session.create(self.uri, self.s_config)
         cur = self.session.open_cursor(self.uri)
-        self.session.begin_transaction(self.txn_config)
+        self.session.begin_transaction()
         cur[1] = 2
         cur[2] = 2
         cur[3] = 2

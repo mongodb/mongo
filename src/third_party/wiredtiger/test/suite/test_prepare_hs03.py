@@ -103,7 +103,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         # Commit some updates to get eviction and history store fired up
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, nsessions * nkeys):
-            self.session.begin_transaction('isolation=snapshot')
+            self.session.begin_transaction()
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(commit_value)
             self.assertEquals(cursor.insert(), 0)
@@ -125,7 +125,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         cursors = [0] * nsessions
         for j in range (0, nsessions):
             sessions[j] = self.conn.open_session()
-            sessions[j].begin_transaction('isolation=snapshot')
+            sessions[j].begin_transaction()
             cursors[j] = sessions[j].open_cursor(self.uri)
             # Each session will update many consecutive keys.
             start = (j * nkeys)

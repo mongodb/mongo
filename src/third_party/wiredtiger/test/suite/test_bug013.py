@@ -50,7 +50,6 @@ class test_bug013(wttest.WiredTigerTestCase):
         self.assertEqual(i, len(keys))
 
     def test_lsm_consistency(self):
-        self.session.reconfigure("isolation=snapshot")
         self.session.create(self.uri, 'key_format=iii,value_format=i,type=lsm')
         cursor = self.session.open_cursor(self.uri, None, None)
         cursor[(2, 6, 1)] = 0

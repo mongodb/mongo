@@ -35,7 +35,6 @@ from wtscenario import make_scenarios
 
 class test_txn25(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB,log=(enabled)'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('string-row', dict(key_format='S', usestrings=True, value_format='S')),

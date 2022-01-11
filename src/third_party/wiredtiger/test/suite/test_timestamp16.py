@@ -38,7 +38,6 @@ import wiredtiger, wttest
 class test_timestamp16(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_timestamp16'
     uri = 'table:' + tablename
-    session_config = 'isolation=snapshot'
 
     def test_read_timestamp_cleared(self):
         # Ensure that the read timestamp doesn't move our checkpoint.

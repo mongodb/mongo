@@ -31,7 +31,6 @@ import wiredtiger, wttest
 # test_timestamp21.py
 # Test read timestamp configuration that allows read timestamp to be older than oldest.
 class test_timestamp21(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
 
     def test_timestamp21(self):
         uri = 'table:test_timestamp21'

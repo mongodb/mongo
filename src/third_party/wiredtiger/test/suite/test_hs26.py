@@ -45,7 +45,6 @@ from wtscenario import make_scenarios
 # history store accesses to go off the rails.
 class test_hs26(wttest.WiredTigerTestCase):
     conn_config = ''
-    session_config = 'isolation=snapshot'
 
     # We control the duplication of values by appending a number computed from the key.
     # Because the keys are 1..N (not 0..N-1), to get aligned RLE groups the suffix is

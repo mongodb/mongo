@@ -46,13 +46,12 @@ from wtscenario import make_scenarios
 # 6. Read the value and see if it matches the expected value.
 class test_hs_evict_race01(wttest.WiredTigerTestCase):
     conn_config = 'timing_stress_for_test=(checkpoint_slow)'
-    session_config = 'isolation=snapshot'
     uri = 'table:hs_evict_race01'
     numrows = 1
 
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
     scenarios = make_scenarios(key_format_values)
     value1 = 'aaaaa'

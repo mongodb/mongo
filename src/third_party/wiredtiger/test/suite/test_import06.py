@@ -34,7 +34,6 @@ from test_import01 import test_import_base
 from wtscenario import make_scenarios
 
 class test_import06(test_import_base):
-    session_config = 'isolation=snapshot'
 
     original_db_file = 'original_db_file'
     uri = 'file:' + original_db_file

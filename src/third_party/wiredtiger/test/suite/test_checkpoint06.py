@@ -35,12 +35,11 @@ from wtscenario import make_scenarios
 # timestamp in the checkpoint.
 class test_checkpoint06(wttest.WiredTigerTestCase):
     conn_config = 'create,cache_size=50MB'
-    session_config = 'isolation=snapshot'
 
     format_values = [
         ('column-fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
-        ('integer_row', dict(key_format='i', value_format='S')),
+        ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)

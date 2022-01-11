@@ -64,7 +64,6 @@ def keys_of_write(write):
         return [2 + my_rle_size - 1]
 
 class test_rollback_to_stable25(wttest.WiredTigerTestCase):
-    session_config = 'isolation=snapshot'
     conn_config = 'in_memory=false'
 
     write_10_values = [

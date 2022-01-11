@@ -59,13 +59,13 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         # No reserved, single update.
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         c = self.session.open_cursor(uri)
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c[key_ts1] = 'value1'
         self.apply_timestamps(1)
         self.session.commit_transaction()
 
         # Reserved at the start of the chain, with one update.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c.set_key(key_ts1)
         c.reserve()
         c[key_ts1] = 'value2'
@@ -73,7 +73,7 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # Reserved at the end of the chain, with one update.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c[key_ts1] = 'value3'
         c.set_key(key_ts1)
         c.reserve()
@@ -81,7 +81,7 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # Reserved at the start of the chain, with multiple.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c.set_key(key_ts1)
         c.reserve()
         c[key_ts1] = 'value4'
@@ -90,7 +90,7 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # Reserved at the end of the chain, with multiple updates.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c[key_ts1] = 'value6'
         c[key_ts1] = 'value7'
         c.set_key(key_ts1)
@@ -99,7 +99,7 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # Reserved between two updates.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c[key_ts1] = 'value8'
         c.set_key(key_ts1)
         c.reserve()
@@ -108,7 +108,7 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # Reserved update with multiple extra updates.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c[key_ts1] = 'value10'
         c.set_key(key_ts1)
         c.reserve()
@@ -119,7 +119,7 @@ class test_assert07(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
 
         # Reserved updates with multiple extra updates.
-        self.session.begin_transaction('isolation=snapshot')
+        self.session.begin_transaction()
         c[key_ts1] = 'value14'
         c.set_key(key_ts1)
         c.reserve()

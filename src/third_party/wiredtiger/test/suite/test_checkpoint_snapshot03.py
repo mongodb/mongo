@@ -50,7 +50,7 @@ class test_checkpoint_snapshot03(wttest.WiredTigerTestCase):
     format_values = [
         ('column_fix', dict(key_format='r', value_format='8t')),
         ('column', dict(key_format='r', value_format='S')),
-        ('string_row', dict(key_format='S', value_format='S')),
+        ('row_string', dict(key_format='S', value_format='S')),
     ]
 
     scenarios = make_scenarios(format_values)

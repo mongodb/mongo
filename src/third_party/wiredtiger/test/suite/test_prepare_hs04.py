@@ -108,7 +108,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         # Insert a key at timestamp 1.
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nsessions * self.nkeys):
-            self.session.begin_transaction('isolation=snapshot')
+            self.session.begin_transaction()
             key = commit_key + ds.key(self.nrows + i)
             cursor.set_key(key)
             cursor.set_value(commit_value)
@@ -121,7 +121,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.nsessions * self.nkeys):
-            self.session.begin_transaction('isolation=snapshot')
+            self.session.begin_transaction()
             key = commit_key + ds.key(self.nrows + i)
             cursor.set_key(key)
             self.assertEquals(cursor.remove(), 0)
@@ -138,7 +138,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         cursors = [0] * self.nsessions
         for j in range (0, self.nsessions):
             sessions[j] = self.conn.open_session()
-            sessions[j].begin_transaction('isolation=snapshot')
+            sessions[j].begin_transaction()
             cursors[j] = sessions[j].open_cursor(self.uri)
             # Each session will update many consecutive keys.
             start = (j * self.nkeys)

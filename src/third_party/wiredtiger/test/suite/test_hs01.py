@@ -37,7 +37,6 @@ from wtscenario import make_scenarios
 # Additionally test that checkpoint inserts content into the history store.
 class test_hs01(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=200MB,statistics=(all)'
-    session_config = 'isolation=snapshot'
     format_values = [
         ('column', dict(key_format='r', value_format='u')),
         ('column_fix', dict(key_format='r', value_format='8t')),
@@ -136,7 +135,7 @@ class test_hs01(wttest.WiredTigerTestCase):
         # Check to see if the history store is working with the old reader.
         # Open session 2.
         session2 = self.conn.open_session()
-        session2.begin_transaction('isolation=snapshot')
+        session2.begin_transaction()
         # Large updates with session 1.
         self.large_updates(self.session, uri, bigvalue2, ds, nrows)
 
@@ -154,7 +153,7 @@ class test_hs01(wttest.WiredTigerTestCase):
         # Check to see the history store working with modify operations.
         # Open session 2.
         session2 = self.conn.open_session()
-        session2.begin_transaction('isolation=snapshot')
+        session2.begin_transaction()
         # Apply two modify operations (session1)- replacing the first two letters with 'A'.
         self.large_modifies(self.session, uri, 0, ds, nrows)
         self.large_modifies(self.session, uri, 1, ds, nrows)

@@ -35,13 +35,12 @@ from wtscenario import make_scenarios
 #
 # Test mixing timestamped and non-timestamped updates on the same VLCS RLE cell.
 class test_rollback_to_stable27(test_rollback_to_stable_base):
-    session_config = 'isolation=snapshot'
 
     # Run it all on row-store as well as a control group: if something odd arises from the
     # RLE cell handling it won't happen in row-store.
     key_format_values = [
         ('column', dict(key_format='r')),
-        ('integer_row', dict(key_format='i')),
+        ('row_integer', dict(key_format='i')),
     ]
 
     in_memory_values = [

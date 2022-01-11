@@ -40,7 +40,6 @@ class test_hs05(wttest.WiredTigerTestCase):
     conn_config += 'eviction_trigger=100,'
     conn_config += 'eviction_dirty_target=95,eviction_dirty_trigger=100,'
     conn_config += 'eviction_updates_target=95,eviction_updates_trigger=100'
-    session_config = 'isolation=snapshot'
     stable = 1
     format_values = [
         ('column', dict(key_format='r', value_format='u')),
