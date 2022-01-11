@@ -321,9 +321,6 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
     /* Discard metadata tracking. */
     __wt_meta_track_discard(session);
 
-    /* Free transaction information. */
-    __wt_txn_destroy(session);
-
     /*
      * Close the file where we tracked long operations. Do this before releasing resources, as we do
      * scratch buffer management when we flush optrack buffers to disk.
@@ -343,6 +340,12 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
 
     /* The API lock protects opening and closing of sessions. */
     __wt_spin_lock(session, &conn->api_lock);
+
+    /*
+     * Free transaction information: inside the lock because we're freeing the WT_TXN structure and
+     * RTS looks at it.
+     */
+    __wt_txn_destroy(session);
 
     /* Decrement the count of open sessions. */
     WT_STAT_CONN_DECR(session, session_open);

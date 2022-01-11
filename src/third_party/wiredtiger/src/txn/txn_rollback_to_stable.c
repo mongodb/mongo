@@ -1319,6 +1319,52 @@ __rollback_to_stable_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_tim
 }
 
 /*
+ * __txn_user_active --
+ *     Return if there are any running user transactions.
+ */
+static bool
+__txn_user_active(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_SESSION_IMPL *session_in_list;
+    uint32_t i, session_cnt;
+    bool txn_active;
+
+    conn = S2C(session);
+    txn_active = false;
+
+    WT_STAT_CONN_INCR(session, txn_walk_sessions);
+
+    /*
+     * WT_TXN structures are allocated and freed as sessions are activated and closed. Lock the
+     * session open/close to ensure we don't race. This call is a rarely used RTS-only function,
+     * acquiring the lock shouldn't be an issue.
+     */
+    __wt_spin_lock(session, &conn->api_lock);
+
+    WT_ORDERED_READ(session_cnt, conn->session_cnt);
+    for (i = 0, session_in_list = conn->sessions; i < session_cnt; i++, session_in_list++) {
+
+        /* Skip inactive or internal sessions. */
+        if (!session_in_list->active || F_ISSET(session_in_list, WT_SESSION_INTERNAL))
+            continue;
+
+        /* Check if a user session has a running transaction. */
+        if (F_ISSET(session_in_list->txn, WT_TXN_RUNNING)) {
+            txn_active = true;
+            break;
+        }
+    }
+    __wt_spin_unlock(session, &conn->api_lock);
+
+    /*
+     * A new transaction may start after we return from this call and callers should be aware of
+     * this limitation.
+     */
+    return (txn_active);
+}
+
+/*
  * __rollback_to_stable_check --
  *     Ensure the rollback request is reasonable.
  */
@@ -1332,7 +1378,7 @@ __rollback_to_stable_check(WT_SESSION_IMPL *session)
      * Help the user comply with the requirement that there are no concurrent user operations. It is
      * okay to have a transaction in prepared state.
      */
-    txn_active = __wt_txn_user_active(session);
+    txn_active = __txn_user_active(session);
 #ifdef HAVE_DIAGNOSTIC
     if (txn_active)
         WT_TRET(__wt_verbose_dump_txn(session));
