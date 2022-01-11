@@ -98,6 +98,7 @@ public:
     TopologyEventsPublisher(std::shared_ptr<executor::TaskExecutor> executor)
         : _executor(executor){};
     void registerListener(TopologyListenerPtr listener);
+    void removeListener(TopologyListenerPtr listener);
     void close();
 
     void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,

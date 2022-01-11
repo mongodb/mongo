@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
-
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/oplog.h"
@@ -36,6 +35,9 @@
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -115,6 +117,23 @@ void PrimaryOnlyServiceMongoDTest::stepDown() {
     ASSERT_OK(ReplicationCoordinator::get(getServiceContext())
                   ->setFollowerMode(MemberState::RS_SECONDARY));
     _registry->onStepDown();
+}
+
+std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.threadNamePrefix = "PrimaryOnlyServiceTest-";
+    threadPoolOptions.poolName = "PrimaryOnlyServiceTestThreadPool";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+
+    auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface(
+            "PrimaryOnlyServiceTestNetwork", nullptr, std::move(hookList)));
+    executor->startup();
+    return executor;
 }
 
 }  // namespace repl

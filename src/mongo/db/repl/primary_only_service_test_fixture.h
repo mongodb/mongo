@@ -35,6 +35,10 @@
 
 namespace mongo {
 
+namespace executor {
+class TaskExecutor;
+}
+
 class OperationContext;
 class OpObserverRegistry;
 class ServiceContext;
@@ -64,6 +68,8 @@ protected:
     repl::PrimaryOnlyService* _service = nullptr;
     long long _term = 0;
 };
+
+std::shared_ptr<executor::TaskExecutor> makeTestExecutor();
 
 }  // namespace repl
 }  // namespace mongo

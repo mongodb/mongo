@@ -31,6 +31,8 @@
 
 #include <memory>
 
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/op_observer_impl.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
+#include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -46,7 +49,15 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
+#include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -56,7 +67,24 @@ namespace mongo {
 
 namespace {
 constexpr std::int32_t stopFailPointErrorCode = 9822402;
+
+sdam::TopologyDescriptionPtr createTopologyDescription(const MockReplicaSet& set) {
+    std::shared_ptr<TopologyDescription> topologyDescription =
+        std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration(
+            set.getHosts(), sdam::TopologyType::kReplicaSetNoPrimary, set.getSetName()));
+
+    for (auto& server : set.getHosts()) {
+        auto serverDescription = sdam::ServerDescriptionBuilder()
+                                     .withAddress(server)
+                                     .withSetName(set.getSetName())
+                                     .instance();
+        topologyDescription->installServerDescription(serverDescription);
+    }
+
+    return topologyDescription;
 }
+
+}  // namespace
 
 std::ostringstream& operator<<(std::ostringstream& builder,
                                const mongo::ShardSplitDonorStateEnum state) {
@@ -88,8 +116,7 @@ public:
         auto serviceContext = getServiceContext();
 
         // Fake replSet just for creating consistent URI for monitor
-        MockReplicaSet replSet("donorSet", 1, true /* hasPrimary */, true /* dollarPrefixHosts */);
-        _rsmMonitor.setup(replSet.getURI());
+        _rsmMonitor.setup(_validRepl.getURI());
 
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
@@ -181,6 +208,8 @@ public:
 protected:
     repl::PrimaryOnlyServiceRegistry* _registry;
     repl::PrimaryOnlyService* _service;
+    MockReplicaSet _validRepl{
+        "replInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     long long _term = 0;
 
 private:
@@ -193,6 +222,7 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 
     ShardSplitDonorDocument initialStateDocument(migrationUUID);
 
+    initialStateDocument.setRecipientConnectionString(StringData(_validRepl.getConnectionString()));
     // Create and start the instance.
     auto opCtx = makeOperationContext();
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -200,10 +230,41 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT(serviceInstance.get());
     ASSERT_EQ(migrationUUID, serviceInstance->getId());
 
-    // Wait for task completion.
-    auto result = serviceInstance->completionFuture().get(opCtx.get());
+    auto completionFuture = serviceInstance->completionFuture();
+
+    std::shared_ptr<TopologyDescription> topologyDescriptionOld =
+        std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration());
+    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
+        createTopologyDescription(_validRepl);
+
+    // construct task executor
+    std::shared_ptr<executor::NetworkInterface> networkInterface = executor::makeNetworkInterface(
+        "SplitReplicaSetObserter-TestExecutor",
+        std::make_unique<ReplicaSetMonitorManagerNetworkConnectionHook>(),
+        std::make_unique<rpc::EgressMetadataHookList>());
+
+    auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
+    auto executor =
+        std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
+    executor->startup();
+
+    // Wait until the RSM has been created by the instance.
+    auto replicaSetMonitorCreatedFuture = serviceInstance->replicaSetMonitorCreatedFuture();
+    replicaSetMonitorCreatedFuture.wait(opCtx.get());
+
+    // Retrieve monitor installed by _rsmMonitor.setup(...)
+    auto monitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
+        ReplicaSetMonitor::createIfNeeded(_validRepl.getURI()));
+    invariant(monitor);
+    auto publisher = monitor->getEventsPublisher();
+
+    publisher->onTopologyDescriptionChangedEvent(topologyDescriptionOld, topologyDescriptionNew);
+
+    completionFuture.wait();
+
+    auto result = completionFuture.get();
     ASSERT(!result.abortReason);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kDataSync);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 }
 
 TEST_F(ShardSplitDonorServiceTest, Abort) {
@@ -254,6 +315,103 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
     auto result = serviceInstance->completionFuture().getNoThrow();
     ASSERT_FALSE(result.isOK());
     ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange, result.getStatus());
+}
+
+class SplitReplicaSetObserverTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        ServiceContextTest::setUp();
+
+        _rsmMonitor.setup(_validRepl.getURI());
+        _otherRsmMonitor.setup(_invalidRepl.getURI());
+
+        _executor = repl::makeTestExecutor();
+
+        // Retrieve monitor installed by _rsmMonitor.setup(...)
+        auto monitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
+            ReplicaSetMonitor::createIfNeeded(_validRepl.getURI()));
+        invariant(monitor);
+        _publisher = monitor->getEventsPublisher();
+    }
+
+protected:
+    MockReplicaSet _validRepl{
+        "replInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+    MockReplicaSet _invalidRepl{
+        "replNotInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+
+    StreamableReplicaSetMonitorForTesting _rsmMonitor;
+    StreamableReplicaSetMonitorForTesting _otherRsmMonitor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
+    std::shared_ptr<sdam::TopologyEventsPublisher> _publisher;
+};
+
+TEST_F(SplitReplicaSetObserverTest, SupportsCancellation) {
+    CancellationSource source;
+    auto future = getRecipientAcceptSplitFuture(
+        _executor, source.token(), MongoURI::parse(_validRepl.getConnectionString()).getValue());
+
+    ASSERT_FALSE(future.isReady());
+    source.cancel();
+
+    ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(SplitReplicaSetObserverTest, GetRecipientAcceptSplitFutureTest) {
+    CancellationSource source;
+
+    auto future = getRecipientAcceptSplitFuture(
+        _executor, source.token(), MongoURI::parse(_validRepl.getConnectionString()).getValue());
+
+    std::shared_ptr<TopologyDescription> topologyDescriptionOld =
+        std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration());
+    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
+        createTopologyDescription(_validRepl);
+
+    _publisher->onTopologyDescriptionChangedEvent(topologyDescriptionOld, topologyDescriptionNew);
+
+    future.wait();
+}
+
+TEST_F(SplitReplicaSetObserverTest, FutureNotReadyMissingNodes) {
+    auto uri = MongoURI::parse(_validRepl.getConnectionString()).getValue();
+
+    auto predicate =
+        makeRecipientAcceptSplitPredicate(uri.getReplicaSetName(), uri.getServers().size());
+
+    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
+        createTopologyDescription(_validRepl);
+    topologyDescriptionNew->removeServerDescription(_validRepl.getHosts()[0]);
+
+    ASSERT_FALSE(predicate(topologyDescriptionNew->getServers()));
+}
+
+TEST_F(SplitReplicaSetObserverTest, FutureNotReadyWrongSet) {
+    auto uri = MongoURI::parse(_validRepl.getConnectionString()).getValue();
+
+    auto predicate =
+        makeRecipientAcceptSplitPredicate(uri.getReplicaSetName(), uri.getServers().size());
+
+    std::shared_ptr<TopologyDescription> topologyDescriptionNew =
+        createTopologyDescription(_invalidRepl);
+
+    ASSERT_FALSE(predicate(topologyDescriptionNew->getServers()));
+}
+
+TEST_F(SplitReplicaSetObserverTest, ExecutorCanceled) {
+    CancellationSource source;
+
+    auto future = getRecipientAcceptSplitFuture(
+        _executor, source.token(), MongoURI::parse(_validRepl.getConnectionString()).getValue());
+
+    _executor->shutdown();
+    _executor->join();
+
+    ASSERT_FALSE(future.isReady());
+
+    // Ensure the test does not hang.
+    source.cancel();
+    ASSERT_EQ(future.getNoThrow().code(), ErrorCodes::ShutdownInProgress);
 }
 
 }  // namespace mongo

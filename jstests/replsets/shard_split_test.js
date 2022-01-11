@@ -81,7 +81,7 @@ function runStart() {
     }));
 
     jsTestLog("Asserting state document exist after command");
-    assertDocumentState(primary, migrationId, "data sync");
+    assertDocumentState(primary, migrationId, "committed");
 
     donorSet.stopSet();
     recipientSet.stopSet();

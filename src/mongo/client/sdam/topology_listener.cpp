@@ -51,6 +51,22 @@ void TopologyEventsPublisher::registerListener(TopologyListenerPtr listener) {
     }
 }
 
+void TopologyEventsPublisher::removeListener(TopologyListenerPtr listener) {
+    auto locked_listener = listener.lock();
+    if (!locked_listener) {
+        LOGV2_WARNING(6142505, "Trying to remove an empty listener with TopologyEventsPublisher");
+        return;
+    }
+
+    stdx::lock_guard lock(_mutex);
+    _listeners.erase(std::remove_if(_listeners.begin(),
+                                    _listeners.end(),
+                                    [&locked_listener](const TopologyListenerPtr& ptr) {
+                                        return ptr.lock() == locked_listener;
+                                    }),
+                     _listeners.end());
+}
+
 void TopologyEventsPublisher::close() {
     stdx::lock_guard lock(_mutex);
     _listeners.clear();

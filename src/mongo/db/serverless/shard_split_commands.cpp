@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -53,9 +54,15 @@ public:
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
             uassert(ErrorCodes::IllegalOperation,
-                    "tenant split is not available on config servers",
+                    "shard split is not available on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::None ||
                         serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+            // TODO SERVER-62079 : Remove check for scanning RSM as it does not exist anymore.
+            uassert(
+                6142502,
+                "feature \"shard split\" not supported when started with \"scanning\" replica set "
+                "monitor mode.",
+                gReplicaSetMonitorProtocol != ReplicaSetMonitorProtocol::kScanning);
 
             const auto& cmd = request();
             auto stateDoc = ShardSplitDonorDocument(cmd.getMigrationId());
@@ -130,6 +137,12 @@ public:
                     "feature \"shard split\" not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
+            // TODO SERVER-62079 : Remove check for scanning RSM as it does not exist anymore.
+            uassert(
+                6142506,
+                "feature \"shard split\" not supported when started with \"scanning\" replica set "
+                "monitor mode.",
+                gReplicaSetMonitorProtocol != ReplicaSetMonitorProtocol::kScanning);
 
             const RequestType& cmd = request();
 

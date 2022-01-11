@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/client/replica_set_monitor.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/executor/cancelable_executor.h"
@@ -36,6 +38,13 @@
 namespace mongo {
 
 using ScopedTaskExecutorPtr = std::shared_ptr<executor::ScopedTaskExecutor>;
+
+std::function<bool(const std::vector<sdam::ServerDescriptionPtr>&)>
+makeRecipientAcceptSplitPredicate(std::string name, int expectedSize);
+
+SemiFuture<void> getRecipientAcceptSplitFuture(ExecutorPtr executor,
+                                               const CancellationToken& token,
+                                               MongoURI recipientConnectionString);
 
 class ShardSplitDonorService final : public repl::PrimaryOnlyService {
 public:
@@ -101,6 +110,10 @@ public:
         return _completionPromise.getFuture();
     }
 
+    SharedSemiFuture<void> replicaSetMonitorCreatedFuture() const {
+        return _replicaSetMonitorCreatedPromise.getFuture();
+    }
+
     UUID getId() const {
         return _migrationId;
     }
@@ -117,6 +130,9 @@ private:
     ExecutorFuture<void> _enterDataSyncState(const ScopedTaskExecutorPtr& executor,
                                              const CancellationToken& token);
 
+    ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
+                                                        const CancellationToken& token);
+
     // Helpers
     ExecutorFuture<void> _writeInitialDocument(const ScopedTaskExecutorPtr& executor,
                                                const CancellationToken& token);
@@ -127,6 +143,8 @@ private:
     ExecutorFuture<void> _waitForMajorityWriteConcern(const ScopedTaskExecutorPtr& executor,
                                                       repl::OpTime opTime,
                                                       const CancellationToken& token);
+
+    void _createReplicaSetMonitor(const ExecutorPtr& executor, const CancellationToken& abortToken);
 
     ExecutorFuture<DurableState> _handleErrorOrEnterAbortedState(
         StatusWith<DurableState> durableState,
@@ -147,8 +165,14 @@ private:
     boost::optional<CancellationSource> _abortSource;
     boost::optional<Status> _abortReason;
 
+    // A promise fulfilled when the replicaSetMonitor has been created;
+    SharedPromise<void> _replicaSetMonitorCreatedPromise;
+
     // A promise fulfilled when the shard split operation has fully completed
     SharedPromise<DurableState> _completionPromise;
+
+    // A promise fulfilled when all recipient nodes have accepted the split.
+    SharedPromise<void> _recipientAcceptedSplit;
 };
 
 }  // namespace mongo

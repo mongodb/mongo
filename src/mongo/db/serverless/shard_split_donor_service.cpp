@@ -29,13 +29,18 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
+
 #include "mongo/db/serverless/shard_split_donor_service.h"
+#include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/executor/cancelable_executor.h"
+#include "mongo/executor/connection_pool.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
@@ -54,6 +59,76 @@ bool shouldStopInsertingDonorStateDoc(Status status) {
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterInitialSync);
 
 }  // namespace
+
+std::function<bool(const std::vector<sdam::ServerDescriptionPtr>&)>
+makeRecipientAcceptSplitPredicate(std::string name, int expectedSize) {
+    return [name = std::move(name),
+            expectedSize](const std::vector<sdam::ServerDescriptionPtr>& servers) {
+        return expectedSize ==
+            std::count_if(servers.begin(), servers.end(), [&](const auto& server) {
+                   return server->getSetName() && *(server->getSetName()) == name;
+               });
+    };
+}
+
+SemiFuture<void> getRecipientAcceptSplitFuture(ExecutorPtr executor,
+                                               const CancellationToken& token,
+                                               MongoURI recipientConnectionString) {
+    class RecipientAcceptSplitListener : public sdam::TopologyListener {
+    public:
+        RecipientAcceptSplitListener(int expectedSize, std::string rsName)
+            : _predicate(makeRecipientAcceptSplitPredicate(std::move(rsName), expectedSize)) {}
+        void onTopologyDescriptionChangedEvent(TopologyDescriptionPtr previousDescription,
+                                               TopologyDescriptionPtr newDescription) final {
+            stdx::lock_guard<Latch> lg(_mutex);
+            if (_fulfilled) {
+                return;
+            }
+
+            if (_predicate(newDescription->getServers())) {
+                _fulfilled = true;
+                _promise.emplaceValue();
+            }
+        }
+
+        // Fulfilled when all nodes have accepted the split.
+        SharedSemiFuture<void> getFuture() const {
+            return _promise.getFuture();
+        }
+
+    private:
+        bool _fulfilled = false;
+        std::function<bool(const std::vector<sdam::ServerDescriptionPtr>&)> _predicate;
+        SharedPromise<void> _promise;
+        mutable Mutex _mutex =
+            MONGO_MAKE_LATCH("ShardSplitDonorService::getRecipientAcceptSplitFuture::_mutex");
+    };
+
+    auto monitor = ReplicaSetMonitor::createIfNeeded(recipientConnectionString);
+    invariant(monitor);
+
+    // TODO SERVER-62079 : Remove check for scanning RSM as it does not exist anymore.
+    auto streamableMonitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(monitor);
+    uassert(6142507,
+            "feature \"shard split\" can only work with a StreamableReplicaSetMonitor.",
+            streamableMonitor);
+
+    auto listener = std::make_shared<RecipientAcceptSplitListener>(
+        recipientConnectionString.getServers().size(),
+        recipientConnectionString.getReplicaSetName());
+
+    streamableMonitor->getEventsPublisher()->registerListener(listener);
+
+    return future_util::withCancellation(listener->getFuture(), token)
+        .thenRunOn(executor)
+        // Preserve lifetime of listener and monitor until the future is fulfilled and remove the
+        // listener.
+        .onCompletion([listener, monitor = streamableMonitor](Status s) {
+            monitor->getEventsPublisher()->removeListener(listener);
+            return s;
+        })
+        .semi();
+}
 
 ThreadPool::Limits ShardSplitDonorService::getThreadPoolLimits() const {
     return ThreadPool::Limits();
@@ -128,12 +203,21 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             })
             // Once the initial write is done, use the abort token
             .thenRunOn(cancelableExecutor)
+            .then([this, cancelableExecutor, abortToken] {
+                _createReplicaSetMonitor(cancelableExecutor, abortToken);
+            })
             .then([this, executor, cancelableExecutor, abortToken] {
                 // Passing executor as a TaskExecutor is required by the downstream call to
                 // AsyncTryUntilWithDelay::on(...)
                 return _enterDataSyncState(executor, abortToken).thenRunOn(cancelableExecutor);
             })
             .then([this, cancelableExecutor] { pauseShardSplitAfterInitialSync.pauseWhileSet(); })
+            .then([this, cancelableExecutor, executor, abortToken] {
+                // Passing executor as a TaskExecutor is required by the downstream call to
+                // AsyncTry::on(...)
+                return _waitForRecipientToAcceptSplit(executor, abortToken)
+                    .thenRunOn(cancelableExecutor);
+            })
             .then([this, cancelableExecutor, abortToken] {
                 LOGV2(6086503,
                       "Shard split completed",
@@ -187,6 +271,33 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterDataSyncSt
         .then([this, executor, abortToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
         });
+}
+
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplit(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+            return ExecutorFuture(**executor);
+        }
+
+        LOGV2(6142501, "Waiting for recipient to accept the split.");
+    }
+
+    return _recipientAcceptedSplit.getFuture().thenRunOn(**executor).then([this, executor, token] {
+        LOGV2(6142503, "Recipient has accepted the split, committing shard split decision");
+
+        {
+            stdx::lock_guard<Latch> lg(_mutex);
+            _stateDoc.setState(ShardSplitDonorStateEnum::kCommitted);
+        }
+
+        return _updateStateDocument(executor, token)
+            .then([this, executor, token](repl::OpTime opTime) {
+                return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+            });
+    });
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDocument(
@@ -288,6 +399,36 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForMajority
         .thenRunOn(**executor);
 }
 
+void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
+    const ExecutorPtr& executor, const CancellationToken& abortToken) {
+
+    auto connectionString = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+
+        return _stateDoc.getRecipientConnectionString();
+    }();
+
+    // TODO SERVER-61772 : remove once we ensure this will not be hit when abort creates the
+    // instance.
+    if (!connectionString) {
+        _recipientAcceptedSplit.setError(Status(
+            ErrorCodes::CallbackCanceled, "Cannot look for a recipient replica set without URI"));
+        _replicaSetMonitorCreatedPromise.setError(Status(
+            ErrorCodes::CallbackCanceled, "Cannot look for a recipient replica set without URI"));
+        return;
+    }
+
+    _recipientAcceptedSplit.setFrom(
+        getRecipientAcceptSplitFuture(
+            executor, abortToken, MongoURI::parse(connectionString.get()).getValue())
+            .unsafeToInlineFuture());
+    _replicaSetMonitorCreatedPromise.emplaceValue();
+
+    LOGV2(6142508,
+          "Monitoring recipient nodes for split acceptance.",
+          "recipientConnectionString"_attr = connectionString.get());
+}
+
 ExecutorFuture<ShardSplitDonorService::DonorStateMachine::DurableState>
 ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
     StatusWith<DurableState> statusWithState,
@@ -316,8 +457,8 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
     }
 
     // There is no use to check the parent token the executor would not run if the parent token
-    // is canceled. At this point either the abortToken has been canceled or a previous operation
-    // failed. In either case we abort the migration.
+    // is cancelled. At this point either the abortToken has been cancelled or a previous
+    // operation failed. In either case we abort the migration.
     if (abortToken.isCanceled()) {
         statusWithState =
             Status(ErrorCodes::TenantMigrationAborted, "Aborted due to abortShardSplit.");
