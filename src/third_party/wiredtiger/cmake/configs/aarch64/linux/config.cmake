@@ -1,10 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
 include(CheckCCompilerFlag)
 
 set(WT_ARCH "aarch64" CACHE STRING "")

@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-# See the file LICENSE for redistribution information.
-#
-
 if(CMAKE_CROSSCOMPILING)
     set(TRIPLE_TARGET "s390x-ibm-linux-gnu")
     set(CROSS_COMPILER_PREFIX ${TRIPLE_TARGET}-)

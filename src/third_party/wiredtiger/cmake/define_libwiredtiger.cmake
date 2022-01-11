@@ -1,11 +1,3 @@
-#
-# Public Domain 2014-present MongoDB, Inc.
-# Public Domain 2008-2014 WiredTiger, Inc.
-#  All rights reserved.
-#
-#  See the file LICENSE for redistribution information
-#
-
 # define_wiredtiger_library(target type)
 # A helper that defines a wiredtiger library target. This defining a set of common targets and properties we
 # want to be associated to any given 'libwiredtiger' target. Having this as a macro allows us to de-duplicate common
