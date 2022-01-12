@@ -39,6 +39,21 @@
 
 namespace mongo {
 
+/**
+ * Struct containing information about secondary collections (such as the 'from' collection in
+ * $lookup) useful for query planning.
+ */
+struct SecondaryCollectionInfo {
+    NamespaceString nss;
+    std::vector<IndexEntry> indexes{};
+    bool exists{true};
+    bool isSharded{false};
+    bool isView{false};
+
+    // The approximate size of the collection in bytes.
+    long long approximateCollectionSizeBytes{0};
+};
+
 struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
@@ -147,6 +162,9 @@ struct QueryPlannerParams {
     // Specifies the collator information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
     const CollatorInterface* clusteredCollectionCollator;
+
+    // List of information about any secondary collections that can be executed against.
+    std::vector<SecondaryCollectionInfo> secondaryCollectionsInfo;
 };
 
 }  // namespace mongo

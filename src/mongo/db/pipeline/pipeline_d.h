@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/multi_collection.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -79,11 +80,12 @@ public:
      * PlanExecutor. For example, an early $match can be removed and replaced with a
      * DocumentSourceCursor containing a PlanExecutor that will do an index scan.
      *
-     * Callers must take care to ensure that 'nss' is locked in at least IS-mode.
+     * Callers must take care to ensure that 'nss' and each collection referenced in
+     * 'collections' is locked in at least IS-mode.
      *
      * When not null, 'aggRequest' provides access to pipeline command options such as hint.
      *
-     * The 'collection' parameter is optional and can be passed as 'nullptr'.
+     * The 'collections' parameter can reference any number of collections.
      *
      * This method will not add a $cursor stage to the pipeline, but will create a PlanExecutor and
      * a callback function. The executor and the callback can later be used to create the $cursor
@@ -92,7 +94,7 @@ public:
      * 'nullptr'.
      */
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutor(const CollectionPtr& collection,
+    buildInnerQueryExecutor(const MultiCollection& collections,
                             const NamespaceString& nss,
                             const AggregateCommandRequest* aggRequest,
                             Pipeline* pipeline);
@@ -101,11 +103,11 @@ public:
      * Completes creation of the $cursor stage using the given callback pair obtained by calling
      * 'buildInnerQueryExecutor()' method. If the callback doesn't hold a valid PlanExecutor, the
      * method does nothing. Otherwise, a new $cursor stage is created using the given PlanExecutor,
-     * and added to the pipeline. The 'collection' parameter is optional and can be passed as
-     * 'nullptr'.
+     * and added to the pipeline. The 'collections' parameter can reference any number of
+     * collections.
      */
     static void attachInnerQueryExecutorToPipeline(
-        const CollectionPtr& collection,
+        const MultiCollection& collection,
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         Pipeline* pipeline);
@@ -114,10 +116,10 @@ public:
      * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
      * into a single call to support auto completion of the cursor stage creation process. Can be
      * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
-     * can be created right after buiding the executor.
+     * can be created right after building the executor.
      */
     static void buildAndAttachInnerQueryExecutorToPipeline(
-        const CollectionPtr& collection,
+        const MultiCollection& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline);
@@ -166,18 +168,51 @@ private:
      * the 'pipeline'.
      */
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
+    buildInnerQueryExecutorGeneric(const MultiCollection& collections,
                                    const NamespaceString& nss,
                                    const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline);
 
     /**
+     * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
+     * push down the $sort, $project, $match and $limit stages into the PlanStage layer whenever
+     * possible. In this case, these stages will be incorporated into the PlanExecutor. Note that
+     * this function takes a 'MultiCollection' because certain $lookup stages that reference
+     * multiple collections may be eligible for pushdown in the PlanExecutor.
+     *
+     * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
+     * compatible with a DISTINCT_SCAN plan that visits the first document in each group
+     * (SERVER-9507).
+     *
+     * Sets the 'hasNoRequirements' out-parameter based on whether the dependency set is both finite
+     * and empty. In this case, the query has count semantics.
+     */
+    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const MultiCollection& collections,
+        const NamespaceString& nss,
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
+        std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
+        QueryMetadataBitSet metadataAvailable,
+        const BSONObj& queryObj,
+        SkipThenLimit skipThenLimit,
+        const AggregateCommandRequest* aggRequest,
+        const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
+        bool* hasNoRequirements);
+
+    /**
      * Build a PlanExecutor and prepare a callback to create a special DocumentSourceGeoNearCursor
-     * for the 'pipeline'. Unlike 'buildInnerQueryExecutorGeneric()', throws if 'collection' does
-     * not exist, as the $geoNearCursor requires a 2d or 2dsphere index.
+     * for the 'pipeline'. Unlike 'buildInnerQueryExecutorGeneric()', throws if the main collection
+     * defined on 'collections' does not exist, as the $geoNearCursor requires a 2d or 2dsphere
+     * index.
+     *
+     * Note that this method takes a 'MultiCollection' even though DocumentSourceGeoNearCursor
+     * only operates over a single collection because the underlying execution API expects a
+     * 'MultiCollection'.
      */
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
+    buildInnerQueryExecutorGeoNear(const MultiCollection& collections,
                                    const NamespaceString& nss,
                                    const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline);
@@ -194,32 +229,6 @@ private:
                                   DocumentSourceInternalUnpackBucket* unpackBucketStage,
                                   const CollectionPtr& collection,
                                   Pipeline* pipeline);
-
-    /**
-     * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
-     * push down the $sort, $project, $match and $limit stages into the PlanStage layer whenever
-     * possible. In this case, these stages will be incorporated into the PlanExecutor.
-     *
-     * Set 'rewrittenGroupStage' when the pipeline uses $match+$sort+$group stages that are
-     * compatible with a DISTINCT_SCAN plan that visits the first document in each group
-     * (SERVER-9507).
-     *
-     * Sets the 'hasNoRequirements' out-parameter based on whether the dependency set is both finite
-     * and empty. In this case, the query has count semantics.
-     */
-    static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const CollectionPtr& collection,
-        const NamespaceString& nss,
-        Pipeline* pipeline,
-        const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
-        std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage,
-        QueryMetadataBitSet metadataAvailable,
-        const BSONObj& queryObj,
-        SkipThenLimit skipThenLimit,
-        const AggregateCommandRequest* aggRequest,
-        const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-        bool* hasNoRequirements);
 
     /**
      * Returns a 'PlanExecutor' which uses a random cursor to sample documents if successful as

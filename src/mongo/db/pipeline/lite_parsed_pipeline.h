@@ -77,6 +77,23 @@ public:
     }
 
     /**
+     * Inserts the foreign collections(s) referenced by this stage that potentially will be involved
+     * in query execution, if any, into 'nssSet'. For example, consider the pipeline:
+     *
+     * [{$lookup: {from: "bar", localField: "a", foreignField: "b", as: "output"}},
+     *  {$unionWith: {coll: "foo", pipeline: [...]}}].
+     *
+     * Here, "foo" is not considered a foreign execution namespace because "$unionWith" cannot be
+     * pushed down into the execution subsystem underneath the leading cursor stage, while "bar"
+     * is considered one because "$lookup" can be pushed down in certain cases.
+     */
+    void getForeignExecutionNamespaces(stdx::unordered_set<NamespaceString>& nssSet) const {
+        for (auto&& spec : _stageSpecs) {
+            spec->getForeignExecutionNamespaces(nssSet);
+        }
+    }
+
+    /**
      * Returns a list of the priviliges required for this pipeline.
      */
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {

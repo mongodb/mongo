@@ -96,6 +96,12 @@ public:
             }
         }
 
+        void getForeignExecutionNamespaces(
+            stdx::unordered_set<NamespaceString>& nssSet) const final {
+            tassert(6235100, "Expected foreignNss to be initialized for $lookup", _foreignNss);
+            nssSet.emplace(*_foreignNss);
+        }
+
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override final;
 

@@ -120,9 +120,18 @@ public:
                                                            const BSONObj& spec);
 
     /**
-     * Returns the foreign collection(s) referenced by this stage, if any.
+     * Returns the foreign collection(s) referenced by this stage (that is, any collection that
+     * the pipeline references, but doesn't get locked), if any.
      */
     virtual stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const = 0;
+
+    /**
+     * Returns the foreign collections(s) referenced by this stage that potentially will be
+     * involved in query execution (that is, a collection that the pipeline references, and gets
+     * locked for the purposes of query execution), if any.
+     */
+    virtual void getForeignExecutionNamespaces(stdx::unordered_set<NamespaceString>& nssSet) const {
+    }
 
     /**
      * Returns a list of the privileges required for this stage.

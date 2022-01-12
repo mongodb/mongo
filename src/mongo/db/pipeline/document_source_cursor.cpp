@@ -137,6 +137,7 @@ void DocumentSourceCursor::loadBatch() {
     PlanExecutor::ExecState state;
     Document resultObj;
 
+    // TODO SERVER-62798: Replace this with 'AutoGetCollectionMulti'.
     boost::optional<AutoGetCollectionForReadMaybeLockFree> autoColl;
     tassert(5565800,
             "Expected PlanExecutor to use an external lock policy",

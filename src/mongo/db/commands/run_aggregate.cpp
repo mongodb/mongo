@@ -559,6 +559,13 @@ Status runAggregate(OperationContext* opCtx,
 
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespace();
+    stdx::unordered_set<NamespaceString> secondaryExecNssList;
+
+    // Determine if this aggregation has foreign collections that the execution subsystem needs
+    // to be aware of.
+    if (internalEnableMultipleAutoGetCollections.load()) {
+        liteParsedPipeline.getForeignExecutionNamespaces(secondaryExecNssList);
+    }
 
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
@@ -572,6 +579,27 @@ Status runAggregate(OperationContext* opCtx,
     // connection is out of date. If the namespace is a view, the lock will be released before
     // re-running the expanded aggregation.
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
+
+    // Vector of AutoGets for secondary collections. At the moment, this is internal to testing
+    // only because eventually, this will be replaced by 'AutoGetCollectionMulti'.
+    // TODO SERVER-62798: Replace this and the above AutoGet with 'AutoGetCollectionMulti'.
+    std::vector<std::unique_ptr<AutoGetCollectionForReadCommandMaybeLockFree>> secondaryCtx;
+    MultiCollection collections;
+
+    auto initContext = [&](AutoGetCollectionViewMode m) -> void {
+        ctx.emplace(opCtx, nss, m);
+        for (const auto& ns : secondaryExecNssList) {
+            secondaryCtx.emplace_back(
+                std::make_unique<AutoGetCollectionForReadCommandMaybeLockFree>(opCtx, ns, m));
+        }
+        collections = MultiCollection(ctx, secondaryCtx);
+    };
+
+    auto resetContext = [&]() -> void {
+        ctx.reset();
+        secondaryCtx.clear();
+        collections.clear();
+    };
 
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -629,7 +657,7 @@ Status runAggregate(OperationContext* opCtx,
             collatorToUseMatchesDefault = match;
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
-            ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
+            initContext(AutoGetCollectionViewMode::kViewsForbidden);
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             uassert(4928901,
                     str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
@@ -646,19 +674,23 @@ Status runAggregate(OperationContext* opCtx,
                 opCtx, request.getCollation().get_value_or(BSONObj()), nullptr);
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
+            tassert(6235101, "A collection-less aggregate should not take any locks", !ctx);
+            tassert(6235102,
+                    "A collection-less aggregate should not take any secondary locks",
+                    secondaryCtx.empty());
         } else {
             // This is a regular aggregation. Lock the collection or view.
-            ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsPermitted);
-            auto [collator, match] = PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), ctx->getCollection());
+            initContext(AutoGetCollectionViewMode::kViewsPermitted);
+            auto [collator, match] =
+                PipelineD::resolveCollator(opCtx,
+                                           request.getCollation().get_value_or(BSONObj()),
+                                           collections.getMainCollection());
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
-            if (ctx->getCollection()) {
-                uuid = ctx->getCollection()->uuid();
+            if (collections.hasMainCollection()) {
+                uuid = collections.getMainCollection()->uuid();
             }
         }
-
-        const auto& collection = ctx ? ctx->getCollection() : CollectionPtr::null;
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
@@ -708,7 +740,7 @@ Status runAggregate(OperationContext* opCtx,
                 uassertStatusOK(viewCatalog->resolveView(opCtx, nss, timeSeriesCollator));
 
             // With the view & collation resolved, we can relinquish locks.
-            ctx.reset();
+            resetContext();
 
             // Set this operation's shard version for the underlying collection to unsharded.
             // This is prerequisite for future shard versioning checks.
@@ -788,7 +820,7 @@ Status runAggregate(OperationContext* opCtx,
 
         // Prepare a PlanExecutor to provide input into the pipeline, if needed.
         auto attachExecutorCallback =
-            PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
+            PipelineD::buildInnerQueryExecutor(collections, nss, &request, pipeline.get());
 
         if (canOptimizeAwayPipeline(pipeline.get(),
                                     attachExecutorCallback.second.get(),
@@ -807,7 +839,7 @@ Status runAggregate(OperationContext* opCtx,
             // Mark that this query uses DocumentSource.
             curOp->debug().documentSourceUsed = true;
             // Complete creation of the initial $cursor stage, if needed.
-            PipelineD::attachInnerQueryExecutorToPipeline(collection,
+            PipelineD::attachInnerQueryExecutorToPipeline(collections,
                                                           attachExecutorCallback.first,
                                                           std::move(attachExecutorCallback.second),
                                                           pipeline.get());
@@ -831,7 +863,7 @@ Status runAggregate(OperationContext* opCtx,
             // though, as we will be changing its lock policy to 'kLockExternally' (see details
             // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
             // we need to hold the collection lock.
-            ctx.reset();
+            resetContext();
         }
 
         {

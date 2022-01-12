@@ -620,3 +620,10 @@ server_parameters:
         expr: 100 * 1024 * 1024
     validator:
         gt: 0
+
+  internalEnableMultipleAutoGetCollections:
+    description: "Test only parameter to enable taking multiple AutoGetCollections in runAggregate"
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalEnableMultipleAutoGetCollections"
+    cpp_vartype: AtomicWord<bool>
+    default: false
