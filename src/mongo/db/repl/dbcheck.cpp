@@ -446,10 +446,10 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
         case OplogEntriesEnum::Start:
             // fallthrough
         case OplogEntriesEnum::Stop:
-            const auto entry = mongo::dbCheckHealthLogEntry(
+            const auto healthLogEntry = mongo::dbCheckHealthLogEntry(
                 boost::none /*nss*/, SeverityEnum::Info, "", type, boost::none /*data*/
             );
-            HealthLog::get(Client::getCurrent()->getServiceContext()).log(*entry);
+            HealthLog::get(Client::getCurrent()->getServiceContext()).log(*healthLogEntry);
             return Status::OK();
     }
 
