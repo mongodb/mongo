@@ -41,6 +41,8 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -81,6 +83,7 @@ namespace {
 using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorAfterPreparingToDonate);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeInitializing);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCloning);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeBlockingWrites);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
@@ -539,11 +542,11 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
 void executeMetadataChangesInTxn(
     OperationContext* opCtx,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
-    ShardingCatalogManager::withTransaction(opCtx,
-                                            NamespaceString::kConfigReshardingOperationsNamespace,
-                                            [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                                                changeMetadataFunc(opCtx, txnNumber);
-                                            });
+    ShardingCatalogManager::withTransaction(
+        opCtx,
+        NamespaceString::kConfigReshardingOperationsNamespace,
+        [&](OperationContext* opCtx, TxnNumber txnNumber) { changeMetadataFunc(opCtx, txnNumber); },
+        ShardingCatalogClient::kLocalWriteConcern);
 }
 
 BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
@@ -630,9 +633,10 @@ void writeDecisionPersistedState(OperationContext* opCtx,
 
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           const ReshardingCoordinatorDocument& coordinatorDoc) {
-
     ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
-        opCtx, coordinatorDoc.getSourceNss(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        opCtx,
+        coordinatorDoc.getSourceNss(),
+        [&](OperationContext* opCtx, TxnNumber txnNumber) {
             auto doc = ShardingCatalogManager::get(opCtx)->findOneConfigDocumentInTxn(
                 opCtx,
                 CollectionType::ConfigNS,
@@ -671,7 +675,8 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
             // 'reshardingFields'
             updateConfigCollectionsForOriginalNss(
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
-        });
+        },
+        ShardingCatalogClient::kLocalWriteConcern);
 }
 
 void writeParticipantShardsAndTempCollInfo(
@@ -697,7 +702,8 @@ void writeParticipantShardsAndTempCollInfo(
             writeToCoordinatorStateNss(opCtx, updatedCoordinatorDoc, txnNumber);
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-        });
+        },
+        ShardingCatalogClient::kLocalWriteConcern);
 }
 
 void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
@@ -711,7 +717,9 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     }
 
     ShardingCatalogManager::get(opCtx)->bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
-        opCtx, collNames, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        opCtx,
+        collNames,
+        [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update the config.reshardingOperations entry
             writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
 
@@ -727,7 +735,8 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
                 writeToConfigCollectionsForTempNss(
                     opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
             }
-        });
+        },
+        ShardingCatalogClient::kLocalWriteConcern);
 }
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
@@ -771,7 +780,8 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
             // Remove the resharding fields from the config.collections entry
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
-        });
+        },
+        ShardingCatalogClient::kLocalWriteConcern);
 }
 }  // namespace resharding
 
@@ -1071,7 +1081,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsReshard
                        _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(),
                                                        _markKilledExecutor);
                    })
-                   .then([this, executor] {
+                   .then([this, executor]() {
                        pauseBeforeTellDonorToRefresh.pauseWhileSet();
                        _establishAllDonorsAsParticipants(executor);
                    })
@@ -1101,7 +1111,8 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_initi
     return resharding::WithAutomaticRetry([this, executor] {
                return ExecutorFuture<void>(**executor)
                    .then([this, executor] { _insertCoordDocAndChangeOrigCollEntry(); })
-                   .then([this, executor] { _calculateParticipantsAndChunksThenWriteToDisk(); });
+                   .then([this, executor] { _calculateParticipantsAndChunksThenWriteToDisk(); })
+                   .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
            })
         .onTransientError([](const Status& status) {
             LOGV2(5093703,
@@ -1243,6 +1254,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_commitAndFinishReshardOper
                    .then([this, executor, updatedCoordinatorDoc] {
                        return _commit(updatedCoordinatorDoc);
                    })
+                   .then([this] { return _waitForMajority(_ctHolder->getStepdownToken()); })
+                   .thenRunOn(**executor)
                    .then([this, executor] {
                        _tellAllParticipantsToCommit(_coordinatorDoc.getSourceNss(), executor);
                    })
@@ -1400,23 +1413,30 @@ ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorAndParti
     invariant(_coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate);
 
     return resharding::WithAutomaticRetry([this, executor, status] {
-               if (_coordinatorDoc.getState() != CoordinatorStateEnum::kAborting) {
-                   // The coordinator only transitions into kAborting if there are participants to
-                   // wait on before transitioning to kDone.
-                   _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kAborting,
-                                                               _coordinatorDoc,
-                                                               boost::none,
-                                                               boost::none,
-                                                               status);
-               }
+               return ExecutorFuture<void>(**executor)
+                   .then([this, executor, status] {
+                       if (_coordinatorDoc.getState() != CoordinatorStateEnum::kAborting) {
+                           // The coordinator only transitions into kAborting if there are
+                           // participants to wait on before transitioning to kDone.
+                           _updateCoordinatorDocStateAndCatalogEntries(
+                               CoordinatorStateEnum::kAborting,
+                               _coordinatorDoc,
+                               boost::none,
+                               boost::none,
+                               status);
+                       }
+                   })
+                   .then([this] { return _waitForMajority(_ctHolder->getStepdownToken()); })
+                   .thenRunOn(**executor)
+                   .then([this, executor, status] {
+                       _tellAllParticipantsToAbort(executor,
+                                                   status == ErrorCodes::ReshardCollectionAborted);
 
-               _tellAllParticipantsToAbort(executor,
-                                           status == ErrorCodes::ReshardCollectionAborted);
-
-               // Wait for all participants to acknowledge the operation reached an unrecoverable
-               // error.
-               return future_util::withCancellation(_awaitAllParticipantShardsDone(executor),
-                                                    _ctHolder->getStepdownToken());
+                       // Wait for all participants to acknowledge the operation reached an
+                       // unrecoverable error.
+                       return future_util::withCancellation(
+                           _awaitAllParticipantShardsDone(executor), _ctHolder->getStepdownToken());
+                   });
            })
         .onTransientError([](const Status& retryStatus) {
             LOGV2(5093707,
@@ -1469,6 +1489,16 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_fulfillOkayToEnterCri
     }
 }
 
+SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_waitForMajority(
+    const CancellationToken& token) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    auto client = opCtx->getClient();
+    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
+    auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
+    return WaitForMajorityService::get(client->getServiceContext())
+        .waitUntilMajority(opTime, token);
+}
+
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
         if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
@@ -1485,6 +1515,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     }
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    reshardingPauseCoordinatorBeforeInitializing.pauseWhileSetAndNotCanceled(
+        opCtx.get(), _ctHolder->getStepdownToken());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
     resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
@@ -1587,7 +1619,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
                 coordinatorDocChangedOnDisk,
                 highestMinFetchTimestamp,
                 computeApproxCopySize(coordinatorDocChangedOnDisk));
-        });
+        })
+        .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
 
 ExecutorFuture<void>
@@ -1604,7 +1637,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kApplying,
                                                               coordinatorDocChangedOnDisk);
-        });
+        })
+        .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_startCommitMonitor(
@@ -1660,6 +1694,10 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               _coordinatorDoc);
+        })
+        .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); })
+        .thenRunOn(**executor)
+        .then([this, executor] {
             const auto criticalSectionTimeout =
                 Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
             const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;
