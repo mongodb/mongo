@@ -281,7 +281,7 @@ class search_near_03 : public test_harness::test {
                 tc->sleep();
             }
             if (tc->running()) {
-                logger::log_msg(LOG_INFO,
+                logger::log_msg(LOG_TRACE,
                   type_string(tc->type) +
                     " thread: calculated count: " + std::to_string(key_count) + " expected size: " +
                     std::to_string(prefixes_map.size() * prefixes_map.at(0).size()));
