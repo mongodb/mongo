@@ -48,6 +48,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
@@ -554,6 +555,14 @@ void ShardingCatalogManager::configureCollectionAutoSplit(
     boost::optional<int64_t> maxChunkSizeBytes,
     boost::optional<bool> balancerShouldMergeChunks,
     boost::optional<bool> enableAutoSplitter) {
+
+    // Hold the FCV region to serialize with the setFeatureCompatibilityVersion command
+    FixedFCVRegion fcvRegion(opCtx);
+    uassert(ErrorCodes::IllegalOperation,
+            "_configsvrConfigureAutoSplit can only be run when the cluster is in feature "
+            "compatibility versions greater or equal than 5.3.",
+            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                multiversion::FeatureCompatibilityVersion::kVersion_5_3));
 
     uassert(ErrorCodes::InvalidOptions,
             "invalid collection auto splitter config update",

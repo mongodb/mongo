@@ -172,6 +172,25 @@ function checkClusterAfterBinaryDowngrade(fcv, call1Ns, call2Ns, call3Ns) {
     testDisabledLongNameSupport(call3Ns);
 }
 
+// TODO SERVER-xyz review this check before v6.0 branches out
+function checkDowngradeDisallowedDuringDefragmentation(oldVersion) {
+    // Block defragmenter to be sure the `balancerShouldMergeChunks` field is not unset too early
+    st.forEachConfigServer((config) => {
+        assert.commandWorked(config.adminCommand(
+            {configureFailPoint: "beforeTransitioningDefragmentationPhase", mode: "alwaysOn"}));
+    });
+
+    // Pretend one collection is being defragmented to test that downgrade is not allowed
+    assert.commandWorked(
+        st.config.collections.updateOne({}, {$set: {balancerShouldMergeChunks: true}}));
+    var setFCVCmdResult = st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion});
+    assert.commandFailedWithCode(setFCVCmdResult, ErrorCodes.CannotDowngrade);
+
+    // Rollback the change to allow downgrade
+    assert.commandWorked(st.config.collections.updateOne(
+        {balancerShouldMergeChunks: {$exists: true}}, {$unset: {balancerShouldMergeChunks: 1}}));
+}
+
 for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     //////////////////////////////
     // Setting and testing cluster using old binaries in default FCV mode
@@ -201,6 +220,7 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Setting and testing cluster using old binaries in old FCV mode
 
     jsTest.log('Downgrading FCV to ' + oldVersion);
+    checkDowngradeDisallowedDuringDefragmentation(oldVersion);
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion}));
 
     checkClusterAfterFCVDowngrade();
