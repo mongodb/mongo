@@ -46,6 +46,10 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                                                               bool attachToOpCtx,
                                                               bool isReplSetMemberOrMongos) {
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
+    auto isAuthorizedForInternalClusterAction =
+        AuthorizationSession::get(opCtx->getClient())
+            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                               ActionType::internal);
 
     if (opCtx->getClient()->isInDirectClient()) {
         uassert(50891,
@@ -98,6 +102,9 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
 
         if (getParentSessionId(lsid)) {
             uassert(ErrorCodes::InvalidOptions,
+                    "Internal sessions are only allowed for internal clients",
+                    isAuthorizedForInternalClusterAction);
+            uassert(ErrorCodes::InvalidOptions,
                     "Internal sessions are not supported outside of transactions",
                     osi.getTxnNumber() && osi.getAutocommit() && !osi.getAutocommit().value());
             uassert(ErrorCodes::InvalidOptions,
@@ -127,11 +134,13 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
         opCtx->setTxnNumber(*osi.getTxnNumber());
 
         if (auto txnRetryCounter = osi.getTxnRetryCounter()) {
-            // TODO (SERVER-58759): Add a uassert that the client is internal.
             uassert(ErrorCodes::InvalidOptions,
                     "txnRetryCounter is not enabled",
                     feature_flags::gFeatureFlagInternalTransactions.isEnabled(
                         serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::InvalidOptions,
+                    "txnRetryCounter is only allowed for internal clients",
+                    isAuthorizedForInternalClusterAction);
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Cannot specify txnRetryCounter for a retryable write",
                     osi.getAutocommit().has_value());

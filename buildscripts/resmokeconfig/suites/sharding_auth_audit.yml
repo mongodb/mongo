@@ -18,6 +18,7 @@ selector:
 
   - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/query/aggregation_currentop.js
+  - jstests/sharding/internal_transactions_internal_client_restrictions.js
   - jstests/sharding/kill_sessions.js
   # Skip these additional tests when running with auth enabled.
   - jstests/sharding/parallel.js

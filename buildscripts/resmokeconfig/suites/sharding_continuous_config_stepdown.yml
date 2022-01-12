@@ -11,6 +11,7 @@ selector:
   - jstests/sharding/*[aA]uth*.js
   - jstests/sharding/query/*[aA]uth*.js
   - jstests/sharding/change_streams/*[aA]uth*.js
+  - jstests/sharding/internal_transactions_internal_client_restrictions.js
 
   - jstests/sharding/localhostAuthBypass.js
   - jstests/sharding/kill_sessions.js
