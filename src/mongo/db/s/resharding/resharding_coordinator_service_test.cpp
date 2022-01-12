@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
+#include <functional>
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
@@ -52,6 +53,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
@@ -497,6 +499,93 @@ public:
         }
     }
 
+    auto initializeAndGetCoordinator() {
+        auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
+        auto opCtx = operationContext();
+        auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+                                                           _originalEpoch,
+                                                           _originalTimestamp,
+                                                           _oldShardKey,
+                                                           std::vector{OID::gen(), OID::gen()});
+
+        auto initialChunks = makeChunks(_reshardingUUID,
+                                        _tempEpoch,
+                                        _tempTimestamp,
+                                        _newShardKey,
+                                        std::vector{OID::gen(), OID::gen()});
+
+        std::vector<ReshardedChunk> presetReshardedChunks;
+        for (const auto& chunk : initialChunks) {
+            presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
+        }
+
+        doc.setPresetReshardedChunks(presetReshardedChunks);
+
+        return ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
+    }
+
+    using TransitionFunctionMap = stdx::unordered_map<CoordinatorStateEnum, std::function<void()>>;
+
+    void runReshardingToCompletion() {
+        runReshardingToCompletion(TransitionFunctionMap{});
+    }
+
+    void runReshardingToCompletion(const TransitionFunctionMap& transitionFunctions) {
+        auto runFunctionForState = [&](CoordinatorStateEnum state) {
+            auto it = transitionFunctions.find(state);
+            if (it == transitionFunctions.end()) {
+                return;
+            }
+            it->second();
+        };
+
+        const std::vector<CoordinatorStateEnum> states{CoordinatorStateEnum::kPreparingToDonate,
+                                                       CoordinatorStateEnum::kCloning,
+                                                       CoordinatorStateEnum::kApplying,
+                                                       CoordinatorStateEnum::kBlockingWrites,
+                                                       CoordinatorStateEnum::kCommitting};
+        PauseDuringStateTransitions stateTransitionsGuard{controller(), states};
+
+        auto opCtx = operationContext();
+        auto coordinator = initializeAndGetCoordinator();
+
+        stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
+        runFunctionForState(CoordinatorStateEnum::kPreparingToDonate);
+        stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
+        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
+        makeDonorsReadyToDonate(opCtx);
+
+        stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
+        runFunctionForState(CoordinatorStateEnum::kCloning);
+        stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
+        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
+
+        makeRecipientsFinishedCloning(opCtx);
+        stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
+        runFunctionForState(CoordinatorStateEnum::kApplying);
+        stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
+        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
+
+        coordinator->onOkayToEnterCritical();
+        stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
+        runFunctionForState(CoordinatorStateEnum::kBlockingWrites);
+        stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
+        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
+
+        makeRecipientsBeInStrictConsistency(opCtx);
+
+        stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
+        runFunctionForState(CoordinatorStateEnum::kCommitting);
+        stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
+
+        waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
+
+        makeDonorsProceedToDone(opCtx);
+        makeRecipientsProceedToDone(opCtx);
+
+        coordinator->getCompletionFuture().get(opCtx);
+    }
+
     repl::PrimaryOnlyService* _service = nullptr;
 
     std::shared_ptr<CoordinatorStateTransitionController> _controller;
@@ -537,135 +626,37 @@ public:
 };
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorSuccessfullyTransitionsTokDone) {
-    const std::vector<CoordinatorStateEnum> coordinatorStates{
-        CoordinatorStateEnum::kPreparingToDonate,
-        CoordinatorStateEnum::kCloning,
-        CoordinatorStateEnum::kApplying,
-        CoordinatorStateEnum::kBlockingWrites,
-        CoordinatorStateEnum::kCommitting};
-    PauseDuringStateTransitions stateTransitionsGuard{controller(), coordinatorStates};
-
-    auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
-    auto opCtx = operationContext();
-    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
-                                                       _originalEpoch,
-                                                       _originalTimestamp,
-                                                       _oldShardKey,
-                                                       std::vector{OID::gen(), OID::gen()});
-
-    auto initialChunks = makeChunks(_reshardingUUID,
-                                    _tempEpoch,
-                                    _tempTimestamp,
-                                    _newShardKey,
-                                    std::vector{OID::gen(), OID::gen()});
-
-    std::vector<ReshardedChunk> presetReshardedChunks;
-    for (const auto& chunk : initialChunks) {
-        presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
-    }
-
-    doc.setPresetReshardedChunks(presetReshardedChunks);
-
-    auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
-
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
-    makeDonorsReadyToDonate(opCtx);
-
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
-
-    makeRecipientsFinishedCloning(opCtx);
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
-
-    coordinator->onOkayToEnterCritical();
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
-
-    makeRecipientsBeInStrictConsistency(opCtx);
-
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
-
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
-
-    makeDonorsProceedToDone(opCtx);
-    makeRecipientsProceedToDone(opCtx);
-
-    coordinator->getCompletionFuture().get(opCtx);
+    runReshardingToCompletion();
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorTransitionsTokDoneWithInterrupt) {
-    const std::vector<CoordinatorStateEnum> coordinatorStates{
-        CoordinatorStateEnum::kPreparingToDonate,
-        CoordinatorStateEnum::kCloning,
-        CoordinatorStateEnum::kApplying,
-        CoordinatorStateEnum::kBlockingWrites,
-        CoordinatorStateEnum::kCommitting};
-    PauseDuringStateTransitions stateTransitionsGuard{controller(), coordinatorStates};
 
-    auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
-    auto opCtx = operationContext();
-    auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
-                                                       _originalEpoch,
-                                                       _originalTimestamp,
-                                                       _oldShardKey,
-                                                       std::vector{OID::gen(), OID::gen()});
+    const auto interrupt = [this] { killAllReshardingCoordinatorOps(); };
+    runReshardingToCompletion(
+        TransitionFunctionMap{{CoordinatorStateEnum::kPreparingToDonate, interrupt},
+                              {CoordinatorStateEnum::kCloning, interrupt},
+                              {CoordinatorStateEnum::kApplying, interrupt},
+                              {CoordinatorStateEnum::kBlockingWrites, interrupt}});
+}
 
-    auto initialChunks = makeChunks(_reshardingUUID,
-                                    _tempEpoch,
-                                    _tempTimestamp,
-                                    _newShardKey,
-                                    std::vector{OID::gen(), OID::gen()});
-
-    std::vector<ReshardedChunk> presetReshardedChunks;
-    for (const auto& chunk : initialChunks) {
-        presetReshardedChunks.emplace_back(chunk.getShard(), chunk.getMin(), chunk.getMax());
-    }
-
-    doc.setPresetReshardedChunks(presetReshardedChunks);
-
-    auto coordinator = ReshardingCoordinator::getOrCreate(opCtx, _service, doc.toBSON());
-
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kPreparingToDonate);
-    killAllReshardingCoordinatorOps();
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kPreparingToDonate);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kPreparingToDonate);
-    makeDonorsReadyToDonate(opCtx);
-
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kCloning);
-    killAllReshardingCoordinatorOps();
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kCloning);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCloning);
-
-    makeRecipientsFinishedCloning(opCtx);
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kApplying);
-    killAllReshardingCoordinatorOps();
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kApplying);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kApplying);
-
-    coordinator->onOkayToEnterCritical();
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kBlockingWrites);
-    killAllReshardingCoordinatorOps();
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kBlockingWrites);
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kBlockingWrites);
-
-    makeRecipientsBeInStrictConsistency(opCtx);
-
-    stateTransitionsGuard.wait(CoordinatorStateEnum::kCommitting);
-    stateTransitionsGuard.unset(CoordinatorStateEnum::kCommitting);
-
-    waitUntilCommittedCoordinatorDocReach(opCtx, CoordinatorStateEnum::kCommitting);
-
-    makeDonorsProceedToDone(opCtx);
-    makeRecipientsProceedToDone(opCtx);
-
-    coordinator->getCompletionFuture().get(opCtx);
+TEST_F(ReshardingCoordinatorServiceTest,
+       ReshardingCoordinatorTransitionsTokDoneWithTransactionFailWC) {
+    const auto failNextTransaction = [] {
+        globalFailPointRegistry()
+            .find("shardingCatalogManagerWithTransactionFailWCAfterCommit")
+            ->setMode(FailPoint::nTimes, 1);
+    };
+    // PauseDuringStateTransitions relies on updates to the coordinator state document on disk to
+    // decide when to unpause. kInitializing is the initial state written to disk (i.e. not an
+    // update), but we still want to verify correct behavior if the transaction to transition to
+    // kInitializing fails, so call failNextTransaction() before calling
+    // runReshardingToCompletion().
+    failNextTransaction();
+    runReshardingToCompletion(
+        TransitionFunctionMap{{CoordinatorStateEnum::kPreparingToDonate, failNextTransaction},
+                              {CoordinatorStateEnum::kCloning, failNextTransaction},
+                              {CoordinatorStateEnum::kApplying, failNextTransaction},
+                              {CoordinatorStateEnum::kBlockingWrites, failNextTransaction}});
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
