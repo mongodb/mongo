@@ -164,11 +164,11 @@ public:
     using ReplSetConfigBase::kRepairedFieldName;
 
     /**
-     * Inline `kMaxMembers` to allow others (e.g, `WriteConcernOptions`) use
+     * Inline `kMaxMembers` and `kMaxVotingMembers` to allow others (e.g, `WriteConcernOptions`) use
      * the constant without linking to `repl_set_config.cpp`.
      */
     inline static const size_t kMaxMembers = 50;
-    static const size_t kMaxVotingMembers = 7;
+    inline static const size_t kMaxVotingMembers = 7;
     static const Milliseconds kInfiniteCatchUpTimeout;
     static const Milliseconds kCatchUpDisabled;
     static const Milliseconds kCatchUpTakeoverDisabled;

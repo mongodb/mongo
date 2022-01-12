@@ -52,7 +52,6 @@ namespace repl {
 // Allow the heartbeat interval to be forcibly overridden on this node.
 MONGO_FAIL_POINT_DEFINE(forceHeartbeatIntervalMS);
 
-const size_t ReplSetConfig::kMaxVotingMembers;
 const Milliseconds ReplSetConfig::kInfiniteCatchUpTimeout(-1);
 const Milliseconds ReplSetConfig::kCatchUpDisabled(0);
 const Milliseconds ReplSetConfig::kCatchUpTakeoverDisabled(-1);
