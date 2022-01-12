@@ -32,6 +32,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 
@@ -64,6 +65,12 @@ ChunkVersion getShardVersion(OperationContext* opCtx, const ShardId& shardId, co
             "No chunks or chunk version in collection",
             !chunkVector.empty() && chunkVector.front().isVersionSet());
     return chunkVector.front().getVersion();
+}
+
+static uint64_t getCollectionMaxChunkSizeBytes(OperationContext* opCtx,
+                                               const CollectionType& coll) {
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
+    return coll.getMaxChunkSizeBytes().get_value_or(balancerConfig->getMaxChunkSizeBytes());
 }
 
 static bool isRetriableForDefragmentation(const Status& error) {
@@ -264,6 +271,187 @@ private:
     size_t _outstandingActions{0};
 };
 
+class SplitChunksPhase : public DefragmentationPhase {
+public:
+    static std::unique_ptr<SplitChunksPhase> build(OperationContext* opCtx,
+                                                   const CollectionType& coll) {
+        auto collectionChunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
+            opCtx,
+            BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
+            BSON(ChunkType::min() << 1) /*sort*/,
+            boost::none /*limit*/,
+            nullptr /*opTime*/,
+            coll.getEpoch(),
+            coll.getTimestamp(),
+            repl::ReadConcernLevel::kLocalReadConcern,
+            boost::none));
+
+        std::map<ShardId, PendingActions> pendingActionsByShards;
+
+        uint64_t maxChunkSizeBytes = getCollectionMaxChunkSizeBytes(opCtx, coll);
+
+        // Issue AutoSplitVector for all chunks with estimated size greater than max chunk size or
+        // with no estimated size.
+        for (const auto& chunk : collectionChunks) {
+            auto chunkSize = chunk.getEstimatedSizeBytes();
+            if (!chunkSize || (uint64_t)chunkSize.get() > maxChunkSizeBytes) {
+                pendingActionsByShards[chunk.getShard()].rangesToFindSplitPoints.emplace_back(
+                    chunk.getMin(), chunk.getMax());
+            }
+        }
+
+        return std::unique_ptr<SplitChunksPhase>(
+            new SplitChunksPhase(coll.getNss(),
+                                 coll.getUuid(),
+                                 coll.getKeyPattern().toBSON(),
+                                 maxChunkSizeBytes,
+                                 std::move(pendingActionsByShards)));
+    }
+
+    DefragmentationPhaseEnum getType() const override {
+        return DefragmentationPhaseEnum::kSplitChunks;
+    }
+
+    boost::optional<DefragmentationAction> popNextStreamableAction(
+        OperationContext* opCtx) override {
+        boost::optional<DefragmentationAction> nextAction = boost::none;
+        if (!_pendingActionsByShards.empty()) {
+            auto& [shardId, pendingActions] = *_pendingActionsByShards.begin();
+            auto shardVersion = getShardVersion(opCtx, shardId, _uuid);
+
+            if (!pendingActions.rangesToSplit.empty()) {
+                const auto& [rangeToSplit, splitPoints] = pendingActions.rangesToSplit.back();
+                nextAction = boost::optional<DefragmentationAction>(
+                    SplitInfoWithKeyPattern(shardId,
+                                            _nss,
+                                            shardVersion,
+                                            rangeToSplit.getMin(),
+                                            rangeToSplit.getMax(),
+                                            splitPoints,
+                                            _uuid,
+                                            _shardKey));
+                pendingActions.rangesToSplit.pop_back();
+            } else if (!pendingActions.rangesToFindSplitPoints.empty()) {
+                const auto& rangeToAutoSplit = pendingActions.rangesToFindSplitPoints.back();
+                nextAction = boost::optional<DefragmentationAction>(
+                    AutoSplitVectorInfo(shardId,
+                                        _nss,
+                                        _uuid,
+                                        shardVersion,
+                                        _shardKey,
+                                        rangeToAutoSplit.getMin(),
+                                        rangeToAutoSplit.getMax(),
+                                        _maxChunkSizeBytes));
+                pendingActions.rangesToFindSplitPoints.pop_back();
+            }
+            if (nextAction.has_value()) {
+                ++_outstandingActions;
+                if (pendingActions.rangesToFindSplitPoints.empty() &&
+                    pendingActions.rangesToSplit.empty()) {
+                    _pendingActionsByShards.erase(shardId);
+                }
+            }
+        }
+        return nextAction;
+    }
+
+    boost::optional<MigrateInfo> popNextMigration(
+        const stdx::unordered_set<ShardId>& unavailableShards) override {
+        return boost::none;
+    }
+
+    bool moreSplitPointsToReceive(const SplitPoints& splitPoints) {
+        auto addBSONSize = [](const int& size, const BSONObj& obj) { return size + obj.objsize(); };
+        int totalSize = std::accumulate(splitPoints.begin(), splitPoints.end(), 0, addBSONSize);
+        return totalSize >= BSONObjMaxUserSize - 4096;
+    }
+
+    void applyActionResult(OperationContext* opCtx,
+                           const DefragmentationAction& action,
+                           const DefragmentationActionResponse& response) override {
+        stdx::visit(
+            visit_helper::Overloaded{
+                [&](const MergeInfo& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                },
+                [&](const DataSizeInfo& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                },
+                [&](const AutoSplitVectorInfo& autoSplitVectorAction) {
+                    auto& splitVectorResponse = stdx::get<StatusWith<SplitPoints>>(response);
+                    handleActionResult(
+                        splitVectorResponse.getStatus(),
+                        [&]() {
+                            auto& splitPoints = splitVectorResponse.getValue();
+                            if (!splitPoints.empty()) {
+                                auto& pendingActions =
+                                    _pendingActionsByShards[autoSplitVectorAction.shardId];
+                                pendingActions.rangesToSplit.push_back(
+                                    std::make_pair(ChunkRange(autoSplitVectorAction.minKey,
+                                                              autoSplitVectorAction.maxKey),
+                                                   splitVectorResponse.getValue()));
+                                // TODO (SERVER-61678): replace with check for continuation flag
+                                if (moreSplitPointsToReceive(splitPoints)) {
+                                    pendingActions.rangesToFindSplitPoints.emplace_back(
+                                        splitPoints.back(), autoSplitVectorAction.maxKey);
+                                }
+                            }
+                        },
+                        [&]() {
+                            auto& pendingActions =
+                                _pendingActionsByShards[autoSplitVectorAction.shardId];
+                            pendingActions.rangesToFindSplitPoints.emplace_back(
+                                autoSplitVectorAction.minKey, autoSplitVectorAction.maxKey);
+                        });
+                },
+                [&](const SplitInfoWithKeyPattern& splitAction) {
+                    auto& splitResponse = stdx::get<Status>(response);
+                    handleActionResult(
+                        splitResponse,
+                        []() {},
+                        [&]() {
+                            auto& pendingActions =
+                                _pendingActionsByShards[splitAction.info.shardId];
+                            pendingActions.rangesToSplit.push_back(std::make_pair(
+                                ChunkRange(splitAction.info.minKey, splitAction.info.maxKey),
+                                splitAction.info.splitKeys));
+                        });
+                },
+                [&](const EndOfActionStream& _) {
+                    uasserted(ErrorCodes::BadValue, "Unexpected action type");
+                }},
+            action);
+        --_outstandingActions;
+    }
+
+    bool isComplete() const override {
+        return _pendingActionsByShards.empty() && _outstandingActions == 0;
+    }
+
+private:
+    struct PendingActions {
+        std::vector<ChunkRange> rangesToFindSplitPoints;
+        std::vector<std::pair<ChunkRange, SplitPoints>> rangesToSplit;
+    };
+    SplitChunksPhase(const NamespaceString& nss,
+                     const UUID& uuid,
+                     const BSONObj& shardKey,
+                     const long long& maxChunkSizeBytes,
+                     std::map<ShardId, PendingActions>&& pendingActionsByShards)
+        : _nss(nss),
+          _uuid(uuid),
+          _shardKey(shardKey),
+          _maxChunkSizeBytes(maxChunkSizeBytes),
+          _pendingActionsByShards(std::move(pendingActionsByShards)) {}
+
+    const NamespaceString _nss;
+    const UUID _uuid;
+    const BSONObj _shardKey;
+    const long long _maxChunkSizeBytes;
+    std::map<ShardId, PendingActions> _pendingActionsByShards;
+    size_t _outstandingActions{0};
+};
+
 }  // namespace
 
 void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
@@ -459,7 +647,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
                 // TODO (SERVER-60459) build phase 2
                 break;
             case DefragmentationPhaseEnum::kSplitChunks:
-                // TODO (SERVER-60479) build phase 3
+                nextPhaseObject = SplitChunksPhase::build(opCtx, coll);
                 break;
             case DefragmentationPhaseEnum::kFinished:
                 _clearDataSizeInformation(opCtx, coll.getUuid());
@@ -499,10 +687,9 @@ DefragmentationPhaseEnum BalancerDefragmentationPolicyImpl::_getNextPhase(
     switch (currentPhase) {
         case DefragmentationPhaseEnum::kMergeChunks:
             // TODO (SERVER-60459) change to kMoveAndMergeChunks
-            return DefragmentationPhaseEnum::kFinished;
+            return DefragmentationPhaseEnum::kSplitChunks;
         case DefragmentationPhaseEnum::kMoveAndMergeChunks:
-            // TODO (SERVER-60479) change to kSplitChunks
-            return DefragmentationPhaseEnum::kFinished;
+            return DefragmentationPhaseEnum::kSplitChunks;
         case DefragmentationPhaseEnum::kSplitChunks:
             return DefragmentationPhaseEnum::kFinished;
         default:

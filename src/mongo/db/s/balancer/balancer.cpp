@@ -433,30 +433,37 @@ void Balancer::_consumeActionStreamLoop() {
                                                      splitVectorAction.maxKey,
                                                      splitVectorAction.maxChunkSizeBytes)
                             .thenRunOn(*executor)
-                            .onCompletion(
-                                [this, splitVectorAction](
-                                    const StatusWith<std::vector<BSONObj>>& swSplitPoints) {
-                                    auto opCtx = cc().makeOperationContext();
-                                    _defragmentationPolicy->acknowledgeAutoSplitVectorResult(
-                                        opCtx.get(), splitVectorAction, swSplitPoints);
-                                });
+                            .onCompletion([this, splitVectorAction](
+                                              const StatusWith<std::vector<BSONObj>>&
+                                                  swSplitPoints) {
+                                ThreadClient tc(
+                                    "BalancerDefragmentationPolicy::acknowledgeSplitVectorResult",
+                                    getGlobalServiceContext());
+                                auto opCtx = tc->makeOperationContext();
+                                _defragmentationPolicy->acknowledgeAutoSplitVectorResult(
+                                    opCtx.get(), splitVectorAction, swSplitPoints);
+                            });
                 },
                 [&](SplitInfoWithKeyPattern splitAction) {
-                    auto result = _commandScheduler
-                                      ->requestSplitChunk(opCtx.get(),
-                                                          splitAction.info.nss,
-                                                          splitAction.info.shardId,
-                                                          splitAction.info.collectionVersion,
-                                                          splitAction.keyPattern,
-                                                          splitAction.info.minKey,
-                                                          splitAction.info.maxKey,
-                                                          splitAction.info.splitKeys)
-                                      .thenRunOn(*executor)
-                                      .onCompletion([this, splitAction](const Status& status) {
-                                          auto opCtx = cc().makeOperationContext();
-                                          _defragmentationPolicy->acknowledgeSplitResult(
-                                              opCtx.get(), splitAction, status);
-                                      });
+                    auto result =
+                        _commandScheduler
+                            ->requestSplitChunk(opCtx.get(),
+                                                splitAction.info.nss,
+                                                splitAction.info.shardId,
+                                                splitAction.info.collectionVersion,
+                                                splitAction.keyPattern,
+                                                splitAction.info.minKey,
+                                                splitAction.info.maxKey,
+                                                splitAction.info.splitKeys)
+                            .thenRunOn(*executor)
+                            .onCompletion([this, splitAction](const Status& status) {
+                                ThreadClient tc(
+                                    "BalancerDefragmentationPolicy::acknowledgeSplitResult",
+                                    getGlobalServiceContext());
+                                auto opCtx = tc->makeOperationContext();
+                                _defragmentationPolicy->acknowledgeSplitResult(
+                                    opCtx.get(), splitAction, status);
+                            });
                 },
                 [](EndOfActionStream eoa) {}},
             action);

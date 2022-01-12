@@ -382,11 +382,11 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
         }
     }
 
-    const executor::RemoteCommandRequest remoteCommand(shardHostWithStatus.getValue(),
-                                                       NamespaceString::kAdminDb.toString(),
-                                                       params.commandInfo->serialise(),
-                                                       opCtx);
-
+    const executor::RemoteCommandRequest remoteCommand =
+        executor::RemoteCommandRequest(shardHostWithStatus.getValue(),
+                                       params.commandInfo->getTargetDb(),
+                                       params.commandInfo->serialise(),
+                                       opCtx);
     auto onRemoteResponseReceived =
         [this,
          requestId = params.id](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {

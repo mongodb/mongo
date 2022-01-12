@@ -83,6 +83,10 @@ public:
         return false;
     }
 
+    virtual std::string getTargetDb() const {
+        return NamespaceString::kAdminDb.toString();
+    }
+
     const ShardId& getTarget() const {
         return _targetShardId;
     }
@@ -273,6 +277,10 @@ public:
                                       _upperBoundKey,
                                       _maxChunkSizeBytes)
             .toBSON({});
+    }
+
+    std::string getTargetDb() const override {
+        return getNameSpace().db().toString();
     }
 
 private:

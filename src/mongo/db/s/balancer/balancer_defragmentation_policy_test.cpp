@@ -50,6 +50,8 @@ protected:
     const long long kMaxChunkSizeBytes{2048};
     const HostAndPort kShardHost0 = HostAndPort("TestHost0", 12345);
     const HostAndPort kShardHost1 = HostAndPort("TestHost1", 12346);
+    const int64_t kPhase3DefaultChunkSize =
+        129 * 1024 * 1024;  // > 128MB should trigger AutoSplitVector
 
     const std::vector<ShardType> kShardList{
         ShardType(kShardId0.toString(), kShardHost0.toString()),
@@ -60,10 +62,16 @@ protected:
           _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
           _defragmentationPolicy(_clusterStats.get()) {}
 
-    CollectionType makeConfigCollectionEntry() {
+    CollectionType makeConfigCollectionEntry(
+        boost::optional<DefragmentationPhaseEnum> phase = boost::none,
+        boost::optional<int64_t> maxChunkSizeBytes = boost::none) {
         CollectionType shardedCollection(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid);
         shardedCollection.setKeyPattern(kShardKeyPattern);
         shardedCollection.setBalancerShouldMergeChunks(true);
+        shardedCollection.setDefragmentationPhase(phase);
+        if (maxChunkSizeBytes) {
+            shardedCollection.setMaxChunkSizeBytes(maxChunkSizeBytes.get());
+        }
         ASSERT_OK(insertToConfigCollection(
             operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
         return shardedCollection;
@@ -430,6 +438,241 @@ TEST_F(BalancerDefragmentationPolicyTest, Phase1NotConsecutive) {
     ASSERT_BSONOBJ_EQ(dataSizeAction.chunkRange.getMax(), BSON("x" << 6));
     auto future4 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future4.isReady());
+}
+
+/** Phase 3 tests. By passing in DefragmentationPhaseEnum::kSplitChunks to
+ * makeConfigCollectionEntry, the persisted collection entry will have
+ * kDefragmentationPhaseFieldName set to kSplitChunks and defragmentation will be started with
+ * phase 3.
+ */
+
+TEST_F(BalancerDefragmentationPolicyTest, DefragmentationBeginsWithPhase3FromPersistedSetting) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    // Defragmentation does not start until refreshCollectionDefragmentationStatus is called
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+
+    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    auto configDoc = findOneOnConfigCollection(operationContext(),
+                                               CollectionType::ConfigNS,
+                                               BSON(CollectionType::kUuidFieldName << kUuid))
+                         .getValue();
+    auto storedDefragmentationPhase = DefragmentationPhase_parse(
+        IDLParserErrorContext("BalancerDefragmentationPolicyTest"),
+        configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
+    ASSERT_TRUE(storedDefragmentationPhase == DefragmentationPhaseEnum::kSplitChunks);
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, SingleLargeChunkCausesAutoSplitAndSplitActions) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+
+    // The action returned by the stream should be now an actionable AutoSplitVector command...
+    ASSERT_TRUE(future.isReady());
+    AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(future.get());
+    // with the expected content
+    ASSERT_EQ(coll.getNss(), splitVectorAction.nss);
+    ASSERT_BSONOBJ_EQ(kKeyAtZero, splitVectorAction.minKey);
+    ASSERT_BSONOBJ_EQ(kKeyAtTen, splitVectorAction.maxKey);
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, CollectionMaxChunkSizeIsUsedForPhase3) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks, 1024);
+    makeConfigChunkEntry(2 * 1024);  // > 1KB should trigger AutoSplitVector
+
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+
+    // The action returned by the stream should be now an actionable AutoSplitVector command...
+    ASSERT_TRUE(future.isReady());
+    AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(future.get());
+    // with the expected content
+    ASSERT_EQ(coll.getNss(), splitVectorAction.nss);
+    ASSERT_BSONOBJ_EQ(kKeyAtZero, splitVectorAction.minKey);
+    ASSERT_BSONOBJ_EQ(kKeyAtTen, splitVectorAction.maxKey);
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, TestRetryableFailedAutoSplitActionGetsReissued) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    AutoSplitVectorInfo failingAutoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(),
+        failingAutoSplitAction,
+        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
+
+    // Under the setup of this test, the stream should only contain one more action - which (version
+    // aside) matches the failed one.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto replayedAutoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+    ASSERT_BSONOBJ_EQ(failingAutoSplitAction.minKey, replayedAutoSplitAction.minKey);
+    ASSERT_BSONOBJ_EQ(failingAutoSplitAction.maxKey, replayedAutoSplitAction.maxKey);
+    ASSERT_EQ(failingAutoSplitAction.uuid, replayedAutoSplitAction.uuid);
+    ASSERT_EQ(failingAutoSplitAction.shardId, replayedAutoSplitAction.shardId);
+    ASSERT_EQ(failingAutoSplitAction.nss, replayedAutoSplitAction.nss);
+    ASSERT_BSONOBJ_EQ(failingAutoSplitAction.keyPattern, replayedAutoSplitAction.keyPattern);
+    ASSERT_EQ(failingAutoSplitAction.maxChunkSizeBytes, replayedAutoSplitAction.maxChunkSizeBytes);
+
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest,
+       TestAcknowledgeAutoSplitActionTriggersSplitOnResultingRange) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+
+    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(), autoSplitAction, StatusWith(splitPoints));
+
+    // Under the setup of this test, the stream should only contain only a split action over the
+    // recently AutoSplitVector-ed range.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto splitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
+    ASSERT_BSONOBJ_EQ(splitAction.info.minKey, autoSplitAction.minKey);
+    ASSERT_BSONOBJ_EQ(splitAction.info.maxKey, autoSplitAction.maxKey);
+    ASSERT_EQ(splitAction.uuid, autoSplitAction.uuid);
+    ASSERT_EQ(splitAction.info.shardId, autoSplitAction.shardId);
+    ASSERT_EQ(splitAction.info.nss, autoSplitAction.nss);
+    ASSERT_EQ(splitAction.info.splitKeys.size(), 1);
+    ASSERT_BSONOBJ_EQ(splitAction.info.splitKeys[0], splitPoints[0]);
+
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, TestAutoSplitWithNoSplitPointsDoesNotTriggerSplit) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+
+    std::vector<BSONObj> splitPoints;
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(), autoSplitAction, StatusWith(splitPoints));
+
+    // The stream should now be empty
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, TestMoreThan16MBSplitPointsTriggersSplitAndAutoSplit) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+
+    // TODO (SERVER-61678) use continuation flag instead of large vector
+    std::vector<BSONObj> splitPoints = [] {
+        std::vector<BSONObj> splitPoints;
+        int splitPointSize = 0;
+        std::string filler(1024 * 1024, 'x');
+        int distinguisher = 0;
+        while (splitPointSize < BSONObjMaxUserSize) {
+            auto newBSON = BSON("id" << distinguisher++ << "filler" << filler);
+            splitPointSize += newBSON.objsize();
+            splitPoints.push_back(newBSON);
+        }
+        return splitPoints;
+    }();
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(), autoSplitAction, StatusWith(splitPoints));
+
+    // The stream should now contain one Split action with the split points from above and one
+    // AutoSplitVector action from the last split point to the end of the chunk
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto splitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
+    ASSERT_BSONOBJ_EQ(splitAction.info.minKey, autoSplitAction.minKey);
+    ASSERT_BSONOBJ_EQ(splitAction.info.maxKey, autoSplitAction.maxKey);
+    ASSERT_EQ(splitAction.info.splitKeys.size(), splitPoints.size());
+    ASSERT_BSONOBJ_EQ(splitAction.info.splitKeys[0], splitPoints[0]);
+    ASSERT_BSONOBJ_EQ(splitAction.info.splitKeys.back(), splitPoints.back());
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto nextAutoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+    ASSERT_BSONOBJ_EQ(nextAutoSplitAction.minKey, splitPoints.back());
+    ASSERT_BSONOBJ_EQ(nextAutoSplitAction.maxKey, autoSplitAction.maxKey);
+
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, TestFailedSplitChunkActionGetsReissued) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+
+    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(), autoSplitAction, StatusWith(splitPoints));
+
+    // The stream should now contain the split action for the recently AutoSplitVector-ed range.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto failingSplitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
+    _defragmentationPolicy.acknowledgeSplitResult(
+        operationContext(),
+        failingSplitAction,
+        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
+    // Under the setup of this test, the stream should only contain one more action - which (version
+    // aside) matches the failed one.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto replayedSplitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
+    ASSERT_EQ(failingSplitAction.uuid, replayedSplitAction.uuid);
+    ASSERT_EQ(failingSplitAction.info.shardId, replayedSplitAction.info.shardId);
+    ASSERT_EQ(failingSplitAction.info.nss, replayedSplitAction.info.nss);
+    ASSERT_BSONOBJ_EQ(failingSplitAction.info.minKey, replayedSplitAction.info.minKey);
+    ASSERT_BSONOBJ_EQ(failingSplitAction.info.maxKey, replayedSplitAction.info.maxKey);
+
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest,
+       TestAcknowledgeLastSuccessfulSplitActionEndsDefragmentation) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kSplitChunks);
+    makeConfigChunkEntry(kPhase3DefaultChunkSize);
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto autoSplitAction = stdx::get<AutoSplitVectorInfo>(future.get());
+
+    std::vector<BSONObj> splitPoints{BSON("x" << 5)};
+    _defragmentationPolicy.acknowledgeAutoSplitVectorResult(
+        operationContext(), autoSplitAction, StatusWith(splitPoints));
+
+    // The stream should now contain the split action for the recently AutoSplitVector-ed range.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    auto splitAction = stdx::get<SplitInfoWithKeyPattern>(future.get());
+    _defragmentationPolicy.acknowledgeSplitResult(operationContext(), splitAction, Status::OK());
+
+    // Successful split actions trigger no new actions
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+
+    // With phase 3 complete, defragmentation should be completed.
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    auto configDoc = findOneOnConfigCollection(operationContext(),
+                                               CollectionType::ConfigNS,
+                                               BSON(CollectionType::kUuidFieldName << kUuid))
+                         .getValue();
+    ASSERT_FALSE(configDoc.hasField(CollectionType::kDefragmentationPhaseFieldName));
 }
 
 }  // namespace
