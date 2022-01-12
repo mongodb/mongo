@@ -237,7 +237,13 @@ struct CompileCtx {
     CompileCtx makeCopyForParallelUse();
     CompileCtx makeCopy() const;
 
+    /**
+     * Root plan stage is used to resolve slot accessors introduced by PlanStage (optional).
+     * - if specified, the root plan stage will be used to resolve the slot accessor.
+     * - otherwise, if null, default context accessor resolution rules will be used.
+     */
     PlanStage* root{nullptr};
+
     value::SlotAccessor* accumulator{nullptr};
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> correlated;
     stdx::unordered_map<SpoolId, std::shared_ptr<SpoolBuffer>> spoolBuffers;
