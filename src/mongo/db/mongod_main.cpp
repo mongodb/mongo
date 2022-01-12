@@ -181,6 +181,8 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
@@ -543,6 +545,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
     uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
+
+    if (gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV()) {
+        ClusterServerParameterOpObserver::initializeAllParametersFromDisk(startupOpCtx.get());
+    }
 
     if (audit::initializeManager) {
         audit::initializeManager(startupOpCtx.get());
@@ -1124,6 +1130,10 @@ void setUpObservers(ServiceContext* serviceContext) {
     opObserverRegistry->addObserver(
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
+
+    if (gFeatureFlagClusterWideConfig.isEnabledAndIgnoreFCV()) {
+        opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
+    }
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 
