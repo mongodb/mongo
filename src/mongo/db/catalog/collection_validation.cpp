@@ -464,9 +464,9 @@ void _validateBSONColumnRoundtrip(OperationContext* opCtx,
 
     // This function is memory intensive as it needs to store the original documents prior to
     // compressing and decompressing them to check that the documents are the same afterwards. We'll
-    // limit the number of original documents we hold in-memory to be approximately 100MB to avoid
+    // limit the number of original documents we hold in-memory to be approximately 25MB to avoid
     // running out of memory.
-    constexpr size_t kMaxMemoryUsageBytes = 100 * 1024 * 1024;
+    constexpr size_t kMaxMemoryUsageBytes = 25 * 1024 * 1024;
     size_t currentMemoryUsageBytes = 0;
 
     BSONColumnBuilder columnBuilder("");
