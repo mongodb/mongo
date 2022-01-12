@@ -592,22 +592,22 @@ MONGO_COMPILER_NOINLINE DocumentSource::GetNextResult DocumentSourceGroup::initi
                 accum->startNewGroup(initializerValue);
                 group.push_back(accum);
             }
-        } else {
-            for (size_t i = 0; i < group.size(); i++) {
-                // subtract old mem usage. New usage added back after processing.
-                _memoryTracker.update(_accumulatedFields[i].fieldName,
-                                      -1 * group[i]->getMemUsage());
-            }
         }
 
         /* tickle all the accumulators for the group we found */
         dassert(numAccumulators == group.size());
 
         for (size_t i = 0; i < numAccumulators; i++) {
-            group[i]->process(
-                _accumulatedFields[i].expr.argument->evaluate(rootDocument, &pExpCtx->variables),
-                _doingMerge);
-            _memoryTracker.update(_accumulatedFields[i].fieldName, group[i]->getMemUsage());
+            // Only process the input and update the memory footprint if the current accumulator
+            // needs more input.
+            if (group[i]->needsInput()) {
+                const auto prevMemUsage = inserted ? 0 : group[i]->getMemUsage();
+                group[i]->process(_accumulatedFields[i].expr.argument->evaluate(
+                                      rootDocument, &pExpCtx->variables),
+                                  _doingMerge);
+                _memoryTracker.update(_accumulatedFields[i].fieldName,
+                                      group[i]->getMemUsage() - prevMemUsage);
+            }
         }
 
         if (kDebugBuild && !storageGlobalParams.readOnly) {

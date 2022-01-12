@@ -365,6 +365,9 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
             _memUsageBytes -= _deque.front().getApproximateSize();
             _deque.pop_front();
         } else {
+            // If our deque has 'n' elements and this is $firstN, we don't need to call process
+            // anymore.
+            _needsInput = false;
             return;
         }
     }

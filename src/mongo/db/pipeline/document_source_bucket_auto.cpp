@@ -97,7 +97,7 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
         }
         invariant(populationResult.isEOF());
 
-        initalizeBucketIteration();
+        initializeBucketIteration();
         _populated = true;
     }
 
@@ -206,13 +206,15 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
 
     const size_t numAccumulators = _accumulatedFields.size();
     for (size_t k = 0; k < numAccumulators; k++) {
-        bucket._accums[k]->process(
-            _accumulatedFields[k].expr.argument->evaluate(entry.second, &pExpCtx->variables),
-            false);
+        if (bucket._accums[k]->needsInput()) {
+            bucket._accums[k]->process(
+                _accumulatedFields[k].expr.argument->evaluate(entry.second, &pExpCtx->variables),
+                false);
+        }
     }
 }
 
-void DocumentSourceBucketAuto::initalizeBucketIteration() {
+void DocumentSourceBucketAuto::initializeBucketIteration() {
     // Initialize the iterator on '_sorter'.
     invariant(_sorter);
     _sortedInput.reset(_sorter->done());

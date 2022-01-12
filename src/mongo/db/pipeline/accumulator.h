@@ -105,6 +105,11 @@ public:
     /// Reset this accumulator to a fresh state, ready for a new call to startNewGroup.
     virtual void reset() = 0;
 
+    /// True if the accumulator needs input, false otherwise.
+    bool needsInput() const {
+        return _needsInput;
+    }
+
     virtual bool isAssociative() const {
         return false;
     }
@@ -151,6 +156,12 @@ protected:
 
     /// subclasses are expected to update this as necessary
     int _memUsageBytes = 0;
+
+    /// Member which tracks if this accumulator requires any more input values to compute its final
+    /// result. In general, most accumulators require all input values, however, some accumulators
+    /// can ignore input values under certain conditions. For example, $first can set this to
+    /// 'false' after it sees one value.
+    bool _needsInput = true;
 
 private:
     ExpressionContext* _expCtx;

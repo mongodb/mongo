@@ -47,6 +47,7 @@ void AccumulatorFirst::processInternal(const Value& input, bool merging) {
         _haveFirst = true;
         _first = input;
         _memUsageBytes = sizeof(*this) + input.getApproximateSize() - sizeof(Value);
+        _needsInput = false;
     }
 }
 

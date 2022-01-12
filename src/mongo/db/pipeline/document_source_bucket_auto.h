@@ -133,7 +133,7 @@ private:
      */
     GetNextResult populateSorter();
 
-    void initalizeBucketIteration();
+    void initializeBucketIteration();
 
     /**
      * Computes the 'groupBy' expression value for 'doc'.
