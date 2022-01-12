@@ -189,6 +189,11 @@ __create_file(
      * reconstruct the configuration metadata from the file.
      */
     if (import) {
+        /*
+         * FIXME-WT-7735: Importing a tiered table is not yet allowed.
+         */
+        if (WT_SUFFIX_MATCH(filename, ".wtobj"))
+            WT_ERR_MSG(session, ENOTSUP, "%s: import not supported on tiered files", uri);
         /* First verify that the data to import exists on disk. */
         WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
         if (!exists)
@@ -209,6 +214,12 @@ __create_file(
                     cval.len -= 2;
                 }
                 WT_ERR(__wt_strndup(session, cval.str, cval.len, &filemeta));
+                /*
+                 * FIXME-WT-7735: Importing a tiered table is not yet allowed.
+                 */
+                if (__wt_config_getones(session, filemeta, "tiered_object", &cval) == 0 &&
+                  cval.val != 0)
+                    WT_ERR_MSG(session, ENOTSUP, "%s: import not supported on tiered files", uri);
                 filecfg[2] = filemeta;
                 /*
                  * If there is a file metadata provided, reconstruct the incremental backup

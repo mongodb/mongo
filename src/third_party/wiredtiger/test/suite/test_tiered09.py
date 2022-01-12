@@ -37,13 +37,9 @@ class test_tiered09(wttest.WiredTigerTestCase):
     # If the 'uri' changes all the other names must change with it.
     base = 'test_tiered09-000000000'
     base2 = 'test_second09-000000000'
-    fileuri_base = 'file:' + base
     obj1file = base + '1.wtobj'
     obj1second = base2 + '1.wtobj'
     obj2file = base + '2.wtobj'
-    obj3file = base + '3.wtobj'
-    objuri = 'object:' + base + '1.wtobj'
-    tiereduri = "tiered:test_tiered09"
     uri = "table:test_tiered09"
     uri2 = "table:test_second09"
 
