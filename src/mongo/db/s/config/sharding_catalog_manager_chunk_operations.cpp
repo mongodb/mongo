@@ -1545,15 +1545,35 @@ void ShardingCatalogManager::bumpCollectionVersionAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const NamespaceString& nss,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
+    bumpCollectionVersionAndChangeMetadataInTxn(
+        opCtx, nss, std::move(changeMetadataFunc), ShardingCatalogClient::kMajorityWriteConcern);
+}
 
+void ShardingCatalogManager::bumpCollectionVersionAndChangeMetadataInTxn(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
+    const WriteConcernOptions& writeConcern) {
     bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
-        opCtx, {nss}, std::move(changeMetadataFunc));
+        opCtx, {nss}, std::move(changeMetadataFunc), writeConcern);
 }
 
 void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const std::vector<NamespaceString>& collNames,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
+    bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+        opCtx,
+        collNames,
+        std::move(changeMetadataFunc),
+        ShardingCatalogClient::kMajorityWriteConcern);
+}
+
+void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+    OperationContext* opCtx,
+    const std::vector<NamespaceString>& collNames,
+    unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
+    const WriteConcernOptions& writeConcern) {
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
@@ -1566,7 +1586,8 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
                             bumpCollectionMinorVersion(opCtx, nss, txnNumber);
                         }
                         changeMetadataFunc(opCtx, txnNumber);
-                    });
+                    },
+                    writeConcern);
 }
 
 void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,

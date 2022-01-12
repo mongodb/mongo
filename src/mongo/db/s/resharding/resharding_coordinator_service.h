@@ -496,6 +496,9 @@ private:
      */
     void _fulfillOkayToEnterCritical(Status status);
 
+    // Waits for majority replication of the latest opTime unless token is cancelled.
+    SemiFuture<void> _waitForMajority(const CancellationToken& token);
+
     // The unique key for a given resharding operation. InstanceID is an alias for BSONObj. The
     // value of this is the UUID that will be used as the collection UUID for the new sharded
     // collection. The object looks like: {_id: 'reshardingUUID'}
