@@ -9090,6 +9090,7 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
+  - name: .csfle
 
 - name: enterprise-macos-xcode-current
   display_name: "~ Enterprise macOS Xcode Current"
@@ -9118,6 +9119,7 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
+  - name: .csfle
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -9145,6 +9147,7 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
+  - name: .csfle
 
 - name: enterprise-macos-rosetta-2-cxx20
   display_name: "Enterprise macOS Via Rosetta 2 C++20 DEBUG"
@@ -9172,6 +9175,7 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
+  - name: .csfle
 
 - name: enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64 (--js-engine=none)"
@@ -9187,6 +9191,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_and_test_TG
+  - name: .csfle
 
 ###########################################
 #          Embedded SDK buildvariants     #
