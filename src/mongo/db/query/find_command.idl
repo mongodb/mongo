@@ -239,3 +239,8 @@ commands:
         type: LegacyRuntimeConstants
         optional: true
         unstable: true
+      collectionUUID:
+        description: "The expected UUID of the collection."
+        type: uuid
+        optional: true
+        unstable: true

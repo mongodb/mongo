@@ -73,7 +73,10 @@ class TestDefinition extends SelinuxBaseTest {
             "jstests/core/validate_db_metadata_command.js",
             "jstests/core/version_api_list_commands_verification.js",
             "jstests/core/wildcard_index_distinct_scan.js",
-            "jstests/core/wildcard_index_projection.js"
+            "jstests/core/wildcard_index_projection.js",
+            // TODO (SERVER-60185): Remove the collection_uuid_*.js exclusions once the feature flag
+            // is enabled by default.
+            "jstests/core/collection_uuid_find.js",
         ]);
 
         for (let id = 0; id < dirs.length; ++id) {

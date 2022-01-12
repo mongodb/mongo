@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -400,6 +401,11 @@ public:
                     !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
                       !findCommand->getAllowSpeculativeMajorityRead()));
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "When using the find command by UUID, the collectionUUID parameter cannot also "
+                    "be specified",
+                    !findCommand->getNamespaceOrUUID().uuid() || !findCommand->getCollectionUUID());
+
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::InvalidOptions,
@@ -471,6 +477,18 @@ public:
                     str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().get()
                                   << " specified in query request not found",
                     ctx || !findCommand->getNamespaceOrUUID().uuid());
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "The collectionUUID parameter is not enabled",
+                    !findCommand->getCollectionUUID() ||
+                        feature_flags::gCommandsAcceptCollectionUUID.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
+            if (findCommand->getCollectionUUID() &&
+                (!ctx->getCollection() ||
+                 findCommand->getCollectionUUID() != ctx->getCollection()->uuid())) {
+                uassertCollectionUUIDMismatch(opCtx, *findCommand->getCollectionUUID());
+            }
 
             // Set the namespace if a collection was found, as opposed to nothing or a view.
             if (ctx) {
