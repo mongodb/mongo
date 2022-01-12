@@ -14,6 +14,8 @@ load("jstests/libs/fail_point_util.js");
 load('jstests/sharding/autosplit_include.js');
 load("jstests/sharding/libs/find_chunks_util.js");
 
+Random.setRandomSeed();
+
 const st = new ShardingTest({
     mongos: 1,
     shards: 3,
@@ -66,12 +68,10 @@ function setupCollection() {
     assert.commandWorked(
         st.s.adminCommand({configureCollectionAutoSplitter: fullNs, enableAutoSplitter: true}));
 
-    let bulk = coll.initializeUnorderedBulkOp();
-    for (let i = 0; i < 12 * 128; i++) {
-        bulk.insert({key: i, str: bigString});
+    for (let i = 0; i < 250; i++) {
+        assert.commandWorked(coll.insert({key: Random.randInt(1000) - 500, str: bigString}));
+        waitForOngoingChunkSplits(st);
     }
-    assert.commandWorked(bulk.execute());
-    waitForOngoingChunkSplits(st);
     const numChunksPrev = findChunksUtil.countChunksForNs(st.config, fullNs);
     jsTest.log("Collection " + fullNs + ", number of chunks before merging: " + numChunksPrev);
 
