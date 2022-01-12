@@ -251,7 +251,9 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::runTenantMigration
         << ActionType::setDefaultRWConcern
         << ActionType::setFeatureCompatibilityVersion
-        << ActionType::setFreeMonitoring;
+        << ActionType::setFreeMonitoring
+        << ActionType::setChangeStreamOptions
+        << ActionType::getChangeStreamOptions;
 
     clusterManagerRoleDatabaseActions
         << ActionType::clearJumboFlag

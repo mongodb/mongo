@@ -1,0 +1,98 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# Commands to set and get change streams configuration options and associated data structures.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/write_concern_options.idl"
+    - "mongo/idl/basic_types.idl"
+
+structs:
+    PreAndPostImagesOptions:
+        description: "Change streams pre- and post-images options."
+        fields:
+            expireAfterSeconds:
+                description: "The number of seconds after which a pre-image is eligible for
+                              deletion. A string value 'off' enables the default expiration policy."
+                optional: true
+                type:
+                    variant: [string, safeInt64]
+    ChangeStreamOptions:
+        description: "A specification for the change streams options."
+        fields:
+            preAndPostImages:
+                type: PreAndPostImagesOptions
+                optional: true
+    GetChangeStreamOptionsResponse:
+        description: "A response for the get change streams options command."
+        chained_structs:
+            ChangeStreamOptions: ChangeStreamOptions
+
+commands:
+    setChangeStreamOptions:
+        description: "A command to set the change streams options."
+        command_name: setChangeStreamOptions
+        namespace: ignored
+        cpp_name: setChangeStreamOptions
+        strict: true
+        api_version: "1"
+        access_check:
+            complex:
+                - check: is_authenticated
+                - privilege:
+                    resource_pattern: cluster
+                    action_type: setChangeStreamOptions
+        fields:
+            preAndPostImages:
+                description: "The pre- and post-images options to set."
+                type: PreAndPostImagesOptions
+                optional: true
+            writeConcern:
+                description: "The level of write concern for the command."
+                type: WriteConcern
+                optional: true
+        reply_type: OkReply
+    getChangeStreamOptions:
+        description: "A command to get the change streams options."
+        command_name: getChangeStreamOptions
+        namespace: ignored
+        cpp_name: getChangeStreamOptions
+        strict: true
+        api_version: "1"
+        access_check:
+            complex:
+                - check: is_authenticated
+                - privilege:
+                    resource_pattern: cluster
+                    action_type: getChangeStreamOptions
+        reply_type: GetChangeStreamOptionsResponse

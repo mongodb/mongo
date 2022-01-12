@@ -62,6 +62,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/clientcursor.h"
@@ -1547,6 +1548,7 @@ int mongod_main(int argc, char* argv[]) {
     startSignalProcessingThread();
 
     ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
+    ChangeStreamOptionsManager::create(service);
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

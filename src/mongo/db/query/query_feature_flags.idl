@@ -114,3 +114,8 @@ feature_flags:
       description : "Feature flag for optimizing Last Point queries on time-series collections"
       cpp_varname: gfeatureFlagLastPointQuery
       default: false
+    
+    featureFlagChangeStreamPreAndPostImagesTimeBasedRetentionPolicy:
+      description: "Feature flag to enable time based retention policy of point-in-time pre- and post-images of documents in change streams"
+      cpp_varname: gFeatureFlagChangeStreamPreAndPostImagesTimeBasedRetentionPolicy
+      default: false
