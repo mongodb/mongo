@@ -578,7 +578,7 @@ public:
         std::unique_ptr<DBClientConnection> _client;              // (S)
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
-        CursorId _donorFilenameBackupCursorId;                           // (M)
+        CursorId _donorFilenameBackupCursorId = 0;                       // (M)
         NamespaceString _donorFilenameBackupCursorNamespaceString;       // (M)
         std::unique_ptr<Fetcher> _donorFilenameBackupCursorFileFetcher;  // (M)
 
