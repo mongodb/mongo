@@ -41,6 +41,13 @@
 #define __has_feature(x) 0
 #endif
 
+/** Workaround for bug in MSVC 2022's lambda processor. See SERVER-62480. */
+#ifdef _MSC_VER
+#define FTU_LAMBDA_R(...) ->__VA_ARGS__
+#else
+#define FTU_LAMBDA_R(...)
+#endif
+
 namespace mongo {
 
 enum DoExecutorFuture : bool {

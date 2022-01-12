@@ -36,9 +36,10 @@
 
 namespace mongo {
 namespace {
+
 TEST(Executor_Future, Success_getAsync) {
     FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
+                        [](auto&& fut) {
                             auto exec = InlineQueuedCountingExecutor::make();
                             auto pf = makePromiseFuture<void>();
                             ExecutorFuture<void>(exec).thenRunOn(exec).getAsync(
@@ -53,7 +54,7 @@ TEST(Executor_Future, Success_getAsync) {
 
 TEST(Executor_Future, Reject_getAsync) {
     FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
+                        [](auto&& fut) {
                             auto exec = RejectingExecutor::make();
                             auto pf = makePromiseFuture<void>();
                             std::move(fut).thenRunOn(exec).getAsync(
@@ -69,7 +70,7 @@ TEST(Executor_Future, Reject_getAsync) {
 
 TEST(Executor_Future, Success_then) {
     FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
+                        [](auto&& fut) {
                             auto exec = InlineQueuedCountingExecutor::make();
                             ASSERT_EQ(std::move(fut).thenRunOn(exec).then([]() { return 3; }).get(),
                                       3);
@@ -78,7 +79,7 @@ TEST(Executor_Future, Success_then) {
 }
 TEST(Executor_Future, Reject_then) {
     FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
+                        [](auto&& fut) {
                             auto exec = RejectingExecutor::make();
                             ASSERT_EQ(std::move(fut)
                                           .thenRunOn(exec)
@@ -92,7 +93,7 @@ TEST(Executor_Future, Reject_then) {
 }
 
 TEST(Executor_Future, Fail_then) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    FUTURE_FAIL_TEST<void>([](auto&& fut) {
         auto exec = InlineQueuedCountingExecutor::make();
         ASSERT_EQ(std::move(fut)
                       .thenRunOn(exec)
@@ -108,7 +109,7 @@ TEST(Executor_Future, Fail_then) {
 
 TEST(Executor_Future, Success_onError) {
     FUTURE_SUCCESS_TEST([] { return 3; },
-                        [](/*Future<int>*/ auto&& fut) {
+                        [](auto&& fut) {
                             auto exec = InlineQueuedCountingExecutor::make();
                             ASSERT_EQ(std::move(fut)
                                           .thenRunOn(exec)
@@ -123,11 +124,11 @@ TEST(Executor_Future, Success_onError) {
 }
 
 TEST(Executor_Future, Fail_onErrorSimple) {
-    FUTURE_FAIL_TEST<int>([](/*Future<int>*/ auto&& fut) {
+    FUTURE_FAIL_TEST<int>([](auto&& fut) {
         auto exec = InlineQueuedCountingExecutor::make();
         ASSERT_EQ(std::move(fut)
                       .thenRunOn(exec)
-                      .onError([](Status s) {
+                      .onError([](Status s) FTU_LAMBDA_R(int) {
                           ASSERT_EQ(s, failStatus());
                           return 3;
                       })
@@ -138,63 +139,65 @@ TEST(Executor_Future, Fail_onErrorSimple) {
 }
 
 TEST(Executor_Future, Fail_onErrorCode_OtherCode) {
-    FUTURE_FAIL_TEST<void>([](/*Future<void>*/ auto&& fut) {
+    FUTURE_FAIL_TEST<void>([](auto&& fut) {
         auto exec = InlineQueuedCountingExecutor::make();
-        ASSERT_EQ(
-            std::move(fut)
-                .thenRunOn(exec)
-                .template onError<ErrorCodes::BadValue>([](Status s) { FAIL("wrong code, sir"); })
-                .getNoThrow(),
-            failStatus());
+        ASSERT_EQ(std::move(fut)
+                      .thenRunOn(exec)
+                      .template onError<ErrorCodes::BadValue>(
+                          [](Status s) FTU_LAMBDA_R(void) { FAIL("wrong code, sir"); })
+                      .getNoThrow(),
+                  failStatus());
         ASSERT_EQ(exec->tasksRun.load(), 0);
     });
 }
 
 TEST(Executor_Future, Success_then_onError_onError_then) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            auto exec = InlineQueuedCountingExecutor::make();
-                            ASSERT_EQ(
-                                std::move(fut)
-                                    .thenRunOn(exec)
-                                    .then([] { return failStatus(); })
-                                    .onError([](Status s) { ASSERT_EQ(s, failStatus()); })
-                                    .onError([](Status) { FAIL("how did you get this number?"); })
-                                    .then([] { return 3; })
-                                    .get(),
-                                3);
+    FUTURE_SUCCESS_TEST(
+        [] {},
+        [](auto&& fut) {
+            auto exec = InlineQueuedCountingExecutor::make();
+            ASSERT_EQ(std::move(fut)
+                          .thenRunOn(exec)
+                          .then([] { return failStatus(); })
+                          .onError([](Status s) FTU_LAMBDA_R(void) { ASSERT_EQ(s, failStatus()); })
+                          .onError([](Status)
+                                       FTU_LAMBDA_R(void) { FAIL("how did you get this number?"); })
+                          .then([] { return 3; })
+                          .get(),
+                      3);
 
-                            // 1 would also be valid if we did the optimization to not reschedule if
-                            // running on the same executor.
-                            ASSERT_EQ(exec->tasksRun.load(), 3);
-                        });
+            // 1 would also be valid if we did the optimization to not reschedule if
+            // running on the same executor.
+            ASSERT_EQ(exec->tasksRun.load(), 3);
+        });
 }
 
 TEST(Executor_Future, Success_reject_recoverToFallback) {
-    FUTURE_SUCCESS_TEST([] {},
-                        [](/*Future<void>*/ auto&& fut) {
-                            auto rejecter = RejectingExecutor::make();
-                            auto accepter = InlineQueuedCountingExecutor::make();
+    FUTURE_SUCCESS_TEST(
+        [] {},
+        [](auto&& fut) {
+            auto rejecter = RejectingExecutor::make();
+            auto accepter = InlineQueuedCountingExecutor::make();
 
-                            auto res = std::move(fut)
-                                           .thenRunOn(rejecter)
-                                           .then([] { FAIL("then()"); })
-                                           .onError([](Status) { FAIL("onError()"); })
-                                           .onCompletion([](Status) { FAIL("onCompletion()"); })
-                                           .thenRunOn(accepter)
-                                           .then([] {
-                                               FAIL("error?");
-                                               return 42;
-                                           })
-                                           .onError([](Status s) {
-                                               ASSERT_EQ(s, ErrorCodes::ShutdownInProgress);
-                                               return 3;
-                                           })
-                                           .get();
-                            ASSERT_EQ(res, 3);
+            auto res = std::move(fut)
+                           .thenRunOn(rejecter)
+                           .then([] { FAIL("then()"); })
+                           .onError([](Status) FTU_LAMBDA_R(void) { FAIL("onError()"); })
+                           .onCompletion([](Status) FTU_LAMBDA_R(void) { FAIL("onCompletion()"); })
+                           .thenRunOn(accepter)
+                           .then([] {
+                               FAIL("error?");
+                               return 42;
+                           })
+                           .onError([](Status s) FTU_LAMBDA_R(int) {
+                               ASSERT_EQ(s, ErrorCodes::ShutdownInProgress);
+                               return 3;
+                           })
+                           .get();
+            ASSERT_EQ(res, 3);
 
-                            ASSERT_EQ(accepter->tasksRun.load(), 1);
-                        });
+            ASSERT_EQ(accepter->tasksRun.load(), 1);
+        });
 }
 }  // namespace
 }  // namespace mongo
