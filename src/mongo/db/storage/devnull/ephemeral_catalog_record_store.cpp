@@ -404,9 +404,6 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
     EphemeralForTestRecord* oldRecord = recordFor(lock, loc);
     int oldLen = oldRecord->size;
 
-    // Documents in capped collections cannot change size. We check that above the storage layer.
-    invariant(!_isCapped || len == oldLen);
-
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);
 
