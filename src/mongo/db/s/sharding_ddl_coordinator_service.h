@@ -69,6 +69,8 @@ public:
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
 
+    std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;
+
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;

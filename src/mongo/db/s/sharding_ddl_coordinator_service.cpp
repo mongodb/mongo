@@ -244,4 +244,10 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
     return coordinator;
 }
 
+
+std::shared_ptr<executor::TaskExecutor> ShardingDDLCoordinatorService::getInstanceCleanupExecutor()
+    const {
+    return PrimaryOnlyService::getInstanceCleanupExecutor();
+}
+
 }  // namespace mongo
