@@ -187,6 +187,10 @@ private:
     void interrupt(Status status) override final;
 
     bool _removeDocument(OperationContext* opCtx);
+
+    ExecutorFuture<bool> _removeDocumentUntillSuccessOrStepdown(
+        std::shared_ptr<executor::TaskExecutor> executor);
+
     ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token,
                                            StringData resource);
