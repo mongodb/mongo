@@ -248,6 +248,14 @@ public:
         }
         ASSERT_EQ(indexesCopy.size(), 0);
     }
+
+    void verifyTempReshardingCollectionAndMetadata() {
+        RecipientStateMachineExternalStateImpl externalState;
+        externalState.ensureTempReshardingCollectionExistsWithIndexes(
+            operationContext(), kMetadata, kDefaultFetchTimestamp);
+        CollectionShardingRuntime csr(getServiceContext(), kOrigNss, executor());
+        ASSERT(csr.getCurrentMetadataIfKnown() == boost::none);
+    }
 };
 
 TEST_F(RecipientServiceExternalStateTest, ReshardingConfigServerUpdatesHaveNoTimeout) {
@@ -313,9 +321,7 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    RecipientStateMachineExternalStateImpl externalState;
-    externalState.ensureTempReshardingCollectionExistsWithIndexes(
-        operationContext(), kMetadata, kDefaultFetchTimestamp);
+    verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
 
@@ -372,9 +378,7 @@ TEST_F(RecipientServiceExternalStateTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    RecipientStateMachineExternalStateImpl externalState;
-    externalState.ensureTempReshardingCollectionExistsWithIndexes(
-        operationContext(), kMetadata, kDefaultFetchTimestamp);
+    verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
 
@@ -440,9 +444,7 @@ TEST_F(RecipientServiceExternalStateTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    RecipientStateMachineExternalStateImpl externalState;
-    externalState.ensureTempReshardingCollectionExistsWithIndexes(
-        operationContext(), kMetadata, kDefaultFetchTimestamp);
+    verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
 
@@ -510,9 +512,7 @@ TEST_F(RecipientServiceExternalStateTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    RecipientStateMachineExternalStateImpl externalState;
-    externalState.ensureTempReshardingCollectionExistsWithIndexes(
-        operationContext(), kMetadata, kDefaultFetchTimestamp);
+    verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
 
@@ -570,9 +570,7 @@ TEST_F(RecipientServiceExternalStateTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    RecipientStateMachineExternalStateImpl externalState;
-    externalState.ensureTempReshardingCollectionExistsWithIndexes(
-        operationContext(), kMetadata, kDefaultFetchTimestamp);
+    verifyTempReshardingCollectionAndMetadata();
 
     future.default_timed_get();
 

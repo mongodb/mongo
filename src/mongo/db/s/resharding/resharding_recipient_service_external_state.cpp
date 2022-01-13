@@ -85,6 +85,10 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                                     std::move(indexes),
                                     std::move(idIndex),
                                     std::move(collOptions)});
+
+    AutoGetCollection autoColl(opCtx, metadata.getTempReshardingNss(), MODE_IX);
+    CollectionShardingRuntime::get(opCtx, metadata.getTempReshardingNss())
+        ->clearFilteringMetadata(opCtx);
 }
 
 template <typename Callable>
