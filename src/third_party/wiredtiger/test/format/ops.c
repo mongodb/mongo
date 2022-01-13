@@ -553,7 +553,6 @@ prepare_transaction(TINFO *tinfo)
     WT_DECL_RET;
     WT_SESSION *session;
     uint64_t ts;
-    uint32_t longwait, pause_ms;
     char buf[64];
 
     session = tinfo->session;
@@ -580,19 +579,6 @@ prepare_transaction(TINFO *tinfo)
 
     lock_writeunlock(session, &g.ts_lock);
 
-    /*
-     * Sometimes add a delay after prepare to induce extra memory stress. For 80% of the threads,
-     * there is never a delay, so there is always a dedicated set of threads trying to do work. For
-     * the other 20%, we'll sometimes delay. For these threads, 99% of the time, proceed without
-     * delay. The rest of the time, pause up to 5 seconds, weighted toward the smaller delays.
-     */
-    if (tinfo->id % 5 == 0) {
-        longwait = mmrand(&tinfo->rnd, 0, 999);
-        if (longwait < 10) {
-            pause_ms = mmrand(&tinfo->rnd, 1, 10) << longwait;
-            __wt_sleep(0, (uint64_t)pause_ms * WT_THOUSAND);
-        }
-    }
     return (ret);
 }
 
