@@ -3648,6 +3648,12 @@ def doConfigure(myenv):
         #
         myenv.Append( CCFLAGS=["/Zc:inline"])
 
+    if myenv.ToolchainIs('msvc') and get_option('cxx-std') == "20":
+        # Disable the updated lambda processor, which is on by default in
+        # /std:C++20 mode. The new lambda processor cannot compile the nested
+        # lambda expression usage in util/future_test_* files. See
+        # SERVER-62480. Must appear after `/std:c++20` to override it.
+        env.Append( CCFLAGS=["/Zc:lambda-"] )
 
 
     if myenv.ToolchainIs('gcc', 'clang'):
