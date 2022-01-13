@@ -97,9 +97,6 @@ struct __wt_reconcile {
     wt_timestamp_t max_ts;
     wt_timestamp_t min_skipped_ts;
 
-    u_int updates_seen;     /* Count of updates seen. */
-    u_int updates_unstable; /* Count of updates not visible_all. */
-
     /*
      * When we do not find any update to be written for the whole page, we would like to mark
      * eviction failed in the case of update-restore. There is no progress made by eviction in such
