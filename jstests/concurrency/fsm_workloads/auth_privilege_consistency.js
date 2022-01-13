@@ -15,6 +15,9 @@ var $config = (function() {
     const kTestUserName = kTestNamePrefix + '_user';
     const kTestUserPassword = 'secret';
     const kTestRoleNamePrefix = kTestNamePrefix + '_role_';
+    const kMaxCmdTimeMs = 60000;
+    const kMaxTxnLockReqTimeMs = 100;
+    const kDefaultTxnLockReqTimeMs = 5;
 
     const states = (function() {
         let roleName = kTestRoleNamePrefix;
@@ -44,12 +47,32 @@ var $config = (function() {
             mutate: function(db, collName) {
                 // Revoke privs from intermediate role,
                 // then give that, now empty, role to the user.
-                db.revokePrivilegesFromRole(roleName, [privilege]);
-                db.grantRolesToUser(kTestUserName, [roleWithDB]);
+
+                db.runCommand({
+                    revokePrivilegesFromRole: roleName,
+                    privileges: [privilege],
+                    maxTimeMS: kMaxCmdTimeMs
+                });
+
+                db.runCommand({
+                    grantRolesToUser: kTestUserName,
+                    roles: [roleWithDB],
+                    maxTimeMS: kMaxCmdTimeMs
+                });
 
                 // Take the role away from the user, and give it privs.
-                db.revokeRolesFromUser(kTestUserName, [roleWithDB]);
-                db.grantPrivilegesToRole(roleName, [privilege]);
+
+                db.runCommand({
+                    revokeRolesFromUser: kTestUserName,
+                    roles: [roleWithDB],
+                    maxTimeMS: kMaxCmdTimeMs
+                });
+
+                db.runCommand({
+                    grantPrivilegesToRole: roleName,
+                    privileges: [privilege],
+                    maxTimeMS: kMaxCmdTimeMs
+                });
             },
 
             observeInit: function(db, collName) {
@@ -123,6 +146,16 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
+        cluster.executeOnMongodNodes(function(db) {
+            db.adminCommand(
+                {setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+        });
+
+        cluster.executeOnMongosNodes(function(db) {
+            db.adminCommand(
+                {setParameter: 1, maxTransactionLockRequestTimeoutMillis: kMaxTxnLockReqTimeMs});
+        });
+
         db.createUser({user: kTestUserName, pwd: kTestUserPassword, roles: []});
     }
 
@@ -130,6 +163,20 @@ var $config = (function() {
         const pattern = new RegExp('^' + kTestRoleNamePrefix + '\\d+$');
         dropRoles(db, pattern);
         db.dropUser(kTestUserName);
+
+        cluster.executeOnMongodNodes(function(db) {
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kDefaultTxnLockReqTimeMs
+            });
+        });
+
+        cluster.executeOnMongosNodes(function(db) {
+            db.adminCommand({
+                setParameter: 1,
+                maxTransactionLockRequestTimeoutMillis: kDefaultTxnLockReqTimeMs
+            });
+        });
     }
 
     return {
