@@ -9,7 +9,8 @@
 (function() {
 clearRawMongoProgramOutput();
 const conn = MongoRunner.runMongod();
-runMongoProgram('/bin/kill', '-s', 'SIGUSR2', conn.pid);
+// convert the float to a string to make sure it's correctly represented.
+runMongoProgram('/bin/kill', '-s', 'SIGUSR2', conn.pid.valueOf().toString());
 MongoRunner.stopMongod(conn);
 const output = rawMongoProgramOutput();
 assert(output.search(/"processInfo":/) >= 0, output);
