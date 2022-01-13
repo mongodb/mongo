@@ -224,4 +224,12 @@ private:
     stdx::variant<std::string, std::int64_t> _w;
     bool _usedDefaultConstructedW1;
 };
+
+inline std::int64_t parseWTimeoutFromBSON(BSONElement element) {
+    constexpr std::array<mongo::BSONType, 4> validTypes{
+        NumberLong, NumberInt, NumberDecimal, NumberDouble};
+    bool isValidType = std::any_of(
+        validTypes.begin(), validTypes.end(), [&](auto type) { return element.type() == type; });
+    return isValidType ? element.safeNumberLong() : 0;
+}
 }  // namespace mongo

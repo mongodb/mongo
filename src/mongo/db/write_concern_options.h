@@ -172,7 +172,6 @@ public:
 
 private:
     ReadWriteConcernProvenance _provenance;
-    static StatusWith<WriteConcernOptions> convertFromIdl(const WriteConcernIdl& writeConcernIdl);
 };
 
 }  // namespace mongo
