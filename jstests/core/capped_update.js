@@ -14,25 +14,30 @@
 
 (function() {
 'use strict';
-var t = db.getSiblingDB("local").cannot_change_capped_size;
-t.drop();
-assert.commandWorked(
-    t.getDB().createCollection(t.getName(), {capped: true, size: 1024, autoIndexId: false}));
-assert.eq(0, t.getIndexes().length, "the capped collection has indexes");
 
-for (var j = 1; j <= 10; j++) {
-    assert.commandWorked(t.insert({_id: j, s: "Hello, World!"}));
+const localDB = db.getSiblingDB("local");
+const t = localDB.capped_update;
+t.drop();
+
+assert.commandWorked(
+    localDB.createCollection(t.getName(), {capped: true, size: 1024, autoIndexId: false}));
+assert.sameMembers([], t.getIndexes(), "the capped collection has indexes");
+
+let docs = [];
+for (let j = 1; j <= 10; j++) {
+    docs.push({_id: j, s: "Hello, World!"});
 }
+assert.commandWorked(t.insert(docs));
 
 assert.commandWorked(t.update({_id: 3}, {s: "Hello, Mongo!"}));  // Mongo is same length as World
 assert.writeError(t.update({_id: 3}, {$set: {s: "Hello!"}}));
 assert.writeError(t.update({_id: 10}, {}));
 assert.writeError(t.update({_id: 10}, {s: "Hello, World!!!"}));
 
-assert.commandWorked(t.getDB().runCommand({godinsert: t.getName(), obj: {a: 2}}));
-var doc = t.findOne({a: 2});
-assert.eq(undefined, doc["_id"], "now has _id after godinsert");
+assert.commandWorked(localDB.runCommand({godinsert: t.getName(), obj: {a: 2}}));
+let doc = t.findOne({a: 2});
+assert(!doc.hasOwnProperty("_id"), "now has _id after godinsert: " + tojson(doc));
 assert.commandWorked(t.update({a: 2}, {$inc: {a: 1}}));
 doc = t.findOne({a: 3});
-assert.eq(undefined, doc["_id"], "now has _id after update");
+assert(!doc.hasOwnProperty("_id"), "now has _id after update: " + tojson(doc));
 })();
