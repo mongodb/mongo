@@ -368,7 +368,7 @@ TEST_F(MongodbCAPITest, KillOp) {
                 // See if we find the sleep command among the running commands
                 for (const auto& elt : inprog) {
                     auto inprogObj = inprog.getObjectField(elt.fieldNameStringData());
-                    std::string ns = inprogObj.getStringField("ns");
+                    std::string ns = inprogObj.getStringField("ns").toString();
                     if (ns == "admin.$cmd") {
                         opid = inprogObj.getIntField("opid");
                         break;

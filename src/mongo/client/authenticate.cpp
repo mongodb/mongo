@@ -112,7 +112,7 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
     if (username != clientName.toString()) {
         StringBuilder message;
         message << "Username \"";
-        message << params[saslCommandUserFieldName].valuestr();
+        message << params[saslCommandUserFieldName].valueStringData();
         message << "\" does not match the provided client certificate user \"";
         message << clientName.toString() << "\"";
         return {ErrorCodes::AuthenticationFailed, message.str()};

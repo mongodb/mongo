@@ -82,7 +82,7 @@ StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& 
                          << " must be a string"};
     }
 
-    auto swConnString = ConnectionString::parse(firstElement.valuestrsafe());
+    auto swConnString = ConnectionString::parse(firstElement.str());
     if (!swConnString.isOK()) {
         return swConnString.getStatus();
     }

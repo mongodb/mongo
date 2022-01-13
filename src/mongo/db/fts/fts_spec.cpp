@@ -109,7 +109,7 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
                                    " correct options.");
     }
 
-    _languageOverrideField = indexInfo["language_override"].valuestrsafe();
+    _languageOverrideField = indexInfo.getStringField("language_override").toString();
 
     _wildcard = false;
 
@@ -290,7 +290,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
             while (i.more()) {
                 BSONElement e = i.next();
                 if (e.fieldNameStringData() == "_fts") {
-                    if (INDEX_NAME != e.valuestrsafe()) {
+                    if (INDEX_NAME != e.str()) {
                         return {ErrorCodes::CannotCreateIndex, "expecting _fts:\"text\""};
                     }
                     addedFtsStuff = true;
@@ -300,7 +300,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
                         return {ErrorCodes::CannotCreateIndex, "expecting _ftsx:1"};
                     }
                     b.append(e);
-                } else if (e.type() == String && INDEX_NAME == e.valuestr()) {
+                } else if (e.type() == String && INDEX_NAME == e.str()) {
                     if (!addedFtsStuff) {
                         _addFTSStuff(&b);
                         addedFtsStuff = true;

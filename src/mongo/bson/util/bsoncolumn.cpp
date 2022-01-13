@@ -117,10 +117,7 @@ int BSONColumn::ElementStorage::Element::size() const {
 }
 
 BSONElement BSONColumn::ElementStorage::Element::element() const {
-    return {_buffer,
-            _nameSize + 1,
-            _valueSize + _nameSize + kElementValueOffset,
-            BSONElement::CachedSizeTag{}};
+    return {_buffer, _nameSize + 1, _valueSize + _nameSize + kElementValueOffset};
 }
 
 BSONColumn::ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage)
@@ -575,7 +572,7 @@ BSONColumn::Iterator::DecodingState::_loadControl(BSONColumn& column,
     if (_isLiteral(control)) {
         // Load BSONElement from the literal and set last encoded in case we need to calculate
         // deltas from this literal
-        BSONElement literalElem(buffer, 1, -1, BSONElement::CachedSizeTag{});
+        BSONElement literalElem(buffer, 1, -1);
         _loadLiteral(literalElem);
 
         _decoder64 = boost::none;

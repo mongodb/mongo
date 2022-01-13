@@ -171,8 +171,7 @@ private:
 
         if constexpr (precise) {
             auto nameLen = obj - _currElem;
-            _currFrame->elem =
-                BSONElement(_currElem, nameLen, nameLen + len, BSONElement::CachedSizeTag());
+            _currFrame->elem = BSONElement(_currElem, nameLen, nameLen + len);
         }
         return cursor.ptr;
     }

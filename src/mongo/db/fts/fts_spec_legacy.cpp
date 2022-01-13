@@ -53,8 +53,8 @@ void _addFTSStuff(BSONObjBuilder* b) {
 const FTSLanguage& FTSSpec::_getLanguageToUseV1(const BSONObj& userDoc) const {
     BSONElement e = userDoc[_languageOverrideField];
     if (e.type() == String) {
-        const char* x = e.valuestrsafe();
-        if (strlen(x) > 0) {
+        StringData x = e.valueStringData();
+        if (e.size() > 0) {
             // make() w/ TEXT_INDEX_VERSION_1 guaranteed to not fail.
             return FTSLanguage::make(x, TEXT_INDEX_VERSION_1);
         }
@@ -144,7 +144,7 @@ void FTSSpec::_scoreRecurseV1(const Tools& tools,
         if (x.type() == String) {
             double w = 1;
             _weightV1(x.fieldName(), &w);
-            _scoreStringV1(tools, x.valuestr(), term_freqs, w);
+            _scoreStringV1(tools, x.valueStringData(), term_freqs, w);
         } else if (x.isABSONObj()) {
             _scoreRecurseV1(tools, x.Obj(), term_freqs);
         }
@@ -181,10 +181,10 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
                 if (leftOverName[0] && x.isABSONObj())
                     x = dps::extractElementAtPath(x.Obj(), leftOverName);
                 if (x.type() == String)
-                    _scoreStringV1(tools, x.valuestr(), term_freqs, weight);
+                    _scoreStringV1(tools, x.valueStringData(), term_freqs, weight);
             }
         } else if (e.type() == String) {
-            _scoreStringV1(tools, e.valuestr(), term_freqs, weight);
+            _scoreStringV1(tools, e.valueStringData(), term_freqs, weight);
         }
     }
 }

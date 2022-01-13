@@ -179,7 +179,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) {
         writeConcern.notExplicitWValue = false;
     } else if (wEl.type() == String) {
         writeConcern.wNumNodes = 0;
-        writeConcern.wMode = wEl.valuestrsafe();
+        writeConcern.wMode = wEl.str();
         writeConcern.notExplicitWValue = false;
     } else if (wEl.eoo() || wEl.type() == jstNULL || wEl.type() == Undefined) {
         writeConcern.wNumNodes = 1;

@@ -82,7 +82,7 @@ std::string getThreadNameByAppName(DBClientBase* conn, StringData appName) {
     const auto cursorResponse = CursorResponse::parseFromBSON(curOpReply->getCommandReply());
     ASSERT_OK(cursorResponse.getStatus());
     const auto batch = cursorResponse.getValue().getBatch();
-    return batch.empty() ? "" : batch[0].getStringField("desc");
+    return batch.empty() ? "" : batch[0].getStringField("desc").toString();
 }
 
 TEST(OpMsg, UnknownRequiredFlagClosesConnection) {

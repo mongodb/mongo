@@ -843,9 +843,10 @@ class WrongStringSize : public Base {
     }
     BSONObj invalid() const {
         BSONObj ret = valid();
-        ASSERT_EQUALS(ret.firstElement().valuestr()[0], 'b');
-        ASSERT_EQUALS(ret.firstElement().valuestr()[1], 0);
-        ((char*)ret.firstElement().valuestr())[1] = 1;
+        ASSERT_TRUE(ret.firstElement().valueStringData().size() >= 1);
+        ASSERT_EQUALS(ret.firstElement().valueStringData()[0], 'b');
+        ASSERT_EQUALS(ret.firstElement().valueStringData()[1], 0);
+        ((char*)ret.firstElement().valueStringData().rawData())[1] = 1;
         return ret.copy();
     }
 };

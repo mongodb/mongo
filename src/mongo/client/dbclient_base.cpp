@@ -97,7 +97,8 @@ bool DBClientBase::isOk(const BSONObj& o) {
 
 bool DBClientBase::isNotPrimaryErrorString(const BSONElement& e) {
     return e.type() == String &&
-        (str::contains(e.valuestr(), "not primary") || str::contains(e.valuestr(), "not master"));
+        (str::contains(e.valueStringData(), "not primary") ||
+         str::contains(e.valueStringData(), "not master"));
 }
 
 void DBClientBase::setRequestMetadataWriter(rpc::RequestMetadataWriter writer) {

@@ -204,7 +204,7 @@ bool isTextScoreMeta(BSONElement elt) {
     if (mongo::String != metaElt.type()) {
         return false;
     }
-    if (StringData{metaElt.valuestr()} != metaTextScore) {
+    if (metaElt.valueStringData() != metaTextScore) {
         return false;
     }
     // must have exactly 1 element

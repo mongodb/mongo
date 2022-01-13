@@ -367,7 +367,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //        }
                 //     ...
                 // }
-                NamespaceString collectionNamespace(nss.getSisterNS(first.valuestr()));
+                NamespaceString collectionNamespace(nss.getSisterNS(first.valueStringDataSafe()));
 
                 // Registers the collection to be removed from the drop pending collection
                 // reaper and to be renamed from its drop pending namespace to original namespace.
@@ -388,7 +388,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //            ns: "foo.x"
                 //        }
 
-                string ns = nss.db().toString() + '.' + first.valuestr();
+                string ns = nss.db().toString() + '.' + first.str();
 
                 string indexName;
                 auto status = bsonExtractStringField(obj, "index", &indexName);
@@ -607,7 +607,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 BSONObj cmd = obj;
 
-                std::string ns = first.valuestrsafe();
+                std::string ns = first.str();
                 if (ns.empty()) {
                     static constexpr char message[] = "Collection name missing from oplog entry";
                     LOGV2(21667, message, "oplogEntry"_attr = redact(obj));

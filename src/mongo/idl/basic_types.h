@@ -190,7 +190,7 @@ public:
         if (wEl.isNumber()) {
             return WriteConcernW{wEl.safeNumberLong()};
         } else if (wEl.type() == BSONType::String) {
-            return WriteConcernW{wEl.valuestrsafe()};
+            return WriteConcernW{wEl.str()};
         } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL ||
                    wEl.type() == BSONType::Undefined) {
             return WriteConcernW{};

@@ -673,7 +673,7 @@ void FlatBSON<Derived, Element, Value>::_setTypeArray(
 }
 
 BSONElement BSONElementValue::get() const {
-    return BSONElement(_buffer.get(), 1, _size, BSONElement::CachedSizeTag{});
+    return BSONElement(_buffer.get(), 1, _size);
 }
 
 void BSONElementValue::set(const BSONElement& elem) {

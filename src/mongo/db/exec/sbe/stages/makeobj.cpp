@@ -258,8 +258,7 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
                     auto nextBe = bson::advance(be, sv.size());
 
                     if (!isFieldProjectedOrRestricted(key)) {
-                        bob.append(BSONElement(
-                            be, sv.size() + 1, nextBe - be, BSONElement::CachedSizeTag{}));
+                        bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
                         --nFieldsNeededIfInclusion;
                     }
 

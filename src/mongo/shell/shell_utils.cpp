@@ -446,8 +446,8 @@ BSONObj replMonitorStats(const BSONObj& a, void* data) {
             "replMonitorStats requires a single string argument (the ReplSet name)",
             a.nFields() == 1 && a.firstElement().type() == String);
 
-    auto name = a.firstElement().valuestrsafe();
-    auto rsm = ReplicaSetMonitor::get(name);
+    auto name = a.firstElement().valueStringDataSafe();
+    auto rsm = ReplicaSetMonitor::get(name.toString());
     if (!rsm) {
         return BSON(""
                     << "no ReplSetMonitor exists by that name");
@@ -482,7 +482,7 @@ BSONObj fileExistsJS(const BSONObj& a, void*) {
     uassert(40678,
             "fileExists expects one string argument",
             a.nFields() == 1 && a.firstElement().type() == String);
-    return BSON("" << fileExists(a.firstElement().valuestrsafe()));
+    return BSON("" << fileExists(a.firstElement().str()));
 }
 
 BSONObj isInteractive(const BSONObj& a, void*) {

@@ -88,8 +88,7 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
         BSONElement element() const {
             return BSONElement(fieldName.rawData() - 1,  // Include type byte before field name
                                fieldName.size() + 1,     // Include null terminator after field name
-                               totalSize,
-                               BSONElement::CachedSizeTag{});
+                               totalSize);
         }
         bool operator<(const Field& rhs) const {
             return fieldName < rhs.fieldName;

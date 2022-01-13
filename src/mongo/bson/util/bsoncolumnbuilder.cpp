@@ -766,7 +766,7 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
 }
 
 BSONElement BSONColumnBuilder::EncodingState::_previous() const {
-    return {_prev.get(), 1, _prevSize, BSONElement::CachedSizeTag{}};
+    return {_prev.get(), 1, _prevSize};
 }
 
 

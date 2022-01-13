@@ -287,8 +287,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
         reader,
         _indexCatalogEntry->accessMethod()->getSortedDataInterface()->getKeyStringVersion());
 
-    const Op opType =
-        (strcmp(operation.getStringField("op"), "i") == 0) ? Op::kInsert : Op::kDelete;
+    const Op opType = operation.getStringField("op") == "i"_sd ? Op::kInsert : Op::kDelete;
 
     const KeyStringSet keySet{keyString};
     const RecordId opRecordId = [&]() {
@@ -328,7 +327,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     } else {
         invariant(opType == Op::kDelete);
         if (kDebugBuild)
-            invariant(strcmp(operation.getStringField("op"), "d") == 0);
+            invariant(operation.getStringField("op") == "d"_sd);
 
         int64_t numDeleted;
         Status s = accessMethod->removeKeys(

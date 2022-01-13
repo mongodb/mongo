@@ -697,7 +697,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
             bool lastPathComponentCausesIndexToBeMultikey;
             std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
 
-            if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.valuestr()) {
+            if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.str()) {
                 timeseries::dotted_path_support::extractAllElementsAlongBucketPath(
                     obj,
                     keyElem.fieldName(),
@@ -738,7 +738,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
                                                  expandArrayOnTrailingField,
                                                  arrayComponents);
 
-                if (IndexNames::GEO_2DSPHERE == keyElem.valuestr()) {
+                if (IndexNames::GEO_2DSPHERE == keyElem.str()) {
                     if (params.indexVersion >= S2_INDEX_VERSION_2) {
                         // For >= V2,
                         // geo: null,

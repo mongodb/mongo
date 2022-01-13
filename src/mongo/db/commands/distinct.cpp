@@ -246,7 +246,7 @@ public:
                 executor.getValue()->getPlanExplainer().getPlanSummary());
         }
 
-        const auto key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
+        const auto key = cmdObj.getStringField(ParsedDistinct::kKeyField);
 
         std::vector<BSONObj> distinctValueHolder;
         BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());

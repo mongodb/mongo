@@ -601,9 +601,9 @@ bool BSONObj::getBoolField(StringData name) const {
     return e.type() == Bool ? e.boolean() : false;
 }
 
-const char* BSONObj::getStringField(StringData name) const {
+StringData BSONObj::getStringField(StringData name) const {
     BSONElement e = getField(name);
-    return e.type() == String ? e.valuestr() : "";
+    return e.valueStringDataSafe();
 }
 
 bool BSONObj::getObjectID(BSONElement& e) const {

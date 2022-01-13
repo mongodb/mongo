@@ -760,10 +760,7 @@ inline Element::Element(Document* doc, RepIdx repIdx) : _doc(doc), _repIdx(repId
 }
 
 inline StringData Element::getValueStringOrSymbol() const {
-    const BSONElement value = getValue();
-    const char* str = value.valuestr();
-    const size_t size = value.valuestrsize() - 1;
-    return StringData(str, size);
+    return getValue().valueStringData();
 }
 
 inline bool operator==(const Element& l, const Element& r) {

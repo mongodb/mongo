@@ -256,9 +256,9 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         }
 
         try {
-            setElement(n.valuestr(), v, o);
-            thisTime.insert(n.valuestr());
-            _storedNames.insert(n.valuestr());
+            setElement(n.valueStringDataSafe().rawData(), v, o);
+            thisTime.insert(n.str());
+            _storedNames.insert(n.str());
         } catch (const DBException& setElemEx) {
             if (setElemEx.code() == ErrorCodes::Interrupted) {
                 throw;
@@ -266,7 +266,7 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
 
             LOGV2_ERROR(22781,
                         "unable to load stored JavaScript function {n_valuestr}(): {setElemEx}",
-                        "n_valuestr"_attr = n.valuestr(),
+                        "n_valuestr"_attr = n.valueStringDataSafe(),
                         "setElemEx"_attr = redact(setElemEx));
         }
     }

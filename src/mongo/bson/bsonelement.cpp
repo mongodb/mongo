@@ -132,10 +132,10 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
 
     switch (type()) {
         case mongo::String:
-            g.writeString(buffer, StringData(valuestr(), valuestrsize() - 1));
+            g.writeString(buffer, valueStringData());
             break;
         case Symbol:
-            g.writeSymbol(buffer, StringData(valuestr(), valuestrsize() - 1));
+            g.writeSymbol(buffer, valueStringData());
             break;
         case NumberLong:
             g.writeInt64(buffer, _numberLong());
@@ -182,9 +182,7 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
         }
         case DBRef:
             // valuestrsize() returns the size including the null terminator
-            g.writeDBRef(buffer,
-                         StringData(valuestr(), valuestrsize() - 1),
-                         OID::from(valuestr() + valuestrsize()));
+            g.writeDBRef(buffer, valueStringData(), OID::from(valuestr() + valuestrsize()));
             break;
         case jstOID:
             g.writeOID(buffer, __oid());
@@ -273,15 +271,7 @@ namespace {
 
 // Compares two string elements using a simple binary compare.
 int compareElementStringValues(const BSONElement& leftStr, const BSONElement& rightStr) {
-    // we use memcmp as we allow zeros in UTF8 strings
-    int lsz = leftStr.valuestrsize();
-    int rsz = rightStr.valuestrsize();
-    int common = std::min(lsz, rsz);
-    int res = memcmp(leftStr.valuestr(), rightStr.valuestr(), common);
-    if (res)
-        return res;
-    // longer std::string is the greater one
-    return lsz - rsz;
+    return leftStr.valueStringData().compare(rightStr.valueStringData());
 }
 
 }  // namespace
@@ -650,8 +640,8 @@ BSONElement BSONElement::operator[](StringData field) const {
 namespace {
 MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (const char* data) {
     // We intentionally read memory that may be out of the allocated memory's boundary, so do not
-    // do this when the adress sanitizer is enabled. We do this in an attempt to log as much context
-    // about the failure, even if that risks undefined behavior or a segmentation fault.
+    // do this when the address sanitizer is enabled. We do this in an attempt to log as much
+    // context about the failure, even if that risks undefined behavior or a segmentation fault.
 #if !__has_feature(address_sanitizer)
     bool logMemory = true;
 #else
@@ -908,7 +898,7 @@ std::string BSONElement::_asCode() const {
     switch (type()) {
         case mongo::String:
         case Code:
-            return std::string(valuestr(), valuestrsize() - 1);
+            return valueStringData().toString();
         case CodeWScope:
             return std::string(codeWScopeCode(),
                                ConstDataView(valuestr()).read<LittleEndian<int>>() - 1);

@@ -162,7 +162,7 @@ private:
         // Only create the initial server description if the original avg rtt is not "NULL". If it
         // is, the test case is meant to mimic creating the first ServerDescription which we will do
         // above.
-        std::string origRttAsString = _jsonTest.getStringField("avg_rtt_ms");
+        std::string origRttAsString = _jsonTest.getStringField("avg_rtt_ms").toString();
         if (origRttAsString.compare("NULL") != 0) {
             auto serverDescription = ServerDescriptionBuilder()
                                          .withAddress(HostAndPort("dummy"))
@@ -286,7 +286,7 @@ private:
         // lowercased keywords. Also, change the key "tags_set" to "tags".
         // This can throw for test cases that have invalid read preferences.
         auto readPrefObj = _jsonTest.getObjectField("read_preference");
-        std::string mode = readPrefObj.getStringField("mode");
+        std::string mode = readPrefObj.getStringField("mode").toString();
         mode[0] = ctype::toLower(mode[0]);
         auto tagSetsObj = readPrefObj["tag_sets"];
         auto tags = tagSetsObj ? BSONArray(readPrefObj["tag_sets"].Obj()) : BSONArray();
@@ -364,7 +364,7 @@ private:
             auto tagsObj = server.getObjectField("tags");
             const auto keys = tagsObj.getFieldNames<std::set<std::string>>();
             for (const auto& key : keys) {
-                serverDescription.withTag(key, tagsObj.getStringField(key));
+                serverDescription.withTag(key, tagsObj.getStringField(key).toString());
             }
 
             serverDescriptions.push_back(serverDescription.instance());

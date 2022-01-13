@@ -450,7 +450,7 @@ BSONObj createObjFromRadixKey(const std::string& radixKey,
     auto it = BSONObjIterator(bsonObj);
     ++it;  // We want the second part
     KeyString::Builder ks(version);
-    ks.resetFromBuffer((*it).valuestr(), (*it).valuestrsize());
+    ks.resetFromBuffer((*it).valueStringDataSafe().rawData(), (*it).valueStringDataSafe().size());
 
     return KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), order, typeBits);
 }

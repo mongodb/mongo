@@ -177,8 +177,8 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
                 str::stream() << "\"op\" field is not a string: " << e.fieldName()};
     }
     // operation type -- see logOp() comments for types
-    const char* opType = opElement.valuestrsafe();
-    if (*opType == '\0') {
+    StringData opType = opElement.valueStringDataSafe();
+    if (opType.empty()) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"op\" field value cannot be empty: " << e.fieldName()};
     }
@@ -198,7 +198,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "namespaces cannot have embedded null characters"};
     }
-    if (*opType != 'n' && nsElement.String().empty()) {
+    if (opType != "n"_sd && nsElement.String().empty()) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"ns\" field value cannot be empty when op type is not 'n': "
                               << e.fieldName()};

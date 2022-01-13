@@ -203,7 +203,7 @@ namespace {
 // specified in the fail point info.
 bool opShouldFail(Client* client, const BSONObj& failPointInfo) {
     // Only target the client with the specified connection number.
-    if (client->desc() != failPointInfo["threadName"].valuestrsafe()) {
+    if (client->desc() != failPointInfo.getStringField("threadName")) {
         return false;
     }
 

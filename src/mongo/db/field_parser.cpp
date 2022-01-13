@@ -206,7 +206,7 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
 
     if (elem.type() == String) {
         // Extract everything, including embedded null characters.
-        *out = string(elem.valuestr(), elem.valuestrsize() - 1);
+        *out = elem.str();
         return FIELD_SET;
     }
 

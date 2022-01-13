@@ -222,7 +222,7 @@ public:
                    const BSONObj& cmdObj,
                    string& errmsg,
                    BSONObjBuilder& result) {
-        bool all = *cmdObj.firstElement().valuestrsafe() == '*';
+        bool all = cmdObj.firstElement().str() == "*";
 
         int before = result.len();
 

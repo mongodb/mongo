@@ -234,7 +234,7 @@ public:
 
         s->invoke("z = { x : 'eliot' };", nullptr, nullptr);
         out = s->getObject("z");
-        ASSERT_EQUALS((string) "eliot", out["x"].valuestr());
+        ASSERT_EQUALS("eliot", out["x"].str());
         ASSERT_EQUALS(1, out.nFields());
 
         BSONObj o = BSON("x" << 17);
@@ -598,7 +598,7 @@ public:
         out = s->getObject("c");
         stringstream ss;
         ss << "NumberLong(\"" << val << "\")";
-        ASSERT_EQUALS(ss.str(), out.firstElement().valuestr());
+        ASSERT_EQUALS(ss.str(), out.firstElement().str());
 
         ASSERT(s->exec("d = {d:a.a.toNumber()}", "foo", false, true, false));
         out = s->getObject("d");
@@ -688,7 +688,7 @@ public:
         out = s->getObject("c");
         stringstream ss;
         ss << "NumberLong(\"" << val << "\")";
-        ASSERT_EQUALS(ss.str(), out.firstElement().valuestr());
+        ASSERT_EQUALS(ss.str(), out.firstElement().str());
 
         ASSERT(s->exec("d = {d:a.a.toNumber()}", "foo", false, true, false));
         out = s->getObject("d");
@@ -732,7 +732,7 @@ public:
         out = s->getObject("c");
         stringstream ss;
         ss << "NumberDecimal(\"" << val.toString() << "\")";
-        ASSERT_EQUALS(ss.str(), out.firstElement().valuestr());
+        ASSERT_EQUALS(ss.str(), out.firstElement().str());
     }
 };
 

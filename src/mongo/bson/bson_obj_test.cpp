@@ -764,4 +764,43 @@ TEST(BSONObj, sizeChecks) {
         ErrorCodes::BSONObjectTooLarge);
 }
 
+TEST(BSONObj, nullByteInStringBasic) {
+    const size_t size = 3;
+    StringData str("b\0c", size);
+
+    // { "a": "b\0c" }
+    BSONObjBuilder b;
+    b.append("a"_sd, str);
+    BSONObj obj{b.obj()};
+
+    ASSERT_EQ(str.size(), obj.getStringField("a").size());
+    ASSERT_EQ(str, obj.getStringField("a"));
+}
+
+TEST(BSONObj, nullByteInStringMulti) {
+    const size_t size = 5;
+    StringData str("b\0c\0d", size);
+
+    // { "a": "b\0c\0d" }
+    BSONObjBuilder b;
+    b.append("a"_sd, str);
+    BSONObj obj{b.obj()};
+
+    ASSERT_EQ(str.size(), obj.getStringField("a").size());
+    ASSERT_EQ(str, obj.getStringField("a"));
+}
+
+TEST(BSONObj, nullByteInStringFull) {
+    const size_t size = 9;
+    StringData str("\0\0\0\0\0\0\0\0\0", size);
+
+    // { "a": "\0\0\0\0\0\0\0\0\0" }
+    BSONObjBuilder b;
+    b.append("a"_sd, str);
+    BSONObj obj{b.obj()};
+
+    ASSERT_EQ(str.size(), obj.getStringField("a").size());
+    ASSERT_EQ(str, obj.getStringField("a"));
+}
+
 }  // unnamed namespace

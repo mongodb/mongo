@@ -238,7 +238,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
 }
 
 void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
-    ns = obj["ns"].valuestrsafe();
+    ns = obj.getStringField("ns").toString();
 
     if (obj["options"].isABSONObj()) {
         options = uassertStatusOK(

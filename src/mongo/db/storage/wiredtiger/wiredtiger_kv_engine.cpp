@@ -1567,7 +1567,7 @@ Status WiredTigerKVEngine::createSortedDataInterface(OperationContext* opCtx,
     if (auto storageEngineOptions = collOptions.indexOptionDefaults.getStorageEngine()) {
         collIndexOptions =
             dps::extractElementAtPath(*storageEngineOptions, _canonicalName + ".configString")
-                .valuestrsafe();
+                .str();
     }
     // Some unittests use a OperationContextNoop that can't support such lookups.
     auto ns = collOptions.uuid

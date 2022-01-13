@@ -167,7 +167,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
     if (modeElem.eoo()) {
         return {ErrorCodes::IllegalOperation, "When setting a failpoint, you must supply a 'mode'"};
     } else if (modeElem.type() == String) {
-        const std::string modeStr(modeElem.valuestr());
+        const std::string modeStr(modeElem.str());
         if (modeStr == "off") {
             mode = FailPoint::off;
         } else if (modeStr == "alwaysOn") {

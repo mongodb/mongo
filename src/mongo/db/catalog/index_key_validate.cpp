@@ -224,11 +224,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 
         // "$**" is acceptable for a text index or wildcard index.
         if ((keyElement.fieldNameStringData() == "$**") &&
-            ((keyElement.isNumber()) || (keyElement.valuestrsafe() == IndexNames::TEXT)))
+            ((keyElement.isNumber()) || (keyElement.str() == IndexNames::TEXT)))
             continue;
 
-        if ((keyElement.fieldNameStringData() == "_fts") &&
-            keyElement.valuestrsafe() != IndexNames::TEXT) {
+        if ((keyElement.fieldNameStringData() == "_fts") && keyElement.str() != IndexNames::TEXT) {
             return Status(code, "Index key contains an illegal field name: '_fts'");
         }
 

@@ -89,7 +89,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       const IndexStateInfo& stateInfo,
                                       IndexBuildPhaseEnum phase) {
 
-    _indexName = _spec.getStringField("name");
+    _indexName = _spec.getStringField("name").toString();
     auto descriptor = collection->getIndexCatalog()->findIndexByName(
         opCtx, _indexName, true /* includeUnfinishedIndexes */);
 

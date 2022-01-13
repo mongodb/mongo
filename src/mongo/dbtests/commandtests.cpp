@@ -135,7 +135,7 @@ struct Type0 : Base {
 
         BSONObj result;
         ASSERT(db.runCommand("test", BSON("filemd5" << 0), result));
-        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result["md5"].valuestr());
+        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result.getStringField("md5"));
     }
 };
 struct Type2 : Base {
@@ -159,7 +159,7 @@ struct Type2 : Base {
 
         BSONObj result;
         ASSERT(db.runCommand("test", BSON("filemd5" << 0), result));
-        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result["md5"].valuestr());
+        ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result.getStringField("md5"));
     }
 };
 }  // namespace FileMD5

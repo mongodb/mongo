@@ -276,7 +276,8 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
         std::vector<std::string> indexNames;
         std::vector<BSONObj> indexSpecs;
         for (const auto& indexSpec : groupedIndexSpec.second) {
-            std::string indexName = indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName);
+            std::string indexName =
+                indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
             indexNames.push_back(indexName);
             indexSpecs.push_back(indexSpec.getOwned());
         }

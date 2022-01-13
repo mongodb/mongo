@@ -77,7 +77,7 @@ Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
         }
         numNodes = static_cast<decltype(numNodes)>(cNumNodes);
     } else if (commitQuorumElement.type() == String) {
-        mode = commitQuorumElement.valuestrsafe();
+        mode = commitQuorumElement.str();
         if (mode.empty()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "commitQuorum can't be an empty string");

@@ -401,7 +401,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             "cannot pass an empty argument to ProgramRunner",
             !args.isEmpty());
 
-    string program(args.firstElement().valuestrsafe());
+    string program(args.firstElement().str());
     uassert(ErrorCodes::FailedToParse,
             "invalid program name passed to ProgramRunner",
             !program.empty());
@@ -455,7 +455,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
             uassert(ErrorCodes::FailedToParse,
                     "Program arguments must be strings",
                     e.type() == mongo::String);
-            str = e.valuestr();
+            str = e.str();
         }
         if (isMongo) {
             if (str == "--port") {
@@ -476,7 +476,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env, bool isMon
                 "Environment variable values must be strings",
                 e.type() == mongo::String);
 
-        _envp.emplace(std::string(e.fieldName()), std::string(e.valuestr()));
+        _envp.emplace(std::string(e.fieldName()), e.str());
     }
 
 // Import this process' environment into _envp, for all keys that have not already been set.
@@ -935,7 +935,7 @@ BSONObj RunNonMongoProgram(const BSONObj& a, void* data) {
 
 BSONObj ResetDbpath(const BSONObj& a, void* data) {
     uassert(ErrorCodes::FailedToParse, "Expected 1 field", a.nFields() == 1);
-    string path = a.firstElement().valuestrsafe();
+    string path = a.firstElement().str();
     if (path.empty()) {
         LOGV2_WARNING(22824, "ResetDbpath(): nothing to do, path was empty");
         return undefinedReturn;
@@ -980,7 +980,7 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
 
 BSONObj PathExists(const BSONObj& a, void* data) {
     uassert(ErrorCodes::FailedToParse, "Expected 1 field", a.nFields() == 1);
-    string path = a.firstElement().valuestrsafe();
+    string path = a.firstElement().str();
     if (path.empty()) {
         LOGV2_WARNING(22825, "PathExists(): path was empty");
         return BSON(string("") << false);

@@ -728,7 +728,7 @@ TEST(FromJsonTest, Utf8Test) {
     using namespace std::literals::string_literals;
     const std::string u = "\xea\x80\x80\xea\x80\x80"s;
     BSONObj built = B().append("a", u).obj();
-    ASSERT_EQUALS(built.firstElement().valuestr(), u);
+    ASSERT_EQUALS(built.firstElement().str(), u);
 
     checkEquivalenceEach({
         // EscapedUnicodeToUtf8

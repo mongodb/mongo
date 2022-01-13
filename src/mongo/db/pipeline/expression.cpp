@@ -246,7 +246,7 @@ intrusive_ptr<Expression> Expression::parseOperand(ExpressionContext* const expC
                                                    const VariablesParseState& vps) {
     BSONType type = exprElement.type();
 
-    if (type == String && exprElement.valuestr()[0] == '$') {
+    if (type == String && exprElement.valueStringData()[0] == '$') {
         /* if we got here, this is a field path expression */
         return ExpressionFieldPath::parse(expCtx, exprElement.str(), vps);
     } else if (type == Object) {

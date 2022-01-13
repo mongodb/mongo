@@ -412,7 +412,7 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
         switch (oplogEntry.getCommandType()) {
             case OplogEntry::CommandType::kRenameCollection: {
                 // Add both the 'from' and 'to' namespaces.
-                namespaces.insert(NamespaceString(firstElem.valuestrsafe()));
+                namespaces.insert(NamespaceString(firstElem.valueStringDataSafe()));
                 namespaces.insert(NamespaceString(obj.getStringField("to")));
                 break;
             }

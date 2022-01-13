@@ -77,7 +77,7 @@ BSONObj listFiles(const BSONObj& _args, void* data) {
 
     BSONArrayBuilder lst;
 
-    string rootname = args.firstElement().valuestrsafe();
+    string rootname = args.firstElement().str();
     boost::filesystem::path root(rootname);
     stringstream ss;
     ss << "listFiles: no such directory: " << rootname;
@@ -178,16 +178,16 @@ BSONObj cat(const BSONObj& args, void* data) {
             mode |= std::ios::binary;
     }
 
-    ifstream f(filePath.valuestrsafe(), mode);
-    uassert(CANT_OPEN_FILE, "couldn't open file {}"_format(filePath.valuestrsafe()), f.is_open());
+    ifstream f(filePath.valueStringDataSafe().rawData(), mode);
+    uassert(CANT_OPEN_FILE, "couldn't open file {}"_format(filePath.str()), f.is_open());
     std::streamsize fileSize = 0;
     // will throw on filesystem error
-    fileSize = boost::filesystem::file_size(filePath.valuestrsafe());
+    fileSize = boost::filesystem::file_size(filePath.str());
     static constexpr auto kFileSizeLimit = 1024 * 1024 * 16;
     uassert(
         13301,
         "cat() : file {} too big to load as a variable (file is {} bytes, limit is {} bytes.)"_format(
-            filePath.valuestrsafe(), fileSize, kFileSizeLimit),
+            filePath.str(), fileSize, kFileSizeLimit),
         fileSize < kFileSizeLimit);
 
     std::ostringstream ss;
@@ -252,8 +252,8 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
 BSONObj md5sumFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
     stringstream ss;
-    FILE* f = fopen(e.valuestrsafe(), "rb");
-    uassert(CANT_OPEN_FILE, str::stream() << "couldn't open file " << e.valuestrsafe(), f);
+    FILE* f = fopen(e.valueStringDataSafe().rawData(), "rb");
+    uassert(CANT_OPEN_FILE, str::stream() << "couldn't open file " << e.str(), f);
     ON_BLOCK_EXIT([&] { fclose(f); });
 
     md5digest d;
@@ -315,7 +315,7 @@ BSONObj removeFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
     bool found = false;
 
-    boost::filesystem::path root(e.valuestrsafe());
+    boost::filesystem::path root(e.str());
     if (boost::filesystem::exists(root)) {
         found = true;
         boost::filesystem::remove_all(root);

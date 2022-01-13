@@ -893,7 +893,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                                        const CollectionPtr& collection,
                                                        const BSONObj& spec,
                                                        const bool includeUnfinishedIndexes) const {
-    const char* name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+    StringData name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
     invariant(name[0]);
 
     const BSONObj key = spec.getObjectField(IndexDescriptor::kKeyPatternFieldName);

@@ -267,7 +267,8 @@ bool RegexMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetai
             // String values stored in documents can contain embedded NUL bytes. We construct a
             // pcrecpp::StringPiece instance using the full length of the string to avoid truncating
             // 'data' early.
-            pcrecpp::StringPiece data(e.valuestr(), e.valuestrsize() - 1);
+            auto stringData = e.valueStringData();
+            pcrecpp::StringPiece data{stringData.rawData(), static_cast<int>(stringData.size())};
             return _re->PartialMatch(data);
         }
         case RegEx:

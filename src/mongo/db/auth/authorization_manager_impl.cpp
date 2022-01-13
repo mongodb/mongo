@@ -138,7 +138,7 @@ public:
 
     Status set(const BSONElement& newValueElement) {
         if (newValueElement.type() == String) {
-            return setFromString(newValueElement.valuestrsafe());
+            return setFromString(newValueElement.str());
         } else if (newValueElement.type() == Array) {
             auto array = static_cast<BSONArray>(newValueElement.embeddedObject());
             std::vector<UserName> out;
@@ -244,7 +244,7 @@ bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj&
         return true;
     } else if (cmdName == "renameCollection") {
         const NamespaceString fromNamespace(cmdObj.firstElement().valueStringDataSafe());
-        const NamespaceString toNamespace(cmdObj["to"].valueStringDataSafe());
+        const NamespaceString toNamespace(cmdObj.getStringField("to"));
 
         if (fromNamespace.isAdminDB() || toNamespace.isAdminDB()) {
             return isAuthzCollection(fromNamespace.coll()) || isAuthzCollection(toNamespace.coll());

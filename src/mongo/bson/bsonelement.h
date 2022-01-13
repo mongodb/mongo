@@ -62,7 +62,8 @@ typedef BSONElement be;
 typedef BSONObj bo;
 typedef BSONObjBuilder bob;
 
-/** BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
+/**
+    BSONElement represents an "element" in a BSONObj.  So for the object { a : 3, b : "abc" },
     'a : 3' is the first element (key+value).
 
     The BSONElement object points into the BSONObj's data.  Thus the BSONObj must stay in scope
@@ -105,11 +106,12 @@ public:
                                const StringData::ComparatorInterface* comparator);
 
 
-    /** These functions, which start with a capital letter, throw if the
-        element is not of the required type. Example:
-
-        std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
-    */
+    /**
+     * These functions, which start with a capital letter, throw if the
+     * element is not of the required type. Example:
+     *
+     * std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
+     */
     std::string String() const {
         return chk(mongo::String).str();
     }
@@ -146,17 +148,19 @@ public:
         return chk(jstOID).__oid();
     }
 
-    /** @return the embedded object associated with this field.
-        Note the returned object is a reference to within the parent bson object. If that
-        object is out of scope, this pointer will no longer be valid. Call getOwned() on the
-        returned BSONObj if you need your own copy.
-        throws AssertionException if the element is not of type object.
-    */
+    /**
+     * @return the embedded object associated with this field.
+     * Note the returned object is a reference to within the parent bson object. If that
+     * object is out of scope, this pointer will no longer be valid. Call getOwned() on the
+     * returned BSONObj if you need your own copy.
+     * throws AssertionException if the element is not of type object.
+     */
     BSONObj Obj() const;
 
-    /** populate v with the value of the element.  If type does not match, throw exception.
-        useful in templates -- see also BSONObj::Vals().
-    */
+    /**
+     * populate v with the value of the element.  If type does not match, throw exception.
+     * useful in templates -- see also BSONObj::Vals().
+     */
     void Val(Date_t& v) const {
         v = Date();
     }
@@ -183,9 +187,10 @@ public:
         v = String();
     }
 
-    /** Use ok() to check if a value is assigned:
-        if( myObj["foo"].ok() ) ...
-    */
+    /**
+     * Use ok() to check if a value is assigned:
+     * if( myObj["foo"].ok() ) ...
+     */
     bool ok() const {
         return !eoo();
     }
@@ -249,25 +254,31 @@ public:
         return toString();
     }
 
-    /** Returns the type of the element */
+    /**
+     * Returns the type of the element
+     */
     BSONType type() const {
         const signed char typeByte = ConstDataView(data).read<signed char>();
         return static_cast<BSONType>(typeByte);
     }
 
-    /** retrieve a field within this element
-        throws exception if *this is not an embedded object
-    */
+    /**
+     * retrieve a field within this element
+     * throws exception if *this is not an embedded object
+     */
     BSONElement operator[](StringData field) const;
 
-    /** See canonicalizeBSONType in bsontypes.h */
+    /**
+     * See canonicalizeBSONType in bsontypes.h
+     */
     int canonicalType() const {
         return canonicalizeBSONType(type());
     }
 
-    /** Indicates if it is the end-of-object element, which is present at the end of
-        every BSON object.
-    */
+    /**
+     * Indicates if it is the end-of-object element, which is present at the end of
+     * every BSON object.
+     */
     bool eoo() const {
         return type() == EOO;
     }
@@ -279,16 +290,21 @@ public:
         return totalSize;
     }
 
-    /** Wrap this element up as a singleton object. */
+    /**
+     * Wrap this element up as a singleton object.
+     */
     BSONObj wrap() const;
 
-    /** Wrap this element up as a singleton object with a new name. */
+    /**
+     * Wrap this element up as a singleton object with a new name.
+     */
     BSONObj wrap(StringData newName) const;
 
-    /** field name of the element.  e.g., for
-        name : "Joe"
-        "name" is the fieldname
-    */
+    /**
+     * field name of the element.  e.g., for
+     * name : "Joe"
+     * "name" is the fieldname
+     */
     const char* fieldName() const {
         if (eoo())
             return "";  // no fieldname for it.
@@ -306,11 +322,15 @@ public:
         return StringData(fieldName(), eoo() ? 0 : fieldNameSize() - 1);
     }
 
-    /** raw data of the element's value (so be careful). */
+    /**
+     * raw data of the element's value (so be careful).
+     */
     const char* value() const {
         return (data + fieldNameSize() + 1);
     }
-    /** size in bytes of the element's value (when applicable). */
+    /**
+     * size in bytes of the element's value (when applicable).
+     */
     int valuesize() const {
         return size() - fieldNameSize() - 1;
     }
@@ -319,9 +339,11 @@ public:
         return type() == mongo::Bool;
     }
 
-    /** @return value of a boolean element.
-        You must assure element is a boolean before
-        calling. */
+    /**
+     * @return value of a boolean element.
+     * You must assure element is a boolean before
+     * calling.
+     */
     bool boolean() const {
         return *value() ? true : false;
     }
@@ -330,40 +352,52 @@ public:
         return isBoolean() && boolean();
     }
 
-    /** Retrieve a java style date value from the element.
-        Ensure element is of type Date before calling.
-        @see Bool(), trueValue()
-    */
+    /**
+     * Retrieve a java style date value from the element.
+     * Ensure element is of type Date before calling.
+     * @see Bool(), trueValue()
+     */
     Date_t date() const {
         return Date_t::fromMillisSinceEpoch(ConstDataView(value()).read<LittleEndian<long long>>());
     }
 
-    /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
-        (i.e., treats zero and null and eoo as false).
-    */
+    /**
+     * Convert the value to boolean, regardless of its type, in a javascript-like fashion
+     * (i.e., treats zero and null and eoo as false).
+     */
     bool trueValue() const;
 
-    /** True if element is of a numeric type. */
+    /**
+     * True if element is of a numeric type.
+     */
     bool isNumber() const;
 
-    /** Return double value for this field. MUST be NumberDouble type. */
+    /**
+     * Return double value for this field. MUST be NumberDouble type.
+     */
     double _numberDouble() const {
         return ConstDataView(value()).read<LittleEndian<double>>();
     }
 
-    /** Return int value for this field. MUST be NumberInt type. */
+    /**
+     * Return int value for this field. MUST be NumberInt type.
+     */
     int _numberInt() const {
         return ConstDataView(value()).read<LittleEndian<int>>();
     }
 
-    /** Return decimal128 value for this field. MUST be NumberDecimal type. */
+    /**
+     * Return decimal128 value for this field. MUST be NumberDecimal type.
+     */
     Decimal128 _numberDecimal() const {
         uint64_t low = ConstDataView(value()).read<LittleEndian<long long>>();
         uint64_t high = ConstDataView(value() + sizeof(long long)).read<LittleEndian<long long>>();
         return Decimal128(Decimal128::Value({low, high}));
     }
 
-    /** Return long long value for this field. MUST be NumberLong type. */
+    /**
+     * Return long long value for this field. MUST be NumberLong type.
+     */
     long long _numberLong() const {
         return ConstDataView(value()).read<LittleEndian<long long>>();
     }
@@ -378,11 +412,13 @@ public:
      */
     int numberInt() const;
 
-    /** Like numberInt() but with well-defined behavior for doubles that
-     *  are NaNs, or too large/small to be represented as int.
-     *  NaNs -> 0
-     *  very large doubles -> INT_MAX
-     *  very small doubles -> INT_MIN  */
+    /**
+     * Like numberInt() but with well-defined behavior for doubles that
+     * are NaNs, or too large/small to be represented as int.
+     * NaNs -> 0
+     * very large doubles -> INT_MAX
+     * very small doubles -> INT_MIN
+     */
     int safeNumberInt() const;
 
     /**
@@ -395,19 +431,23 @@ public:
      */
     long long numberLong() const;
 
-    /** Like numberLong() but with well-defined behavior for doubles that
-     *  are NaNs, or too large/small to be represented as long longs.
-     *  NaNs -> 0
-     *  very large doubles -> LLONG_MAX
-     *  very small doubles -> LLONG_MIN  */
+    /**
+     * Like numberLong() but with well-defined behavior for doubles that
+     * are NaNs, or too large/small to be represented as long longs.
+     * NaNs -> 0
+     * very large doubles -> LLONG_MAX
+     * very small doubles -> LLONG_MIN
+     */
     long long safeNumberLong() const;
 
-    /** This safeNumberLongForHash() function does the same thing as safeNumberLong, but it
-     *  preserves edge-case behavior from older versions.
+    /**
+     * This safeNumberLongForHash() function does the same thing as safeNumberLong, but it
+     * preserves edge-case behavior from older versions.
      */
     long long safeNumberLongForHash() const;
 
-    /** Convert a numeric field to long long, and uassert the conversion is exact.
+    /**
+     * Convert a numeric field to long long, and uassert the conversion is exact.
      */
     long long exactNumberLong() const;
 
@@ -452,67 +492,75 @@ public:
      */
     StatusWith<int> parseIntegerElementToInt() const;
 
-    /** Retrieve decimal value for the element safely. */
+    /**
+     * Retrieve decimal value for the element safely.
+     */
     Decimal128 numberDecimal() const;
 
-    /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
-        Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
-    */
+    /**
+     * Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
+     * Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
+     */
     double numberDouble() const;
-    /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
-        Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
-    */
+    /**
+     * Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
+     * Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
+     */
     double number() const {
         return numberDouble();
     }
 
-    /** Like numberDouble() but with well-defined behavior for doubles that
-     *  are NaNs, or too large/small to be represented as doubles.
-     *  NaNs -> 0
-     *  very large decimals -> DOUBLE_MAX
-     *  very small decimals -> DOUBLE_MIN  */
+    /**
+     * Like numberDouble() but with well-defined behavior for doubles that
+     * are NaNs, or too large/small to be represented as doubles.
+     * NaNs -> 0
+     * very large decimals -> DOUBLE_MAX
+     * very small decimals -> DOUBLE_MIN
+     */
     double safeNumberDouble() const;
 
-    /** Retrieve the object ID stored in the object.
-        You must ensure the element is of type jstOID first. */
+    /**
+     * Retrieve the object ID stored in the object.
+     * You must ensure the element is of type jstOID first.
+     */
     mongo::OID __oid() const {
         return OID::from(value());
     }
 
-    /** True if element is null. */
+    /**
+     * True if element is null.
+     */
     bool isNull() const {
         return type() == jstNULL;
     }
 
-    /** Size of a BSON String element.
-        Requires that type() == mongo::String.
-        @return String size including its null-termination.
-    */
+    /**
+     * Size of a BSON String element.
+     * Requires that type() == mongo::String.
+     * @return String size including its null-termination.
+     */
     int valuestrsize() const {
         return ConstDataView(value()).read<LittleEndian<int>>();
     }
 
-    // for objects the size *includes* the size of the size field
+    /**
+     * for objects the size *includes* the size of the size field
+     */
     size_t objsize() const {
         return ConstDataView(value()).read<LittleEndian<uint32_t>>();
     }
 
-    /** Get a string's value.  Also gives you start of the real data for an embedded object.
-        You must assure data is of an appropriate type first -- see also valuestrsafe().
-    */
-    const char* valuestr() const {
-        return value() + 4;
-    }
-
-    /** Like valuestr, but returns a valid empty string if `type() != mongo::String`. */
-    const char* valuestrsafe() const {
-        return type() == mongo::String ? valuestr() : "";
-    }
-    /** Like valuestrsafe, but returns StringData. */
+    /**
+     * Get a string's value. Returns a valid empty string if
+     * `type() != mongo::String`.
+     */
     StringData valueStringDataSafe() const {
         return type() == mongo::String ? StringData(valuestr(), valuestrsize() - 1) : StringData();
     }
-    /** Like valuestrsafe, but returns std::string. */
+
+    /**
+     * Like valueStringDataSafe, but returns std::string.
+     */
     std::string str() const {
         return valueStringDataSafe().toString();
     }
@@ -525,41 +573,54 @@ public:
         return StringData(valuestr(), valuestrsize() - 1);
     }
 
-    /** Get javascript code of a CodeWScope data element. */
+    /**
+     * Get javascript code of a CodeWScope data element.
+     */
     const char* codeWScopeCode() const {
         massert(16177, "not codeWScope", type() == CodeWScope);
         return value() + 4 + 4;  // two ints precede code (see BSON spec)
     }
 
-    /** Get length of the code part of the CodeWScope object
-     *  This INCLUDES the null char at the end */
+    /**
+     * Get length of the code part of the CodeWScope object
+     * This INCLUDES the null char at the end
+     */
     int codeWScopeCodeLen() const {
         massert(16178, "not codeWScope", type() == CodeWScope);
         return ConstDataView(value() + 4).read<LittleEndian<int>>();
     }
 
-    /* Get the scope SavedContext of a CodeWScope data element.
+    /**
+     * Get the scope SavedContext of a CodeWScope data element.
      */
     const char* codeWScopeScopeData() const {
         return codeWScopeCode() + codeWScopeCodeLen();
     }
 
-    /** Get the embedded object this element holds. */
+    /**
+     * Get the embedded object this element holds.
+     */
     BSONObj embeddedObject() const;
 
-    /* uasserts if not an object */
+    /**
+     * uasserts if not an object
+     */
     BSONObj embeddedObjectUserCheck() const;
 
     BSONObj codeWScopeObject() const;
 
-    /** Get raw binary data.  Element must be of type BinData. Doesn't handle type 2 specially */
+    /**
+     * Get raw binary data.  Element must be of type BinData. Doesn't handle type 2 specially
+     */
     const char* binData(int& len) const {
         // BinData: <int len> <byte subtype> <byte[len] data>
         verify(type() == BinData);
         len = valuestrsize();
         return value() + 5;
     }
-    /** Get binary data.  Element must be of type BinData. Handles type 2 */
+    /**
+     * Get binary data.  Element must be of type BinData. Handles type 2
+     */
     const char* binDataClean(int& len) const {
         // BinData: <int len> <byte subtype> <byte[len] data>
         if (binDataType() != ByteArrayDeprecated) {
@@ -586,13 +647,17 @@ public:
         return {first, last};
     }
 
-    /** Retrieve the regex std::string for a Regex element */
+    /**
+     * Retrieve the regex std::string for a Regex element
+     */
     const char* regex() const {
         verify(type() == RegEx);
         return value();
     }
 
-    /** Retrieve the regex flags (options) for a Regex element */
+    /**
+     * Retrieve the regex flags (options) for a Regex element
+     */
     const char* regexFlags() const {
         const char* p = regex();
         return p + strlen(p) + 1;
@@ -663,10 +728,14 @@ public:
         return data;
     }
 
-    /** Constructs an empty element */
+    /**
+     * Constructs an empty element
+     */
     BSONElement();
 
-    /** True if this element may contain subobjects. */
+    /**
+     * True if this element may contain subobjects.
+     */
     bool mayEncapsulate() const {
         switch (type()) {
             case Object:
@@ -678,7 +747,9 @@ public:
         }
     }
 
-    /** True if this element can be a BSONObj */
+    /**
+     * True if this element can be a BSONObj
+     */
     bool isABSONObj() const {
         switch (type()) {
             case Object:
@@ -751,7 +822,6 @@ public:
         return mongo::OID::from(start);
     }
 
-    // @param maxLen don't scan more than maxLen bytes
     explicit BSONElement(const char* d) : data(d) {
         // While we should skip the type, and add 1 for the terminating null byte, just include
         // the type byte in the strlen call: the extra byte cancels out. As an extra bonus, this
@@ -761,14 +831,12 @@ public:
         totalSize = computeSize(type, d, fieldNameSize_);
     }
 
-    struct CachedSizeTag {};  // Opts in to next constructor.
-
     /**
      * Construct a BSONElement where you already know the length of the name and/or the total size
      * of the element. fieldNameSize includes the null terminator. You may pass -1 for either or
      * both sizes to indicate that they are unknown and should be computed.
      */
-    BSONElement(const char* d, int fieldNameSize, int totalSize, CachedSizeTag) : data(d) {
+    BSONElement(const char* d, int fieldNameSize, int totalSize) : data(d) {
         if (eoo()) {
             fieldNameSize_ = 0;
             this->totalSize = 1;
@@ -832,6 +900,18 @@ public:
     static const long long kSmallestSafeLongLongAsDouble;
 
 private:
+    /**
+     * Get a string's value. Also gives you start of the real data for an embedded object.
+     * You must assure data is of an appropriate type first, like the type check in
+     * valueStringDataSafe(). You should use the string's size when performing any operations
+     * on the data to disambiguate between potential embedded null's and the terminating null.
+     * This function is only used in limited forms internally. Not to be exposed publicly.
+     * If a char* is desired use valueStringDataSafe().rawData().
+     */
+    const char* valuestr() const {
+        return value() + 4;
+    }
+
     template <typename Generator>
     BSONObj _jsonStringGenerator(const Generator& g,
                                  bool includeSeparator,
@@ -885,7 +965,9 @@ inline bool BSONElement::trueValue() const {
     }
 }
 
-/** @return true if element is of a numeric type. */
+/**
+ * @return true if element is of a numeric type.
+ */
 inline bool BSONElement::isNumber() const {
     switch (type()) {
         case NumberLong:
@@ -1003,11 +1085,13 @@ inline long long BSONElement::numberLong() const {
     }
 }
 
-/** Like numberLong() but with well-defined behavior for doubles and decimals that
- *  are NaNs, or too large/small to be represented as long longs.
- *  NaNs -> 0
- *  very large values -> LLONG_MAX
- *  very small values -> LLONG_MIN  */
+/**
+ * Like numberLong() but with well-defined behavior for doubles and decimals that
+ * are NaNs, or too large/small to be represented as long longs.
+ * NaNs -> 0
+ * very large values -> LLONG_MAX
+ * very small values -> LLONG_MIN
+ */
 inline long long BSONElement::safeNumberLong() const {
     switch (type()) {
         case NumberDouble: {

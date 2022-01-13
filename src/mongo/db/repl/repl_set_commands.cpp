@@ -643,7 +643,7 @@ public:
         uassertStatusOK(status);
 
         HostAndPort targetHostAndPort;
-        status = targetHostAndPort.initialize(cmdObj["replSetSyncFrom"].valuestrsafe());
+        status = targetHostAndPort.initialize(cmdObj.getStringField("replSetSyncFrom"));
         uassertStatusOK(status);
 
         uassertStatusOK(ReplicationCoordinator::get(opCtx)->processReplSetSyncFrom(

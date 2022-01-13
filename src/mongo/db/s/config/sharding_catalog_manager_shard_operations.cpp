@@ -327,7 +327,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     auto resIsMaster = std::move(swCommandResponse.getValue().response);
 
     // Fail if the node being added is a mongos.
-    const std::string msg = resIsMaster.getStringField("msg");
+    const std::string msg = resIsMaster.getStringField("msg").toString();
     if (msg == "isdbgrid") {
         return {ErrorCodes::IllegalOperation, "cannot add a mongos as a shard"};
     }

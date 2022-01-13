@@ -87,7 +87,7 @@ TEST(FTSIndexFormat, ExtraBack1) {
     auto key = KeyString::toBson(*keys.begin(), Ordering::make(BSONObj()));
     ASSERT_EQUALS(3, key.nFields());
     BSONObjIterator i(key);
-    ASSERT_EQUALS(StringData("cat"), i.next().valuestr());
+    ASSERT_EQUALS(StringData("cat"), i.next().valueStringDataSafe());
     ASSERT(i.next().numberDouble() > 0);
     ASSERT_EQUALS(5, i.next().numberInt());
 }
@@ -111,7 +111,7 @@ TEST(FTSIndexFormat, ExtraFront1) {
     ASSERT_EQUALS(3, key.nFields());
     BSONObjIterator i(key);
     ASSERT_EQUALS(5, i.next().numberInt());
-    ASSERT_EQUALS(StringData("cat"), i.next().valuestr());
+    ASSERT_EQUALS(StringData("cat"), i.next().valueStringDataSafe());
     ASSERT(i.next().numberDouble() > 0);
 }
 

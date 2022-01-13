@@ -481,8 +481,7 @@ struct ElementRep {
     BSONElement toSerializedElement(const BSONObj& holder) const {
         return BSONElement(holder.objdata() + offset,  //
                            _fieldNameSize,
-                           _totalSize,
-                           BSONElement::CachedSizeTag());
+                           _totalSize);
     }
 
 private:

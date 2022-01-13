@@ -40,12 +40,12 @@ static BSONObj native_hex_md5(const BSONObj& args, void* data) {
     uassert(10261,
             "hex_md5 takes a single string argument -- hex_md5(string)",
             args.nFields() == 1 && args.firstElement().type() == String);
-    const char* s = args.firstElement().valuestrsafe();
+    StringData sd = args.firstElement().valueStringDataSafe();
 
     md5digest d;
     md5_state_t st;
     md5_init(&st);
-    md5_append(&st, (const md5_byte_t*)s, strlen(s));
+    md5_append(&st, reinterpret_cast<const md5_byte_t*>(sd.rawData()), sd.size());
     md5_finish(&st, d);
 
     return BSON("" << digestToString(d));

@@ -486,7 +486,7 @@ private:
             _jsonTest = fromjson(json.str());
         }
 
-        _testName = _jsonTest.getStringField("description");
+        _testName = _jsonTest.getStringField("description").toString();
         _testUri = uassertStatusOK(mongo::MongoURI::parse(_jsonTest["uri"].String()));
 
         _replicaSetName = _testUri.getOption("replicaSet");

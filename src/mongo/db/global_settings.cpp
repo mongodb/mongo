@@ -86,7 +86,7 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e) {
             if (sub.type() != mongo::String) {
                 return {ErrorCodes::BadValue, "Expected array of strings"};
             }
-            allowlistedClusterNetwork->push_back(sub.valuestr());
+            allowlistedClusterNetwork->push_back(sub.str());
         }
     } else {
         return {ErrorCodes::BadValue, "Expected array or null"};

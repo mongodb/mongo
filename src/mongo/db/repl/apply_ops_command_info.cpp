@@ -47,7 +47,7 @@ namespace {
  */
 bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
     for (const auto& elem : applyOpCmd.firstElement().Obj()) {
-        const char* opType = elem.Obj().getField("op").valuestrsafe();
+        const char* opType = elem.Obj().getStringField("op").rawData();
 
         // All atomic ops have an opType of length 1.
         if (opType[0] == '\0' || opType[1] != '\0')

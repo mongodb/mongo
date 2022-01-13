@@ -1523,7 +1523,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_EQ(expectedParticipants.size(), participantElements.size());
 
         for (const auto& element : participantElements) {
-            auto shardId = element["shardId"].valuestr();
+            auto shardId = element["shardId"].str();
             ASSERT_EQ(1ull, expectedParticipants.count(shardId));
             expectedParticipants.erase(shardId);
         }
@@ -1575,7 +1575,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
         ASSERT_EQ(expectedParticipants.size(), participantElements.size());
 
         for (const auto& element : participantElements) {
-            auto shardId = element["shardId"].valuestr();
+            auto shardId = element["shardId"].str();
             ASSERT_EQ(1ull, expectedParticipants.count(shardId));
             expectedParticipants.erase(shardId);
         }
@@ -1741,7 +1741,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             ASSERT_EQ(expectedParticipants.size(), participantElements.size());
 
             for (const auto& element : participantElements) {
-                auto shardId = element["shardId"].valuestr();
+                auto shardId = element["shardId"].str();
                 ASSERT_EQ(1ull, expectedParticipants.count(shardId));
                 expectedParticipants.erase(shardId);
             }
@@ -1803,7 +1803,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
             ASSERT_EQ(expectedParticipants.size(), participantElements.size());
 
             for (const auto& element : participantElements) {
-                auto shardId = element["shardId"].valuestr();
+                auto shardId = element["shardId"].str();
                 ASSERT_EQ(1ull, expectedParticipants.count(shardId));
                 expectedParticipants.erase(shardId);
             }

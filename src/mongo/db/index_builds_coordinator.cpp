@@ -496,7 +496,7 @@ std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
     const std::vector<BSONObj>& specs) {
     std::vector<std::string> indexNames;
     for (const auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
         invariant(!name.empty(),
                   str::stream() << "Bad spec passed into ReplIndexBuildState constructor, missing '"
                                 << IndexDescriptor::kIndexNameFieldName << "' field: " << spec);
@@ -533,7 +533,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
         if (name.empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
@@ -661,7 +661,8 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     auto durableCatalog = DurableCatalog::get(opCtx);
 
     for (auto spec : specs) {
-        std::string indexName = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+        std::string indexName =
+            spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
         if (indexName.empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
@@ -859,7 +860,8 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
 
             const bool includeUnfinished = false;
             for (const auto& spec : oplogEntry.indexSpecs) {
-                std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
+                std::string name =
+                    spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Index spec is missing the 'name' field " << spec,
                         !name.empty());
