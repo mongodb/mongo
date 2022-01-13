@@ -52,6 +52,7 @@
 #include "mongo/transport/session_asio.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
@@ -327,8 +328,13 @@ TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
     connected.get();
 }
 
+/**
+ * Test that the server appropriately handles a client-side socket disconnection, and that the
+ * client sends an RST packet when the socket is forcibly closed.
+ */
 TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
     TestFixture tf;
+    unittest::Barrier barrier(2);
 
     AtomicWord<int> sessionsCreated{0};
     tf.sep().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
@@ -347,8 +353,12 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
             auto err = make_error_code(std::errc{errno});
             LOGV2_ERROR(6109517, "setsockopt", "error"_attr = err.message());
         }
+        barrier.countDownAndWait();
     });
     fp.waitForTimesEntered(timesEntered + 1);
+    // Test case thread does not close socket until client thread has set options to ensure that an
+    // RST packet will be set on close.
+    barrier.countDownAndWait();
 
     LOGV2(6109516, "closing");
     connectThread.close();
