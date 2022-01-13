@@ -449,7 +449,6 @@ std::vector<T> variadicArgsToVector(U&&... elems) {
     (vector.push_back(std::forward<U>(elems)), ...);
     return vector;
 }
-
 }  // namespace future_util_details
 
 /**
@@ -865,7 +864,5 @@ template <typename T, typename... Args>
 auto makeState(Args&&... args) {
     return AsyncState<T>::make(std::forward<Args>(args)...);
 }
-
 }  // namespace future_util
-
 }  // namespace mongo

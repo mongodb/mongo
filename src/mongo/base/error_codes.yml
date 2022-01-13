@@ -462,6 +462,8 @@ error_codes:
     - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
 
     - {code: 361, name: CollectionUUIDMismatch, extra: CollectionUUIDMismatchInfo}
+    
+    - {code: 362, name: FutureAlreadyRetrieved}
 
     # Error codes 4000-8999 are reserved.
 
