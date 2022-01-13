@@ -162,7 +162,6 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
         for (const auto& doc : *docsForUniqueIndex) {
             // The OpObserver records CRUD events in transactions that are about to be committed.
             // We should not assume that inserts/updates can be conflated with deletes.
-            // TODO(SERVER-61913): Investigate recording delete operations.
             getKeysForIndex(opCtx, collection, accessMethod, doc, &keys);
         }
 
