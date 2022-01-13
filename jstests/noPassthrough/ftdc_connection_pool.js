@@ -2,9 +2,7 @@
  * The FTDC connection pool stats from mongos are a different structure than the connPoolStats
  * command, verify its contents.
  *
- * @tags: [
- *   requires_sharding,
- * ]
+ * @tags: [requires_sharding, requires_fcv_53]
  */
 load('jstests/libs/ftdc.js');
 
@@ -26,6 +24,7 @@ assert(stats.hasOwnProperty('totalInUse'));
 assert(stats.hasOwnProperty('totalAvailable'));
 assert(stats.hasOwnProperty('totalCreated'));
 assert(stats.hasOwnProperty('totalRefreshing'));
+assert(stats.hasOwnProperty('totalRefreshed'));
 assert("hello" in stats["replicaSetMonitor"]);
 const helloStats = stats["replicaSetMonitor"]["hello"];
 assert(helloStats.hasOwnProperty('currentlyActive'));
