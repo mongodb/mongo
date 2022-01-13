@@ -2426,10 +2426,10 @@ Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) con
 
     /* if we've hit the end of the path, stop */
     if (index == _fieldPath.getPathLength() - 1)
-        return input[_fieldPath.getFieldName(index)];
+        return input[_fieldPath.getFieldNameHashed(index)];
 
     // Try to dive deeper
-    const Value val = input[_fieldPath.getFieldName(index)];
+    const Value val = input[_fieldPath.getFieldNameHashed(index)];
     switch (val.getType()) {
         case Object:
             return evaluatePath(index + 1, val.getDocument());

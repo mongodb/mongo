@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/exec/bucket_unpacker.h"
 
 #include "mongo/bson/util/bsoncolumn.h"
-#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
@@ -163,12 +162,12 @@ bool BucketUnpackerV1::getNext(MutableDocument& measurement,
                                bool includeMetaField) {
     auto&& timeElem = _timeFieldIter.next();
     if (includeTimeField) {
-        measurement.addField(spec.timeField, Value{timeElem});
+        measurement.addField(spec.timeFieldHashed(), Value{timeElem});
     }
 
     // Includes metaField when we're instructed to do so and metaField value exists.
     if (includeMetaField && !metaValue.missing()) {
-        measurement.addField(*spec.metaField, metaValue);
+        measurement.addField(*spec.metaFieldHashed(), metaValue);
     }
 
     auto& currentIdx = timeElem.fieldNameStringData();
@@ -195,7 +194,7 @@ void BucketUnpackerV1::extractSingleMeasurement(MutableDocument& measurement,
     auto&& dataRegion = bucket.getField(timeseries::kBucketDataFieldName).Obj();
 
     if (includeMetaField && !metaValue.missing()) {
-        measurement.addField(*spec.metaField, metaValue);
+        measurement.addField(*spec.metaFieldHashed(), metaValue);
     }
 
     for (auto&& dataElem : dataRegion) {
@@ -283,13 +282,13 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
     // Get element and increment iterator
     const auto& timeElem = *_timeColumn.it;
     if (includeTimeField) {
-        measurement.addField(spec.timeField, Value{timeElem});
+        measurement.addField(spec.timeFieldHashed(), Value{timeElem});
     }
     ++_timeColumn.it;
 
     // Includes metaField when we're instructed to do so and metaField value exists.
     if (includeMetaField && !metaValue.missing()) {
-        measurement.addField(*spec.metaField, metaValue);
+        measurement.addField(*spec.metaFieldHashed(), metaValue);
     }
 
     for (auto& fieldColumn : _fieldColumns) {
@@ -299,7 +298,7 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
         const BSONElement& elem = *fieldColumn.it;
         // EOO represents missing field
         if (!elem.eoo()) {
-            measurement.addField(fieldColumn.column.name(), Value{elem});
+            measurement.addField(HashedFieldName{fieldColumn.column.nameHashed()}, Value{elem});
         }
         ++fieldColumn.it;
     }
@@ -319,18 +318,18 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
         auto val = _timeColumn.column[j];
         uassert(
             6067500, "Bucket unexpectedly contained fewer values than count", val && !val->eoo());
-        measurement.addField(_timeColumn.column.name(), Value{*val});
+        measurement.addField(spec.timeFieldHashed(), Value{*val});
     }
 
     if (includeMetaField && !metaValue.missing()) {
-        measurement.addField(*spec.metaField, metaValue);
+        measurement.addField(*spec.metaFieldHashed(), metaValue);
     }
 
     if (includeTimeField) {
         for (auto& fieldColumn : _fieldColumns) {
             auto val = fieldColumn.column[j];
             uassert(6067600, "Bucket unexpectedly contained fewer values than count", val);
-            measurement.addField(fieldColumn.column.name(), Value{*val});
+            measurement.addField(HashedFieldName{fieldColumn.column.nameHashed()}, Value{*val});
         }
     }
 }
@@ -360,6 +359,88 @@ void eraseExcludedComputedMetaProjFields(BucketUnpacker::Behavior unpackerBehavi
 }
 
 }  // namespace
+
+BucketSpec::BucketSpec(const std::string& timeField,
+                       const boost::optional<std::string>& metaField,
+                       const std::set<std::string>& fields,
+                       const std::vector<std::string>& computedProjections)
+    : fieldSet(fields),
+      computedMetaProjFields(computedProjections),
+      _timeField(timeField),
+      _timeFieldHashed(FieldNameHasher().hashedFieldName(_timeField)),
+      _metaField(metaField) {
+    if (_metaField) {
+        _metaFieldHashed = FieldNameHasher().hashedFieldName(*_metaField);
+    }
+}
+
+BucketSpec::BucketSpec(const BucketSpec& other)
+    : fieldSet(other.fieldSet),
+      computedMetaProjFields(other.computedMetaProjFields),
+      _timeField(other._timeField),
+      _timeFieldHashed(HashedFieldName{_timeField, other._timeFieldHashed->hash()}),
+      _metaField(other._metaField) {
+    if (_metaField) {
+        _metaFieldHashed = HashedFieldName{*_metaField, other._metaFieldHashed->hash()};
+    }
+}
+
+BucketSpec::BucketSpec(BucketSpec&& other)
+    : fieldSet(std::move(other.fieldSet)),
+      computedMetaProjFields(std::move(other.computedMetaProjFields)),
+      _timeField(std::move(other._timeField)),
+      _timeFieldHashed(HashedFieldName{_timeField, other._timeFieldHashed->hash()}),
+      _metaField(std::move(other._metaField)) {
+    if (_metaField) {
+        _metaFieldHashed = HashedFieldName{*_metaField, other._metaFieldHashed->hash()};
+    }
+}
+
+BucketSpec& BucketSpec::operator=(const BucketSpec& other) {
+    if (&other != this) {
+        fieldSet = other.fieldSet;
+        computedMetaProjFields = other.computedMetaProjFields;
+        _timeField = other._timeField;
+        _timeFieldHashed = HashedFieldName{_timeField, other._timeFieldHashed->hash()};
+        _metaField = other._metaField;
+        if (_metaField) {
+            _metaFieldHashed = HashedFieldName{*_metaField, other._metaFieldHashed->hash()};
+        }
+    }
+    return *this;
+}
+
+void BucketSpec::setTimeField(std::string&& name) {
+    _timeField = std::move(name);
+    _timeFieldHashed = FieldNameHasher().hashedFieldName(_timeField);
+}
+
+const std::string& BucketSpec::timeField() const {
+    return _timeField;
+}
+
+HashedFieldName BucketSpec::timeFieldHashed() const {
+    invariant(_timeFieldHashed->key().rawData() == _timeField.data());
+    invariant(_timeFieldHashed->key() == _timeField);
+    return *_timeFieldHashed;
+}
+
+void BucketSpec::setMetaField(boost::optional<std::string>&& name) {
+    _metaField = std::move(name);
+    if (_metaField) {
+        _metaFieldHashed = FieldNameHasher().hashedFieldName(*_metaField);
+    } else {
+        _metaFieldHashed = boost::none;
+    }
+}
+
+const boost::optional<std::string>& BucketSpec::metaField() const {
+    return _metaField;
+}
+
+boost::optional<HashedFieldName> BucketSpec::metaFieldHashed() const {
+    return _metaFieldHashed;
+}
 
 BucketUnpacker::BucketUnpacker() = default;
 BucketUnpacker::BucketUnpacker(BucketUnpacker&& other) = default;
@@ -437,13 +518,13 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
         return;
     }
 
-    auto&& timeFieldElem = dataRegion.getField(_spec.timeField);
+    auto&& timeFieldElem = dataRegion.getField(_spec.timeField());
     uassert(5346700,
             "The $_internalUnpackBucket stage requires the data region to have a timeField object",
             timeFieldElem);
 
     _metaValue = Value{_bucket[timeseries::kBucketMetaFieldName]};
-    if (_spec.metaField) {
+    if (_spec.metaField()) {
         // The spec indicates that there might be a metadata region. Missing metadata in
         // measurements is expressed with missing metadata in a bucket. But we disallow undefined
         // since the undefined BSON type is deprecated.
@@ -489,7 +570,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
     // include or exclude case.
     for (auto&& elem : dataRegion) {
         auto& colName = elem.fieldNameStringData();
-        if (colName == _spec.timeField) {
+        if (colName == _spec.timeField()) {
             // Skip adding a FieldIterator for the timeField since the timestamp value from
             // _timeFieldIter can be placed accordingly in the materialized measurement.
             continue;

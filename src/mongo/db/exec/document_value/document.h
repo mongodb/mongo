@@ -136,17 +136,16 @@ public:
      * Note that this method does *not* traverse nested documents and arrays, use getNestedField()
      * instead.
      */
-    const Value operator[](StringData key) const {
+    template <typename T>
+    const Value operator[](T key) const {
         return getField(key);
     }
-    const Value getField(StringData key) const {
+    template <typename T>
+    const Value getField(T key) const {
         return storage().getField(key);
     }
 
     /// Look up a field by Position. See positionOf and getNestedField.
-    const Value operator[](Position pos) const {
-        return getField(pos);
-    }
     const Value getField(Position pos) const {
         return storage().getField(pos).val;
     }
@@ -535,12 +534,18 @@ public:
      *        Decide what level of support is needed for duplicate fields.
      *        If duplicates are not allowed, consider removing this method.
      */
-    void addField(StringData fieldName, const Value& val) {
-        storage().appendField(fieldName, ValueElement::Kind::kInserted) = val;
+    void addField(StringData name, const Value& val) {
+        storage().appendField(name, ValueElement::Kind::kInserted) = val;
+    }
+    void addField(HashedFieldName field, const Value& val) {
+        storage().appendField(field, ValueElement::Kind::kInserted) = val;
     }
 
-    void addField(StringData fieldName, Value&& val) {
-        storage().appendField(fieldName, ValueElement::Kind::kInserted) = std::move(val);
+    void addField(StringData name, Value&& val) {
+        storage().appendField(name, ValueElement::Kind::kInserted) = std::move(val);
+    }
+    void addField(HashedFieldName field, Value&& val) {
+        storage().appendField(field, ValueElement::Kind::kInserted) = std::move(val);
     }
 
     /** Update field by key. If there is no field with that key, add one.

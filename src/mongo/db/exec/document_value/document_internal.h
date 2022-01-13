@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include <third_party/murmurhash3/MurmurHash3.h>
-
 #include <bitset>
 #include <boost/intrusive_ptr.hpp>
+#include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -275,6 +274,85 @@ private:
     const ValueElement* _end;
 };
 
+/**
+ * Type that bundles the hashed field name along with the actual string so that hashing can be done
+ * outside of inserts and lookups and re-used across calls.
+ */
+class HashedFieldName {
+public:
+    explicit HashedFieldName(StringData sd, std::size_t hash) : _sd(sd), _hash(hash) {}
+    explicit HashedFieldName(std::pair<StringData, std::size_t> pair)
+        : _sd(pair.first), _hash(pair.second) {}
+
+    StringData key() const {
+        return _sd;
+    }
+
+    std::size_t hash() const {
+        return _hash;
+    }
+
+    std::size_t size() const {
+        return _sd.size();
+    }
+
+    inline void copyTo(char* dest, bool includeEndingNull) const {
+        return _sd.copyTo(dest, includeEndingNull);
+    }
+
+    constexpr const char* rawData() const noexcept {
+        return _sd.rawData();
+    }
+
+private:
+    StringData _sd;
+    std::size_t _hash;
+};
+
+inline bool operator==(HashedFieldName lhs, StringData rhs) {
+    return lhs.key() == rhs;
+}
+
+inline bool operator==(StringData lhs, HashedFieldName rhs) {
+    return lhs == rhs.key();
+}
+
+inline bool operator==(HashedFieldName lhs, HashedFieldName rhs) {
+    return lhs.key() == rhs.key();
+}
+
+/**
+ * Hasher to support heterogeneous lookup for StringData and string-like elements.
+ */
+struct FieldNameHasher {
+    // This using directive activates heterogeneous lookup in the hash table
+    using is_transparent = void;
+
+    std::size_t operator()(StringData sd) const {
+        // TODO consider FNV-1a once we have a better benchmark corpus
+        // Keep in sync with 'hashName' in BSONColumn implementation.
+        unsigned out;
+        MurmurHash3_x86_32(sd.rawData(), sd.size(), 0, &out);
+        return out;
+    }
+
+    std::size_t operator()(const std::string& s) const {
+        return operator()(StringData(s));
+    }
+
+    std::size_t operator()(const char* s) const {
+        return operator()(StringData(s));
+    }
+
+    std::size_t operator()(HashedFieldName key) const {
+        return key.hash();
+    }
+
+    HashedFieldName hashedFieldName(StringData sd) {
+        return HashedFieldName(sd, operator()(sd));
+    }
+};
+
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
@@ -334,15 +412,24 @@ public:
     };
 
     /// Returns the position of the named field or Position()
-    Position findField(StringData name, LookupPolicy policy) const;
+    template <typename T>
+    Position findField(T field, LookupPolicy policy) const;
 
     // Document uses these
     const ValueElement& getField(Position pos) const {
         verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
+
     Value getField(StringData name) const {
         Position pos = findField(name, LookupPolicy::kCacheAndBSON);
+        if (!pos.found())
+            return Value();
+        return getField(pos).val;
+    }
+
+    Value getField(HashedFieldName field) const {
+        Position pos = findField(field, LookupPolicy::kCacheAndBSON);
         if (!pos.found())
             return Value();
         return getField(pos).val;
@@ -354,6 +441,7 @@ public:
         verify(pos.found());
         return *(_firstElement->plusBytes(pos.index));
     }
+
     Value& getField(StringData name, LookupPolicy policy) {
         _modified = true;
         Position pos = findField(name, policy);
@@ -383,7 +471,8 @@ public:
     }
 
     /// Adds a new field with missing Value at the end of the document
-    Value& appendField(StringData name, ValueElement::Kind kind);
+    template <typename T>
+    Value& appendField(T field, ValueElement::Kind kind);
 
     /** Preallocates space for fields. Use this to attempt to prevent buffer growth.
      *  This is only valid to call before anything is added to the document.
@@ -487,11 +576,9 @@ public:
         _metadataFields = std::move(metadata);
     }
 
-    static unsigned hashKey(StringData name) {
-        // TODO consider FNV-1a once we have a better benchmark corpus
-        unsigned out;
-        MurmurHash3_x86_32(name.rawData(), name.size(), 0, &out);
-        return out;
+    template <typename T>
+    static unsigned hashKey(T name) {
+        return FieldNameHasher()(name);
     }
 
     const ValueElement* begin() const {
@@ -519,13 +606,15 @@ public:
 
 private:
     /// Returns the position of the named field in the cache or Position()
-    Position findFieldInCache(StringData name) const;
+    template <typename T>
+    Position findFieldInCache(T name) const;
 
     /// Allocates space in _cache. Copies existing data if there is any.
     void alloc(unsigned newSize);
 
     /// Call after adding field to _cache and increasing _numFields
-    void addFieldToHashTable(Position pos);
+    template <typename T>
+    void addFieldToHashTable(T field, Position pos);
 
     // assumes _hashTabMask is (power of two) - 1
     unsigned hashTabBuckets() const {
@@ -545,15 +634,16 @@ private:
         memset(static_cast<void*>(_hashTab), -1, hashTabBytes());
     }
 
-    unsigned bucketForKey(StringData name) const {
-        return hashKey(name) & _hashTabMask;
+    template <typename T>
+    unsigned bucketForKey(T field) const {
+        return hashKey(field) & _hashTabMask;
     }
 
     /// Adds all fields to the hash table
     void rehash() {
         hashTabInit();
         for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance())
-            addFieldToHashTable(it.position());
+            addFieldToHashTable(getField(it.position()).nameSD(), it.position());
     }
 
     void loadLazyMetadata() const;

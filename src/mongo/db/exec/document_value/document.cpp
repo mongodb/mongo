@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/document_value/document.h"
 
 #include <boost/functional/hash.hpp>
@@ -164,7 +162,8 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
     return false;
 }
 
-Position DocumentStorage::findFieldInCache(StringData requested) const {
+template <typename T>
+Position DocumentStorage::findFieldInCache(T requested) const {
     int reqSize = requested.size();  // get size calculation out of the way if needed
 
     if (_numFields >= HASH_TAB_MIN) {  // hash lookup
@@ -192,14 +191,17 @@ Position DocumentStorage::findFieldInCache(StringData requested) const {
     // if we got here, there's no such field
     return Position();
 }
+template Position DocumentStorage::findFieldInCache<StringData>(StringData field) const;
+template Position DocumentStorage::findFieldInCache<HashedFieldName>(HashedFieldName field) const;
 
-Position DocumentStorage::findField(StringData requested, LookupPolicy policy) const {
-    if (auto pos = findFieldInCache(requested); pos.found() || policy == LookupPolicy::kCacheOnly) {
+template <typename T>
+Position DocumentStorage::findField(T field, LookupPolicy policy) const {
+    if (auto pos = findFieldInCache(field); pos.found() || policy == LookupPolicy::kCacheOnly) {
         return pos;
     }
 
     for (auto&& bsonElement : _bson) {
-        if (requested == bsonElement.fieldNameStringData()) {
+        if (field == bsonElement.fieldNameStringData()) {
             return const_cast<DocumentStorage*>(this)->constructInCache(bsonElement);
         }
     }
@@ -207,6 +209,10 @@ Position DocumentStorage::findField(StringData requested, LookupPolicy policy) c
     // if we got here, there's no such field
     return Position();
 }
+template Position DocumentStorage::findField<StringData>(StringData field,
+                                                         LookupPolicy policy) const;
+template Position DocumentStorage::findField<HashedFieldName>(HashedFieldName field,
+                                                              LookupPolicy policy) const;
 
 Position DocumentStorage::constructInCache(const BSONElement& elem) {
     auto savedModified = _modified;
@@ -222,9 +228,10 @@ Position DocumentStorage::constructInCache(const BSONElement& elem) {
     return pos;
 }
 
-Value& DocumentStorage::appendField(StringData name, ValueElement::Kind kind) {
+template <typename T>
+Value& DocumentStorage::appendField(T field, ValueElement::Kind kind) {
     Position pos = getNextPosition();
-    const int nameSize = name.size();
+    const int nameSize = field.size();
 
     // these are the same for everyone
     const Position nextCollision;
@@ -245,7 +252,7 @@ Value& DocumentStorage::appendField(StringData name, ValueElement::Kind kind) {
     append(nextCollision);
     append(nameSize);
     append(kind);
-    name.copyTo(dest, true);
+    field.copyTo(dest, true);
 // Padding for alignment handled above
 #undef append
 
@@ -255,7 +262,7 @@ Value& DocumentStorage::appendField(StringData name, ValueElement::Kind kind) {
     _numFields++;
 
     if (_numFields > HASH_TAB_MIN) {
-        addFieldToHashTable(pos);
+        addFieldToHashTable(field, pos);
     } else if (_numFields == HASH_TAB_MIN) {
         // adds all fields to hash table (including the one we just added)
         rehash();
@@ -263,13 +270,16 @@ Value& DocumentStorage::appendField(StringData name, ValueElement::Kind kind) {
 
     return getField(pos).val;
 }
+template Value& DocumentStorage::appendField<StringData>(StringData, ValueElement::Kind);
+template Value& DocumentStorage::appendField<HashedFieldName>(HashedFieldName, ValueElement::Kind);
 
 // Call after adding field to _fields and increasing _numFields
-void DocumentStorage::addFieldToHashTable(Position pos) {
+template <typename T>
+void DocumentStorage::addFieldToHashTable(T field, Position pos) {
     ValueElement& elem = getField(pos);
     elem.nextCollision = Position();
 
-    const unsigned bucket = bucketForKey(elem.nameSD());
+    const unsigned bucket = bucketForKey(field);
 
     Position* posPtr = &_hashTab[bucket];
     while (posPtr->found()) {
