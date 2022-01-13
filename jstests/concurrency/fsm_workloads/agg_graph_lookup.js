@@ -8,48 +8,68 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
  * Runs a $graphLookup aggregation simultaneously with updates.
  */
 var $config = (function() {
-    var data = {numDocs: 1000};
-    var isShardedAndShardedLookupDisabled = false;
+    const data = {numDocs: 1000};
+    const isShardedAndShardedLookupDisabled = false;
 
-    var states = (function() {
+    const states = (function() {
         function query(db, collName) {
             if (this.isShardedAndShardedLookupDisabled) {
                 return;
             }
 
-            var limitAmount = 20;
-            var startingId = Random.randInt(this.numDocs - limitAmount);
-            var res = db[collName]
-                          .aggregate([
-                              {$match: {_id: {$gt: startingId}}},
-                              {
-                                $graphLookup: {
-                                    from: collName,
-                                    startWith: "$to",
-                                    connectToField: "_id",
-                                    connectFromField: "to",
-                                    maxDepth: 10,
-                                    as: "out",
-                                }
-                              },
-                              {$limit: limitAmount}
-                          ])
-                          .toArray();
+            const limitAmount = 20;
+            const startingId = Random.randInt(this.numDocs - limitAmount);
 
-            assertWhenOwnColl.eq(res.length, limitAmount);
+            function getQueryResults() {
+                const cursor = db[collName]
+                      .aggregate([
+                          {$match: {_id: {$gt: startingId}}},
+                          {
+                              $graphLookup: {
+                                  from: collName,
+                                  startWith: "$to",
+                                  connectToField: "_id",
+                                  connectFromField: "to",
+                                  maxDepth: 10,
+                                  as: "out",
+                              }
+                          },
+                          {$limit: limitAmount}
+                      ]);
+
+                let arr = null;
+                try {
+                    arr = cursor.toArray();
+                } catch (e) {
+                    if (TestData.runningWithShardStepdowns) {
+                        // When running with stepdowns, we expect to sometimes see the query
+                        // killed.
+                        assert.eq(e.code, ErrorCodes.QueryPlanKilled);
+                    } else {
+                        throw e;
+                    }
+                }
+
+                return arr;
+            }
+
+            const res = getQueryResults();
+            if (res) {
+                assertWhenOwnColl.eq(res.length, limitAmount);
+            }
         }
 
         function update(db, collName) {
-            var index = Random.randInt(this.numDocs + 1);
-            var update = Random.randInt(this.numDocs + 1);
-            var res = db[collName].update({_id: index}, {$set: {to: update}});
+            const index = Random.randInt(this.numDocs + 1);
+            const update = Random.randInt(this.numDocs + 1);
+            const res = db[collName].update({_id: index}, {$set: {to: update}});
             assertWhenOwnColl.commandWorked(res);
         }
 
         return {query, update};
     })();
 
-    var transitions = {query: {query: 0.5, update: 0.5}, update: {query: 0.5, update: 0.5}};
+    const transitions = {query: {query: 0.5, update: 0.5}, update: {query: 0.5, update: 0.5}};
 
     function setup(db, collName, cluster) {
         // Do not run the rest of the tests if the foreign collection is implicitly sharded but the
@@ -67,11 +87,11 @@ var $config = (function() {
         }
 
         // Load example data.
-        var bulk = db[collName].initializeUnorderedBulkOp();
-        for (var i = 0; i < this.numDocs; ++i) {
+        const bulk = db[collName].initializeUnorderedBulkOp();
+        for (let i = 0; i < this.numDocs; ++i) {
             bulk.insert({_id: i, to: i + 1});
         }
-        var res = bulk.execute();
+        const res = bulk.execute();
         assertWhenOwnColl.commandWorked(res);
         assertWhenOwnColl.eq(this.numDocs, res.nInserted);
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
