@@ -107,6 +107,14 @@ bool Constant::operator==(const Constant& other) const {
     return sbe::value::bitcastTo<int32_t>(compareVal) == 0;
 }
 
+bool Constant::isString() const {
+    return sbe::value::isString(_tag);
+}
+
+StringData Constant::getString() const {
+    return getStringView(_tag, _val);
+}
+
 bool Constant::isValueInt64() const {
     return _tag == TypeTags::NumberInt64;
 }

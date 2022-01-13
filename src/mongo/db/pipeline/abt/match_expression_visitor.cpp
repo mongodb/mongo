@@ -293,7 +293,7 @@ public:
             lambdaProjName,
             make<FunctionCall>("typeMatch",
                                makeSeq(make<Variable>(lambdaProjName),
-                                       Constant::int64(expr->typeSet().getBSONTypeMask())))));
+                                       Constant::int32(expr->typeSet().getBSONTypeMask())))));
 
         if (!expr->path().empty()) {
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));

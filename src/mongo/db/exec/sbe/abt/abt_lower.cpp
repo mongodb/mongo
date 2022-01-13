@@ -211,14 +211,50 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     const FunctionCall& fn, std::vector<std::unique_ptr<sbe::EExpression>> args) {
     auto name = fn.name();
 
+    if (name == "fail") {
+        uassert(6250200, "Invalid number of arguments to fail()", fn.nodes().size() == 2);
+        const auto* codeConstPtr = fn.nodes().at(0).cast<Constant>();
+        const auto* messageConstPtr = fn.nodes().at(1).cast<Constant>();
+
+        uassert(6250201,
+                "First argument to fail() must be a 32-bit integer constant",
+                codeConstPtr != nullptr && codeConstPtr->isValueInt32());
+        uassert(6250202,
+                "Second argument to fail() must be a string constant",
+                messageConstPtr != nullptr && messageConstPtr->isString());
+
+        return sbe::makeE<sbe::EFail>(static_cast<ErrorCodes::Error>(codeConstPtr->getValueInt32()),
+                                      messageConstPtr->getString());
+    }
+
+    if (name == "convert") {
+        uassert(6250203, "Invalid number of arguments to convert()", fn.nodes().size() == 2);
+        const auto* constPtr = fn.nodes().at(1).cast<Constant>();
+
+        uassert(6250204,
+                "Second argument to convert() must be a 32-bit integer constant",
+                constPtr != nullptr && constPtr->isValueInt32());
+        int32_t constVal = constPtr->getValueInt32();
+
+        uassert(6250205,
+                "Second argument to convert() must be a numeric type tag",
+                constVal >= static_cast<int32_t>(std::numeric_limits<uint8_t>::min()) &&
+                    constVal <= static_cast<int32_t>(std::numeric_limits<uint8_t>::max()) &&
+                    sbe::value::isNumber(static_cast<sbe::value::TypeTags>(constVal)));
+
+        return sbe::makeE<sbe::ENumericConvert>(std::move(args.at(0)),
+                                                static_cast<sbe::value::TypeTags>(constVal));
+    }
+
     if (name == "typeMatch") {
-        uassert(6624209, "Invalid number of typeMatch arguments", fn.nodes().size() == 2);
-        if (const auto* constPtr = fn.nodes().at(1).cast<Constant>();
-            constPtr != nullptr && constPtr->isValueInt64()) {
-            return sbe::makeE<sbe::ETypeMatch>(std::move(args.at(0)), constPtr->getValueInt64());
-        } else {
-            uasserted(6624210, "Second argument of typeMatch must be an integer constant");
-        }
+        uassert(6250206, "Invalid number of arguments to typeMatch()", fn.nodes().size() == 2);
+        const auto* constPtr = fn.nodes().at(1).cast<Constant>();
+
+        uassert(6250207,
+                "Second argument to typeMatch() must be a 32-bit integer constant",
+                constPtr != nullptr && constPtr->isValueInt32());
+
+        return sbe::makeE<sbe::ETypeMatch>(std::move(args.at(0)), constPtr->getValueInt32());
     }
 
     // TODO - this is an open question how to do the name mappings.

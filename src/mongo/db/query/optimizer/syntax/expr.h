@@ -69,6 +69,9 @@ public:
         return std::pair{_tag, _val};
     }
 
+    bool isString() const;
+    StringData getString() const;
+
     bool isValueInt64() const;
     int64_t getValueInt64() const;
 

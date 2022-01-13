@@ -238,6 +238,105 @@ TEST_F(ABTSBE, Lower7) {
     ASSERT(result);
 }
 
+TEST_F(ABTSBE, LowerFunctionCallFail) {
+    std::string errorMessage = "Error: Bad value 123456789!";
+
+    auto tree =
+        make<FunctionCall>("fail",
+                           makeSeq(Constant::int32(static_cast<int32_t>(ErrorCodes::BadValue)),
+                                   Constant::str(errorMessage)));
+    auto env = VariableEnvironment::build(tree);
+    SlotVarMap map;
+
+    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    ASSERT(expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    Status status = Status::OK();
+
+    try {
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        sbe::value::releaseValue(resultTag, resultVal);
+    } catch (const DBException& e) {
+        status = e.toStatus();
+    }
+
+    ASSERT(!status.isOK());
+    ASSERT_EQ(status.code(), ErrorCodes::BadValue);
+    ASSERT_EQ(status.reason(), errorMessage);
+}
+
+TEST_F(ABTSBE, LowerFunctionCallConvert) {
+    sbe::value::OwnedValueAccessor inputAccessor;
+    auto slotId = bindAccessor(&inputAccessor);
+    SlotVarMap map;
+    map["inputVar"] = slotId;
+
+    auto tree = make<FunctionCall>(
+        "convert",
+        makeSeq(make<Variable>("inputVar"),
+                Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+    auto env = VariableEnvironment::build(tree);
+
+    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    ASSERT(expr);
+
+    auto compiledExpr = compileExpression(*expr);
+
+    {
+        inputAccessor.reset(sbe::value::TypeTags::NumberDouble,
+                            sbe::value::bitcastFrom<double>(42.0));
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        sbe::value::ValueGuard guard(resultTag, resultVal);
+        ASSERT_EQ(resultTag, sbe::value::TypeTags::NumberInt64);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), 42);
+    }
+
+    {
+        auto [tag, val] = sbe::value::makeCopyDecimal(Decimal128{-73});
+        inputAccessor.reset(tag, val);
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        sbe::value::ValueGuard guard(resultTag, resultVal);
+        ASSERT_EQ(resultTag, sbe::value::TypeTags::NumberInt64);
+        ASSERT_EQ(sbe::value::bitcastTo<int64_t>(resultVal), -73);
+    }
+}
+
+TEST_F(ABTSBE, LowerFunctionCallTypeMatch) {
+    sbe::value::OwnedValueAccessor inputAccessor;
+    auto slotId = bindAccessor(&inputAccessor);
+    SlotVarMap map;
+    map["inputVar"] = slotId;
+
+    auto tree = make<FunctionCall>(
+        "typeMatch",
+        makeSeq(make<Variable>("inputVar"),
+                Constant::int32(getBSONTypeMask(sbe::value::TypeTags::NumberInt32) |
+                                getBSONTypeMask(sbe::value::TypeTags::NumberInt64) |
+                                getBSONTypeMask(sbe::value::TypeTags::NumberDouble) |
+                                getBSONTypeMask(sbe::value::TypeTags::NumberDecimal))));
+    auto env = VariableEnvironment::build(tree);
+
+    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    ASSERT(expr);
+
+    auto compiledExpr = compileExpression(*expr);
+
+    {
+        inputAccessor.reset(sbe::value::TypeTags::NumberDouble,
+                            sbe::value::bitcastFrom<double>(123.0));
+        auto result = runCompiledExpressionPredicate(compiledExpr.get());
+        ASSERT(result);
+    }
+
+    {
+        auto [tag, val] = sbe::value::makeNewString("123");
+        inputAccessor.reset(tag, val);
+        auto result = runCompiledExpressionPredicate(compiledExpr.get());
+        ASSERT(!result);
+    }
+}
+
 TEST_F(NodeSBE, Lower1) {
     PrefixId prefixId;
     Metadata metadata{{}};
