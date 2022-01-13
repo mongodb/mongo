@@ -65,6 +65,7 @@ public:
 
     // TODO SERVER-53283 remove the following function after 5.0 became last LTS
     void waitForAllCoordinatorsToComplete(OperationContext* opCtx) const;
+    std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
