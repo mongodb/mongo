@@ -22,8 +22,9 @@ let st = new ShardingTest({
     ]
 });
 assert.commandWorked(st.s0.adminCommand({"ping": 1}));  // Ensure s0 is unaffected.
+
 try {
-    conn = new Mongo("127.0.0.1:" + st.s1.port);
+    new Mongo("127.0.0.1:" + st.s1.port);
     assert(false);
 } catch (e) {
     assert(
