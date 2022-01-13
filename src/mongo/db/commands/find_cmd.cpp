@@ -572,7 +572,8 @@ public:
                      opCtx->getWriteConcern(),
                      repl::ReadConcernArgs::get(opCtx),
                      _request.body,
-                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+                     {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+                     false /*isOpQueryExhaust*/});
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);

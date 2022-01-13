@@ -548,7 +548,8 @@ public:
                  repl::ReadConcernArgs::get(opCtx),
                  cmdObj,
                  uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                     ->checkAuthorizedToListCollections(dbName, cmdObj))});
+                                     ->checkAuthorizedToListCollections(dbName, cmdObj)),
+                 false /*isOpQueryExhaust*/});
 
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());

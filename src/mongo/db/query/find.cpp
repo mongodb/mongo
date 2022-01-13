@@ -760,7 +760,8 @@ bool runQuery(OperationContext* opCtx,
              opCtx->getWriteConcern(),
              readConcernArgs,
              upconvertedQuery,
-             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)}});
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+             opCtx->isExhaust()});
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOGV2_DEBUG(20916,

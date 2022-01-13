@@ -287,7 +287,8 @@ public:
                  opCtx->getWriteConcern(),
                  repl::ReadConcernArgs::get(opCtx),
                  cmd.toBSON({}),
-                 {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)}});
+                 {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)},
+                 false /*isOpQueryExhaust*/});
 
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());

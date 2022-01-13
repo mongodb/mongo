@@ -86,6 +86,8 @@ last-continuous:
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
     - ticket: SERVER-62245
       test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
+    - ticket: SERVER-62147
+      test_file: jstests/core/exhaust.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -328,6 +330,8 @@ last-lts:
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
     - ticket: SERVER-62245
       test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
+    - ticket: SERVER-62147
+      test_file: jstests/core/exhaust.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

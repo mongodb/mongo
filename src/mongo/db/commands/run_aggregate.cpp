@@ -873,7 +873,8 @@ Status runAggregate(OperationContext* opCtx,
             opCtx->getWriteConcern(),
             repl::ReadConcernArgs::get(opCtx),
             cmdObj,
-            privileges);
+            privileges,
+            false /*isOpQueryExhaust*/);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);
         } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {

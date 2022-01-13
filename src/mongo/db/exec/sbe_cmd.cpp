@@ -146,7 +146,8 @@ public:
              opCtx->getWriteConcern(),
              repl::ReadConcernArgs::get(opCtx),
              cmdObj,
-             {}});
+             {},
+             false /*isOpQueryExhaust*/});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), nss.ns(), firstBatch.arr(), &result);
