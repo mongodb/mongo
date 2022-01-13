@@ -42,7 +42,10 @@ namespace mongo::sdam {
 class ServerSelectorTestFixture : public SdamTestFixture {
 public:
     static inline const auto clockSource = SystemClockSource::get();
-    static inline const auto sdamConfiguration = SdamConfiguration({{HostAndPort("s0")}});
+
+    const SdamConfiguration sdamConfiguration;
+
+    ServerSelectorTestFixture() : sdamConfiguration(SdamConfiguration({{HostAndPort("s0")}})) {}
 
     static constexpr auto SET_NAME = "set";
     static constexpr int NUM_ITERATIONS = 1000;

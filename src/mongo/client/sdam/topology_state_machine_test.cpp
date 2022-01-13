@@ -47,21 +47,22 @@ protected:
     static inline const auto kNotUsedMs = Milliseconds(100);
     static inline const auto kFiveHundredMs = Milliseconds(500);
 
-    static inline const auto kTwoSeedConfig =
-        SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
-                          TopologyType::kUnknown,
-                          kFiveHundredMs);
-
-    static inline const auto kTwoSeedReplicaSetNoPrimaryConfig =
-        SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
-                          TopologyType::kReplicaSetNoPrimary,
-                          kFiveHundredMs,
-                          kNotUsedMs,
-                          kNotUsedMs,
-                          std::string("setName"));
-
-    static inline const auto kSingleConfig =
-        SdamConfiguration(std::vector<HostAndPort>{kLocalServer}, TopologyType::kSingle);
+    const SdamConfiguration kTwoSeedConfig;
+    const SdamConfiguration kTwoSeedReplicaSetNoPrimaryConfig;
+    const SdamConfiguration kSingleConfig;
+    TopologyStateMachineTestFixture()
+        : kTwoSeedConfig(SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
+                                           TopologyType::kUnknown,
+                                           kFiveHundredMs)),
+          kTwoSeedReplicaSetNoPrimaryConfig(
+              SdamConfiguration(std::vector<HostAndPort>{kLocalServer, kLocalServer2},
+                                TopologyType::kReplicaSetNoPrimary,
+                                kFiveHundredMs,
+                                kNotUsedMs,
+                                kNotUsedMs,
+                                std::string("setName"))),
+          kSingleConfig(
+              SdamConfiguration(std::vector<HostAndPort>{kLocalServer}, TopologyType::kSingle)) {}
 
     // Given we are in 'starting' state with initial config 'initialConfig'. We receive a
     // ServerDescription with type 'incoming', and expected the ending topology state to be

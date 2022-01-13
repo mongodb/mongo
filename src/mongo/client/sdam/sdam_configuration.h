@@ -30,7 +30,7 @@
 
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
-
+#include "mongo/db/server_options.h"
 namespace mongo::sdam {
 class SdamConfiguration {
 public:
@@ -60,7 +60,8 @@ public:
         TopologyType initialType = TopologyType::kUnknown,
         Milliseconds heartBeatFrequencyMs = Milliseconds(sdamHeartBeatFrequencyMs),
         Milliseconds connectTimeoutMs = Milliseconds(sdamConnectTimeoutMs),
-        Milliseconds localThreshholdMs = Milliseconds(sdamLocalThreshholdMs),
+        Milliseconds localThreshholdMs =
+            Milliseconds(serverGlobalParams.defaultLocalThresholdMillis),
         boost::optional<std::string> setName = boost::none);
 
     SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
@@ -70,7 +71,7 @@ public:
                             initialType,
                             Milliseconds(sdamHeartBeatFrequencyMs),
                             Milliseconds(sdamConnectTimeoutMs),
-                            Milliseconds(sdamLocalThreshholdMs),
+                            Milliseconds(serverGlobalParams.defaultLocalThresholdMillis),
                             setName) {}
 
     /**

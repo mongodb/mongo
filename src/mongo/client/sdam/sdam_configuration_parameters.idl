@@ -27,6 +27,8 @@
 
 global:
     cpp_namespace: mongo::sdam
+    cpp_includes:
+       - "mongo/db/server_options.h"
 
 server_parameters:
     heartBeatFrequencyMs:
@@ -40,8 +42,7 @@ server_parameters:
     localThresholdMs:
         description: Determines the width of the latency window used in server selection.
         set_at: startup
-        cpp_vartype: int
-        cpp_varname: sdamLocalThreshholdMs
+        cpp_varname: "mongo::serverGlobalParams.defaultLocalThresholdMillis"
         validator:
             gte: 0
         default: 15
@@ -53,3 +54,5 @@ server_parameters:
         validator:
             gte: 500
         default: 10000
+
+

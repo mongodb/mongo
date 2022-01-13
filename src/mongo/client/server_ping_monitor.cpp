@@ -46,6 +46,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(serverPingMonitorFailWithHostUnreachable);
+MONGO_FAIL_POINT_DEFINE(serverPingMonitorSetRTT);
 
 using executor::NetworkInterface;
 using executor::NetworkInterfaceThreadPool;
@@ -152,6 +153,7 @@ void SingleServerPingMonitor::_doServerPing() {
             }
             {
                 stdx::lock_guard lk(anchor->_mutex);
+                int rttValue;
                 if (anchor->_isDropped) {
                     return;
                 }
@@ -165,6 +167,16 @@ void SingleServerPingMonitor::_doServerPing() {
                         << "Failing the ping command to " << (anchor->_hostAndPort);
                     anchor->_rttListener->onServerPingFailedEvent(
                         anchor->_hostAndPort, {ErrorCodes::HostUnreachable, reason});
+                } else if (MONGO_unlikely(
+                               serverPingMonitorSetRTT.shouldFail([&](const BSONObj& data) {
+                                   if (data.hasField(anchor->_hostAndPort.toString())) {
+                                       rttValue = data.getIntField(anchor->_hostAndPort.toString());
+                                       return true;
+                                   }
+                                   return false;
+                               }))) {
+                    anchor->_rttListener->onServerPingSucceededEvent(Microseconds(rttValue),
+                                                                     anchor->_hostAndPort);
                 } else if (!result.response.isOK()) {
                     anchor->_rttListener->onServerPingFailedEvent(anchor->_hostAndPort,
                                                                   result.response.status);

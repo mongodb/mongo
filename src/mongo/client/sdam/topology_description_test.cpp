@@ -69,11 +69,14 @@ protected:
     static inline const std::vector<HostAndPort> kThreeServers{
         HostAndPort("foo:1234"), HostAndPort("bar:1234"), HostAndPort("baz:1234")};
 
-    static inline const auto kDefaultConfig = SdamConfiguration();
-    static inline const auto kSingleSeedConfig =
-        SdamConfiguration(kOneServer, TopologyType::kSingle);
-
     static inline const auto kNotUsedMs = Milliseconds{1000};
+
+    const SdamConfiguration kDefaultConfig;
+    const SdamConfiguration kSingleSeedConfig;
+
+    TopologyDescriptionTestFixture()
+        : kDefaultConfig(SdamConfiguration()),
+          kSingleSeedConfig(SdamConfiguration(kOneServer, TopologyType::kSingle)) {}
 };
 
 void TopologyDescriptionTestFixture::assertDefaultConfig(

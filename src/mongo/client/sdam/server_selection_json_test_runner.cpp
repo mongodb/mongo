@@ -379,12 +379,13 @@ private:
         if (serverAddresses.size() > 0)
             seedList = serverAddresses;
 
-        auto config = SdamConfiguration(seedList,
-                                        initType,
-                                        Milliseconds{sdamHeartBeatFrequencyMs},
-                                        Milliseconds{sdamConnectTimeoutMs},
-                                        Milliseconds{sdamLocalThreshholdMs},
-                                        setName);
+        auto config =
+            SdamConfiguration(seedList,
+                              initType,
+                              Milliseconds{sdamHeartBeatFrequencyMs},
+                              Milliseconds{sdamConnectTimeoutMs},
+                              Milliseconds{serverGlobalParams.defaultLocalThresholdMillis},
+                              setName);
         _topologyDescription = std::make_shared<TopologyDescription>(config);
 
         std::vector<BSONElement> bsonLatencyWindow;
