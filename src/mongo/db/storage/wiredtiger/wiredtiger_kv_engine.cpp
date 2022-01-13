@@ -2089,7 +2089,7 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool forc
     auto ts = stableTimestamp.asULL();
     if (force) {
         stableTSConfigString =
-            "force=true,oldest_timestamp={0:x},commit_timestamp={0:x},stable_timestamp={0:x}"_format(
+            "force=true,oldest_timestamp={0:x},durable_timestamp={0:x},stable_timestamp={0:x}"_format(
                 ts);
         stdx::lock_guard<Latch> lk(_highestDurableTimestampMutex);
         _highestSeenDurableTimestamp = ts;
@@ -2163,7 +2163,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
 
     if (force) {
         auto oldestTSConfigString =
-            "force=true,oldest_timestamp={0:x},commit_timestamp={0:x}"_format(
+            "force=true,oldest_timestamp={0:x},durable_timestamp={0:x}"_format(
                 newOldestTimestamp.asULL());
         invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString.c_str()));
         _oldestTimestamp.store(newOldestTimestamp.asULL());
@@ -2171,7 +2171,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
         _highestSeenDurableTimestamp = newOldestTimestamp.asULL();
         LOGV2_DEBUG(22342,
                     2,
-                    "oldest_timestamp and commit_timestamp force set to {newOldestTimestamp}",
+                    "oldest_timestamp and durable_timestamp force set to {newOldestTimestamp}",
                     "newOldestTimestamp"_attr = newOldestTimestamp);
     } else {
         auto oldestTSConfigString = "oldest_timestamp={:x}"_format(newOldestTimestamp.asULL());

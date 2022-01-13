@@ -1991,8 +1991,8 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
             _kvEngine->setOldestTimestamp(truncTs, force);
         } else {
             auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
-            auto commitTSConfigString = "commit_timestamp={:x}"_format(truncTs.asULL());
-            invariantWTOK(conn->set_timestamp(conn, commitTSConfigString.c_str()));
+            auto durableTSConfigString = "durable_timestamp={:x}"_format(truncTs.asULL());
+            invariantWTOK(conn->set_timestamp(conn, durableTSConfigString.c_str()));
         }
 
         _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);
