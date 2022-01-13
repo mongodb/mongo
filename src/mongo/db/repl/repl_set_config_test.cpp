@@ -1968,6 +1968,31 @@ TEST(ReplSetConfig, IsImplicitDefaultWriteConcernMajority) {
     ASSERT_OK(config.validate());
     ASSERT_FALSE(config.isImplicitDefaultWriteConcernMajority());
 }
+
+TEST(ReplSetConfig, MakeCustomWriteMode) {
+    auto config = ReplSetConfig::parse(BSON("_id"
+                                            << "rs0"
+                                            << "version" << 1 << "term" << 1.0 << "protocolVersion"
+                                            << 1 << "members"
+                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345"
+                                                                     << "tags"
+                                                                     << BSON("NYC"
+                                                                             << "NY")))));
+
+    auto swPattern = config.makeCustomWriteMode(BSON("NYC"
+                                                     << "invalid value type"));
+    ASSERT_FALSE(swPattern.isOK());
+    ASSERT_EQ(swPattern.getStatus().code(), ErrorCodes::BadValue);
+
+    swPattern = config.makeCustomWriteMode(BSON("NonExistentTag" << 1));
+    ASSERT_FALSE(swPattern.isOK());
+    ASSERT_EQ(swPattern.getStatus().code(), ErrorCodes::NoSuchKey);
+
+    swPattern = config.makeCustomWriteMode(BSON("NYC" << 1));
+    ASSERT_TRUE(swPattern.isOK());
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

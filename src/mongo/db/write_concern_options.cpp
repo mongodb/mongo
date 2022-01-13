@@ -126,6 +126,9 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) t
                                         << repl::ReplSetConfig::kMaxMembers << ", found: " << wNum);
             }
             writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(*wNum);
+        } else if (auto tags = stdx::get_if<BSONObj>(&wVal)) {
+            writeConcern.wNumNodes = 0;
+            writeConcern._tags = *tags;
         } else {
             auto wMode = stdx::get_if<std::string>(&wVal);
             invariant(wMode);
@@ -194,7 +197,9 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 BSONObj WriteConcernOptions::toBSON() const {
     BSONObjBuilder builder;
 
-    if (wMode.empty()) {
+    if (_tags) {
+        builder.append("w", *_tags);
+    } else if (wMode.empty()) {
         builder.append("w", wNumNodes);
     } else {
         builder.append("w", wMode);
@@ -216,12 +221,13 @@ BSONObj WriteConcernOptions::toBSON() const {
 }
 
 bool WriteConcernOptions::needToWaitForOtherNodes() const {
-    return !wMode.empty() || wNumNodes > 1;
+    return !wMode.empty() || wNumNodes > 1 || _tags;
 }
 
 bool WriteConcernOptions::operator==(const WriteConcernOptions& other) const {
-    return syncMode == other.syncMode && wMode == other.wMode && wNumNodes == other.wNumNodes &&
-        wDeadline == other.wDeadline && wTimeout == other.wTimeout &&
+    return (_tags ? other._tags && _tags->woCompare(*other._tags) == 0
+                  : wMode == other.wMode && wNumNodes == other.wNumNodes) &&
+        syncMode == other.syncMode && wDeadline == other.wDeadline && wTimeout == other.wTimeout &&
         _provenance == other._provenance;
 }
 

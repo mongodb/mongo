@@ -1900,6 +1900,11 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
 
     const bool useDurableOpTime = writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL;
     if (writeConcern.wMode.empty()) {
+        if (writeConcern.wTags()) {
+            auto tagPattern = uassertStatusOK(_rsConfig.makeCustomWriteMode(*writeConcern.wTags()));
+            return _topCoord->haveTaggedNodesReachedOpTime(opTime, tagPattern, useDurableOpTime);
+        }
+
         return _topCoord->haveNumNodesReachedOpTime(
             opTime, writeConcern.wNumNodes, useDurableOpTime);
     }

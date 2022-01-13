@@ -102,9 +102,10 @@ TEST(WriteConcernOptionsTest, ParseLeavesSyncModeAsUnsetIfFSyncIsFalse) {
     ASSERT_EQUALS(0, options.wTimeout);
 }
 
-TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNotNumberOrString) {
-    auto status = WriteConcernOptions::parse(BSON("w" << BSONObj())).getStatus();
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNotNumberOrStringOrObject) {
+    auto status = WriteConcernOptions::parse(BSON("w" << true)).getStatus();
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_EQUALS("w has to be a number, string, or object", status.reason());
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseIfWIsNegativeOrExceedsMaxMembers) {
@@ -187,6 +188,38 @@ TEST(WriteConcernOptionsTest, ParseIgnoresSpecialFields) {
     _testIgnoreWriteConcernField("wElectionId");
     _testIgnoreWriteConcernField("wOpTime");
     _testIgnoreWriteConcernField("getLastError");
+}
+
+TEST(WriteConcernOptionsTest, ParseWithTags) {
+    auto status = WriteConcernOptions::parse(BSON("w" << BSON("abc"
+                                                              << "def")))
+                      .getStatus();
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    ASSERT_EQUALS("tags must be a single level document with only number values", status.reason());
+
+    auto sw = WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1)));
+    ASSERT_OK(sw.getStatus());
+
+    WriteConcernOptions wc = sw.getValue();
+    ASSERT_EQ(wc.wNumNodes, 0);
+    ASSERT_TRUE(wc.wMode.empty());
+    ASSERT_EQ(wc.wTimeout, WriteConcernOptions::kNoTimeout);
+    ASSERT_TRUE(wc.needToWaitForOtherNodes());
+
+    auto tags = wc.wTags();
+    ASSERT(tags.has_value());
+    ASSERT_BSONOBJ_EQ(*tags, BSON("abc" << 1));
+    ASSERT_BSONOBJ_EQ(wc.toBSON(), BSON("w" << BSON("abc" << 1) << "wtimeout" << 0));
+
+    auto wc2 = uassertStatusOK(WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1))));
+    ASSERT(wc == wc2);
+    auto wc3 = uassertStatusOK(WriteConcernOptions::parse(BSON("w" << BSON("def" << 1))));
+    ASSERT(wc != wc3);
+    auto wc4 = uassertStatusOK(WriteConcernOptions::parse(BSON("w"
+                                                               << "majority")));
+    ASSERT(wc != wc4);
+    auto wc5 = uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 2)));
+    ASSERT(wc != wc5);
 }
 
 }  // namespace

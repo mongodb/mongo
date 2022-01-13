@@ -423,6 +423,15 @@ public:
     StatusWith<ReplSetTagPattern> findCustomWriteMode(StringData patternName) const;
 
     /**
+     * Returns a pattern constructed from a raw set of tags provided as the `w` value
+     * of a write concern.
+     *
+     * @returns `ErrorCodes::NoSuchKey` if a tag was provided which is not found in
+     * the local tag config.
+     */
+    StatusWith<ReplSetTagPattern> makeCustomWriteMode(const BSONObj& wTags) const;
+
+    /**
      * Returns the "tags configuration" for this replicaset.
      *
      * NOTE(schwerin): Not clear if this should be used other than for reporting/debugging.

@@ -170,8 +170,13 @@ public:
 
     CheckCondition checkCondition = CheckCondition::OpTime;
 
+    boost::optional<BSONObj> wTags() const {
+        return _tags;
+    }
+
 private:
     ReadWriteConcernProvenance _provenance;
+    boost::optional<BSONObj> _tags;
 };
 
 }  // namespace mongo

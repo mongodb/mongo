@@ -1374,6 +1374,56 @@ TEST_F(ReplCoordTest,
     awaiter.reset();
 }
 
+TEST_F(ReplCoordTest, SupportTaggedWriteConcern) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "node1:12345"
+                                                     << "tags"
+                                                     << BSON("donor"
+                                                             << "node"))
+                                          << BSON("_id" << 1 << "host"
+                                                        << "node2:12345"
+                                                        << "tags"
+                                                        << BSON("recipient"
+                                                                << "two"))
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node3:12345"
+                                                        << "tags"
+                                                        << BSON("recipient"
+                                                                << "three")))),
+                       HostAndPort("node1", 12345));
+
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    replCoordSetMyLastAppliedOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    replCoordSetMyLastDurableOpTime(OpTimeWithTermOne(100, 1), Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+
+    OpTimeWithTermOne time1(100, 1);
+    OpTimeWithTermOne time2(100, 2);
+
+    auto writeConcern =
+        uassertStatusOK(WriteConcernOptions::parse(BSON("w" << BSON("recipient" << 2))));
+
+    ReplicationAwaiter awaiter(getReplCoord(), getServiceContext());
+    awaiter.setOpTime(time2);
+    awaiter.setWriteConcern(writeConcern);
+    awaiter.start();
+
+    // start nodes in a lagged state
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time1));
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1));
+
+    // catch them up to time2
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time2));
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time2));
+
+    ReplicationCoordinator::StatusAndDuration sad = awaiter.getResult();
+    ASSERT_OK(sad.status);
+    awaiter.reset();
+}
+
 TEST_F(ReplCoordTest, NodeReturnsNotPrimaryWhenSteppingDownBeforeSatisfyingAWriteConcern) {
     // Test that a thread blocked in awaitReplication will be woken up and return PrimarySteppedDown
     // (a NotPrimaryError) if the node steps down while it is waiting.

@@ -242,12 +242,7 @@ types:
         deserializer: mongo::IDLAnyTypeOwned::parseFromBSON
 
     writeConcernW:
-        bson_serialization_type:
-                                 - string
-                                 - int
-                                 - decimal
-                                 - double
-                                 - long
+        bson_serialization_type: any
         description: >-
             A string or integer representing the 'w' option in a document specifying write concern.
             See https://docs.mongodb.com/manual/reference/write-concern/"

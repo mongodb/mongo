@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 
 #include <algorithm>
+#include <fmt/format.h>
 #include <functional>
 
 #include "mongo/bson/util/bson_check.h"
@@ -525,6 +526,29 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
                           << "' found in replica set configuration");
     }
     return StatusWith<ReplSetTagPattern>(iter->second);
+}
+
+StatusWith<ReplSetTagPattern> ReplSetConfig::makeCustomWriteMode(const BSONObj& wTags) const {
+    ReplSetTagPattern pattern = _tagConfig.makePattern();
+    for (auto e : wTags) {
+        const auto tagName = e.fieldNameStringData();
+        if (!e.isNumber()) {
+            return {
+                ErrorCodes::BadValue,
+                fmt::format(
+                    "Custom write mode only supports integer values, found: \"{}\" for tag: \"{}\"",
+                    e.toString(),
+                    tagName)};
+        }
+
+        const auto minNodesWithTag = e.safeNumberInt();
+        auto status = _tagConfig.addTagCountConstraintToPattern(&pattern, tagName, minNodesWithTag);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    return pattern;
 }
 
 void ReplSetConfig::_calculateMajorities() {
