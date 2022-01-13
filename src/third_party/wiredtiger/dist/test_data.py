@@ -88,21 +88,21 @@ enabled_config_false = [
         type='boolean'),
 ]
 
-stat_config = enabled_config_false
-
-limit_stat = stat_config + [
-    Config('limit', 0, r'''
-    The limit value a statistic is allowed to reach''', min=0)
-]
-
 range_config = [
     Config('min', 0, r'''
-        The minimum a value can be in a range''', min=0),
+        Lower limit''', min=0),
     Config('max', 1, r'''
-        The maximum a value can be in a range''')
+        Upper limit''')
 ]
 
-component_config =  throttle_config
+stat_config = range_config + [
+    Config('postrun', 'false', r'''
+        Whether the stat needs to be checked post run.''', type='boolean'),
+    Config('runtime', 'false', r'''
+        Whether the stat needs to be checked at runtime.''', type='boolean'),
+]
+
+component_config = throttle_config
 
 transaction_config = [
     Config('ops_per_transaction', '', r'''
@@ -129,16 +129,18 @@ checkpoint_manager = enabled_config_false + component_config
 # that need to be checked by the component.
 #
 runtime_monitor = enabled_config_true + component_config + [
-    Config('stat_cache_size', '', '''
-        The maximum cache percentage that can be hit while running.''',
-        type='category', subconfig=limit_stat),
-    Config('stat_db_size', '', '''
-        The maximum on-disk database size in bytes that can be hit while running.''',
-        type='category', subconfig=limit_stat),
-    Config('postrun_statistics', '[]', '''
-        A list of statistics to be checked after the workload has completed. Each element of the
-        list should be formatted as "stat_name:min_limit:max_limit".''',
-        type='list')
+    Config('cache_hs_insert', '', r'''
+        Number of history store table insert calls.''',
+        type='category', subconfig=stat_config),
+    Config('cc_pages_removed', '', r'''
+        Number of pages removed.''',
+        type='category', subconfig=stat_config),
+    Config('stat_cache_size', '', r'''
+        Cache size statistics.''',
+        type='category', subconfig=stat_config),
+    Config('stat_db_size', '', r'''
+        Size of the database.''',
+        type='category', subconfig=stat_config),
 ]
 
 #

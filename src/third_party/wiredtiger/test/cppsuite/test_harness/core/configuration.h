@@ -65,8 +65,6 @@ class configuration {
 
     ~configuration();
 
-    const std::string &get_config() const;
-
     /*
      * Wrapper functions for retrieving basic configuration values. Ideally tests can avoid using
      * the config item struct provided by wiredtiger.

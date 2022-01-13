@@ -35,6 +35,7 @@
 #include "util/logger.h"
 
 namespace test_harness {
+
 /* Static methods implementation. */
 static std::string
 collection_name_to_file_name(const std::string &collection_name)
@@ -49,6 +50,7 @@ collection_name_to_file_name(const std::string &collection_name)
 }
 
 /* Inline methods implementation. */
+
 /*
  * The WiredTiger configuration API doesn't accept string statistic names when retrieving statistic
  * values. This function provides the required mapping to statistic id. We should consider
@@ -58,35 +60,106 @@ collection_name_to_file_name(const std::string &collection_name)
 inline int
 get_stat_field(const std::string &name)
 {
-    if (name == "cache_hs_insert")
+    if (name == CACHE_HS_INSERT)
         return (WT_STAT_CONN_CACHE_HS_INSERT);
-    else if (name == "cc_pages_removed")
+    else if (name == CC_PAGES_REMOVED)
         return (WT_STAT_CONN_CC_PAGES_REMOVED);
     testutil_die(EINVAL, "get_stat_field: Stat \"%s\" is unrecognized", name.c_str());
 }
 
-/* runtime_statistic class implementation */
-runtime_statistic::runtime_statistic(configuration *config)
+/* statistics class implementation */
+statistics::statistics(configuration &config, const std::string &stat_name, int stat_field)
+    : field(stat_field), max(config.get_int(MAX)), min(config.get_int(MIN)), name(stat_name),
+      postrun(config.get_bool(POSTRUN_STATISTICS)), runtime(config.get_bool(RUNTIME_STATISTICS))
 {
-    _enabled = config->get_bool(ENABLED);
+}
+
+void
+statistics::check(scoped_cursor &cursor)
+{
+    int64_t stat_value;
+    runtime_monitor::get_stat(cursor, field, &stat_value);
+    if (stat_value < min || stat_value > max) {
+        const std::string error_string = "runtime_monitor: Postrun stat \"" + name +
+          "\" was outside of the specified limits. Min=" + std::to_string(min) +
+          " Max=" + std::to_string(max) + " Actual=" + std::to_string(stat_value);
+        testutil_die(-1, error_string.c_str());
+    } else
+        logger::log_msg(LOG_TRACE, name + " usage: " + std::to_string(stat_value));
+}
+
+std::string
+statistics::get_value_str(scoped_cursor &cursor)
+{
+    int64_t stat_value;
+    runtime_monitor::get_stat(cursor, field, &stat_value);
+    return std::to_string(stat_value);
+}
+
+int
+statistics::get_field() const
+{
+    return field;
+}
+
+int64_t
+statistics::get_max() const
+{
+    return max;
+}
+
+int64_t
+statistics::get_min() const
+{
+    return min;
+}
+
+const std::string &
+statistics::get_name() const
+{
+    return name;
 }
 
 bool
-runtime_statistic::enabled() const
+statistics::get_postrun()
 {
-    return (_enabled);
+    return postrun;
+}
+
+bool
+statistics::get_runtime()
+{
+    return runtime;
 }
 
 /* cache_limit_statistic class implementation */
-cache_limit_statistic::cache_limit_statistic(configuration *config) : runtime_statistic(config)
+cache_limit_statistic::cache_limit_statistic(configuration &config, const std::string &name)
+    : statistics(config, name, -1)
 {
-    _limit = config->get_int(LIMIT);
 }
 
 void
 cache_limit_statistic::check(scoped_cursor &cursor)
 {
-    testutil_assert(cursor.get() != nullptr);
+    double use_percent = get_cache_value(cursor);
+    if (use_percent > max) {
+        const std::string error_string =
+          "runtime_monitor: Cache usage exceeded during test! Limit: " + std::to_string(max) +
+          " usage: " + std::to_string(use_percent);
+        testutil_die(-1, error_string.c_str());
+    } else
+        logger::log_msg(LOG_TRACE, name + " usage: " + std::to_string(use_percent));
+}
+
+std::string
+cache_limit_statistic::get_value_str(scoped_cursor &cursor)
+{
+    return std::to_string(get_cache_value(cursor));
+}
+
+double
+cache_limit_statistic::get_cache_value(scoped_cursor &cursor)
+{
     int64_t cache_bytes_image, cache_bytes_other, cache_bytes_max;
     double use_percent;
     /* Three statistics are required to compute cache use percentage. */
@@ -97,21 +170,16 @@ cache_limit_statistic::check(scoped_cursor &cursor)
      * Assert that we never exceed our configured limit for cache usage. Add 0.0 to avoid floating
      * point conversion errors.
      */
+    testutil_assert(cache_bytes_max > 0);
     use_percent = ((cache_bytes_image + cache_bytes_other + 0.0) / cache_bytes_max) * 100;
-    if (use_percent > _limit) {
-        const std::string error_string =
-          "runtime_monitor: Cache usage exceeded during test! Limit: " + std::to_string(_limit) +
-          " usage: " + std::to_string(use_percent);
-        testutil_die(-1, error_string.c_str());
-    } else
-        logger::log_msg(LOG_TRACE, "Cache usage: " + std::to_string(use_percent));
+    return use_percent;
 }
 
 /* db_size_statistic class implementation */
-db_size_statistic::db_size_statistic(configuration *config, database &database)
-    : runtime_statistic(config), _database(database)
+db_size_statistic::db_size_statistic(
+  configuration &config, const std::string &name, database &database)
+    : statistics(config, name, -1), _database(database)
 {
-    _limit = config->get_int(LIMIT);
 #ifdef _WIN32
     Logger::log_msg("Database size checking is not implemented on Windows", LOG_ERROR);
 #endif
@@ -120,9 +188,32 @@ db_size_statistic::db_size_statistic(configuration *config, database &database)
 void
 db_size_statistic::check(scoped_cursor &)
 {
-    const auto file_names = get_file_names();
 #ifndef _WIN32
+    const auto file_names = get_file_names();
+    size_t db_size = get_db_size();
+    logger::log_msg(LOG_TRACE, "Current database size is " + std::to_string(db_size) + " bytes");
+
+    if (db_size > max) {
+        const std::string error_string =
+          "runtime_monitor: Database size limit exceeded during test! Limit: " +
+          std::to_string(max) + " db size: " + std::to_string(db_size);
+        testutil_die(-1, error_string.c_str());
+    }
+#endif
+}
+
+std::string
+db_size_statistic::get_value_str(scoped_cursor &)
+{
+    return std::to_string(get_db_size());
+}
+
+size_t
+db_size_statistic::get_db_size() const
+{
+    const auto file_names = get_file_names();
     size_t db_size = 0;
+
     for (const auto &name : file_names) {
         struct stat sb;
         if (stat(name.c_str(), &sb) == 0) {
@@ -132,22 +223,12 @@ db_size_statistic::check(scoped_cursor &)
             /* The only good reason for this to fail is if the file hasn't been created yet. */
             testutil_assert(errno == ENOENT);
     }
-    logger::log_msg(LOG_TRACE, "Current database size is " + std::to_string(db_size) + " bytes");
-    if (db_size > _limit) {
-        const std::string error_string =
-          "runtime_monitor: Database size limit exceeded during test! Limit: " +
-          std::to_string(_limit) + " db size: " + std::to_string(db_size);
-        testutil_die(-1, error_string.c_str());
-    }
-#else
-    static_cast<void>(file_names);
-    static_cast<void>(_database);
-    static_cast<void>(_limit);
-#endif
+
+    return db_size;
 }
 
-std::vector<std::string>
-db_size_statistic::get_file_names()
+const std::vector<std::string>
+db_size_statistic::get_file_names() const
 {
     std::vector<std::string> file_names;
     for (const auto &name : _database.get_collection_names())
@@ -158,71 +239,6 @@ db_size_statistic::get_file_names()
     file_names.push_back(std::string(DEFAULT_DIR) + "/" + WT_METAFILE);
 
     return (file_names);
-}
-
-/* postrun_statistic_check class implementation */
-postrun_statistic_check::postrun_statistic::postrun_statistic(
-  std::string &&name, const int64_t min_limit, const int64_t max_limit)
-    : name(std::move(name)), field(get_stat_field(this->name)), min_limit(min_limit),
-      max_limit(max_limit)
-{
-}
-
-postrun_statistic_check::postrun_statistic_check(configuration *config)
-{
-    const auto config_stats = config->get_list(POSTRUN_STATISTICS);
-    /*
-     * Each stat in the configuration is a colon separated list in the following format:
-     * <stat_name>:<min_limit>:<max_limit>
-     */
-    for (const auto &c : config_stats) {
-        auto stat = split_string(c, ':');
-        if (stat.size() != 3)
-            testutil_die(EINVAL,
-              "runtime_monitor: Each postrun statistic must follow the format of "
-              "\"stat_name:min_limit:max_limit\". Invalid format \"%s\" provided.",
-              c.c_str());
-        const int min_limit = std::stoi(stat.at(1)), max_limit = std::stoi(stat.at(2));
-        if (min_limit > max_limit)
-            testutil_die(EINVAL,
-              "runtime_monitor: The min limit of each postrun statistic must be less than or "
-              "equal to its max limit. Config=\"%s\" Min=%ld Max=%ld",
-              c.c_str(), min_limit, max_limit);
-        _stats.emplace_back(std::move(stat.at(0)), min_limit, max_limit);
-    }
-}
-
-void
-postrun_statistic_check::check(scoped_cursor &cursor) const
-{
-    bool success = true;
-    for (const auto &stat : _stats) {
-        if (!check_stat(cursor, stat))
-            success = false;
-    }
-    if (!success)
-        testutil_die(-1,
-          "runtime_monitor: One or more postrun statistics were outside of their specified "
-          "limits.");
-}
-
-bool
-postrun_statistic_check::check_stat(scoped_cursor &cursor, const postrun_statistic &stat) const
-{
-    int64_t stat_value;
-
-    testutil_assert(cursor.get() != nullptr);
-    runtime_monitor::get_stat(cursor, stat.field, &stat_value);
-    if (stat_value < stat.min_limit || stat_value > stat.max_limit) {
-        const std::string error_string = "runtime_monitor: Postrun stat \"" + stat.name +
-          "\" was outside of the specified limits. Min=" + std::to_string(stat.min_limit) +
-          " Max=" + std::to_string(stat.max_limit) + " Actual=" + std::to_string(stat_value);
-        logger::log_msg(LOG_ERROR, error_string);
-        return (false);
-    }
-    logger::log_msg(LOG_INFO,
-      "runtime_monitor: Final value of stat " + stat.name + " is: " + std::to_string(stat_value));
-    return (true);
 }
 
 /* runtime_monitor class implementation */
@@ -237,56 +253,89 @@ runtime_monitor::get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep
 }
 
 runtime_monitor::runtime_monitor(configuration *config, database &database)
-    : component("runtime_monitor", config), _postrun_stats(config), _database(database)
+    : component("runtime_monitor", config), _database(database)
 {
-}
-
-runtime_monitor::~runtime_monitor()
-{
-    for (auto &it : _stats)
-        delete it;
-    _stats.clear();
 }
 
 void
 runtime_monitor::load()
 {
-    configuration *sub_config;
-    std::string statistic_list;
-
     /* Load the general component things. */
     component::load();
 
+    /* If the component is enabled, load all the known statistics. */
     if (_enabled) {
-        _session = connection_manager::instance().create_session();
+
+        std::unique_ptr<configuration> stat_config(_config->get_subconfig(STAT_CACHE_SIZE));
+        _stats.push_back(std::unique_ptr<cache_limit_statistic>(
+          new cache_limit_statistic(*stat_config, STAT_CACHE_SIZE)));
+
+        stat_config.reset(_config->get_subconfig(STAT_DB_SIZE));
+        _stats.push_back(std::unique_ptr<db_size_statistic>(
+          new db_size_statistic(*stat_config, STAT_DB_SIZE, _database)));
+
+        stat_config.reset(_config->get_subconfig(CACHE_HS_INSERT));
+        _stats.push_back(std::unique_ptr<statistics>(
+          new statistics(*stat_config, CACHE_HS_INSERT, get_stat_field(CACHE_HS_INSERT))));
+
+        stat_config.reset(_config->get_subconfig(CC_PAGES_REMOVED));
+        _stats.push_back(std::unique_ptr<statistics>(
+          new statistics(*stat_config, CC_PAGES_REMOVED, get_stat_field(CC_PAGES_REMOVED))));
 
         /* Open our statistic cursor. */
+        _session = connection_manager::instance().create_session();
         _cursor = _session.open_scoped_cursor(STATISTICS_URI);
-
-        /* Load known runtime statistics. */
-        sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
-        _stats.push_back(new cache_limit_statistic(sub_config));
-        delete sub_config;
-
-        sub_config = _config->get_subconfig(STAT_DB_SIZE);
-        _stats.push_back(new db_size_statistic(sub_config, _database));
-        delete sub_config;
     }
 }
 
 void
 runtime_monitor::do_work()
 {
-    for (const auto &it : _stats) {
-        if (it->enabled())
-            it->check(_cursor);
+    /* Check runtime statistics. */
+    for (const auto &stat : _stats) {
+        if (stat->get_runtime())
+            stat->check(_cursor);
     }
 }
 
 void
 runtime_monitor::finish()
 {
-    _postrun_stats.check(_cursor);
     component::finish();
+
+    /* Check the post run statistics now. */
+    bool success = true;
+    int64_t stat_max, stat_min, stat_value;
+    std::string stat_name;
+
+    for (const auto &stat : _stats) {
+
+        if (!stat->get_postrun())
+            continue;
+
+        stat_max = stat->get_max();
+        stat_min = stat->get_min();
+        stat_name = stat->get_name();
+
+        stat_value = std::stoi(stat->get_value_str(_cursor));
+
+        if (stat_value < stat_min || stat_value > stat_max) {
+            const std::string error_string = "runtime_monitor: Postrun stat \"" + stat_name +
+              "\" was outside of the specified limits. Min=" + std::to_string(stat_min) +
+              " Max=" + std::to_string(stat_max) + " Actual=" + std::to_string(stat_value);
+            logger::log_msg(LOG_ERROR, error_string);
+            success = false;
+        }
+
+        logger::log_msg(LOG_INFO,
+          "runtime_monitor: Final value of stat " + stat_name +
+            " is: " + std::to_string(stat_value));
+    }
+
+    if (!success)
+        testutil_die(-1,
+          "runtime_monitor: One or more postrun statistics were outside of their specified "
+          "limits.");
 }
+
 } // namespace test_harness

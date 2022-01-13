@@ -45,67 +45,62 @@ class configuration;
 
 namespace test_harness {
 
-class runtime_statistic {
+class statistics {
     public:
-    explicit runtime_statistic(configuration *config);
-    virtual ~runtime_statistic() = default;
+    statistics() = default;
+    explicit statistics(configuration &config, const std::string &stat_name, int stat_field);
+    virtual ~statistics() = default;
 
-    /* Check that the given statistic is within bounds. */
-    virtual void check(scoped_cursor &cursor) = 0;
+    /* Check that the statistics are within bounds. */
+    virtual void check(scoped_cursor &cursor);
 
-    bool enabled() const;
+    /* Retrieve the value associated to the stat in a string format. */
+    virtual std::string get_value_str(scoped_cursor &cursor);
+
+    /* Getters. */
+    int get_field() const;
+    int64_t get_max() const;
+    int64_t get_min() const;
+    const std::string &get_name() const;
+    bool get_runtime();
+    bool get_postrun();
 
     protected:
-    bool _enabled = false;
+    int field;
+    int64_t max;
+    int64_t min;
+    std::string name;
+    bool postrun;
+    bool runtime;
 };
 
-class cache_limit_statistic : public runtime_statistic {
+class cache_limit_statistic : public statistics {
     public:
-    explicit cache_limit_statistic(configuration *config);
+    explicit cache_limit_statistic(configuration &config, const std::string &name);
     virtual ~cache_limit_statistic() = default;
 
     void check(scoped_cursor &cursor) override final;
+    std::string get_value_str(scoped_cursor &cursor) override final;
 
     private:
-    int64_t _limit;
+    double get_cache_value(scoped_cursor &cursor);
 };
 
-class db_size_statistic : public runtime_statistic {
+class db_size_statistic : public statistics {
     public:
-    explicit db_size_statistic(configuration *config, database &database);
+    explicit db_size_statistic(configuration &config, const std::string &name, database &database);
     virtual ~db_size_statistic() = default;
 
-    /* Don't need the stat cursor for this. */
+    /* Don't need the stat cursor for these. */
     void check(scoped_cursor &) override final;
+    std::string get_value_str(scoped_cursor &) override final;
 
     private:
-    std::vector<std::string> get_file_names();
+    size_t get_db_size() const;
+    const std::vector<std::string> get_file_names() const;
 
     private:
     database &_database;
-    int64_t _limit;
-};
-
-class postrun_statistic_check {
-    public:
-    explicit postrun_statistic_check(configuration *config);
-
-    void check(scoped_cursor &cursor) const;
-
-    private:
-    struct postrun_statistic {
-        postrun_statistic(std::string &&name, const int64_t min_limit, const int64_t max_limit);
-
-        const std::string name;
-        const int field;
-        const int64_t min_limit, max_limit;
-    };
-
-    private:
-    bool check_stat(scoped_cursor &cursor, const postrun_statistic &stat) const;
-
-    private:
-    std::vector<postrun_statistic> _stats;
 };
 
 /*
@@ -118,7 +113,7 @@ class runtime_monitor : public component {
 
     public:
     explicit runtime_monitor(configuration *config, database &database);
-    ~runtime_monitor();
+    virtual ~runtime_monitor() = default;
 
     /* Delete the copy constructor and the assignment operator. */
     runtime_monitor(const runtime_monitor &) = delete;
@@ -131,8 +126,7 @@ class runtime_monitor : public component {
     private:
     scoped_session _session;
     scoped_cursor _cursor;
-    std::vector<runtime_statistic *> _stats;
-    postrun_statistic_check _postrun_stats;
+    std::vector<std::unique_ptr<statistics>> _stats;
     database &_database;
 };
 } // namespace test_harness

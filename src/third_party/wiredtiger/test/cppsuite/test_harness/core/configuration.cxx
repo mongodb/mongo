@@ -164,14 +164,14 @@ configuration::get(
 {
     WT_DECL_RET;
     WT_CONFIG_ITEM value = {"", 0, 1, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL};
-    const char *error_msg = "Configuration value doesn't match requested type";
 
     ret = _config_parser->get(_config_parser, key.c_str(), &value);
     if (ret == WT_NOTFOUND && optional)
         return (def);
     else if (ret != 0)
-        testutil_die(ret, "Error while finding config");
+        testutil_die(ret, ("Error while finding config with key \"" + key + "\"").c_str());
 
+    const char *error_msg = "Configuration value doesn't match requested type";
     if (type == types::STRING &&
       (value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING &&
         value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID))

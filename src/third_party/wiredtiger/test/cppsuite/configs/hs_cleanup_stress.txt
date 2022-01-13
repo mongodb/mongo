@@ -14,21 +14,32 @@ checkpoint_manager=
 ),
 runtime_monitor=
 (
+    # Seems to insert around 477K records. Give it +-20K margin.
+    cache_hs_insert=
+    (
+        max=497000,
+        min=457000,
+        postrun=true,
+    ),
+    # Seems to remove 160K records. Give it a similar margin.
+    cc_pages_removed=
+    (
+        max=170000,
+        min=150000,
+        postrun=true,
+    ),
     stat_cache_size=
     (
-        enabled=true,
-        limit=110
+        max=110,
+        runtime=true,
     ),
     # The data files compress to around 25MB per table at the end of a run so 250MB total.
     # +1.4GB for the history store. With an additional 150MB margin.
     stat_db_size=
     (
-        enabled=true,
-        limit=1900000000,
+        max=1900000000,
+        runtime=true,
     ),
-    # Seems to insert around 477K records. Give it +-20K margin.
-    # Seems to remove 160K records. Give it a similar margin.
-    postrun_statistics=[cache_hs_insert:457000:497000, cc_pages_removed:150000:170000]
 ),
 timestamp_manager=
 (

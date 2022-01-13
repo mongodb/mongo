@@ -9,18 +9,27 @@ checkpoint_manager=
 ),
 runtime_monitor=
 (
+    cache_hs_insert=
+    (
+        max=100000000,
+        postrun=true,
+    ),
+    cc_pages_removed=
+    (
+        max=10000000,
+        postrun=true,
+    ),
     stat_cache_size=
     (
-        enabled=true,
-        limit=1000
+        max=1000,
+        runtime=true,
     ),
     stat_db_size=
     (
-        enabled=true,
         #10GB
-        limit=10000000000
+        max=10000000000,
+        runtime=true,
     ),
-    postrun_statistics=[cache_hs_insert:0:100000000, cc_pages_removed:0:10000000],
 ),
 timestamp_manager=
 (

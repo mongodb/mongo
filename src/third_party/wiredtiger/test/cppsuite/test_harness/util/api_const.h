@@ -42,7 +42,9 @@ extern const std::string WORKLOAD_GENERATOR;
 extern const std::string WORKLOAD_TRACKING;
 
 /* Configuration API consts. */
+extern const std::string CACHE_HS_INSERT;
 extern const std::string CACHE_SIZE_MB;
+extern const std::string CC_PAGES_REMOVED;
 extern const std::string COLLECTION_COUNT;
 extern const std::string COMPRESSION_ENABLED;
 extern const std::string DURATION_SECONDS;
@@ -60,6 +62,7 @@ extern const std::string OPS_PER_TRANSACTION;
 extern const std::string POPULATE_CONFIG;
 extern const std::string POSTRUN_STATISTICS;
 extern const std::string READ_CONFIG;
+extern const std::string RUNTIME_STATISTICS;
 extern const std::string STABLE_LAG;
 extern const std::string STAT_CACHE_SIZE;
 extern const std::string STAT_DB_SIZE;

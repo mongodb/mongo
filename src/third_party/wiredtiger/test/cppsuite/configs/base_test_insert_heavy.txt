@@ -6,14 +6,6 @@ checkpoint_manager=
     enabled=true,
     op_rate=20s
 ),
-runtime_monitor=
-(
-    stat_cache_size=
-    (
-        enabled=false,
-        limit=100
-    )
-),
 timestamp_manager=
 (
     enabled=true,

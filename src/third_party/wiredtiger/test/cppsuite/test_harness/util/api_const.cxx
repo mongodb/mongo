@@ -39,7 +39,9 @@ const std::string WORKLOAD_GENERATOR = "workload_generator";
 const std::string WORKLOAD_TRACKING = "workload_tracking";
 
 /* Configuration API consts. */
+const std::string CACHE_HS_INSERT = "cache_hs_insert";
 const std::string CACHE_SIZE_MB = "cache_size_mb";
+const std::string CC_PAGES_REMOVED = "cc_pages_removed";
 const std::string COLLECTION_COUNT = "collection_count";
 const std::string COMPRESSION_ENABLED = "compression_enabled";
 const std::string DURATION_SECONDS = "duration_seconds";
@@ -55,8 +57,9 @@ const std::string OLDEST_LAG = "oldest_lag";
 const std::string OP_RATE = "op_rate";
 const std::string OPS_PER_TRANSACTION = "ops_per_transaction";
 const std::string POPULATE_CONFIG = "populate_config";
-const std::string POSTRUN_STATISTICS = "postrun_statistics";
+const std::string POSTRUN_STATISTICS = "postrun";
 const std::string READ_CONFIG = "read_config";
+const std::string RUNTIME_STATISTICS = "runtime";
 const std::string STABLE_LAG = "stable_lag";
 const std::string STAT_CACHE_SIZE = "stat_cache_size";
 const std::string STAT_DB_SIZE = "stat_db_size";
