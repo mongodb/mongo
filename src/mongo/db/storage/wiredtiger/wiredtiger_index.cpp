@@ -1574,10 +1574,10 @@ StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
             fmt::format("WiredTigerIndexUnique::_insert: remove: {}; uri: {}", _indexName, _uri));
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
-        // The usage of 'prefix_key=true' enables an optimization that allows this search to return
-        // more quickly. See SERVER-56509.
-        c->reconfigure(c, "prefix_key=true");
-        ON_BLOCK_EXIT([c] { c->reconfigure(c, "prefix_key=false"); });
+        // The usage of 'prefix_search=true' enables an optimization that allows this search to
+        // return more quickly. See SERVER-56509.
+        c->reconfigure(c, "prefix_search=true");
+        ON_BLOCK_EXIT([c] { c->reconfigure(c, "prefix_search=false"); });
         auto keyExists = _keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId);
         if (keyExists) {
             auto key = KeyString::toBson(

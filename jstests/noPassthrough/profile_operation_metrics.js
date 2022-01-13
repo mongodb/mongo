@@ -685,9 +685,8 @@ const operations = [
         profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            // The insert will perform a read to ensure uniqueness of 'a'.
-            assert.eq(profileDoc.idxEntryBytesRead, 6);
-            assert.eq(profileDoc.idxEntryUnitsRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.cursorSeeks, 1);
             assert.eq(profileDoc.docBytesWritten, 29);
             assert.eq(profileDoc.docUnitsWritten, 1);
@@ -753,9 +752,9 @@ const operations = [
                 assert.gte(profileDoc.docUnitsRead, 1);
                 assert.gte(profileDoc.cursorSeeks, 4);
             }
-            // Reads index entries on '_id' for the lookup and 'a' to ensure uniqueness.
-            assert.eq(profileDoc.idxEntryBytesRead, 9);
-            assert.eq(profileDoc.idxEntryUnitsRead, 2);
+            // Reads index entries on '_id' for the lookup.
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             // This out-of-place update should perform a direct insert because it is not large
             // enough to qualify for the in-place update path.
             assert.eq(profileDoc.docBytesWritten, 29);
@@ -793,9 +792,9 @@ const operations = [
                 assert.gte(profileDoc.docUnitsRead, 9);
                 assert.gte(profileDoc.cursorSeeks, 4);
             }
-            // Reads index entries on '_id' and 'a' to ensure uniqueness.
-            assert.eq(profileDoc.idxEntryBytesRead, 10);
-            assert.eq(profileDoc.idxEntryUnitsRead, 2);
+            // Reads index entries on '_id' to ensure uniqueness.
+            assert.eq(profileDoc.idxEntryBytesRead, 4);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (FixtureHelpers.isReplSet(db)) {
                 // When WT_MODIFY is used on a replicated collection fewer bytes are written per the
                 // comment about WT_MODIFY above.
