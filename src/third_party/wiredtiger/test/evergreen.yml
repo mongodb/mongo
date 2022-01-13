@@ -4206,7 +4206,7 @@ buildvariants:
     - name: fops
 
 - name: macos-1014
-  display_name: "OS X 10.14 CMake"
+  display_name: "OS X 10.14"
   run_on:
   - macos-1014
   batchtime: 120 # 2 hours
@@ -4279,8 +4279,9 @@ buildvariants:
   display_name: "~ Ubuntu 18.04 PPC"
   run_on:
   - ubuntu1804-power8-test
-  batchtime: 10080 # 7 days
+  batchtime: 120 # 2 hours
   expansions:
+    format_test_setting: ulimit -c unlimited
     test_env_vars:
       WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
@@ -4309,7 +4310,7 @@ buildvariants:
   display_name: "~ Ubuntu 18.04 zSeries"
   run_on:
   - ubuntu1804-zseries-test
-  batchtime: 10080 # 7 days
+  batchtime: 120 # 2 hours
   expansions:
     test_env_vars:
       WT_BUILDDIR=$(git rev-parse --show-toplevel)/cmake_build
