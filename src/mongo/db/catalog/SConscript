@@ -468,6 +468,7 @@ env.Library(
         'coll_mod_op_observer.cpp',
         'coll_mod_write_ops_tracker.cpp',
         "collection_compact.cpp",
+        'collection_uuid_mismatch.cpp',
         'create_collection.cpp',
         'drop_collection.cpp',
         'drop_database.cpp',
@@ -493,6 +494,7 @@ env.Library(
         'clustered_collection_options',
         'collection',
         'collection_options',
+        'collection_uuid_mismatch_info',
         'database_holder',
         'index_catalog',
         'index_key_validate',
@@ -570,18 +572,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
-    target='collection_uuid_mismatch',
-    source=[
-        'collection_uuid_mismatch.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        'collection_catalog',
-        'collection_uuid_mismatch_info',
     ],
 )
 
