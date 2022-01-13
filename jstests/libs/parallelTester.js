@@ -230,11 +230,7 @@ if (typeof _threadInject != "undefined") {
             "timeseries/timeseries_delete_hint.js",
             "timeseries/timeseries_update_hint.js",
             "timeseries/timeseries_delete_concurrent.js",
-            "timeseries/timeseries_update_concurrent.js",
-
-            // TODO (SERVER-60185): Remove the collection_uuid_*.js exclusions once the feature flag
-            // is enabled by default.
-            "collection_uuid_find.js",
+            "timeseries/timeseries_update_concurrent.js"
         ]);
 
         // Get files, including files in subdirectories.
