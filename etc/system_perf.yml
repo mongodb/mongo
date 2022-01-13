@@ -1770,10 +1770,10 @@ buildvariants:
   #  cron: "0 0 * * 4" # 00:00 on Thursday
   #  modules: *modules
   #  expansions:
-  #    mongodb_setup: initialsync-logkeeper
+  #    mongodb_setup: initialsync-logkeeper-snapshot-update
   #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #    # Update this to latest snapshot after each LTS release.
-  #    snapshotId: snap-0dba360e743e27ea0
+  #    snapshotId: snap-0cc5e61399e2e79f6
   #    platform: linux
   #    authentication: disabled
   #    storageEngine: wiredTiger
