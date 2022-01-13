@@ -148,13 +148,11 @@
   base_suite: concurrency_sharded_replication
   overrides:
     - "multiversion.sharded_fixture_last_continuous_new_old_old_new"
-    - "multiversion.concurrency_sharded_replication_multiversion_mongod_options"
 
 - suite_name: concurrency_sharded_replication_last_lts_new_old_old_new
   base_suite: concurrency_sharded_replication
   overrides:
     - "multiversion.sharded_fixture_last_lts_new_old_old_new"
-    - "multiversion.concurrency_sharded_replication_multiversion_mongod_options"
 
 - suite_name: sharded_collections_jscore_passthrough_last_continuous_new_old_old_new
   base_suite: sharded_collections_jscore_passthrough

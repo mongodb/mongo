@@ -73,14 +73,6 @@
       include_with_any_tags:
         - multiversion_sanity_check
 
-- name: concurrency_sharded_replication_multiversion_mongod_options
-  value:
-    executor:
-      fixture:
-        mongod_options:
-          set_parameters:
-            receiveChunkWaitForRangeDeleterTimeoutMS:
-
 - name: replica_sets_multiversion_selector
   value:
     selector:
