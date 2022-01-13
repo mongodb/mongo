@@ -225,3 +225,9 @@ commands:
                 type: uuid
                 optional: true
                 unstable: true
+            $_passthroughToShard:
+                description: "An optional internal parameter for this request. If a shard key is specified, then that specific shard will be targeted."
+                type: object
+                cpp_name: passthroughToShard
+                optional: true
+                unstable: true
