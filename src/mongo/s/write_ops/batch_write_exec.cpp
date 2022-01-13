@@ -34,7 +34,6 @@
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/owned_pointer_map.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
@@ -169,8 +168,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         //    exactly when the metadata changed.
         //
 
-        OwnedPointerMap<ShardId, TargetedWriteBatch> childBatchesOwned;
-        std::map<ShardId, TargetedWriteBatch*>& childBatches = childBatchesOwned.mutableMap();
+        std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> childBatches;
 
         // If we've already had a targeting error, we've refreshed the metadata once and can
         // record target errors definitively.
@@ -204,9 +202,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         while (numSent != numToSend) {
             // Collect batches out on the network, mapped by endpoint
-            OwnedPointerMap<ShardId, TargetedWriteBatch> ownedPendingBatches;
-            OwnedPointerMap<ShardId, TargetedWriteBatch>::MapType& pendingBatches =
-                ownedPendingBatches.mutableMap();
+            std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> pendingBatches;
 
             //
             // Construct the requests.
@@ -215,8 +211,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             std::vector<AsyncRequestsSender::Request> requests;
 
             // Get as many batches as we can at once
-            for (auto& childBatch : childBatches) {
-                TargetedWriteBatch* const nextBatch = childBatch.second;
+            for (auto&& childBatch : childBatches) {
+                auto nextBatch = std::move(childBatch.second);
 
                 // If the batch is nullptr, we sent it previously, so skip
                 if (!nextBatch)
@@ -254,7 +250,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 childBatch.second = nullptr;
 
                 // Recv-side is responsible for cleaning up the nextBatch when used
-                pendingBatches.emplace(targetShardId, nextBatch);
+                pendingBatches.emplace(targetShardId, std::move(nextBatch));
             }
 
             bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
@@ -278,7 +274,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                 // Get the TargetedWriteBatch to find where to put the response
                 dassert(pendingBatches.find(response.shardId) != pendingBatches.end());
-                TargetedWriteBatch* batch = pendingBatches.find(response.shardId)->second;
+                TargetedWriteBatch* batch = pendingBatches.find(response.shardId)->second.get();
 
                 const auto shardInfo = response.shardHostAndPort
                     ? response.shardHostAndPort->toString()

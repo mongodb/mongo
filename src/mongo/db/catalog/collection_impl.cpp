@@ -35,7 +35,6 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/init.h"
-#include "mongo/base/owned_pointer_map.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"

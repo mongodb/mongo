@@ -90,7 +90,8 @@ struct EndpointComp {
     bool operator()(const ShardEndpoint* endpointA, const ShardEndpoint* endpointB) const;
 };
 
-using TargetedBatchMap = std::map<const ShardEndpoint*, TargetedWriteBatch*, EndpointComp>;
+using TargetedBatchMap =
+    std::map<const ShardEndpoint*, std::unique_ptr<TargetedWriteBatch>, EndpointComp>;
 
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -144,7 +145,7 @@ public:
      */
     Status targetBatch(const NSTargeter& targeter,
                        bool recordTargetErrors,
-                       std::map<ShardId, TargetedWriteBatch*>* targetedBatches);
+                       std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches);
 
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.

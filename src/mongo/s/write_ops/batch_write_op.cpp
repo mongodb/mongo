@@ -131,14 +131,12 @@ bool wouldMakeBatchesTooBig(const std::vector<std::unique_ptr<TargetedWrite>>& w
             continue;
         }
 
-        const auto& batch = it->second;
-
-        if (batch->getNumOps() >= write_ops::kMaxWriteBatchSize) {
+        if (it->second->getNumOps() >= write_ops::kMaxWriteBatchSize) {
             // Too many items in batch
             return true;
         }
 
-        if (batch->getEstimatedSizeBytes() + writeSizeBytes > BSONObjMaxUserSize) {
+        if (it->second->getEstimatedSizeBytes() + writeSizeBytes > BSONObjMaxUserSize) {
             // Batch would be too big
             return true;
         }
@@ -267,9 +265,10 @@ BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest&
     }
 }
 
-Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
-                                 bool recordTargetErrors,
-                                 std::map<ShardId, TargetedWriteBatch*>* targetedBatches) {
+Status BatchWriteOp::targetBatch(
+    const NSTargeter& targeter,
+    bool recordTargetErrors,
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>* targetedBatches) {
     //
     // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
     // and each of those targeted writes are grouped into a batch for a particular shard
@@ -417,14 +416,14 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         for (auto&& write : writes) {
             TargetedBatchMap::iterator batchIt = batchMap.find(&write->endpoint);
             if (batchIt == batchMap.end()) {
-                TargetedWriteBatch* newBatch = new TargetedWriteBatch(write->endpoint);
-                batchIt = batchMap.emplace(&newBatch->getEndpoint(), newBatch).first;
-                targetedShards.insert((&newBatch->getEndpoint())->shardName);
+                auto newBatch = std::make_unique<TargetedWriteBatch>(write->endpoint);
+                auto endpoint = &newBatch->getEndpoint();
+                batchIt = batchMap.emplace(endpoint, std::move(newBatch)).first;
+                targetedShards.insert(endpoint->shardName);
             }
 
-            TargetedWriteBatch* batch = batchIt->second;
-            batch->addWrite(std::move(write),
-                            std::max(writeSizeBytes, errorResponsePotentialSizeBytes));
+            batchIt->second->addWrite(std::move(write),
+                                      std::max(writeSizeBytes, errorResponsePotentialSizeBytes));
         }
 
         // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
@@ -444,16 +443,16 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
     //
 
     for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end(); ++it) {
-        TargetedWriteBatch* batch = it->second;
+        auto batch = std::move(it->second);
         if (batch->getWrites().empty())
             continue;
 
         // Remember targeted batch for reporting
-        _targeted.insert(batch);
+        _targeted.insert(batch.get());
 
         // Send the handle back to caller
         invariant(targetedBatches->find(batch->getEndpoint().shardName) == targetedBatches->end());
-        targetedBatches->emplace(batch->getEndpoint().shardName, batch);
+        targetedBatches->emplace(batch->getEndpoint().shardName, std::move(batch));
     }
 
     _nShardsOwningChunks = targeter.getNShardsOwningChunks();
@@ -887,23 +886,16 @@ void BatchWriteOp::_incBatchStats(const BatchedCommandResponse& response) {
 
 void BatchWriteOp::_cancelBatches(const WriteErrorDetail& why,
                                   TargetedBatchMap&& batchMapToCancel) {
-    TargetedBatchMap batchMap(batchMapToCancel);
-
     // Collect all the writeOps that are currently targeted
-    for (TargetedBatchMap::iterator it = batchMap.begin(); it != batchMap.end();) {
-        TargetedWriteBatch* batch = it->second;
-
-        for (auto&& write : batch->getWrites()) {
+    for (TargetedBatchMap::iterator it = batchMapToCancel.begin(); it != batchMapToCancel.end();) {
+        for (auto&& write : it->second->getWrites()) {
             // NOTE: We may repeatedly cancel a write op here, but that's fast and we want to cancel
             // before erasing the TargetedWrite* (which owns the cancelled targeting info) for
             // reporting reasons.
             _writeOps[write->writeOpRef.first].cancelWrites(&why);
         }
 
-        // Note that we need to *erase* first, *then* delete, since the map keys are ptrs from
-        // the values
-        batchMap.erase(it++);
-        delete batch;
+        it = batchMapToCancel.erase(it);
     }
 }
 
