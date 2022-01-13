@@ -711,7 +711,7 @@ class RunPlugin(PluginInterface):
         parser.add_argument(
             "--dryRun", action="store", dest="dry_run", choices=("off", "tests"), metavar="MODE",
             help=("Instead of running the tests, outputs the tests that would be run"
-                  " (if MODE=tests). Defaults to MODE=%%default."))
+                  " (if MODE=tests). Defaults to MODE=%(default)s."))
 
         parser.add_argument(
             "-j", "--jobs", type=int, dest="jobs", metavar="JOBS",
@@ -882,7 +882,7 @@ class RunPlugin(PluginInterface):
             "--majorityReadConcern", action="store", dest="majority_read_concern", choices=("on",
                                                                                             "off"),
             metavar="ON|OFF", help=("Enable or disable majority read concern support."
-                                    " Defaults to %%default."))
+                                    " Defaults to %(default)s."))
 
         mongodb_server_options.add_argument("--flowControl", action="store", dest="flow_control",
                                             choices=("on", "off"), metavar="ON|OFF",
@@ -973,7 +973,7 @@ class RunPlugin(PluginInterface):
             choices=("fail", "silentfail"), metavar="STATUS",
             help="Controls if the test failure status should be reported as failed"
             " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
-            " never be silently ignored. Defaults to STATUS=%%default.")
+            " never be silently ignored. Defaults to STATUS=%(default)s.")
 
         internal_options.add_argument(
             "--reportFile", dest="report_file", metavar="REPORT",
@@ -982,7 +982,7 @@ class RunPlugin(PluginInterface):
         internal_options.add_argument(
             "--staggerJobs", action="store", dest="stagger_jobs", choices=("on", "off"),
             metavar="ON|OFF", help=("Enables or disables the stagger of launching resmoke jobs."
-                                    " Defaults to %%default."))
+                                    " Defaults to %(default)s."))
 
         internal_options.add_argument(
             "--exportMongodConfig", dest="export_mongod_config", choices=("off", "regular",
