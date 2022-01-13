@@ -43,7 +43,7 @@ then
 fi
 
 # Locate Wiredtiger home directory.
-RW_LOCK_FILE=$(git rev-parse --show-toplevel)/build_posix/test/csuite/test_rwlock
+: ${RW_LOCK_FILE:=$(git rev-parse --show-toplevel)/build_posix/test/csuite/test_rwlock}
 
 SEC1=`date +%s`
 if [ "$RUN_OS" = "Darwin" ]

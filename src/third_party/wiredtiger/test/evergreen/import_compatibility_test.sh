@@ -21,11 +21,20 @@ build_branch()
 
     git checkout --quiet "$1"
 
-    config=""
-    config+="--enable-snappy "
-    config+="--disable-standalone-build "
-    (sh build_posix/reconf &&
-         ./configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+    if [ "${build_sys[$1]}" == "cmake" ]; then
+            . ./test/evergreen/find_cmake.sh
+            config=""
+            config+="-DENABLE_SNAPPY=1 "
+            config+="-DWT_STANDALONE_BUILD=0 "
+            (mkdir build && cd build &&
+                $CMAKE $config ../. && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+    else
+        config=""
+        config+="--enable-snappy "
+        config+="--disable-standalone-build "
+        (mkdir build && cd build && sh ../build_posix/reconf &&
+            ../configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+    fi
     cd ..
 }
 
@@ -38,8 +47,8 @@ create_file()
     echo "Branch \"$1\" creating and populating \"$2\""
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-    wt_cmd="$1/wt"
-    test_dir="$1/WT_TEST/"
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
     uri="file:$2"
 
     # Make the home directory.
@@ -60,12 +69,12 @@ import_file()
     echo "Importing file \"$3\" from \"$1\" to \"$2\""
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-    wt_cmd="$1/wt"
-    test_dir="$1/WT_TEST/"
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
     mkdir -p $test_dir
 
     # Move the file across to the destination branch's home directory.
-    import_file="$2/WT_TEST/$3"
+    import_file="$2/build/WT_TEST/$3"
     cp $import_file $test_dir
 
     # Run import via the wt tool.
@@ -82,8 +91,8 @@ verify_file()
     echo "Branch \"$1\" verifying \"$2\""
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-    wt_cmd="$1/wt"
-    test_dir="$1/WT_TEST/"
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
     uri="file:$2"
 
     $wt_cmd -h $test_dir verify $uri
@@ -93,7 +102,7 @@ verify_file()
 #     1: branch
 cleanup_branch()
 {
-    test_dir="$1/WT_TEST/"
+    test_dir="$1/build/WT_TEST/"
     if [ -d $test_dir ]; then
         rm -rf $test_dir
     fi
@@ -123,9 +132,21 @@ import_compatibility_test()
     #
     # Before trying this, we must remove the base configuration. The wt tool produces this file
     # however MongoDB will not so we should emulate this.
-    rm $1/WT_TEST/WiredTiger.basecfg
-    $2/wt -h $1/WT_TEST/ dump file:test_import
+    rm $1/build/WT_TEST/WiredTiger.basecfg
+    $2/build/wt -h $1/build/WT_TEST/ dump file:test_import
 }
+
+# The following associative array maps the 'official' build system to use for each branch.
+# CMake build support is reliably mature in newer release branches, whilst earlier revisions
+# primarily use Autoconf (note: some earlier branches may have CMake support, but these aren't
+# considered 'mature' versions.)
+declare -A build_sys
+build_sys['develop']="cmake"
+build_sys['mongodb-5.0']="autoconf"
+build_sys['mongodb-4.4']="autoconf"
+build_sys['mongodb-4.2']="autoconf"
+build_sys['mongodb-4.0']="autoconf"
+build_sys['mongodb-3.6']="autoconf"
 
 # Release branches.
 #

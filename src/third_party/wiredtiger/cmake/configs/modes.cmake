@@ -142,8 +142,8 @@ set(tsan_compiler_cxx_flag "-fsanitize=thread")
 
 # Define our custom build variants.
 define_build_mode(ASan
-    C_COMPILER_FLAGS ${asan_compiler_c_flag}
-    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag}
+    C_COMPILER_FLAGS ${asan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag} ${no_omit_frame_flag}
     LINK_FLAGS ${asan_link_flags}
     LIBS ${asan_lib_flags}
 )

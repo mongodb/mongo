@@ -27,7 +27,7 @@ fi
 cd $(git rev-parse --show-toplevel)
 
 # Walk into the test/format directory in which data files are generated
-cd build_posix/test/format
+cd cmake_build/test/format
 
 # Check the existence of 'WT_TEST' directories
 num_dirs=$(find . -type d -name 'WT_TEST.[0-9]*' | wc -l)
@@ -37,7 +37,7 @@ if [ "${num_dirs}" -eq "0" ]; then
 fi
 
 # Check the existence of 'wt' binary
-wt_binary="../../.libs/wt"
+wt_binary="../../wt"
 if [ ! -x "${wt_binary}" ]; then
 	echo "'wt' binary does not exist, exiting ..."
 	exit 6

@@ -1,6 +1,13 @@
 #!/bin/sh
 set -o errexit  # Exit the script with error if any of the commands fail
 
+# CMake version we fallback to and download when cmake doesn't exist on the
+# host system.
+CMAKE_MAJOR_VER=3
+CMAKE_MINOR_VER=11
+CMAKE_PATCH_VER=0
+CMAKE_VERSION=$CMAKE_MAJOR_VER.$CMAKE_MINOR_VER.$CMAKE_PATCH_VER
+
 # Adapted 'find_cmake' from mongo-c-driver evergreen infrastructure:
 #   https://github.com/mongodb/mongo-c-driver/blob/master/.evergreen/find-cmake.sh
 find_cmake ()
@@ -17,16 +24,16 @@ find_cmake ()
         CMAKE=cmake
         CTEST=ctest
     elif uname -a | grep -iq 'x86_64 GNU/Linux'; then
-        if [ -f "$(pwd)/cmake-3.11.0/bin/cmake" ]; then
-            CMAKE="$(pwd)/cmake-3.11.0/bin/cmake"
-            CTEST="$(pwd)/cmake-3.11.0/bin/ctest"
+        if [ -f "$(pwd)/cmake-$CMAKE_VERSION/bin/cmake" ]; then
+            CMAKE="$(pwd)/cmake-$CMAKE_VERSION/bin/cmake"
+            CTEST="$(pwd)/cmake-$CMAKE_VERSION/bin/ctest"
             return 0
         fi
-        curl --retry 5 https://cmake.org/files/v3.11/cmake-3.11.0-Linux-x86_64.tar.gz -sS --max-time 120 --fail --output cmake.tar.gz
-        mkdir cmake-3.11.0
-        tar xzf cmake.tar.gz -C cmake-3.11.0 --strip-components=1
-        CMAKE=$(pwd)/cmake-3.11.0/bin/cmake
-        CTEST=$(pwd)/cmake-3.11.0/bin/ctest
+        curl --retry 5 https://cmake.org/files/v$CMAKE_MAJOR_VER.$CMAKE_MINOR_VER/cmake-$CMAKE_VERSION-Linux-x86_64.tar.gz -sS --max-time 120 --fail --output cmake.tar.gz
+        mkdir cmake-$CMAKE_VERSION
+        tar xzf cmake.tar.gz -C cmake-$CMAKE_VERSION --strip-components=1
+        CMAKE=$(pwd)/cmake-$CMAKE_VERSION/bin/cmake
+        CTEST=$(pwd)/cmake-$CMAKE_VERSION/bin/ctest
     elif [ -f "/cygdrive/c/cmake/bin/cmake" ]; then
         CMAKE="/cygdrive/c/cmake/bin/cmake"
         CTEST="/cygdrive/c/cmake/bin/ctest"
@@ -40,9 +47,10 @@ find_cmake ()
         # Some images have no cmake yet, or a broken cmake (see: BUILD-8570)
         echo "-- MAKE CMAKE --"
         CMAKE_INSTALL_DIR=$(readlink -f cmake-install)
-        curl --retry 5 https://cmake.org/files/v3.11/cmake-3.11.0.tar.gz -sS --max-time 120 --fail --output cmake.tar.gz
+        if [ -d  cmake-$CMAKE_VERSION ]; then rm -r cmake-$CMAKE_VERSION; fi
+        curl --retry 5 https://cmake.org/files/v$CMAKE_MAJOR_VER.$CMAKE_MINOR_VER/cmake-$CMAKE_VERSION.tar.gz -sS --max-time 120 --fail --output cmake.tar.gz
         tar xzf cmake.tar.gz
-        cd cmake-3.11.0
+        cd cmake-$CMAKE_VERSION
         ./bootstrap --prefix="${CMAKE_INSTALL_DIR}"
         make -j8
         make install

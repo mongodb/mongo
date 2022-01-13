@@ -44,12 +44,25 @@ build_branch()
         git clone --quiet https://github.com/wiredtiger/wiredtiger.git "$1"
         cd "$1"
         git checkout --quiet "$1"
-
-        config=""
-        config+="--enable-snappy "
-        config+="--disable-standalone-build "
-        (sh build_posix/reconf &&
-            ./configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+        if [ "${build_sys[$1]}" == "cmake" ]; then
+            . ./test/evergreen/find_cmake.sh
+            config=""
+            config+="-DENABLE_SNAPPY=1 "
+            config+="-DWT_STANDALONE_BUILD=0 "
+            (mkdir build && cd build &&
+                $CMAKE $config ../. && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+        else
+            config+="--enable-snappy "
+            config+="--disable-standalone-build "
+            (mkdir build && cd build && sh ../build_posix/reconf &&
+                ../configure $config && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
+            # Copy out the extension modules to their parent directory. This is done to maintain uniformity between
+            # autoconf and CMake build directories, where relative module paths can possibly be cached when running verify/upgrade_downgrade
+            # tests between branch directories i.e. in the connection configuration.
+            cp build/ext/compressors/snappy/.libs/libwiredtiger_snappy.so build/ext/compressors/snappy/libwiredtiger_snappy.so
+            cp build/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so build/ext/collators/reverse/libwiredtiger_reverse_collator.so
+            cp build/ext/encryptors/rotn/.libs/libwiredtiger_rotn.so build/ext/encryptors/rotn/libwiredtiger_rotn.so
+        fi
 }
 
 #############################################################
@@ -60,8 +73,9 @@ get_config_file_name()
 {
     local file_name=""
     branch_name=$1
+    format_dir="$branch_name/build/test/format"
     if [ "${wt_standalone}" = true ] || [ $older = true ] ; then
-        file_name="${branch_name}/test/format/CONFIG_default"
+        file_name="${format_dir}/CONFIG_default"
         echo $file_name
         return
     fi
@@ -92,7 +106,7 @@ create_configs()
     echo "checkpoints=1"  >> $file_name             # Force periodic writes
     echo "compression=snappy"  >> $file_name        # We only built with snappy, force the choice
     echo "data_source=table" >> $file_name
-    echo "huffman_key=0" >> $file_name              # WT-6893 - Not supoprted by newer releases 
+    echo "huffman_key=0" >> $file_name              # WT-6893 - Not supported by newer releases
     echo "in_memory=0" >> $file_name                # Interested in the on-disk format
     echo "leak_memory=1" >> $file_name              # Faster runs
     echo "logging=1" >> $file_name                  # Test log compatibility
@@ -143,7 +157,8 @@ create_configs_for_newer_release_branches()
 
     # Copy per-release configs in the newer release branches
     for b in ${newer_release_branches[@]}; do
-        cp -rf CONFIG* $b/test/format/
+        format_dir="$b/build/test/format"
+        cp -rf CONFIG* $format_dir
     done
 
     # Delete configs from the top folder
@@ -162,7 +177,9 @@ run_format()
         echo "Running format in branch: \"$branch_name\""
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-        cd "$branch_name/test/format"
+
+        format_dir="$branch_name/build/test/format"
+        cd "$format_dir"
         flags="-1q $(bflag $branch_name)"
 
         config_file=""
@@ -191,9 +208,9 @@ run_format()
 }
 
 EXT="extensions=["
-EXT+="ext/compressors/snappy/.libs/libwiredtiger_snappy.so,"
-EXT+="ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so, "
-EXT+="ext/encryptors/rotn/.libs/libwiredtiger_rotn.so, "
+EXT+="build/ext/compressors/snappy/libwiredtiger_snappy.so,"
+EXT+="build/ext/collators/reverse/libwiredtiger_reverse_collator.so, "
+EXT+="build/ext/encryptors/rotn/libwiredtiger_rotn.so, "
 EXT+="]"
 
 #############################################################
@@ -210,15 +227,17 @@ verify_branches()
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
         cd "$1"
+
+        wt_bin="build/wt"
         for am in $3; do
-            echo "$1/wt verifying $2 access method $am..."
-            dir="$2/test/format/RUNDIR.$am"
-            WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" verify table:wt
+            echo "$1/$wt_bin verifying $2 access method $am..."
+            dir="$2/build/test/format/RUNDIR.$am"
+            WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" verify table:wt
 
             if [ "$4" = true ]; then
                 echo "$1/wt dump and load $2 access method $am..."
-                WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
-                WIREDTIGER_CONFIG="$EXT" ./wt $(bflag $1) -h "../$dir" load -f dump_wt.txt
+                WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" dump table:wt > dump_wt.txt
+                WIREDTIGER_CONFIG="$EXT" ./$wt_bin $(bflag $1) -h "../$dir" load -f dump_wt.txt
             fi
         done
 }
@@ -238,18 +257,21 @@ upgrade_downgrade()
         cfg_file_branch1=$(get_config_file_name $1)
         cfg_file_branch2=$(get_config_file_name $2)
 
+        format_dir_branch1="$1/build/test/format"
+        format_dir_branch2="$2/build/test/format"
+
         # Alternate running each branch format test program on the second branch's build.
         # Loop twice, that is, run format twice using each branch.
         top="$PWD"
         for am in $3; do
             for reps in {1..2}; do
                 echo "$1 format running on $2 access method $am..."
-                cd "$top/$1/test/format"
+                cd "$top/$format_dir_branch1"
                 flags="-1Rq $(bflag $1)"
-                ./t $flags -c "$top/$2/test/format/${cfg_file_branch1}" -h "$top/$2/test/format/RUNDIR.$am" timer=2
+                ./t $flags -c "$top/$format_dir_branch2/${cfg_file_branch1}" -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
 
                 echo "$2 format running on $2 access method $am..."
-                cd "$top/$2/test/format"
+                cd "$top/$format_dir_branch2"
                 flags="-1Rq $(bflag $2)"
                 ./t $flags -c $cfg_file_branch2 -h "RUNDIR.$am" timer=2
             done
@@ -263,7 +285,13 @@ upgrade_downgrade()
 #############################################################
 test_upgrade_to_branch()
 {
-        cd $1/test/checkpoint
+        cd $1/build/test/checkpoint
+
+        if [ "${build_sys[$1]}" == "cmake" ]; then
+            test_bin="test_checkpoint"
+        else
+            test_bin="t"
+        fi
 
         for FILE in $2/*; do
             # Run actual test.
@@ -273,7 +301,7 @@ test_upgrade_to_branch()
             # Disable exit on non 0
             set +e
 
-            output="$(./t -t r -D -v -h $FILE)"
+            output="$(./$test_bin -t r -D -v -h $FILE)"
             test_res=$?
 
             # Enable exit on non 0
@@ -331,7 +359,7 @@ older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
 
 # This array is used to generate compatible configuration files between releases, because
 # upgrade/downgrade test runs each build's format test program on the second build's
-# configuration file. 
+# configuration file.
 compatible_upgrade_downgrade_release_branches=(mongodb-4.4 mongodb-4.2)
 
 # This array is used to configure the release branches we'd like to run upgrade to latest test.
@@ -342,6 +370,18 @@ scopes[newer]="newer stable release branches"
 scopes[older]="older stable release branches"
 scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of the codebase"
 scopes[wt_standalone]="WiredTiger standalone releases"
+
+# The following associative array maps the 'official' build system to use for each branch.
+# CMake build support is reliably mature in newer release branches, whilst earlier revisions
+# primarily use Autoconf (note: some earlier branches may have CMake support, but these aren't
+# considered 'mature' versions.)
+declare -A build_sys
+build_sys['develop']="cmake"
+build_sys['mongodb-5.0']="autoconf"
+build_sys['mongodb-4.4']="autoconf"
+build_sys['mongodb-4.2']="autoconf"
+build_sys['mongodb-4.0']="autoconf"
+build_sys['mongodb-3.6']="autoconf"
 
 #############################################################
 # usage string
