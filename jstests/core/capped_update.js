@@ -1,9 +1,10 @@
 /**
  * Tests various update scenarios on capped collections:
- *  -- SERVER-20529: Ensure capped document sizes do not change
+ *  -- SERVER-58865: Allow modifications that change capped document sizes.
  *  -- SERVER-11983: Don't create _id field on capped updates
  * @tags: [
  *   requires_capped,
+ *   requires_fcv_53,
  *   uses_testing_only_commands,
  *   # godinsert and can't run under replication
  *   assumes_standalone_mongod,
@@ -30,9 +31,9 @@ for (let j = 1; j <= 10; j++) {
 assert.commandWorked(t.insert(docs));
 
 assert.commandWorked(t.update({_id: 3}, {s: "Hello, Mongo!"}));  // Mongo is same length as World
-assert.writeError(t.update({_id: 3}, {$set: {s: "Hello!"}}));
-assert.writeError(t.update({_id: 10}, {}));
-assert.writeError(t.update({_id: 10}, {s: "Hello, World!!!"}));
+assert.commandWorked(t.update({_id: 3}, {$set: {s: "Hello!"}}));
+assert.commandWorked(t.update({_id: 10}, {}));
+assert.commandWorked(t.update({_id: 10}, {s: "Hello, World!!!"}));
 
 assert.commandWorked(localDB.runCommand({godinsert: t.getName(), obj: {a: 2}}));
 let doc = t.findOne({a: 2});
