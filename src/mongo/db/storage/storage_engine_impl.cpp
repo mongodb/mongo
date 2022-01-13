@@ -230,6 +230,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
 
     const auto loadingFromUncleanShutdownOrRepair =
         lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
+    BatchedCollectionCatalogWriter catalogBatchWriter{opCtx};
     for (DurableCatalog::Entry entry : catalogEntries) {
         if (loadingFromUncleanShutdownOrRepair) {
             // If we are loading the catalog after an unclean shutdown or during repair, it's
