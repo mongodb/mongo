@@ -59,6 +59,8 @@ class SessionCatalog {
     friend class OperationContextSession;
 
 public:
+    static constexpr StringData kInternalSessionsCleanupClient = "InternalSessionsCleanup"_sd;
+
     class ScopedCheckedOutSession;
     class SessionToKill;
 

@@ -297,7 +297,6 @@ void writeToImageCollection(OperationContext* opCtx,
     request.setFromOplogApplication(true);
     try {
         // This code path can also be hit by things such as `applyOps` and tenant migrations.
-        repl::UnreplicatedWritesBlock dontReplicate(opCtx);
         ::mongo::update(opCtx, autoColl.getDb(), request);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // We can get a duplicate key when two upserts race on inserting a document.

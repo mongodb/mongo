@@ -336,6 +336,10 @@ function runTests(lsid,
     retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
     assertRetryCommand(res, retryRes);
 
+    // Because the config.image_collection table is implicitly replicated, validate that writes do
+    // not generate oplog entries, with the exception of deletions.
+    assert.eq(0, oplog.find({ns: "config.image_collection", op: {'$ne': 'd'}}).itcount());
+
     assert(mainConn.getDB('test').user.drop());
 }
 

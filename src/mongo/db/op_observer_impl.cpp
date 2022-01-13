@@ -297,7 +297,6 @@ void writeToImageCollection(OperationContext* opCtx,
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(dataImage);
 
-    repl::UnreplicatedWritesBlock unreplicated(opCtx);
     DisableDocumentValidation documentValidationDisabler(
         opCtx, DocumentValidationSettings::kDisableInternalValidation);
 

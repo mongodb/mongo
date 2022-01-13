@@ -48,6 +48,11 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
         assert.eq(writtenPreImages[idx].preImage, expectedPreImages[idx]);
         assertValidChangeStreamPreImageDocument(writtenPreImages[idx]);
     }
+
+    // Because the pre-images collection is implicitly replicated, validate that writes do not
+    // generate oplog entries, with the exception of deletions.
+    assert.eq(0,
+              localDB.oplog.rs.find({op: {'$ne': 'd'}, ns: 'config.system.preimages'}).itcount());
 }
 
 // Validates that no pre-image is written while performing ops.

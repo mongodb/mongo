@@ -33,10 +33,12 @@ const kCollName = "testColl";
 const kConfigSessionsNs = "config.system.sessions";
 const kConfigTxnsNs = "config.transactions";
 const kImageCollNs = "config.image_collection";
+const kOplogCollNs = "local.oplog.rs";
 
 let sessionsCollOnPrimary = shard0Primary.getCollection(kConfigSessionsNs);
 let transactionsCollOnPrimary = shard0Primary.getCollection(kConfigTxnsNs);
 let imageCollOnPrimary = shard0Primary.getCollection(kImageCollNs);
+let oplogCollOnPrimary = shard0Primary.getCollection(kOplogCollNs);
 let testDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(testDB.createCollection(kCollName));
@@ -180,6 +182,12 @@ assert.eq(0,
           transactionsCollOnPrimary.find().itcount(),
           tojson(transactionsCollOnPrimary.find().toArray()));
 assert.eq(0, imageCollOnPrimary.find().itcount());
+
+// Because the config.transactions is implicitly replicated, validate that writes do not generate
+// oplog entries, with the exception of deletions.
+assert.eq(numTransactionsCollEntries,
+          oplogCollOnPrimary.find({op: 'd', ns: kConfigTxnsNs}).itcount());
+assert.eq(0, oplogCollOnPrimary.find({op: {'$ne': 'd'}, ns: kConfigTxnsNs}).itcount());
 
 st.stop();
 })();

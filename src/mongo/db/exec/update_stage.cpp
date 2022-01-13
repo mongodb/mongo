@@ -52,6 +52,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/storage_validation.h"
@@ -370,6 +371,17 @@ bool UpdateStage::isEOF() {
 PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
+    }
+
+    boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
+    const auto isSessionCleanupClient =
+        opCtx()->getClient()->desc() == SessionCatalog::kInternalSessionsCleanupClient;
+    if (collection()->ns().isImplicitlyReplicated() && !_isUserInitiatedWrite &&
+        !isSessionCleanupClient) {
+        // Implictly replicated collections do not replicate updates.
+        // However, user-initiated writes and some background maintenance tasks are allowed
+        // to replicate as they cannot be derived from the oplog.
+        unReplBlock.emplace(opCtx());
     }
 
     // It is possible that after an update was applied, a WriteConflictException

@@ -711,7 +711,8 @@ private:
             // Due to the possibility that the shell or drivers have implicit sessions enabled, we
             // cannot write to the config.transactions collection while we're in a session. So we
             // construct a temporary client to as a work around.
-            auto newClient = opCtx->getServiceContext()->makeClient("InternalSessionsCleanup");
+            auto newClient = opCtx->getServiceContext()->makeClient(
+                SessionCatalog::kInternalSessionsCleanupClient.toString());
 
             {
                 stdx::lock_guard<Client> lk(*newClient.get());

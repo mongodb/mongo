@@ -48,7 +48,6 @@ void writeToChangeStreamPreImagesCollection(OperationContext* opCtx,
     // This lock acquisition can block on a stronger lock held by another operation modifying the
     // pre-images collection. There are no known cases where an operation holding an exclusive lock
     // on the pre-images collection also waits for oplog visibility.
-    repl::UnreplicatedWritesBlock unreplicated(opCtx);
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection preimagesCollectionRaii(opCtx, collectionNamespace, LockMode::MODE_IX);
     UpdateResult res = Helpers::upsert(opCtx, collectionNamespace.toString(), preImage.toBSON());

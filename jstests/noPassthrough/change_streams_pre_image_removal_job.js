@@ -41,6 +41,7 @@ rst.startSet({setParameter: {expiredChangeStreamPreImageRemovalJobSleepSecs: 1}}
 rst.initiate();
 const primaryNode = rst.getPrimary();
 const testDB = primaryNode.getDB(jsTestName());
+const localDB = primaryNode.getDB("local");
 const collA =
     assertCreateCollection(testDB, "collA", {changeStreamPreAndPostImages: {enabled: true}});
 const collB =
@@ -59,7 +60,8 @@ for (const coll of [collA, collB]) {
 
 // Pre-images collection should contain four pre-images.
 preImages = getPreImages(primaryNode);
-assert.eq(preImages.length, 4, preImages);
+const preImagesToExpire = 4;
+assert.eq(preImages.length, preImagesToExpire, preImages);
 
 // Roll over all current oplog entries.
 const lastOplogEntryToBeRemoved = getLatestOp(primaryNode);
@@ -95,6 +97,12 @@ assert.soon(() => {
         preImage => timestampCmp(preImage._id.ts, lastOplogEntryToBeRemoved.ts) == 1);
     return onlyTwoPreImagesLeft && allPreImagesHaveBiggerTimestamp;
 });
+
+// Because the pre-images collection is implicitly replicated, validate that writes do not generate
+// oplog entries, with the exception of deletions.
+const preimagesNs = 'config.system.preimages';
+assert.eq(preImagesToExpire, localDB.oplog.rs.find({op: 'd', ns: preimagesNs}).itcount());
+assert.eq(0, localDB.oplog.rs.find({op: {'$ne': 'd'}, ns: preimagesNs}).itcount());
 
 // Verify that pre-images collection content on the primary node is the same as on the
 // secondary.

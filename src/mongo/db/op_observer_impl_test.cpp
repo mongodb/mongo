@@ -187,6 +187,7 @@ public:
         reset(opCtx, NamespaceString::kRsOplogNamespace);
         reset(opCtx, NamespaceString::kSessionTransactionsTableNamespace);
         reset(opCtx, NamespaceString::kConfigImagesNamespace);
+        reset(opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
     }
 
 protected:

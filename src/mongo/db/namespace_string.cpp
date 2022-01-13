@@ -347,6 +347,10 @@ bool NamespaceString::isConfigImagesCollection() const {
     return ns() == kConfigImagesNamespace.ns();
 }
 
+bool NamespaceString::isConfigTransactionsCollection() const {
+    return ns() == kSessionTransactionsTableNamespace.ns();
+}
+
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
     return {db(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
@@ -354,6 +358,18 @@ NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
     invariant(isTimeseriesBucketsCollection(), ns());
     return {db(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
+}
+
+bool NamespaceString::isImplicitlyReplicated() const {
+    if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
+        isConfigTransactionsCollection() || isChangeCollection()) {
+        // Implicitly replicated namespaces are replicated, although they only replicate a subset of
+        // writes.
+        invariant(isReplicated());
+        return true;
+    }
+
+    return false;
 }
 
 bool NamespaceString::isReplicated() const {
