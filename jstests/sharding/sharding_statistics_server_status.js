@@ -83,7 +83,10 @@ function runConcurrentMoveChunk(host, ns, toShard) {
                            result.code == ErrorCodes.ConflictingOperationInProgress);
         if (shouldRetry) {
             jsTestLog("Retrying moveChunk due to ConflictingOperationInProgress");
+        } else if (!result.ok) {
+            jsTestLog("moveChunk encountered an error: " + tojson(result));
         }
+
         return shouldRetry ? runMoveChunkUntilSuccessOrUnexpectedError() : result;
     }
     // Kick off the recursive helper function.
