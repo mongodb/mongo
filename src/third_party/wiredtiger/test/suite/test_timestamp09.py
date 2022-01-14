@@ -43,9 +43,9 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Begin by adding some data.
         self.session.begin_transaction()
+        c[1] = 1
         self.session.commit_transaction(
             'commit_timestamp=' + self.timestamp_str(1))
-        c[1] = 1
 
         # In a single transaction it is illegal to set a commit timestamp
         # older than the first commit timestamp used for this transaction.
