@@ -210,13 +210,19 @@ bool isValidBinDataType(int type);
 /** Returns a number for where a given type falls in the sort order.
  *  Elements with the same return value should be compared for value equality.
  *  The return value is not a BSONType and should not be treated as one.
- *  Note: if the order changes, indexes have to be re-built or than can be corruption
+ *  Note: if the order changes, indexes have to be re-built or there can be corruption
  */
-inline int canonicalizeBSONType(BSONType type) {
+inline constexpr std::int8_t canonicalizeBSONTypeUnsafeLookup(BSONType type) {
+    // This switch statement gets compiled down to a lookup table in GCC >= 8.5
+    // To achieve this there must be NO exceptions thrown nor functions called as
+    // otherwise it would break the optimization.
+    // Additionally, it must also contain a default case in order to fully build
+    // out the lookup table as it won't generate it as such without it.
     switch (type) {
         case MinKey:
+            return MinKey;
         case MaxKey:
-            return type;
+            return MaxKey;
         case EOO:
         case Undefined:
             return 0;
@@ -253,9 +259,29 @@ inline int canonicalizeBSONType(BSONType type) {
         case CodeWScope:
             return 65;
         default:
-            verify(0);
-            return -1;
+            // As all possible values are mapped in the BSONType enum, we'll return a signal value
+            // to be checked (if desired) by callers of the method if something completely
+            // unexpected comes in. This codepath would only be reached if the given BSONType is not
+            // a valid BSONType. One way this could occur is if the given value was constructed by
+            // forcibly casting something into a BSONType without checking if it's valid.
+            const auto ret = std::numeric_limits<std::int8_t>::min();
+            static_assert(ret < MinKey);  // To explicitly make it different than all BSONTypes
+            return ret;
     }
+}
+
+/** Returns a number for where a given type falls in the sort order.
+ *  Elements with the same return value should be compared for value equality.
+ *  The return value is not a BSONType and should not be treated as one.
+ *  Note: if the order changes, indexes have to be re-built or there can be corruption
+ */
+inline int canonicalizeBSONType(BSONType type) {
+    auto ret = canonicalizeBSONTypeUnsafeLookup(type);
+    if (ret != std::numeric_limits<std::int8_t>::min()) {
+        return ret;
+    }
+    msgasserted(ErrorCodes::InvalidBSONType,
+                fmt::format("Invalid/undefined BSONType value was provided ({:d})", type));
 }
 
 template <BSONType value>
