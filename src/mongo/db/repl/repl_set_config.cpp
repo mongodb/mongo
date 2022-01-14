@@ -97,6 +97,17 @@ ReplSetConfig ReplSetConfig::parseForInitiate(const BSONObj& cfg, OID newReplica
     return result;
 }
 
+BSONObj ReplSetConfig::toBSON() const {
+    BSONObjBuilder builder;
+    serialize(&builder);
+
+    if (_recipientConfig) {
+        builder.append(kRecipientConfigFieldName, _recipientConfig->toBSON());
+    }
+
+    return builder.obj();
+}
+
 void ReplSetConfig::_setRequiredFields() {
     // The three required fields need to be set to something valid to avoid a potential
     // invariant if the uninitialized object is ever used with toBSON().
@@ -123,6 +134,12 @@ ReplSetConfig::ReplSetConfig(const BSONObj& cfg,
     setSettings(ReplSetConfigSettings());
     ReplSetConfigBase::parseProtected(IDLParserErrorContext("ReplSetConfig"), cfg);
     uassertStatusOK(_initialize(forInitiate, forceTerm, defaultReplicaSetId));
+
+    if (cfg.hasField(kRecipientConfigFieldName)) {
+        auto splitConfig = cfg[kRecipientConfigFieldName].Obj();
+        _recipientConfig.reset(new ReplSetConfig(
+            splitConfig, false /* forInitiate */, forceTerm, defaultReplicaSetId));
+    }
 }
 
 Status ReplSetConfig::_initialize(bool forInitiate,
@@ -719,6 +736,14 @@ bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
     const auto& getLastErrorDefaults = getDefaultWriteConcern();
     return !(getLastErrorDefaults.wNumNodes == 1 && getLastErrorDefaults.wTimeout == 0 &&
              getLastErrorDefaults.syncMode == WriteConcernOptions::SyncMode::UNSET);
+}
+
+bool ReplSetConfig::isSplitConfig() const {
+    return !!_recipientConfig;
+}
+
+ReplSetConfigPtr ReplSetConfig::getRecipientConfig() const {
+    return _recipientConfig;
 }
 
 MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {

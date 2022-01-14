@@ -145,6 +145,9 @@ protected:
     MemberConfig* _findMemberByID(MemberId id);
 };
 
+class ReplSetConfig;
+using ReplSetConfigPtr = std::shared_ptr<ReplSetConfig>;
+
 /**
  * Representation of the configuration information about a particular replica set.
  */
@@ -188,7 +191,6 @@ public:
     using ReplSetConfigBase::getReplSetName;
     using ReplSetConfigBase::getWriteConcernMajorityShouldJournal;
     using ReplSetConfigBase::serialize;
-    using ReplSetConfigBase::toBSON;
 
     /**
      * Constructor used for converting a mutable config to an immutable one.
@@ -221,6 +223,11 @@ public:
      * Sets replicaSetId to "newReplicaSetId", which must be set.
      */
     static ReplSetConfig parseForInitiate(const BSONObj& cfg, OID newReplicaSetId);
+
+    /**
+     * Override ReplSetConfigBase::toBSON to conditionally include the recipient config.
+     */
+    BSONObj toBSON() const;
 
     /**
      * Returns true if this object has been successfully initialized or copied from
@@ -528,6 +535,17 @@ public:
      */
     bool containsCustomizedGetLastErrorDefaults() const;
 
+    /**
+     * Returns true if this config is a split config, which is determined by checking if it contains
+     * a recipient config for a shard split operation.
+     */
+    bool isSplitConfig() const;
+
+    /**
+     * Returns the config for the recipient during a tenant split operation, if it exists.
+     */
+    ReplSetConfigPtr getRecipientConfig() const;
+
 private:
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.
@@ -579,6 +597,7 @@ private:
     ReplSetTagConfig _tagConfig;
     StringMap<ReplSetTagPattern> _customWriteConcernModes;
     ConnectionString _connectionString;
+    ReplSetConfigPtr _recipientConfig;
 };
 
 }  // namespace repl
