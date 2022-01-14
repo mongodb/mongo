@@ -56,8 +56,10 @@
 
 namespace mongo {
 /**
- * Forward declaration.
+ * Forward declarations.
  */
+class RecordId;
+
 namespace KeyString {
 class Value;
 }
@@ -1084,6 +1086,14 @@ inline uint8_t* getBSONBinDataCompat(TypeTags tag, Value val) {
     }
 }
 
+inline RecordId* getRecordIdView(Value val) noexcept {
+    return reinterpret_cast<RecordId*>(val);
+}
+
+std::pair<TypeTags, Value> makeNewRecordId(int64_t rid);
+std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size);
+std::pair<TypeTags, Value> makeCopyRecordId(const RecordId&);
+
 inline bool canUseSmallString(StringData input) {
     auto length = input.size();
     auto ptr = input.rawData();
@@ -1360,6 +1370,8 @@ void releaseValue(TypeTags tag, Value val) noexcept;
 
 inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
     switch (tag) {
+        case TypeTags::RecordId:
+            return makeCopyRecordId(*getRecordIdView(val));
         case TypeTags::NumberDecimal:
             return makeCopyDecimal(bitcastTo<Decimal128>(val));
         case TypeTags::Array:

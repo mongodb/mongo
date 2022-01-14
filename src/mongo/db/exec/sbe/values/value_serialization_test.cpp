@@ -45,7 +45,8 @@ TEST(ValueSerializeForSorter, Serialize) {
 
     testData->push_back(value::TypeTags::Nothing, 0);
     testData->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(33550336));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(8589869056));
+    auto [ridTag, ridVal] = value::makeNewRecordId(8589869056);
+    testData->push_back(ridTag, ridVal);
     testData->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(137438691328));
     testData->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.305e18));
 
@@ -228,9 +229,9 @@ TEST_F(ValueSerializeForKeyString, Numerics) {
 }
 
 TEST_F(ValueSerializeForKeyString, RecordIdMinKeyMaxKey) {
-    runTest({{value::TypeTags::MinKey, 0},
-             {value::TypeTags::MaxKey, 0},
-             {value::TypeTags::RecordId, value::bitcastFrom<int64_t>(8589869056)}});
+    auto [ridTag, ridVal] = value::makeNewRecordId(8589869056);
+    sbe::value::ValueGuard guard{ridTag, ridVal};
+    runTest({{value::TypeTags::MinKey, 0}, {value::TypeTags::MaxKey, 0}, {ridTag, ridVal}});
 }
 
 TEST_F(ValueSerializeForKeyString, BoolNullAndNothing) {

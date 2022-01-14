@@ -287,6 +287,19 @@ public:
     }
 
     /**
+     * Same as above but in a binary.
+     */
+    void serializeToken(BufBuilder& buf) const {
+        buf.appendChar(static_cast<char>(_format));
+        withFormat([&](Null) {},
+                   [&](int64_t rid) { buf.appendNum(rid); },
+                   [&](const char* str, int size) {
+                       buf.appendNum(size);
+                       buf.appendBuf(str, size);
+                   });
+    }
+
+    /**
      * Decode a token created by serializeToken().
      */
     static RecordId deserializeToken(const BSONElement& elem) {
@@ -306,6 +319,26 @@ public:
         } else {
             uasserted(ErrorCodes::BadValue,
                       fmt::format("Could not deserialize RecordId with type {}", elem.type()));
+        }
+    }
+
+    /**
+     * Decode a token created by serializeToken().
+     */
+    static RecordId deserializeToken(BufReader& buf) {
+        auto format = buf.read<Format>();
+        if (format == Format::kNull) {
+            return RecordId();
+        } else if (format == Format::kLong) {
+            return RecordId(buf.read<LittleEndian<int64_t>>());
+        } else if (format == Format::kSmallStr || format == Format::kBigStr) {
+            const int size = buf.read<LittleEndian<int>>();
+            const char* str = static_cast<const char*>(buf.skip(size));
+            return RecordId(str, size);
+        } else {
+            uasserted(ErrorCodes::BadValue,
+                      fmt::format("Could not deserialize RecordId with type {}",
+                                  static_cast<int8_t>(format)));
         }
     }
 

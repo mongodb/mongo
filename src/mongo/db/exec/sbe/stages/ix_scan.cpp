@@ -381,9 +381,8 @@ PlanState IndexScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(false,
-                                 value::TypeTags::RecordId,
-                                 value::bitcastFrom<int64_t>(_nextRecord->loc.getLong()));
+        _recordIdAccessor->reset(
+            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_nextRecord->loc));
     }
 
     if (_accessors.size()) {

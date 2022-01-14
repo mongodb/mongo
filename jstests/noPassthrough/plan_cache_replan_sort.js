@@ -33,7 +33,7 @@ assert.commandWorked(coll.insert({x: 5, y: 1}));
 
 // Set the memory limit to be large enough to sort a single document in the collection.
 const documentBsonSize = Object.bsonsize(docs[0]);
-const sizeMultiplier = 4.0;
+const sizeMultiplier = 5.0;
 assert.commandWorked(db.adminCommand({
     setParameter: 1,
     internalQueryMaxBlockingSortMemoryUsageBytes: documentBsonSize * sizeMultiplier

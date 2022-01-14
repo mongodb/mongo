@@ -770,18 +770,50 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     // Build a scan of record ids [1,10,999,10,1,999,8589869056,999,10,8589869056] input array.
     auto [inputTag, inputVal] = sbe::value::makeNewArray();
     auto testData = sbe::value::getArrayView(inputVal);
-
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(1));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(10));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(999));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(10));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(999));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(1));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(999));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(8589869056));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(999));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(10));
-    testData->push_back(value::TypeTags::RecordId, value::bitcastFrom<int64_t>(8589869056));
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(1);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(10);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(999);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(10);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(999);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(1);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(999);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(8589869056);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(999);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(10);
+        testData->push_back(ridTag, ridVal);
+    }
+    {
+        auto [ridTag, ridVal] = sbe::value::makeNewRecordId(8589869056);
+        testData->push_back(ridTag, ridVal);
+    }
 
     auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
 
@@ -807,8 +839,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto [res1ScanTag, res1ScanVal] = resultAccessors[0]->getViewOfValue();
     auto [res1Tag, res1Val] = resultAccessors[1]->getViewOfValue();
     // There are '2' occurences of '1' in the input.
-    assertValuesEqual(
-        res1ScanTag, res1ScanVal, value::TypeTags::RecordId, value::bitcastFrom<int64_t>(1));
+    ASSERT_TRUE(res1ScanTag == value::TypeTags::RecordId);
+    ASSERT_TRUE(sbe::value::getRecordIdView(res1ScanVal)->getLong() == 1);
     assertValuesEqual(
         res1Tag, res1Val, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
 
@@ -816,10 +848,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto [res2ScanTag, res2ScanVal] = resultAccessors[0]->getViewOfValue();
     auto [res2Tag, res2Val] = resultAccessors[1]->getViewOfValue();
     // There are '2' occurences of '8589869056' in the input.
-    assertValuesEqual(res2ScanTag,
-                      res2ScanVal,
-                      value::TypeTags::RecordId,
-                      value::bitcastFrom<int64_t>(8589869056));
+    ASSERT_TRUE(res2ScanTag == value::TypeTags::RecordId);
+    ASSERT_TRUE(sbe::value::getRecordIdView(res2ScanVal)->getLong() == 8589869056);
     assertValuesEqual(
         res2Tag, res2Val, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
 
@@ -827,8 +857,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto [res3ScanTag, res3ScanVal] = resultAccessors[0]->getViewOfValue();
     auto [res3Tag, res3Val] = resultAccessors[1]->getViewOfValue();
     // There are '3' occurences of '10' in the input.
-    assertValuesEqual(
-        res3ScanTag, res3ScanVal, value::TypeTags::RecordId, value::bitcastFrom<int64_t>(10));
+    ASSERT_TRUE(res3ScanTag == value::TypeTags::RecordId);
+    ASSERT_TRUE(sbe::value::getRecordIdView(res3ScanVal)->getLong() == 10);
     assertValuesEqual(
         res3Tag, res3Val, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
 
@@ -836,8 +866,8 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto [res4ScanTag, res4ScanVal] = resultAccessors[0]->getViewOfValue();
     auto [res4Tag, res4Val] = resultAccessors[1]->getViewOfValue();
     // There are '4' occurences of '999' in the input.
-    assertValuesEqual(
-        res4ScanTag, res4ScanVal, value::TypeTags::RecordId, value::bitcastFrom<int64_t>(999));
+    ASSERT_TRUE(res4ScanTag == value::TypeTags::RecordId);
+    ASSERT_TRUE(sbe::value::getRecordIdView(res4ScanVal)->getLong() == 999);
     assertValuesEqual(
         res4Tag, res4Val, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4));
     ASSERT_TRUE(stage->getNext() == PlanState::IS_EOF);

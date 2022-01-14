@@ -329,7 +329,9 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
                                      "but found a result without a valid RecordId: "
                                   << msgTag,
                     tag == sbe::value::TypeTags::RecordId);
-            return BSON("$recordId" << sbe::value::bitcastTo<int64_t>(val));
+            BSONObjBuilder builder;
+            sbe::value::getRecordIdView(val)->serializeToken("$recordId", &builder);
+            return builder.obj();
         }
     }
 
@@ -383,7 +385,7 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
         invariant(recordIdSlot);
         auto [tag, val] = recordIdSlot->getViewOfValue();
         if (tag == sbe::value::TypeTags::RecordId) {
-            *dlOut = RecordId{sbe::value::bitcastTo<int64_t>(val)};
+            *dlOut = *sbe::value::getRecordIdView(val);
         }
     }
     return state;

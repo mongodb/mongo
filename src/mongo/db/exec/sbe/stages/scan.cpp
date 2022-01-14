@@ -317,7 +317,7 @@ void ScanStage::open(bool reOpen) {
                     str::stream() << "seek key is wrong type: " << msgTag,
                     tag == value::TypeTags::RecordId);
 
-            _key = RecordId{value::bitcastTo<int64_t>(val)};
+            _key = *value::getRecordIdView(val);
         }
 
         if (!_cursor || !_seekKeyAccessor) {
@@ -391,9 +391,9 @@ PlanState ScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(false,
-                                 value::TypeTags::RecordId,
-                                 value::bitcastFrom<int64_t>(nextRecord->id.getLong()));
+        _recordId = nextRecord->id;
+        _recordIdAccessor->reset(
+            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
     }
 
     if (!_fieldAccessors.empty()) {
@@ -899,9 +899,9 @@ PlanState ParallelScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(false,
-                                 value::TypeTags::RecordId,
-                                 value::bitcastFrom<int64_t>(nextRecord->id.getLong()));
+        _recordId = nextRecord->id;
+        _recordIdAccessor->reset(
+            false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
     }
 
 

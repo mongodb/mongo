@@ -243,8 +243,27 @@ std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec& ss) {
     return {TypeTags::sortSpec, ssCopy};
 }
 
+std::pair<TypeTags, Value> makeNewRecordId(int64_t rid) {
+    auto val = bitcastFrom<RecordId*>(new RecordId(rid));
+    return {TypeTags::RecordId, val};
+}
+
+std::pair<TypeTags, Value> makeNewRecordId(const char* str, int32_t size) {
+    auto val = bitcastFrom<RecordId*>(new RecordId(str, size));
+    return {TypeTags::RecordId, val};
+}
+
+std::pair<TypeTags, Value> makeCopyRecordId(const RecordId& rid) {
+    auto copy = bitcastFrom<RecordId*>(new RecordId(rid));
+    return {TypeTags::RecordId, copy};
+}
+
+
 void releaseValue(TypeTags tag, Value val) noexcept {
     switch (tag) {
+        case TypeTags::RecordId:
+            delete getRecordIdView(val);
+            break;
         case TypeTags::NumberDecimal:
             delete[] getRawPointerView(val);
             break;
@@ -644,7 +663,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val, size_t depth = 1) {
             break;
         }
         case TypeTags::RecordId:
-            stream << "RecordId(" << bitcastTo<int64_t>(val) << ")";
+            stream << "RecordId(" << getRecordIdView(val)->toString() << ")";
             break;
         case TypeTags::jsFunction:
             // TODO: Also include code.
@@ -728,6 +747,7 @@ BSONType tagToType(TypeTags tag) noexcept {
         case TypeTags::NumberInt32:
             return BSONType::NumberInt;
         case TypeTags::RecordId:
+            return BSONType::EOO;
         case TypeTags::NumberInt64:
             return BSONType::NumberLong;
         case TypeTags::NumberDouble:
@@ -799,12 +819,12 @@ bool isShallowType(TypeTags tag) noexcept {
         case TypeTags::Timestamp:
         case TypeTags::Boolean:
         case TypeTags::StringSmall:
-        case TypeTags::RecordId:
         case TypeTags::MinKey:
         case TypeTags::MaxKey:
         case TypeTags::bsonUndefined:
         case TypeTags::LocalLambda:
             return true;
+        case TypeTags::RecordId:
         case TypeTags::NumberDecimal:
         case TypeTags::StringBig:
         case TypeTags::bsonString:
@@ -838,6 +858,7 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
         case TypeTags::NumberInt32:
             return abslHash(bitcastTo<int32_t>(val));
         case TypeTags::RecordId:
+            return getRecordIdView(val)->hash();
         case TypeTags::NumberInt64:
             return abslHash(bitcastTo<int64_t>(val));
         case TypeTags::NumberDouble: {
@@ -1154,7 +1175,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         // Special case for Nothing in a hash table (group) and sort comparison.
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (lhsTag == TypeTags::RecordId && rhsTag == TypeTags::RecordId) {
-        auto result = compareHelper(bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue));
+        int32_t result = getRecordIdView(lhsValue)->compare(*getRecordIdView(rhsValue));
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::bsonRegex && rhsTag == TypeTags::bsonRegex) {
         auto lhsRegex = getBsonRegexView(lhsValue);

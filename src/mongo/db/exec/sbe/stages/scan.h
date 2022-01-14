@@ -172,6 +172,8 @@ private:
     value::SlotAccessorMap _varAccessors;
     value::SlotAccessor* _seekKeyAccessor{nullptr};
 
+    RecordId _recordId;
+
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
@@ -291,6 +293,8 @@ private:
 
     size_t _currentRange{std::numeric_limits<std::size_t>::max()};
     Range _range;
+
+    RecordId _recordId;
 
     bool _open{false};
 

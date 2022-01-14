@@ -357,8 +357,8 @@ private:
                     return {true, ksTag, ksVal};
                 }
                 case TypeTags::RecordId: {
-                    int64_t ridValue = buf.read<LittleEndian<int64_t>>();
-                    return {false, TypeTags::RecordId, bitcastFrom<int64_t>(ridValue)};
+                    auto [tag, val] = makeCopyRecordId(RecordId::deserializeToken(buf));
+                    return {true, tag, val};
                 }
                 default:
                     MONGO_UNREACHABLE;

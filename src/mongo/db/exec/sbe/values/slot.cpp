@@ -52,6 +52,8 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             val = bitcastFrom<int32_t>(buf.read<LittleEndian<int32_t>>());
             break;
         case TypeTags::RecordId:
+            std::tie(tag, val) = makeCopyRecordId(RecordId::deserializeToken(buf));
+            break;
         case TypeTags::NumberInt64:
             val = bitcastFrom<int64_t>(buf.read<LittleEndian<int64_t>>());
             break;
@@ -232,6 +234,8 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendNum(bitcastTo<int32_t>(val));
             break;
         case TypeTags::RecordId:
+            getRecordIdView(val)->serializeToken(buf);
+            break;
         case TypeTags::NumberInt64:
             buf.appendNum(bitcastTo<int64_t>(val));
             break;
@@ -530,10 +534,9 @@ static void serializeValueIntoKeyString(KeyString::Builder& buf, TypeTags tag, V
             break;
         }
         case TypeTags::RecordId: {
-            // TODO SERVER-61630: Support RecordId strings when sbe also supports this.
             BufBuilder innerBinDataBuf;
             innerBinDataBuf.appendUChar(static_cast<uint8_t>(tag));
-            innerBinDataBuf.appendNum(bitcastTo<int64_t>(val));
+            getRecordIdView(val)->serializeToken(innerBinDataBuf);
             buf.appendBool(true);
             buf.appendBinData(BSONBinData(
                 innerBinDataBuf.buf(), innerBinDataBuf.len(), BinDataType::BinDataGeneral));
@@ -592,13 +595,15 @@ int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::Timestamp:
         case TypeTags::Boolean:
         case TypeTags::StringSmall:
-        case TypeTags::RecordId:
         case TypeTags::MinKey:
         case TypeTags::MaxKey:
         case TypeTags::bsonUndefined:
         case TypeTags::LocalLambda:
             break;
         // There are deep types.
+        case TypeTags::RecordId:
+            result += getRecordIdView(val)->memUsage();
+            break;
         case TypeTags::NumberDecimal:
             result += sizeof(Decimal128);
             break;

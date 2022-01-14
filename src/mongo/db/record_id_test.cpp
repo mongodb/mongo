@@ -248,6 +248,48 @@ TEST(RecordId, RoundTripSerialize) {
     }
 }
 
+TEST(RecordId, RoundTripSerializeBinary) {
+    {
+        RecordId id(1);
+        BufBuilder builder;
+        id.serializeToken(builder);
+        BufReader reader(builder.buf(), builder.len());
+        ASSERT_EQ(id, RecordId::deserializeToken(reader));
+    }
+
+    {
+        RecordId id(4611686018427387904);
+        BufBuilder builder;
+        id.serializeToken(builder);
+        BufReader reader(builder.buf(), builder.len());
+        ASSERT_EQ(id, RecordId::deserializeToken(reader));
+    }
+
+    {
+        RecordId id;
+        BufBuilder builder;
+        id.serializeToken(builder);
+        BufReader reader(builder.buf(), builder.len());
+        ASSERT_EQ(id, RecordId::deserializeToken(reader));
+    }
+
+    {
+        RecordId id(record_id_helpers::keyForOID(OID::gen()));
+        BufBuilder builder;
+        id.serializeToken(builder);
+        BufReader reader(builder.buf(), builder.len());
+        ASSERT_EQ(id, RecordId::deserializeToken(reader));
+    }
+
+    {
+        char buf[1024] = {'x'};
+        RecordId id(buf, sizeof(buf));
+        BufBuilder builder;
+        id.serializeToken(builder);
+        BufReader reader(builder.buf(), builder.len());
+        ASSERT_EQ(id, RecordId::deserializeToken(reader));
+    }
+}
 TEST(RecordId, RecordIdBigStr) {
     char buf[1024] = {'x'};
 

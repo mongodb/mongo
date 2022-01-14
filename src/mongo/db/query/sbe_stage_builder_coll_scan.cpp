@@ -268,16 +268,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             auto resumeRecordIdSlot = state.env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
         } else if (csn->resumeAfterRecordId) {
-            return {
-                state.slotId(),
-                makeConstant(sbe::value::TypeTags::RecordId, csn->resumeAfterRecordId->getLong())};
+            auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
+            return {state.slotId(), makeConstant(tag, val)};
         } else if (csn->minRecord) {
             auto cursor = collection->getRecordStore()->getCursor(state.opCtx);
             auto startRec = cursor->seekNear(*csn->minRecord);
             if (startRec) {
                 LOGV2_DEBUG(205841, 3, "Using direct oplog seek");
-                return {state.slotId(),
-                        makeConstant(sbe::value::TypeTags::RecordId, startRec->id.getLong())};
+                auto [tag, val] = sbe::value::makeCopyRecordId(startRec->id);
+                return {state.slotId(), makeConstant(tag, val)};
             }
         }
         return {};
@@ -550,9 +549,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     auto [seekRecordIdSlot, seekRecordIdExpression] =
         [&]() -> std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::EExpression>> {
         if (csn->resumeAfterRecordId) {
-            return {
-                state.slotId(),
-                makeConstant(sbe::value::TypeTags::RecordId, csn->resumeAfterRecordId->getLong())};
+            auto [tag, val] = sbe::value::makeCopyRecordId(*csn->resumeAfterRecordId);
+            return {state.slotId(), makeConstant(tag, val)};
         } else if (isTailableResumeBranch) {
             auto resumeRecordIdSlot = state.env->getSlot("resumeRecordId"_sd);
             return {resumeRecordIdSlot, makeVariable(resumeRecordIdSlot)};
