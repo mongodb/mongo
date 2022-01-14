@@ -20,8 +20,11 @@ ldd src/dist-test/bin/mongo | grep libvoidstar
 # prepare the image building environment
 cp -rf src/buildscripts/antithesis/ antithesis
 # due to gitignore, we can't commit a folder called logs, so make it here
-mkdir -p antithesis/topologies/replica_set/logs/{database1,database2,database3,workload}
-mkdir -p antithesis/topologies/sharded_cluster/logs/{database1,database2,database3,database4,database5,database6,configsvr1,configsvr2,configsvr3,mongos,workload}
+mkdir -p antithesis/topologies/replica_set/{logs,data}/database{1,2,3}
+mkdir -p antithesis/topologies/replica_set/{logs,data}/workload
+mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/database{1,2,3,4,5,6}
+mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/configsvr{1,2,3}
+mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/{mongos,workload}
 
 # copy ... to the build context
 # resmoke

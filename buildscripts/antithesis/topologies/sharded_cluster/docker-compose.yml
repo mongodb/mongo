@@ -7,7 +7,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                   - ./logs/configsvr1:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --configsvr --replSet ConfigServerReplSet --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1 --setParameter reshardingMinimumOperationDurationMillis=30000 --wiredTigerCacheSizeGB 1 --oplogSize 256
+                  - ./scripts:/scripts/
+                  - ./data/configsvr1:/data/configdb/
+                command: /bin/bash /scripts/configsvr_init.sh
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.6
@@ -21,7 +23,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                         - ./logs/configsvr2:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --configsvr --replSet ConfigServerReplSet --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1 --setParameter reshardingMinimumOperationDurationMillis=30000 --wiredTigerCacheSizeGB 1 --oplogSize 256
+                        - ./scripts:/scripts/
+                        - ./data/configsvr2:/data/configdb/
+                command: /bin/bash /scripts/configsvr_init.sh
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.7
@@ -35,7 +39,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                         - ./logs/configsvr3:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --configsvr --replSet ConfigServerReplSet --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1 --setParameter reshardingMinimumOperationDurationMillis=30000 --wiredTigerCacheSizeGB 1 --oplogSize 256
+                        - ./scripts:/scripts/
+                        - ./data/configsvr3:/data/configdb/
+                command: /bin/bash /scripts/configsvr_init.sh
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.8
@@ -49,7 +55,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                   - ./logs/database1:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard1 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                  - ./scripts:/scripts/
+                  - ./data/database1:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard1
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.3
@@ -62,7 +70,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                   - ./logs/database2:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard1 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                  - ./scripts:/scripts/
+                  - ./data/database2:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard1
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.4
@@ -75,7 +85,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                   - ./logs/database3:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard1 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                  - ./scripts:/scripts/
+                  - ./data/database3:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard1
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.5
@@ -88,7 +100,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                         - ./logs/database4:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard2 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                        - ./scripts:/scripts/
+                        - ./data/database4:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard2
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.10
@@ -101,7 +115,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                         - ./logs/database5:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard2 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                        - ./scripts:/scripts/
+                        - ./data/database5:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard2
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.11
@@ -114,7 +130,9 @@ services:
                 image: mongo-binaries:evergreen-latest-master
                 volumes:
                         - ./logs/database6:/var/log/mongodb/
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --shardsvr --replSet Shard2 --logpath /var/log/mongodb/mongodb.log --oplogSize 256 --setParameter enableTestCommands=1 --setParameter enableElectionHandoff=0 --setParameter roleGraphInvalidationIsFatal=1 --setParameter receiveChunkWaitForRangeDeleterTimeoutMS=90000 --wiredTigerCacheSizeGB 1
+                        - ./scripts:/scripts/
+                        - ./data/database6:/data/db/
+                command: /bin/bash /scripts/database_init.sh Shard2
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.12

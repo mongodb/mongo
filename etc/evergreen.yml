@@ -12178,3 +12178,4 @@ buildvariants:
   tasks:
   - name: compile_and_archive_dist_test_TG
   - name: .antithesis
+  - name: generate_buildid_to_debug_symbols_mapping

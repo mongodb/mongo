@@ -5,9 +5,11 @@ services:
                 container_name: database1
                 hostname: database1
                 image: mongo-binaries:evergreen-latest-master
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
+                command: /bin/bash /scripts/database_init.sh
                 volumes:
                   - ./logs/database1:/var/log/mongodb/
+                  - ./scripts:/scripts/
+                  - ./data/database1:/data/db/
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.3
@@ -18,9 +20,11 @@ services:
                 container_name: database2
                 hostname: database2
                 image: mongo-binaries:evergreen-latest-master
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
+                command: /bin/bash /scripts/database_init.sh
                 volumes:
                   - ./logs/database2:/var/log/mongodb/
+                  - ./scripts:/scripts/
+                  - ./data/database2:/data/db/
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.4
@@ -31,9 +35,11 @@ services:
                 container_name: database3
                 hostname: database3
                 image: mongo-binaries:evergreen-latest-master
-                command: /usr/bin/mongod --bind_ip 0.0.0.0 --replSet RollbackFuzzerTest --logpath /var/log/mongodb/mongodb.log --setParameter enableTestCommands=1
+                command: /bin/bash /scripts/database_init.sh
                 volumes:
                   - ./logs/database3:/var/log/mongodb/
+                  - ./scripts:/scripts/
+                  - ./data/database3:/data/db/
                 networks:
                         antithesis-net:
                                 ipv4_address: 10.20.20.5
