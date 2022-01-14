@@ -66,7 +66,13 @@ function checkServerStatusAbortedMigrationCount(shardConn, count) {
 
 function runConcurrentMoveChunk(host, ns, toShard) {
     const mongos = new Mongo(host);
-    return mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: toShard});
+    let result = mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: toShard});
+
+    if (!result.ok) {
+        jsTestLog("moveChunk encountered an error: " + tojson(result));
+    }
+
+    return result;
 }
 
 function runConcurrentRead(host, dbName, collName) {
