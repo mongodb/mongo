@@ -87,8 +87,6 @@ public:
      */
     virtual void onMajorityCommitPointUpdate(repl::OpTime opTime) = 0;
 
-    virtual std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor() = 0;
-
     virtual void appendInfoForServerStatus(BSONObjBuilder* builder) const = 0;
 
     /**

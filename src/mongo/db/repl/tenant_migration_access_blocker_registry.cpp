@@ -28,8 +28,36 @@
  */
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
+
+namespace {
+
+// Executor to asynchronously schedule blocking operations while the tenant migration access
+// blockers are in action. This provides migrated tenants isolation from the non-migrated users.
+// The executor is shared by all access blockers and the thread count goes to 0 when there is no
+// migration.
+std::shared_ptr<executor::TaskExecutor> _createBlockedOperationsExecutor() {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.maxThreads = 4;
+    // When there is no migration, reduce thread count to 0.
+    threadPoolOptions.minThreads = 0;
+    threadPoolOptions.threadNamePrefix = "TenantMigrationBlockerAsync-";
+    threadPoolOptions.poolName = "TenantMigrationBlockerAsyncThreadPool";
+    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+        Client::initThread(threadName.c_str());
+    };
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(threadPoolOptions),
+        executor::makeNetworkInterface("TenantMigrationBlockerNet"));
+
+    return executor;
+}
+}  // namespace
+
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 using MtabPair = TenantMigrationAccessBlockerRegistry::DonorRecipientAccessBlockerPair;
 
@@ -162,6 +190,7 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId
 void TenantMigrationAccessBlockerRegistry::shutDown() {
     stdx::lock_guard<Latch> lg(_mutex);
     _tenantMigrationAccessBlockers.clear();
+    _asyncBlockingOperationsExecutor.reset();
 }
 
 void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(
@@ -207,6 +236,17 @@ void TenantMigrationAccessBlockerRegistry::onMajorityCommitPointUpdate(repl::OpT
             donorMtab->onMajorityCommitPointUpdate(opTime);
         }
     }
+}
+
+std::shared_ptr<executor::TaskExecutor>
+TenantMigrationAccessBlockerRegistry::getAsyncBlockingOperationsExecutor() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_asyncBlockingOperationsExecutor) {
+        _asyncBlockingOperationsExecutor = _createBlockedOperationsExecutor();
+        _asyncBlockingOperationsExecutor->startup();
+    }
+
+    return _asyncBlockingOperationsExecutor;
 }
 
 }  // namespace mongo

@@ -88,6 +88,7 @@ public:
         std::shared_ptr<TenantMigrationAccessBlocker> _recipient;
     };
     TenantMigrationAccessBlockerRegistry() = default;
+
     static const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry> get;
 
     /**
@@ -152,11 +153,15 @@ public:
      */
     void onMajorityCommitPointUpdate(repl::OpTime opTime);
 
+    std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor();
+
 private:
     using TenantMigrationAccessBlockersMap = StringMap<DonorRecipientAccessBlockerPair>;
 
     boost::optional<DonorRecipientAccessBlockerPair> _getTenantMigrationAccessBlockersForDbName(
         StringData dbName, WithLock);
+
+    std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
     TenantMigrationAccessBlockersMap _tenantMigrationAccessBlockers;

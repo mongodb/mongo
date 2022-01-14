@@ -138,8 +138,8 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
     // migrations happen back-to-back before the old recipient state (from the first
     // migration) is garbage collected.
     auto dbName = request.getDatabase();
-    auto mtabPair = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .getTenantMigrationAccessBlockerForDbName(dbName);
+    auto& blockerRegistry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+    auto mtabPair = blockerRegistry.getTenantMigrationAccessBlockerForDbName(dbName);
 
     if (!mtabPair) {
         return Status::OK();
@@ -164,7 +164,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
                 return status;
             }
         }
-        executor = donorMtab->getAsyncBlockingOperationsExecutor();
+        executor = blockerRegistry.getAsyncBlockingOperationsExecutor();
         futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
     }
     if (recipientMtab) {
@@ -176,7 +176,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
                 return status;
             }
         }
-        executor = recipientMtab->getAsyncBlockingOperationsExecutor();
+        executor = blockerRegistry.getAsyncBlockingOperationsExecutor();
         futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
     }
 

@@ -106,10 +106,6 @@ public:
      */
     void onMajorityCommitPointUpdate(repl::OpTime opTime) final;
 
-    std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor() final {
-        return _asyncBlockingOperationsExecutor;
-    }
-
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
 
     UUID getMigrationId() const;
@@ -169,8 +165,6 @@ private:
     // Start with blocked TTL, unblock when the migration document is marked as
     // garbage collectable.
     bool _ttlIsBlocked = true;
-
-    std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
 };
 
 }  // namespace mongo

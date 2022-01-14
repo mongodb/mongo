@@ -213,10 +213,6 @@ public:
      */
     void onMajorityCommitPointUpdate(repl::OpTime opTime) final;
 
-    std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor() final {
-        return _asyncBlockingOperationsExecutor;
-    }
-
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
 
     BSONObj getDebugInfo() const final;
@@ -342,8 +338,6 @@ private:
     SharedPromise<void> _completionPromise;
 
     RepeatableSharedPromise<void> _transitionOutOfBlockingPromise;
-
-    std::shared_ptr<executor::TaskExecutor> _asyncBlockingOperationsExecutor;
 };
 
 }  // namespace mongo

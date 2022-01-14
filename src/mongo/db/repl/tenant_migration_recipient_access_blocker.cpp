@@ -36,7 +36,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_util.h"
@@ -66,8 +66,6 @@ TenantMigrationRecipientAccessBlocker::TenantMigrationRecipientAccessBlocker(
       _protocol(protocol),
       _donorConnString(std::move(donorConnString)) {
     invariant(tenant_migration_util::protocolTenantIdCompatibilityCheck(_protocol, _tenantId));
-    _asyncBlockingOperationsExecutor = TenantMigrationAccessBlockerExecutor::get(serviceContext)
-                                           .getOrCreateBlockedOperationsExecutor();
 }
 
 Status TenantMigrationRecipientAccessBlocker::checkIfCanWrite(Timestamp writeTs) {
@@ -147,9 +145,13 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
         // Speculative majority reads are only used for change streams (against the oplog
         // collection) or when enableMajorityReadConcern=false. So we don't expect speculative
         // majority reads in serverless.
+
+        auto executor = TenantMigrationAccessBlockerRegistry::get(_serviceContext)
+                            .getAsyncBlockingOperationsExecutor();
+
         invariant(readConcernArgs.getMajorityReadMechanism() !=
                   repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
-        return ExecutorFuture(_asyncBlockingOperationsExecutor)
+        return ExecutorFuture(executor)
             .then([timestamp = *_rejectBeforeTimestamp, deadline = opCtx->getDeadline()] {
                 auto uniqueOpCtx = cc().makeOperationContext();
                 auto opCtx = uniqueOpCtx.get();

@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -94,6 +95,7 @@ public:
     }
 
     void tearDown() override {
+        TenantMigrationAccessBlockerRegistry::get(cc().getServiceContext()).shutDown();
         ServiceContextMongoDTest::tearDown();
     }
 

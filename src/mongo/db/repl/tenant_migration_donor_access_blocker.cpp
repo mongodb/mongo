@@ -36,7 +36,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_util.h"
@@ -83,8 +82,6 @@ TenantMigrationDonorAccessBlocker::TenantMigrationDonorAccessBlocker(
       _protocol(protocol),
       _recipientConnString(std::move(recipientConnString)) {
     invariant(tenant_migration_util::protocolTenantIdCompatibilityCheck(_protocol, _tenantId));
-    _asyncBlockingOperationsExecutor = TenantMigrationAccessBlockerExecutor::get(serviceContext)
-                                           .getOrCreateBlockedOperationsExecutor();
 }
 
 Status TenantMigrationDonorAccessBlocker::checkIfCanWrite(Timestamp writeTs) {
@@ -112,7 +109,8 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanWrite(Timestamp writeTs) {
 Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
     // Source to cancel the timeout if the operation completed in time.
     CancellationSource cancelTimeoutSource;
-    auto executor = getAsyncBlockingOperationsExecutor();
+    auto executor = TenantMigrationAccessBlockerRegistry::get(_serviceContext)
+                        .getAsyncBlockingOperationsExecutor();
     std::vector<ExecutorFuture<void>> futures;
 
     futures.emplace_back(_onCompletion().thenRunOn(executor));
