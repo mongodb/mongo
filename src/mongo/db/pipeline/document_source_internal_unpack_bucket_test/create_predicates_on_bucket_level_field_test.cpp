@@ -440,8 +440,16 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             ASSERT_EQ(idPred->path(), "_id"_sd);
             ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
 
+            // As ObjectId holds time at a second granularity, the rewrite value used for a $lt/$lte
+            // predicate on _id may be rounded up by a second to missing results due to trunacted
+            // milliseconds.
+            Date_t adjustedDate = date;
+            if (adjustedDate.toMillisSinceEpoch() % 1000 != 0) {
+                adjustedDate += Seconds{1};
+            }
+
             OID oid;
-            oid.init(date);
+            oid.init(adjustedDate);
             ASSERT_TRUE(oid.compare(idPred->getData().OID()) == 0);
         }
     }

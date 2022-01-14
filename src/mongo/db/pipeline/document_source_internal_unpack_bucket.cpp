@@ -115,8 +115,13 @@ template <typename MatchType>
 auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
     // Indicates whether to initialize an ObjectId with a max or min value for the non-date bytes.
     enum class OIDInit : bool { max, min };
-    // Make an ObjectId cooresponding to a date value.
-    auto makeDateOID = [](auto&& date, auto&& maxOrMin) {
+    // Make an ObjectId cooresponding to a date value. As a conversion from date to ObjectId will
+    // truncate milliseconds, we round up when needed to prevent missing results.
+    auto makeDateOID = [](auto&& date, auto&& maxOrMin, bool roundMillisUpToSecond = false) {
+        if (roundMillisUpToSecond && (date.toMillisSinceEpoch() % 1000 != 0)) {
+            date += Seconds{1};
+        }
+
         auto oid = OID{};
         oid.init(date, maxOrMin == OIDInit::max);
         return oid;
@@ -142,9 +147,9 @@ auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
     // make this case faster by keeping the ObjectId as the lowest or highest possible value so as
     // to eliminate all buckets.
     if constexpr (std::is_same_v<MatchType, LTMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::min)};
+        return Value{makeDateOID(rhs.date(), OIDInit::min, true /*roundMillisUpToSecond*/)};
     } else if constexpr (std::is_same_v<MatchType, LTEMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::max)};
+        return Value{makeDateOID(rhs.date(), OIDInit::max, true /*roundMillisUpToSecond*/)};
     } else if constexpr (std::is_same_v<MatchType, GTMatchExpression>) {
         return Value{makeMaxAdjustedDateOID(rhs.date(), OIDInit::max)};
     } else if constexpr (std::is_same_v<MatchType, GTEMatchExpression>) {
