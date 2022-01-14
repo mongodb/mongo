@@ -53,8 +53,9 @@ public:
     static constexpr int64_t kMinRepr = LLONG_MIN;
     static constexpr int64_t kMaxRepr = LLONG_MAX;
 
-    // A RecordId binary string cannot be larger than this arbitrary size.
-    static constexpr int64_t kBigStrMaxSize = 4 * 1024 * 1024;
+    // A RecordId binary string cannot be larger than this arbitrary size. RecordIds get written to
+    // the key and the value in WiredTiger, so we should avoid large strings.
+    static constexpr int64_t kBigStrMaxSize = 8 * 1024 * 1024;
 
     /**
      * A RecordId that compares less than all int64_t RecordIds that represent documents in a
@@ -101,7 +102,9 @@ public:
             _sharedBuffer = std::move(sharedBuf);
         } else {
             uasserted(5894900,
-                      fmt::format("Size of RecordId is above limit of {} bytes", kBigStrMaxSize));
+                      fmt::format("Size of RecordId ({}) is above limit of {} bytes",
+                                  size,
+                                  kBigStrMaxSize));
         }
     }
 
@@ -279,7 +282,7 @@ public:
         withFormat([&](Null n) { builder->appendNull(fieldName); },
                    [&](int64_t rid) { builder->append(fieldName, rid); },
                    [&](const char* str, int size) {
-                       builder->append(fieldName, hexblob::encodeLower(str, size));
+                       builder->appendBinData(fieldName, size, BinDataGeneral, str);
                    });
     }
 
@@ -291,7 +294,13 @@ public:
             return RecordId();
         } else if (elem.isNumber()) {
             return RecordId(elem.numberLong());
+        } else if (elem.type() == BSONType::BinData) {
+            int size;
+            auto str = elem.binData(size);
+            return RecordId(str, size);
         } else if (elem.type() == BSONType::String) {
+            // Support old format for upgrades during resumable index builds.
+            // TODO SERVER-62369: Remove when we branch out 6.0.
             auto str = hexblob::decode(elem.String());
             return RecordId(str.c_str(), str.size());
         } else {

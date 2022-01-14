@@ -256,7 +256,7 @@ class RecordIdPrinter(object):
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
             return "RecordId small string %d hex bytes: %s" % (str_len, str("".join(hex_bytes)))
         elif rid_format == 3:
-            holder_ptr = self.val["_ownedBuffer"]["_buffer"]["_holder"]["px"]
+            holder_ptr = self.val["_sharedBuffer"]["_buffer"]["_holder"]["px"]
             holder = holder_ptr.dereference()
             str_len = int(holder["_capacity"])
             # Start of data is immediately after pointer for holder

@@ -141,19 +141,15 @@ var IndexBuildTest = class {
     }
 
     /**
-     * Returns true if the passed in collection is clustered.
+     * Returns true if `listIndexes` returns the '_id_' index for the collection
      */
-    static isCollectionClustered(coll) {
-        const res = assert.commandWorked(
-            coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}));
-        assert.eq(1, res.cursor.firstBatch.length);
-
-        const collInfo = res.cursor.firstBatch[0];
-        return collInfo.options.hasOwnProperty("clusteredIndex");
+    static listIndexesIncludesId(coll) {
+        const res = assert.commandWorked(coll.getDB().runCommand({listIndexes: coll.getName()}));
+        return 1 == res.cursor.firstBatch.filter(i => i.name == "_id_" || i.clustered).length;
     }
 
     static assertIndexesIdHelper(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
-        if (!IndexBuildTest.isCollectionClustered(coll)) {
+        if (IndexBuildTest.listIndexesIncludesId(coll)) {
             numIndexes++;
             readyIndexes.concat("_id_");
         }
@@ -453,16 +449,17 @@ const ResumableIndexBuildTest = class {
      * shutdown and are completed upon startup. Returns the build UUIDs of the index builds that
      * were resumed.
      */
-    static restart(rst,
-                   conn,
-                   coll,
-                   indexNames,
-                   failPoints,
-                   failPointsIteration,
-                   shouldComplete = true,
-                   failPointAfterStartup,
-                   runBeforeStartup,
-                   options) {
+    static restartWithUpgrade(rst,
+                              upg,
+                              conn,
+                              coll,
+                              indexNames,
+                              failPoints,
+                              failPointsIteration,
+                              shouldComplete = true,
+                              failPointAfterStartup,
+                              runBeforeStartup,
+                              options) {
         clearRawMongoProgramOutput();
 
         const buildUUIDs = ResumableIndexBuildTest.generateFailPointsData(
@@ -523,7 +520,7 @@ const ResumableIndexBuildTest = class {
             });
         }
         const defaultOptions = {noCleanData: true, setParameter: setParameter};
-        rst.start(conn, Object.assign(defaultOptions, options || {}));
+        upg.start(conn, Object.assign(defaultOptions, options || {}));
 
         if (shouldComplete) {
             // Ensure that the index builds were completed upon the node starting back up.
@@ -536,6 +533,29 @@ const ResumableIndexBuildTest = class {
         }
 
         return buildUUIDs;
+    }
+
+    static restart(rst,
+                   conn,
+                   coll,
+                   indexNames,
+                   failPoints,
+                   failPointsIteration,
+                   shouldComplete = true,
+                   failPointAfterStartup,
+                   runBeforeStartup,
+                   options) {
+        return ResumableIndexBuildTest.restartWithUpgrade(rst,
+                                                          rst,
+                                                          conn,
+                                                          coll,
+                                                          indexNames,
+                                                          failPoints,
+                                                          failPointsIteration,
+                                                          shouldComplete,
+                                                          failPointAfterStartup,
+                                                          runBeforeStartup,
+                                                          options);
     }
 
     /**
@@ -601,7 +621,9 @@ const ResumableIndexBuildTest = class {
     }
 
     /**
-     * Runs a resumable index build test on the provided replica set and namespace.
+     * Runs a resumable index build test on the specified namespace, starting it on the 'rst'
+     * replica set and resuming it in the 'upg' replica set, which could be a different binary
+     * version.
      *
      * 'indexSpecs' is a 2d array that specifies all indexes that should be built. The first
      *   dimension indicates separate calls to the createIndexes command, while the second
@@ -629,11 +651,60 @@ const ResumableIndexBuildTest = class {
      *   index build did not resume from an earlier phase than expected. The log message must
      *   contain the buildUUID attribute.
      *
-     * 'sideWries' is an array of documents inserted during the initialization phase so that they
+     * 'sideWrites' is an array of documents inserted during the initialization phase so that they
      *   are inserted into the side writes table and processed during the drain writes phase.
      *
      * 'postIndexBuildInserts' is an array of documents inserted after the index builds have
      *   completed.
+     */
+    static runAndUpgrade(rst,
+                         upg,
+                         dbName,
+                         collName,
+                         indexSpecs,
+                         failPoints,
+                         failPointsIteration,
+                         expectedResumePhases,
+                         resumeChecks,
+                         sideWrites = [],
+                         postIndexBuildInserts = [],
+                         restartOptions) {
+        const primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).getCollection(collName);
+        const indexNames = ResumableIndexBuildTest.generateIndexNames(indexSpecs);
+
+        const awaitCreateIndexes = ResumableIndexBuildTest.createIndexesWithSideWrites(
+            rst, function(collName, indexSpecs, indexNames) {
+                load("jstests/noPassthrough/libs/index_build.js");
+                ResumableIndexBuildTest.createIndexesFails(db, collName, indexSpecs, indexNames);
+            }, coll, indexSpecs, indexNames, sideWrites, {hangBeforeBuildingIndex: true});
+
+        const buildUUIDs = ResumableIndexBuildTest.restartWithUpgrade(rst,
+                                                                      upg,
+                                                                      primary,
+                                                                      coll,
+                                                                      indexNames,
+                                                                      failPoints,
+                                                                      failPointsIteration,
+                                                                      true,
+                                                                      undefined,
+                                                                      undefined,
+                                                                      restartOptions);
+
+        for (const awaitCreateIndex of awaitCreateIndexes) {
+            awaitCreateIndex();
+        }
+
+        ResumableIndexBuildTest.checkResume(
+            primary, buildUUIDs, expectedResumePhases, resumeChecks);
+
+        ResumableIndexBuildTest.checkIndexes(
+            rst, dbName, collName, indexNames, postIndexBuildInserts);
+    }
+
+    /**
+     *  Runs a resumable index build test on the specified namespace and replica set. See
+     * `runAndUpgrade' for paremeters documentation.
      */
     static run(rst,
                dbName,
@@ -646,36 +717,18 @@ const ResumableIndexBuildTest = class {
                sideWrites = [],
                postIndexBuildInserts = [],
                restartOptions) {
-        const primary = rst.getPrimary();
-        const coll = primary.getDB(dbName).getCollection(collName);
-        const indexNames = ResumableIndexBuildTest.generateIndexNames(indexSpecs);
-
-        const awaitCreateIndexes = ResumableIndexBuildTest.createIndexesWithSideWrites(
-            rst, function(collName, indexSpecs, indexNames) {
-                load("jstests/noPassthrough/libs/index_build.js");
-                ResumableIndexBuildTest.createIndexesFails(db, collName, indexSpecs, indexNames);
-            }, coll, indexSpecs, indexNames, sideWrites, {hangBeforeBuildingIndex: true});
-
-        const buildUUIDs = ResumableIndexBuildTest.restart(rst,
-                                                           primary,
-                                                           coll,
-                                                           indexNames,
-                                                           failPoints,
-                                                           failPointsIteration,
-                                                           true,
-                                                           undefined,
-                                                           undefined,
-                                                           restartOptions);
-
-        for (const awaitCreateIndex of awaitCreateIndexes) {
-            awaitCreateIndex();
-        }
-
-        ResumableIndexBuildTest.checkResume(
-            primary, buildUUIDs, expectedResumePhases, resumeChecks);
-
-        ResumableIndexBuildTest.checkIndexes(
-            rst, dbName, collName, indexNames, postIndexBuildInserts);
+        this.runAndUpgrade(rst,
+                           rst,
+                           dbName,
+                           collName,
+                           indexSpecs,
+                           failPoints,
+                           failPointsIteration,
+                           expectedResumePhases,
+                           resumeChecks,
+                           sideWrites,
+                           postIndexBuildInserts,
+                           restartOptions);
     }
 
     /**

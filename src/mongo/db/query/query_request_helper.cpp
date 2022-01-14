@@ -130,12 +130,12 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
         if (!findCommand.getResumeAfter().isEmpty()) {
             if (findCommand.getResumeAfter().nFields() != 1 ||
                 (findCommand.getResumeAfter()["$recordId"].type() != BSONType::NumberLong &&
-                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::String &&
+                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::BinData &&
                  findCommand.getResumeAfter()["$recordId"].type() != BSONType::jstNULL)) {
-                return Status(
-                    ErrorCodes::BadValue,
-                    "Malformed resume token: the '_resumeAfter' object must contain"
-                    " exactly one field named '$recordId', of type NumberLong, jstOID or jstNULL.");
+                return Status(ErrorCodes::BadValue,
+                              "Malformed resume token: the '_resumeAfter' object must contain"
+                              " exactly one field named '$recordId', of type NumberLong, BinData "
+                              "or jstNULL.");
             }
         }
     } else if (!findCommand.getResumeAfter().isEmpty()) {

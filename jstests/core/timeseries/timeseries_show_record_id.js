@@ -38,10 +38,15 @@ TimeseriesTest.run((insert) => {
         }));
     }
 
+    function isRecordId(data) {
+        return isString(data)  // old format
+            || Object.prototype.toString.call(data) === "[object BinData]";
+    }
+
     function checkRecordId(documents) {
         for (const document of documents) {
             assert(document.hasOwnProperty("$recordId"));
-            assert(isString(document["$recordId"]));
+            assert(isRecordId(document["$recordId"]));
         }
     }
 

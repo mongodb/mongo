@@ -134,7 +134,7 @@ var ClusteredCollectionUtil = class {
 
         // This key is too large.
         assert.commandFailedWithCode(
-            coll.insert({[clusterKey]: 'x'.repeat(8 * 1024 * 1024), a: 11}), 5894900);
+            coll.insert({[clusterKey]: 'x'.repeat(9 * 1024 * 1024), a: 11}), 5894900);
 
         // Look up using the secondary index on {a: 1}
         assert.commandWorked(coll.createIndex({a: 1}));
