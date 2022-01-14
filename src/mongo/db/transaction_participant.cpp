@@ -621,9 +621,38 @@ boost::optional<TxnNumber> TransactionParticipant::Observer::_activeRetryableWri
     return boost::none;
 }
 
+void TransactionParticipant::Participant::_uassertNoConflictingInternalTransactionForRetryableWrite(
+    OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    auto& retryableWriteTxnParticipantCatalog =
+        getRetryableWriteTransactionParticipantCatalog(opCtx);
+    invariant(retryableWriteTxnParticipantCatalog.isValid());
+
+    for (const auto& it : retryableWriteTxnParticipantCatalog.getParticipants()) {
+        const auto& txnParticipant = it.second;
+
+        if (txnParticipant._sessionId() == opCtx->getLogicalSessionId() ||
+            !txnParticipant._isInternalSessionForRetryableWrite()) {
+            continue;
+        }
+
+        uassert(
+            ErrorCodes::RetryableTransactionInProgress,
+            str::stream() << "Cannot run retryable write with session id " << _sessionId()
+                          << " and transaction number " << txnNumberAndRetryCounter.getTxnNumber()
+                          << " because it is being executed in a retryable internal transaction "
+                          << " with session id " << txnParticipant._sessionId()
+                          << " and transaction number "
+                          << txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber()
+                          << " in state " << txnParticipant.o().txnState,
+            !txnParticipant.transactionIsOpen());
+    }
+}
+
 void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     invariant(!txnNumberAndRetryCounter.getTxnRetryCounter());
+
+    _uassertNoConflictingInternalTransactionForRetryableWrite(opCtx, txnNumberAndRetryCounter);
 
     if (txnNumberAndRetryCounter.getTxnNumber() >
         o().activeTxnNumberAndRetryCounter.getTxnNumber()) {

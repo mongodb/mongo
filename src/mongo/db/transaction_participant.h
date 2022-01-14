@@ -840,6 +840,11 @@ public:
         void _setNewTxnNumberAndRetryCounter(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
+        // Asserts that there is no open retryable internal transaction (i.e. not committed or
+        // aborted) apart from the one being run by the given 'opCtx', if any.
+        void _uassertNoConflictingInternalTransactionForRetryableWrite(
+            OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
+
         // Attempt to begin or retry a retryable write at the given transaction number.
         void _beginOrContinueRetryableWrite(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);

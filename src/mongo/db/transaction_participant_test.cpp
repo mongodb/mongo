@@ -4759,6 +4759,7 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressTransactionForRetryableWrit
 }
 
 TEST_F(ShardTxnParticipantTest, CannotRetryPreparedTransactionForRetryableWrites) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsInProgress());
@@ -4766,8 +4767,6 @@ TEST_F(ShardTxnParticipantTest, CannotRetryPreparedTransactionForRetryableWrites
     txnParticipant.prepareTransaction(opCtx(), {});
     ASSERT_TRUE(txnParticipant.transactionIsPrepared());
 
-    // TODO (SERVER-60917): Make transaction participants throw RetryableTransactionInProgress if a
-    // retry arrives while the transaction has been committed or aborted
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber(), 0},
                                                       false /* autocommit */,
