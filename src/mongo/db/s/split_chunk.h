@@ -61,6 +61,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                                                    const ChunkRange& chunkRange,
                                                    const std::vector<BSONObj>& splitKeys,
                                                    const std::string& shardName,
-                                                   const OID& expectedCollectionEpoch);
+                                                   const OID& expectedCollectionEpoch,
+                                                   bool fromChunkSplitter = false);
 
 }  // namespace mongo

@@ -101,7 +101,8 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                       chunkRange,
                       splitPoints,
                       shardId.toString(),
-                      collectionVersion.epoch())
+                      collectionVersion.epoch(),
+                      true /* fromChunkSplitter */)
         .getStatus()
         .withContext("split failed");
 }

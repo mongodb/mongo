@@ -59,7 +59,7 @@ public:
         return "internal command usage only\n"
                "example:\n"
                " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { "
-               "splitKeys : [ {a:150} , ... ]}";
+               "splitKeys : [ {a:150} , ... ], fromChunkSplitter: <bool>}";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -155,6 +155,7 @@ public:
                 errmsg = "need to provide the split points to chunk over";
                 return false;
             }
+
             BSONObjIterator it(splitKeysElem.Obj());
             while (it.more()) {
                 splitKeys.push_back(it.next().Obj().getOwned());
@@ -164,8 +165,20 @@ public:
         OID expectedCollectionEpoch;
         uassertStatusOK(bsonExtractOIDField(cmdObj, "epoch", &expectedCollectionEpoch));
 
-        auto topChunk = uassertStatusOK(splitChunk(
-            opCtx, nss, keyPatternObj, chunkRange, splitKeys, shardName, expectedCollectionEpoch));
+        bool fromChunkSplitter = [&]() {
+            bool field = false;
+            Status status = bsonExtractBooleanField(cmdObj, "fromChunkSplitter", &field);
+            return status.isOK() && field;
+        }();
+
+        auto topChunk = uassertStatusOK(splitChunk(opCtx,
+                                                   nss,
+                                                   keyPatternObj,
+                                                   chunkRange,
+                                                   splitKeys,
+                                                   shardName,
+                                                   expectedCollectionEpoch,
+                                                   fromChunkSplitter));
 
         // Otherwise, we want to check whether or not top-chunk optimization should be performed. If
         // yes, then we should have a ChunkRange that was returned. Regardless of whether it should

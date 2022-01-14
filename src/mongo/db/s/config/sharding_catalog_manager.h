@@ -241,7 +241,8 @@ public:
                                          const OID& requestEpoch,
                                          const ChunkRange& range,
                                          const std::vector<BSONObj>& splitPoints,
-                                         const std::string& shardName);
+                                         const std::string& shardName,
+                                         bool fromChunkSplitter);
 
     /**
      * Updates metadata in the config.chunks collection so the chunks with given boundaries are seen

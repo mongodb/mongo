@@ -600,11 +600,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
         unsetBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, 0);
         updatedFields++;
     }
-    if (balancerShouldMergeChunks && enableAutoSplitter) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Autosplitter and defragmentation cannot both be enabled for a collection",
-                !(doMerge && doSplit));
-    }
 
     if (updatedFields == 0) {
         return;

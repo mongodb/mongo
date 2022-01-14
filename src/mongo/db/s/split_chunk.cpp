@@ -132,7 +132,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                                                    const ChunkRange& chunkRange,
                                                    const std::vector<BSONObj>& splitKeys,
                                                    const std::string& shardName,
-                                                   const OID& expectedCollectionEpoch) {
+                                                   const OID& expectedCollectionEpoch,
+                                                   const bool fromChunkSplitter) {
     auto scopedSplitOrMergeChunk(uassertStatusOK(
         ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(opCtx, nss, chunkRange)));
 
@@ -153,8 +154,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     }
 
     // Commit the split to the config server.
-    auto request =
-        SplitChunkRequest(nss, shardName, expectedCollectionEpoch, chunkRange, splitKeys);
+    auto request = SplitChunkRequest(
+        nss, shardName, expectedCollectionEpoch, chunkRange, splitKeys, fromChunkSplitter);
 
     auto configCmdObj =
         request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());

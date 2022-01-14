@@ -485,19 +485,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     const OID& requestEpoch,
     const ChunkRange& range,
     const std::vector<BSONObj>& splitPoints,
-    const std::string& shardName) {
+    const std::string& shardName,
+    const bool fromChunkSplitter) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
-
-    // Get the max chunk version for this namespace.
-    auto swCollVersion = getCollectionVersion(opCtx, nss);
-    if (!swCollVersion.isOK()) {
-        return swCollVersion.getStatus().withContext(
-            str::stream() << "splitChunk cannot split chunk " << range.toString() << ".");
-    }
-
-    auto collVersion = swCollVersion.getValue();
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse = uassertStatusOK(
@@ -508,10 +500,27 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
                                             BSON(CollectionType::kNssFieldName << nss.ns()),
                                             {},
                                             1));
+
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Collection does not exist",
             !findCollResponse.docs.empty());
     const CollectionType coll(findCollResponse.docs[0]);
+
+    // Don't allow auto-splitting if the collection is being defragmented
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't commit auto-split while `" << nss.ns()
+                          << "` is undergoing a defragmentation.",
+            !(coll.getBalancerShouldMergeChunks() && fromChunkSplitter));
+
+    // Get the max chunk version for this namespace.
+    auto swCollVersion = getCollectionVersion(opCtx, nss);
+
+    if (!swCollVersion.isOK()) {
+        return swCollVersion.getStatus().withContext(
+            str::stream() << "splitChunk cannot split chunk " << range.toString() << ".");
+    }
+
+    auto collVersion = swCollVersion.getValue();
 
     // Return an error if collection epoch does not match epoch of request.
     if (coll.getEpoch() != requestEpoch) {

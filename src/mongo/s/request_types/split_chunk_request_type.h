@@ -49,7 +49,8 @@ public:
                       std::string shardName,
                       OID epoch,
                       ChunkRange chunkRange,
-                      std::vector<BSONObj> splitPoints);
+                      std::vector<BSONObj> splitPoints,
+                      bool fromChunkSplitter);
 
     /**
      * Parses the provided BSON content as the internal _configsvrCommitChunkSplit command, and if
@@ -61,7 +62,8 @@ public:
      *   min: <BSONObj chunkToSplitMin>,
      *   max: <BSONObj chunkToSplitMax>,
      *   splitPoints: [<BSONObj key>, ...],
-     *   shard: <string shard>
+     *   shard: <string shard>,
+     *   fromChunkSplitter: <bool>
      * }
      */
     static StatusWith<SplitChunkRequest> parseFromConfigCommand(const BSONObj& cmdObj);
@@ -84,6 +86,7 @@ public:
     const ChunkRange& getChunkRange() const;
     const std::vector<BSONObj>& getSplitPoints() const;
     const std::string& getShardName() const;
+    const bool isFromChunkSplitter() const;
 
 private:
     /**
@@ -97,6 +100,8 @@ private:
     ChunkRange _chunkRange;
     std::vector<BSONObj> _splitPoints;
     std::string _shardName;
+
+    bool _fromChunkSplitter;
 };
 
 }  // namespace mongo

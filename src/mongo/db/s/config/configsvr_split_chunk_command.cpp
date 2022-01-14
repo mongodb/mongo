@@ -59,6 +59,7 @@ using std::string;
  *   max: <BSONObj chunkToSplitMax>,
  *   splitPoints: [<BSONObj key>, ...],
  *   shard: <string shard>,
+ *   fromChunkSplitter: <bool>,
  *   writeConcern: <BSONObj>
  * }
  */
@@ -116,13 +117,15 @@ public:
 
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
 
-        auto shardAndCollVers = uassertStatusOK(
-            ShardingCatalogManager::get(opCtx)->commitChunkSplit(opCtx,
-                                                                 parsedRequest.getNamespace(),
-                                                                 parsedRequest.getEpoch(),
-                                                                 parsedRequest.getChunkRange(),
-                                                                 parsedRequest.getSplitPoints(),
-                                                                 parsedRequest.getShardName()));
+        auto shardAndCollVers =
+            uassertStatusOK(ShardingCatalogManager::get(opCtx)->commitChunkSplit(
+                opCtx,
+                parsedRequest.getNamespace(),
+                parsedRequest.getEpoch(),
+                parsedRequest.getChunkRange(),
+                parsedRequest.getSplitPoints(),
+                parsedRequest.getShardName(),
+                parsedRequest.isFromChunkSplitter()));
         result.appendElements(shardAndCollVers);
 
         return true;
