@@ -478,17 +478,8 @@ public:
                                   << " specified in query request not found",
                     ctx || !findCommand->getNamespaceOrUUID().uuid());
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "The collectionUUID parameter is not enabled",
-                    !findCommand->getCollectionUUID() ||
-                        feature_flags::gCommandsAcceptCollectionUUID.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-
-            if (findCommand->getCollectionUUID() &&
-                (!ctx->getCollection() ||
-                 findCommand->getCollectionUUID() != ctx->getCollection()->uuid())) {
-                uassertCollectionUUIDMismatch(opCtx, *findCommand->getCollectionUUID());
-            }
+            checkCollectionUUIDMismatch(
+                opCtx, ctx->getCollection(), findCommand->getCollectionUUID());
 
             // Set the namespace if a collection was found, as opposed to nothing or a view.
             if (ctx) {

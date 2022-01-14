@@ -31,13 +31,26 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
-void uassertCollectionUUIDMismatch(OperationContext* opCtx, const UUID& uuid) {
-    uassertStatusOK({CollectionUUIDMismatchInfo{uuid,
-                                                CollectionCatalog::get(opCtx)
-                                                    ->lookupNSSByUUID(opCtx, uuid)
-                                                    .value_or(NamespaceString{})},
-                     "Collection UUID does not match that specified"});
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid) {
+    if (!uuid) {
+        return;
+    }
+
+    uassert(ErrorCodes::InvalidOptions,
+            "The collectionUUID parameter is not enabled",
+            feature_flags::gCommandsAcceptCollectionUUID.isEnabled(
+                serverGlobalParams.featureCompatibility));
+
+    uassert((CollectionUUIDMismatchInfo{*uuid,
+                                        CollectionCatalog::get(opCtx)
+                                            ->lookupNSSByUUID(opCtx, *uuid)
+                                            .value_or(NamespaceString{})}),
+            "Collection UUID does not match that specified",
+            coll && coll->uuid() == *uuid);
 }
 }  // namespace mongo

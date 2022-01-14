@@ -32,5 +32,7 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-void uassertCollectionUUIDMismatch(OperationContext* opCtx, const UUID& uuid);
+void checkCollectionUUIDMismatch(OperationContext* opCtx,
+                                 const CollectionPtr& coll,
+                                 const boost::optional<UUID>& uuid);
 }  // namespace mongo
