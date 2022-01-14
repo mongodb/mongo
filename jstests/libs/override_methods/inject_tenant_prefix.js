@@ -12,6 +12,7 @@ load("jstests/libs/transactions_util.js");
 // Save references to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
 let originalRunCommand = Mongo.prototype.runCommand;
+let originalMarkNodeAsFailed = Mongo.prototype._markNodeAsFailed;
 
 const denylistedDbNames = ["config", "admin", "local"];
 
@@ -604,6 +605,13 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         // assume the command was run against the original database.
         removeTenantId(resObj);
     }
+
+    Mongo.prototype._markNodeAsFailed = function(hostName, errorCode, errorReason) {
+        if (this.reroutingMongo)
+            originalMarkNodeAsFailed.apply(this.reroutingMongo, [hostName, errorCode, errorReason]);
+        else
+            originalMarkNodeAsFailed.apply(this, [hostName, errorCode, errorReason]);
+    };
 
     return resObj;
 };
