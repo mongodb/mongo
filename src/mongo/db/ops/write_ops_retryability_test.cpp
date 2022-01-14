@@ -95,9 +95,12 @@ void setUpReplication(ServiceContext* svcCtx) {
 }
 
 void setUpTxnParticipant(OperationContext* opCtx, std::vector<int> executedStmtIds) {
-    opCtx->setTxnNumber(1);
+    const TxnNumber txnNumber = 1;
+    opCtx->setTxnNumber(txnNumber);
     auto txnPart = TransactionParticipant::get(opCtx);
-    txnPart.setCommittedStmtIdsForTest(std::move(executedStmtIds));
+    txnPart.refreshFromStorageIfNeeded(opCtx);
+    txnPart.beginOrContinue(opCtx, {txnNumber}, boost::none, boost::none);
+    txnPart.setCommittedStmtIdsForTest(opCtx, std::move(executedStmtIds));
 }
 
 write_ops::FindAndModifyCommandRequest makeFindAndModifyRequest(

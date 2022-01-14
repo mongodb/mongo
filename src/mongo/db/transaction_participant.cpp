@@ -96,6 +96,30 @@ MONGO_FAIL_POINT_DEFINE(failTransactionNoopWrite);
 
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
+const auto retryableWriteTransactionParticipantCatalogDecoration =
+    Session::declareDecoration<RetryableWriteTransactionParticipantCatalog>();
+
+/**
+ * Returns the RetryableWriteTransactionParticipantCatalog for the given session.
+ */
+RetryableWriteTransactionParticipantCatalog& getRetryableWriteTransactionParticipantCatalog(
+    Session* session) {
+    if (const auto parentSession = session->getParentSession()) {
+        return retryableWriteTransactionParticipantCatalogDecoration(parentSession);
+    }
+    return retryableWriteTransactionParticipantCatalogDecoration(session);
+}
+
+/**
+ * Returns the RetryableWriteTransactionParticipantCatalog for the session checked out by the
+ * given 'opCtx'.
+ */
+RetryableWriteTransactionParticipantCatalog& getRetryableWriteTransactionParticipantCatalog(
+    OperationContext* opCtx) {
+    auto session = OperationContextSession::get(opCtx);
+    return getRetryableWriteTransactionParticipantCatalog(session);
+}
+
 // The command names that are allowed in a prepared transaction.
 const StringMap<int> preparedTxnCmdAllowlist = {
     {"abortTransaction", 1}, {"commitTransaction", 1}, {"prepareTransaction", 1}};
@@ -131,6 +155,24 @@ void validateTransactionHistoryApplyOpsOplogEntry(const repl::OplogEntry& oplogE
             oplogEntry.getStatementIds().empty());
 }
 
+/**
+ * Runs the given 'callable' with a DBDirectClient with a no-timestamp read source, and restores
+ * the original timestamp read source after returning. Used for performing a read against the
+ * config.transactions collection during refresh below since snapshot reads and causal consistent
+ * majority reads against are not supported in that collection.
+ */
+template <typename Callable>
+auto performReadWithNoTimestampDBDirectClient(OperationContext* opCtx, Callable&& callable) {
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
+
+    DBDirectClient client(opCtx);
+    // If the 'opCtx' is marked as "in multi document transaction", the read done by 'callable'
+    // would acquire the global lock in the IX mode. That upconvert would require a flow control
+    // ticket to be obtained.
+    FlowControl::Bypass flowControlBypass(opCtx);
+    return callable(&client);
+}
+
 struct ActiveTransactionHistory {
     boost::optional<SessionTxnRecord> lastTxnRecord;
     TransactionParticipant::CommittedStatementTimestampMap committedStatements;
@@ -143,27 +185,22 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     // Storage engine operations require at least Global IS.
     Lock::GlobalLock lk(opCtx, MODE_IS);
 
-    // Restore the current timestamp read source after fetching transaction history using
-    // DBDirectClient, which may change our ReadSource.
-    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
-
     ActiveTransactionHistory result;
 
-    result.lastTxnRecord = [&]() -> boost::optional<SessionTxnRecord> {
-        DBDirectClient client(opCtx);
-        // Even though the request only performs a read, the OpCtx's "in multi document transaction"
-        // field has been set, bumping the global lock acquisition to an IX. That upconvert would
-        // require a flow control ticket to be obtained.
-        FlowControl::Bypass flowControlBypass(opCtx);
-        auto result = client.findOne(NamespaceString::kSessionTransactionsTableNamespace,
-                                     BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()));
-        if (result.isEmpty()) {
-            return boost::none;
-        }
-
-        return SessionTxnRecord::parse(IDLParserErrorContext("parse latest txn record for session"),
-                                       result);
-    }();
+    result.lastTxnRecord = [&]() -> auto {
+        return performReadWithNoTimestampDBDirectClient(
+            opCtx, [&](DBDirectClient* client) -> boost::optional<SessionTxnRecord> {
+                auto result =
+                    client->findOne(NamespaceString::kSessionTransactionsTableNamespace,
+                                    BSON(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()));
+                if (result.isEmpty()) {
+                    return boost::none;
+                }
+                return SessionTxnRecord::parse(
+                    IDLParserErrorContext("parse latest txn record for session"), result);
+            });
+    }
+    ();
 
     if (!result.lastTxnRecord) {
         return result;
@@ -198,6 +235,10 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
             }
         }
     };
+
+    // Restore the current timestamp read source after fetching transaction history, which may
+    // change our ReadSource.
+    ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
     while (it.hasNext()) {
@@ -259,6 +300,51 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     }
 
     return result;
+}
+
+/**
+ * Returns the highest txnNumber in the given session that has corresponding internal sessions as
+ * found in the session catalog and the config.transactions collection.
+ */
+TxnNumber fetchHighestTxnNumberWithInternalSessions(OperationContext* opCtx,
+                                                    const LogicalSessionId& parentLsid) {
+    TxnNumber highestTxnNumber{kUninitializedTxnNumber};
+
+    const auto sessionCatalog = SessionCatalog::get(opCtx);
+    SessionKiller::Matcher matcher(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx, parentLsid)});
+    sessionCatalog->scanSessions(matcher, [&](const ObservableSession& osession) {
+        const auto lsid = osession.getSessionId();
+        if (getParentSessionId(lsid) == parentLsid && isInternalSessionForRetryableWrite(lsid)) {
+            highestTxnNumber = std::max(highestTxnNumber, *osession.getSessionId().getTxnNumber());
+        }
+    });
+
+    performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
+        FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+        findRequest.setFilter(BSON(
+            SessionTxnRecord::kParentSessionIdFieldName
+            << parentLsid.toBSON()
+            << (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
+            << BSON("$gte" << highestTxnNumber)));
+        findRequest.setSort(BSON(
+            (SessionTxnRecord::kSessionIdFieldName + "." + LogicalSessionId::kTxnNumberFieldName)
+            << -1));
+        findRequest.setProjection(BSON(SessionTxnRecord::kSessionIdFieldName << 1));
+        findRequest.setLimit(1);
+
+        auto cursor = client->find(findRequest);
+
+        while (cursor->more()) {
+            const auto doc = cursor->next();
+            const auto childLsid = LogicalSessionId::parse(
+                IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
+            highestTxnNumber = std::max(highestTxnNumber, *childLsid.getTxnNumber());
+            invariant(!cursor->more());
+        }
+    });
+
+    return highestTxnNumber;
 }
 
 void updateSessionEntry(OperationContext* opCtx,
@@ -384,6 +470,21 @@ TransactionParticipant::Participant::Participant(OperationContext* opCtx)
           return nullptr;
       }()) {}
 
+TransactionParticipant::Participant::Participant(OperationContext* opCtx, Session* session)
+    : Observer([opCtx, session]() -> TransactionParticipant* {
+          invariant(session);
+
+          auto checkedOutSession = OperationContextSession::get(opCtx);
+          uassert(6202000,
+                  str::stream() << "Cannot get the transaction participant for the session "
+                                << session->getSessionId()
+                                << " without having it or its parent checked out",
+                  checkedOutSession &&
+                      (castToParentSessionId(checkedOutSession->getSessionId()) ==
+                       castToParentSessionId(session->getSessionId())));
+          return &getTransactionParticipant(session);
+      }()) {}
+
 TransactionParticipant::Participant::Participant(const SessionToKill& session)
     : Observer(&getTransactionParticipant(session.get())) {}
 
@@ -482,24 +583,58 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
     }
 }
 
+Session* TransactionParticipant::Observer::_session() const {
+    return getTransactionParticipant.owner(_tp);
+}
+
 const LogicalSessionId& TransactionParticipant::Observer::_sessionId() const {
-    const auto* owningSession = getTransactionParticipant.owner(_tp);
-    return owningSession->getSessionId();
+    return _session()->getSessionId();
+}
+
+bool TransactionParticipant::Observer::_isInternalSession() const {
+    return getParentSessionId(_sessionId()).has_value();
 }
 
 bool TransactionParticipant::Observer::_isInternalSessionForRetryableWrite() const {
     return isInternalSessionForRetryableWrite(_sessionId());
 }
 
+bool TransactionParticipant::Observer::_isInternalSessionForNonRetryableWrite() const {
+    return isInternalSessionForNonRetryableWrite(_sessionId());
+}
+
+boost::optional<TxnNumber> TransactionParticipant::Observer::_activeRetryableWriteTxnNumber()
+    const {
+    if (_isInternalSessionForNonRetryableWrite()) {
+        return boost::none;
+    }
+
+    if (_isInternalSessionForRetryableWrite()) {
+        return *_sessionId().getTxnNumber();
+    }
+
+    invariant(!_isInternalSession());
+    if (o().txnState.isInRetryableWriteMode()) {
+        const auto txnNumber = o().activeTxnNumberAndRetryCounter.getTxnNumber();
+        return txnNumber != kUninitializedTxnNumber ? boost::make_optional(txnNumber) : boost::none;
+    }
+    return boost::none;
+}
+
 void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     invariant(!txnNumberAndRetryCounter.getTxnRetryCounter());
+
     if (txnNumberAndRetryCounter.getTxnNumber() >
         o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
         // New retryable write.
         _setNewTxnNumberAndRetryCounter(
             opCtx, {txnNumberAndRetryCounter.getTxnNumber(), kUninitializedTxnRetryCounter});
         p().autoCommit = boost::none;
+
+        auto& retryableWriteTxnParticipantCatalog =
+            getRetryableWriteTransactionParticipantCatalog(opCtx);
+        retryableWriteTxnParticipantCatalog.addParticipant(*this);
     } else {
         // Retrying a retryable write.
         uassert(ErrorCodes::IncompleteTransactionHistory,
@@ -634,6 +769,14 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
     _setNewTxnNumberAndRetryCounter(opCtx, txnNumberAndRetryCounter);
     p().autoCommit = false;
 
+    auto& retryableWriteTxnParticipantCatalog =
+        getRetryableWriteTransactionParticipantCatalog(opCtx);
+    if (_isInternalSessionForRetryableWrite()) {
+        retryableWriteTxnParticipantCatalog.addParticipant(*this);
+    } else {
+        retryableWriteTxnParticipantCatalog.reset();
+    }
+
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     o(lk).txnState.transitionTo(TransactionState::kInProgress);
 
@@ -661,11 +804,18 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     boost::optional<bool> startTransaction) {
-    if (getParentSessionId(_sessionId()) && startTransaction) {
+    if (_isInternalSession() && startTransaction) {
         uassert(ErrorCodes::InternalTransactionNotSupported,
                 "Internal transactions are not enabled",
                 feature_flags::gFeatureFlagInternalTransactions.isEnabled(
                     serverGlobalParams.featureCompatibility));
+    }
+
+    if (_isInternalSessionForRetryableWrite()) {
+        auto parentTxnParticipant =
+            TransactionParticipant::get(opCtx, _session()->getParentSession());
+        parentTxnParticipant.beginOrContinue(
+            opCtx, {*_sessionId().getTxnNumber(), boost::none}, boost::none, boost::none);
     }
 
     // Make sure we are still a primary. We need to hold on to the RSTL through the end of this
@@ -710,7 +860,6 @@ void TransactionParticipant::Participant::beginOrContinue(
                           << " has already started on this session.");
         }
     }
-
 
     // Requests without an autocommit field are interpreted as retryable writes. They cannot specify
     // startTransaction, which is verified earlier when parsing the request.
@@ -1867,6 +2016,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
         o(lk).txnResourceStash->setNoEvictionAfterRollback();
     }
     _resetTransactionState(lk, nextState);
+    _resetRetryableWriteState();
 }
 
 void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
@@ -2380,6 +2530,43 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
         txnNumberAndRetryCounter.getTxnNumber());
 }
 
+void RetryableWriteTransactionParticipantCatalog::addParticipant(
+    const TransactionParticipant::Participant& participant) {
+    invariant(participant.p().isValid);
+
+    const auto txnNumber = participant._activeRetryableWriteTxnNumber();
+    invariant(*txnNumber >= _activeTxnNumber);
+
+    if (txnNumber > _activeTxnNumber) {
+        _activeTxnNumber = *txnNumber;
+        _participants.clear();
+    }
+    _participants.emplace(participant._sessionId(), participant);
+}
+
+void RetryableWriteTransactionParticipantCatalog::reset() {
+    _activeTxnNumber = kUninitializedTxnNumber;
+    _participants.clear();
+}
+
+void RetryableWriteTransactionParticipantCatalog::markAsValid() {
+    invariant(std::all_of(_participants.begin(), _participants.end(), [](const auto& it) {
+        return it.second.p().isValid;
+    }));
+    _isValid = true;
+}
+
+void RetryableWriteTransactionParticipantCatalog::invalidate() {
+    reset();
+    _isValid = false;
+}
+
+bool RetryableWriteTransactionParticipantCatalog::isValid() const {
+    return _isValid && std::all_of(_participants.begin(), _participants.end(), [](const auto& it) {
+               return it.second.p().isValid;
+           });
+}
+
 void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationContext* opCtx) {
     return _refreshFromStorageIfNeeded(opCtx, true);
 }
@@ -2391,11 +2578,22 @@ void TransactionParticipant::Participant::refreshFromStorageIfNeededNoOplogEntry
 
 void TransactionParticipant::Participant::_refreshFromStorageIfNeeded(OperationContext* opCtx,
                                                                       bool fetchOplogEntries) {
+    _refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);
+    if (!_isInternalSessionForNonRetryableWrite()) {
+        // Internal sessions for writes without a txnNumber runs independently of the original
+        // session that those write run in, so there is no need to do a cross-session refresh.
+        _refreshActiveTransactionParticipantsFromStorageIfNeeded(opCtx, fetchOplogEntries);
+    }
+}
+
+void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(OperationContext* opCtx,
+                                                                          bool fetchOplogEntries) {
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(!opCtx->lockState()->isLocked());
 
-    if (p().isValid)
+    if (p().isValid) {
         return;
+    }
 
     auto activeTxnHistory = fetchActiveTransactionHistory(opCtx, _sessionId(), fetchOplogEntries);
     const auto& lastTxnRecord = activeTxnHistory.lastTxnRecord;
@@ -2449,7 +2647,85 @@ void TransactionParticipant::Participant::_refreshFromStorageIfNeeded(OperationC
         }
     }
 
+    if (!_isInternalSession()) {
+        const auto txnNumber = fetchHighestTxnNumberWithInternalSessions(opCtx, _sessionId());
+        if (txnNumber > o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
+            _setNewTxnNumberAndRetryCounter(opCtx, {txnNumber, kUninitializedTxnRetryCounter});
+        }
+    }
+
     p().isValid = true;
+}
+
+void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsFromStorageIfNeeded(
+    OperationContext* opCtx, bool fetchOplogEntries) {
+    invariant(!opCtx->getClient()->isInDirectClient());
+    invariant(!opCtx->lockState()->isLocked());
+
+    auto parentTxnParticipant = _isInternalSessionForRetryableWrite()
+        ? TransactionParticipant::get(opCtx, _session()->getParentSession())
+        : *this;
+    parentTxnParticipant._refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);
+
+    auto& retryableWriteTxnParticipantCatalog =
+        getRetryableWriteTransactionParticipantCatalog(opCtx);
+
+    if (retryableWriteTxnParticipantCatalog.isValid()) {
+        return;
+    }
+
+    // Populate the catalog if the session is running a retryable write, and reset it otherwise.
+    if (const auto activeRetryableWriteTxnNumber =
+            parentTxnParticipant._activeRetryableWriteTxnNumber()) {
+        // Add parent Participant.
+        retryableWriteTxnParticipantCatalog.addParticipant(parentTxnParticipant);
+
+        // Add child participants.
+        std::vector<TransactionParticipant::Participant> childTxnParticipants;
+
+        // Make sure that every child session has a corresponding Session/TransactionParticipant.
+        performReadWithNoTimestampDBDirectClient(opCtx, [&](DBDirectClient* client) {
+            FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
+            findRequest.setFilter(BSON(SessionTxnRecord::kParentSessionIdFieldName
+                                       << parentTxnParticipant._sessionId().toBSON()
+                                       << (SessionTxnRecord::kSessionIdFieldName + "." +
+                                           LogicalSessionId::kTxnNumberFieldName)
+                                       << BSON("$gte" << *activeRetryableWriteTxnNumber)));
+            findRequest.setProjection(BSON("_id" << 1));
+
+            auto cursor = client->find(findRequest);
+
+            while (cursor->more()) {
+                const auto doc = cursor->next();
+                const auto childLsid = LogicalSessionId::parse(
+                    IDLParserErrorContext("LogicalSessionId"), doc.getObjectField("_id"));
+                uassert(6202001,
+                        str::stream()
+                            << "Refresh expected the highest transaction number in the session "
+                            << parentTxnParticipant._sessionId() << " to be "
+                            << *activeRetryableWriteTxnNumber << " found a "
+                            << NamespaceString::kSessionTransactionsTableNamespace
+                            << " entry for an internal transaction for retryable writes with "
+                            << "transaction number " << *childLsid.getTxnNumber(),
+                        *childLsid.getTxnNumber() == *activeRetryableWriteTxnNumber);
+                auto sessionCatalog = SessionCatalog::get(opCtx);
+                sessionCatalog->createSessionIfDoesNotExist(childLsid);
+                sessionCatalog->scanSession(childLsid, [&](const ObservableSession& osession) {
+                    auto childTxnParticipant = TransactionParticipant::get(opCtx, osession.get());
+                    childTxnParticipants.push_back(childTxnParticipant);
+                });
+            }
+        });
+
+        for (auto& childTxnParticipant : childTxnParticipants) {
+            childTxnParticipant._refreshSelfFromStorageIfNeeded(opCtx, fetchOplogEntries);
+            retryableWriteTxnParticipantCatalog.addParticipant(childTxnParticipant);
+        }
+    } else {
+        retryableWriteTxnParticipantCatalog.reset();
+    }
+
+    retryableWriteTxnParticipantCatalog.markAsValid();
 }
 
 void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
@@ -2471,7 +2747,7 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
 
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
-        const auto stmtOpTime = _checkStatementExecuted(stmtId);
+        const auto stmtOpTime = _checkStatementExecutedSelf(stmtId);
         if (stmtOpTime) {
             fassertOnRepeatedExecution(_sessionId(),
                                        sessionTxnRecord.getTxnNum(),
@@ -2556,18 +2832,34 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
     // Invalidate the session and clear both the retryable writes and transactional states on
     // this participant.
     _invalidate(lg);
+
     _resetRetryableWriteState();
+    // Get the RetryableWriteTransactionParticipantCatalog without checking the opCtx has checked
+    // out this session since by design it is illegal to invalidate sessions with an opCtx that has
+    // a session checked out.
+    auto& retryableWriteTxnParticipantCatalog =
+        getRetryableWriteTransactionParticipantCatalog(_session());
+    if (!_isInternalSessionForNonRetryableWrite()) {
+        // Internal sessions for writes without a txnNumber runs independently of the original
+        // session that those write run in.
+        retryableWriteTxnParticipantCatalog.invalidate();
+    }
+
     _resetTransactionState(lg, TransactionState::kNone);
 }
 
 boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStatementExecuted(
     OperationContext* opCtx, StmtId stmtId) const {
-    const auto stmtTimestamp = _checkStatementExecuted(stmtId);
+    const auto stmtOpTime = _checkStatementExecuted(opCtx, stmtId);
 
-    if (!stmtTimestamp)
+    if (!stmtOpTime) {
         return boost::none;
+    }
 
-    TransactionHistoryIterator txnIter(*stmtTimestamp);
+    // Use a SideTransactionBlock since it is illegal to scan the oplog while in a write unit of
+    // work.
+    TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
+    TransactionHistoryIterator txnIter(*stmtOpTime);
     while (txnIter.hasNext()) {
         const auto entry = txnIter.next(opCtx);
 
@@ -2595,13 +2887,40 @@ boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStat
 }
 
 bool TransactionParticipant::Participant::checkStatementExecutedNoOplogEntryFetch(
-    StmtId stmtId) const {
-    return bool(_checkStatementExecuted(stmtId));
+    OperationContext* opCtx, StmtId stmtId) const {
+    return bool(_checkStatementExecuted(opCtx, stmtId));
 }
 
 boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStatementExecuted(
+    OperationContext* opCtx, StmtId stmtId) const {
+    const auto& retryableWriteTxnParticipantCatalog =
+        getRetryableWriteTransactionParticipantCatalog(opCtx);
+    invariant(retryableWriteTxnParticipantCatalog.isValid());
+    invariant(retryableWriteTxnParticipantCatalog.getActiveTxnNumber() ==
+              _activeRetryableWriteTxnNumber());
+
+    if (auto opTime = _checkStatementExecutedSelf(stmtId)) {
+        return opTime;
+    }
+
+    for (const auto& [sessionId, txnParticipant] :
+         retryableWriteTxnParticipantCatalog.getParticipants()) {
+        if (_sessionId() == sessionId || txnParticipant.transactionIsAborted()) {
+            continue;
+        }
+        if (auto opTime = txnParticipant._checkStatementExecutedSelf(stmtId)) {
+            return opTime;
+        }
+    }
+    return boost::none;
+}
+
+boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStatementExecutedSelf(
     StmtId stmtId) const {
     invariant(p().isValid);
+    if (_isInternalSessionForRetryableWrite()) {
+        invariant(!transactionIsAborted());
+    }
 
     const auto it = p().activeTxnCommittedStatements.find(stmtId);
     if (it == p().activeTxnCommittedStatements.end()) {
@@ -2631,8 +2950,8 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
 }
 
 void TransactionParticipant::Participant::setCommittedStmtIdsForTest(
-    std::vector<int> stmtIdsCommitted) {
-    p().isValid = true;
+    OperationContext* opCtx, std::vector<int> stmtIdsCommitted) {
+    stdx::lock_guard<Client> lg(*opCtx->getClient());
     for (auto stmtId : stmtIdsCommitted) {
         p().activeTxnCommittedStatements.emplace(stmtId, repl::OpTime());
     }

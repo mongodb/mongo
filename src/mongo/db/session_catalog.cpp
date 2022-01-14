@@ -129,6 +129,7 @@ SessionCatalog::ScopedCheckedOutSession SessionCatalog::_checkOutSessionWithPare
 
     childSri->session._checkoutOpCtx = opCtx;
     childSri->session._lastCheckout = Date_t::now();
+    childSri->session._parentSession = &parentSri->session;
 
     return ScopedCheckedOutSession(
         *this, std::move(childSri), std::move(parentSri), std::move(killToken));
@@ -257,6 +258,11 @@ size_t SessionCatalog::size() const {
     return _sessions.size();
 }
 
+void SessionCatalog::createSessionIfDoesNotExist(const LogicalSessionId& lsid) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _getOrCreateSessionRuntimeInfo(lg, lsid);
+}
+
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
     WithLock, const LogicalSessionId& lsid) {
     auto it = _sessions.find(lsid);
@@ -299,6 +305,7 @@ void SessionCatalog::_releaseSession(SessionRuntimeInfo* sri,
         invariant(!parentLsid);
     }
     sri->session._checkoutOpCtx = nullptr;
+    sri->session._parentSession = nullptr;
     sri->availableCondVar.notify_all();
 
     if (killToken) {

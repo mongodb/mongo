@@ -54,7 +54,6 @@ const childLsid0 = {
     id: sessionUUID,
     txnUUID: UUID()
 };
-
 assert.commandWorked(testDB.runCommand({
     update: kCollName,
     updates: [{q: {_id: 0}, u: {$set: {a: 0}}}],
@@ -70,11 +69,13 @@ numTransactionsCollEntries++;
 assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find().itcount());
 
 const parentTxnNumber1 = NumberLong(1);
+
 assert.commandWorked(testDB.runCommand({
     update: kCollName,
     updates: [{q: {_id: 0}, u: {$set: {b: 0}}}],
     lsid: parentLsid,
     txnNumber: parentTxnNumber1,
+    stmtId: NumberInt(0)
 }));
 numTransactionsCollEntries++;
 
@@ -83,13 +84,13 @@ const childLsid1 = {
     txnNumber: parentTxnNumber1,
     txnUUID: UUID()
 };
-
 assert.commandWorked(testDB.runCommand({
     findAndModify: kCollName,
     query: {_id: 0},
     update: {$set: {c: 0}},
     lsid: childLsid1,
     txnNumber: kInternalTxnNumber,
+    stmtId: NumberInt(1),
     startTransaction: true,
     autocommit: false
 }));

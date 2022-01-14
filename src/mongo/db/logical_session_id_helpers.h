@@ -67,6 +67,12 @@ LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId);
 bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId);
 
 /**
+ * Returns true if the session with the given session id is an internal session for internal
+ * transactions for non-retryable writes (i.e. writes in a session without a transaction number).
+ */
+bool isInternalSessionForNonRetryableWrite(const LogicalSessionId& sessionId);
+
+/**
  * Helpers to make internal sessions.
  */
 LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid,

@@ -645,7 +645,7 @@ WriteResult performInserts(OperationContext* opCtx,
         auto fixedDoc = fixDocumentForInsert(opCtx, doc, &containsDotsAndDollarsField);
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         const bool wasAlreadyExecuted = opCtx->isRetryableWrite() &&
-            txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId);
+            txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId);
 
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -1218,7 +1218,7 @@ WriteResult performDeletes(OperationContext* opCtx,
     for (auto&& singleOp : wholeOp.getDeletes()) {
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
         if (opCtx->isRetryableWrite() &&
-            txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
+            txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());

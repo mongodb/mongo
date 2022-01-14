@@ -116,6 +116,11 @@ public:
      */
     size_t size() const;
 
+    /**
+     * Creates the session runtime info for 'lsid' if it doesn't exist.
+     */
+    void createSessionIfDoesNotExist(const LogicalSessionId& lsid);
+
 private:
     struct SessionRuntimeInfo {
         SessionRuntimeInfo(LogicalSessionId lsid) : session(std::move(lsid)) {}

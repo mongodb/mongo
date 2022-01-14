@@ -93,6 +93,10 @@ bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId) {
     return sessionId.getTxnNumber().has_value();
 }
 
+bool isInternalSessionForNonRetryableWrite(const LogicalSessionId& sessionId) {
+    return sessionId.getTxnUUID() && !sessionId.getTxnNumber();
+}
+
 LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid,
                                                           TxnNumber txnNumber) {
     auto lsid = LogicalSessionId(parentLsid.getId(), parentLsid.getUid());

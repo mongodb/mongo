@@ -57,6 +57,10 @@ public:
         return _sessionId;
     }
 
+    Session* getParentSession() const {
+        return _parentSession;
+    }
+
     OperationContext* currentOperation_forTest() const {
         return _checkoutOpCtx;
     }
@@ -64,6 +68,10 @@ public:
 private:
     // The id of the session with which this object is associated
     const LogicalSessionId _sessionId;
+
+    // A pointer to the parent Session for this Session if there is one. Always set to nullptr when
+    // this Session is not checked out.
+    Session* _parentSession{nullptr};
 
     // These fields are only safe to read or write while holding the SessionCatalog::_mutex. In
     // practice, it is only used inside of the SessionCatalog itself.

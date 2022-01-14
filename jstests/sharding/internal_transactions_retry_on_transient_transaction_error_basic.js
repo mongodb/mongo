@@ -200,7 +200,7 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
     testCommitAfterRetry(mongosTestDB, lsid0, NumberLong(0));
     testAbortAfterRetry(mongosTestDB, lsid0, NumberLong(1));
 
-    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(1), txnUUID: UUID()};
+    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(2), txnUUID: UUID()};
     testCommitAfterRetry(mongosTestDB, lsid1, NumberLong(0));
     testAbortAfterRetry(mongosTestDB, lsid1, NumberLong(1));
 
@@ -216,7 +216,7 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
     testCommitAfterRetry(shard0TestDB, lsid0, NumberLong(0));
     testAbortAfterRetry(shard0TestDB, lsid0, NumberLong(1));
 
-    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(1), txnUUID: UUID()};
+    const lsid1 = {id: sessionUUID, txnNumber: NumberLong(2), txnUUID: UUID()};
     testCommitAfterRetry(shard0TestDB, lsid1, NumberLong(0));
     testAbortAfterRetry(shard0TestDB, lsid1, NumberLong(1));
 

@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -184,11 +185,11 @@ protected:
         opObserverRegistry->addObserver(std::make_unique<OpObserverMock>());
 
         opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
-        _opContextSession.emplace(opCtx());
+        opContextSession.emplace(opCtx());
     }
 
     void tearDown() {
-        _opContextSession.reset();
+        opContextSession.reset();
 
         MockReplCoordServerFixture::tearDown();
     }
@@ -241,7 +242,11 @@ protected:
             logOp(opCtx(), kNss, uuid, session->getSessionId(), txnNum, stmtIds, prevOpTime);
 
         SessionTxnRecord sessionTxnRecord;
-        sessionTxnRecord.setSessionId(session->getSessionId());
+        auto sessionId = session->getSessionId();
+        sessionTxnRecord.setSessionId(sessionId);
+        if (isInternalSessionForRetryableWrite(sessionId)) {
+            sessionTxnRecord.setParentSessionId(*getParentSessionId(sessionId));
+        }
         sessionTxnRecord.setTxnNum(txnNum);
         sessionTxnRecord.setLastWriteOpTime(opTime);
         sessionTxnRecord.setLastWriteDate(Date_t::now());
@@ -284,8 +289,25 @@ protected:
         ASSERT_EQ(opTime, txnParticipant.getLastWriteOpTime());
     }
 
+protected:
+    boost::optional<OperationContextSession> opContextSession;
+};
+
+class ShardTransactionParticipantRetryableWritesTest
+    : public TransactionParticipantRetryableWritesTest {
+protected:
+    void setUp() {
+        TransactionParticipantRetryableWritesTest::setUp();
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    }
+
+    void tearDown() final {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+        TransactionParticipantRetryableWritesTest::tearDown();
+    }
+
 private:
-    boost::optional<OperationContextSession> _opContextSession;
+    RAIIServerParameterControllerForTest _controller{"featureFlagInternalTransactions", true};
 };
 
 TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin) {
@@ -489,7 +511,8 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
                   AssertionException);
 }
 
-TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
+TEST_F(TransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedSingleTransactionParticipant) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
@@ -498,16 +521,16 @@ TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
         opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
 
     ASSERT(!txnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(1000));
+    ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
     const auto firstOpTime = writeTxnRecord(txnNum, {1000}, {}, boost::none);
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(1000));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
 
     ASSERT(!txnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(2000));
+    ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
     writeTxnRecord(txnNum, {2000}, firstOpTime, boost::none);
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(2000));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 
     // Invalidate the session and ensure the statements still check out
     txnParticipant.invalidate(opCtx());
@@ -516,16 +539,124 @@ TEST_F(TransactionParticipantRetryableWritesTest, CheckStatementExecuted) {
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2000));
 
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(1000));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(2000));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
+}
+
+TEST_F(ShardTransactionParticipantRetryableWritesTest,
+       CheckStatementExecutedMultipleTransactionParticipants) {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+    const TxnNumber childTxnNumber = 0;
+
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+    parentTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    parentTxnParticipant.beginOrContinue(opCtx(),
+                                         {parentTxnNumber},
+                                         boost::none /* autocommit */,
+                                         boost::none /* startTransaction */);
+    ASSERT(!parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
+    ASSERT(!parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
+    writeTxnRecord(parentTxnNumber, {1000}, {}, boost::none);
+    ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
+    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opContextSession.emplace(opCtx());
+
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    childTxnParticipant.beginOrContinue(opCtx(),
+                                        {childTxnNumber},
+                                        boost::none /* autocommit */,
+                                        boost::none /* startTransaction */);
+    ASSERT(!childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
+    ASSERT(!childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
+    writeTxnRecord(childTxnNumber, {2000}, {}, DurableTxnStateEnum::kCommitted);
+    ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
+    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
+
+    // The transaction history is shared across associated TransactionParticipants.
+    ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 2000));
+    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
+    ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 1000));
+    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
+
+    // Invalidate both sessions. Verify that refreshing only the child session causes both sessions
+    // to be refreshed.
+    parentTxnParticipant.invalidate(opCtx());
+    parentTxnParticipant.invalidate(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
+    ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 2000));
+    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
+    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
+
+    ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 1000));
+    ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
+    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
+    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 }
 
 DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTest,
-                   CheckStatementExecutedForInvalidatedTransactionInvariants,
-                   R"#(Invariant failure.*p\(\).isValid)#") {
+                   CheckStatementExecutedForInvalidatedSelfTransactionParticipantInvariants,
+                   R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.invalidate(opCtx());
     txnParticipant.checkStatementExecuted(opCtx(), 0);
+}
+
+DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
+                   CheckStatementExecutedForInvalidatedParentTransactionParticipantInvariants,
+                   R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+    parentTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opContextSession.emplace(opCtx());
+
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+    opCtx()->setInMultiDocumentTransaction();
+    childTxnParticipant.beginOrContinue(
+        opCtx(), {0}, false /* autocommit */, true /* startTransaction */);
+
+    parentTxnParticipant.invalidate(opCtx());
+    childTxnParticipant.checkStatementExecuted(opCtx(), 0);
+}
+
+DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
+                   CheckStatementExecutedForInvalidatedChildTransactionParticipantInvariants,
+                   R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
+    const auto parentLsid = *opCtx()->getLogicalSessionId();
+    const TxnNumber parentTxnNumber = 100;
+    const auto childLsid = makeLogicalSessionIdWithTxnNumberAndUUID(parentLsid, parentTxnNumber);
+
+    auto parentTxnParticipant = TransactionParticipant::get(opCtx());
+    parentTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+
+    opContextSession.reset();
+    opCtx()->setLogicalSessionId(childLsid);
+    opContextSession.emplace(opCtx());
+
+    auto childTxnParticipant = TransactionParticipant::get(opCtx());
+    childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
+    opCtx()->setInMultiDocumentTransaction();
+    childTxnParticipant.beginOrContinue(
+        opCtx(), {0}, false /* autocommit */, true /* startTransaction */);
+
+    childTxnParticipant.invalidate(opCtx());
+    parentTxnParticipant.checkStatementExecuted(opCtx(), 0);
 }
 
 DEATH_TEST_REGEX_F(
@@ -699,11 +830,11 @@ TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTru
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
 
-    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(0),
+    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 0),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(1));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(2));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest,
@@ -773,16 +904,16 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 4));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 5));
 
-    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(0),
+    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 0),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
-    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(1),
+    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(2));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(3));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(4));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(5));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 4));
+    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 5));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {

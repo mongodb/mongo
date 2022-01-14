@@ -17,16 +17,18 @@ const mongosTestDB = st.s.getDB(kDbName);
 const shard0PrimaryConfigTxnColl = st.rs0.getPrimary().getCollection(kConfigTxnNs);
 
 const sessionUUID = UUID();
-
 const parentLsid = {
     id: sessionUUID
 };
 const parentTxnNumber = 35;
+let stmtId = 0;
+
 assert.commandWorked(mongosTestDB.runCommand({
     insert: kCollName,
     documents: [{_id: 0}],
     lsid: parentLsid,
-    txnNumber: NumberLong(parentTxnNumber)
+    txnNumber: NumberLong(parentTxnNumber),
+    stmtId: NumberInt(stmtId++)
 }));
 const parentSessionDoc = shard0PrimaryConfigTxnColl.findOne({"_id.id": sessionUUID});
 
@@ -43,6 +45,7 @@ function runRetryableInternalTransaction(txnNumber) {
         documents: [{x: 1}],
         lsid: childLsid,
         txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
         autocommit: false,
         startTransaction: true
     }));

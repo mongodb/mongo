@@ -26,16 +26,23 @@ const kCollName = "testColl";
     const parentLsid = {id: sessionUUID};
     const childLsid0 = {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()};
     const childLsid1 = {id: sessionUUID, txnNumber: NumberLong(6), txnUUID: UUID()};
+    let stmtId = 0;
 
     // Create the parent and child sessions
-    assert.commandWorked(testDB.runCommand(
-        {insert: kCollName, documents: [{x: 0}], lsid: parentLsid, txnNumber: NumberLong(4)}));
+    assert.commandWorked(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 0}],
+        lsid: parentLsid,
+        txnNumber: NumberLong(4),
+        stmtId: NumberInt(stmtId++)
+    }));
 
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 1}],
         lsid: childLsid0,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -48,6 +55,7 @@ const kCollName = "testColl";
         documents: [{x: 2}],
         lsid: childLsid1,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -92,13 +100,14 @@ const kCollName = "testColl";
     const unrelatedParentLsid = {id: UUID()};
     const childLsid0 = {id: sessionUUID, txnNumber: NumberLong(7), txnUUID: UUID()};
     const childLsid1 = {id: sessionUUID, txnNumber: NumberLong(8), txnUUID: UUID()};
+    let stmtId = 0;
 
     // Start a parent session without related children.
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 0}],
         lsid: unrelatedParentLsid,
-        txnNumber: NumberLong(10)
+        txnNumber: NumberLong(10),
     }));
 
     assert.commandWorked(testDB.runCommand({
@@ -106,6 +115,7 @@ const kCollName = "testColl";
         documents: [{x: 1}],
         lsid: childLsid0,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -118,6 +128,7 @@ const kCollName = "testColl";
         documents: [{x: 2}],
         lsid: childLsid1,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -169,16 +180,14 @@ const kCollName = "testColl";
     const parentLsid = {id: sessionUUID};
     const childLsid0 = {id: sessionUUID, txnNumber: NumberLong(11), txnUUID: UUID()};
     const childLsid1 = {id: sessionUUID, txnNumber: NumberLong(12), txnUUID: UUID()};
-
-    // Start a parent session without related children.
-    assert.commandWorked(testDB.runCommand(
-        {insert: kCollName, documents: [{x: 0}], lsid: parentLsid, txnNumber: NumberLong(13)}));
+    let stmtId = 0;
 
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 1}],
         lsid: childLsid0,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -191,15 +200,26 @@ const kCollName = "testColl";
         documents: [{x: 2}],
         lsid: childLsid1,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
 
-    const parentDocBeforeDowngrade =
-        shard0Primary.getCollection(kConfigTxnNs).findOne({"_id.id": sessionUUID});
-
     assert.commandWorked(testDB.adminCommand(
         {commitTransaction: 1, lsid: childLsid1, txnNumber: NumberLong(0), autocommit: false}));
+
+    assert.commandWorked(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 0}],
+        lsid: parentLsid,
+        txnNumber: NumberLong(13),
+        stmtId: NumberInt(stmtId++)
+    }));
+
+    const parentDocBeforeDowngrade = shard0Primary.getCollection(kConfigTxnNs).findOne({
+        "_id.id": sessionUUID,
+        "_id.txnNumber": {"$exists": false}
+    });
 
     assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
@@ -232,16 +252,14 @@ const kCollName = "testColl";
     const parentLsid = {id: sessionUUID};
     const childLsid0 = {id: sessionUUID, txnNumber: NumberLong(13), txnUUID: UUID()};
     const childLsid1 = {id: sessionUUID, txnNumber: NumberLong(14), txnUUID: UUID()};
-
-    // Start a parent session without related children.
-    assert.commandWorked(testDB.runCommand(
-        {insert: kCollName, documents: [{x: 0}], lsid: parentLsid, txnNumber: NumberLong(14)}));
+    let stmtId = 0;
 
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
         documents: [{x: 1}],
         lsid: childLsid0,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -251,9 +269,18 @@ const kCollName = "testColl";
 
     assert.commandWorked(testDB.runCommand({
         insert: kCollName,
+        documents: [{x: 0}],
+        lsid: parentLsid,
+        txnNumber: NumberLong(14),
+        stmtId: NumberInt(stmtId++)
+    }));
+
+    assert.commandWorked(testDB.runCommand({
+        insert: kCollName,
         documents: [{x: 2}],
         lsid: childLsid1,
         txnNumber: NumberLong(0),
+        stmtId: NumberInt(stmtId++),
         startTransaction: true,
         autocommit: false
     }));
@@ -261,8 +288,10 @@ const kCollName = "testColl";
     assert.commandWorked(testDB.adminCommand(
         {commitTransaction: 1, lsid: childLsid1, txnNumber: NumberLong(0), autocommit: false}));
 
-    const parentDocBeforeDowngrade =
-        shard0Primary.getCollection(kConfigTxnNs).findOne({"_id.id": sessionUUID});
+    const parentDocBeforeDowngrade = shard0Primary.getCollection(kConfigTxnNs).findOne({
+        "_id.id": sessionUUID,
+        "_id.txnNumber": {"$exists": false}
+    });
 
     assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 

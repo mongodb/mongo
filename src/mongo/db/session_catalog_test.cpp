@@ -114,8 +114,11 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnNumbe
     OperationContextSession ocs(_opCtx);
 
     auto session = OperationContextSession::get(_opCtx);
+    auto parentSession = session->getParentSession();
     ASSERT(session);
-    ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
+    ASSERT_EQ(childLsid, session->getSessionId());
+    ASSERT(parentSession);
+    ASSERT_EQ(parentLsid, parentSession->getSessionId());
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnUUID) {
@@ -125,8 +128,11 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CheckoutAndReleaseSessionWithTxnUUID)
     OperationContextSession ocs(_opCtx);
 
     auto session = OperationContextSession::get(_opCtx);
+    auto parentSession = session->getParentSession();
     ASSERT(session);
-    ASSERT_EQ(*_opCtx->getLogicalSessionId(), session->getSessionId());
+    ASSERT_EQ(childLsid, session->getSessionId());
+    ASSERT(parentSession);
+    ASSERT_EQ(parentLsid, parentSession->getSessionId());
 }
 
 TEST_F(SessionCatalogTestWithDefaultOpCtx,

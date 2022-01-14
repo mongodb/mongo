@@ -973,7 +973,7 @@ public:
 
                 if (isTimeseriesWriteRetryable(opCtx) &&
                     TransactionParticipant::get(opCtx).checkStatementExecutedNoOplogEntryFetch(
-                        stmtId)) {
+                        opCtx, stmtId)) {
                     RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                     *containsRetry = true;
                     return true;

@@ -106,19 +106,27 @@ private:
 
 
 inline std::ostream& operator<<(std::ostream& s, const LogicalSessionId& lsid) {
-    return (s << lsid.getId() << " - " << lsid.getUid());
+    return (s << lsid.getId() << " - " << lsid.getUid() << " - "
+              << (lsid.getTxnNumber() ? std::to_string(*lsid.getTxnNumber()) : "") << " - "
+              << (lsid.getTxnUUID() ? lsid.getTxnUUID()->toString() : ""));
 }
 
 inline StringBuilder& operator<<(StringBuilder& s, const LogicalSessionId& lsid) {
-    return (s << lsid.getId().toString() << " - " << lsid.getUid().toString());
+    return (s << lsid.getId().toString() << " - " << lsid.getUid().toString() << " - "
+              << (lsid.getTxnNumber() ? std::to_string(*lsid.getTxnNumber()) : "") << " - "
+              << (lsid.getTxnUUID() ? lsid.getTxnUUID()->toString() : ""));
 }
 
 inline std::ostream& operator<<(std::ostream& s, const LogicalSessionFromClient& lsid) {
-    return (s << lsid.getId() << " - " << (lsid.getUid() ? lsid.getUid()->toString() : ""));
+    return (s << lsid.getId() << " - " << (lsid.getUid() ? lsid.getUid()->toString() : "") << " - "
+              << (lsid.getTxnNumber() ? std::to_string(*lsid.getTxnNumber()) : "") << " - "
+              << (lsid.getTxnUUID() ? lsid.getTxnUUID()->toString() : ""));
 }
 
 inline StringBuilder& operator<<(StringBuilder& s, const LogicalSessionFromClient& lsid) {
-    return (s << lsid.getId() << " - " << (lsid.getUid() ? lsid.getUid()->toString() : ""));
+    return (s << lsid.getId() << " - " << (lsid.getUid() ? lsid.getUid()->toString() : "") << " - "
+              << (lsid.getTxnNumber() ? std::to_string(*lsid.getTxnNumber()) : "") << " - "
+              << (lsid.getTxnUUID() ? lsid.getTxnUUID()->toString() : ""));
 }
 
 /**
