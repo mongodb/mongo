@@ -116,6 +116,7 @@ static WT_EVENT_HANDLER event_handler = {NULL, handle_message, NULL, NULL};
 static const char *current; /* Current test configuration */
 
 static void on_alarm(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * on_alarm --
  *     TODO: Add a comment describing this function.

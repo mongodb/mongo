@@ -150,12 +150,9 @@ main(int argc, char *argv[])
 }
 
 /*
- * Append to a table in a "racy" fashion - that is attempt to insert the same record another thread
- * is likely to also be inserting.
- */
-/*
  * thread_insert_race --
- *     TODO: Add a comment describing this function.
+ *     Append to a table in a "racy" fashion - that is attempt to insert the same record another
+ *     thread is likely to also be inserting.
  */
 void *
 thread_insert_race(void *arg)

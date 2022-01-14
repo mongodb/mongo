@@ -156,11 +156,8 @@ die(void)
 }
 
 /*
- * Get operation type based on the number of changes
- */
-/*
  * get_operation_type --
- *     TODO: Add a comment describing this function.
+ *     Get operation type based on the number of changes.
  */
 static OPERATION_TYPE
 get_operation_type(uint64_t change_count)
@@ -586,12 +583,9 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
 }
 
 /*
- * Open a file if it isn't already open. The "memory" of the open file name is kept in the buffer
- * passed in.
- */
-/*
  * reopen_file --
- *     TODO: Add a comment describing this function.
+ *     Open a file if it isn't already open. The "memory" of the open file name is kept in the
+ *     buffer passed in.
  */
 static void
 reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
@@ -607,11 +601,8 @@ reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
 }
 
 /*
- * Perform an incremental backup into an existing backup directory.
- */
-/*
  * incr_backup --
- *     TODO: Add a comment describing this function.
+ *     Perform an incremental backup into an existing backup directory.
  */
 static void
 incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABLE_INFO *tinfo,
@@ -789,11 +780,8 @@ check_table(WT_SESSION *session, TABLE *table)
 }
 
 /*
- * Verify the backup to make sure the proper tables exist and have the correct content.
- */
-/*
  * check_backup --
- *     TODO: Add a comment describing this function.
+ *     Verify the backup to make sure the proper tables exist and have the correct content.
  */
 static void
 check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinfo)

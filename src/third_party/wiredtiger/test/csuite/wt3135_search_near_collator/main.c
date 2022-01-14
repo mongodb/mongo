@@ -164,11 +164,8 @@ static WT_COLLATOR collator_u = {index_compare_u, NULL, NULL};
 static WT_EXTRACTOR extractor_u = {index_extractor_u, NULL, NULL};
 
 /*
- * Check search() and search_near() using the test string indicated by test_index.
- */
-/*
  * search_using_str --
- *     TODO: Add a comment describing this function.
+ *     Check search() and search_near() using the test string indicated by test_index.
  */
 static void
 search_using_str(WT_CURSOR *cursor, TEST_SET test_set, int test_index)
@@ -208,12 +205,9 @@ search_using_str(WT_CURSOR *cursor, TEST_SET test_set, int test_index)
 }
 
 /*
- * Check search() and search_near() using the test string indicated by test_index against a table
- * containing a variable sized item.
- */
-/*
  * search_using_item --
- *     TODO: Add a comment describing this function.
+ *     Check search() and search_near() using the test string indicated by test_index against a
+ *     table containing a variable sized item.
  */
 static void
 search_using_item(WT_CURSOR *cursor, TEST_SET test_set, int test_index)
@@ -259,11 +253,8 @@ search_using_item(WT_CURSOR *cursor, TEST_SET test_set, int test_index)
 }
 
 /*
- * For each set of data, perform tests.
- */
-/*
  * test_one_set --
- *     TODO: Add a comment describing this function.
+ *     For each set of data, perform tests.
  */
 static void
 test_one_set(WT_SESSION *session, TEST_SET set)

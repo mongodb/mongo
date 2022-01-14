@@ -37,6 +37,7 @@
  * Failure mode: When a custom extractor is used with cursor joins, there are memory leaks at the
  * point where the extractor sets the key.
  */
+
 /*
  * custom_extract1 --
  *     TODO: Add a comment describing this function.

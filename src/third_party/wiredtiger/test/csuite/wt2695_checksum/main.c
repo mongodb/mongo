@@ -43,6 +43,7 @@ check(uint32_t hw, uint32_t sw, size_t len, const char *msg)
 }
 
 #define DATASIZE (128 * 1024)
+
 /*
  * main --
  *     TODO: Add a comment describing this function.

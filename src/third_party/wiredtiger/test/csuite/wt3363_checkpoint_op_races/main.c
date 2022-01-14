@@ -125,11 +125,8 @@ main(int argc, char *argv[])
 }
 
 /*
- * Function for repeatedly running checkpoint operations.
- */
-/*
  * do_checkpoints --
- *     TODO: Add a comment describing this function.
+ *     Function for repeatedly running checkpoint operations.
  */
 static WT_THREAD_RET
 do_checkpoints(void *_opts)
@@ -164,12 +161,9 @@ do_checkpoints(void *_opts)
 }
 
 /*
- * Function to monitor running operations and abort to dump core in the event that we catch an
- * operation running long.
- */
-/*
  * monitor --
- *     TODO: Add a comment describing this function.
+ *     Function to monitor running operations and abort to dump core in the event that we catch an
+ *     operation running long.
  */
 static WT_THREAD_RET
 monitor(void *args)
@@ -219,11 +213,8 @@ monitor(void *args)
 }
 
 /*
- * Worker thread. Executes random operations from the set of 6.
- */
-/*
  * do_ops --
- *     TODO: Add a comment describing this function.
+ *     Worker thread. Executes random operations from the set of 6.
  */
 static WT_THREAD_RET
 do_ops(void *args)

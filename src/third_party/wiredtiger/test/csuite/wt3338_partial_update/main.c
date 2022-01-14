@@ -139,25 +139,19 @@ compare(WT_ITEM *orig, WT_ITEM *local, WT_ITEM *library)
 }
 
 /*
- * modify_run
- *	Run some tests:
- *	1. Create an initial value, a copy and a fake cursor to use with the
- *	WiredTiger routines. Generate a set of modify vectors and apply them to
- *	the item stored in the cursor using the modify apply API. Also apply the
- *	same modify vector to one of the copies using a helper routine written
- *	to test the modify API. The final value generated with the modify API
- *	and the helper routine should match.
- *
- *	2. Use the initial value and the modified value generated above as
- *	inputs into the calculate-modify API to generate a set of modify
- *	vectors. Apply this generated vector to the initial value using the
- *	modify apply API to obtain a final value. The final value generated
- *	should match the modified value that was used as input to the
- *	calculate-modify API.
- */
-/*
  * modify_run --
- *     TODO: Add a comment describing this function.
+ *     Run some tests:
+ *
+ * 1. Create an initial value, a copy and a fake cursor to use with the WiredTiger routines.
+ *     Generate a set of modify vectors and apply them to the item stored in the cursor using the
+ *     modify apply API. Also apply the same modify vector to one of the copies using a helper
+ *     routine written to test the modify API. The final value generated with the modify API and the
+ *     helper routine should match.
+ *
+ * 2. Use the initial value and the modified value generated above as inputs into the
+ *     calculate-modify API to generate a set of modify vectors. Apply this generated vector to the
+ *     initial value using the modify apply API to obtain a final value. The final value generated
+ *     should match the modified value that was used as input to the calculate-modify API.
  */
 static void
 modify_run(TEST_OPTS *opts)

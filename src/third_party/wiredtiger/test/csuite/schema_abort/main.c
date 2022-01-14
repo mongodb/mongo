@@ -129,6 +129,7 @@ typedef struct {
 
 static void sig_handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * usage --
  *     TODO: Add a comment describing this function.
@@ -767,14 +768,12 @@ thread_run(void *arg)
     /* NOTREACHED */
 }
 
-/*
- * Child process creates the database and table, and then creates worker threads to add data until
- * it is killed by the parent.
- */
 static void run_workload(uint32_t) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * run_workload --
- *     TODO: Add a comment describing this function.
+ *     Child process creates the database and table, and then creates worker threads to add data
+ *     until it is killed by the parent.
  */
 static void
 run_workload(uint32_t nth)
@@ -856,11 +855,8 @@ extern int __wt_optind;
 extern char *__wt_optarg;
 
 /*
- * Initialize a report structure. Since zero is a valid key we cannot just clear it.
- */
-/*
  * initialize_rep --
- *     TODO: Add a comment describing this function.
+ *     Initialize a report structure. Since zero is a valid key we cannot just clear it.
  */
 static void
 initialize_rep(REPORT *r)
@@ -870,12 +866,9 @@ initialize_rep(REPORT *r)
 }
 
 /*
- * Print out information if we detect missing records in the middle of the data of a report
- * structure.
- */
-/*
  * print_missing --
- *     TODO: Add a comment describing this function.
+ *     Print out information if we detect missing records in the middle of the data of a report
+ *     structure.
  */
 static void
 print_missing(REPORT *r, const char *fname, const char *msg)
@@ -888,11 +881,8 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 }
 
 /*
- * Signal handler to catch if the child died unexpectedly.
- */
-/*
  * sig_handler --
- *     TODO: Add a comment describing this function.
+ *     Signal handler to catch if the child died unexpectedly.
  */
 static void
 sig_handler(int sig)

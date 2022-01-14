@@ -311,12 +311,8 @@ testutil_create_backup_directory(const char *home)
 }
 
 /*
- * copy_file --
- *     Copy a single file into the backup directories.
- */
-/*
  * testutil_copy_file --
- *     TODO: Add a comment describing this function.
+ *     Copy a single file into the backup directories.
  */
 void
 testutil_copy_file(WT_SESSION *session, const char *name)

@@ -42,12 +42,9 @@
 static uint64_t g_ts = 0;
 
 /*
- * Each thread inserts a set of keys into the record store database. The keys are generated in such
- * a way that there are large gaps in the key range.
- */
-/*
  * thread_func --
- *     TODO: Add a comment describing this function.
+ *     Each thread inserts a set of keys into the record store database. The keys are generated in
+ *     such a way that there are large gaps in the key range.
  */
 static void *
 thread_func(void *arg)

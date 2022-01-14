@@ -92,11 +92,8 @@ main(int argc, char *argv[])
 }
 
 /*
- * Acquire a rwlock, every Nth operation, acquire exclusive.
- */
-/*
  * thread_rwlock --
- *     TODO: Add a comment describing this function.
+ *     Acquire a rwlock, every Nth operation, acquire exclusive.
  */
 void *
 thread_rwlock(void *arg)

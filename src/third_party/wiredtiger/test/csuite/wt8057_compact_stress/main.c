@@ -94,11 +94,8 @@ static void get_compact_progress(
   WT_SESSION *session, const char *, uint64_t *, uint64_t *, uint64_t *);
 
 /*
- * Signal handler to catch if the child died unexpectedly.
- */
-/*
  * sig_handler --
- *     TODO: Add a comment describing this function.
+ *     Signal handler to catch if the child died unexpectedly.
  */
 static void
 sig_handler(int sig)
@@ -113,10 +110,9 @@ sig_handler(int sig)
     testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
 }
 
-/* Methods implementation. */
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     Methods implementation.
  */
 int
 main(int argc, char *argv[])

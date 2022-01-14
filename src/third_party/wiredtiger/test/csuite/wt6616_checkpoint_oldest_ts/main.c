@@ -72,6 +72,7 @@ static const char *const ckpt_file = "checkpoint_done";
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * usage --
  *     TODO: Add a comment describing this function.
@@ -189,14 +190,12 @@ thread_run(void *arg)
     /* NOTREACHED */
 }
 
-/*
- * Child process creates the database and table, and then creates the worker thread to add data
- * until it is killed by the parent.
- */
 static void run_workload(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * run_workload --
- *     TODO: Add a comment describing this function.
+ *     Child process creates the database and table, and then creates the worker thread to add data
+ *     until it is killed by the parent.
  */
 static void
 run_workload(void)
@@ -240,11 +239,8 @@ run_workload(void)
 }
 
 /*
- * Signal handler to catch if the child died unexpectedly.
- */
-/*
  * handler --
- *     TODO: Add a comment describing this function.
+ *     Signal handler to catch if the child died unexpectedly.
  */
 static void
 handler(int sig)

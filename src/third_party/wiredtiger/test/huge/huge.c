@@ -59,6 +59,7 @@ static size_t lengths[] = {20,       /* Check configuration */
   0};
 
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * usage --
  *     TODO: Add a comment describing this function.

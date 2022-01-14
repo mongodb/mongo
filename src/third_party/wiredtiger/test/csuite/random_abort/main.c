@@ -87,6 +87,7 @@ static bool inmem;
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * usage --
  *     TODO: Add a comment describing this function.
@@ -303,14 +304,12 @@ thread_run(void *arg)
     /* NOTREACHED */
 }
 
-/*
- * Child process creates the database and table, and then creates worker threads to add data until
- * it is killed by the parent.
- */
 static void fill_db(uint32_t) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * fill_db --
- *     TODO: Add a comment describing this function.
+ *     Child process creates the database and table, and then creates worker threads to add data
+ *     until it is killed by the parent.
  */
 static void
 fill_db(uint32_t nth)

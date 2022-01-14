@@ -46,16 +46,14 @@ static bool use_columns = false;
 #define K_SIZE 16
 #define V_SIZE 256
 
-/*
- * Write a new log record into the log via log print, then open up a log cursor and walk the log to
- * make sure we can read it. The reason for this test is that if there is a partial log record at
- * the end of the previous log file and truncate does not exist, this tests that we can still read
- * past that record.
- */
 static void write_and_read_new(WT_SESSION *);
+
 /*
  * write_and_read_new --
- *     TODO: Add a comment describing this function.
+ *     Write a new log record into the log via log print, then open up a log cursor and walk the log
+ *     to make sure we can read it. The reason for this test is that if there is a partial log
+ *     record at the end of the previous log file and truncate does not exist, this tests that we
+ *     can still read past that record.
  */
 static void
 write_and_read_new(WT_SESSION *session)
@@ -111,6 +109,7 @@ write_and_read_new(WT_SESSION *session)
 }
 
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * usage --
  *     TODO: Add a comment describing this function.
@@ -122,14 +121,12 @@ usage(void)
     exit(EXIT_FAILURE);
 }
 
-/*
- * Child process creates the database and table, and then writes data into the table until it
- * switches into log file 2.
- */
 static void fill_db(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+
 /*
  * fill_db --
- *     TODO: Add a comment describing this function.
+ *     Child process creates the database and table, and then writes data into the table until it
+ *     switches into log file 2.
  */
 static void
 fill_db(void)

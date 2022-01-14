@@ -26,11 +26,8 @@ static const char *mongodb_config = "log=(enabled=true,path=journal,compressor=s
 #define SALVAGE "salvage=true"
 
 /*
- * wt_explicit_zero: clear a buffer, with precautions against being optimized away.
- */
-/*
  * wt_explicit_zero --
- *     TODO: Add a comment describing this function.
+ *     Clear a buffer, with precautions against being optimized away.
  */
 static void
 wt_explicit_zero(void *ptr, size_t len)

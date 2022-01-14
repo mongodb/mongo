@@ -327,12 +327,8 @@ dump_json_end(WT_SESSION *session)
 }
 
 /*
- * dump_json_begin --
- *     Output a separator between two JSON outputs in a list.
- */
-/*
  * dump_json_separator --
- *     TODO: Add a comment describing this function.
+ *     Output a separator between two JSON outputs in a list.
  */
 static int
 dump_json_separator(WT_SESSION *session)
@@ -355,12 +351,8 @@ dump_json_table_end(WT_SESSION *session)
 }
 
 /*
- * dump_add_config
- *	Add a formatted config string to an output buffer.
- */
-/*
  * dump_add_config --
- *     TODO: Add a comment describing this function.
+ *     Add a formatted config string to an output buffer.
  */
 static int
 dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp, const char *fmt, ...)
@@ -586,11 +578,8 @@ match:
 }
 
 /*
- * Returns dump type string based on the passed format flags
- */
-/*
  * get_dump_type --
- *     TODO: Add a comment describing this function.
+ *     Returns dump type string based on the passed format flags
  */
 static const char *
 get_dump_type(bool pretty, bool hex, bool json)

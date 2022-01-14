@@ -173,12 +173,8 @@ create_data(TABLE_INFO *t)
 }
 
 /*
- * corrupt_metadata --
- *     Corrupt the file by scribbling on the provided URI string.
- */
-/*
  * corrupt_file --
- *     TODO: Add a comment describing this function.
+ *     Corrupt the file by scribbling on the provided URI string.
  */
 static void
 corrupt_file(const char *file_name, const char *uri)

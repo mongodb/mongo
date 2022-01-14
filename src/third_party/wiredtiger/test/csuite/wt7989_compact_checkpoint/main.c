@@ -72,10 +72,9 @@ static bool check_db_size(WT_SESSION *, const char *);
 static void get_compact_progress(
   WT_SESSION *session, const char *, uint64_t *, uint64_t *, uint64_t *);
 
-/* Methods implementation. */
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     Methods implementation.
  */
 int
 main(int argc, char *argv[])
