@@ -2772,6 +2772,7 @@ tasks:
           --enterprise-features=fle
           --js-engine=none
           --link-model=dynamic-sdk
+          ${csfle_task_compile_flags}
           DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
     - command: s3.put
       params:
@@ -7465,6 +7466,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1804
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
@@ -7550,6 +7552,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu1804
     compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -7697,6 +7700,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu2004
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: ubuntu2004
     multiversion_edition: enterprise
     has_packages: true
@@ -7751,6 +7755,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2004
     compile_flags: --ssl MONGO_DISTMOD=ubuntu2004 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager_enterprise.py
@@ -8105,6 +8110,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amzn64
     multiversion_edition: enterprise
@@ -8223,6 +8229,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: amazon2
     multiversion_edition: enterprise
     has_packages: true
@@ -8335,6 +8342,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip
     has_packages: true
@@ -9365,6 +9373,7 @@ buildvariants:
   expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
@@ -9501,6 +9510,7 @@ buildvariants:
   expansions: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: false
@@ -9922,6 +9932,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: rhel70
     multiversion_edition: enterprise
     has_packages: true
@@ -10019,6 +10030,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel80
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -10083,6 +10095,7 @@ buildvariants:
     push_name: linux
     push_arch: aarch64-enterprise-rhel82
     compile_flags: --ssl MONGO_DISTMOD=rhel82 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: aarch64
@@ -10442,6 +10455,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel81 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     resmoke_jobs_factor: 0.25
     has_packages: true
     packager_script: packager_enterprise.py
@@ -10526,6 +10540,7 @@ buildvariants:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     release_buid: true
     compile_flags: --ssl MONGO_DISTMOD=rhel72 -j3 --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py
@@ -10646,6 +10661,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: suse12
     multiversion_edition: enterprise
     has_packages: true
@@ -10747,6 +10763,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse15
     compile_flags: --ssl MONGO_DISTMOD=suse15 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
@@ -10846,6 +10863,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     num_scons_link_jobs_available: 0.0625
     multiversion_platform: debian92
     multiversion_edition: enterprise
@@ -10951,6 +10969,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian10
     compile_flags: --ssl MONGO_DISTMOD=debian10 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    csfle_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic"
     multiversion_platform: linux_x86_64
     multiversion_edition: base
     multiversion_platform_42_or_later: debian10

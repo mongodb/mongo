@@ -1031,6 +1031,10 @@ env_vars.Add('SHLINKFLAGS',
     help='Sets flags for the linker when building shared libraries',
     converter=variable_shlex_converter)
 
+env_vars.Add('SHLINKFLAGS_EXTRA',
+    help='Adds additional flags for shared links without overwriting tool configured SHLINKFLAGS values',
+    converter=variable_shlex_converter)
+
 env_vars.Add('STRIP',
     help='Path to the strip utility (non-darwin platforms probably use OBJCOPY for this)',
 )
@@ -1804,6 +1808,10 @@ if not env.TargetOSIs('windows'):
 
     env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$PROGLINKFLAGS")
     env["PROGLINKFLAGS"] = ['$LINKFLAGS']
+
+# When it is necessary to supply additional SHLINKFLAGS without modifying the toolset default,
+# following appends contents of SHLINKFLAGS_EXTRA variable to the linker command
+env.AppendUnique(SHLINKFLAGS=['$SHLINKFLAGS_EXTRA'])
 
 if not env.Verbose():
     env.Append( CCCOMSTR = "Compiling $TARGET" )
