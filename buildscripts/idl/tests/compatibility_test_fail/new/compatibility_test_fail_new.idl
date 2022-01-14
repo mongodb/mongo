@@ -754,6 +754,20 @@ structs:
     NewRemovedChainedTypeStruct:
         description: "This reply contains an added chained type in the new version"
 
+    OptionalBoolToBoolStruct:
+        description: "optionalBool field replaced by bool"
+        fields:
+            ok:
+                type: bool
+                unstable: false
+
+    BoolToOptionalBoolStruct:
+        description: "bool field replaced by optionalBool"
+        fields:
+            ok:
+                type: optionalBool
+                unstable: false
+
 commands:
     invalidAPIVersionNew:
         description: "new command fails because of invalid API version"
@@ -2682,7 +2696,7 @@ commands:
                 type: array<ArrayTypeStruct>
                 unstable: false
         reply_type: ArrayTypeStruct
-    
+
     ArrayCommandParameterNoArrayOld:
         description: "command will fail because the old command field type is not of ArrayType while
                       the new is of ArrayType."
@@ -2847,3 +2861,35 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NewAddedChainedTypeReply
+
+    optionalBoolToBoolParameter:
+        description: "new command gets bool parameter instead of optionalBool"
+        command_name: optionalBoolToBoolParameter
+        namespace: ignored
+        cpp_name: optionalBoolToBoolParameter
+        strict: true
+        api_version: "1"
+        fields:
+            flag1:
+                unstable: false
+                type: bool
+        reply_type: OkReply
+
+    optionalBoolToBoolCommandType:
+        description: "new command gets bool command type instead of optionalBool"
+        command_name: optionalBoolToBoolCommandType
+        namespace: type
+        type: OptionalBoolToBoolStruct
+        cpp_name: optionalBoolToBoolCommandType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    boolToOptionalBoolReply:
+        description: "new command gets optionalBool reply instead of bool"
+        command_name: boolToOptionalBoolReply
+        namespace: ignored
+        cpp_name: boolToOptionalBoolReply
+        strict: true
+        api_version: "1"
+        reply_type: BoolToOptionalBoolStruct

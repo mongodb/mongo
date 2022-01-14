@@ -34,11 +34,9 @@ import sys
 from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
-#pylint: disable=wrong-import-position,too-many-lines
-import idl_check_compatibility
-import idl_compatibility_errors
-
-#pylint: enable=wrong-import-position
+# pylint: disable=too-many-lines
+import idl_check_compatibility  # noqa: E402 pylint: disable=wrong-import-position
+import idl_compatibility_errors  # noqa: E402 pylint: disable=wrong-import-position
 
 
 class TestIDLCompatibilityChecker(unittest.TestCase):
@@ -92,7 +90,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"], ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertEqual(error_collection.count(), 182)
+        self.assertEqual(error_collection.count(), 185)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -1334,6 +1332,21 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertTrue(new_reply_added_chained_type_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET)
         self.assertRegex(str(new_reply_added_chained_type_error), "newReplyAddedChainedType")
+
+        optional_bool_to_bool_parameter_error = error_collection.get_error_by_command_name(
+            "optionalBoolToBoolParameter")
+        self.assertTrue(optional_bool_to_bool_parameter_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_REQUIRED)
+
+        optional_bool_to_bool_command_type_error = error_collection.get_error_by_command_name(
+            "optionalBoolToBoolCommandType")
+        self.assertTrue(optional_bool_to_bool_command_type_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRED)
+
+        bool_to_optional_bool_reply_error = error_collection.get_error_by_command_name(
+            "boolToOptionalBoolReply")
+        self.assertTrue(bool_to_optional_bool_reply_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_OPTIONAL)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""

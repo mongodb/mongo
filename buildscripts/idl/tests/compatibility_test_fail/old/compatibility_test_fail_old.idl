@@ -740,6 +740,20 @@ structs:
         chained_types:
             intStringToInt: intStringToInt
 
+    OptionalBoolToBoolStruct:
+        description: "optionalBool field replaced by bool"
+        fields:
+            ok:
+                type: optionalBool
+                unstable: false
+
+    BoolToOptionalBoolStruct:
+        description: "bool field replaced by optionalBool"
+        fields:
+            ok:
+                type: bool
+                unstable: false
+
 commands:
     invalidAPIVersionOld:
         description: "old command fails because of invalid API version"
@@ -2805,3 +2819,35 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NewAddedChainedTypeReply
+
+    optionalBoolToBoolParameter:
+        description: "new command gets bool parameter instead of optionalBool"
+        command_name: optionalBoolToBoolParameter
+        namespace: ignored
+        cpp_name: optionalBoolToBoolParameter
+        strict: true
+        api_version: "1"
+        fields:
+            flag1:
+                unstable: false
+                type: optionalBool
+        reply_type: OkReply
+
+    optionalBoolToBoolCommandType:
+        description: "new command gets bool command type instead of optionalBool"
+        command_name: optionalBoolToBoolCommandType
+        namespace: type
+        type: OptionalBoolToBoolStruct
+        cpp_name: optionalBoolToBoolCommandType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    boolToOptionalBoolReply:
+        description: "new command gets optionalBool reply instead of bool"
+        command_name: boolToOptionalBoolReply
+        namespace: ignored
+        cpp_name: boolToOptionalBoolReply
+        strict: true
+        api_version: "1"
+        reply_type: BoolToOptionalBoolStruct

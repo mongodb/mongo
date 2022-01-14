@@ -48,7 +48,7 @@ types:
                       command's reply field type to [int, string] in the new command's reply
                       field type"
         cpp_type: "std::int32_t"
-    
+
     intStringToIntStringBool:
         bson_serialization_type:
                                 - int
@@ -82,7 +82,7 @@ enums:
         values:
             valueOne: "one"
             valueTwo: "two"
-    
+
     EnumSuperset:
         description: "The new enum is a superset of the old enum values"
         type: string
@@ -107,7 +107,7 @@ structs:
             requiredNewField:
                 type: string
                 unstable: false
-    
+
     OptionalNewField:
         description: "This struct contains a field that is required in the old command but is
                       optional in the new command."
@@ -116,14 +116,14 @@ structs:
                 type: string
                 optional: true
                 unstable: false
-    
+
     AddedNewFieldReply:
         description: "This reply contains a field that is added in the new command."
         fields:
             addedNewField:
                 type: string
                 unstable: false
-    
+
     UnstableOldFieldReply:
         description: "This reply contains a field that is unstable in the old command and is
                       unstable and optional in the new command."
@@ -158,15 +158,15 @@ structs:
                 unstable: false
 
     StructFieldTypeRecursiveReplyOne:
-        description: "This reply contains a field whose new type is a struct that is 
+        description: "This reply contains a field whose new type is a struct that is
                       compatible with the old field type"
         fields:
             structReplyField:
                 type: StableNewFieldReply
                 unstable: false
-    
+
     StructFieldTypeRecursiveReplyTwo:
-        description: "This reply contains a field whose new type is a struct that is 
+        description: "This reply contains a field whose new type is a struct that is
                       compatible with the old field type"
         fields:
             structReplyField:
@@ -174,13 +174,13 @@ structs:
                 unstable: false
 
     StructType:
-        description: "This struct contains a field whose new type is compatible with the 
+        description: "This struct contains a field whose new type is compatible with the
                       old field type"
         fields:
             fieldOne:
                 type: BsonSubsetReply
                 unstable: false
-    
+
     OldVariantTypeReply:
         description: "This reply contains an old field that has a variant type while the new field
                       is not a variant type"
@@ -195,16 +195,16 @@ structs:
         fields:
             variantSubsetReplyField:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, array<string>]
-    
+
     NewVariantSubsetReplyTwo:
         description: "This reply contains a field whose new variant types are a subset
                       of the old variant types"
         fields:
             variantSubsetReplyFieldTwo:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, array<string>]
 
     VariantRecursiveReply:
@@ -213,27 +213,27 @@ structs:
         fields:
             variantRecursiveReplyField:
                 unstable: false
-                type: 
+                type:
                     variant: [int, intStringBoolToIntString,
                               array<intStringBoolToIntString>, array<string>]
-    
+
     OldVariantStructReply:
         description: "This reply contains a field whose new variant type does not have a variant
                       struct type while the old one does"
         fields:
             variantStructReplyField:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, array<string>]
-    
+
     VariantStructRecursiveReply:
         description: "This reply contains a field that has a new variant struct type that is
                       compatible with the old variant struct type"
         fields:
             variantStructRecursiveReplyField:
                 unstable: false
-                type: 
-                    variant: [int, StructFieldTypeRecursiveReplyTwo, 
+                type:
+                    variant: [int, StructFieldTypeRecursiveReplyTwo,
                               array<StructFieldTypeRecursiveReplyTwo>, array<string>]
 
     CommandParamStructRecursiveOne:
@@ -337,7 +337,7 @@ structs:
         fields:
             variantSupersetField:
                 unstable: false
-                type: 
+                type:
                     variant: [int, bool, string, array<string>]
 
     VariantSupersetStructTwo:
@@ -346,7 +346,7 @@ structs:
         fields:
             variantSupersetFieldTwo:
                 unstable: false
-                type: 
+                type:
                     variant: [int, bool, string, double, array<string>]
 
     OldTypeNotVariantStruct:
@@ -364,7 +364,7 @@ structs:
         fields:
             variantRecursiveField:
                 unstable: false
-                type: 
+                type:
                     variant: [int, intStringToIntStringBool,
                               array<intStringToIntStringBool>, array<string>]
 
@@ -374,7 +374,7 @@ structs:
         fields:
             variantStructSupersetField:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, NewCommandParameterStruct,
                               array<NewCommandParameterStruct>, array<string>]
 
@@ -482,6 +482,34 @@ structs:
                 unstable: false
                 optional: true
             ok2:
+                type: optionalBool
+                unstable: false
+
+    OptionalBoolEquivalenceStruct:
+        description: "First two fields get the types swapped."
+        fields:
+            ok1:
+                type: optionalBool
+                unstable: false
+            ok2:
+                type: bool
+                unstable: false
+                optional: true
+            ok3:
+                type: optionalBool
+                unstable: false
+
+    OptionalBoolToBoolStruct:
+        description: "optionalBool field replaced by bool"
+        fields:
+            ok:
+                type: bool
+                unstable: false
+
+    BoolToOptionalBoolStruct:
+        description: "bool field replaced by optionalBool"
+        fields:
+            ok:
                 type: optionalBool
                 unstable: false
 
@@ -821,7 +849,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: StableNewFieldReply
-    
+
     newReplyFieldRequired:
         description: "new command contains a required reply field that is optional
                       in the corresponding old command and still passes"
@@ -850,7 +878,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: UnstableOldFieldReply
-    
+
     importedReplyCommand:
         description: "reply is imported and should pass"
         command_name: importedReplyCommand
@@ -891,7 +919,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: BsonSubsetReplyTwo
-    
+
     newReplyFieldTypeStructRecursiveOne:
         description: "new command passes because its reply field type is a struct that is
                       compatible with the old reply field type struct"
@@ -992,7 +1020,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
-    
+
     newTypeFieldAddedOptional:
         description: "new optional type field is added and should pass"
         command_name: newTypeFieldAddedOptional
@@ -1067,7 +1095,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OldVariantTypeReply
-    
+
     newReplyFieldVariantSubset:
         description: "new command when its reply field type is a variant type that is
                       a subset of the old reply field variant types"
@@ -1097,7 +1125,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: VariantRecursiveReply
-    
+
     oldReplyFieldVariantStruct:
         description: "new command passes if it doesn't have a variant struct type while the
                       old command does"
@@ -1107,7 +1135,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OldVariantStructReply
-    
+
     replyFieldVariantStructRecursive:
         description: "new command passes when its reply field type has a variant struct type
                       that is compatible with the old reply field variant struct type"
@@ -1174,7 +1202,7 @@ commands:
         fields:
             variantSupersetParam:
                 unstable: false
-                type: 
+                type:
                     variant: [int, bool, string, array<string>]
 
     newParamVariantSupersetTwo:
@@ -1189,7 +1217,7 @@ commands:
         fields:
             variantSupersetParam:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, bool, double, array<string>]
 
     oldParamTypeNotVariant:
@@ -1204,7 +1232,7 @@ commands:
         fields:
             variantParam:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, array<string>]
 
     newParamVariantRecursive:
@@ -1219,7 +1247,7 @@ commands:
         fields:
             variantRecursiveParam:
                 unstable: false
-                type: 
+                type:
                     variant: [int, intStringToIntStringBool,
                               array<intStringToIntStringBool>, array<string>]
 
@@ -1235,7 +1263,7 @@ commands:
         fields:
             variantStructSupersetParam:
                 unstable: false
-                type: 
+                type:
                     variant: [int, string, NewCommandParameterStruct,
                               array<NewCommandParameterStruct>, array<string>]
 
@@ -1620,3 +1648,74 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    optionalBoolParameterEquivalence:
+        description: "new command gets first two parameter types swapped"
+        command_name: optionalBoolParameterEquivalence
+        namespace: ignored
+        cpp_name: optionalBoolParameterEquivalence
+        strict: true
+        api_version: "1"
+        fields:
+            flag1:
+                unstable: false
+                type: optionalBool
+            flag2:
+                unstable: false
+                type: bool
+                optional: true
+            flag3:
+                unstable: false
+                type: optionalBool
+        reply_type: OkReply
+
+    optionalBoolReplyEquivalence:
+        description: "new command gets first two reply field types swapped"
+        command_name: optionalBoolReplyEquivalence
+        namespace: ignored
+        cpp_name: optionalBoolReplyEquivalence
+        strict: true
+        api_version: "1"
+        reply_type: OptionalBoolEquivalenceStruct
+
+    optionalBoolCommandTypeEquivalence:
+        description: "new command gets first two type field types swapped"
+        command_name: optionalBoolCommandTypeEquivalence
+        namespace: type
+        type: OptionalBoolEquivalenceStruct
+        cpp_name: optionalBoolCommandTypeEquivalence
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    boolToOptionalBoolParameter:
+        description: "new command parameter has type optionalBool instead of bool"
+        command_name: boolToOptionalBoolParameter
+        namespace: ignored
+        cpp_name: boolToOptionalBoolParameter
+        strict: true
+        api_version: "1"
+        fields:
+            flag:
+                unstable: false
+                type: optionalBool
+        reply_type: OkReply
+
+    boolToOptionalBoolCommandType:
+        description: "new command type has type optionalBool instead of bool"
+        command_name: boolTooptionalBoolCommandType
+        namespace: type
+        type: BoolToOptionalBoolStruct
+        cpp_name: boolTooptionalBoolCommandType
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    optionalBoolToBoolReply:
+        description: "new command gets bool reply instead of optionalBool"
+        command_name: optionalBoolToBoolReply
+        namespace: ignored
+        cpp_name: optionalBoolToBoolReply
+        strict: true
+        api_version: "1"
+        reply_type: OptionalBoolToBoolStruct

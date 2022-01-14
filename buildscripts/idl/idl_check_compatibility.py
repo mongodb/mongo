@@ -171,15 +171,27 @@ IGNORE_UNSTABLE_LIST: List[str] = [
 SKIPPED_FILES = ["unittest.idl"]
 
 
-@dataclass
 class FieldCompatibility:
     """Information about a Field to check compatibility."""
 
-    field_type: syntax.Type
-    idl_file: syntax.IDLParsedSpec
-    idl_file_path: str
-    unstable: Optional[bool]
-    optional: bool
+    def __init__(self, field_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+                 idl_file: syntax.IDLParsedSpec, idl_file_path: str, unstable: Optional[bool],
+                 optional: bool) -> None:
+        """Initialize data members and hand special cases, such as optionalBool type."""
+        self.field_type = field_type
+        self.idl_file = idl_file
+        self.idl_file_path = idl_file_path
+        self.unstable = unstable
+        self.optional = optional
+
+        if isinstance(self.field_type, syntax.Type) and self.field_type.name == "optionalBool":
+            # special case for optionalBool type, because it is compatible
+            # with bool type, but has bson_serialization_type == 'any'
+            # which is not supported by many checks
+            self.field_type = syntax.Type(field_type.file_name, field_type.line, field_type.column)
+            self.field_type.name = "bool"
+            self.field_type.bson_serialization_type = ["bool"]
+            self.optional = True
 
 
 @dataclass
@@ -481,11 +493,17 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                       new_idl_file_path: str):
     """Check compatibility between old and new reply field."""
     # pylint: disable=too-many-arguments
+    old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
+    new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
+    old_field_optional = old_field.optional or (old_field_type
+                                                and old_field_type.name == "optionalBool")
+    new_field_optional = new_field.optional or (new_field_type
+                                                and new_field_type.name == "optionalBool")
     if not old_field.unstable:
         field_name: str = cmd_name + "-reply-" + new_field.name
         if new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
             ctxt.add_new_reply_field_unstable_error(cmd_name, new_field.name, new_idl_file_path)
-        if new_field.optional and not old_field.optional:
+        if new_field_optional and not old_field_optional:
             ctxt.add_new_reply_field_optional_error(cmd_name, new_field.name, new_idl_file_path)
 
         if new_field.validator:
@@ -496,9 +514,6 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
             else:
                 ctxt.add_reply_field_contains_validator_error(cmd_name, new_field.name,
                                                               new_idl_file_path)
-
-    old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
-    new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
 
     old_field_compatibility = FieldCompatibility(old_field_type, old_idl_file, old_idl_file_path,
                                                  old_field.unstable, old_field.optional)
@@ -609,17 +624,10 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                 is_command_parameter)
         return
 
-    # If the type has changed from type: optionalBool to type: bool with optional: true we should
-    # allow it.
-    # pylint: disable=invalid-name
-    optionalBoolToBoolWithOptional: bool = (old_type.name == "optionalBool"
-                                            and new_type.name == "bool" and new_field.optional)
-
     allow_name: str = cmd_name + "-param-" + param_name if is_command_parameter else cmd_name
 
     # If bson_serialization_type switches from 'any' to non-any type.
-    if ("any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type
-            and not optionalBoolToBoolWithOptional):
+    if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
         ctxt.add_old_command_or_param_type_bson_any_error(
             cmd_name, old_type.name, old_field.idl_file_path, param_name, is_command_parameter)
         return
@@ -630,7 +638,7 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
             cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
         return
 
-    if ("any" in old_type.bson_serialization_type and not optionalBoolToBoolWithOptional):
+    if "any" in old_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
         if allow_name not in ALLOW_ANY_TYPE_LIST:
             ctxt.add_command_or_param_type_bson_any_not_allowed_error(
@@ -699,7 +707,7 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                         cmd_name, old_type.variant_struct_type.name, new_field.idl_file_path,
                         param_name, is_command_parameter)
 
-    elif (not old_field.unstable and not optionalBoolToBoolWithOptional):
+    elif not old_field.unstable:
         check_superset(ctxt, cmd_name, new_type.name, new_type.bson_serialization_type,
                        old_type.bson_serialization_type, new_field.idl_file_path, param_name,
                        is_command_parameter)
@@ -899,20 +907,23 @@ def check_command_param_or_type_struct_field(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
     # If old field is unstable and new field is stable, the new field should either be optional or
     # have a default value.
-    if old_field.unstable and not new_field.unstable and not new_field.optional and new_field.default is None:
+    old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
+    new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
+    old_field_optional = old_field.optional or (old_field_type
+                                                and old_field_type.name == "optionalBool")
+    new_field_optional = new_field.optional or (new_field_type
+                                                and new_field_type.name == "optionalBool")
+    if old_field.unstable and not new_field.unstable and not new_field_optional and new_field.default is None:
         ctxt.add_new_param_or_command_type_field_stable_required_no_default_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
 
-    if old_field.optional and not new_field.optional:
+    if old_field_optional and not new_field_optional:
         ctxt.add_new_param_or_command_type_field_required_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
 
     if not old_field.unstable:
         check_param_or_type_validator(ctxt, old_field, new_field, cmd_name, new_idl_file_path,
                                       type_name, is_command_parameter)
-
-    old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
-    new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
 
     old_field_compatibility = FieldCompatibility(old_field_type, old_idl_file, old_idl_file_path,
                                                  old_field.unstable, old_field.optional)
