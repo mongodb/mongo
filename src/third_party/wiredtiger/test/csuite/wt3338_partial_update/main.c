@@ -121,7 +121,8 @@ compare(WT_ITEM *orig, WT_ITEM *local, WT_ITEM *library)
     const uint8_t *p, *t;
 
     max = WT_MIN(local->size, library->size);
-    if (local->size != library->size || memcmp(local->data, library->data, local->size) != 0) {
+    if (local->size != library->size ||
+      (local->size != 0 && memcmp(local->data, library->data, local->size) != 0)) {
         for (i = 0, p = local->data, t = library->data; i < max; ++i, ++p, ++t)
             if (*p != *t)
                 break;
@@ -133,9 +134,8 @@ compare(WT_ITEM *orig, WT_ITEM *local, WT_ITEM *library)
         show(orig, "original");
         show(local, "local results");
         show(library, "library results");
+        testutil_assert(false);
     }
-    testutil_assert(
-      local->size == library->size && memcmp(local->data, library->data, local->size) == 0);
 }
 
 /*
