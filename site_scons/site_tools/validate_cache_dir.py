@@ -25,6 +25,7 @@ import json
 import os
 import pathlib
 import shutil
+import tempfile
 import traceback
 
 
@@ -106,10 +107,14 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             if not csig:
                 raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"no content_hash data found")
 
-        try:
-            shutil.copy2(src_file, dst)
-        except OSError as ex:
-            raise CacheTransferFailed(src_file, dst, f"failed to copy from cache: {ex}") from ex
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            dst_tmp = pathlib.Path(tmpdirname) / os.path.basename(dst)
+            try:
+                shutil.copy2(src_file, dst_tmp)
+            except OSError as ex:
+                raise CacheTransferFailed(src_file, dst, f"failed to copy from cache: {ex}") from ex
+            else:
+                shutil.move(dst_tmp, dst)
 
         new_csig = SCons.Util.MD5filesignature(dst,
             chunksize=SCons.Node.FS.File.md5_chunksize*1024)
