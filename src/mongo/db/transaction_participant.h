@@ -140,6 +140,10 @@ class TransactionParticipant {
             return _state == kAbortedWithPrepare || _state == kAbortedWithoutPrepare;
         }
 
+        bool isAbortedWithoutPrepare() const {
+            return _state == kAbortedWithoutPrepare;
+        }
+
         bool hasExecutedRetryableWrite() const {
             return _state == kExecutedRetryableWrite;
         }
@@ -310,6 +314,10 @@ public:
 
         bool transactionIsAborted() const {
             return o().txnState.isAborted();
+        }
+
+        bool transactionIsAbortedWithoutPrepare() const {
+            return o().txnState.isAbortedWithoutPrepare();
         }
 
         bool transactionIsPrepared() const {
@@ -844,6 +852,22 @@ public:
         // aborted) apart from the one being run by the given 'opCtx', if any.
         void _uassertNoConflictingInternalTransactionForRetryableWrite(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
+
+        // Asserts that the active transaction number can be reused. Below are the two cases where
+        // an active transaction number is allowed to be reused:
+        // 1. The transaction participant is in transaction mode and the transaction has been
+        //    aborted and not been involved in a two phase commit. This corresponds to the case
+        //    where a transaction is internally retried after failing with a transient error such a
+        //    stale config or snapshot too old or view resolution error.
+        // 2. The transaction participant is in retryable write mode and has not yet executed a
+        //    retryable write. This corresponds to the case where a retryable write is converted
+        //    to a transaction. The only use case of this is where the write fails with a
+        //    WouldChangeOwningShard error. For a retryable write being executed using internal
+        //    transactions, there is an additional requirement that all the internal transactions
+        //    have been aborted and have not been involved in a two phase commit.
+        // Assuming routers target primaries in increasing order of term and in the absence of
+        // byzantine messages, this check should never fail.
+        void _uassertCanReuseActiveTxnNumberForTransaction(OperationContext* opCtx);
 
         // Attempt to begin or retry a retryable write at the given transaction number.
         void _beginOrContinueRetryableWrite(

@@ -224,6 +224,15 @@ function getImageEntriesForTxn(rs, lsid, txnNumber) {
     return getImageEntriesForTxnOnNode(rs.getPrimary(), lsid, txnNumber);
 }
 
+function makeAbortTransactionCmdObj(lsid, txnNumber) {
+    return {
+        abortTransaction: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    };
+}
+
 function makeCommitTransactionCmdObj(lsid, txnNumber) {
     return {
         commitTransaction: 1,

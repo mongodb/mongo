@@ -648,6 +648,46 @@ void TransactionParticipant::Participant::_uassertNoConflictingInternalTransacti
     }
 }
 
+void TransactionParticipant::Participant::_uassertCanReuseActiveTxnNumberForTransaction(
+    OperationContext* opCtx) {
+    if (o().txnState.isInSet(TransactionState::kNone)) {
+        const auto& retryableWriteTxnParticipantCatalog =
+            getRetryableWriteTransactionParticipantCatalog(opCtx);
+        invariant(retryableWriteTxnParticipantCatalog.isValid());
+
+        for (const auto& it : retryableWriteTxnParticipantCatalog.getParticipants()) {
+            const auto& txnParticipant = it.second;
+
+            if (txnParticipant._sessionId() == _sessionId()) {
+                continue;
+            }
+
+            invariant(txnParticipant._isInternalSessionForRetryableWrite());
+            uassert(
+                6202002,
+                str::stream() << "Cannot start transaction with session id " << _sessionId()
+                              << " and transaction number "
+                              << o().activeTxnNumberAndRetryCounter.getTxnNumber()
+                              << " because a retryable write with the same transaction number"
+                              << " is being executed in a retryable internal transaction "
+                              << " with session id " << txnParticipant._sessionId()
+                              << " and transaction number "
+                              << txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber()
+                              << " in state " << txnParticipant.o().txnState,
+                txnParticipant.transactionIsAbortedWithoutPrepare());
+        }
+    } else {
+        uassert(
+            50911,
+            str::stream() << "Cannot start a transaction with session id " << _sessionId()
+                          << " and transaction number "
+                          << o().activeTxnNumberAndRetryCounter.toBSON()
+                          << " because a transaction with the same transaction number is in state "
+                          << o().txnState,
+            o().txnState.isInSet(TransactionState::kAbortedWithoutPrepare));
+    }
+}
+
 void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
     OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
     invariant(!txnNumberAndRetryCounter.getTxnRetryCounter());
@@ -761,21 +801,7 @@ void TransactionParticipant::Participant::_beginMultiDocumentTransaction(
                 return;
             }
 
-            // The active transaction number can only be reused if:
-            // 1. The transaction participant is in retryable write mode and has not yet executed a
-            // retryable write, or
-            // 2. A transaction is aborted and has not been involved in a two phase commit.
-            //
-            // Assuming routers target primaries in increasing order of term and in the absence of
-            // byzantine messages, this check should never fail.
-            const auto restartableStates =
-                TransactionState::kNone | TransactionState::kAbortedWithoutPrepare;
-            uassert(50911,
-                    str::stream() << "Cannot start a transaction at given transaction with "
-                                  << txnNumberAndRetryCounter.toBSON()
-                                  << " because a transaction with the same number is in state "
-                                  << o().txnState,
-                    o().txnState.isInSet(restartableStates));
+            _uassertCanReuseActiveTxnNumberForTransaction(opCtx);
         } else {
             const auto restartableStates = TransactionState::kNone | TransactionState::kInProgress |
                 TransactionState::kAbortedWithoutPrepare | TransactionState::kAbortedWithPrepare;
