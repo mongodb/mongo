@@ -479,11 +479,6 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
-    if (_acquireCSOnRecipient) {
-        // Asynchronously tell the recipient to release its critical section
-        _coordinator->launchReleaseRecipientCriticalSection(_opCtx);
-    }
-
     Status migrationCommitStatus =
         Shard::CommandResponse::getEffectiveStatus(commitChunkMigrationResponse);
 
@@ -498,6 +493,11 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         // Best-effort recover of the shard version.
         onShardVersionMismatchNoExcept(_opCtx, _args.getNss(), boost::none).ignore();
         uassertStatusOK(migrationCommitStatus);
+    }
+
+    if (_acquireCSOnRecipient) {
+        // Asynchronously tell the recipient to release its critical section
+        _coordinator->launchReleaseRecipientCriticalSection(_opCtx);
     }
 
     hangBeforePostMigrationCommitRefresh.pauseWhileSet();
