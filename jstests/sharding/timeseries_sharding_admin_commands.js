@@ -257,7 +257,10 @@ function assertRangeMatch(savedRange, paramRange) {
     const configDB = mongo.s0.getDB('config');
     const collDoc = configDB.collections.findOne({_id: bucketNss});
     let chunkDoc = configDB.chunks.findOne({uuid: collDoc.uuid});
-    configDB.chunks.update({_id: chunkDoc._id}, {$set: {jumbo: true}});
+    assert.retryNoExcept(() => {
+        assert.commandWorked(configDB.chunks.update({_id: chunkDoc._id}, {$set: {jumbo: true}}));
+        return true;
+    }, "Setting jumbo flag update failed on config server", 10);
     chunkDoc = configDB.chunks.findOne({_id: chunkDoc._id});
     assert(chunkDoc.jumbo);
     assert.commandWorked(
