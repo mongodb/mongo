@@ -472,7 +472,35 @@ function rangeTestTwoDates() {
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
-
+// Test $densify with partitions and explicit bounds that are inside the collection's total range of
+// values for the field we are densifying.
+function testPartitionsWithBoundsInsideFullRange() {
+    coll.drop();
+    let collection = [
+        {_id: 0, val: 0, part: 1},      {_id: 1, val: 20, part: 2},
+        {_id: 2, val: -5, part: 1},     {_id: 3, val: 50, part: 2},
+        {_id: 4, val: 106, part: 1},    {_id: 5, val: -50, part: 2},
+        {_id: 6, val: 100, part: 1},    {_id: 7, val: -75, part: 2},
+        {_id: 8, val: 45, part: 1},     {_id: 9, val: -28, part: 2},
+        {_id: 10, val: 67, part: 1},    {_id: 11, val: -19, part: 2},
+        {_id: 12, val: -125, part: 1},  {_id: 13, val: -500, part: 2},
+        {_id: 14, val: 600, part: 1},   {_id: 15, val: 1000, part: 2},
+        {_id: 16, val: -1000, part: 1}, {_id: 17, val: 1400, part: 2},
+        {_id: 18, val: 3000, part: 1},  {_id: 19, val: -1900, part: 2},
+        {_id: 20, val: -2995, part: 1},
+    ];
+    assert.commandWorked(coll.insert(collection));
+    // Total range is [-2995, 3000] so [-399, -19] is within that.
+    let pipeline = [
+        {
+            $densify:
+                {field: "val", range: {step: 17, bounds: [-399, -19]}, partitionByFields: ["part"]}
+        },
+        {$sort: {part: 1, val: 1}}
+    ];
+    let result = coll.aggregate(pipeline).toArray();
+    assert(anyEq(result.length, 67));
+}
 // Test negative numbers.
 function fullTestFour() {
     coll.drop();
@@ -624,6 +652,7 @@ fullTestThree();
 rangeTestOne();
 rangeTestTwo();
 rangeTestThree();
+testPartitionsWithBoundsInsideFullRange();
 fullTestFour();
 
 testOneDates();

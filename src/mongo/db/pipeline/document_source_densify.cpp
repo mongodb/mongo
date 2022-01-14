@@ -399,6 +399,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::processFirstDocForE
             return doc;
         }
         case ValComparedToRange::kBelow: {
+            _densifyState = DensifyState::kUninitializedOrBelowRange;
             return doc;
         }
     }
