@@ -35,7 +35,6 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/session_catalog.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 
@@ -74,9 +73,7 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     }
 
     boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
-    const auto isSessionCleanupClient =
-        opCtx()->getClient()->desc() == SessionCatalog::kInternalSessionsCleanupClient;
-    if (collection()->ns().isImplicitlyReplicated() && !isSessionCleanupClient) {
+    if (collection()->ns().isImplicitlyReplicated()) {
         // Implictly replicated collections do not replicate updates.
         unReplBlock.emplace(opCtx());
     }

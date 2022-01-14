@@ -45,6 +45,7 @@ class CachedCollectionProperties {
 public:
     struct CollectionProperties {
         bool isCapped = false;
+        bool isClustered = false;
         const CollatorInterface* collator = nullptr;
     };
 

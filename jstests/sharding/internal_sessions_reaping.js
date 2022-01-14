@@ -183,8 +183,8 @@ assert.eq(0,
           tojson(transactionsCollOnPrimary.find().toArray()));
 assert.eq(0, imageCollOnPrimary.find().itcount());
 
-// Because the config.transactions is implicitly replicated, validate that writes do not generate
-// oplog entries, with the exception of deletions.
+// Validate that writes to config.transactions do not generate oplog entries, with the exception of
+// deletions.
 assert.eq(numTransactionsCollEntries,
           oplogCollOnPrimary.find({op: 'd', ns: kConfigTxnsNs}).itcount());
 assert.eq(0, oplogCollOnPrimary.find({op: {'$ne': 'd'}, ns: kConfigTxnsNs}).itcount());

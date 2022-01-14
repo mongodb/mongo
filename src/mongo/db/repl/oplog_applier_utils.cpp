@@ -73,6 +73,7 @@ CachedCollectionProperties::getCollectionPropertiesImpl(OperationContext* opCtx,
     }
 
     collProperties.isCapped = collection->isCapped();
+    collProperties.isClustered = collection->isClustered();
     collProperties.collator = collection->getDefaultCollator();
     return collProperties;
 }
@@ -87,9 +88,10 @@ void OplogApplierUtils::processCrudOp(OperationContext* opCtx,
     // Include the _id of the document in the hash so we get parallelism even if all writes are to a
     // single collection.
     //
-    // For capped collections, this is illegal, since capped collections must preserve
-    // insertion order.
-    if (!collProperties.isCapped) {
+    // For capped collections, this is usually illegal, since capped collections must preserve
+    // insertion order. One exception are clustered capped collections with a monotonically
+    // increasing cluster key, which guarantee preservation of the insertion order.
+    if (!collProperties.isCapped || collProperties.isClustered) {
         BSONElement id = op->getIdElement();
         BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
                                             collProperties.collator);

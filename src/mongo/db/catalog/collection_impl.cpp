@@ -369,7 +369,10 @@ CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
       _recordStore(std::move(recordStore)),
       _cappedNotifier(_recordStore && options.capped ? std::make_shared<CappedInsertNotifier>()
                                                      : nullptr),
-      _needCappedLock(options.capped && collection->ns().isReplicated()),
+      // Capped collections must preserve insertion order, so we serialize writes. One exception are
+      // clustered capped collections because they only guarantee insertion order when cluster keys
+      // are inserted in monotonically-increasing order.
+      _needCappedLock(options.capped && collection->ns().isReplicated() && !options.clusteredIndex),
       _isCapped(options.capped),
       _cappedMaxDocs(options.cappedMaxDocs) {
     if (_cappedNotifier) {
@@ -882,10 +885,14 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     }
 
     if (_shared->_needCappedLock) {
-        // X-lock the metadata resource for this capped collection until the end of the WUOW. This
-        // prevents the primary from executing with more concurrency than secondaries and protects
-        // '_cappedFirstRecord'.
-        // See SERVER-21646.
+        // X-lock the metadata resource for this replicated, non-clustered capped collection until
+        // the end of the WUOW. Non-clustered capped collections require writes to be serialized on
+        // the secondary in order to guarantee insertion order (SERVER-21483); this exclusive access
+        // to the metadata resource prevents the primary from executing with more concurrency than
+        // secondaries - thus helping secondaries keep up - and protects '_cappedFirstRecord'. See
+        // SERVER-21646. On the other hand, capped clustered collections with a monotonically
+        // increasing cluster key natively guarantee preservation of the insertion order, and don't
+        // need serialisation. We allow concurrent inserts for clustered capped collections.
         Lock::ResourceLock heldUntilEndOfWUOW{
             opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
     }

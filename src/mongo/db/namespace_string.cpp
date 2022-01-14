@@ -361,8 +361,7 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {
-    if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
-        isConfigTransactionsCollection() || isChangeCollection()) {
+    if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() || isChangeCollection()) {
         // Implicitly replicated namespaces are replicated, although they only replicate a subset of
         // writes.
         invariant(isReplicated());

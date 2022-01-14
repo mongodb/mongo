@@ -206,7 +206,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
         }
         // Implcitily replicated collections and capped collections not replicating truncation are
         // not designed to be consistent, so inconsistency is not necessarily pathological.
-        if (nss.isImplicitlyReplicated() || (options && options->capped)) {
+        if (nss.isChangeStreamPreImagesCollection() || nss.isConfigImagesCollection() ||
+            (options && options->capped)) {
             return SeverityEnum::Warning;
         }
 
