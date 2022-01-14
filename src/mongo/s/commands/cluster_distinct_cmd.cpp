@@ -196,7 +196,15 @@ public:
                 CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
         }
 
-        const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
+        if (swCM == ErrorCodes::NamespaceNotFound) {
+            // If the database doesn't exist, we successfully return an empty result set without
+            // creating a cursor.
+            result.appendArray("values", BSONObj());
+            return true;
+        }
+
+        const auto cm = uassertStatusOK(std::move(swCM));
         if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
                 repl::ReadConcernLevel::kSnapshotReadConcern &&
             !opCtx->inMultiDocumentTransaction() && cm.isSharded()) {
