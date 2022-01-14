@@ -19,16 +19,18 @@ load("jstests/core/timeseries/libs/timeseries.js");
 TimeseriesTest.run((insert) => {
     // These dates will all be inserted into individual buckets.
     const dates = [
-        ISODate("2021-04-01T00:00:00.000Z"),
-        ISODate("2021-04-02T00:00:00.000Z"),
-        ISODate("2021-04-03T00:00:00.000Z"),
-        ISODate("2021-04-04T00:00:00.000Z"),
-        ISODate("2021-04-05T00:00:00.000Z"),
-        ISODate("2021-04-06T00:00:00.000Z"),
-        ISODate("2021-04-07T00:00:00.000Z"),
-        ISODate("2021-04-08T00:00:00.000Z"),
-        ISODate("2021-04-09T00:00:00.000Z"),
-        ISODate("2021-04-10T00:00:00.000Z"),
+        ISODate("2021-04-01T00:00:00.001Z"),
+        ISODate("2021-04-02T00:00:00.007Z"),
+        ISODate("2021-04-03T00:00:00.005Z"),
+        ISODate("2021-04-04T00:00:00.003Z"),
+        ISODate("2021-04-05T00:00:00.009Z"),
+        ISODate("2021-04-06T00:00:00.008Z"),  // Starting document for $gt & $gte predicates.
+        ISODate("2021-04-06T00:00:00.010Z"),
+        ISODate("2021-04-06T00:00:00.010Z"),  // Starting document for $lt & $gte predicates.
+        ISODate("2021-04-07T00:00:00.006Z"),
+        ISODate("2021-04-08T00:00:00.003Z"),
+        ISODate("2021-04-09T00:00:00.007Z"),
+        ISODate("2021-04-10T00:00:00.002Z"),
     ];
 
     const coll = db.timeseries_id_range;
@@ -58,7 +60,7 @@ TimeseriesTest.run((insert) => {
     (function testLTE() {
         init();
         // Just for this test, use a more complex pipeline with unwind.
-        const pipeline = [{$match: {time: {$lte: dates[5]}}}, {$unwind: '$x'}];
+        const pipeline = [{$match: {time: {$lte: dates[7]}}}, {$unwind: '$x'}];
         let res = coll.aggregate(pipeline).toArray();
         assert.eq(0, res.length);
 
@@ -67,12 +69,12 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"), expl);
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i], x: [1, 2]}));
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(12, res.length);
+        assert.eq(16, res.length);  // 8 documents x 2 unwound array entries per document.
 
         expl = coll.explain("executionStats").aggregate(pipeline);
         assert.eq(7, expl.stages[0].$cursor.executionStats.totalDocsExamined);
@@ -80,7 +82,7 @@ TimeseriesTest.run((insert) => {
 
     (function testLT() {
         init();
-        const pipeline = [{$match: {time: {$lt: dates[5]}}}];
+        const pipeline = [{$match: {time: {$lt: dates[7]}}}];
         let res = coll.aggregate(pipeline).toArray();
         assert.eq(0, res.length);
 
@@ -88,15 +90,15 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(5, res.length);
+        assert.eq(6, res.length);
 
         expl = coll.explain("executionStats").aggregate(pipeline);
-        assert.eq(6, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(7, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 
     (function testGTE() {
@@ -109,12 +111,12 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(5, res.length);
+        assert.eq(7, res.length, coll.explain().aggregate(pipeline));
 
         expl = coll.explain("executionStats").aggregate(pipeline);
         assert.eq(6, expl.stages[0].$cursor.executionStats.totalDocsExamined);
@@ -130,12 +132,12 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("minRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(4, res.length);
+        assert.eq(6, res.length);
 
         expl = coll.explain("executionStats").aggregate(pipeline);
         assert.eq(6, expl.stages[0].$cursor.executionStats.totalDocsExamined);
@@ -153,7 +155,7 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
@@ -161,7 +163,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(3, res.length);
 
         expl = coll.explain("executionStats").aggregate(pipeline);
-        assert.eq(5, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
     })();
 
     (function testRange2() {
@@ -176,15 +178,15 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(1, res.length);
+        assert.eq(0, res.length);
 
         expl = coll.explain("executionStats").aggregate(pipeline);
-        assert.eq(4, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 
     (function testRange3() {
@@ -199,7 +201,7 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
@@ -207,7 +209,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         expl = coll.explain("executionStats").aggregate(pipeline);
-        assert.eq(1, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 
     (function testRange4() {
@@ -222,15 +224,15 @@ TimeseriesTest.run((insert) => {
         assert(getAggPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));
         assert.eq(0, expl.stages[0].$cursor.executionStats.executionStages.nReturned);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < dates.length; i++) {
             assert.commandWorked(insert(coll, {_id: i, [timeFieldName]: dates[i]}));
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(1, res.length);
+        assert.eq(0, res.length);
 
         expl = coll.explain("executionStats").aggregate(pipeline);
-        assert.eq(4, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 });
 })();
