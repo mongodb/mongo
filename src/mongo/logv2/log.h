@@ -65,11 +65,11 @@ const mongo::logv2::LogComponent MongoLogV2DefaultComponent_component =
 #else
 #error \
     "mongo/logv2/log.h requires MONGO_LOGV2_DEFAULT_COMPONENT to be defined. " \
-       "Please see https://github.com/mongodb/mongo/blob/master/src/mongo/logv2/README.md "
+       "Please see https://github.com/mongodb/mongo/blob/master/docs/logging.md "
 #endif  // MONGO_LOGV2_DEFAULT_COMPONENT
 }  // namespace
 
-// The logging macros below are documented in detail under src/mongo/logv2/README.md
+// The logging macros below are documented in detail under docs/logging.md
 namespace mongo {
 // Internal helper to be able to create LogOptions with two arguments from other macros
 #define MAKE_OPTIONS_ARG2(ARG0, ARG1) \
