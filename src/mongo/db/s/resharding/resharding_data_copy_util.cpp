@@ -43,7 +43,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding_util.h"
-#include "mongo/db/s/session_catalog_migration_destination.h"
+#include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -303,7 +303,7 @@ void updateSessionRecord(OperationContext* opCtx,
 
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setObject(BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
+    oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
     oplogEntry.setObject2(std::move(o2Field));
     oplogEntry.setNss({});
     oplogEntry.setSessionId(opCtx->getLogicalSessionId());

@@ -96,6 +96,7 @@ env.Library(
         'resharding/resharding_txn_cloner.cpp',
         'resharding/resharding_txn_cloner_progress.idl',
         'scoped_operation_completion_sharding_actions.cpp',
+        'session_catalog_migration.cpp',
         'session_catalog_migration_destination.cpp',
         'session_catalog_migration_source.cpp',
         'shard_filtering_metadata_refresh.cpp',

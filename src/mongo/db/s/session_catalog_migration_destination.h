@@ -67,8 +67,6 @@ public:
         Done,
     };
 
-    static const char kSessionMigrateOplogTag[];
-
     SessionCatalogMigrationDestination(NamespaceString nss,
                                        ShardId fromShard,
                                        MigrationSessionId migrationSessionId);

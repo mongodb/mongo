@@ -158,6 +158,19 @@ public:
      */
     void onCloneCleanup();
 
+    /**
+     * This function will utilize the shardKeyPattern and chunkRange to evaluate whether or not
+     * the oplogEntry is relevant to the migration. If not, the chunk should be skipped and the
+     * function will return true. Otherwise the function will return false.
+     *
+     * If the oplogEntry is of type no-op and it has been rewritten by another migration and it's
+     * outside of the chunk range, then it should be skipped. Or if the oplog is a crud operation
+     * and it's outside of the chunk range then it should be skipped.
+     */
+    static bool shouldSkipOplogEntry(const mongo::repl::OplogEntry& oplogEntry,
+                                     const ShardKeyPattern& shardKeyPattern,
+                                     const ChunkRange& chunkRange);
+
 private:
     /**
      * An iterator for extracting session write oplogs that need to be cloned during migration.

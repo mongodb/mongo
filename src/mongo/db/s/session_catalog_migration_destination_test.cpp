@@ -45,6 +45,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/server_options.h"
@@ -73,10 +74,6 @@ const ConnectionString kConfigConnStr =
 const ConnectionString kDonorConnStr =
     ConnectionString::forReplicaSet("donor", {HostAndPort("donor:1")});
 const ShardId kFromShard("donor");
-
-const BSONObj kSessionOplogTag(BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag
-                                    << 1));
-
 const NamespaceString kNs("a.b");
 
 /**
@@ -323,7 +320,7 @@ private:
         ASSERT_TRUE(sessionInfoToCheck.getTxnNumber());
         ASSERT_EQ(*origSessionInfo.getTxnNumber(), *sessionInfoToCheck.getTxnNumber());
 
-        ASSERT_BSONOBJ_EQ(kSessionOplogTag, oplogToCheck.getObject());
+        ASSERT_BSONOBJ_EQ(SessionCatalogMigration::kSessionOplogTag, oplogToCheck.getObject());
     }
 
     boost::optional<MigrationSessionId> _migrationId;
@@ -782,7 +779,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
     ASSERT_TRUE(nextSessionInfo.getTxnNumber());
     ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
 
-    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+    ASSERT_BSONOBJ_EQ(SessionCatalogMigration::kSessionOplogTag, nextOplog.getObject());
 
     auto innerOplog = extractInnerOplog(nextOplog);
     ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);
@@ -875,7 +872,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImag
     ASSERT_TRUE(nextSessionInfo.getTxnNumber());
     ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
 
-    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+    ASSERT_BSONOBJ_EQ(SessionCatalogMigration::kSessionOplogTag, nextOplog.getObject());
 
     auto innerOplog = extractInnerOplog(nextOplog);
     ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);
@@ -966,7 +963,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
     ASSERT_TRUE(nextSessionInfo.getTxnNumber());
     ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
 
-    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+    ASSERT_BSONOBJ_EQ(SessionCatalogMigration::kSessionOplogTag, nextOplog.getObject());
 
     auto innerOplog = extractInnerOplog(nextOplog);
     ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);
@@ -1058,7 +1055,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPostIma
     ASSERT_TRUE(nextSessionInfo.getTxnNumber());
     ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
 
-    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+    ASSERT_BSONOBJ_EQ(SessionCatalogMigration::kSessionOplogTag, nextOplog.getObject());
 
     auto innerOplog = extractInnerOplog(nextOplog);
     ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);
@@ -1153,7 +1150,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
     ASSERT_TRUE(nextSessionInfo.getTxnNumber());
     ASSERT_EQ(2, nextSessionInfo.getTxnNumber().value());
 
-    ASSERT_BSONOBJ_EQ(kSessionOplogTag, nextOplog.getObject());
+    ASSERT_BSONOBJ_EQ(SessionCatalogMigration::kSessionOplogTag, nextOplog.getObject());
 
     auto innerOplog = extractInnerOplog(nextOplog);
     ASSERT_TRUE(innerOplog.getOpType() == OpTypeEnum::kUpdate);

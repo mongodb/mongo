@@ -29,16 +29,25 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -49,6 +58,8 @@ using executor::RemoteCommandRequest;
 const NamespaceString kNs("a.b");
 const KeyPattern kShardKey(BSON("x" << 1));
 const ChunkRange kChunkRange(BSON("x" << 0), BSON("x" << 100));
+const KeyPattern kNestedShardKey(BSON("x.y" << 1));
+const ChunkRange kNestedChunkRange(BSON("x.y" << 0), BSON("x.y" << 100));
 
 class SessionCatalogMigrationSourceTest : public MockReplCoordServerFixture {};
 
@@ -114,6 +125,50 @@ repl::OplogEntry makeOplogEntry(
                           osi,
                           needsRetryImage);
 }
+
+repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& lsid,
+                                        const TxnNumber& txnNumber,
+                                        Date_t wallClockTime) {
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNumber);
+
+    return makeOplogEntry({},                                        // optime
+                          repl::OpTypeEnum::kNoop,                   // op type
+                          {},                                        // o
+                          TransactionParticipant::kDeadEndSentinel,  // o2
+                          wallClockTime,                             // wall clock time
+                          {kIncompleteHistoryStmtId},                // statement id
+                          repl::OpTime(Timestamp(0, 0), 0),
+                          boost::none,
+                          boost::none,
+                          sessionInfo  // session info
+    );
+}
+
+repl::OplogEntry makeRewrittenOplogInSession(repl::OpTime opTime,
+                                             repl::OpTime previousWriteOpTime,
+                                             BSONObj object,
+                                             int statementId) {
+    auto original =
+        makeOplogEntry(opTime,                     // optime
+                       repl::OpTypeEnum::kInsert,  // op type
+                       object,                     // o
+                       boost::none,                // o2
+                       Date_t::now(),              // wall clock time
+                       {statementId},              // statement ids
+                       previousWriteOpTime);  // optime of previous write within same transaction
+
+    return makeOplogEntry(original.getOpTime(),                                         // optime
+                          repl::OpTypeEnum::kNoop,                                      // op type
+                          BSON(SessionCatalogMigration::kSessionMigrateOplogTag << 1),  // o
+                          original.getEntry().toBSON(),                                 // o2
+                          original.getWallClockTime(),  // wall clock time
+                          original.getStatementIds(),   // statement ids
+                          original.getPrevWriteOpTimeInTransaction()
+                              .get());  // optime of previous write within same transaction
+};
+
 
 TEST_F(SessionCatalogMigrationSourceTest, NoSessionsToTransferShouldNotHaveOplog) {
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
@@ -1385,6 +1440,213 @@ TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithNoCommittedWr
     const int64_t defaultSessionDocSize =
         sizeof(LogicalSessionId) + sizeof(TxnNumber) + sizeof(Timestamp) + 16;
     ASSERT_EQ(migrationSource.untransferredCatchUpDataSize(), defaultSessionDocSize);
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, FilterRewrittenOplogEntriesOutsideChunkRange) {
+
+    auto data = {std::make_pair(BSON("x" << 30), repl::OpTime(Timestamp(52, 345), 2)),
+                 std::make_pair(BSON("x" << -50), repl::OpTime(Timestamp(67, 54801), 2)),
+                 std::make_pair(BSON("x" << 40), repl::OpTime(Timestamp(43, 12), 2)),
+                 std::make_pair(BSON("x" << 50), repl::OpTime(Timestamp(789, 13), 2))};
+
+    std::vector<repl::OplogEntry> entries;
+    std::transform(data.begin(), data.end(), std::back_inserter(entries), [](const auto& pair) {
+        auto original =
+            makeOplogEntry(pair.second,                // optime
+                           repl::OpTypeEnum::kInsert,  // op type
+                           pair.first,                 // o
+                           boost::none,                // o2
+                           Date_t::now(),              // wall clock time
+                           {0},                        // statement ids
+                           repl::OpTime(Timestamp(0, 0),
+                                        0));  // optime of previous write within same transaction
+        return makeOplogEntry(pair.second,    // optime
+                              repl::OpTypeEnum::kNoop,  // op type
+                              BSON(SessionCatalogMigration::kSessionMigrateOplogTag << 1),  // o
+                              original.getEntry().toBSON(),                                 // o2
+                              original.getWallClockTime(),  // wall clock time
+                              {0},                          // statement ids
+                              repl::OpTime(Timestamp(0, 0),
+                                           0));  // optime of previous write within same transaction
+    });
+
+
+    DBDirectClient client(opCtx());
+    for (auto entry : entries) {
+        SessionTxnRecord sessionRecord(
+            makeLogicalSessionIdForTest(), 1, entry.getOpTime(), entry.getWallClockTime());
+
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                      sessionRecord.toBSON());
+        insertOplogEntry(entry);
+    }
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    std::vector<repl::OplogEntry> filteredEntries = {entries.at(1)};
+
+    while (migrationSource.fetchNextOplog(opCtx())) {
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        std::for_each(
+            filteredEntries.begin(), filteredEntries.end(), [nextOplogResult](auto& entry) {
+                ASSERT_BSONOBJ_NE(entry.getEntry().toBSON(),
+                                  nextOplogResult.oplog->getEntry().toBSON());
+            });
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       FilterSingleSessionRewrittenOplogEntriesOutsideChunkRange) {
+
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(
+        repl::OpTime(Timestamp(52, 345), 2), repl::OpTime(Timestamp(0, 0), 0), BSON("x" << 30), 0);
+
+    auto rewrittenEntryTwo = makeRewrittenOplogInSession(
+        repl::OpTime(Timestamp(67, 54801), 2), rewrittenEntryOne.getOpTime(), BSON("x" << -50), 1);
+
+    std::vector<repl::OplogEntry> entries = {rewrittenEntryOne, rewrittenEntryTwo};
+
+    SessionTxnRecord sessionRecord1(makeLogicalSessionIdForTest(),
+                                    1,
+                                    rewrittenEntryTwo.getOpTime(),
+                                    rewrittenEntryTwo.getWallClockTime());
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                  sessionRecord1.toBSON());
+
+    for (auto entry : entries) {
+        insertOplogEntry(entry);
+    }
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+
+    std::vector<repl::OplogEntry> filteredEntries = {entries.at(1)};
+
+    while (migrationSource.fetchNextOplog(opCtx())) {
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+
+        std::for_each(
+            filteredEntries.begin(), filteredEntries.end(), [nextOplogResult](auto& entry) {
+                ASSERT_BSONOBJ_NE(entry.getEntry().toBSON(),
+                                  nextOplogResult.oplog->getEntry().toBSON());
+            });
+    }
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ShouldSkipOplogEntryReturnsTrueForCrudOplogEntryOutsideChunkRange) {
+    const auto shardKeyPattern = ShardKeyPattern(kShardKey);
+
+    auto skippedEntry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << -30),                     // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        {0},                                  // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+
+    ASSERT_TRUE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        skippedEntry, shardKeyPattern, kChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ShouldSkipOplogEntryReturnsFalseForCrudOplogEntryInChunkRange) {
+    const auto shardKeyPattern = ShardKeyPattern(kShardKey);
+
+    auto processedEntry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 30),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        {0},                                  // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+
+    ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        processedEntry, shardKeyPattern, kChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ShouldSkipOplogEntryReturnsFalseForUserDocumentWithSessionMigrateOplogTag) {
+    const auto shardKeyPattern = ShardKeyPattern(kShardKey);
+
+    // This oplogEntry represents the preImage document stored in a no-op oplogEntry.
+    auto processedEntry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kNoop,              // op type
+        BSON("_id" << 5 << "x" << 30 << SessionCatalogMigration::kSessionMigrateOplogTag
+                   << 1),                   // o
+        BSONObj(),                          // o2
+        Date_t::now(),                      // wall clock time
+        {0},                                // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
+
+    ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        processedEntry, shardKeyPattern, kChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ShouldSkipOplogEntryReturnsFalseForRewrittenOplogInChunkRange) {
+    const auto shardKeyPattern = ShardKeyPattern(kShardKey);
+    BSONObj emptyObject;
+
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(
+        repl::OpTime(Timestamp(52, 345), 2), repl::OpTime(Timestamp(0, 0), 0), BSON("x" << 30), 0);
+
+    ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        rewrittenEntryOne, shardKeyPattern, kChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       ShouldSkipOplogEntryReturnsTrueForRewrittenOplogInChunkRange) {
+    const auto shardKeyPattern = ShardKeyPattern(kShardKey);
+    BSONObj emptyObject;
+
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(
+        repl::OpTime(Timestamp(52, 345), 2), repl::OpTime(Timestamp(0, 0), 0), BSON("x" << -30), 0);
+
+    ASSERT_TRUE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        rewrittenEntryOne, shardKeyPattern, kChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryReturnsFalseForDeadSentinel) {
+    const auto shardKeyPattern = ShardKeyPattern(kShardKey);
+    auto wallClockTime = Date_t::now();
+    auto deadSentinel = makeSentinelOplogEntry(makeLogicalSessionIdForTest(), 1, wallClockTime);
+
+    ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        deadSentinel, shardKeyPattern, kChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryWorksWithNestedShardKeys) {
+    const auto shardKeyPattern = ShardKeyPattern(kNestedShardKey);
+
+    auto processedEntry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << BSON("y" << 30)),         // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        {0},                                  // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+
+    ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        processedEntry, shardKeyPattern, kNestedChunkRange));
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, ShouldSkipOplogEntryWorksWithRewrittenNestedShardKeys) {
+    const auto shardKeyPattern = ShardKeyPattern(kNestedShardKey);
+
+    auto rewrittenEntryOne = makeRewrittenOplogInSession(repl::OpTime(Timestamp(52, 345), 2),
+                                                         repl::OpTime(Timestamp(0, 0), 0),
+                                                         BSON("x" << BSON("y" << 30)),
+                                                         0);
+
+    ASSERT_FALSE(SessionCatalogMigrationSource::shouldSkipOplogEntry(
+        rewrittenEntryOne, shardKeyPattern, kNestedChunkRange));
 }
 
 }  // namespace

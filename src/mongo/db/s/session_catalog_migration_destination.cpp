@@ -43,6 +43,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/write_concern.h"
@@ -272,8 +273,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     }
 
     if (!result.isPrePostImage)
-        oplogEntry.setObject(
-            BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
+        oplogEntry.setObject(SessionCatalogMigration::kSessionOplogTag);
     setPrePostImageTs(lastResult, &oplogEntry);
     oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
 
@@ -326,8 +326,6 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
 }
 
 }  // namespace
-
-const char SessionCatalogMigrationDestination::kSessionMigrateOplogTag[] = "$sessionMigrateInfo";
 
 SessionCatalogMigrationDestination::SessionCatalogMigrationDestination(
     NamespaceString nss, ShardId fromShard, MigrationSessionId migrationSessionId)
