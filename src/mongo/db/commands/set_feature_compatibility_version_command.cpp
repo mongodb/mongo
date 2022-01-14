@@ -349,6 +349,30 @@ public:
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
+                if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                    if (requestedVersion < actualVersion) {
+                        // TODO SERVER-62584 review/adapt this scope before v6.0 branches out
+                        // Make sure no collection is currently being defragmented
+                        DBDirectClient client(opCtx);
+
+                        const BSONObj collBeingDefragmentedQuery =
+                            BSON(CollectionType::kBalancerShouldMergeChunksFieldName
+                                 << BSON("$exists" << true));
+
+                        const bool isDefragmenting = client.count(CollectionType::ConfigNS,
+                                                                  collBeingDefragmentedQuery,
+                                                                  0 /*options*/,
+                                                                  1 /* limit */);
+
+                        uassert(ErrorCodes::CannotDowngrade,
+                                str::stream()
+                                    << "Cannot downgrade the cluster when there are collections "
+                                       "being defragmented. Please drain all the defragmentation "
+                                       "processes before downgrading.",
+                                !isDefragmenting);
+                    }
+                }
+
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     actualVersion,
@@ -530,26 +554,6 @@ private:
                 requestedVersion);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            {
-                // TODO SERVER-xyz review/adapt this scope before v6.0 branches out
-                // Make sure no collection is currently being defragmented
-                DBDirectClient client(opCtx);
-
-                const BSONObj collBeingDefragmentedQuery = BSON(
-                    CollectionType::kBalancerShouldMergeChunksFieldName << BSON("$exists" << true));
-
-                const bool isDefragmenting = client.count(CollectionType::ConfigNS,
-                                                          collBeingDefragmentedQuery,
-                                                          0 /*options*/,
-                                                          1 /* limit */);
-
-                uassert(ErrorCodes::CannotDowngrade,
-                        str::stream() << "Cannot downgrade the cluster when there are collections "
-                                         "being defragmented. Please drain all the defragmentation "
-                                         "processes before downgrading.",
-                        !isDefragmenting);
-            }
-
             // Tell the shards to enter phase-1 of setFCV
             auto requestPhase1 = request;
             requestPhase1.setFromConfigServer(true);
