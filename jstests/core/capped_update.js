@@ -10,6 +10,7 @@
  *   assumes_standalone_mongod,
  *   # capped collections connot be sharded
  *   assumes_unsharded_collection,
+ *   no_selinux,
  * ]
  */
 

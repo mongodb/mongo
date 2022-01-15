@@ -9,6 +9,7 @@
  *   assumes_unsharded_collection,
  *   # emptycapped command is not supported on mongos
  *   assumes_against_mongod_not_mongos,
+ *   no_selinux,
  * ]
  */
 

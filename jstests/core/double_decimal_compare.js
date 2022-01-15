@@ -3,6 +3,7 @@
  * is intended to reproduce SERVER-58155.
  * @tags: [
  *   assumes_read_concern_local,
+ *   no_selinux,
  * ]
  */
 (function() {

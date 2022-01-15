@@ -2,7 +2,7 @@
  * Tests that a backtrace will appear in the $currentOp output if the backtrace option is
  * set to true and there is a latch timeout.
  *
- * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged]
+ * @tags: [assumes_read_concern_unchanged, assumes_read_preference_unchanged, no_selinux]
  */
 (function() {
 "use strict";

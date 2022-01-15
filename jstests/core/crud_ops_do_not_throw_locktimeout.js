@@ -6,6 +6,7 @@
  *   assumes_read_concern_unchanged,
  *   assumes_write_concern_unchanged,
  *   uses_parallel_shell,
+ *   no_selinux,
  * ]
  */
 (function() {

@@ -7,6 +7,7 @@
  *   requires_non_retryable_commands,
  *   requires_capped,
  *   requires_collstats,
+ *   no_selinux,
  * ]
  */
 

@@ -4,6 +4,7 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
+ *   no_selinux,
  * ]
  */
 (function() {

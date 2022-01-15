@@ -1,6 +1,7 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
+//   no_selinux,
 // ]
 
 // Test query stage merge sorting.

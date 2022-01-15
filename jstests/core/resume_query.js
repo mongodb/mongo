@@ -5,6 +5,7 @@
  *   multiversion_incompatible,
  *   requires_getmore,
  *   requires_persistence,
+ *   no_selinux,
  * ]
  */
 

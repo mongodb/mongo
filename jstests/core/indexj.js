@@ -3,6 +3,7 @@
 // change depending on whether/how many documents are filtered out by the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
+//   no_selinux,
 // ]
 
 (function() {

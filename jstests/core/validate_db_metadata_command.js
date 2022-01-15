@@ -1,6 +1,7 @@
 /**
  * Tests the validateDBMetaData commands with various input parameters.
  * @tags: [
+ *   no_selinux,
  * ]
  */
 (function() {

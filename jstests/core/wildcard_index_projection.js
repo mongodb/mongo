@@ -3,6 +3,7 @@
  * properly. Exercises the fix for SERVER-52814.
  * @tags: [
  *   assumes_read_concern_local,
+ *   no_selinux,
  * ]
  */
 

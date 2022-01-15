@@ -2,6 +2,7 @@
  * Tests that a $** index can provide a DISTINCT_SCAN or indexed solution where appropriate.
  * @tags: [
  *   assumes_read_concern_local,
+ *   no_selinux,
  * ]
  */
 (function() {

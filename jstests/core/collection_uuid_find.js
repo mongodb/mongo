@@ -4,6 +4,7 @@
  * @tags: [
  *   featureFlagCommandsAcceptCollectionUUID,
  *   tenant_migration_incompatible,
+ *   no_selinux,
  * ]
  */
 (function() {

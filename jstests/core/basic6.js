@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   no_selinux,
+ * ]
+ */
 
 t = db.basic6;
 

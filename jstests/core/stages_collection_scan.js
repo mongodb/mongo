@@ -2,6 +2,7 @@
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
 //   tenant_migration_incompatible,
+//   no_selinux,
 // ]
 
 // Test basic query stage collection scan functionality.

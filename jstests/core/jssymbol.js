@@ -1,5 +1,9 @@
 // Test Symbol.toPrimitive works for DB and BSON objects
 //
+// @tags: [
+//   no_selinux,
+// ]
+
 (function() {
 // Exercise Symbol.toPrimitive on DB objects
 assert(`${db}` === 'test');

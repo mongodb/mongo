@@ -2,7 +2,7 @@
  * Verifies that $geoNear correctly matches the point given to the 'near' parameter when the
  * 'maxDistance' parameter is set to 0.
  *
- * @tags: [backport_required_multiversion]
+ * @tags: [backport_required_multiversion,no_selinux]
  */
 (function() {
 "use strict";

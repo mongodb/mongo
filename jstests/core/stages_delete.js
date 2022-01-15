@@ -5,6 +5,7 @@
 //   does_not_support_stepdowns,
 //   requires_fastcount,
 //   uses_testing_only_commands,
+//   no_selinux,
 // ]
 
 // Test basic delete stage functionality.

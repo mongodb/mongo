@@ -10,6 +10,7 @@
  *   # node and the expected command is run on another, the latter will not show up in the
  *   # currentOp results.
  *   assumes_read_preference_unchanged,
+ *   no_selinux,
  * ]
  */
 

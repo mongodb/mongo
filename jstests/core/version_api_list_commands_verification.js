@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_non_retryable_commands,
+ *   no_selinux,
  * ]
  */
 

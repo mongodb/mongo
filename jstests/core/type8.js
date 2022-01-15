@@ -1,3 +1,7 @@
+// @tags: [
+//   no_selinux,
+// ]
+
 (function() {
 "use strict";
 

@@ -19,79 +19,32 @@ class TestDefinition extends SelinuxBaseTest {
     }
 
     run() {
-        let dirs = ["jstests/core", "jstests/core_standalone"];
+        // On RHEL7 there is no python3, but check_has_tag.py will also work with python2
+        const python = (0 == runNonMongoProgram("which", "python3")) ? "python3" : "python2";
 
-        // Tests in jstests/core weren't specifically made to pass in this very scenario, so we
-        // will not be fixing what is not working, and instead exclude them from running as
-        // "known" to not work
-        const exclude = new Set([
-            "jstests/core/api_version_parameters.js",
-            "jstests/core/api_version_test_expression.js",
-            "jstests/core/basic6.js",
-            "jstests/core/capped_empty.js",
-            "jstests/core/capped_update.js",
-            "jstests/core/check_shard_index.js",
-            "jstests/core/collection_truncate.js",
-            "jstests/core/commands_namespace_parsing.js",
-            "jstests/core/comment_field.js",
-            "jstests/core/compound_index_max_fields.js",
-            "jstests/core/crud_ops_do_not_throw_locktimeout.js",
-            "jstests/core/currentop_cursors.js",
-            "jstests/core/currentop_shell.js",
-            "jstests/core/currentop_waiting_for_latch.js",
-            "jstests/core/datasize2.js",
-            "jstests/core/doc_validation_options.js",
-            "jstests/core/double_decimal_compare.js",
-            "jstests/core/drop_collection.js",
-            "jstests/core/explain_uuid.js",
-            "jstests/core/failcommand_failpoint.js",
-            "jstests/core/geo_near_point_query.js",
-            "jstests/core/getlog2.js",
-            "jstests/core/hash.js",
-            "jstests/core/indexj.js",
-            "jstests/core/jssymbol.js",
-            "jstests/core/latch_analyzer.js",
-            "jstests/core/list_all_sessions.js",
-            "jstests/core/list_sessions.js",
-            "jstests/core/logprocessdetails.js",
-            "jstests/core/mr_killop.js",
-            "jstests/core/profile_hide_index.js",
-            "jstests/core/rename_collection_capped.js",
-            "jstests/core/resume_query.js",
-            "jstests/core/splitvector.js",
-            "jstests/core/sort_with_update_between_getmores.js",
-            "jstests/core/stages_and_hash.js",
-            "jstests/core/stages_and_sorted.js",
-            "jstests/core/stages_collection_scan.js",
-            "jstests/core/stages_delete.js",
-            "jstests/core/stages_fetch.js",
-            "jstests/core/stages_ixscan.js",
-            "jstests/core/stages_limit_skip.js",
-            "jstests/core/stages_mergesort.js",
-            "jstests/core/stages_or.js",
-            "jstests/core/type8.js",
-            "jstests/core/validate_db_metadata_command.js",
-            "jstests/core/version_api_list_commands_verification.js",
-            "jstests/core/wildcard_index_distinct_scan.js",
-            "jstests/core/wildcard_index_projection.js",
-            // TODO (SERVER-60185): Remove the collection_uuid_*.js exclusions once the feature flag
-            // is enabled by default.
-            "jstests/core/collection_uuid_find.js",
-        ]);
+        const dirs = ["jstests/core", "jstests/core_standalone"];
 
-        for (let id = 0; id < dirs.length; ++id) {
-            const dir = dirs[id];
+        for (let dir of dirs) {
             jsTest.log("Running tests in " + dir);
 
-            const all_tests = ls(dir).filter(d => !d.endsWith("/") && !exclude.has(d)).sort();
+            const all_tests = ls(dir).filter(d => !d.endsWith("/")).sort();
             assert(all_tests);
             assert(all_tests.length);
 
-            for (let i = 0; i < all_tests.length; ++i) {
-                let t = all_tests[i];
-                if (t.endsWith("/")) {
+            for (let t of all_tests) {
+                // Tests in jstests/core weren't specifically made to pass in this very scenario, so
+                // we will not be fixing what is not working, and instead exclude them from running
+                // as "known" to not work. This is done by the means of "no_selinux" tag
+                const HAS_TAG = 0;
+                if (HAS_TAG ==
+                    runNonMongoProgram(python,
+                                       "buildscripts/resmokelib/utils/check_has_tag.py",
+                                       t,
+                                       "no_selinux")) {
+                    jsTest.log("Skipping test due to no_selinux tag: " + t);
                     continue;
                 }
+
                 jsTest.log("Running test: " + t);
                 if (!load(t)) {
                     throw ("failed to load test " + t);

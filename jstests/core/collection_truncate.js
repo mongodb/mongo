@@ -4,6 +4,7 @@
 //   uses_testing_only_commands,
 //   requires_emptycapped,
 //   uses_full_validation,
+//   no_selinux,
 // ]
 
 // SERVER-15033 truncate on a regular collection

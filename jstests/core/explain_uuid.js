@@ -1,6 +1,9 @@
 /**
  * Test that running explain() providing a collection UUID rather than collection name will fail
  * cleanly.
+ * @tags: [
+ *   no_selinux,
+ * ]
  */
 (function() {
 "use strict";

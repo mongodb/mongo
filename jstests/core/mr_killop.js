@@ -6,6 +6,7 @@
 //   uses_map_reduce_with_temp_collections,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   no_selinux,
 // ]
 (function() {
 "use strict";

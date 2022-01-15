@@ -2,6 +2,7 @@
 //   requires_fastcount,
 //   requires_non_retryable_writes,
 //   requires_sharding,
+//   no_selinux,
 // ]
 
 // -------------------------

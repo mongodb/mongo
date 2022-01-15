@@ -1,7 +1,7 @@
 """Utility for parsing JS comments."""
 
+import io
 import re
-
 import yaml
 
 # TODO: use a more robust regular expression for matching tags
@@ -27,7 +27,7 @@ def get_tags(pathname):
       */
     """
 
-    with open(pathname, 'r', encoding='utf-8') as fp:
+    with io.open(pathname, 'r', encoding='utf-8') as fp:
         match = _JSTEST_TAGS_RE.match(fp.read())
         if match:
             try:

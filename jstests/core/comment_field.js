@@ -9,6 +9,7 @@
  *   does_not_support_stepdowns,
  *   requires_profiling,
  *   uses_parallel_shell,
+ *   no_selinux,
  * ]
  */
 

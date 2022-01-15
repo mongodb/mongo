@@ -4,6 +4,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_getmore,
+//   no_selinux,
 // ]
 
 // This test checks that a sort query with an update between getMores() doesn't produce out-of-order

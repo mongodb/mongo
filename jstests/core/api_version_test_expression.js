@@ -7,6 +7,7 @@
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   uses_api_parameters,
+ *   no_selinux,
  * ]
  */
 

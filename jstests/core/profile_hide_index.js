@@ -7,6 +7,7 @@
  *   requires_non_retryable_writes,
  *   requires_profiling,
  *   uses_parallel_shell,
+ *   no_selinux,
  * ]
  */
 

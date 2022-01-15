@@ -1,7 +1,6 @@
 // Cannot implicitly shard accessed collections because the "dataSize" command returns an
 // "keyPattern must equal shard key" error response.
-// @tags: [assumes_unsharded_collection]
-
+// @tags: [assumes_unsharded_collection, no_selinux]
 //
 // Test dataSize command, when called on the same or different database
 // than the collection being queried.

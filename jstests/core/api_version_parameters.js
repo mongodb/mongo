@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   uses_api_parameters,
+ *   no_selinux,
  * ]
  */
 

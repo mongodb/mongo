@@ -10,6 +10,7 @@
 //   incompatible_with_embedded,
 //   requires_collstats,
 //   requires_fastcount,
+//   no_selinux,
 // ]
 
 // -------------------------
