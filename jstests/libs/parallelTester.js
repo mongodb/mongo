@@ -235,6 +235,7 @@ if (typeof _threadInject != "undefined") {
             // TODO (SERVER-60185): Remove the collection_uuid_*.js exclusions once the feature flag
             // is enabled by default.
             "collection_uuid_find.js",
+            "collection_uuid_write_commands.js",
         ]);
 
         // Get files, including files in subdirectories.

@@ -543,6 +543,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& 
         wcb.setBypassDocumentValidation(
             _clientRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
         wcb.setOrdered(_clientRequest.getWriteCommandRequestBase().getOrdered());
+        wcb.setCollectionUUID(_clientRequest.getWriteCommandRequestBase().getCollectionUUID());
 
         if (targeter.isShardedTimeSeriesBucketsNamespace() &&
             !_clientRequest.getNS().isTimeseriesBucketsCollection()) {

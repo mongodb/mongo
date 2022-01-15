@@ -179,6 +179,11 @@ structs:
                 type: bool
                 unstable: false
                 optional: true
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true
+                unstable: true
 
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
