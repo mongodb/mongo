@@ -150,14 +150,6 @@ public:
                              const OpTime& minValid,
                              bool alwaysAllowUntimestampedWrite = false) = 0;
 
-    /**
-     * Sets minValid only if it is not already higher than endOpTime.
-     *
-     * Warning, this compares the term and timestamp independently. Do not use if the current
-     * minValid could be from the other fork of a rollback.
-     */
-    virtual void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) = 0;
-
     // -------- Oplog Truncate After Point ----------
 
     /**
@@ -248,18 +240,15 @@ public:
     /**
      * The applied through point is a persistent record of which oplog entries we've applied.
      * If we crash while applying a batch of oplog entries, this OpTime tells us where to start
-     * applying operations on startup. If 'setTimestamp' is true, the write will be timestamped with
-     * the timestamp from 'optime'.
+     * applying operations on startup.
      */
-    virtual void setAppliedThrough(OperationContext* opCtx,
-                                   const OpTime& optime,
-                                   bool setTimestamp = true) = 0;
+    virtual void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) = 0;
 
     /**
-     * Unsets the applied through OpTime at the given 'writeTimestamp'.
+     * Unsets the applied through OpTime.
      * Once cleared, the applied through point is the top of the oplog.
      */
-    virtual void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) = 0;
+    virtual void clearAppliedThrough(OperationContext* opCtx) = 0;
 
     /**
      * You should probably be calling ReplicationCoordinator::getLastAppliedOpTime() instead.

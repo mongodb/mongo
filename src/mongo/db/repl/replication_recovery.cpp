@@ -615,6 +615,19 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
     // recovery timestamp does not exist, the applied through is used to determine where to start
     // playing oplog entries from.
     opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, /*stableCheckpoint*/ true);
+
+    // Now that we have set the initial data timestamp and taken an unstable checkpoint with the
+    // appliedThrough being the topOfOplog, it is safe to clear the appliedThrough. This minValid
+    // document write would never get into an unstable checkpoint because we will no longer take
+    // unstable checkpoints from now on, except when gTakeUnstableCheckpointOnShutdown is true in
+    // certain standalone restore cases. Additionally, future stable checkpoints are guaranteed to
+    // be taken with the appliedThrough cleared. Therefore, if this node crashes before the first
+    // stable checkpoint, it can safely recover from the last unstable checkpoint with a correct
+    // appliedThrough value. Otherwise, if this node crashes after the first stable checkpoint, it
+    // can safely recover from a stable checkpoint (with an empty appliedThrough).
+    if (!gTakeUnstableCheckpointOnShutdown) {
+        _consistencyMarkers->clearAppliedThrough(opCtx);
+    }
 }
 
 void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
@@ -745,7 +758,19 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     // It is safe to do startup recovery from an unstable checkpoint provided we recover to the
     // end of the oplog and discard history before it, as _recoverFromUnstableCheckpoint does.
     if (!advanceTimestampsEachBatch) {
-        _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
+        if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp) {
+            // Advance all_durable timestamp to the last applied timestamp. This is needed because
+            // the last applied entry during recovery could be a no-op entry which doesn't do
+            // timestamped writes or advance the all_durable timestamp. We may set the stable
+            // timestamp to this last applied timestamp later and we require the stable timestamp to
+            // be less than or equal to the all_durable timestamp.
+            WriteUnitOfWork wunit(opCtx);
+            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(applyThroughOpTime.getTimestamp()));
+            opCtx->recoveryUnit()->setOrderedCommit(false);
+            wunit.commit();
+        } else {
+            _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
+        }
     }
     return applyThroughOpTime.getTimestamp();
 }

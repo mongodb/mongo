@@ -343,13 +343,9 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         fassertNoTrace(34437, swLastOpTimeAppliedInBatch);
         invariant(swLastOpTimeAppliedInBatch.getValue() == lastOpTimeInBatch);
 
-        // Update various things that care about our last applied optime. Tests rely on 1 happening
-        // before 2 even though it isn't strictly necessary.
+        // Update various things that care about our last applied optime.
 
-        // 1. Persist our "applied through" optime to disk.
-        _consistencyMarkers->setAppliedThrough(&opCtx, lastOpTimeInBatch);
-
-        // 2. Ensure that the last applied op time hasn't changed since the start of this batch.
+        // 1. Ensure that the last applied op time hasn't changed since the start of this batch.
         const auto lastAppliedOpTimeAtEndOfBatch = _replCoord->getMyLastAppliedOpTime();
         invariant(lastAppliedOpTimeAtStartOfBatch == lastAppliedOpTimeAtEndOfBatch,
                   str::stream() << "the last known applied OpTime has changed from "
@@ -357,12 +353,12 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
                                 << lastAppliedOpTimeAtEndOfBatch.toString()
                                 << " in the middle of batch application");
 
-        // 3. Update oplog visibility by notifying the storage engine of the new oplog entries.
+        // 2. Update oplog visibility by notifying the storage engine of the new oplog entries.
         const bool orderedCommit = true;
         _storageInterface->oplogDiskLocRegister(
             &opCtx, lastOpTimeInBatch.getTimestamp(), orderedCommit);
 
-        // 4. Finalize this batch. The finalizer advances the global timestamp to lastOpTimeInBatch.
+        // 3. Finalize this batch. The finalizer advances the global timestamp to lastOpTimeInBatch.
         finalizer->record({lastOpTimeInBatch, lastWallTimeInBatch});
     }
 }
@@ -501,7 +497,6 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         // Reset consistency markers in case the node fails while applying ops.
         if (!getOptions().skipWritesToOplog) {
             _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
-            _consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
         }
 
         {

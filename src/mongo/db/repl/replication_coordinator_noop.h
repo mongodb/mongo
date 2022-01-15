@@ -57,8 +57,6 @@ public:
 
     void shutdown(OperationContext* opCtx) final;
 
-    void markAsCleanShutdownIfPossible(OperationContext* opCtx) final;
-
     ServiceContext* getServiceContext() final {
         return _service;
     }

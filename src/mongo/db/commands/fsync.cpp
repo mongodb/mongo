@@ -374,13 +374,15 @@ void FSyncLockThread::run() {
         try {
             storageEngine->flushAllFiles(&opCtx, /*callerHoldsReadLock*/ true);
         } catch (const std::exception& e) {
-            LOGV2_ERROR(20472,
-                        "Error doing flushAll: {error}",
-                        "Error doing flushAll",
-                        "error"_attr = e.what());
-            fsyncCmd.threadStatus = Status(ErrorCodes::CommandFailed, e.what());
-            fsyncCmd.acquireFsyncLockSyncCV.notify_one();
-            return;
+            if (!_allowFsyncFailure) {
+                LOGV2_ERROR(20472,
+                            "Error doing flushAll: {error}",
+                            "Error doing flushAll",
+                            "error"_attr = e.what());
+                fsyncCmd.threadStatus = Status(ErrorCodes::CommandFailed, e.what());
+                fsyncCmd.acquireFsyncLockSyncCV.notify_one();
+                return;
+            }
         }
 
         bool successfulFsyncLock = false;

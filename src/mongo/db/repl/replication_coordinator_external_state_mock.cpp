@@ -79,9 +79,6 @@ Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(Operati
 
 void ReplicationCoordinatorExternalStateMock::shutdown(OperationContext*) {}
 
-void ReplicationCoordinatorExternalStateMock::clearAppliedThroughIfCleanShutdown(
-    OperationContext*) {}
-
 executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor() const {
     return nullptr;
 }

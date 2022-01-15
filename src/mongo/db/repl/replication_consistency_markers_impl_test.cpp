@@ -210,14 +210,6 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), endOpTime);
     ASSERT_EQ(consistencyMarkers.getOplogTruncateAfterPoint(opCtx), endOpTime.getTimestamp());
 
-    // setMinValid always changes minValid, but setMinValidToAtLeast only does if higher.
-    consistencyMarkers.setMinValid(opCtx, startOpTime);  // Forcibly lower it.
-    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), startOpTime);
-    consistencyMarkers.setMinValidToAtLeast(opCtx, endOpTime);  // Higher than current (sets it).
-    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), endOpTime);
-    consistencyMarkers.setMinValidToAtLeast(opCtx, startOpTime);  // Lower than current (no-op).
-    ASSERT_EQ(consistencyMarkers.getMinValid(opCtx), endOpTime);
-
     // Check min valid document using storage engine interface.
     auto minValidDocument = getMinValidDocument(opCtx, kMinValidNss);
     ASSERT_TRUE(minValidDocument.hasField(MinValidDocument::kAppliedThroughFieldName));

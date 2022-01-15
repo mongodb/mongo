@@ -56,8 +56,6 @@ public:
 
     void shutdown(OperationContext* opCtx) override;
 
-    void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;
-
     // Returns the ServiceContext where this instance runs.
     ServiceContext* getServiceContext() override {
         return _service;

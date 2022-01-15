@@ -114,8 +114,6 @@ public:
 
     virtual void shutdown(OperationContext* opCtx) override;
 
-    void markAsCleanShutdownIfPossible(OperationContext* opCtx) override;
-
     virtual const ReplSettings& getSettings() const override;
 
     virtual Mode getReplicationMode() const override;

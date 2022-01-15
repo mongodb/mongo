@@ -105,7 +105,7 @@ void RollbackTest::setUp() {
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
 
     _opCtx = makeOperationContext();
-    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get());
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
 

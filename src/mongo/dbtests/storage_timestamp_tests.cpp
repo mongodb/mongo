@@ -1847,68 +1847,14 @@ public:
         expectedMinValidWithSetFlag.setInitialSyncFlag(true);
 
         assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidWithSetFlag);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidWithSetFlag);
 
         consistencyMarkers.clearInitialSyncFlag(_opCtx);
 
         repl::MinValidDocument expectedMinValidWithUnsetFlag;
-        expectedMinValidWithUnsetFlag.setMinValidTerm(presentTerm);
-        expectedMinValidWithUnsetFlag.setMinValidTimestamp(presentTs);
-        expectedMinValidWithUnsetFlag.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
+        expectedMinValidWithSetFlag.setMinValidTerm(repl::OpTime::kUninitializedTerm);
+        expectedMinValidWithSetFlag.setMinValidTimestamp(nullTs);
 
         assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidWithUnsetFlag);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidWithUnsetFlag);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidWithUnsetFlag);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidWithUnsetFlag);
-    }
-};
-
-class SetMinValidToAtLeast : public StorageTimestampTest {
-public:
-    void run() {
-        NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
-        reset(nss);
-
-        repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
-            repl::StorageInterface::get(_opCtx));
-        consistencyMarkers.initializeMinValidDocument(_opCtx);
-
-        // Setting minValid sets it at the provided OpTime.
-        consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(presentTs, presentTerm));
-
-        repl::MinValidDocument expectedMinValidInit;
-        expectedMinValidInit.setMinValidTerm(repl::OpTime::kUninitializedTerm);
-        expectedMinValidInit.setMinValidTimestamp(nullTs);
-
-        repl::MinValidDocument expectedMinValidPresent;
-        expectedMinValidPresent.setMinValidTerm(presentTerm);
-        expectedMinValidPresent.setMinValidTimestamp(presentTs);
-
-        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidPresent);
-
-        consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(futureTs, presentTerm));
-
-        repl::MinValidDocument expectedMinValidFuture;
-        expectedMinValidFuture.setMinValidTerm(presentTerm);
-        expectedMinValidFuture.setMinValidTimestamp(futureTs);
-
-        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidFuture);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidFuture);
-
-        // Setting the timestamp to the past should be a noop.
-        consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(pastTs, presentTerm));
-
-        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidFuture);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidFuture);
     }
 };
 
@@ -1922,11 +1868,12 @@ public:
             repl::StorageInterface::get(_opCtx));
         consistencyMarkers.initializeMinValidDocument(_opCtx);
 
-        consistencyMarkers.setAppliedThrough(_opCtx, repl::OpTime(presentTs, presentTerm));
-
         repl::MinValidDocument expectedMinValidInit;
         expectedMinValidInit.setMinValidTerm(repl::OpTime::kUninitializedTerm);
         expectedMinValidInit.setMinValidTimestamp(nullTs);
+        assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidInit);
+
+        consistencyMarkers.setAppliedThrough(_opCtx, repl::OpTime(presentTs, presentTerm));
 
         repl::MinValidDocument expectedMinValidPresent;
         expectedMinValidPresent.setMinValidTerm(repl::OpTime::kUninitializedTerm);
@@ -1934,17 +1881,10 @@ public:
         expectedMinValidPresent.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
 
         assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidPresent);
 
         // appliedThrough opTime can be unset.
-        consistencyMarkers.clearAppliedThrough(_opCtx, futureTs);
-
+        consistencyMarkers.clearAppliedThrough(_opCtx);
         assertMinValidDocumentAtTimestamp(nss, nullTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(nss, pastTs, expectedMinValidInit);
-        assertMinValidDocumentAtTimestamp(nss, presentTs, expectedMinValidPresent);
-        assertMinValidDocumentAtTimestamp(nss, futureTs, expectedMinValidInit);
     }
 };
 
@@ -4441,7 +4381,6 @@ public:
         addIf<PrimarySetsMultikeyInsideMultiDocumentTransaction>();
         addIf<InitializeMinValid>();
         addIf<SetMinValidInitialSyncFlag>();
-        addIf<SetMinValidToAtLeast>();
         addIf<SetMinValidAppliedThrough>();
         // KVDropDatabase<SimulatePrimary>
         addIf<KVDropDatabase<false>>();

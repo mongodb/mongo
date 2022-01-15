@@ -496,7 +496,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryTruncatesOplogAtOplogTruncateAfterPoint)
     _assertDocsInOplog(opCtx, {1, 2, 3});
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryDoesNotTruncateOplogAtOrBeforeStableTimestamp) {
@@ -514,7 +513,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryDoesNotTruncateOplogAtOrBeforeStableTime
     _assertDocsInTestCollection(opCtx, {});
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryTruncatesNothingIfNothingIsAfterStableTimestamp) {
@@ -532,7 +530,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryTruncatesNothingIfNothingIsAfterStableTi
     _assertDocsInTestCollection(opCtx, {});
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
 }
 
 TEST_F(ReplicationRecoveryTest,
@@ -551,7 +548,6 @@ TEST_F(ReplicationRecoveryTest,
     _assertDocsInTestCollection(opCtx, {});
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryTruncatesAfterStableIfTruncatePointEqualsStable) {
@@ -569,7 +565,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryTruncatesAfterStableIfTruncatePointEqual
     _assertDocsInTestCollection(opCtx, {});
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(4, 4), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverySucceedsWithOplogTruncatePointTooHigh) {
@@ -585,7 +580,6 @@ TEST_F(ReplicationRecoveryTest, RecoverySucceedsWithOplogTruncatePointTooHigh) {
     _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
     _assertDocsInTestCollection(opCtx, {4, 5});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverySucceedsWithOplogTruncatePointInGap) {
@@ -601,7 +595,6 @@ TEST_F(ReplicationRecoveryTest, RecoverySucceedsWithOplogTruncatePointInGap) {
     _assertDocsInOplog(opCtx, {1, 2, 3});
     _assertDocsInTestCollection(opCtx, {3});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverySkipsEverythingIfInitialSyncFlagIsSet) {
@@ -618,7 +611,6 @@ TEST_F(ReplicationRecoveryTest, RecoverySkipsEverythingIfInitialSyncFlagIsSet) {
     _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
     _assertDocsInTestCollection(opCtx, {});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp(4, 4));
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(1, 1), 1));
 }
 
 void ReplicationRecoveryTest::testRecoveryAppliesDocumentsWhenAppliedThroughIsBehind(
@@ -644,9 +636,6 @@ void ReplicationRecoveryTest::testRecoveryAppliesDocumentsWhenAppliedThroughIsBe
     _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
     _assertDocsInTestCollection(opCtx, {4, 5});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-
-    auto topTS = Timestamp(5, 5);
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(topTS, 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehind) {
@@ -696,7 +685,6 @@ void ReplicationRecoveryTest::testRecoveryToStableAppliesDocumentsWithNoAppliedT
     _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
     _assertDocsInTestCollection(opCtx, {4, 5});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 }
 
 TEST_F(ReplicationRecoveryTest,
@@ -730,7 +718,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryIgnoresDroppedCollections) {
         ASSERT_FALSE(autoColl.getCollection());
     }
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehindAfterTruncation) {
@@ -746,7 +733,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesDocumentsWhenAppliedThroughIsBehi
     _assertDocsInOplog(opCtx, {1, 2, 3});
     _assertDocsInTestCollection(opCtx, {2, 3});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
 }
 
 void ReplicationRecoveryTest::testRecoveryAppliesDocumentsWithNoAppliedThroughAfterTruncation(
@@ -769,7 +755,6 @@ void ReplicationRecoveryTest::testRecoveryAppliesDocumentsWithNoAppliedThroughAf
     _assertDocsInOplog(opCtx, {1, 2, 3});
     _assertDocsInTestCollection(opCtx, {2, 3});
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 3), 1));
 }
 
 TEST_F(ReplicationRecoveryTest,
@@ -830,8 +815,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryDoesNotApplyOperationsIfAppliedThroughIs
     _assertDocsInOplog(opCtx, {5});
     _assertDocsInTestCollection(opCtx, {});
     ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
-    // Recovering without a `recoverTimestamp` will set `appliedThrough` to the top of oplog.
-    ASSERT_EQ(OpTime(Timestamp(5, 5), 1), getConsistencyMarkers()->getAppliedThrough(opCtx));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
@@ -895,7 +878,6 @@ TEST_F(ReplicationRecoveryTest, RecoveryAppliesUpdatesIdempotently) {
     _assertDocumentsInCollectionEqualsUnordered(opCtx, testNs, expectedColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(ts, ts), 1));
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest, RecoveryFailsWithBadOp, "terminate() called") {
@@ -966,7 +948,6 @@ TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConfigTransactions) {
@@ -1015,7 +996,6 @@ TEST_F(ReplicationRecoveryTest, PrepareTransactionOplogEntryCorrectlyUpdatesConf
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(2, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfigTransactions) {
@@ -1076,7 +1056,6 @@ TEST_F(ReplicationRecoveryTest, AbortTransactionOplogEntryCorrectlyUpdatesConfig
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfigTransactions) {
@@ -1146,7 +1125,6 @@ TEST_F(ReplicationRecoveryTest, CommitTransactionOplogEntryCorrectlyUpdatesConfi
     _assertDocumentsInCollectionEqualsOrdered(opCtx, testNs, expectedColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest,
@@ -1227,7 +1205,6 @@ TEST_F(ReplicationRecoveryTest,
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
 
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
@@ -1240,12 +1217,10 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToBeforeEndOfOplog) {
     // Recovers operations with timestamps: 3, 4, 5.
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(5, 5));
     _assertDocsInTestCollection(opCtx, {3, 4, 5});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 
     // Recovers operations with timestamps: 6, 7, 8, 9.
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
     _assertDocsInTestCollection(opCtx, {3, 4, 5, 6, 7, 8, 9});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(9, 9), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToEndOfOplog) {
@@ -1258,7 +1233,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToEndOfOplog) {
     // Recovers all operations
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(10, 10));
     _assertDocsInTestCollection(opCtx, {3, 4, 5, 6, 7, 8, 9, 10});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(10, 10), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToInvalidEndPoint) {
@@ -1273,7 +1247,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToInvalidEndPoint) {
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(2, 2));
 
     _assertDocsInTestCollection(opCtx, {});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(0, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
@@ -1290,7 +1263,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithEmptyOplog) {
     ASSERT_EQUALS(
         1, countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery"));
     _assertDocsInTestCollection(opCtx, {});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(0, 0), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToFailsWithInitialSyncFlag) {
@@ -1313,10 +1285,8 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToDoesNotExceedEndPoint) {
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(9, 9));
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(15, 15));
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(10, 10), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToWithNoOperationsToRecover) {
@@ -1488,7 +1458,6 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogAsStandaloneRecoversOplog) {
 
     recovery.recoverFromOplogAsStandalone(opCtx);
     _assertDocsInTestCollection(opCtx, {5});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 
     // Test the node is readOnly.
     ASSERT_THROWS(getStorageInterface()->insertDocument(opCtx, testNs, {_makeInsertDocument(2)}, 1),
@@ -1507,7 +1476,6 @@ TEST_F(ReplicationRecoveryTest,
 
     recovery.recoverFromOplogAsStandalone(opCtx);
     _assertDocsInTestCollection(opCtx, {5});
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 }
 
 TEST_F(ReplicationRecoveryTest,

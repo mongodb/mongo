@@ -965,6 +965,14 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
         return;
     }
 
+    const Timestamp stableTimestamp = getStableTimestamp();
+    const Timestamp initialDataTimestamp = getInitialDataTimestamp();
+    uassert(
+        5841000,
+        "Cannot take checkpoints when the stable timestamp is less than the initial data timestamp",
+        initialDataTimestamp == Timestamp::kAllowUnstableCheckpointsSentinel ||
+            stableTimestamp >= initialDataTimestamp);
+
     // Immediately flush the size storer information to disk. When the node is fsync locked for
     // operations such as backup, it's imperative that we copy the most up-to-date data files.
     syncSizeInfo(true);

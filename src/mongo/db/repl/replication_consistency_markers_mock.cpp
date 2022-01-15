@@ -75,12 +75,6 @@ void ReplicationConsistencyMarkersMock::setMinValid(OperationContext* opCtx,
     _minValid = minValid;
 }
 
-void ReplicationConsistencyMarkersMock::setMinValidToAtLeast(OperationContext* opCtx,
-                                                             const OpTime& minValid) {
-    stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
-    _minValid = std::max(_minValid, minValid);
-}
-
 void ReplicationConsistencyMarkersMock::ensureFastCountOnOplogTruncateAfterPoint(
     OperationContext* opCtx) {}
 
@@ -114,15 +108,13 @@ ReplicationConsistencyMarkersMock::refreshOplogTruncateAfterPointIfPrimary(
 }
 
 void ReplicationConsistencyMarkersMock::setAppliedThrough(OperationContext* opCtx,
-                                                          const OpTime& optime,
-                                                          bool setTimestamp) {
+                                                          const OpTime& optime) {
     invariant(!optime.isNull());
     stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
     _appliedThrough = optime;
 }
 
-void ReplicationConsistencyMarkersMock::clearAppliedThrough(OperationContext* opCtx,
-                                                            const Timestamp& writeTimestamp) {
+void ReplicationConsistencyMarkersMock::clearAppliedThrough(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lock(_minValidBoundariesMutex);
     _appliedThrough = {};
 }

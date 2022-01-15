@@ -103,11 +103,45 @@ restoreNode = rst.restart(restoreNode, {
 // Make sure we can read something after standalone recovery.
 assert.eq(2, restoreNode.getDB(dbName)[sentinelCollName].find({}).itcount());
 
+jsTestLog("Restarting restore node again, in repl set mode with stable checkpointing disabled");
+restoreNode = rst.restart(restoreNode, {
+    noReplSet: false,
+    setParameter:
+        Object.merge(startParams, {"failpoint.disableSnapshotting": "{'mode':'alwaysOn'}"})
+});
+
+rst.awaitSecondaryNodes(undefined, [restoreNode]);
+jsTestLog("Finished restarting restore node with stable checkpointing disabled");
+
+// Test that no appliedThrough in the minValid document after recovery.
+const minValid = restoreNode.getCollection('local.replset.minvalid').findOne();
+assert(!minValid.hasOwnProperty('begin'), tojson(minValid));
+
+// Test that we cannot take another checkpoint via fsync before we have an up-to-date stable
+// timestamp because otherwise we would end up mistakenly taking an unstable timestamp with a null
+// appliedThrough.
+jsTestLog("Running fsync on restore node before it takes the first stable checkpoint should fail");
+assert.commandFailed(restoreNode.adminCommand({fsync: 1}));
+
+jsTestLog("Doing more write on the primary");
+assert.commandWorked(db.runCommand({insert: sentinelCollName, documents: [{_id: "s3"}]}));
+
+// Make sure we can read the new write on the restore node.
+rst.awaitReplication(undefined, undefined, [restoreNode]);
+assert.eq(3, restoreNode.getDB(dbName)[sentinelCollName].find({}).itcount());
+
+jsTestLog("Crashing restore node before it takes the first stable checkpoint");
+rst.stop(restoreNode, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+
 jsTestLog("Restarting restore node again, in repl set mode");
-restoreNode = rst.restart(restoreNode, {noReplSet: false, setParameter: startParams});
+restoreNode =
+    rst.start(restoreNode, {noReplSet: false, setParameter: startParams}, /* restart */ true);
 
 rst.awaitSecondaryNodes(undefined, [restoreNode]);
 jsTestLog("Finished restarting restore node");
+
+// Make sure we can still read the latest write on the restore node.
+assert.eq(3, restoreNode.getDB(dbName)[sentinelCollName].find({}).itcount());
 
 const restoreDb = restoreNode.getDB(dbName);
 

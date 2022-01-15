@@ -81,11 +81,11 @@ void RecoveryUnit::doCommitUnitOfWork() {
         }
         _forked = false;
         _dirty = false;
-        _isTimestamped = false;
     } else if (_forked) {
         if (kDebugBuild)
             invariant(*_mergeBase == *_workingCopy);
     }
+    _isTimestamped = false;
 
     _setState(State::kCommitting);
     commitRegisteredChanges(boost::none);

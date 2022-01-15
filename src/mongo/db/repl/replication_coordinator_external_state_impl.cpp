@@ -364,41 +364,6 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
     _startedThreads = true;
 }
 
-void ReplicationCoordinatorExternalStateImpl::clearAppliedThroughIfCleanShutdown(
-    OperationContext* opCtx) {
-    {
-        stdx::lock_guard<Latch> lk(_threadMutex);
-        if (!_startedThreads) {
-            return;
-        }
-        invariant(_inShutdown);
-    }
-
-    // Ensure that all writes are visible before reading. If we failed mid-batch, it would be
-    // possible to read from a kNoOverlap ReadSource where not all writes to the minValid
-    // document are visible, generating a writeConflict that would not resolve.
-    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
-
-    auto loadLastOpTimeAndWallTimeResult = loadLastOpTimeAndWallTime(opCtx);
-    if (_replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull() &&
-        loadLastOpTimeAndWallTimeResult.isOK() &&
-        loadLastOpTimeAndWallTimeResult.getValue().opTime ==
-            _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
-        // Clear the appliedThrough marker to indicate we are consistent with the top of the
-        // oplog.
-        //
-        // TODO SERVER-53642: We used to record this update at the 'lastAppliedOpTime'. If there
-        // are any outstanding checkpoints being taken, they should only reflect this write if
-        // they see all writes up to our 'lastAppliedOpTime'. But with Lock Free Reads we can
-        // have readers on that timestamp, making it not safe to write to, even as we're holding
-        // the RSTL in exclusive mode.
-
-        invariant(opCtx->lockState()->isRSTLExclusive());
-        _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, Timestamp());
-    }
-}
-
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_threadMutex);
     _inShutdown = true;
@@ -530,13 +495,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must
     // be done before we add anything to our oplog.
-    //
-    // TODO SERVER-53642: We used to record this update at the 'lastAppliedOpTime'. If there are
-    // any outstanding checkpoints being taken, they should only reflect this write if they see
-    // all writes up to our 'lastAppliedOpTime'. But with Lock Free Reads we can have readers on
-    // that timestamp, making it not safe to write to, even as we're holding the RSTL in
-    // exclusive mode.
-    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, Timestamp());
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
 
     LOGV2(6015309, "Logging transition to primary to oplog on stepup");
     writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {

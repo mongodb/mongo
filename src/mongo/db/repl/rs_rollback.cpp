@@ -833,7 +833,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     // This method is only used with storage engines that do not support recover to stable
     // timestamp. As a result, the timestamp on the 'appliedThrough' update does not matter.
     invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
-    replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
+    replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
     if (MONGO_unlikely(rollbackHangThenFailAfterWritingMinValid.shouldFail())) {
@@ -1978,9 +1978,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
               "Setting appliedThrough to the common point: {commonPoint}",
               "Setting appliedThrough to the common point",
               "commonPoint"_attr = fixUpInfo.commonPoint);
-        const bool setTimestamp = false;
-        replicationProcess->getConsistencyMarkers()->setAppliedThrough(
-            opCtx, fixUpInfo.commonPoint, setTimestamp);
+        replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx,
+                                                                       fixUpInfo.commonPoint);
 
         // Take an unstable checkpoint to ensure the appliedThrough write is persisted to disk.
         LOGV2(21720, "Waiting for an unstable checkpoint");
@@ -1989,7 +1988,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
         // Ensure that appliedThrough is unset in the next stable checkpoint.
         LOGV2(21721, "Clearing appliedThrough");
-        replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, Timestamp());
+        replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
     }
 
     Status status = AuthorizationManager::get(opCtx->getServiceContext())->initialize(opCtx);

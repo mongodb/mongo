@@ -577,11 +577,13 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
     _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);
+
+    // We set the initial data timestamp before clearing the initial sync flag. See comments in
+    // clearInitialSyncFlag.
+    _storage->setInitialDataTimestamp(opCtx->getServiceContext(), initialDataTimestamp);
+
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
 
-    // All updates that represent initial sync must be completed before setting the initial data
-    // timestamp.
-    _storage->setInitialDataTimestamp(opCtx->getServiceContext(), initialDataTimestamp);
     auto currentLastAppliedOpTime = _opts.getMyLastOptime();
     if (currentLastAppliedOpTime.isNull()) {
         _opts.setMyLastOptime(lastApplied.getValue());

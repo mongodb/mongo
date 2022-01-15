@@ -1346,23 +1346,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // Depends on setKillAllOperations() above to interrupt the index build operations.
         LOGV2_OPTIONS(4784915, {LogComponent::kIndex}, "Shutting down the IndexBuildsCoordinator");
         IndexBuildsCoordinator::get(serviceContext)->shutdown(opCtx);
-
-        // No new readers can come in after the releasing the RSTL, as previously before releasing
-        // the RSTL, we made sure that all new operations will be immediately interrupted by setting
-        // ServiceContext::_globalKill to true. Reacquires RSTL in mode X.
-        LOGV2_OPTIONS(4784916,
-                      {LogComponent::kReplication},
-                      "Reacquiring the ReplicationStateTransitionLock for shutdown");
-        rstl.reacquire();
-
-        // We are expected to have no active readers while performing
-        // markAsCleanShutdownIfPossible() step. We guarantee that there are no active readers at
-        // this point due to:
-        // 1) Acquiring RSTL in mode X as all readers (except single phase hybrid index builds on
-        //    secondaries) are expected to hold RSTL in mode IX.
-        // 2) By waiting for all index build to finish.
-        LOGV2_OPTIONS(4784917, {LogComponent::kReplication}, "Attempting to mark clean shutdown");
-        repl::ReplicationCoordinator::get(serviceContext)->markAsCleanShutdownIfPossible(opCtx);
     }
 
     LOGV2_OPTIONS(4784918, {LogComponent::kNetwork}, "Shutting down the ReplicaSetMonitor");

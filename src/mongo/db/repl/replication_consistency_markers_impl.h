@@ -71,7 +71,6 @@ public:
     void setMinValid(OperationContext* opCtx,
                      const OpTime& minValid,
                      bool alwaysAllowUntimestampedWrite = false) override;
-    void setMinValidToAtLeast(OperationContext* opCtx, const OpTime& minValid) override;
 
     void ensureFastCountOnOplogTruncateAfterPoint(OperationContext* opCtx) override;
 
@@ -87,10 +86,8 @@ public:
     boost::optional<OpTimeAndWallTime> refreshOplogTruncateAfterPointIfPrimary(
         OperationContext* opCtx) override;
 
-    void setAppliedThrough(OperationContext* opCtx,
-                           const OpTime& optime,
-                           bool setTimestamp = true) override;
-    void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
+    void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
+    void clearAppliedThrough(OperationContext* opCtx) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
 
     Status createInternalCollections(OperationContext* opCtx) override;
@@ -112,7 +109,7 @@ private:
      *
      * This fasserts on failure.
      */
-    void _updateMinValidDocument(OperationContext* opCtx, const TimestampedBSONObj& updateSpec);
+    void _updateMinValidDocument(OperationContext* opCtx, const BSONObj& updateSpec);
 
     /**
      * Reads the OplogTruncateAfterPoint document from disk.
