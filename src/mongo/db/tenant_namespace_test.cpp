@@ -40,7 +40,6 @@ namespace mongo {
 namespace {
 
 TEST(TenantNamespaceTest, TenantNamespaceMultitenancySupportDisabledBasic) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     TenantNamespace tenantNs(boost::none, NamespaceString("a.b"));
     ASSERT(!tenantNs.tenantId());
     ASSERT_EQUALS(std::string("a"), tenantNs.db());
@@ -49,7 +48,6 @@ TEST(TenantNamespaceTest, TenantNamespaceMultitenancySupportDisabledBasic) {
 }
 
 TEST(TenantNamespaceTest, TenantNamespaceParseFromDiskMultitenancySupportDisabled) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     TenantNamespace tenantNs = TenantNamespace::parseTenantNamespaceFromDisk("a.b");
     ASSERT(!tenantNs.tenantId());
     ASSERT_EQUALS(std::string("a"), tenantNs.db());

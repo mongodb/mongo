@@ -40,7 +40,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
@@ -103,10 +102,9 @@ public:
         std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
         RecordId catalogId = coll.first;
 
-        TenantNamespace tenantNs(getActiveTenant(operationContext()), nss);
         std::shared_ptr<Collection> collection = std::make_shared<CollectionImpl>(
             operationContext(),
-            tenantNs,
+            nss,
             catalogId,
             getCatalog()->getMetaData(operationContext(), catalogId),
             std::move(coll.second));

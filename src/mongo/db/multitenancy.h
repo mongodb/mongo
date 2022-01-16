@@ -46,12 +46,6 @@ namespace mongo {
 extern const OID kSystemTenantID;
 
 /**
- * Parses the tenantId from the '$tenant' field in the request if it exists and
- * "multitenancySupport" is enabled. Then, sets the parsed tenantId on the opCtx.
- */
-void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request);
-
-/**
  * Extract the active TenantID for this operation.
  */
 boost::optional<OID> getActiveTenant(OperationContext* opCtx);

@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -150,9 +149,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
     auto uuid = UUID::gen();
     CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
         catalog.registerCollection(
-            operationContext(),
-            uuid,
-            std::make_shared<CollectionMock>(TenantNamespace(boost::none, kNamespace)));
+            operationContext(), uuid, std::make_shared<CollectionMock>(kNamespace));
     });
 
     auto future = launchAsync([&] {

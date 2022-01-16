@@ -65,7 +65,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -1021,7 +1020,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     uassert(ErrorCodes::BadValue,
             "Username cannot contain NULL characters",
             cmd.getCommandParameter().find('\0') == std::string::npos);
-    UserName userName(cmd.getCommandParameter(), dbname, getActiveTenant(opCtx));
+    UserName userName(cmd.getCommandParameter(), dbname, cmd.getTenantOverride());
 
     uassert(ErrorCodes::BadValue,
             "Must provide a 'pwd' field for all user documents, except those"

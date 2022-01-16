@@ -41,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/deferred_drop_record_store.h"
@@ -348,8 +347,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     }
 
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
-    TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
-    auto collection = collectionFactory->make(opCtx, tenantNs, catalogId, md, std::move(rs));
+    auto collection = collectionFactory->make(opCtx, nss, catalogId, md, std::move(rs));
     collection->setMinimumVisibleSnapshot(minVisibleTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {

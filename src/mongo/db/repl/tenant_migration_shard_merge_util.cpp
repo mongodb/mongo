@@ -42,7 +42,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/db/views/view_catalog.h"
@@ -130,7 +129,6 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
             // Create Collection object
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto durableCatalog = storageEngine->getCatalog();
-            // TODO SERVER-62659 Ensure the correct tenantId is used when importing the collection.
             auto importResult = uassertStatusOK(DurableCatalog::get(opCtx)->importCollection(
                 opCtx,
                 collectionMetadata.ns,
@@ -142,9 +140,8 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                 uassert(6114301, "Cannot import non-ready indexes", index.ready);
             }
 
-            TenantNamespace tenantNs(getActiveTenant(opCtx), nss);
             std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-                opCtx, tenantNs, importResult.catalogId, md, std::move(importResult.rs));
+                opCtx, nss, importResult.catalogId, md, std::move(importResult.rs));
             ownedCollection->init(opCtx);
             ownedCollection->setCommitted(false);
 

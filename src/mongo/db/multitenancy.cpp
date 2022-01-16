@@ -26,15 +26,10 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 #include "mongo/db/multitenancy.h"
 
-#include "mongo/bson/oid.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_token.h"
-#include "mongo/db/multitenancy_gen.h"
-#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -43,50 +38,12 @@ const OID kSystemTenantID(
     "0102030405" /* process id */
     "060708" /* counter */);
 
-// Holds the tenantId for the operation if it was provided in the request on the $tenant field only
-// if the tenantId was not also provided in the security token.
-const auto dollarTenantDecoration =
-    OperationContext::declareDecoration<boost::optional<mongo::OID>>();
-
-void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request) {
-    // The internal security user is allowed to run commands on behalf of a tenant by passing
-    // the tenantId in the "$tenant" field.
-    auto tenantElem = request.body["$tenant"];
-    if (!tenantElem)
-        return;
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Multitenancy not enabled, cannot set $tenant in command body",
-            gMultitenancySupport);
-
-    // TODO SERVER-62406 check for the new ActionType for use with $tenant.
-    uassert(ErrorCodes::Unauthorized,
-            "'$tenant' may only be specified with the internal action type",
-            AuthorizationSession::get(opCtx->getClient())
-                ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                   ActionType::internal));
-
-    auto tenantId = tenantElem.OID();
-
-    uassert(6223901,
-            str::stream() << "Cannot pass $tenant id if also passing securityToken, securityToken: "
-                          << auth::getSecurityToken(opCtx)->getAuthenticatedUser().getTenant()
-                          << " $tenant: " << tenantId,
-            !auth::getSecurityToken(opCtx));
-
-
-    dollarTenantDecoration(opCtx) = std::move(tenantId);
-    LOGV2_DEBUG(
-        6223900, 4, "Setting tenantId from $tenant request parameter", "tenantId"_attr = tenantId);
-}
-
 boost::optional<OID> getActiveTenant(OperationContext* opCtx) {
     auto token = auth::getSecurityToken(opCtx);
     if (!token) {
-        return dollarTenantDecoration(opCtx);
+        return boost::none;
     }
 
-    invariant(!dollarTenantDecoration(opCtx));
     return token->getAuthenticatedUser().getTenant();
 }
 

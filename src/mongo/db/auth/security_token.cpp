@@ -52,19 +52,13 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
     if (gMultitenancySupport) {
         logv2::detail::setGetTenantIDCallback([]() -> boost::optional<OID> {
             auto* client = Client::getCurrent();
-            if (!client)
+            auto* opCtx = client ? client->getOperationContext() : nullptr;
+            auto token = getSecurityToken(opCtx);
+            if (token) {
+                return token->getAuthenticatedUser().getTenant();
+            } else {
                 return boost::none;
-
-            if (auto* opCtx = client->getOperationContext()) {
-                auto token = getSecurityToken(opCtx);
-                if (token) {
-                    return token->getAuthenticatedUser().getTenant();
-                } else {
-                    return boost::none;
-                }
             }
-
-            return boost::none;
         });
     }
 }
@@ -120,6 +114,10 @@ void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) t
 }
 
 MaybeSecurityToken getSecurityToken(OperationContext* opCtx) {
+    if (!opCtx) {
+        return boost::none;
+    }
+
     return securityTokenDecoration(opCtx);
 }
 

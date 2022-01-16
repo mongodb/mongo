@@ -37,7 +37,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -92,8 +91,6 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
 
     readImpersonatedUserMetadata(impersonationElem, opCtx);
     auth::readSecurityTokenMetadata(opCtx, opMsg.securityToken);
-
-    parseDollarTenantFromRequest(opCtx, opMsg);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.

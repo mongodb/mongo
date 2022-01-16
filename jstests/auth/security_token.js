@@ -43,11 +43,8 @@ function makeTokenAndExpect(user, db) {
 function runTest(conn, enabled, rst = undefined) {
     const admin = conn.getDB('admin');
     const tenantAdmin = conn.getDB(tenantID.str + '_admin');
-
-    // Must be authenticated as the internal __system user in order to use $tenant
-    assert.commandWorked(
-        admin.runCommand({createUser: 'system', pwd: 'system', roles: ['__system']}));
-    assert(admin.auth('system', 'system'));
+    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
+    assert(admin.auth('admin', 'admin'));
 
     // Create a tenant-local user.
     const createUserCmd =

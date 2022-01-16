@@ -55,7 +55,17 @@ public:
      *
      * If featureFlagRequireTenantID is set, tenantId is required.
      */
-    TenantNamespace(boost::optional<mongo::OID> tenantId, NamespaceString nss);
+    TenantNamespace(boost::optional<mongo::OID> tenantId, NamespaceString nss) {
+        // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
+        if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV())
+            invariant(tenantId);
+
+        _tenantId = tenantId;
+        _nss = nss;
+        _tenantNsStr = _tenantId
+            ? boost::make_optional(_tenantId->toString() + "_" + _nss.toString())
+            : boost::none;
+    }
 
     /**
      * Constructs a TenantNamespace from the string "ns". When the server parameter
@@ -75,7 +85,19 @@ public:
      *
      * If featureFlagRequireTenantID is set, tenantId is required.
      */
-    static TenantNamespace parseTenantNamespaceFromDisk(StringData ns);
+    static TenantNamespace parseTenantNamespaceFromDisk(StringData ns) {
+        if (!gMultitenancySupport) {
+            return TenantNamespace(boost::none, NamespaceString(ns));
+        }
+
+        auto tenantDelim = ns.find('_');
+        if (tenantDelim == std::string::npos)
+            return TenantNamespace(boost::none, NamespaceString(ns));
+
+        auto tenantId = OID(ns.substr(0, tenantDelim));
+        auto nss = NamespaceString(ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
+        return TenantNamespace(tenantId, nss);
+    }
 
     boost::optional<mongo::OID> tenantId() const {
         return _tenantId;
@@ -89,7 +111,7 @@ public:
         return _nss.coll();
     }
 
-    const NamespaceString& getNss() const {
+    NamespaceString getNss() const {
         return _nss;
     }
 

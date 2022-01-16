@@ -37,7 +37,6 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/tenant_namespace.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -241,7 +240,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     ASSERT(engine);
 
     std::string ident = "abc";
-    auto tenantNs = TenantNamespace(boost::none, NamespaceString("mydb.mycoll"));
+    auto ns = NamespaceString("mydb.mycoll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();
@@ -260,8 +259,8 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        collection = std::make_unique<CollectionImpl>(
-            opCtx.get(), tenantNs, RecordId(0), options, std::move(rs));
+        collection =
+            std::make_unique<CollectionImpl>(opCtx.get(), ns, RecordId(0), options, std::move(rs));
         uow.commit();
     }
 
@@ -1485,7 +1484,7 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
     ASSERT(engine);
 
     std::string ident = "abc";
-    auto tenantNs = TenantNamespace(boost::none, NamespaceString("mydb.mycoll"));
+    auto ns = NamespaceString("mydb.mycoll");
 
     CollectionOptions options;
     options.uuid = UUID::gen();
@@ -1506,7 +1505,7 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
         collection =
-            std::make_unique<CollectionImpl>(opCtx, tenantNs, RecordId(0), options, std::move(rs));
+            std::make_unique<CollectionImpl>(opCtx, ns, RecordId(0), options, std::move(rs));
         uow.commit();
     }
 

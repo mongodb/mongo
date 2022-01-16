@@ -49,7 +49,7 @@ using std::unique_ptr;
 static const NamespaceString nss("testdb.testcoll");
 
 PlanCacheKey makeKey(const CanonicalQuery& cq) {
-    CollectionMock coll(TenantNamespace(boost::none, nss));
+    CollectionMock coll(nss);
     return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
 }
 
