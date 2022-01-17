@@ -30,7 +30,8 @@
 
 /*
  * hs_cursor --
- *     Do history store cursor operations.
+ *     Run a cursor through the history store, depending on the library order checking code to
+ *     detect problems.
  */
 WT_THREAD_RET
 hs_cursor(void *arg)
@@ -41,14 +42,13 @@ hs_cursor(void *arg)
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_ITEM hs_key, hs_value, key;
+    WT_ITEM hs_key, hs_value;
     WT_SESSION *session;
     wt_timestamp_t hs_durable_timestamp, hs_start_ts, hs_stop_durable_ts;
     uint64_t hs_counter, hs_upd_type;
     uint32_t hs_btree_id, i;
     u_int period;
-    int exact;
-    bool next, restart;
+    bool next;
 
     (void)(arg); /* Unused parameter */
 
@@ -64,53 +64,29 @@ hs_cursor(void *arg)
 
     memset(&hs_key, 0, sizeof(hs_key));
     memset(&hs_value, 0, sizeof(hs_value));
-    memset(&key, 0, sizeof(key));
-    hs_start_ts = 0; /* [-Wconditional-uninitialized] */
-    hs_counter = 0;  /* [-Wconditional-uninitialized] */
-    hs_btree_id = 0; /* [-Wconditional-uninitialized] */
-    for (restart = true;;) {
+    for (;;) {
+        /* Open a HS cursor. */
         testutil_check(__wt_curhs_open((WT_SESSION_IMPL *)session, NULL, &cursor));
         F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
 
-        /* Search to the last-known location. */
-        if (!restart) {
-            cursor->set_key(cursor, 4, hs_btree_id, &key, hs_start_ts, hs_counter);
-
-            /*
-             * Limit expected errors because this is a diagnostic check (the WiredTiger API allows
-             * prepare-conflict, but that would be unexpected from the history store file).
-             */
-            ret = cursor->search_near(cursor, &exact);
-            testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
-        }
-
         /*
-         * Get some more key/value pairs. Always retrieve at least one key, that ensures we have a
-         * valid key when we copy it to start the next run.
+         * Move the cursor through the table from the beginning or the end. We can't position the
+         * cursor in the HS store because the semantics of search aren't quite the same as other
+         * tables, and we can't correct for them in application code. We don't sleep with an open
+         * cursor, so we should be able to traverse large chunks of the HS store quickly, without
+         * blocking normal operations.
          */
         next = mmrand(NULL, 0, 1) == 1;
-        for (i = mmrand(NULL, 1, 1000); i > 0; --i) {
-            if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) == 0) {
-                testutil_check(
-                  cursor->get_key(cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
-                testutil_check(cursor->get_value(
-                  cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
-                continue;
+        for (i = mmrand(NULL, 1000, 100000); i > 0; --i) {
+            if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) != 0) {
+                testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK || ret == WT_CACHE_FULL);
+                break;
             }
-            testutil_assert(ret == WT_NOTFOUND || ret == WT_ROLLBACK || ret == WT_CACHE_FULL);
-            break;
-        }
-
-        /*
-         * If we didn't hit the end of the store, save the current key to continue in the next run.
-         * Otherwise, reset so we'll start over.
-         */
-        if (ret == 0) {
             testutil_check(
-              __wt_buf_set((WT_SESSION_IMPL *)session, &key, hs_key.data, hs_key.size));
-            restart = false;
-        } else
-            restart = true;
+              cursor->get_key(cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
+            testutil_check(cursor->get_value(
+              cursor, &hs_stop_durable_ts, &hs_durable_timestamp, &hs_upd_type, &hs_value));
+        }
 
         testutil_check(cursor->close(cursor));
 
@@ -121,7 +97,6 @@ hs_cursor(void *arg)
             break;
     }
 
-    __wt_buf_free((WT_SESSION_IMPL *)session, &key);
     testutil_check(session->close(session, NULL));
 #endif
 
