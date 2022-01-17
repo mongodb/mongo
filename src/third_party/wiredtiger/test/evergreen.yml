@@ -325,6 +325,15 @@ functions:
         set -o verbose
         ${test_env_vars|} ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
 
+  "csuite test":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      script: |
+        set -o errexit
+        set -o verbose
+        ${test_env_vars|} $(pwd)/test/csuite/${test_name}/test_${test_name} ${test_args|} 2>&1
+        
   "unit test":
     command: shell.exec
     params:
@@ -371,38 +380,6 @@ functions:
         set -o errexit
         set -o verbose
         ${test_env_vars|} ./t ${thread_test_args|} 2>&1
-  "random abort test":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/random_abort"
-      script: |
-        set -o errexit
-        set -o verbose
-        ${test_env_vars|} ./test_random_abort ${random_abort_args|} 2>&1
-  "tiered abort test":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/tiered_abort"
-      script: |
-        set -o errexit
-        set -o verbose
-        ${test_env_vars|} ./test_tiered_abort ${tiered_abort_args|} 2>&1
-  "timestamp abort test":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/timestamp_abort"
-      script: |
-        set -o errexit
-        set -o verbose
-        ${test_env_vars|} ./test_timestamp_abort ${timestamp_abort_args|} 2>&1
-  "truncated log test":
-    command: shell.exec
-    params:
-      working_dir: "wiredtiger/cmake_build/test/csuite/truncated_log"
-      script: |
-        set -o errexit
-        set -o verbose
-        ${test_env_vars|} ./test_truncated_log ${truncated_log_args|} 2>&1
   "recovery stress test script":
     command: shell.exec
     params:
@@ -1081,7 +1058,7 @@ tasks:
         vars:
           test_config_filename: configs/hs_cleanup_stress.txt
           test_name: hs_cleanup
-
+  
   - name: cppsuite-search-near-01-stress
     depends_on:
       - name: compile
@@ -1121,14 +1098,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/incr_backup/test_incr_backup 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: incr_backup
 
   - name: csuite-random-abort-test
     tags: ["pull_request"]
@@ -1202,14 +1174,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/scope/test_scope 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: scope
 
   - name: csuite-truncated-log-test
     tags: ["pull_request"]
@@ -1217,7 +1184,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - func: "truncated log test"
+      - func: "csuite test"
+        vars:
+          test_name: truncated_log
 
   - name: csuite-wt1965-col-efficiency-test
     tags: ["pull_request"]
@@ -1225,14 +1194,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt1965_col_efficiency/test_wt1965_col_efficiency 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt1965_col_efficiency
 
   - name: csuite-wt2403-lsm-workload-test
     tags: ["pull_request"]
@@ -1240,14 +1204,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2403_lsm_workload/test_wt2403_lsm_workload 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2403_lsm_workload
 
   - name: csuite-wt2447-join-main-table-test
     tags: ["pull_request"]
@@ -1255,14 +1214,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2447_join_main_table/test_wt2447_join_main_table 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2447_join_main_table
 
   - name: csuite-wt2695-checksum-test
     tags: ["pull_request"]
@@ -1270,14 +1224,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2695_checksum/test_wt2695_checksum 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2695_checksum
 
   - name: csuite-wt2592-join-schema-test
     tags: ["pull_request"]
@@ -1285,14 +1234,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2592_join_schema/test_wt2592_join_schema 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2592_join_schema
 
   - name: csuite-wt2719-reconfig-test
     tags: ["pull_request"]
@@ -1300,14 +1244,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2719_reconfig/test_wt2719_reconfig 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2719_reconfig
 
   - name: csuite-wt2999-join-extractor-test
     tags: ["pull_request"]
@@ -1315,14 +1254,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2999_join_extractor/test_wt2999_join_extractor 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2999_join_extractor
 
   - name: csuite-wt3120-filesys-test
     tags: ["pull_request"]
@@ -1330,14 +1264,10 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt3120_filesys/test_wt3120_filesys -b $(pwd)  2>&1
+      - func: "csuite test"
+        vars:
+          test_args: -b $(pwd)
+          test_name: wt3120_filesys
 
   - name: csuite-wt3135-search-near-collator-test
     tags: ["pull_request"]
@@ -1345,14 +1275,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt3135_search_near_collator/test_wt3135_search_near_collator 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt3135_search_near_collator
 
   - name: csuite-wt3184-dup-index-collator-test
     tags: ["pull_request"]
@@ -1360,14 +1285,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt3184_dup_index_collator/test_wt3184_dup_index_collator 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt3184_dup_index_collator
 
   - name: csuite-wt3363-checkpoint-op-races-test
     tags: ["pull_request"]
@@ -1375,14 +1295,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt3363_checkpoint_op_races/test_wt3363_checkpoint_op_races 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt3363_checkpoint_op_races
 
   - name: csuite-wt3874-pad-byte-collator-test
     tags: ["pull_request"]
@@ -1390,14 +1305,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt3874_pad_byte_collator/test_wt3874_pad_byte_collator 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt3874_pad_byte_collator
 
   - name: csuite-wt4105-large-doc-small-upd-test
     tags: ["pull_request"]
@@ -1405,14 +1315,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4105_large_doc_small_upd/test_wt4105_large_doc_small_upd 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4105_large_doc_small_upd
 
   - name: csuite-wt4117-checksum-test
     tags: ["pull_request"]
@@ -1420,14 +1325,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4117_checksum/test_wt4117_checksum 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4117_checksum
 
   - name: csuite-wt4156-metadata-salvage-test
     tags: ["pull_request"]
@@ -1435,14 +1335,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4156_metadata_salvage/test_wt4156_metadata_salvage 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4156_metadata_salvage
 
   - name: csuite-wt4699-json-test
     tags: ["pull_request"]
@@ -1450,14 +1345,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4699_json/test_wt4699_json 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4699_json
 
   - name: csuite-wt4803-history-store-abort-test
     tags: ["pull_request"]
@@ -1465,14 +1355,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4803_history_store_abort/test_wt4803_history_store_abort 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4803_history_store_abort
 
   - name: csuite-wt4891-meta-ckptlist-get-alloc-test
     tags: ["pull_request"]
@@ -1480,14 +1365,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4891_meta_ckptlist_get_alloc/test_wt4891_meta_ckptlist_get_alloc 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4891_meta_ckptlist_get_alloc
 
   - name: csuite-wt6185-modify-ts-test
     tags: ["pull_request"]
@@ -1495,14 +1375,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt6185_modify_ts/test_wt6185_modify_ts 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt6185_modify_ts
 
   - name: csuite-rwlock-test
     tags: ["pull_request"]
@@ -1510,30 +1385,19 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
+      - func: "csuite test"
+        vars:
+          test_name: rwlock
 
-            ${test_env_vars|} $(pwd)/test/csuite/rwlock/test_rwlock 2>&1
-
-  # FIXME-WT-8512: The test was temporarily disabled by WT-5790.
-  # - name: csuite-wt2246-col-append-test
-  #   tags: ["pull_request"]
-  #   depends_on:
-  #     - name: compile
-  #   commands:
-  #     - func: "fetch artifacts"
-  #     - command: shell.exec
-  #       params:
-  #         working_dir: "wiredtiger/build_posix"
-  #         script: |
-  #           set -o errexit
-  #           set -o verbose
-
-  #           ${test_env_vars|} $(pwd)/test/csuite/test_wt2246_col_append 2>&1
+  - name: csuite-wt2246-col-append-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: wt2246_col_append
 
   - name: csuite-wt2323-join-visibility-test
     tags: ["pull_request"]
@@ -1541,14 +1405,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2323_join_visibility/test_wt2323_join_visibility 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2323_join_visibility
 
   - name: csuite-wt2535-insert-race-test
     tags: ["pull_request"]
@@ -1556,14 +1415,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2535_insert_race/test_wt2535_insert_race 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2535_insert_race
 
   - name: csuite-wt2834-join-bloom-fix-test
     tags: ["pull_request"]
@@ -1571,14 +1425,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2834_join_bloom_fix/test_wt2834_join_bloom_fix 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2834_join_bloom_fix
 
   - name: csuite-wt2853-perf-test
     tags: ["pull_request"]
@@ -1586,14 +1435,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2853_perf/test_wt2853_perf 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt2853_perf
 
   - name: csuite-wt2909-checkpoint-integrity-test
     tags: ["pull_request"]
@@ -1601,14 +1445,10 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt2909_checkpoint_integrity/test_wt2909_checkpoint_integrity -b $(pwd) 2>&1
+      - func: "csuite test"
+        vars:
+          test_args: -b $(pwd)
+          test_name: wt2909_checkpoint_integrity
 
   - name: csuite-wt3338-partial-update-test
     tags: ["pull_request"]
@@ -1616,14 +1456,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt3338_partial_update/test_wt3338_partial_update 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt3338_partial_update
 
   - name: csuite-wt4333-handle-locks-test
     tags: ["pull_request"]
@@ -1631,14 +1466,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt4333_handle_locks/test_wt4333_handle_locks 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt4333_handle_locks
 
   - name: csuite-wt6616-checkpoint-oldest-ts-test
     tags: ["pull_request"]
@@ -1646,14 +1476,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt6616_checkpoint_oldest_ts/test_wt6616_checkpoint_oldest_ts 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt6616_checkpoint_oldest_ts
 
   - name: csuite-wt7989-compact-checkpoint-test
     tags: ["pull_request"]
@@ -1661,14 +1486,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/test/csuite/wt7989_compact_checkpoint/test_wt7989_compact_checkpoint 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt7989_compact_checkpoint
 
   - name: csuite-wt8057-compact-stress-test
     tags: ["pull_request"]
@@ -1676,13 +1496,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${test_env_vars|} $(pwd)/test/csuite/wt8057_compact_stress/test_wt8057_compact_stress 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt8057_compact_stress
 
   - name: csuite-wt8246-compact-rts-data-correctness-test
     tags: ["pull_request"]
@@ -1690,13 +1506,9 @@ tasks:
       - name: compile
     commands:
       - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-            ${test_env_vars|} $(pwd)/test/csuite/wt8246_compact_rts_data_correctness/test_wt8246_compact_rts_data_correctness 2>&1
+      - func: "csuite test"
+        vars:
+          test_name: wt8246_compact_rts_data_correctness
 
   # End of csuite test tasks
 
@@ -2333,14 +2145,12 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_FTRUNCATE=0
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-            # ${test_env_vars|} $(pwd)/../test/csuite/random_abort/smoke.sh 2>&1
-            ${test_env_vars|} $(pwd)/test/csuite/truncated_log/test_truncated_log 2>&1
+      - func: "csuite smoke test"
+        vars:
+          test_name: random_abort
+      - func: "csuite test"
+        vars:
+          test_name: truncated_log
       - func: "csuite smoke test"
         vars:
           test_args: -b cmake_build/test/csuite/timestamp_abort/test_timestamp_abort
@@ -2361,14 +2171,6 @@ tasks:
 
       # Run the long version of make check, that includes the full csuite tests
       - func: "make check all"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            TESTUTIL_ENABLE_TIMING_TESTS=1 ./test/csuite/wt3363_checkpoint_op_races/test_wt3363_checkpoint_op_races 2>&1
 
       # Many dbs test - Run with:
       # 1.  The defaults
@@ -2407,22 +2209,30 @@ tasks:
           thread_test_args: -S -F -n 100000 -t v
 
       # random-abort - default (random time and number of threads)
-      - func: "random abort test"
-      # random-abort - minimum time, random number of threads
-      - func: "random abort test"
+      - func: "csuite test"
         vars:
-          random_abort_args: -t 10
-      # random-abort - maximum time, random number of threads
-      - func: "random abort test"
-        vars:
-          random_abort_args: -t 40
-      # random-abort - run compaction
-      - func: "random abort test"
-        vars:
-          random_abort_args: -c -t 60
+          test_name: random_abort
 
       # truncated-log
-      - func: "truncated log test"
+      - func: "csuite test"
+        vars:
+          test_name: truncated_log
+
+      # random-abort - minimum time, random number of threads
+      - func: "csuite test"
+        vars:
+          test_args: -t 10
+          test_name: random_abort
+      # random-abort - maximum time, random number of threads
+      - func: "csuite test"
+        vars:
+          test_args: -t 40
+          test_name: random_abort
+      # random-abort - run compaction
+      - func: "csuite test"
+        vars:
+          test_args: -c -t 60
+          test_name: random_abort
 
       # format test
       - func: "format test"
