@@ -242,20 +242,6 @@ __timestamp_out_of_order_fix(WT_SESSION_IMPL *session, WT_TIME_WINDOW *select_tw
         select_tw->start_ts = select_tw->stop_ts;
         return (true);
     }
-
-    /*
-     * As per the time window validation the durable_start_ts must not be greater than the stop_ts.
-     * Hence, if the stop_ts is less than durable_start_ts and greater than start_ts, make
-     * durable_start_ts equal to stop_ts.
-     */
-    if ((select_tw->start_ts != select_tw->stop_ts) &&
-      (select_tw->stop_ts < select_tw->durable_start_ts)) {
-        __wt_verbose(session, WT_VERB_TIMESTAMP,
-          "Warning: fixing out-of-order timestamps remove earlier than value; time window %s",
-          __wt_time_window_to_string(select_tw, time_string));
-
-        select_tw->durable_start_ts = select_tw->stop_ts;
-    }
     return (false);
 }
 
