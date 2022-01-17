@@ -10,6 +10,9 @@ load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
 
+// Replanning is not supported yet by the SBE plan cache without auto-parameterization.
+//
+// TODO SERVER-61314: Remove this check together with removal of "featureFlagSbePlanCache".
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
     return;

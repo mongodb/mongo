@@ -32,9 +32,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/plan_cache_util.h"
+
 #include "mongo/logv2/log.h"
 
-namespace mongo::plan_cache_util {
+namespace mongo {
+namespace plan_cache_util {
 namespace log_detail {
 void logTieForBest(std::string&& query,
                    double winnerScore,
@@ -67,4 +69,96 @@ void logNotCachingNoData(std::string&& solution) {
                 "solutions"_attr = redact(solution));
 }
 }  // namespace log_detail
-}  // namespace mongo::plan_cache_util
+
+plan_cache_debug_info::DebugInfo buildDebugInfo(
+    const CanonicalQuery& query, std::unique_ptr<const plan_ranker::PlanRankingDecision> decision) {
+    // Strip projections on $-prefixed fields, as these are added by internal callers of the
+    // system and are not considered part of the user projection.
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
+    BSONObjBuilder projBuilder;
+    for (auto elem : findCommand.getProjection()) {
+        if (elem.fieldName()[0] == '$') {
+            continue;
+        }
+        projBuilder.append(elem);
+    }
+
+    plan_cache_debug_info::CreatedFromQuery createdFromQuery =
+        plan_cache_debug_info::CreatedFromQuery{
+            findCommand.getFilter(),
+            findCommand.getSort(),
+            projBuilder.obj(),
+            query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
+
+    return {std::move(createdFromQuery), std::move(decision)};
+}
+
+plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution) {
+    plan_cache_debug_info::DebugInfoSBE debugInfo;
+
+    if (!solution || !solution->root())
+        return debugInfo;
+
+    std::queue<const QuerySolutionNode*> queue;
+    queue.push(solution->root());
+
+    // Look through the QuerySolution to collect some static stat details.
+    while (!queue.empty()) {
+        auto node = queue.front();
+        queue.pop();
+        invariant(node);
+
+        switch (node->getType()) {
+            case STAGE_COUNT_SCAN: {
+                auto csn = static_cast<const CountScanNode*>(node);
+                debugInfo.indexesUsed.push_back(csn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_DISTINCT_SCAN: {
+                auto dn = static_cast<const DistinctNode*>(node);
+                debugInfo.indexesUsed.push_back(dn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_GEO_NEAR_2D: {
+                auto geo2d = static_cast<const GeoNear2DNode*>(node);
+                debugInfo.indexesUsed.push_back(geo2d->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_GEO_NEAR_2DSPHERE: {
+                auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+                debugInfo.indexesUsed.push_back(geo2dsphere->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_IXSCAN: {
+                auto ixn = static_cast<const IndexScanNode*>(node);
+                debugInfo.indexesUsed.push_back(ixn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_TEXT_MATCH: {
+                auto tn = static_cast<const TextMatchNode*>(node);
+                debugInfo.indexesUsed.push_back(tn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_COLLSCAN: {
+                debugInfo.collectionScans++;
+                auto csn = static_cast<const CollectionScanNode*>(node);
+                if (!csn->tailable) {
+                    debugInfo.collectionScansNonTailable++;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+
+        for (auto&& child : node->children) {
+            queue.push(child);
+        }
+    }
+
+    debugInfo.planSummary = solution->summaryString();
+
+    return debugInfo;
+}
+}  // namespace plan_cache_util
+}  // namespace mongo

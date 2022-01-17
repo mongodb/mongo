@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
@@ -44,13 +45,17 @@ public:
                      const stage_builder::PlanStageData* data,
                      const QuerySolution* solution,
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                     bool isMultiPlan)
+                     bool isMultiPlan,
+                     std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo)
         : PlanExplainer{solution},
           _root{root},
           _rootData{data},
           _solution{solution},
           _rejectedCandidates{std::move(rejectedCandidates)},
-          _isMultiPlan{isMultiPlan} {}
+          _isMultiPlan{isMultiPlan},
+          _debugInfo{std::move(debugInfo)} {
+        tassert(5968203, "_debugInfo should not be null", _debugInfo);
+    }
 
     bool isMultiPlan() const final {
         return _isMultiPlan;
@@ -83,5 +88,7 @@ private:
 
     const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};
+    // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
+    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> _debugInfo;
 };
 }  // namespace mongo

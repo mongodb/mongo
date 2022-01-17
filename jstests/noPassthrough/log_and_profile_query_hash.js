@@ -20,12 +20,6 @@ assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("jstests_query_shape_hash");
 const coll = testDB.test;
 
-if (checkSBEEnabled(testDB, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 const profileEntryFilter = {
     op: "query"
 };
@@ -140,7 +134,13 @@ const hashValues = testList.map((testCase) => runTestsAndGetHashes(testDB, testC
 
 // Confirm that the same shape of query has the same hashes.
 assert.neq(hashValues[0], hashValues[1]);
-assert.eq(hashValues[1], hashValues[2]);
+
+// TODO SERVER-61314: Remove this check when "featureFlagSbePlanCache" is removed. This part of the
+// test cannot work when the SBE plan cache is enabled until the SBE plan cache supports
+// auto-parameterization.
+if (!checkSBEEnabled(testDB, ["featureFlagSbePlanCache"])) {
+    assert.eq(hashValues[1], hashValues[2]);
+}
 
 // Test that the expected 'planCacheKey' and 'queryHash' are included in the transitional
 // log lines when an inactive cache entry is created.
@@ -160,15 +160,11 @@ const onCreationHashes = runTestsAndGetHashes(testDB, testInactiveCreationLog);
 const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 
 // Fetch the line that logs when an inactive cache entry is created for the query with
-// 'planCacheKey' and 'queryHash'. Confirm only one line does this.
+// 'queryHash'. Confirm only one line does this.
 const creationLogList = log.filter(
-    logLine => (
-        logLine.indexOf("Creating inactive cache entry for query") != -1 &&
-        (!isJsonLog(conn)
-             ? (logLine.indexOf("planCacheKey " + String(onCreationHashes.planCacheKey)) != -1 &&
-                logLine.indexOf("queryHash " + String(onCreationHashes.queryHash)) != -1)
-             : (logLine.indexOf('"planCacheKey":"' + String(onCreationHashes.planCacheKey)) != -1 &&
-                logLine.indexOf('"queryHash":"' + String(onCreationHashes.queryHash)) != -1))));
+    logLine => (logLine.indexOf("Creating inactive cache entry for query") != -1 &&
+                logLine.indexOf('"planCacheKey":"' + String(onCreationHashes.planCacheKey)) != -1 &&
+                logLine.indexOf('"queryHash":"' + String(onCreationHashes.queryHash)) != -1));
 assert.eq(1, creationLogList.length);
 
 MongoRunner.stopMongod(conn);

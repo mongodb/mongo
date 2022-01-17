@@ -243,6 +243,11 @@ std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec& ss) {
     return {TypeTags::sortSpec, ssCopy};
 }
 
+std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator) {
+    auto collatorCopy = bitcastFrom<CollatorInterface*>(collator.clone().release());
+    return {TypeTags::collator, collatorCopy};
+}
+
 std::pair<TypeTags, Value> makeNewRecordId(int64_t rid) {
     auto val = bitcastFrom<RecordId*>(new RecordId(rid));
     return {TypeTags::RecordId, val};
@@ -310,6 +315,9 @@ void releaseValue(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::sortSpec:
             delete getSortSpecView(val);
+            break;
+        case TypeTags::collator:
+            delete getCollatorView(val);
             break;
         default:
             break;

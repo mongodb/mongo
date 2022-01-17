@@ -1359,6 +1359,8 @@ std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher&);
 
 std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
 
+std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
+
 /**
  * Releases memory allocated for the value. If the value does not have any memory allocated for it,
  * does nothing.
@@ -1434,6 +1436,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyFtsMatcher(*getFtsMatcherView(val));
         case TypeTags::sortSpec:
             return makeCopySortSpec(*getSortSpecView(val));
+        case TypeTags::collator:
+            return makeCopyCollator(*getCollatorView(val));
         default:
             break;
     }

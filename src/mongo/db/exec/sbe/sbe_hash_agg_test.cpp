@@ -64,7 +64,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     auto collatorSlot = generateSlotId();
-    auto shouldUseCollator = optionalCollator.get() != nullptr;
+    auto shouldUseCollator = optionalCollator != nullptr;
 
     auto makeStageFn = [this, collatorSlot, shouldUseCollator, shouldSpill](
                            value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
@@ -92,7 +92,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
     if (shouldUseCollator) {
         ctx->pushCorrelated(collatorSlot, &collatorAccessor);
         collatorAccessor.reset(value::TypeTags::collator,
-                               value::bitcastFrom<CollatorInterface*>(optionalCollator.get()));
+                               value::bitcastFrom<CollatorInterface*>(optionalCollator.release()));
     }
 
     // Generate a mock scan from 'input' with a single output slot.
@@ -155,8 +155,8 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
 
     auto makeStageFn = [this, &collator](value::SlotId scanSlot,
                                          std::unique_ptr<PlanStage> scanStage) {
-        auto collExpr = makeE<EConstant>(value::TypeTags::collator,
-                                         value::bitcastFrom<CollatorInterface*>(collator.get()));
+        auto collExpr = makeE<EConstant>(
+            value::TypeTags::collator, value::bitcastFrom<CollatorInterface*>(collator.release()));
 
         // Build a HashAggStage that exercises the collMin() and collMax() aggregate functions.
         auto minSlot = generateSlotId();
@@ -222,8 +222,8 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
 
     auto makeStageFn = [this, &collator](value::SlotId scanSlot,
                                          std::unique_ptr<PlanStage> scanStage) {
-        auto collExpr = makeE<EConstant>(value::TypeTags::collator,
-                                         value::bitcastFrom<CollatorInterface*>(collator.get()));
+        auto collExpr = makeE<EConstant>(
+            value::TypeTags::collator, value::bitcastFrom<CollatorInterface*>(collator.release()));
 
         // Build a HashAggStage that exercises the collAddToSet() aggregate function.
         auto hashAggSlot = generateSlotId();

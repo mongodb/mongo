@@ -5,30 +5,17 @@
 (function() {
 "use strict";
 
-load('jstests/libs/analyze_plan.js');  // For isCollScan.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
-
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
+load('jstests/libs/analyze_plan.js');  // For isCollScan and getPlanCacheKeyFromShape.
 
 const coll = db.plan_cache_not_in_regex;
 coll.drop();
 
 // Helper function which obtains the cached plan, if any, for a given query shape.
 function getPlanForCacheEntry(query, proj, sort) {
-    const key = {query: query, sort: sort, projection: proj};
-    const cursor = coll.aggregate([
-        {$planCacheStats: {}},
-        {
-            $match: {
-                "createdFromQuery.query": query,
-                "createdFromQuery.projection": proj,
-                "createdFromQuery.sort": sort
-            }
-        }
-    ]);
+    const keyHash = getPlanCacheKeyFromShape(
+        {query: query, projection: proj, sort: sort, collection: coll, db: db});
+
+    const cursor = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]);
     const entryStats = cursor.toArray();
     assert.eq(entryStats.length, 1, `Expected one cached plan, found: ${tojson(entryStats)}`);
     return entryStats.shift();

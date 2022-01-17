@@ -92,7 +92,7 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
         value::OwnedValueAccessor collatorAccessor;
         ctx->pushCorrelated(collatorSlot, &collatorAccessor);
         collatorAccessor.reset(value::TypeTags::collator,
-                               value::bitcastFrom<CollatorInterface*>(collator.get()));
+                               value::bitcastFrom<CollatorInterface*>(collator.release()));
 
         // Two separate virtual scans are needed since HashJoinStage needs two child stages.
         outerGuard.reset();

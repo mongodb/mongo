@@ -38,14 +38,24 @@
 
 namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root);
+
 std::unique_ptr<PlanExplainer> make(PlanStage* root,
                                     const PlanEnumeratorExplainInfo& enumeratorInfo);
+
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution);
+
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan);
+
+std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
+                                    const stage_builder::PlanStageData* data,
+                                    const QuerySolution* solution,
+                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+                                    bool isMultiPlan,
+                                    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo);
 }  // namespace mongo::plan_explainer_factory

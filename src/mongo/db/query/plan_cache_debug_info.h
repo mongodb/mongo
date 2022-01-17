@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/util/container_size_helper.h"
 
 namespace mongo::plan_cache_debug_info {
 /**
@@ -105,6 +106,10 @@ struct DebugInfo {
         return size;
     }
 
+    std::string debugString() const {
+        return createdFromQuery.debugString();
+    }
+
     CreatedFromQuery createdFromQuery;
 
     // Information that went into picking the winning plan and also why the other plans lost.
@@ -112,6 +117,23 @@ struct DebugInfo {
     std::unique_ptr<const plan_ranker::PlanRankingDecision> decision;
 };
 
-DebugInfo buildDebugInfo(const CanonicalQuery& query,
-                         std::unique_ptr<const plan_ranker::PlanRankingDecision> decision);
+/*
+ * Similar to "DebugInfo" above. This debug info struct is only for SBE plan cache.
+ */
+struct DebugInfoSBE {
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(DebugInfoSBE) + planSummary.capacity() +
+            container_size_helper::estimateObjectSizeInBytes(
+                   indexesUsed, [](std::string str) { return str.capacity(); }, true);
+    }
+
+    std::string debugString() const {
+        return planSummary;
+    }
+
+    long long collectionScans = 0;
+    long long collectionScansNonTailable = 0;
+    std::string planSummary;
+    std::vector<std::string> indexesUsed;
+};
 }  // namespace mongo::plan_cache_debug_info

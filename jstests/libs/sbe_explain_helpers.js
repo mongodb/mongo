@@ -19,10 +19,12 @@ function isIdIndexScan(db, root, expectedParentStageForIxScan) {
         ixscan.indexName === "_id_";
 }
 
-// Helper to make an assertion depending on the engine being used. If we're in a mixed version
-// cluster, then we assert that either 'classicAssert' or 'sbeAssert' is true because the
-// outcome will depend on which node we're making assertions against. If we're not in a mixed
-// version scenario, then we make an assertion depending on the value of 'isSBEEnabled'.
+/**
+ * Helper to make an assertion depending on the engine being used. If we're in a mixed version
+ * cluster, then we assert that either 'classicAssert' or 'sbeAssert' is true because the outcome
+ * will depend on which node we're making assertions against. If we're not in a mixed version
+ * scenario, then we make an assertion depending on the value of 'isSBEEnabled'.
+ */
 function engineSpecificAssertion(classicAssert, sbeAssert, theDB, msg) {
     if (checkBothEnginesAreRunOnCluster(theDB)) {
         assert(classicAssert || sbeAssert, msg);

@@ -505,3 +505,26 @@ function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNo
     }
     return plan;
 }
+
+/**
+ * Get the "planCacheKey" from the explain result.
+ */
+function getPlanCacheKeyFromExplain(explainRes, db) {
+    const hash = FixtureHelpers.isMongos(db)
+        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
+        : explainRes.queryPlanner.planCacheKey;
+    assert.eq(typeof hash, "string");
+
+    return hash;
+}
+
+/**
+ * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
+ * result.
+ */
+function getPlanCacheKeyFromShape({query = {}, projection = {}, sort = {}, collection, db}) {
+    const explainRes =
+        assert.commandWorked(collection.explain().find(query, projection).sort(sort).finish());
+
+    return getPlanCacheKeyFromExplain(explainRes, db);
+}

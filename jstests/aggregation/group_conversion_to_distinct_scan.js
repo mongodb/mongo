@@ -20,12 +20,6 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
 
 let coll = db.group_conversion_to_distinct_scan;
 coll.drop();

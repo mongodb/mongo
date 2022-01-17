@@ -13,12 +13,8 @@
 
 (function() {
 'use strict';
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
-
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
+load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 const collName = 'introspect_hidden_index_plan_cache_entries';
 const collNotAffectedName = 'introspect_hidden_index_plan_cache_entries_unaffected';
@@ -31,10 +27,23 @@ db[collNotAffectedName].drop();
 const collNotAffected = db[collNotAffectedName];
 
 function getPlansForCacheEntry(queryShape, collection) {
+    const keyHash = getPlanCacheKeyFromShape({
+        query: queryShape.query,
+        projection: queryShape.projection,
+        sort: queryShape.sort,
+        collection: collection,
+        db: db
+    });
+
     const match = {
-        'createdFromQuery.query': queryShape.query,
-        'createdFromQuery.sort': queryShape.sort,
-        'createdFromQuery.projection': queryShape.projection
+        $or: [
+            {
+                'createdFromQuery.query': queryShape.query,
+                'createdFromQuery.sort': queryShape.sort,
+                'createdFromQuery.projection': queryShape.projection
+            },
+            {planCacheKey: keyHash}
+        ]
     };
 
     return collection.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();

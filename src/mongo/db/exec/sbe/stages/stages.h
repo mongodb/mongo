@@ -360,6 +360,7 @@ private:
  * Maintains an internal state to maintain the interrupt check period. Also responsible for
  * triggering yields if this object has been configured with a yield policy.
  */
+template <typename T>
 class CanInterrupt {
 public:
     /**
@@ -389,8 +390,17 @@ public:
         }
     }
 
+    void attachNewYieldPolicy(PlanYieldPolicy* yieldPolicy) {
+        auto stage = static_cast<T*>(this);
+        for (auto&& child : stage->_children) {
+            child->attachNewYieldPolicy(yieldPolicy);
+        }
+
+        _yieldPolicy = yieldPolicy;
+    }
+
 protected:
-    PlanYieldPolicy* const _yieldPolicy{nullptr};
+    PlanYieldPolicy* _yieldPolicy{nullptr};
 
 private:
     static const int kInterruptCheckPeriod = 128;
@@ -403,7 +413,7 @@ private:
 class PlanStage : public CanSwitchOperationContext<PlanStage>,
                   public CanChangeState<PlanStage>,
                   public CanTrackStats<PlanStage>,
-                  public CanInterrupt {
+                  public CanInterrupt<PlanStage> {
 public:
     using Vector = absl::InlinedVector<std::unique_ptr<PlanStage>, 2>;
 
@@ -470,6 +480,7 @@ public:
     friend class CanSwitchOperationContext<PlanStage>;
     friend class CanChangeState<PlanStage>;
     friend class CanTrackStats<PlanStage>;
+    friend class CanInterrupt<PlanStage>;
 
 protected:
     // Derived classes can optionally override these methods.

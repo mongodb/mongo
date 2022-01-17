@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 load('jstests/libs/fixture_helpers.js');  // For and isMongos().
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 const collName = "query_hash_stability";
 const coll = db[collName];
@@ -105,11 +106,15 @@ assertPlanCacheField({
     expectedToMatch: true
 });
 
-// The 'planCacheKey' should be the same as what it was before we dropped the index.
-assertPlanCacheField({
-    firstExplain: initialExplain,
-    secondExplain: postDropExplain,
-    planCacheField: 'planCacheKey',
-    expectedToMatch: true
-});
+// SBE's planCacheKey encoding encodes "collection version" which will be increased after dropping
+// an index.
+if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    // The 'planCacheKey' should be the same as what it was before we dropped the index.
+    assertPlanCacheField({
+        firstExplain: initialExplain,
+        secondExplain: postDropExplain,
+        planCacheField: 'planCacheKey',
+        expectedToMatch: true
+    });
+}
 })();

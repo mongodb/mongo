@@ -32,8 +32,10 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 
@@ -70,6 +72,18 @@ void logTieForBest(std::string&& query,
 void logNotCachingZeroResults(std::string&& query, double score, std::string winnerPlanSummary);
 void logNotCachingNoData(std::string&& solution);
 }  // namespace log_detail
+
+/*
+ * Builds "DebugInfo" for storing in the classic plan cache.
+ */
+plan_cache_debug_info::DebugInfo buildDebugInfo(
+    const CanonicalQuery& query, std::unique_ptr<const plan_ranker::PlanRankingDecision> decision);
+
+/*
+ * Builds "DebugInfoSBE" for storing in the SBE plan cache. Pre-computes necessary debugging
+ * information to build "PlanExplainerSBE" when recoverying the cached SBE plan from the cache.
+ */
+plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
 
 /**
  * Caches the best candidate plan, chosen from the given 'candidates' based on the 'ranking'
@@ -165,14 +179,19 @@ void updatePlanCache(
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
     if (shouldCacheQuery(query) && canCache) {
+        auto rankingDecision = ranking.get();
         auto cacheClassicPlan = [&]() {
-            PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{query};
+            PlanCacheLoggingCallbacks<PlanCacheKey,
+                                      SolutionCacheData,
+                                      plan_cache_debug_info::DebugInfo>
+                callbacks{query};
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
                                 ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
                                       winningPlan.solution->cacheData->clone(),
-                                      std::move(ranking),
+                                      *rankingDecision,
                                       opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                                      buildDebugInfo(query, std::move(ranking)),
                                       boost::none, /* worksGrowthCoefficient */
                                       &callbacks));
         };
@@ -184,13 +203,16 @@ void updatePlanCache(
                     auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
                         winningPlan.root->clone(), winningPlan.data);
 
-                    PlanCacheLoggingCallbacks<sbe::PlanCacheKey, sbe::CachedSbePlan> callbacks{
-                        query};
+                    PlanCacheLoggingCallbacks<sbe::PlanCacheKey,
+                                              sbe::CachedSbePlan,
+                                              plan_cache_debug_info::DebugInfoSBE>
+                        callbacks{query};
                     uassertStatusOK(sbe::getPlanCache(opCtx).set(
                         plan_cache_key_factory::make<sbe::PlanCacheKey>(query, collection),
                         std::move(cachedPlan),
-                        std::move(ranking),
+                        *rankingDecision,
                         opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                        buildDebugInfo(winningPlan.solution.get()),
                         boost::none, /* worksGrowthCoefficient */
                         &callbacks));
                 } else {

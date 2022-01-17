@@ -36,6 +36,7 @@
 #include <memory>
 
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -148,11 +149,15 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
 
     auto cacheData = std::make_unique<SolutionCacheData>();
     cacheData->tree = std::make_unique<PlanCacheIndexTree>();
-    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+    auto decision = createDecision(1U);
+    auto decisionPtr = decision.get();
+    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
+        callbacks{*cq};
     ASSERT_OK(planCache->set(makeKey(*cq),
                              std::move(cacheData),
-                             createDecision(1U),
+                             *decisionPtr,
                              opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                             plan_cache_util::buildDebugInfo(*cq, std::move(decision)),
                              boost::none, /* worksGrowthCoefficient */
                              &callbacks));
 }

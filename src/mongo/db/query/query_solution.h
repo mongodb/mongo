@@ -355,6 +355,8 @@ public:
         return ss;
     }
 
+    std::string summaryString() const;
+
     const QuerySolutionNode* root() const {
         return _root.get();
     }

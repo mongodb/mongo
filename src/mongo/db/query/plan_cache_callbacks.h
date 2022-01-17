@@ -65,56 +65,63 @@ void logPromoteCacheEntry(std::string&& query,
                           size_t newWorks);
 }  // namespace log_detail
 
-template <class CachedPlanType>
+template <class CachedPlanType, class DebugInfo>
 class PlanCacheEntryBase;
+struct SolutionCacheData;
 
 /**
  * Encapsulates callback functions used to perform a custom action when the plan cache state
  * changes.
  */
-template <typename KeyType, typename CachedPlanType>
+template <typename KeyType, typename CachedPlanType, typename DebugInfoType>
 class PlanCacheCallbacks {
 public:
     virtual ~PlanCacheCallbacks() = default;
 
-    virtual void onCreateInactiveCacheEntry(const KeyType& key,
-                                            const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                            size_t newWorks) const = 0;
-    virtual void onReplaceActiveCacheEntry(const KeyType& key,
-                                           const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                           size_t newWorks) const = 0;
-    virtual void onNoopActiveCacheEntry(const KeyType& key,
-                                        const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                        size_t newWorks) const = 0;
-    virtual void onIncreasingWorkValue(const KeyType& key,
-                                       const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                       size_t newWorks) const = 0;
-    virtual void onPromoteCacheEntry(const KeyType& key,
-                                     const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                     size_t newWorks) const = 0;
-    virtual plan_cache_debug_info::DebugInfo buildDebugInfo(
-        std::unique_ptr<const plan_ranker::PlanRankingDecision> decision) const = 0;
+    virtual void onCreateInactiveCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const = 0;
+    virtual void onReplaceActiveCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const = 0;
+    virtual void onNoopActiveCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const = 0;
+    virtual void onIncreasingWorkValue(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const = 0;
+    virtual void onPromoteCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const = 0;
 };
 
 /**
  * Simple logging callbacks for the plan cache.
  */
-template <typename KeyType, typename CachedPlanType>
-class PlanCacheLoggingCallbacks : public PlanCacheCallbacks<KeyType, CachedPlanType> {
+template <typename KeyType, typename CachedPlanType, typename DebugInfoType>
+class PlanCacheLoggingCallbacks
+    : public PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType> {
 public:
     PlanCacheLoggingCallbacks(const CanonicalQuery& cq) : _cq{cq} {}
 
-    void onCreateInactiveCacheEntry(const KeyType& key,
-                                    const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                    size_t newWorks) const final {
+    void onCreateInactiveCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const final {
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logCreateInactiveCacheEntry(
             _cq.toStringShort(), std::move(queryHash), std::move(planCacheKey), newWorks);
     }
 
-    void onReplaceActiveCacheEntry(const KeyType& key,
-                                   const PlanCacheEntryBase<CachedPlanType>* oldEntry,
-                                   size_t newWorks) const final {
+    void onReplaceActiveCacheEntry(
+        const KeyType& key,
+        const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        size_t newWorks) const final {
         invariant(oldEntry);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
         log_detail::logReplaceActiveCacheEntry(_cq.toStringShort(),
@@ -125,7 +132,7 @@ public:
     }
 
     void onNoopActiveCacheEntry(const KeyType& key,
-                                const PlanCacheEntryBase<CachedPlanType>* oldEntry,
+                                const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                                 size_t newWorks) const final {
         invariant(oldEntry);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
@@ -137,7 +144,7 @@ public:
     }
 
     void onIncreasingWorkValue(const KeyType& key,
-                               const PlanCacheEntryBase<CachedPlanType>* oldEntry,
+                               const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                                size_t newWorks) const final {
         invariant(oldEntry);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
@@ -149,7 +156,7 @@ public:
     }
 
     void onPromoteCacheEntry(const KeyType& key,
-                             const PlanCacheEntryBase<CachedPlanType>* oldEntry,
+                             const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
                              size_t newWorks) const final {
         invariant(oldEntry);
         auto&& [queryHash, planCacheKey] = hashes(key, oldEntry);
@@ -160,13 +167,9 @@ public:
                                          newWorks);
     }
 
-    plan_cache_debug_info::DebugInfo buildDebugInfo(
-        std::unique_ptr<const plan_ranker::PlanRankingDecision> decision) const final {
-        return plan_cache_debug_info::buildDebugInfo(_cq, std::move(decision));
-    }
-
 private:
-    auto hashes(const KeyType& key, const PlanCacheEntryBase<CachedPlanType>* oldEntry) const {
+    auto hashes(const KeyType& key,
+                const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry) const {
         // Avoid recomputing the hashes if we've got an old entry to grab them from.
         return oldEntry
             ? std::make_pair(zeroPaddedHex(oldEntry->queryHash),

@@ -335,82 +335,13 @@ const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
 }
 
 std::string PlanExplainerSBE::getPlanSummary() const {
-    if (!_solution) {
-        return {};
-    }
-
-    StringBuilder sb;
-    bool seenLeaf = false;
-    std::queue<const QuerySolutionNode*> queue;
-    queue.push(_solution->root());
-
-    while (!queue.empty()) {
-        auto node = queue.front();
-        queue.pop();
-
-        if (node->children.empty()) {
-            if (seenLeaf) {
-                sb << ", ";
-            } else {
-                seenLeaf = true;
-            }
-
-            sb << stageTypeToString(node->getType());
-
-            switch (node->getType()) {
-                case STAGE_COUNT_SCAN: {
-                    auto csn = static_cast<const CountScanNode*>(node);
-                    const KeyPattern keyPattern{csn->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_DISTINCT_SCAN: {
-                    auto dn = static_cast<const DistinctNode*>(node);
-                    const KeyPattern keyPattern{dn->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_GEO_NEAR_2D: {
-                    auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                    const KeyPattern keyPattern{geo2d->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_GEO_NEAR_2DSPHERE: {
-                    auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                    const KeyPattern keyPattern{geo2dsphere->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_IXSCAN: {
-                    auto ixn = static_cast<const IndexScanNode*>(node);
-                    const KeyPattern keyPattern{ixn->index.keyPattern};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                case STAGE_TEXT_MATCH: {
-                    auto tn = static_cast<const TextMatchNode*>(node);
-                    const KeyPattern keyPattern{tn->indexPrefix};
-                    sb << " " << keyPattern;
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-
-        for (auto&& child : node->children) {
-            queue.push(child);
-        }
-    }
-
-    return sb.str();
+    return _debugInfo->planSummary;
 }
 
 void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     invariant(statsOut);
 
-    if (!_solution || !_root) {
+    if (!_root) {
         return;
     }
 
@@ -428,61 +359,11 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     auto visitor = PlanSummaryStatsVisitor(*statsOut);
     _root->accumulate(kEmptyPlanNodeId, &visitor);
 
-    std::queue<const QuerySolutionNode*> queue;
-    queue.push(_solution->root());
-
-    // Look through the QuerySolution to collect some static stat details.
-    while (!queue.empty()) {
-        auto node = queue.front();
-        queue.pop();
-        invariant(node);
-
-        switch (node->getType()) {
-            case STAGE_COUNT_SCAN: {
-                auto csn = static_cast<const CountScanNode*>(node);
-                statsOut->indexesUsed.insert(csn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_DISTINCT_SCAN: {
-                auto dn = static_cast<const DistinctNode*>(node);
-                statsOut->indexesUsed.insert(dn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_GEO_NEAR_2D: {
-                auto geo2d = static_cast<const GeoNear2DNode*>(node);
-                statsOut->indexesUsed.insert(geo2d->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_GEO_NEAR_2DSPHERE: {
-                auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-                statsOut->indexesUsed.insert(geo2dsphere->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_IXSCAN: {
-                auto ixn = static_cast<const IndexScanNode*>(node);
-                statsOut->indexesUsed.insert(ixn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_TEXT_MATCH: {
-                auto tn = static_cast<const TextMatchNode*>(node);
-                statsOut->indexesUsed.insert(tn->index.identifier.catalogName);
-                break;
-            }
-            case STAGE_COLLSCAN: {
-                statsOut->collectionScans++;
-                auto csn = static_cast<const CollectionScanNode*>(node);
-                if (!csn->tailable) {
-                    statsOut->collectionScansNonTailable++;
-                }
-            }
-            default:
-                break;
-        }
-
-        for (auto&& child : node->children) {
-            queue.push(child);
-        }
-    }
+    // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
+    const auto& indexesUsed = _debugInfo->indexesUsed;
+    statsOut->indexesUsed.insert(indexesUsed.begin(), indexesUsed.end());
+    statsOut->collectionScans += _debugInfo->collectionScans;
+    statsOut->collectionScansNonTailable += _debugInfo->collectionScansNonTailable;
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(

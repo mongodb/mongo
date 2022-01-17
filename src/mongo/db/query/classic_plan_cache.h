@@ -230,9 +230,9 @@ struct SolutionCacheData {
     bool indexFilterApplied;
 };
 
-using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData>;
+using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData, plan_cache_debug_info::DebugInfo>;
 
-using CachedSolution = CachedPlanHolder<SolutionCacheData>;
+using CachedSolution = CachedPlanHolder<SolutionCacheData, plan_cache_debug_info::DebugInfo>;
 
 struct BudgetEstimator {
     size_t operator()(const PlanCacheEntry&) {
@@ -243,6 +243,7 @@ struct BudgetEstimator {
 using PlanCache = PlanCacheBase<PlanCacheKey,
                                 SolutionCacheData,
                                 BudgetEstimator,
+                                plan_cache_debug_info::DebugInfo,
                                 PlanCachePartitioner,
                                 PlanCacheKeyHasher>;
 

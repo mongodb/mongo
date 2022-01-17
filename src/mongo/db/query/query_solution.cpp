@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <queue>
 #include <vector>
 
 #include "mongo/db/query/query_solution.h"
@@ -39,6 +40,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -148,6 +150,77 @@ bool QuerySolutionNode::hasNode(StageType type) const {
     }
 
     return false;
+}
+
+std::string QuerySolution::summaryString() const {
+    tassert(5968205, "QuerySolutionNode cannot be null in this QuerySolution", _root);
+
+    StringBuilder sb;
+    bool seenLeaf = false;
+    std::queue<const QuerySolutionNode*> queue;
+    queue.push(_root.get());
+
+    while (!queue.empty()) {
+        auto node = queue.front();
+        queue.pop();
+
+        if (node->children.empty()) {
+            if (seenLeaf) {
+                sb << ", ";
+            } else {
+                seenLeaf = true;
+            }
+
+            sb << stageTypeToString(node->getType());
+
+            switch (node->getType()) {
+                case STAGE_COUNT_SCAN: {
+                    auto csn = static_cast<const CountScanNode*>(node);
+                    const KeyPattern keyPattern{csn->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_DISTINCT_SCAN: {
+                    auto dn = static_cast<const DistinctNode*>(node);
+                    const KeyPattern keyPattern{dn->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_GEO_NEAR_2D: {
+                    auto geo2d = static_cast<const GeoNear2DNode*>(node);
+                    const KeyPattern keyPattern{geo2d->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_GEO_NEAR_2DSPHERE: {
+                    auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+                    const KeyPattern keyPattern{geo2dsphere->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_IXSCAN: {
+                    auto ixn = static_cast<const IndexScanNode*>(node);
+                    const KeyPattern keyPattern{ixn->index.keyPattern};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                case STAGE_TEXT_MATCH: {
+                    auto tn = static_cast<const TextMatchNode*>(node);
+                    const KeyPattern keyPattern{tn->indexPrefix};
+                    sb << " " << keyPattern;
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
+        for (auto&& child : node->children) {
+            queue.push(child);
+        }
+    }
+
+    return sb.str();
 }
 
 void QuerySolution::assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode& node) {

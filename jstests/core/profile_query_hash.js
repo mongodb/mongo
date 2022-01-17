@@ -14,6 +14,9 @@ load("jstests/libs/profiler.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    // Instead of encoding the shape of a query, SBE's encoding currently includes the entire query.
+    // So the tests in this file only apply when the SBE plan cache is disabled. This will change
+    // after implementing auto-parameterization.
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
     return;
 }

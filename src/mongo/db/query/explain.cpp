@@ -94,15 +94,24 @@ void generatePlannerInfo(PlanExecutor* exec,
     if (collection && exec->getCanonicalQuery()) {
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(collection->getSharedDecorations());
-        const auto planCacheKeyInfo =
-            plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
-        planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-        queryHash = planCacheKeyInfo.queryHash();
-
-        if (auto allowedIndicesFilter =
-                querySettings->getAllowedIndicesFilter(planCacheKeyInfo.getQueryShape())) {
-            // Found an index filter set on the query shape.
-            indexFilterSet = true;
+        if (exec->getCanonicalQuery()->isSbeCompatible() &&
+            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
+            !exec->getCanonicalQuery()->getForceClassicEngine()) {
+            const auto planCacheKeyInfo = plan_cache_key_factory::make<sbe::PlanCacheKey>(
+                *exec->getCanonicalQuery(), collection);
+            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
+            queryHash = planCacheKeyInfo.queryHash();
+            // TODO SERVER-59695: Set the correct value of "indexFilterSet".
+        } else {
+            const auto planCacheKeyInfo =
+                plan_cache_key_factory::make<PlanCacheKey>(*exec->getCanonicalQuery(), collection);
+            planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
+            queryHash = planCacheKeyInfo.queryHash();
+            if (auto allowedIndicesFilter =
+                    querySettings->getAllowedIndicesFilter(planCacheKeyInfo.getQueryShape())) {
+                // Found an index filter set on the query shape.
+                indexFilterSet = true;
+            }
         }
     }
     plannerBob.append("indexFilterSet", indexFilterSet);

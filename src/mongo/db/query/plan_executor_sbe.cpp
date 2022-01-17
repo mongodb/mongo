@@ -112,8 +112,12 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         candidates.plans.erase(candidates.plans.begin() + candidates.winnerIdx);
     }
 
-    _planExplainer = plan_explainer_factory::make(
-        _root.get(), &_rootData, _solution.get(), std::move(candidates.plans), isMultiPlan);
+    _planExplainer = plan_explainer_factory::make(_root.get(),
+                                                  &_rootData,
+                                                  _solution.get(),
+                                                  std::move(candidates.plans),
+                                                  isMultiPlan,
+                                                  std::move(_rootData.debugInfo));
 }
 
 void PlanExecutorSBE::saveState() {

@@ -49,10 +49,12 @@ public:
                           const CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
                           size_t decisionReads,
-                          PlanYieldPolicySBE* yieldPolicy)
+                          PlanYieldPolicySBE* yieldPolicy,
+                          std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo)
         : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy},
           _queryParams{queryParams},
-          _decisionReads{decisionReads} {}
+          _decisionReads{decisionReads},
+          _debugInfo{std::move(debugInfo)} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
@@ -103,5 +105,8 @@ private:
     // The number of physical reads taken to decide on a winning plan when the plan was first
     // cached.
     const size_t _decisionReads;
+
+    // Stores plan cache entry information used as debug information or for "explain" purpose.
+    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> _debugInfo;
 };
 }  // namespace mongo::sbe

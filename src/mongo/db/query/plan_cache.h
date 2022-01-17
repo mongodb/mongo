@@ -40,21 +40,24 @@ namespace mongo {
 class QuerySolution;
 struct QuerySolutionNode;
 
-template <class CachedPlanType>
+template <class CachedPlanType, class DebugInfoType>
 class PlanCacheEntryBase;
 
 /**
  * Information returned from a get(...) query.
  */
-template <class CachedPlanType>
+template <class CachedPlanType, class DebugInfoType>
 class CachedPlanHolder {
 private:
     CachedPlanHolder(const CachedPlanHolder&) = delete;
     CachedPlanHolder& operator=(const CachedPlanHolder&) = delete;
 
 public:
-    CachedPlanHolder(const PlanCacheEntryBase<CachedPlanType>& entry)
-        : cachedPlan(entry.cachedPlan->clone()), decisionWorks(entry.works) {}
+    CachedPlanHolder(const PlanCacheEntryBase<CachedPlanType, DebugInfoType>& entry)
+        : cachedPlan(entry.cachedPlan->clone()),
+          decisionWorks(entry.works),
+          debugInfo(entry.debugInfo ? std::make_unique<DebugInfoType>(*entry.debugInfo) : nullptr) {
+    }
 
 
     // A cached plan that can be used to reconstitute the complete execution plan from cache.
@@ -63,48 +66,54 @@ public:
     // The number of work cycles taken to decide on a winning plan when the plan was first
     // cached.
     const size_t decisionWorks;
+
+    // Per-plan cache entry information that is used for debugging purpose.
+    std::unique_ptr<DebugInfoType> debugInfo;
 };
 
 /**
  * Used by the cache to track entries and their performance over time.
  * Also used by the plan cache commands to display plan cache state.
  */
-template <class CachedPlanType>
+template <class CachedPlanType, class DebugInfoType>
 class PlanCacheEntryBase {
 public:
-    template <typename KeyType>
-    static std::unique_ptr<PlanCacheEntryBase<CachedPlanType>> create(
-        std::unique_ptr<const plan_ranker::PlanRankingDecision> decision,
-        std::unique_ptr<CachedPlanType> cachedPlan,
-        uint32_t queryHash,
-        uint32_t planCacheKey,
-        Date_t timeOfCreation,
-        bool isActive,
-        size_t works,
-        const PlanCacheCallbacks<KeyType, CachedPlanType>* callbacks) {
-        invariant(decision);
+    using Entry = PlanCacheEntryBase<CachedPlanType, DebugInfoType>;
+
+    static std::unique_ptr<Entry> create(std::unique_ptr<CachedPlanType> cachedPlan,
+                                         uint32_t queryHash,
+                                         uint32_t planCacheKey,
+                                         Date_t timeOfCreation,
+                                         bool isActive,
+                                         size_t works,
+                                         DebugInfoType debugInfo) {
 
         // If the cumulative size of the plan caches is estimated to remain within a predefined
         // threshold, then then include additional debug info which is not strictly necessary for
         // the plan cache to be functional. Once the cumulative plan cache size exceeds this
         // threshold, omit this debug info as a heuristic to prevent plan cache memory consumption
         // from growing too large.
-        const bool includeDebugInfo = planCacheTotalSizeEstimateBytes.get() <
+        bool includeDebugInfo = planCacheTotalSizeEstimateBytes.get() <
             internalQueryCacheMaxSizeBytesBeforeStripDebugInfo.load();
 
-        boost::optional<plan_cache_debug_info::DebugInfo> debugInfo;
-        if (includeDebugInfo && callbacks) {
-            debugInfo.emplace(callbacks->buildDebugInfo(std::move(decision)));
+        // The stripping logic does not apply to SBE's debugging info as "DebugInfoSBE" is not
+        // expected to be huge and is required to build a PlanExplainerSBE for the executor.
+        if constexpr (std::is_same_v<DebugInfoType, plan_cache_debug_info::DebugInfoSBE>) {
+            includeDebugInfo = true;
         }
 
-        return std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>(
-            new PlanCacheEntryBase<CachedPlanType>(std::move(cachedPlan),
-                                                   timeOfCreation,
-                                                   queryHash,
-                                                   planCacheKey,
-                                                   isActive,
-                                                   works,
-                                                   std::move(debugInfo)));
+        boost::optional<DebugInfoType> debugInfoOpt;
+        if (includeDebugInfo) {
+            debugInfoOpt.emplace(std::move(debugInfo));
+        }
+
+        return std::unique_ptr<Entry>(new Entry(std::move(cachedPlan),
+                                                timeOfCreation,
+                                                queryHash,
+                                                planCacheKey,
+                                                isActive,
+                                                works,
+                                                std::move(debugInfoOpt)));
     }
 
     ~PlanCacheEntryBase() {
@@ -114,20 +123,19 @@ public:
     /**
      * Make a deep copy.
      */
-    std::unique_ptr<PlanCacheEntryBase<CachedPlanType>> clone() const {
-        boost::optional<plan_cache_debug_info::DebugInfo> debugInfoCopy;
+    std::unique_ptr<Entry> clone() const {
+        boost::optional<DebugInfoType> debugInfoCopy;
         if (debugInfo) {
             debugInfoCopy.emplace(*debugInfo);
         }
 
-        return std::unique_ptr<PlanCacheEntryBase<CachedPlanType>>(
-            new PlanCacheEntryBase<CachedPlanType>(cachedPlan->clone(),
-                                                   timeOfCreation,
-                                                   queryHash,
-                                                   planCacheKey,
-                                                   isActive,
-                                                   works,
-                                                   std::move(debugInfoCopy)));
+        return std::unique_ptr<Entry>(new Entry(cachedPlan->clone(),
+                                                timeOfCreation,
+                                                queryHash,
+                                                planCacheKey,
+                                                isActive,
+                                                works,
+                                                std::move(debugInfoCopy)));
     }
 
     std::string debugString() const {
@@ -136,8 +144,7 @@ public:
         builder << "queryHash: " << queryHash;
         builder << "; planCacheKey: " << planCacheKey;
         if (debugInfo) {
-            builder << "; ";
-            builder << debugInfo->createdFromQuery.debugString();
+            builder << "; " << debugInfo->debugString();
         }
         builder << "; timeOfCreation: " << timeOfCreation.toString() << ")";
         return builder.str();
@@ -165,13 +172,9 @@ public:
     // cause this value to be increased.
     size_t works = 0;
 
-    // Optional debug info containing detailed statistics. Includes a description of the query which
-    // resulted in this plan cache's creation as well as runtime stats from the multi-planner trial
-    // period that resulted in this cache entry.
-    //
-    // Once the estimated cumulative size of the mongod's plan caches exceeds a threshold, this
-    // debug info is omitted from new plan cache entries.
-    const boost::optional<plan_cache_debug_info::DebugInfo> debugInfo;
+    // Optional debug info containing plan cache entry information that is used strictly as
+    // debug information.
+    const boost::optional<DebugInfoType> debugInfo;
 
     // An estimate of the size in bytes of this plan cache entry. This is the "deep size",
     // calculated by recursively incorporating the size of owned objects, the objects that they in
@@ -193,7 +196,7 @@ private:
                        uint32_t planCacheKey,
                        bool isActive,
                        size_t works,
-                       boost::optional<plan_cache_debug_info::DebugInfo> debugInfo)
+                       boost::optional<DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
           queryHash(queryHash),
@@ -234,6 +237,7 @@ private:
 template <class KeyType,
           class CachedPlanType,
           class BudgetEstimator,
+          class DebugInfoType,
           class Partitioner,
           class KeyHasher = std::hash<KeyType>>
 class PlanCacheBase {
@@ -242,7 +246,7 @@ private:
     PlanCacheBase& operator=(const PlanCacheBase&) = delete;
 
 public:
-    using Entry = PlanCacheEntryBase<CachedPlanType>;
+    using Entry = PlanCacheEntryBase<CachedPlanType, DebugInfoType>;
     using Lru = LRUKeyValue<KeyType, Entry, BudgetEstimator, KeyHasher>;
 
     // We have three states for a cache entry to be in. Rather than just 'present' or 'not
@@ -269,7 +273,7 @@ public:
      */
     struct GetResult {
         CacheEntryState state;
-        std::unique_ptr<CachedPlanHolder<CachedPlanType>> cachedPlanHolder;
+        std::unique_ptr<CachedPlanHolder<CachedPlanType, DebugInfoType>> cachedPlanHolder;
     };
 
     /**
@@ -300,16 +304,17 @@ public:
      *
      * If the mapping was set successfully, returns Status::OK(), even if it evicted another entry.
      */
-    Status set(const KeyType& key,
-               std::unique_ptr<CachedPlanType> cachedPlan,
-               std::unique_ptr<plan_ranker::PlanRankingDecision> why,
-               Date_t now,
-               boost::optional<double> worksGrowthCoefficient = boost::none,
-               const PlanCacheCallbacks<KeyType, CachedPlanType>* callbacks = nullptr) {
-        invariant(why);
+    Status set(
+        const KeyType& key,
+        std::unique_ptr<CachedPlanType> cachedPlan,
+        const plan_ranker::PlanRankingDecision& why,
+        Date_t now,
+        DebugInfoType debugInfo,
+        boost::optional<double> worksGrowthCoefficient = boost::none,
+        const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks = nullptr) {
         invariant(cachedPlan);
 
-        if (why->scores.size() != why->candidateOrder.size()) {
+        if (why.scores.size() != why.candidateOrder.size()) {
             return Status(ErrorCodes::BadValue,
                           "number of scores in decision must match viable candidates");
         }
@@ -322,7 +327,7 @@ public:
                                          return calculateNumberOfReads(
                                              details.candidatePlanStats[0].get());
                                      }},
-            why->stats);
+            why.stats);
 
         auto partition = _partitionedCache->lockOnePartition(key);
         auto [queryHash, planCacheKey, isNewEntryActive, shouldBeCreated] = [&]() {
@@ -364,14 +369,13 @@ public:
             return Status::OK();
         }
 
-        auto newEntry(Entry::create(std::move(why),
-                                    std::move(cachedPlan),
+        auto newEntry(Entry::create(std::move(cachedPlan),
                                     queryHash,
                                     planCacheKey,
                                     now,
                                     isNewEntryActive,
                                     newWorks,
-                                    callbacks));
+                                    std::move(debugInfo)));
 
         partition->add(key, newEntry.release());
         return Status::OK();
@@ -420,14 +424,16 @@ public:
 
         auto state = entry.getValue()->isActive ? CacheEntryState::kPresentActive
                                                 : CacheEntryState::kPresentInactive;
-        return {state, std::make_unique<CachedPlanHolder<CachedPlanType>>(*entry.getValue())};
+        return {
+            state,
+            std::make_unique<CachedPlanHolder<CachedPlanType, DebugInfoType>>(*entry.getValue())};
     }
 
     /**
      * If the cache entry exists and is active, return a CachedSolution. If the cache entry is
      * inactive, log a message and return a nullptr. If no cache entry exists, return a nullptr.
      */
-    std::unique_ptr<CachedPlanHolder<CachedPlanType>> getCacheEntryIfActive(
+    std::unique_ptr<CachedPlanHolder<CachedPlanType, DebugInfoType>> getCacheEntryIfActive(
         const KeyType& key) const {
         auto res = get(key);
         if (res.state == CacheEntryState::kPresentInactive) {
@@ -445,7 +451,6 @@ public:
     void remove(const KeyType& key) {
         _partitionedCache->erase(key);
     }
-
 
     /**
      * Remove all the entries for keys for which the predicate returns true. Return the number of
@@ -567,11 +572,12 @@ private:
      * - We should create a new entry
      * - The new entry should be marked 'active'
      */
-    NewEntryState getNewEntryState(const KeyType& key,
-                                   Entry* oldEntry,
-                                   size_t newWorks,
-                                   double growthCoefficient,
-                                   const PlanCacheCallbacks<KeyType, CachedPlanType>* callbacks) {
+    NewEntryState getNewEntryState(
+        const KeyType& key,
+        Entry* oldEntry,
+        size_t newWorks,
+        double growthCoefficient,
+        const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks) {
         NewEntryState res;
         if (!oldEntry) {
             if (callbacks) {

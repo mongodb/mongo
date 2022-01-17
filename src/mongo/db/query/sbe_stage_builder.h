@@ -267,6 +267,10 @@ struct PlanStageData {
     // metrics, the stats are cached in here.
     std::unique_ptr<sbe::PlanStageStats> savedStatsOnEarlyExit{nullptr};
 
+    // Stores plan cache entry information used as debug information or for "explain" purpose.
+    // Note that 'debugInfo' is present only if this PlanStageData is recovered from the plan cache.
+    std::unique_ptr<plan_cache_debug_info::DebugInfoSBE> debugInfo;
+
 private:
     // This copy function copies data from 'other' but will not create a copy of its
     // RuntimeEnvironment and CompileCtx.
@@ -281,6 +285,11 @@ private:
             savedStatsOnEarlyExit.reset(other.savedStatsOnEarlyExit->clone());
         } else {
             savedStatsOnEarlyExit.reset();
+        }
+        if (other.debugInfo) {
+            debugInfo = std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*other.debugInfo);
+        } else {
+            debugInfo.reset();
         }
     }
 };

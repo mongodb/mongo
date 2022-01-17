@@ -12,11 +12,6 @@
 load("jstests/libs/profiler.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
-
 var testDB = db.getSiblingDB("profile_find");
 assert.commandWorked(testDB.dropDatabase());
 var coll = testDB.getCollection("test");
@@ -118,19 +113,24 @@ for (i = 0; i < 20; ++i) {
 assert.neq(coll.findOne({a: 5, b: 15}), null);
 assert.neq(coll.findOne({a: 5, b: 15}), null);
 
-// Run a query with the same shape, but with different parameters. The plan cached for the
-// query above will perform poorly (since the selectivities are different) and we will be
-// forced to replan.
-assert.neq(coll.findOne({a: 15, b: 10}), null);
-profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+// Replanning is not supported yet for the SBE plan cache without auto-parameterization.
+//
+// TODO SERVER-61314: Remove this check together with removal of "featureFlagSbePlanCache".
+if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    // Run a query with the same shape, but with different parameters. The plan cached for the
+    // query above will perform poorly (since the selectivities are different) and we will be
+    // forced to replan.
+    assert.neq(coll.findOne({a: 15, b: 10}), null);
+    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
-assert.eq(profileObj.replanned, true, profileObj);
-assert(profileObj.hasOwnProperty('replanReason'), profileObj);
-assert(
-    profileObj.replanReason.match(
-        /cached plan was less efficient than expected: expected trial execution to take [0-9]+ (works|reads) but it took at least [0-9]+ (works|reads)/),
-    profileObj);
-assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
+    assert.eq(profileObj.replanned, true, profileObj);
+    assert(profileObj.hasOwnProperty('replanReason'), profileObj);
+    assert(
+        profileObj.replanReason.match(
+            /cached plan was less efficient than expected: expected trial execution to take [0-9]+ (works|reads) but it took at least [0-9]+ (works|reads)/),
+        profileObj);
+    assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
+}
 
 //
 // Confirm that query modifiers such as "hint" are in the profiler document.

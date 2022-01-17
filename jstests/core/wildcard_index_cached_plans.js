@@ -23,11 +23,6 @@ load('jstests/libs/fixture_helpers.js');      // For getPrimaryForNodeHostingDat
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
-
 const coll = db.wildcard_cached_plans;
 coll.drop();
 
@@ -43,30 +38,18 @@ for (let i = 0; i < 1000; i++) {
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 
 function getCacheEntryForQuery(query) {
+    const match = {
+        planCacheKey: getPlanCacheKeyFromShape({query: query, collection: coll, db: db})
+    };
     const aggRes = FixtureHelpers.getPrimaryForNodeHostingDatabase(db)
                        .getCollection(coll.getFullName())
-                       .aggregate([
-                           {$planCacheStats: {}},
-                           {$match: {createdFromQuery: {query: query, sort: {}, projection: {}}}}
-                       ])
+                       .aggregate([{$planCacheStats: {}}, {$match: match}])
                        .toArray();
     assert.lte(aggRes.length, 1);
     if (aggRes.length > 0) {
         return aggRes[0];
     }
     return null;
-}
-
-function getPlanCacheKeyFromExplain(explainRes) {
-    const hash = FixtureHelpers.isMongos(db)
-        ? explainRes.queryPlanner.winningPlan.shards[0].planCacheKey
-        : explainRes.queryPlanner.planCacheKey;
-    assert.eq(typeof (hash), "string");
-    return hash;
-}
-
-function getPlanCacheKey(query) {
-    return getPlanCacheKeyFromExplain(assert.commandWorked(coll.explain().find(query).finish()));
 }
 
 const query = {
@@ -87,40 +70,39 @@ for (let i = 0; i < 2; i++) {
 const cacheEntry = getCacheEntryForQuery(query);
 assert.neq(cacheEntry, null);
 assert.eq(cacheEntry.isActive, true);
-// Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
-assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
+if (!checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
+    // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
+    assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-// In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN from
-// the query plan instead.
-const sbeIxScan = function() {
-    const cachedPlan = cacheEntry.cachedPlan;
-    if (!cachedPlan)
-        return null;
-    if (!cachedPlan.queryPlan)
-        return null;
-    return getPlanStage(cachedPlan.queryPlan, "IXSCAN");
-}();
+    // In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN
+    // from the query plan instead.
+    const sbeIxScan = function() {
+        const cachedPlan = cacheEntry.cachedPlan;
+        if (!cachedPlan)
+            return null;
+        if (!cachedPlan.queryPlan)
+            return null;
+        return getPlanStage(cachedPlan.queryPlan, "IXSCAN");
+    }();
 
-const classicIxScan = function() {
-    const execStats = cacheEntry.creationExecStats;
-    if (!execStats)
-        return null;
-    const elem = execStats[0];
-    if (!elem)
-        return null;
-    if (!elem.executionStages)
-        return null;
-    return getPlanStage(elem.executionStages, "IXSCAN");
-}();
-const expectedKeyPattern = {
-    "$_path": 1,
-    "b": 1
-};
-const classicKeyPatternMatch =
-    classicIxScan !== null && bsonWoCompare(classicIxScan.keyPattern, expectedKeyPattern) === 0;
-const sbeKeyPatternmatch =
-    sbeIxScan !== null && bsonWoCompare(sbeIxScan.keyPattern, expectedKeyPattern) === 0;
-engineSpecificAssertion(classicKeyPatternMatch, sbeKeyPatternmatch, db, tojson(cacheEntry));
+    const classicIxScan = function() {
+        const execStats = cacheEntry.creationExecStats;
+        if (!execStats)
+            return null;
+        const elem = execStats[0];
+        if (!elem)
+            return null;
+        if (!elem.executionStages)
+            return null;
+        return getPlanStage(elem.executionStages, "IXSCAN");
+    }();
+    const expectedKeyPattern = {"$_path": 1, "b": 1};
+    const classicKeyPatternMatch =
+        classicIxScan !== null && bsonWoCompare(classicIxScan.keyPattern, expectedKeyPattern) === 0;
+    const sbeKeyPatternmatch =
+        sbeIxScan !== null && bsonWoCompare(sbeIxScan.keyPattern, expectedKeyPattern) === 0;
+    engineSpecificAssertion(classicKeyPatternMatch, sbeKeyPatternmatch, db, tojson(cacheEntry));
+}
 
 // Run the query again. This time it should use the cached plan. We should get the same result
 // as earlier.
@@ -135,7 +117,8 @@ const queryWithBNull = {
 for (let i = 0; i < 2; i++) {
     assert.eq(coll.find({a: 1, b: null}).itcount(), 1000);
 }
-assert.neq(getPlanCacheKey(queryWithBNull), getPlanCacheKey(query));
+assert.neq(getPlanCacheKeyFromShape({query: queryWithBNull, collection: coll, db: db}),
+           getPlanCacheKeyFromShape({query: query, collection: coll, db: db}));
 
 // There should only have been one solution for the above query, so it would not get cached.
 assert.eq(getCacheEntryForQuery({a: 1, b: null}), null);
@@ -163,8 +146,8 @@ assert.eq(ixScans.length, 0);
 
 // Check that the shapes are different since the query which matches on a string will not
 // be eligible to use the b.$** index (since the index has a different collation).
-assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain),
-           getPlanCacheKeyFromExplain(queryWithStringExplain));
+assert.neq(getPlanCacheKeyFromExplain(queryWithoutStringExplain, db),
+           getPlanCacheKeyFromExplain(queryWithStringExplain, db));
 })();
 
 // Check that indexability discriminators work with partial wildcard indexes.
@@ -185,7 +168,7 @@ assert.eq(ixScans.length, 0);
 
 // Check that the shapes are different since the query which searches for a value not
 // included by the partial filter expression won't be eligible to use the $** index.
-assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain),
-           getPlanCacheKeyFromExplain(queryUnindexedExplain));
+assert.neq(getPlanCacheKeyFromExplain(queryIndexedExplain, db),
+           getPlanCacheKeyFromExplain(queryUnindexedExplain, db));
 })();
 })();

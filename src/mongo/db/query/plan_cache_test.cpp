@@ -39,6 +39,7 @@
 #include <memory>
 #include <ostream>
 
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -308,7 +309,13 @@ void addCacheEntryForShape(const CanonicalQuery& cq, PlanCache* planCache) {
     invariant(planCache);
     auto qs = getQuerySolutionForCaching();
 
-    ASSERT_OK(planCache->set(makeKey(cq), qs->cacheData->clone(), createDecision(1U), Date_t{}));
+    auto decision = createDecision(1U);
+    auto decisionPtr = decision.get();
+    ASSERT_OK(planCache->set(makeKey(cq),
+                             qs->cacheData->clone(),
+                             *decisionPtr,
+                             Date_t{},
+                             plan_cache_util::buildDebugInfo(cq, std::move(decision))));
 }
 
 TEST(PlanCacheTest, InactiveEntriesDisabled) {
@@ -320,10 +327,16 @@ TEST(PlanCacheTest, InactiveEntriesDisabled) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
+    auto decision = createDecision(1U);
+    auto decisionPtr = decision.get();
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an _active_ entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
@@ -382,9 +395,15 @@ TEST(PlanCacheTest, PlanCacheRemoveDeletesInactiveEntries) {
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
 
+    auto decision = createDecision(1U);
+    auto decisionPtr = decision.get();
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -401,9 +420,15 @@ TEST(PlanCacheTest, PlanCacheFlushDeletesInactiveEntries) {
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
 
+    auto decision = createDecision(1U);
+    auto decisionPtr = decision.get();
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -420,17 +445,29 @@ TEST(PlanCacheTest, AddActiveCacheEntry) {
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
 
+    auto decision = createDecision(1U, 20);
+    auto decisionPtr = decision.get();
     // Check if key is in cache before and after set().
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 20), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
 
+    decision = createDecision(1U, 10);
+    decisionPtr = decision.get();
     // Calling set() again, with a solution that had a lower works value should create an active
     // entry.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 10), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     ASSERT_EQUALS(planCache.size(), 1U);
 
@@ -445,14 +482,20 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
-    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+    auto decisionPtr = createDecision(1U, 10);
+    auto decision = decisionPtr.get();
+    PlanCacheLoggingCallbacks<PlanCacheKey,
+                              SolutionCacheData,
+                              mongo::plan_cache_debug_info::DebugInfo>
+        callbacks{*cq};
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
-                            createDecision(1U, 10),
+                            *decision,
                             Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
 
@@ -462,9 +505,15 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_EQ(entry->works, 10U);
     ASSERT_FALSE(entry->isActive);
 
+    decisionPtr = createDecision(1U, 50);
+    decision = decisionPtr.get();
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr))));
 
     // The entry should still be inactive. Its works should double though.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -472,9 +521,15 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
+    decisionPtr = createDecision(1U, 30);
+    decision = decisionPtr.get();
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 30), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr))));
 
     // The entry should still be inactive. Its works should have doubled again.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -482,12 +537,15 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_FALSE(entry->isActive);
     ASSERT_EQ(entry->works, 40U);
 
+    decisionPtr = createDecision(1U, 25);
+    decision = decisionPtr.get();
     // Calling set() again, with a solution that has a lower works value than what's currently in
     // the cache.
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
-                            createDecision(1U, 25),
+                            *decision,
                             Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
 
@@ -499,8 +557,8 @@ TEST(PlanCacheTest, WorksValueIncreases) {
 
     ASSERT(entry->debugInfo);
     ASSERT(entry->debugInfo->decision);
-    auto&& decision = entry->debugInfo->decision;
-    ASSERT_EQ(decision->getStats<PlanStageStats>().candidatePlanStats[0]->common.works, 25U);
+    auto&& decision1 = entry->debugInfo->decision;
+    ASSERT_EQ(decision1->getStats<PlanStageStats>().candidatePlanStats[0]->common.works, 25U);
     ASSERT_EQ(entry->works, 25U);
 
     ASSERT_EQUALS(planCache.size(), 1U);
@@ -519,10 +577,16 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
+    auto decision = createDecision(1U, 3);
+    auto decisionPtr = decision.get();
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 3), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -530,12 +594,18 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     ASSERT_EQ(entry->works, 3U);
     ASSERT_FALSE(entry->isActive);
 
+    decision = createDecision(1U, 50);
+    decisionPtr = decision.get();
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased. In this case, since nWorks is 3,
     // multiplying by the value 1.10 will give a value of 3 (static_cast<size_t>(1.1 * 3) == 3).
     // We check that the works value is increased 1 instead.
-    ASSERT_OK(
-        planCache.set(key, qs->cacheData->clone(), createDecision(1U, 50), Date_t{}, kWorksCoeff));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision)),
+                            kWorksCoeff));
 
     // The entry should still be inactive. Its works should increase by 1.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -554,10 +624,16 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
+    auto decision = createDecision(1U, 50);
+    auto decisionPtr = decision.get();
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -565,17 +641,29 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     ASSERT_EQ(entry->works, 50U);
     ASSERT_FALSE(entry->isActive);
 
+    decision = createDecision(1U, 20);
+    decisionPtr = decision.get();
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 20), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
+    decision = createDecision(1U, 100);
+    decisionPtr = decision.get();
     // Now call set() again, but with a solution that has a higher works value. This should be
     // a noop.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 100), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -588,26 +676,44 @@ TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
 
+    auto decision = createDecision(1U, 50);
+    auto decisionPtr = decision.get();
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 50U);
     ASSERT_FALSE(entry->isActive);
 
+    decision = createDecision(1U, 20);
+    decisionPtr = decision.get();
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 20), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_EQ(entry->works, 20U);
 
+    decision = createDecision(1U, 10);
+    decisionPtr = decision.get();
     // Now call set() again, with a solution that has a lower works value. The current active entry
     // should be overwritten.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 10), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -619,19 +725,31 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     auto qs = getQuerySolutionForCaching();
     auto key = makeKey(*cq);
+    auto decision = createDecision(1U, 50);
+    auto decisionPtr = decision.get();
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 50), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
 
     // After add, the planCache should have an inactive entry.
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_EQ(entry->works, 50U);
     ASSERT_FALSE(entry->isActive);
 
+    decision = createDecision(1U, 20);
+    decisionPtr = decision.get();
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), createDecision(1U, 20), Date_t{}));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decisionPtr,
+                            Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -653,16 +771,26 @@ TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
     {
         unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
         auto qs = getQuerySolutionForCaching();
-        ASSERT_OK(
-            planCache.set(makeKey(*cq), qs->cacheData->clone(), createDecision(1U, 5), Date_t{}));
+        auto decision = createDecision(1U, 5);
+        auto decisionPtr = decision.get();
+        ASSERT_OK(planCache.set(makeKey(*cq),
+                                qs->cacheData->clone(),
+                                *decisionPtr,
+                                Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     }
 
     // Create a second cache entry with 3 works.
     {
+        auto decision = createDecision(1U, 3);
         unique_ptr<CanonicalQuery> cq(canonicalize("{b: 1}"));
         auto qs = getQuerySolutionForCaching();
-        ASSERT_OK(
-            planCache.set(makeKey(*cq), qs->cacheData->clone(), createDecision(1U, 3), Date_t{}));
+        auto decisionPtr = decision.get();
+        ASSERT_OK(planCache.set(makeKey(*cq),
+                                qs->cacheData->clone(),
+                                *decisionPtr,
+                                Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
     }
 
     // Verify that the cache entries have been created.
@@ -966,14 +1094,15 @@ protected:
 
         uint32_t queryHash = ck.queryHash();
         uint32_t planCacheKey = queryHash;
-        auto entry = PlanCacheEntry::create<PlanCacheKey>(createDecision(1U),
-                                                          qs.cacheData->clone(),
-                                                          queryHash,
-                                                          planCacheKey,
-                                                          Date_t(),
-                                                          false /* isActive  */,
-                                                          0 /* works */,
-                                                          nullptr /* callbacks */);
+        auto decision = createDecision(1U);
+        auto entry =
+            PlanCacheEntry::create(qs.cacheData->clone(),
+                                   queryHash,
+                                   planCacheKey,
+                                   Date_t(),
+                                   false /* isActive  */,
+                                   0 /* works */,
+                                   plan_cache_util::buildDebugInfo(*scopedCq, std::move(decision)));
         CachedSolution cachedSoln(*entry);
 
         auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);
@@ -1651,43 +1780,58 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
     auto qs = getQuerySolutionForCaching();
     long long previousSize, originalSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     auto key = makeKey(*cq);
-    PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+    auto decisionPtr = createDecision(1U);
+    auto decision = decisionPtr.get();
+    PlanCacheLoggingCallbacks<PlanCacheKey,
+                              SolutionCacheData,
+                              mongo::plan_cache_debug_info::DebugInfo>
+        callbacks{*cq};
 
     // Verify that the plan cache size increases after adding new entry to cache.
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
-                            createDecision(1U),
+                            *decision,
                             Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
     ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
+    decisionPtr = createDecision(1U);
+    decision = decisionPtr.get();
     // Verify that trying to set the same entry won't change the plan cache size.
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
-                            createDecision(1U),
+                            *decision,
                             Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
     ASSERT_EQ(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
+    decisionPtr = createDecision(2U);
+    decision = decisionPtr.get();
     // Verify that the plan cache size increases after updating the same entry with more solutions.
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
-                            createDecision(2U),
+                            *decision,
                             Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
     ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
+    decisionPtr = createDecision(1U);
+    decision = decisionPtr.get();
     // Verify that the plan cache size decreases after updating the same entry with fewer solutions.
     previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     ASSERT_OK(planCache.set(key,
                             qs->cacheData->clone(),
-                            createDecision(1U),
+                            *decision,
                             Date_t{},
+                            plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                             boost::none /* worksGrowthCoefficient */,
                             &callbacks));
     ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
@@ -1697,14 +1841,17 @@ TEST(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
     long long sizeWithOneEntry = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     std::string queryString = "{a: 1, c: 1}";
     for (int i = 0; i < 5; ++i) {
+        decisionPtr = createDecision(1U);
+        decision = decisionPtr.get();
         // Update the field name in the query string so that plan cache creates a new entry.
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(makeKey(*query),
                                 qs->cacheData->clone(),
-                                createDecision(1U),
+                                *decision,
                                 Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
@@ -1746,15 +1893,21 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
     // Add entries until plan cache is full and verify that the size keeps increasing.
     std::string queryString = "{a: 1, c: 1}";
     for (size_t i = 0; i < kCacheSize; ++i) {
+        auto decisionPtr = createDecision(2U);
+        auto decision = decisionPtr.get();
         // Update the field name in the query string so that plan cache creates a new entry.
         queryString[1]++;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        PlanCacheLoggingCallbacks<PlanCacheKey,
+                                  SolutionCacheData,
+                                  mongo::plan_cache_debug_info::DebugInfo>
+            callbacks{*cq};
         ASSERT_OK(planCache.set(makeKey(*query),
                                 qs->cacheData->clone(),
-                                createDecision(2U),
+                                *decision,
                                 Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
@@ -1762,15 +1915,21 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
 
     // Verify that adding entry of same size as evicted entry wouldn't change the plan cache size.
     {
+        auto decisionPtr = createDecision(2U);
+        auto decision = decisionPtr.get();
         queryString = "{k: 1, c: 1}";
         cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
-        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        PlanCacheLoggingCallbacks<PlanCacheKey,
+                                  SolutionCacheData,
+                                  mongo::plan_cache_debug_info::DebugInfo>
+            callbacks{*cq};
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
         ASSERT_EQ(planCache.size(), kCacheSize);
         ASSERT_OK(planCache.set(key,
                                 qs->cacheData->clone(),
-                                createDecision(2U),
+                                *decision,
                                 Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
         ASSERT_EQ(planCache.size(), kCacheSize);
@@ -1780,30 +1939,43 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
     // Verify that adding entry with query bigger than the evicted entry's key should change the
     // plan cache size.
     {
+        auto decisionPtr = createDecision(2U);
+        auto decision = decisionPtr.get();
         queryString = "{k: 1, c: 1, extraField: 1}";
         unique_ptr<CanonicalQuery> queryBiggerKey(canonicalize(queryString));
-        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*queryBiggerKey};
+        PlanCacheLoggingCallbacks<PlanCacheKey,
+                                  SolutionCacheData,
+                                  mongo::plan_cache_debug_info::DebugInfo>
+            callbacks{*queryBiggerKey};
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.set(makeKey(*queryBiggerKey),
-                                qs->cacheData->clone(),
-                                createDecision(2U),
-                                Date_t{},
-                                boost::none /* worksGrowthCoefficient */,
-                                &callbacks));
+        ASSERT_OK(
+            planCache.set(makeKey(*queryBiggerKey),
+                          qs->cacheData->clone(),
+                          *decision,
+                          Date_t{},
+                          plan_cache_util::buildDebugInfo(*queryBiggerKey, std::move(decisionPtr)),
+                          boost::none /* worksGrowthCoefficient */,
+                          &callbacks));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
     // Verify that adding entry with query solutions larger than the evicted entry's query solutions
     // should increase the plan cache size.
     {
+        auto decisionPtr = createDecision(3U);
+        auto decision = decisionPtr.get();
         queryString = "{l: 1, c: 1}";
         cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
-        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        PlanCacheLoggingCallbacks<PlanCacheKey,
+                                  SolutionCacheData,
+                                  mongo::plan_cache_debug_info::DebugInfo>
+            callbacks{*cq};
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(key,
                                 qs->cacheData->clone(),
-                                createDecision(3U),
+                                *decision,
                                 Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
@@ -1812,14 +1984,20 @@ TEST(PlanCacheTest, PlanCacheSizeWithEviction) {
     // Verify that adding entry with query solutions smaller than the evicted entry's query
     // solutions should decrease the plan cache size.
     {
+        auto decisionPtr = createDecision(1U);
+        auto decision = decisionPtr.get();
         queryString = "{m: 1, c: 1}";
         cq = unique_ptr<CanonicalQuery>(canonicalize(queryString));
-        PlanCacheLoggingCallbacks<PlanCacheKey, SolutionCacheData> callbacks{*cq};
+        PlanCacheLoggingCallbacks<PlanCacheKey,
+                                  SolutionCacheData,
+                                  mongo::plan_cache_debug_info::DebugInfo>
+            callbacks{*cq};
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
         ASSERT_OK(planCache.set(key,
                                 qs->cacheData->clone(),
-                                createDecision(1U),
+                                *decision,
                                 Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decisionPtr)),
                                 boost::none /* worksGrowthCoefficient */,
                                 &callbacks));
         ASSERT_LT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
@@ -1840,17 +2018,27 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
     // Verify that adding entries to both plan caches will keep increasing the cache size.
     std::string queryString = "{a: 1, c: 1}";
     for (int i = 0; i < 5; ++i) {
+        auto decision = createDecision(1U);
+        auto decisionPtr = decision.get();
         // Update the field name in the query string so that plan cache creates a new entry.
         queryString[1] = 'b' + i;
         unique_ptr<CanonicalQuery> query(canonicalize(queryString));
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache1.set(makeKey(*query), qs->cacheData->clone(), createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache1.set(makeKey(*query),
+                                 qs->cacheData->clone(),
+                                 *decisionPtr,
+                                 Date_t{},
+                                 plan_cache_util::buildDebugInfo(*query, std::move(decision))));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
 
+        decision = createDecision(1U);
+        decisionPtr = decision.get();
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache2.set(makeKey(*query), qs->cacheData->clone(), createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache2.set(makeKey(*query),
+                                 qs->cacheData->clone(),
+                                 *decisionPtr,
+                                 Date_t{},
+                                 plan_cache_util::buildDebugInfo(*query, std::move(decision))));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1867,10 +2055,15 @@ TEST(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
     // Verify for scoped PlanCache object.
     long long sizeBeforeScopedPlanCache = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
     {
+        auto decision = createDecision(1U);
+        auto decisionPtr = decision.get();
         PlanCache planCache(5000);
         previousSize = PlanCacheEntry::planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache.set(makeKey(*cq), qs->cacheData->clone(), createDecision(1U), Date_t{}));
+        ASSERT_OK(planCache.set(makeKey(*cq),
+                                qs->cacheData->clone(),
+                                *decisionPtr,
+                                Date_t{},
+                                plan_cache_util::buildDebugInfo(*cq, std::move(decision))));
         ASSERT_GT(PlanCacheEntry::planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 

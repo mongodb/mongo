@@ -24,11 +24,6 @@ if (!checkSBEEnabled(db)) {
     return;
 }
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
-
 const testDb = db.getSiblingDB('cached_plan_trial_does_not_discard_work');
 assert.commandWorked(testDb.dropDatabase());
 const coll = testDb.getCollection('test');

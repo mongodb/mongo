@@ -17,6 +17,8 @@ const db = conn.getDB("test");
 const coll = db.plan_cache_replan_sort;
 coll.drop();
 
+// Replanning is not supported yet without auto-parameterization. TODO SERVER-61314: Remove this
+// check together with removal of "featureFlagSbePlanCache".
 if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
     jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
     MongoRunner.stopMongod(conn);

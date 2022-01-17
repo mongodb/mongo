@@ -16,52 +16,47 @@
 
 (function() {
 "use strict";
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
+load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 let coll = db.jstests_plan_cache_list_plans;
 coll.drop();
+
+const isSBEAndPlanCacheOn = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
 
 function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();
 }
 
 function getPlansForCacheEntry(query, sort, projection) {
-    const match = {
-        'createdFromQuery.query': query,
-        'createdFromQuery.sort': sort,
-        'createdFromQuery.projection': projection
-    };
-    const res = coll.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();
+    const keyHash = getPlanCacheKeyFromShape(
+        {query: query, projection: projection, sort: sort, collection: coll, db: db});
+
+    const res =
+        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
     // We expect exactly one matching cache entry.
     assert.eq(1, res.length, dumpPlanCacheState());
     return res[0];
 }
 
 function assertNoCacheEntry(query, sort, projection) {
-    const match = {
-        'createdFromQuery.query': query,
-        'createdFromQuery.sort': sort,
-        'createdFromQuery.projection': projection
-    };
+    const keyHash = getPlanCacheKeyFromShape(
+        {query: query, projection: projection, sort: sort, collection: coll, db: db});
+
     assert.eq(0,
-              coll.aggregate([{$planCacheStats: {}}, {$match: match}]).itcount(),
+              coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).itcount(),
               dumpPlanCacheState());
 }
 
 // Assert that timeOfCreation exists in the cache entry. The difference between the current time
 // and the time a plan was cached should not be larger than an hour.
 function checkTimeOfCreation(query, sort, projection, date) {
-    const match = {
-        'createdFromQuery.query': query,
-        'createdFromQuery.sort': sort,
-        'createdFromQuery.projection': projection
-    };
-    const res = coll.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();
+    const keyHash = getPlanCacheKeyFromShape(
+        {query: query, projection: projection, sort: sort, collection: coll, db: db});
+
+    const res =
+        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
     // We expect exactly one matching cache entry.
     assert.eq(1, res.length, res);
     const cacheEntry = res[0];
@@ -98,9 +93,12 @@ let entry = getPlansForCacheEntry({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1});
 assert(entry.hasOwnProperty('works'), entry);
 assert.eq(entry.isActive, false);
 
-// We expect that there were two candidate plans evaluated when the cache entry was created.
-assert(entry.hasOwnProperty("creationExecStats"), entry);
-assert.eq(2, entry.creationExecStats.length, entry);
+if (!isSBEAndPlanCacheOn) {
+    // Note that SBE plan cache entry does not include "creationExecStats". We expect that there
+    // were two candidate plans evaluated when the cache entry was created.
+    assert(entry.hasOwnProperty("creationExecStats"), entry);
+    assert.eq(2, entry.creationExecStats.length, entry);
+}
 
 // Test the queryHash and planCacheKey property by comparing entries for two different
 // query shapes.
@@ -132,15 +130,18 @@ entry = getPlansForCacheEntry({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1});
 assert(entry.hasOwnProperty('works'), entry);
 assert.eq(entry.isActive, true);
 
-// There should be the same number of canidate plan scores as candidate plans.
-assert.eq(entry.creationExecStats.length, entry.candidatePlanScores.length, entry);
+if (!isSBEAndPlanCacheOn) {
+    // Note that SBE plan cache entry does not include "creationExecStats". There should be the same
+    // number of candidate plan scores as candidate plans.
+    assert.eq(entry.creationExecStats.length, entry.candidatePlanScores.length, entry);
 
-// Scores should be greater than zero and sorted descending.
-for (let i = 0; i < entry.candidatePlanScores.length; ++i) {
-    const scores = entry.candidatePlanScores;
-    assert.gt(scores[i], 0, entry);
-    if (i > 0) {
-        assert.lte(scores[i], scores[i - 1], entry);
+    // Scores should be greater than zero and sorted descending.
+    for (let i = 0; i < entry.candidatePlanScores.length; ++i) {
+        const scores = entry.candidatePlanScores;
+        assert.gt(scores[i], 0, entry);
+        if (i > 0) {
+            assert.lte(scores[i], scores[i - 1], entry);
+        }
     }
 }
 })();

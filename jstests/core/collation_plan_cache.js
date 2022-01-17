@@ -11,13 +11,10 @@
 // ]
 (function() {
 'use strict';
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromExplain.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
-
+const isSbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
 var coll = db.collation_plan_cache;
 coll.drop();
 
@@ -25,8 +22,12 @@ function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();
 }
 
-function getPlansByQuery(match) {
-    return coll.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();
+/*
+ * A helper to get all the cache entries that match a specified 'keyHash' representing the
+ * planCacheKey of a cached plan.
+ */
+function getCacheEntriesByPlanCacheKey(keyHash) {
+    return coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
 }
 
 assert.commandWorked(coll.insert({a: 'foo', b: 5}));
@@ -41,62 +42,53 @@ assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: 'fr_CA'}}));
 
 // Run a query so that an entry is inserted into the cache.
 assert.commandWorked(
-    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}),
+    coll.runCommand('find', {filter: {a: 'foo', b: 5}, collation: {locale: 'en_US'}}),
     'find command failed');
 
 // The query shape should have been added.
 var shapes = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(1, shapes.length, 'unexpected cache size after running query');
-assert.eq(shapes[0].createdFromQuery.query, {a: 'foo', b: 5}, shapes);
-assert.eq(shapes[0].createdFromQuery.sort, {}, shapes);
-assert.eq(shapes[0].createdFromQuery.projection, {}, shapes);
-assert.eq(shapes[0].createdFromQuery.collation,
-          {
-              locale: 'en_US',
-              caseLevel: false,
-              caseFirst: 'off',
-              strength: 3,
-              numericOrdering: false,
-              alternate: 'non-ignorable',
-              maxVariable: 'punct',
-              normalization: false,
-              backwards: false,
-              version: '57.1'
-          },
-          shapes);
-
+if (!isSbePlanCacheEnabled) {
+    assert.eq(shapes[0].createdFromQuery.query, {a: 'foo', b: 5}, shapes);
+    assert.eq(shapes[0].createdFromQuery.sort, {}, shapes);
+    assert.eq(shapes[0].createdFromQuery.projection, {}, shapes);
+    assert.eq(shapes[0].createdFromQuery.collation,
+              {
+                  locale: 'en_US',
+                  caseLevel: false,
+                  caseFirst: 'off',
+                  strength: 3,
+                  numericOrdering: false,
+                  alternate: 'non-ignorable',
+                  maxVariable: 'punct',
+                  normalization: false,
+                  backwards: false,
+                  version: '57.1'
+              },
+              shapes);
+}
 coll.getPlanCache().clear();
 
 // Run a query so that an entry is inserted into the cache.
 assert.commandWorked(
-    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}));
+    coll.runCommand('find', {filter: {a: 'foo', b: 5}, collation: {locale: 'en_US'}}));
+let explainRes = coll.find({a: 'foo', b: 5}).collation({locale: 'en_US'}).explain();
 
 // The query should have cached plans.
 assert.lt(0,
-          getPlansByQuery({
-              'createdFromQuery.query': {a: 'foo', b: 5},
-              'createdFromQuery.collation.locale': 'en_US'
-          }).length,
+          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
           dumpPlanCacheState());
 
+explainRes = coll.find({a: 'foo', b: 5}).collation({locale: 'fr_CA'}).explain();
 // A query with a different collation should have no cached plans.
 assert.eq(0,
-          getPlansByQuery({
-              'createdFromQuery.query': {a: 'foo', b: 5},
-              'createdFromQuery.sort': {},
-              'createdFromQuery.projection': {},
-              'createdFromQuery.collation.locale': 'fr_CA'
-          }).length,
+          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
           dumpPlanCacheState());
 
+explainRes = coll.find({a: 'foo', b: 'bar'}).collation({locale: 'en_US'}).explain();
 // A query with different string locations should have no cached plans.
 assert.eq(0,
-          getPlansByQuery({
-              'createdFromQuery.query': {a: 'foo', b: 'bar'},
-              'createdFromQuery.sort': {},
-              'createdFromQuery.projection': {},
-              'createdFromQuery.collation': {locale: 'en_US'}
-          }).length,
+          getCacheEntriesByPlanCacheKey(getPlanCacheKeyFromExplain(explainRes, db)).length,
           dumpPlanCacheState());
 
 coll.getPlanCache().clear();
@@ -117,7 +109,7 @@ assert.throws(function() {
 
 // Run a query so that an entry is inserted into the cache.
 assert.commandWorked(
-    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: "en_US"}}),
+    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: 'en_US'}}),
     'find command failed');
 assert.eq(1, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
@@ -137,7 +129,7 @@ coll.getPlanCache().clearPlansByQuery(
 assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
 // 'collation' parameter is not allowed with 'query' parameter for 'planCacheClear'.
-assert.commandFailedWithCode(coll.runCommand('planCacheClear', {collation: {locale: "en_US"}}),
+assert.commandFailedWithCode(coll.runCommand('planCacheClear', {collation: {locale: 'en_US'}}),
                              ErrorCodes.BadValue);
 
 // Index filter commands.

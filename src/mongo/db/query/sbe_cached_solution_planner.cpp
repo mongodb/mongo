@@ -46,8 +46,6 @@ namespace mongo::sbe {
 CandidatePlans CachedSolutionPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
-    invariant(solutions.size() == 1);
-    invariant(solutions.size() == roots.size());
 
     // If the cached plan is accepted we'd like to keep the results from the trials even if there
     // are parts of agg pipelines being lowered into SBE, so we run the trial with the extended
@@ -72,7 +70,14 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                         std::move(roots[0].second),
                                                         maxReadsBeforeReplan);
     auto explainer = plan_explainer_factory::make(
-        candidate.root.get(), &candidate.data, candidate.solution.get());
+        candidate.root.get(),
+        &candidate.data,
+        candidate.solution.get(),
+        {},    /* rejectedCandidates */
+        false, /* isMultiPlan */
+        candidate.data.debugInfo
+            ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.debugInfo)
+            : nullptr);
 
     if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
@@ -151,6 +156,9 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCached
         std::move(onMetricReached), maxNumResults, maxTrialPeriodNumReads);
     candidate.root->attachToTrialRunTracker(tracker.get());
     executeCandidateTrial(&candidate, maxNumResults);
+
+    candidate.data.debugInfo = std::move(_debugInfo);
+
     return candidate;
 }
 

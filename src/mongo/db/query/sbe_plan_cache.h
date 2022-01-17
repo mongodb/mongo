@@ -80,6 +80,10 @@ public:
         return hash;
     }
 
+    const std::string& toString() const {
+        return _info.toString();
+    }
+
 private:
     const PlanCacheKeyInfo _info;
     const UUID _collectionUuid;
@@ -106,7 +110,20 @@ struct PlanCachePartitioner {
  */
 struct CachedSbePlan {
     CachedSbePlan(std::unique_ptr<sbe::PlanStage> root, stage_builder::PlanStageData data)
-        : root(std::move(root)), planStageData(std::move(data)) {}
+        : root(std::move(root)), planStageData(std::move(data)) {
+        tassert(5968206, "The RuntimeEnvironment should not be null", planStageData.env);
+        // TODO SERVER-61737: Once the RuntimeEnvironment is deep-copied, there's no need to copy
+        // collator.
+        //
+        // Always make "collator" owned before caching the plan. Because the cached plan should
+        // outlive collator's original owner.
+        auto collatorSlot = planStageData.env->getSlotIfExists("collator"_sd);
+        if (collatorSlot) {
+            auto collatorCopy = planStageData.env->getAccessor(*collatorSlot)->copyOrMoveValue();
+            planStageData.env->resetSlot(
+                *collatorSlot, collatorCopy.first, collatorCopy.second, true);
+        }
+    }
 
     std::unique_ptr<CachedSbePlan> clone() const {
         return std::make_unique<CachedSbePlan>(root->clone(), planStageData);
@@ -120,7 +137,7 @@ struct CachedSbePlan {
     stage_builder::PlanStageData planStageData;
 };
 
-using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan>;
+using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 
 struct BudgetEstimator {
     size_t operator()(const PlanCacheEntry& entry) {
@@ -131,6 +148,7 @@ struct BudgetEstimator {
 using PlanCache = PlanCacheBase<PlanCacheKey,
                                 CachedSbePlan,
                                 BudgetEstimator,
+                                plan_cache_debug_info::DebugInfoSBE,
                                 PlanCachePartitioner,
                                 PlanCacheKeyHasher>;
 

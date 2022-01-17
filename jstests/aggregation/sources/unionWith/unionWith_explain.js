@@ -43,6 +43,8 @@ const stagesIgnoredFields = [
 const mongosIgnoredFields = [
     "works",
     "needTime",
+    "queryHash",
+    "planCacheKey",
 ].concat(executionStatsIngoredFields, stagesIgnoredFields);
 
 const queryPlannerIgnoredFields = [

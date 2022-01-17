@@ -89,7 +89,6 @@ env.Library(
     source=[
         "classic_plan_cache.cpp",
         "plan_cache_callbacks.cpp",
-        "plan_cache_debug_info.cpp",
         "plan_cache_invalidator.cpp",
         "sbe_plan_cache.cpp",
     ],

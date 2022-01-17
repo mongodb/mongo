@@ -13,13 +13,10 @@
 // ]
 (function() {
 'use strict';
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
-    return;
-}
-
+const isSBEPlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache"]);
 var coll = db.jstests_plan_cache_shell_helpers;
 coll.drop();
 
@@ -83,15 +80,36 @@ assert.eq([{count: 4}], planCache.list([{$count: "count"}]), planCache.list());
 // Test that we can collect descriptions of all the queries that created cache entries using the
 // list() helper. Also verify that these are listed in order of most recently created to least
 // recently created.
-assert.eq(
-    [
-        {query: queryB, sort: {}, projection: {}},
-        {query: queryB, sort: sortC, projection: {}},
-        {query: queryB, sort: {}, projection: projectionB},
-        {query: queryB, sort: sortC, projection: projectionB}
-    ],
-    planCache.list([{$sort: {timeOfCreation: -1}}, {$replaceWith: "$createdFromQuery"}]),
-    planCache.list());
+if (isSBEPlanCacheEnabled) {
+    assert.eq(
+        [
+            {planCacheKey: getPlanCacheKeyFromShape({query: queryB, collection: coll, db: db})},
+            {
+                planCacheKey:
+                    getPlanCacheKeyFromShape({query: queryB, sort: sortC, collection: coll, db: db})
+            },
+            {
+                planCacheKey: getPlanCacheKeyFromShape(
+                    {query: queryB, projection: projectionB, collection: coll, db: db})
+            },
+            {
+                planCacheKey: getPlanCacheKeyFromShape(
+                    {query: queryB, projection: projectionB, sort: sortC, collection: coll, db: db})
+            },
+        ],
+        planCache.list([{$sort: {timeOfCreation: -1}}, {$project: {planCacheKey: 1}}]),
+        planCache.list());
+} else {
+    assert.eq(
+        [
+            {query: queryB, sort: {}, projection: {}},
+            {query: queryB, sort: sortC, projection: {}},
+            {query: queryB, sort: {}, projection: projectionB},
+            {query: queryB, sort: sortC, projection: projectionB}
+        ],
+        planCache.list([{$sort: {timeOfCreation: -1}}, {$replaceWith: "$createdFromQuery"}]),
+        planCache.list());
+}
 
 //
 // collection.getPlanCache().clearPlansByQuery
