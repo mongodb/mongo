@@ -203,7 +203,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     waitForAnyFailpointOnConfigNodes(0);
     const numChunksPost = findChunksUtil.countChunksForNs(st.config, coll3);
     jsTest.log("Number of chunks after merging " + numChunksPost);
-    assert.lt(numChunksPost, numChunksPrev);
+    assert.lte(numChunksPost, numChunksPrev);
     // Turn fail point off, let phase 3 run and complete
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", "off");
     assert.soon(function() {
@@ -215,7 +215,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     st.stopBalancer();
     const numChunksEnd = findChunksUtil.countChunksForNs(st.config, coll3);
     jsTest.log("Number of chunks after splitting " + numChunksEnd);
-    assert.gt(numChunksEnd, numChunksPost);
+    assert.gte(numChunksEnd, numChunksPost);
 }
 
 const collection4 = db[collName + collCounter];
