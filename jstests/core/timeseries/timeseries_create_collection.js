@@ -68,18 +68,4 @@ collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).curs
 jsTestLog('Checking listCollections result: ' + tojson(collections));
 assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
 assert(collections.find(entry => entry.name === coll.getName()));
-
-// Should fail to create a timeseries collection with enabled 'changeStreamPreAndPostImages'
-// option.
-coll.drop();
-assert.commandFailedWithCode(testDB.runCommand({
-    create: coll.getName(),
-    timeseries: {timeField: timeFieldName},
-    changeStreamPreAndPostImages: {enabled: true}
-}),
-                             [
-                                 ErrorCodes.InvalidOptions,
-                                 // TODO SERVER-58584: remove the error code.
-                                 5846901
-                             ]);
 })();
