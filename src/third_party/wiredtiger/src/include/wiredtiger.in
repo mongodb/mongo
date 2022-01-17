@@ -3803,10 +3803,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp)
 #define	WT_CACHE_FULL	(-31807)
 /*!
  * Conflict with a prepared update.
- * This error is generated when the application attempts to update an already
- * updated record which is in prepared state. An updated record will be in
- * prepared state, when the transaction that performed the update is in prepared
- * state.
+ * This error is generated when the application attempts to read an updated
+ * record which is part of a transaction that has been prepared but not yet
+ * resolved.
  */
 #define	WT_PREPARE_CONFLICT	(-31808)
 /*!

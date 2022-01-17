@@ -584,7 +584,7 @@ prepare_transaction(TINFO *tinfo)
 
 /*
  * OP_FAILED --
- *	General error handling.
+ *	Error handling.
  */
 #define OP_FAILED(notfound_ok)                                                                \
     do {                                                                                      \
@@ -593,18 +593,6 @@ prepare_transaction(TINFO *tinfo)
             goto rollback;                                                                    \
         testutil_assert(                                                                      \
           (notfound_ok && ret == WT_NOTFOUND) || ret == WT_CACHE_FULL || ret == WT_ROLLBACK); \
-    } while (0)
-
-/*
- * Rollback updates returning prepare-conflict, they're unlikely to succeed unless the prepare
- * aborts. Reads wait out the error, so it's unexpected.
- */
-#define READ_OP_FAILED(notfound_ok) OP_FAILED(notfound_ok)
-#define WRITE_OP_FAILED(notfound_ok)    \
-    do {                                \
-        if (ret == WT_PREPARE_CONFLICT) \
-            ret = WT_ROLLBACK;          \
-        OP_FAILED(notfound_ok);         \
     } while (0)
 
 /*
@@ -815,7 +803,7 @@ ops(void *arg)
                 positioned = true;
                 SNAP_TRACK(tinfo, READ);
             } else
-                READ_OP_FAILED(true);
+                OP_FAILED(true);
         }
 
         /*
@@ -837,7 +825,7 @@ ops(void *arg)
                 positioned = true;
                 __wt_yield(); /* Encourage races */
             } else
-                WRITE_OP_FAILED(true);
+                OP_FAILED(true);
         }
 
         /* Perform the operation. */
@@ -867,7 +855,7 @@ ops(void *arg)
                 ++tinfo->insert;
                 SNAP_TRACK(tinfo, INSERT);
             } else
-                WRITE_OP_FAILED(false);
+                OP_FAILED(false);
             break;
         case MODIFY:
             ++tinfo->update;
@@ -887,7 +875,7 @@ ops(void *arg)
                 positioned = true;
                 SNAP_TRACK(tinfo, MODIFY);
             } else
-                WRITE_OP_FAILED(true);
+                OP_FAILED(true);
             break;
         case READ:
             ++tinfo->search;
@@ -896,7 +884,7 @@ ops(void *arg)
                 positioned = true;
                 SNAP_TRACK(tinfo, READ);
             } else
-                READ_OP_FAILED(true);
+                OP_FAILED(true);
             break;
         case REMOVE:
             switch (table->type) {
@@ -916,7 +904,7 @@ ops(void *arg)
                  */
                 SNAP_TRACK(tinfo, REMOVE);
             } else
-                WRITE_OP_FAILED(true);
+                OP_FAILED(true);
             break;
         case TRUNCATE:
             /*
@@ -983,7 +971,7 @@ ops(void *arg)
                 ++tinfo->truncate;
                 SNAP_TRACK(tinfo, TRUNCATE);
             } else
-                WRITE_OP_FAILED(false);
+                OP_FAILED(false);
             break;
         case UPDATE:
 update_instead_of_chosen_op:
@@ -1001,7 +989,7 @@ update_instead_of_chosen_op:
                 positioned = true;
                 SNAP_TRACK(tinfo, UPDATE);
             } else
-                WRITE_OP_FAILED(false);
+                OP_FAILED(false);
             break;
         }
 
@@ -1020,7 +1008,7 @@ update_instead_of_chosen_op:
                 if ((ret = nextprev(tinfo, next)) == 0)
                     continue;
 
-                READ_OP_FAILED(true);
+                OP_FAILED(true);
                 break;
             }
         }
@@ -1055,7 +1043,7 @@ update_instead_of_chosen_op:
         prepared = false;
         if (GV(OPS_PREPARE) && mmrand(&tinfo->rnd, 1, 10) == 1) {
             if ((ret = prepare_transaction(tinfo)) != 0)
-                WRITE_OP_FAILED(false);
+                OP_FAILED(false);
 
             __wt_yield(); /* Encourage races */
             prepared = true;

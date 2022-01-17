@@ -56,9 +56,8 @@ thread fails to do eviction within cache_max_wait_ms. The operation may be retri
 is in progress, it should be rolled back and the operation retried in a new transaction.
 
 @par <code>WT_PREPARE_CONFLICT</code>
-This error is generated when the application attempts to update an already updated record which is
-in prepared state. An updated record will be in prepared state, when the transaction that performed
-the update is in prepared state.
+This error is generated when the application attempts to read an updated record which is part of a
+transaction that has been prepared but not yet resolved.
 
 @par <code>WT_TRY_SALVAGE</code>
 This error is generated when corruption is detected in an on-disk file. During normal operations,
