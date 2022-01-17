@@ -113,6 +113,17 @@ const runSuccessfulCreate = function(db, coll, createOptions) {
     coll.drop();
 };
 
+const validateCreatedCollectionNonClustered = function(db, collName) {
+    ClusteredCollectionUtil.validateListCollectionsNotClustered(db, collName);
+    ClusteredCollectionUtil.validateListIndexesNonClustered(db, collName);
+};
+
+const runSuccessfulCreateNonClustered = function(db, coll, createOptions) {
+    assert.commandWorked(db.createCollection(coll.getName(), createOptions));
+    validateCreatedCollectionNonClustered(db, coll.getName(), createOptions);
+    coll.drop();
+};
+
 const validateClusteredCappedCollections = function(db, coll, clusterKey) {
     runSuccessfulCreate(
         db,
@@ -169,6 +180,13 @@ const nonReplicatedColl = nonReplicatedDB.coll;
 
 replicatedColl.drop();
 nonReplicatedColl.drop();
+
+runSuccessfulCreateNonClustered(
+    replicatedDB, replicatedColl, {clusteredIndex: false, expireAfterSeconds: 5});
+runSuccessfulCreateNonClustered(
+    nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false, expireAfterSeconds: 5});
+runSuccessfulCreateNonClustered(
+    nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false, expireAfterSeconds: 5});
 
 runSuccessfulCreate(replicatedDB, replicatedColl, {clusteredIndex: {key: {_id: 1}, unique: true}});
 runSuccessfulCreate(

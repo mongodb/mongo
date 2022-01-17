@@ -41,6 +41,21 @@ var ClusteredCollectionUtil = class {
         return fullCreateOptions;
     }
 
+    static validateListCollectionsNotClustered(db, collName) {
+        const listColls =
+            assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+        const listCollsOptions = listColls.cursor.firstBatch[0].options;
+        assert.eq(
+            listCollsOptions.clusteredIndex, undefined, "Expected clusteredIndex to be undefined");
+    }
+
+    static validateListIndexesNonClustered(db, collName) {
+        const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
+        assert.eq(listIndexes.cursor.firstBatch[0].clustered || false,
+                  false,
+                  "Index had clustering in it when it shouldn't");
+    }
+
     // Provided the createOptions used to create the collection, validates the output from
     // listCollections contains the correct information about the clusteredIndex.
     static validateListCollections(db, collName, createOptions) {
