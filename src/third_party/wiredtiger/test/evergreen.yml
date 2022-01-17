@@ -2145,12 +2145,13 @@ tasks:
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DENABLE_STRICT=1 -DHAVE_FTRUNCATE=0
-      - func: "csuite smoke test"
-        vars:
-          test_name: random_abort
       - func: "csuite test"
         vars:
           test_name: truncated_log
+      - func: "csuite smoke test"
+        vars:
+          test_args: cmake_build/test/csuite/random_abort/test_random_abort
+          test_binary: random_abort
       - func: "csuite smoke test"
         vars:
           test_args: -b cmake_build/test/csuite/timestamp_abort/test_timestamp_abort
