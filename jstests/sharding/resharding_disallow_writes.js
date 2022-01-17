@@ -71,6 +71,7 @@ reshardingTest.withReshardingInBackground(
             assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
             jsTestLog("Attempting collMod");
+
             assert.commandFailedWithCode(
                 // The collMod is serialized with the resharding command, so we explicitly add an
                 // timeout to the command so that it doesn't get blocked and timeout the test.
@@ -83,6 +84,10 @@ reshardingTest.withReshardingInBackground(
                 ErrorCodes.ReshardCollectionInProgress);
 
             jsTestLog("Completed operations");
+        },
+        afterReshardingFn: (tempNS) => {
+            jsTestLog("Join possible ongoing collMod command");
+            assert.commandWorked(sourceCollection.runCommand("collMod"));
         }
     });
 

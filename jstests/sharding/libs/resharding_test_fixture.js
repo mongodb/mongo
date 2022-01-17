@@ -377,13 +377,18 @@ var ReshardingTest = class {
      * @param postDecisionPersistedFn - a function for evaluating addition assertions after
      * the decision has been persisted, but before the resharding operation finishes and returns
      * to the client.
+     *
+     * @param afterReshardingFn - a function that will be called after the resharding operation
+     * finishes but before checking the the state post resharding. By the time afterReshardingFn
+     * is called the temporary resharding collection will either have been dropped or renamed.
      */
     withReshardingInBackground({newShardKeyPattern, newChunks},
                                duringReshardingFn = (tempNs) => {},
                                {
                                    expectedErrorCode = ErrorCodes.OK,
                                    postCheckConsistencyFn = (tempNs) => {},
-                                   postDecisionPersistedFn = () => {}
+                                   postDecisionPersistedFn = () => {},
+                                   afterReshardingFn = () => {}
                                } = {}) {
         this._startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
                                                                 expectedErrorCode);
@@ -396,7 +401,8 @@ var ReshardingTest = class {
         this._callFunctionSafely(() => duringReshardingFn(this._tempNs));
         this._checkConsistencyAndPostState(expectedErrorCode,
                                            () => postCheckConsistencyFn(this._tempNs),
-                                           () => postDecisionPersistedFn());
+                                           () => postDecisionPersistedFn(),
+                                           () => afterReshardingFn());
     }
 
     /** @private */
@@ -500,7 +506,8 @@ var ReshardingTest = class {
     /** @private */
     _checkConsistencyAndPostState(expectedErrorCode,
                                   postCheckConsistencyFn = () => {},
-                                  postDecisionPersistedFn = () => {}) {
+                                  postDecisionPersistedFn = () => {},
+                                  afterReshardingFn = () => {}) {
         let performCorrectnessChecks = true;
         if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
@@ -566,6 +573,7 @@ var ReshardingTest = class {
             expectedErrorCode: expectedErrorCode
         });
 
+        afterReshardingFn();
         this._checkPostState(expectedErrorCode);
     }
 

@@ -167,10 +167,15 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                                 << "Cannot update granularity of a sharded time-series collection.",
                             !hasTimeSeriesGranularityUpdate(_doc.getCollModRequest()));
                     }
+                    _doc.setCollUUID(
+                        sharding_ddl_util::getCollectionUUID(opCtx, nss(), true /* allowViews */));
 
-                    if (_recoveredFromDisk) {
+                    sharding_ddl_util::stopMigrations(opCtx, nss(), _doc.getCollUUID());
+
+                    if (!_firstExecution) {
                         _performNoopRetryableWriteOnParticipants(opCtx, **executor);
                     }
+
                     _doc = _updateSession(opCtx, _doc);
                     const OperationSessionInfo osi = getCurrentSession(_doc);
 
@@ -201,6 +206,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
                     }
                     _result = builder.obj();
+                    sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
                 } else {
                     CollMod cmd(nss());
                     cmd.setCollModRequest(_doc.getCollModRequest());
@@ -228,6 +234,15 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             "Error running collMod",
                             "namespace"_attr = nss(),
                             "error"_attr = redact(status));
+                // If we have the collection UUID set, this error happened in a sharded collection,
+                // we should restore the migrations.
+                if (_doc.getCollUUID()) {
+                    auto opCtxHolder = cc().makeOperationContext();
+                    auto* opCtx = opCtxHolder.get();
+                    getForwardableOpMetadata().setOn(opCtx);
+
+                    sharding_ddl_util::resumeMigrations(opCtx, nss(), _doc.getCollUUID());
+                }
             }
             return status;
         });

@@ -116,6 +116,27 @@ if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shar
         assert(currOp[0].command.hasOwnProperty('allowMigrations'));
         assert.eq(true, currOp[0].command.allowMigrations);
     }
+
+    {
+        jsTestLog('Check collmod shows in current op');
+
+        let ddlOpThread = new Thread((mongosConnString, db, coll, nss) => {
+            let mongos = new Mongo(mongosConnString);
+            mongos.getCollection(nss).runCommand(
+                {createIndexes: coll, indexes: [{key: {c: 1}, name: "c_1"}]});
+            mongos.getDB(db).runCommand({collMod: coll, validator: {}});
+        }, st.s0.host, kDbName, kCollectionName, nss);
+
+        let currOp = getCurrentOpOfDDL(ddlOpThread, 'CollModCoordinator');
+
+        // There must be one operation running with the appropiate ns.
+        assert.eq(1, currOp.length);
+        assert.eq(nss, currOp[0].ns);
+        assert(currOp[0].hasOwnProperty('command'));
+        jsTestLog(tojson(currOp[0].command));
+        assert(currOp[0].command.hasOwnProperty('validator'));
+        assert.docEq({}, currOp[0].command.validator);
+    }
 }
 
 {

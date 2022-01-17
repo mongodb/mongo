@@ -61,3 +61,7 @@ structs:
             collModRequest:
                 type: CollModRequest
                 description: "Initial collMod request."
+            collUUID:
+                type: uuid
+                description: "Collection uuid."
+                optional: true

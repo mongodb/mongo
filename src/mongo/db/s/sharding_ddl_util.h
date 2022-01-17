@@ -138,16 +138,28 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
 /**
  * Stops ongoing migrations and prevents future ones to start for the given nss.
  * If expectedCollectionUUID is set and doesn't match that of that collection, then this is a no-op.
+ * If expectedCollectionUUID is not set, no UUID check will be performed before stopping migrations.
  */
 void stopMigrations(OperationContext* opCtx,
                     const NamespaceString& nss,
                     const boost::optional<UUID>& expectedCollectionUUID);
 
+/**
+ * Resume migrations and balancing rounds for the given nss.
+ * If expectedCollectionUUID is set and doesn't match that of the collection, then this is a no-op.
+ * If expectedCollectionUUID is not set, no UUID check will be performed before resuming migrations.
+ */
+void resumeMigrations(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const boost::optional<UUID>& expectedCollectionUUID);
+
 /*
  * Returns the UUID of the collection (if exists) using the catalog. It does not provide any locking
- *guarantees.
+ * guarantees after the call.
  **/
-boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss);
+boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
+                                        const NamespaceString& nss,
+                                        bool allowViews = false);
 
 /*
  * Performs a noop retryable write on the given shards using the session and txNumber specified in
