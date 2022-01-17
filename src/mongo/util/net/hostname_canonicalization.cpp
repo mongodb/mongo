@@ -48,7 +48,8 @@
 
 namespace mongo {
 
-std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicalizationMode mode) {
+StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
+                                                  HostnameCanonicalizationMode mode) {
 #ifndef _WIN32
     using shim_char = char;
     using shim_addrinfo = struct addrinfo;
@@ -90,14 +91,17 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     int err;
     auto nativeHostName = shim_toNativeString(hostName.c_str());
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
+        auto errorStr = getAddrInfoStrError(err);
         LOGV2_DEBUG(23170,
                     3,
                     "Failed to obtain address information for host {hostName}: {error}",
                     "Failed to obtain address information for host",
                     "hostName"_attr = hostName,
-                    "error"_attr = getAddrInfoStrError(err));
-        return results;
+                    "error"_attr = errorStr);
+
+        return Status(ErrorCodes::BadValue, errorStr);
     }
+
     const ScopeGuard guard(shim_freeaddrinfo);
 
     if (mode == HostnameCanonicalizationMode::kForward) {

@@ -32,6 +32,7 @@
 
 #include "mongo/db/process_health/fault_manager.h"
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/process_health/health_observer_mock.h"
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -136,6 +137,8 @@ public:
             _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
             _svcCtx->setPreciseClockSource(std::make_unique<ClockSourceMock>());
             _svcCtx->setTickSource(std::make_unique<TickSourceMock<Milliseconds>>());
+            _svcCtx->registerClientObserver(
+                std::make_unique<LockerNoopClientObserverWithReplacementPolicy>());
             advanceTime(Seconds(100));
         }
     }

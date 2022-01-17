@@ -75,8 +75,10 @@ void reportStatus(OperationContext* opCtx,
     // balancer is never active in mongos. Here for backwards compatibility only.
     mType.setWaiting(true);
     mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
-    mType.setAdvisoryHostFQDNs(
-        getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse));
+    auto statusWith = getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse);
+    if (statusWith.isOK()) {
+        mType.setAdvisoryHostFQDNs(statusWith.getValue());
+    }
 
     try {
         // Field "created" should not be updated every time.

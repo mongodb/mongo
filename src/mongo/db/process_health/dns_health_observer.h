@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,36 +26,40 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include "mongo/base/status_with.h"
+#include "mongo/db/process_health/health_observer_base.h"
+#include "mongo/platform/random.h"
 
 namespace mongo {
+namespace process_health {
+class DnsHealthObserver final : public HealthObserverBase {
+public:
+    DnsHealthObserver(ServiceContext* svcCtx)
+        : HealthObserverBase(svcCtx), _random(PseudoRandom(SecureRandom().nextInt64())){};
 
-/**
- * DNS canonicalization converts a hostname into another potentially more globally useful hostname.
- *
- * This involves issuing some combination of IP and name lookups.
- * This enum controls which canonicalization process a client will perform on a
- * hostname it is canonicalizing.
- */
-enum class HostnameCanonicalizationMode {
-    kNone,              // Perform no canonicalization at all
-    kForward,           // Perform a DNS lookup on the hostname, follow CNAMEs to find the A record
-    kForwardAndReverse  // Forward resolve to get an IP, then perform reverse lookup on it
+protected:
+    FaultFacetType getType() const override {
+        return FaultFacetType::kDns;
+    }
+
+    Milliseconds healthCheckJitter() const override {
+        return Milliseconds(5);
+    }
+
+    Milliseconds getObserverTimeout() const override {
+        return Milliseconds(Seconds(10));
+    }
+
+    bool isConfigured() const override {
+        return true;
+    }
+
+    Future<HealthCheckStatus> periodicCheckImpl(
+        PeriodicHealthCheckContext&& periodicCheckContext) noexcept override;
+
+private:
+    mutable PseudoRandom _random;
 };
-
-/**
- *  Returns zero or more fully qualified hostnames associated with the provided hostname.
- *
- *  May return an empty vector if no FQDNs can be determined, or if the underlying
- *  implementation returns an error. The returned information is advisory only.
- */
-StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
-                                                  HostnameCanonicalizationMode mode);
-
+}  // namespace process_health
 }  // namespace mongo
