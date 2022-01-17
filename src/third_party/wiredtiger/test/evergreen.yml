@@ -771,20 +771,14 @@ tasks:
           posix_configure_flags: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION=8 -DCLANG_CXX_VERSION=8 -DCMAKE_C_FLAGS="-ggdb" -DWITH_PIC=1
 
   - name: make-check-test
-    depends_on:
-      - name: compile
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check all"
 
   - name: make-check-linux-no-ftruncate-test
-    depends_on:
-      - name: compile-linux-no-ftruncate
     commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-linux-no-ftruncate
+      - func: "get project"
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DHAVE_DIAGNOSTIC=1 -DENABLE_STRICT=1 -DENABLE_PYTHON=1 -DHAVE_FTRUNCATE=0
@@ -794,10 +788,8 @@ tasks:
 
   - name: lang-python-test
     tags: ["pull_request", "python"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -805,10 +797,8 @@ tasks:
 
   - name: examples-c-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -816,12 +806,8 @@ tasks:
 
   - name: examples-c-production-disable-shared-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile-production-disable-shared
     commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-production-disable-shared
+      - func: "get project"
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DENABLE_STRICT=1 -DENABLE_SHARED=0 -DENABLE_STATIC=1
@@ -831,12 +817,8 @@ tasks:
 
   - name: examples-c-production-disable-static-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile-production-disable-static
     commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-production-disable-static
+      - func: "get project"
       - func: "compile wiredtiger"
         vars:
           posix_configure_flags: -DENABLE_SHARED=1 -DENABLE_STATIC=0 -DENABLE_STRICT=1 -DHAVE_BUILTIN_EXTENSION_LZ4=1 -DHAVE_BUILTIN_EXTENSION_SNAPPY=1 -DHAVE_BUILTIN_EXTENSION_ZLIB=1 -DHAVE_BUILTIN_EXTENSION_ZSTD=1 -DENABLE_PYTHON=1
@@ -846,10 +828,8 @@ tasks:
 
   - name: bloom-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -857,10 +837,8 @@ tasks:
 
   - name: checkpoint-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -868,10 +846,8 @@ tasks:
 
   - name: cursor-order-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -879,10 +855,8 @@ tasks:
 
   - name: fops-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -890,10 +864,8 @@ tasks:
 
   - name: format-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -901,10 +873,8 @@ tasks:
 
   - name: huge-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -912,10 +882,8 @@ tasks:
 
   - name: manydbs-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -923,10 +891,8 @@ tasks:
 
   - name: packing-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -934,10 +900,8 @@ tasks:
 
   - name: readonly-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -945,10 +909,8 @@ tasks:
 
   - name: salvage-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -956,10 +918,8 @@ tasks:
 
   - name: thread-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -967,10 +927,8 @@ tasks:
 
   - name: bench-wtperf-test
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "make check directory"
         vars:
@@ -1770,10 +1728,8 @@ tasks:
             test/evergreen/import_compatibility_test.sh
 
   - name: generate-datafile-little-endian
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "format test"
         vars:
@@ -1822,10 +1778,8 @@ tasks:
       - func: "verify wt datafiles"
 
   - name: generate-datafile-big-endian
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "format test"
         vars:
@@ -1909,10 +1863,8 @@ tasks:
   # us to perform multiple test runs while ensuring a long-running config does
   # not result in an Evergreen test timeout failure.
   - name: linux-directio
-    depends_on:
-    - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - func: "format test script"
         vars:
@@ -1931,12 +1883,8 @@ tasks:
   #         extra_args: -C "direct_io=[data]"
 
   - name: format-linux-no-ftruncate
-    depends_on:
-    - name: compile-linux-no-ftruncate
     commands:
-      - func: "fetch artifacts"
-        vars:
-          dependent_task: compile-linux-no-ftruncate
+      - func: "get project"
       - func: "compile wiredtiger no linux ftruncate"
       - func: "format test"
         vars:
@@ -1970,10 +1918,8 @@ tasks:
       - func: "update wiredtiger docs"
 
   - name: syscall-linux
-    depends_on:
-    - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - func: "compile wiredtiger"
       - command: shell.exec
         params:
