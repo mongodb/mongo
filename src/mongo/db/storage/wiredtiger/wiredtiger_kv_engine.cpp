@@ -2588,4 +2588,9 @@ void WiredTigerKVEngine::dump() const {
     }
 }
 
+Status WiredTigerKVEngine::reconfigureLogging() {
+    auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
+    return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()));
+}
+
 }  // namespace mongo

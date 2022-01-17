@@ -41,6 +41,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/commands/parse_log_component_settings.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
@@ -343,15 +344,6 @@ public:
                 return false;
             }
 
-            // WiredTiger component verbosity levels cannot be changed at runtime.
-            if (parameterName == "logComponentVerbosity") {
-                const BSONObj obj = parameter.Obj();
-                if (obj.hasField("storage") && obj.getObjectField("storage").hasField("wt")) {
-                    errmsg = "Cannot set log component verbosity parameter storage.wt at runtime.";
-                    return false;
-                }
-            }
-
             if (parameterName == "requireApiVersion" && parameter.trueValue() &&
                 (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
                  serverGlobalParams.clusterRole == ClusterRole::ShardServer)) {
@@ -383,6 +375,15 @@ public:
                       "newValue"_attr = redact(parameter.toString(false)),
                       "error"_attr = redact(ex));
                 throw;
+            }
+
+            if (parameterName == "logComponentVerbosity") {
+                const BSONObj obj = parameter.Obj();
+                auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+                if (storageEngine != nullptr && obj.hasField("storage") &&
+                    obj.getObjectField("storage").hasField("wt")) {
+                    uassertStatusOK(storageEngine->getEngine()->reconfigureLogging());
+                }
             }
 
             if (oldValue) {

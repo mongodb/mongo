@@ -404,6 +404,15 @@ public:
     virtual void dump() const = 0;
 
     /**
+     * Instructs the KVEngine to (re-)configure any internal logging
+     * capabilities. Returns Status::OK() if the logging subsystem was successfully
+     * configured (or if defaulting to the virtual implementation).
+     */
+    virtual Status reconfigureLogging() {
+        return Status::OK();
+    }
+
+    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.

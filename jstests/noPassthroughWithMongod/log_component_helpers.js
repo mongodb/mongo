@@ -40,7 +40,5 @@ assert.throws(function() {
 });
 
 // Restore originalSettings
-// We need to remove the verbosity settings related to WiredTiger as they cannot be set at runtime.
-delete originalSettings["storage"]["wt"];
 assert.commandWorked(db.adminCommand({setParameter: 1, logComponentVerbosity: originalSettings}));
 }(db));

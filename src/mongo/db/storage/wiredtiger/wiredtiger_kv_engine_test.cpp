@@ -535,6 +535,58 @@ TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 }
 
+TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
+    // Perform each test in their own limited scope in order to establish different
+    // severity levels.
+    {
+        // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
+        auto severityGuard = unittest::MinimumLoggedSeverityGuard{
+            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};
+        ASSERT_EQ(logv2::LogSeverity::Log(),
+                  unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
+        ASSERT_OK(_engine->reconfigureLogging());
+        // Perform a checkpoint. The goal here is create some activity in WiredTiger in order
+        // to generate verbose messages (we don't really care about the checkpoint itself).
+        startCapturingLogMessages();
+        _engine->checkpoint();
+        stopCapturingLogMessages();
+        // In this initial case, we don't expect to capture any debug checkpoint messages. The
+        // base severity for the checkpoint component should be at Log().
+        bool foundWTCheckpointMessage = false;
+        for (auto&& bson : getCapturedBSONFormatLogMessages()) {
+            if (bson["c"].String() == "WTCHKPT" &&
+                bson["attr"]["message"]["verbose_level"].String() == "DEBUG" &&
+                bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
+                foundWTCheckpointMessage = true;
+            }
+        }
+        ASSERT_FALSE(foundWTCheckpointMessage);
+    }
+    {
+        // Set the WiredTiger Checkpoint LOGV2 component severity to the Debug(1) level.
+        auto severityGuard = unittest::MinimumLoggedSeverityGuard{
+            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(1)};
+        ASSERT_OK(_engine->reconfigureLogging());
+        ASSERT_EQ(logv2::LogSeverity::Debug(1),
+                  unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
+
+        // Perform another checkpoint.
+        startCapturingLogMessages();
+        _engine->checkpoint();
+        stopCapturingLogMessages();
+
+        // This time we expect to detect WiredTiger checkpoint Debug() messages.
+        bool foundWTCheckpointMessage = false;
+        for (auto&& bson : getCapturedBSONFormatLogMessages()) {
+            if (bson["c"].String() == "WTCHKPT" &&
+                bson["attr"]["message"]["verbose_level"].String() == "DEBUG" &&
+                bson["attr"]["message"]["category"].String() == "WT_VERB_CHECKPOINT") {
+                foundWTCheckpointMessage = true;
+            }
+        }
+        ASSERT_TRUE(foundWTCheckpointMessage);
+    }
+}
 
 std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
     return std::make_unique<WiredTigerKVHarnessHelper>(svcCtx);

@@ -40,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
@@ -422,6 +423,31 @@ TEST(WiredTigerUtilTest, ParseCompactMessages) {
         }
     }
     ASSERT_TRUE(foundWTMessage);
+}
+
+TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
+    // Perform each test in their own limited scope in order to establish different
+    // severity levels.
+    {
+        // Set the WiredTiger Checkpoint LOGV2 component severity to the Log level.
+        auto severityGuard = unittest::MinimumLoggedSeverityGuard{
+            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};
+        // Generate the configuration string and verify the default severity of the
+        // checkpoint component is at the Log level.
+        std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
+        ASSERT_TRUE(config.find("checkpoint:0") != std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:1") == std::string::npos);
+    }
+    {
+        // Set the WiredTiger Checkpoint LOGV2 component severity to the Debug(1) level.
+        // We want to ensure this setting is subsequently reflected in a new WiredTiger
+        // verbose configuration string.
+        auto severityGuard = unittest::MinimumLoggedSeverityGuard{
+            logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(1)};
+        std::string config = WiredTigerUtil::generateWTVerboseConfiguration();
+        ASSERT_TRUE(config.find("checkpoint:1") != std::string::npos);
+        ASSERT_TRUE(config.find("checkpoint:0") == std::string::npos);
+    }
 }
 
 }  // namespace mongo

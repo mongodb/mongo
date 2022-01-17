@@ -366,6 +366,8 @@ public:
 
     void dump() const override;
 
+    Status reconfigureLogging() override;
+
 private:
     class WiredTigerSessionSweeper;
 
