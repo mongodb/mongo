@@ -26,6 +26,7 @@ const collName = 'changeStreamPreAndPostImages';
 const collName2 = 'changeStreamPreAndPostImages2';
 const collName3 = 'changeStreamPreAndPostImages3';
 const collName4 = 'changeStreamPreAndPostImages4';
+const collName5 = 'changeStreamPreAndPostImages5';
 const viewName = "view";
 
 const primary = rsTest.getPrimary();
@@ -124,6 +125,21 @@ assert.commandFailedWithCode(
 assert.commandWorked(testDB.runCommand({create: viewName, viewOn: collName}));
 assert.commandFailedWithCode(
     testDB.runCommand({collMod: viewName, changeStreamPreAndPostImages: {enabled: true}}),
+    ErrorCodes.InvalidOptions);
+
+// Should fail to create a timeseries collection with enabled 'changeStreamPreAndPostImages'
+// option.
+assert.commandFailedWithCode(testDB.runCommand({
+    create: collName5,
+    timeseries: {timeField: 'time'},
+    changeStreamPreAndPostImages: {enabled: true}
+}),
+                             ErrorCodes.InvalidOptions);
+
+// Should fail to enable 'changeStreamPreAndPostImages' option on a timeseries collection.
+assert.commandWorked(testDB.runCommand({create: collName5, timeseries: {timeField: 'time'}}));
+assert.commandFailedWithCode(
+    testDB.runCommand({collMod: collName5, changeStreamPreAndPostImages: {enabled: true}}),
     ErrorCodes.InvalidOptions);
 
 rsTest.stopSet();
