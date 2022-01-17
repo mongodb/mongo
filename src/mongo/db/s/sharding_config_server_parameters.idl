@@ -36,3 +36,13 @@ server_parameters:
         cpp_varname: minNumChunksForSessionsCollection
         default: 1024
         validator: { gte: 1, lte: 1000000 }
+    chunkDefragmentationThrottlingMS:
+        description: >-
+            The minimum amount of time between two consecutive mergeChunks/splitChunk commands
+            issued by the balancer when 'configureCollectionBalancing' is invoked on a collection.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: chunkDefragmentationThrottlingMS
+        validator:
+          gte: 0
+        default: 0

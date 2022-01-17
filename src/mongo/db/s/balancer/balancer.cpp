@@ -51,6 +51,7 @@
 #include "mongo/db/s/balancer/balancer_defragmentation_policy_impl.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
@@ -373,6 +374,14 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 
 void Balancer::_consumeActionStreamLoop() {
     Client::initThread("BalancerSecondary");
+    auto applyThrottling = [lastActionTime = Date_t::fromMillisSinceEpoch(0)]() mutable {
+        const Milliseconds throttle{chunkDefragmentationThrottlingMS.load()};
+        auto timeSinceLastAction = Date_t::now() - lastActionTime;
+        if (throttle > timeSinceLastAction) {
+            sleepFor(throttle - timeSinceLastAction);
+        }
+        lastActionTime = Date_t::now();
+    };
     auto opCtx = cc().makeOperationContext();
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
@@ -384,6 +393,7 @@ void Balancer::_consumeActionStreamLoop() {
         stdx::visit(
             visit_helper::Overloaded{
                 [&](MergeInfo mergeAction) {
+                    applyThrottling();
                     auto result =
                         _commandScheduler
                             ->requestMergeChunks(opCtx.get(),
@@ -445,6 +455,7 @@ void Balancer::_consumeActionStreamLoop() {
                             });
                 },
                 [&](SplitInfoWithKeyPattern splitAction) {
+                    applyThrottling();
                     auto result =
                         _commandScheduler
                             ->requestSplitChunk(opCtx.get(),
