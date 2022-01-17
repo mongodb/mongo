@@ -199,10 +199,11 @@ int sspiClientMechNew(void* glob_context,
 
     // Then obtain all potential FQDNs for the hostname.
     std::string canonName = cparams->serverFQDN;
-    auto fqdns = getHostFQDNs(cparams->serverFQDN, saslSSPIGlobalParams.canonicalization);
-    if (!fqdns.empty()) {
+    auto fqdnsSW = getHostFQDNs(cparams->serverFQDN, saslSSPIGlobalParams.canonicalization);
+    if (fqdnsSW.isOK() && !fqdnsSW.getValue().empty()) {
         // PTR records should point to the canonical name. If there's more than one, warn and
         // arbitrarily use the last entry.
+        auto fqdns = fqdnsSW.getValue();
         if (fqdns.size() > 1) {
             LOGV2_WARNING(23933,
                           "Found multiple PTR records while performing reverse DNS",

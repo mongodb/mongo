@@ -178,9 +178,11 @@ public:
     void appendSection(OperationContext* opCtx,
                        const BSONElement& configElement,
                        BSONObjBuilder* out) const override {
-        out->append(
-            "advisoryHostFQDNs",
-            getHostFQDNs(getHostNameCached(), HostnameCanonicalizationMode::kForwardAndReverse));
+        auto statusWith =
+            getHostFQDNs(getHostNameCached(), HostnameCanonicalizationMode::kForwardAndReverse);
+        if (statusWith.isOK()) {
+            out->append("advisoryHostFQDNs", statusWith.getValue());
+        }
     }
 } advisoryHostFQDNs;
 }  // namespace

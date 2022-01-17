@@ -110,6 +110,11 @@ public:
         auto getIntensity = [this, intensities](FaultFacetType type) {
             auto observerType = toObserverType(type);
             if (observerType) {
+                stdx::lock_guard lock(_mutex);
+                if (_facetToIntensityMapForTest.contains(type)) {
+                    return _facetToIntensityMapForTest.at(type);
+                }
+
                 auto x = intensities->_data->getValues();
                 if (x) {
                     for (auto setting : *x) {
