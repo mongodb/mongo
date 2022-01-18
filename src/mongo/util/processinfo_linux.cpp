@@ -57,6 +57,7 @@
 #include <fmt/format.h>
 #include <pcrecpp.h>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/file.h"
@@ -558,11 +559,16 @@ public:
      * return the actual memory we'll have available to the process.
      */
     static unsigned long long getMemorySizeLimit() {
-        unsigned long long systemMemBytes = getSystemMemorySize();
-        unsigned long long cgroupMemBytes = 0;
-        std::string cgmemlimit = readLineFromFile("/sys/fs/cgroup/memory/memory.limit_in_bytes");
-        if (!cgmemlimit.empty() && mongo::NumberParser{}(cgmemlimit, &cgroupMemBytes).isOK()) {
-            return std::min(systemMemBytes, cgroupMemBytes);
+        const unsigned long long systemMemBytes = getSystemMemorySize();
+        for (const char* file : {
+                 "/sys/fs/cgroup/memory.max",                   // cgroups v2
+                 "/sys/fs/cgroup/memory/memory.limit_in_bytes"  // cgroups v1
+             }) {
+            unsigned long long groupMemBytes = 0;
+            std::string groupLimit = readLineFromFile(file);
+            if (!groupLimit.empty() && NumberParser{}(groupLimit, &groupMemBytes).isOK()) {
+                return std::min(systemMemBytes, groupMemBytes);
+            }
         }
         return systemMemBytes;
     }
