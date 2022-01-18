@@ -103,7 +103,7 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
 
 TEST(WiredTigerRecordStoreTest, Isolation1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId id1;
     RecordId id2;
@@ -154,7 +154,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 
 TEST(WiredTigerRecordStoreTest, Isolation2) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId id1;
     RecordId id2;
@@ -312,7 +312,7 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
 
 TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore("a.b"));
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     BSONObjBuilder builder;
@@ -336,7 +336,7 @@ TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
 
 TEST(WiredTigerRecordStoreTest, AppendCustomNumericStats) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore("a.c"));
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("a.c"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     BSONObjBuilder builder;
@@ -994,7 +994,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
     unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId rid1;
     {
@@ -1034,7 +1034,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
 
 TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
     unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     RecordId rid1;
     {

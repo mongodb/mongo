@@ -45,7 +45,7 @@ using std::unique_ptr;
 // Insert a record and try to update it.
 TEST(RecordStoreTestHarness, UpdateRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -96,7 +96,7 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
 // Insert multiple records and try to update them.
 TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

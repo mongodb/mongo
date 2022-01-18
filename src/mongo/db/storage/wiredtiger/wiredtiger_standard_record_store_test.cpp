@@ -58,7 +58,7 @@ using std::unique_ptr;
 namespace {
 TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
     WiredTigerHarnessHelper harnessHelper("statistics=(none)");
-    unique_ptr<RecordStore> rs(harnessHelper.newNonCappedRecordStore("a.b"));
+    unique_ptr<RecordStore> rs(harnessHelper.newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
     ASSERT_THROWS(rs->storageSize(opCtx.get()), AssertionException);
@@ -66,7 +66,7 @@ TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
 
 TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     string ident = rs->getIdent();
     string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
@@ -163,7 +163,7 @@ private:
             new WiredTigerSizeStorer(harnessHelper->conn(),
                                      WiredTigerKVEngine::kTableUriPrefix + "sizeStorer",
                                      enableWtLogging));
-        rs = harnessHelper->newNonCappedRecordStore();
+        rs = harnessHelper->newRecordStore();
         WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtrs->setSizeStorer(sizeStorer.get());
         ident = wtrs->getIdent();

@@ -44,15 +44,15 @@ public:
     WiredTigerHarnessHelper(StringData extraStrings);
     ~WiredTigerHarnessHelper() {}
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() override {
-        return newNonCappedRecordStore("a.b");
+    virtual std::unique_ptr<RecordStore> newRecordStore() override {
+        return newRecordStore("a.b");
     }
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        return newNonCappedRecordStore(ns, CollectionOptions());
+    virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
+        return newRecordStore(ns, CollectionOptions());
     }
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
+    virtual std::unique_ptr<RecordStore> newRecordStore(
         const std::string& ns,
         const CollectionOptions& collOptions,
         KeyFormat keyFormat = KeyFormat::Long) override;

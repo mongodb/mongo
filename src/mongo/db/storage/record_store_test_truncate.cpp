@@ -45,7 +45,7 @@ using std::unique_ptr;
 // Verify that calling truncate() on an already empty collection returns an OK status.
 TEST(RecordStoreTestHarness, TruncateEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -71,7 +71,7 @@ TEST(RecordStoreTestHarness, TruncateEmpty) {
 // removes all of them and returns an OK status.
 TEST(RecordStoreTestHarness, TruncateNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

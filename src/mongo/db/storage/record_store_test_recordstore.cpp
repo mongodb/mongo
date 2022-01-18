@@ -44,7 +44,7 @@ using std::unique_ptr;
 // Verify that the name of the record store is not NULL and nonempty.
 TEST(RecordStoreTestHarness, RecordStoreName) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         const char* name = rs->name();
@@ -55,7 +55,7 @@ TEST(RecordStoreTestHarness, RecordStoreName) {
 // Verify that the namespace of the record store is nonempty.
 TEST(RecordStoreTestHarness, Namespace) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         string ns = rs->ns();

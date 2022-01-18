@@ -46,7 +46,7 @@ using std::unique_ptr;
 // Create a random iterator for empty record store.
 TEST(RecordStoreTestHarness, GetRandomIteratorEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -67,7 +67,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorEmpty) {
 // Insert multiple records and create a random iterator for the record store
 TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -128,7 +128,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
 // Then check we'll retrieve the record.
 TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

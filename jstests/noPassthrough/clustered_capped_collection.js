@@ -12,17 +12,6 @@
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
-const replSet = new ReplSetTest({name: "clustered_capped_collections", nodes: 1});
-replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1}});
-replSet.initiate();
-
-if (ClusteredCollectionUtil.areClusteredIndexesEnabled(replSet.getPrimary().getDB("test")) ==
-    false) {
-    jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
-    replSet.stopSet();
-    return;
-}
-
 // Validate TTL-based deletion on a clustered, capped collection.
 function testClusteredCappedCollectionWithTTL(db, collName, clusterKeyField) {
     jsTest.log("Validating TTL operation on capped clustered collection");
@@ -325,37 +314,65 @@ function testClusteredReplicatedTTLDeletion(db, collName) {
     db.getCollection(collName).drop();
 }
 
-const replicatedDB = replSet.getPrimary().getDB('replicated');
-const nonReplicatedDB = replSet.getPrimary().getDB('local');
-const collName = 'clustered_collection';
-const replicatedColl = replicatedDB[collName];
-const nonReplicatedColl = nonReplicatedDB[collName];
+{
+    const replSet = new ReplSetTest({name: "clustered_capped_collections", nodes: 1});
+    replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1}});
+    replSet.initiate();
 
-replicatedColl.drop();
-nonReplicatedColl.drop();
+    if (ClusteredCollectionUtil.areClusteredIndexesEnabled(replSet.getPrimary().getDB("test")) ==
+        false) {
+        jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+        replSet.stopSet();
+        return;
+    }
+    const replicatedDB = replSet.getPrimary().getDB('replicated');
+    const nonReplicatedDB = replSet.getPrimary().getDB('local');
+    const collName = 'clustered_collection';
+    const replicatedColl = replicatedDB[collName];
+    const nonReplicatedColl = nonReplicatedDB[collName];
 
-testClusteredCappedCollectionWithTTL(replicatedDB, collName, '_id');
-testClusteredTailableCursorCreation(replicatedDB, collName, '_id', true /* isReplicated */);
-for (let awaitData of [false, true]) {
-    testClusteredTailableCursorWithTTL(
-        replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
-    testClusteredTailableCursorCappedPositionLostWithTTL(
-        replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
-    testClusteredTailableCursorOutOfOrderInsertion(
-        replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+    replicatedColl.drop();
+    nonReplicatedColl.drop();
+
+    testClusteredCappedCollectionWithTTL(replicatedDB, collName, '_id');
+    testClusteredTailableCursorCreation(replicatedDB, collName, '_id', true /* isReplicated */);
+    for (let awaitData of [false, true]) {
+        testClusteredTailableCursorWithTTL(
+            replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+        testClusteredTailableCursorCappedPositionLostWithTTL(
+            replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+        testClusteredTailableCursorOutOfOrderInsertion(
+            replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+    }
+    testClusteredReplicatedTTLDeletion(replicatedDB, collName);
+
+    testClusteredCappedCollectionWithTTL(nonReplicatedDB, collName, 'ts');
+    testClusteredTailableCursorCreation(nonReplicatedDB, collName, 'ts', false /* isReplicated */);
+    for (let awaitData of [false, true]) {
+        testClusteredTailableCursorWithTTL(
+            nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+        testClusteredTailableCursorCappedPositionLostWithTTL(
+            nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+        testClusteredTailableCursorOutOfOrderInsertion(
+            nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+    }
+
+    replSet.stopSet();
 }
-testClusteredReplicatedTTLDeletion(replicatedDB, collName);
 
-testClusteredCappedCollectionWithTTL(nonReplicatedDB, collName, 'ts');
-testClusteredTailableCursorCreation(nonReplicatedDB, collName, 'ts', false /* isReplicated */);
-for (let awaitData of [false, true]) {
-    testClusteredTailableCursorWithTTL(
-        nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
-    testClusteredTailableCursorCappedPositionLostWithTTL(
-        nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
-    testClusteredTailableCursorOutOfOrderInsertion(
-        nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+// enableTestCommands is required for end users to create a capped clustered collection.
+{
+    TestData.enableTestCommands = false;
+    const replSetNoTestCommands = new ReplSetTest({name: "clustered_capped_collections", nodes: 1});
+    replSetNoTestCommands.startSet();
+    replSetNoTestCommands.initiate();
+
+    assert.commandFailedWithCode(
+        replSetNoTestCommands.getPrimary().getDB("test").createCollection(
+            'c',
+            {clusteredIndex: {key: {_id: 1}, unique: true}, capped: true, expireAfterSeconds: 10}),
+        6127800);
+
+    replSetNoTestCommands.stopSet();
 }
-
-replSet.stopSet();
 })();

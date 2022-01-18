@@ -48,7 +48,7 @@ using std::unique_ptr;
 // Insert a record and try to delete it.
 TEST(RecordStoreTestHarness, DeleteRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -92,7 +92,7 @@ TEST(RecordStoreTestHarness, DeleteRecord) {
 // Insert multiple records and try to delete them.
 TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

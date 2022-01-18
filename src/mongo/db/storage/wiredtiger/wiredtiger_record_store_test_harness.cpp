@@ -53,7 +53,7 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(StringData extraStrings)
     _engine.notifyStartupComplete();
 }
 
-std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newNonCappedRecordStore(
+std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     const std::string& ns, const CollectionOptions& collOptions, KeyFormat keyFormat) {
     WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
     OperationContextNoop opCtx(ru);
@@ -76,7 +76,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newNonCappedRecordStore(
     params.ns = ns;
     params.ident = ident.toString();
     params.engineName = kWiredTigerEngineName;
-    params.isCapped = false;
+    params.isCapped = collOptions.capped ? true : false;
     params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
     params.overwrite = collOptions.clusteredIndex ? false : true;
     params.isEphemeral = false;

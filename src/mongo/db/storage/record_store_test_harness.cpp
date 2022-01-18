@@ -58,7 +58,7 @@ using std::unique_ptr;
 
 TEST(RecordStoreTestHarness, Simple1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -115,7 +115,7 @@ TEST(RecordStoreTestHarness, Simple1) {
 
 TEST(RecordStoreTestHarness, Delete1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -160,7 +160,7 @@ TEST(RecordStoreTestHarness, Delete1) {
 
 TEST(RecordStoreTestHarness, Delete2) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -203,7 +203,7 @@ TEST(RecordStoreTestHarness, Delete2) {
 
 TEST(RecordStoreTestHarness, Update1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -251,7 +251,7 @@ TEST(RecordStoreTestHarness, Update1) {
 
 TEST(RecordStoreTestHarness, UpdateInPlace1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     if (!rs->updateWithDamagesSupported())
         return;
@@ -306,7 +306,7 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
 
 TEST(RecordStoreTestHarness, Truncate1) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -358,7 +358,7 @@ TEST(RecordStoreTestHarness, Cursor1) {
     const int N = 10;
 
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -413,8 +413,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs =
-        harnessHelper->newNonCappedRecordStore(ns, options, KeyFormat::String);
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
@@ -515,13 +514,27 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     }
 }
 
+// Verify that the internal API is able to create a capped clustered record store
+// with change collection-like format. This test complements the clustered_capped_collection.js
+// which verifies that we prevent a user from creating a capped clustered collections when
+// enableTestCommands is disabled.
+TEST(RecordStoreTestHarness, ClusteredCappedRecordStoreCreation) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "config.changes.c";
+    CollectionOptions options;
+    options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+    options.expireAfterSeconds = 1;
+    options.capped = true;
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
+    invariant(rs->keyFormat() == KeyFormat::String);
+}
+
 TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "test.system.buckets.a";
     CollectionOptions options;
     options.clusteredIndex = clustered_util::makeCanonicalClusteredInfoForLegacyFormat();
-    std::unique_ptr<RecordStore> rs =
-        harnessHelper->newNonCappedRecordStore(ns, options, KeyFormat::String);
+    std::unique_ptr<RecordStore> rs = harnessHelper->newRecordStore(ns, options, KeyFormat::String);
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
@@ -592,7 +605,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordMismatchedKeyFormat) {
     // Cannot create a clustered record store without KeyFormat::String.
     bool failAsExpected = false;
     try {
-        auto rs = harnessHelper->newNonCappedRecordStore(ns, options);
+        auto rs = harnessHelper->newRecordStore(ns, options);
     } catch (DBException& e) {
         // 6144101: WiredTiger-specific error code
         // 6144102: Ephemeral For Test-specific error code

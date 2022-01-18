@@ -45,16 +45,15 @@ class RecoveryUnit;
 
 class RecordStoreHarnessHelper : public HarnessHelper {
 public:
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() = 0;
+    virtual std::unique_ptr<RecordStore> newRecordStore() = 0;
 
-    std::unique_ptr<RecordStore> newNonCappedRecordStore(const std::string& ns) {
-        return newNonCappedRecordStore(ns, CollectionOptions());
+    std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
+        return newRecordStore(ns, CollectionOptions());
     }
 
-    virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
-        const std::string& ns,
-        const CollectionOptions& options,
-        KeyFormat keyFormat = KeyFormat::Long) = 0;
+    virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns,
+                                                        const CollectionOptions& options,
+                                                        KeyFormat keyFormat = KeyFormat::Long) = 0;
 
     virtual std::unique_ptr<RecordStore> newOplogRecordStore() = 0;
 

@@ -252,7 +252,7 @@ TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
 
 TEST(RecordStoreTestHarness, SeekNearOnNonOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-    std::unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore("local.NOT_oplog.foo"));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore("local.NOT_oplog.foo"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 

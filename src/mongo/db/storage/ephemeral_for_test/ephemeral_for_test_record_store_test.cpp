@@ -51,11 +51,11 @@ class RecordStoreHarnessHelper final : public ::mongo::RecordStoreHarnessHelper 
 public:
     RecordStoreHarnessHelper() {}
 
-    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore() {
-        return newNonCappedRecordStore("a.b", CollectionOptions());
+    virtual std::unique_ptr<mongo::RecordStore> newRecordStore() {
+        return newRecordStore("a.b", CollectionOptions());
     }
 
-    virtual std::unique_ptr<mongo::RecordStore> newNonCappedRecordStore(
+    virtual std::unique_ptr<mongo::RecordStore> newRecordStore(
         const std::string& ns,
         const CollectionOptions& collOptions,
         KeyFormat keyFormat = KeyFormat::Long) {

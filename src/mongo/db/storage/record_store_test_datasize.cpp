@@ -46,7 +46,7 @@ using std::unique_ptr;
 // Verify that an empty collection takes up no space.
 TEST(RecordStoreTestHarness, DataSizeEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -62,7 +62,7 @@ TEST(RecordStoreTestHarness, DataSizeEmpty) {
 // Verify that a nonempty collection takes up some space.
 TEST(RecordStoreTestHarness, DataSizeNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

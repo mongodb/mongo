@@ -45,7 +45,7 @@ using std::unique_ptr;
 // Insert a record and verify the number of entries in the collection is 1.
 TEST(RecordStoreTestHarness, InsertRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -76,7 +76,7 @@ TEST(RecordStoreTestHarness, InsertRecord) {
 // equals the number that were inserted.
 TEST(RecordStoreTestHarness, InsertMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

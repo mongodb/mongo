@@ -48,7 +48,7 @@ using std::unique_ptr;
 // on the returned RecordId.
 TEST(RecordStoreTestHarness, DataFor) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -88,7 +88,7 @@ TEST(RecordStoreTestHarness, DataFor) {
 // on each of the returned RecordIds.
 TEST(RecordStoreTestHarness, DataForMultiple) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

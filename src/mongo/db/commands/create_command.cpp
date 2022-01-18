@@ -134,6 +134,13 @@ public:
                 }
             } else {
                 // Clustered collection.
+                if (cmd.getCapped()) {
+                    uassert(ErrorCodes::Error(6127800),
+                            "Clustered capped collection only available with 'enableTestCommands' "
+                            "server parameter",
+                            getTestCommandsEnabled());
+                }
+
                 uassert(ErrorCodes::Error(6049200),
                         str::stream() << "'size' field for capped collections is not "
                                          "allowed on clustered collections. "

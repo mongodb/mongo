@@ -51,7 +51,7 @@ using std::unique_ptr;
 // the iterator returns RecordId() and stays at EOF.
 TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -101,7 +101,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
 // the iterator returns RecordId() and stays at EOF.
 TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -151,7 +151,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
 // starting at an interior position.
 TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -202,7 +202,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
 // starting at an interior position.
 TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -254,7 +254,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
 // that the iterator remains EOF.
 TEST(RecordStoreTestHarness, RecordIteratorEOF) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -325,7 +325,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 // Test calling save and restore after each call to next
 TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -387,7 +387,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
 // that next() returns the second record.
 TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
@@ -441,7 +441,7 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
 // seekExact() must return boost::none if the RecordId does not exist.
 TEST(RecordStoreTestHarness, SeekExactForMissingRecordReturnsNone) {
     const auto harnessHelper{newRecordStoreHarnessHelper()};
-    auto recordStore = harnessHelper->newNonCappedRecordStore();
+    auto recordStore = harnessHelper->newRecordStore();
     ServiceContext::UniqueOperationContext opCtx{harnessHelper->newOperationContext()};
 
     // Insert three records and remember their record ids.
