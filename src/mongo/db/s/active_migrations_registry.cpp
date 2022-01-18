@@ -107,7 +107,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     if (_activeMoveChunkState) {
         if (_activeMoveChunkState->args == args) {
             LOGV2(5004704,
-                  "registerDonateChunk ",
+                  "registerDonateChunk",
                   "keys"_attr = ChunkRange(args.getMinKey(), args.getMaxKey()).toString(),
                   "toShardId"_attr = args.getToShardId(),
                   logAttrs(args.getNss()));
@@ -219,7 +219,7 @@ void ActiveMigrationsRegistry::_clearDonateChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeMoveChunkState);
     LOGV2(5004702,
-          "clearDonateChunk ",
+          "clearDonateChunk",
           "currentKeys"_attr = ChunkRange(_activeMoveChunkState->args.getMinKey(),
                                           _activeMoveChunkState->args.getMaxKey())
                                    .toString(),
@@ -232,7 +232,7 @@ void ActiveMigrationsRegistry::_clearReceiveChunk() {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_activeReceiveChunkState);
     LOGV2(5004703,
-          "clearReceiveChunk ",
+          "clearReceiveChunk",
           "currentKeys"_attr = ChunkRange(_activeReceiveChunkState->range.getMin(),
                                           _activeReceiveChunkState->range.getMax())
                                    .toString());
