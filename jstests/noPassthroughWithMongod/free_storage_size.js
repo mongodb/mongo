@@ -43,7 +43,7 @@ let collStats = assert.commandWorked(testDB.runCommand({collStats: collName}));
 assert(collStats.hasOwnProperty("freeStorageSize"), tojson(collStats));
 assert.gt(collStats.freeStorageSize, 0);
 
-let dbStats = assert.commandWorked(testDB.runCommand({dbStats: 1}));
+let dbStats = assert.commandWorked(testDB.stats({freeStorage: 1}));
 assert(dbStats.hasOwnProperty("freeStorageSize"), tojson(dbStats));
 assert.gt(dbStats.freeStorageSize, 0);
 assert.eq(dbStats.freeStorageSize, collStats.freeStorageSize);
