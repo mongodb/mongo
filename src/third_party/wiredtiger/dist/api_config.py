@@ -87,6 +87,8 @@ def parseconfig(c, method_name, name_indent=''):
     output = '@config{' + ', '.join((name, desc, tdesc)) + '}\n'
     if ctype == 'category':
         for subc in sorted(c.subconfig):
+            if 'undoc' in subc.flags:
+                continue
             output += parseconfig(subc, method_name, \
                                 name_indent + ('&nbsp;' * 4))
         output += '@config{ ),,}\n'

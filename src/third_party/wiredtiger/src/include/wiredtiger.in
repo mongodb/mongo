@@ -1035,6 +1035,16 @@ struct __wt_session {
 	 * "sequential"; default \c none.}
 	 * @config{app_metadata, application-owned metadata for this object., a string; default
 	 * empty.}
+	 * @config{assert = (, enable enhanced checking., a set of related configuration options
+	 * defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, verify that timestamps
+	 * should \c always or \c never be used on reads with this table.  Verification should be
+	 * set to \c none if mixed read use is allowed., a string\, chosen from the following
+	 * options: \c "always"\, \c "never"\, \c "none"; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;write_timestamp, verify that commit timestamps are used
+	 * per the configured \c write_timestamp_usage option for this table., a string\, chosen
+	 * from the following options: \c "off"\, \c "on"; default \c off.}
+	 * @config{ ),,}
 	 * @config{cache_resident, do not ever evict the object's pages from cache.  Not compatible
 	 * with LSM tables; see @ref tuning_cache_resident for more information., a boolean flag;
 	 * default \c false.}
@@ -1053,8 +1063,9 @@ struct __wt_session {
 	 * 0.}
 	 * @config{readonly, the file is read-only.  All methods that may modify a file are
 	 * disabled.  See @ref readonly for more information., a boolean flag; default \c false.}
-	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
-	 * as <code>"verbose=[write_timestamp]"</code>., a list\, with values chosen from the
+	 * @config{verbose, enable messages for various events.  The choices are \c write_timestamp
+	 * which adds verbose messages as described by \c write_timestamp_usage.  Options are given
+	 * as a list\, such as \c "verbose=[write_timestamp]"., a list\, with values chosen from the
 	 * following options: \c "write_timestamp"; default \c [].}
 	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on
 	 * modifications to the table.  This option should be used in conjunction with the
@@ -1101,6 +1112,16 @@ struct __wt_session {
 	 * an integer between 512B and 128MB; default \c 4KB.}
 	 * @config{app_metadata, application-owned metadata for this object., a string; default
 	 * empty.}
+	 * @config{assert = (, enable enhanced checking., a set of related configuration options
+	 * defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;read_timestamp, verify that timestamps
+	 * should \c always or \c never be used on reads with this table.  Verification should be
+	 * set to \c none if mixed read use is allowed., a string\, chosen from the following
+	 * options: \c "always"\, \c "never"\, \c "none"; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;write_timestamp, verify that commit timestamps are used
+	 * per the configured \c write_timestamp_usage option for this table., a string\, chosen
+	 * from the following options: \c "off"\, \c "on"; default \c off.}
+	 * @config{ ),,}
 	 * @config{block_allocation, configure block allocation.  Permitted values are \c "best" or
 	 * \c "first"; the \c "best" configuration uses a best-fit algorithm\, the \c "first"
 	 * configuration uses a first-available algorithm during block allocation., a string\,
@@ -1328,8 +1349,9 @@ struct __wt_session {
 	 * applications use a WT_ITEM structure to manipulate raw byte arrays.  Value items of type
 	 * 't' are bitfields\, and when configured with record number type keys\, will be stored
 	 * using a fixed-length store., a format string; default \c u.}
-	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
-	 * as <code>"verbose=[write_timestamp]"</code>., a list\, with values chosen from the
+	 * @config{verbose, enable messages for various events.  The choices are \c write_timestamp
+	 * which adds verbose messages as described by \c write_timestamp_usage.  Options are given
+	 * as a list\, such as \c "verbose=[write_timestamp]"., a list\, with values chosen from the
 	 * following options: \c "write_timestamp"; default \c [].}
 	 * @config{write_timestamp_usage, describe how timestamps are expected to be used on
 	 * modifications to the table.  This option should be used in conjunction with the
