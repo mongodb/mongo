@@ -21,7 +21,7 @@ var TimeseriesAggTests = class {
      *     respectively in this order.
      */
     static prepareInputCollections(numHosts, numIterations) {
-        const timeseriesCollOption = {timeseries: {timeField: "time", metaField: "hostid"}};
+        const timeseriesCollOption = {timeseries: {timeField: "time", metaField: "tags"}};
 
         Random.setRandomSeed();
         const hosts = TimeseriesTest.generateHosts(numHosts);
@@ -31,29 +31,44 @@ var TimeseriesAggTests = class {
         // Creates a time-series input collection.
         const inColl = testDB.getCollection("in");
         inColl.drop();
-        assert.commandWorked(testDB.createCollection(inColl.getName()), timeseriesCollOption);
+        assert.commandWorked(testDB.createCollection(inColl.getName(), timeseriesCollOption));
 
         // Creates a non time-series observer input collection.
         const observerInColl = testDB.getCollection("observer_in");
         observerInColl.drop();
         assert.commandWorked(testDB.createCollection(observerInColl.getName()));
+        const currTime = new Date();
 
         // Inserts exactly the same random measurement to both inColl and observerInColl.
         for (let i = 0; i < numIterations; i++) {
-            let host = TimeseriesTest.getRandomElem(hosts);
-            let usage = TimeseriesTest.getRandomUsage();
-            let newMeasurement = {"cpu": usage, "hostid": host.tags.hostid, "time": ISODate()};
-            assert.commandWorked(inColl.insert(newMeasurement));
-            assert.commandWorked(observerInColl.insert(newMeasurement));
-
-            if (i % 2) {
-                let idleMeasurement = {
-                    "idle": 100 - usage,
-                    "hostid": host.tags.hostid,
-                    "time": ISODate()
+            for (let host of hosts) {
+                const userUsage = TimeseriesTest.getRandomUsage();
+                let newMeasurement = {
+                    tags: host.tags,
+                    time: new Date(currTime + i),
+                    usage_guest: TimeseriesTest.getRandomUsage(),
+                    usage_guest_nice: TimeseriesTest.getRandomUsage(),
+                    usage_idle: TimeseriesTest.getRandomUsage(),
+                    usage_iowait: TimeseriesTest.getRandomUsage(),
+                    usage_irq: TimeseriesTest.getRandomUsage(),
+                    usage_nice: TimeseriesTest.getRandomUsage(),
+                    usage_softirq: TimeseriesTest.getRandomUsage(),
+                    usage_steal: TimeseriesTest.getRandomUsage(),
+                    usage_system: TimeseriesTest.getRandomUsage(),
+                    usage_user: userUsage
                 };
-                assert.commandWorked(inColl.insert(idleMeasurement));
-                assert.commandWorked(observerInColl.insert(idleMeasurement));
+                assert.commandWorked(inColl.insert(newMeasurement));
+                assert.commandWorked(observerInColl.insert(newMeasurement));
+
+                if (i % 2) {
+                    let idleMeasurement = {
+                        tags: host.tags,
+                        time: new Date(currTime + i),
+                        idle_user: 100 - userUsage
+                    };
+                    assert.commandWorked(inColl.insert(idleMeasurement));
+                    assert.commandWorked(observerInColl.insert(idleMeasurement));
+                }
             }
         }
 

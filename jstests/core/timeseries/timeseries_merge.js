@@ -3,6 +3,7 @@
  *
  *
  * @tags: [
+ *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_timeseries,
  * ]
@@ -24,7 +25,7 @@ function prepareOutputCollectionForMergeOn(outColl) {
     outColl.drop();
     assert.commandWorked(testDB.createCollection(outColl.getName()));
 
-    assert.commandWorked(outColl.createIndex({"hostid": 1}, {unique: true}));
+    assert.commandWorked(outColl.createIndex({"tags.hostid": 1}, {unique: true}));
 }
 
 /**
@@ -58,7 +59,7 @@ let runMergeOnErrorTestCase = () => {
     var err = assert.throws(() => inColl.aggregate([{
         $merge: {
             into: outColl.getName(),
-            on: "hostid",
+            on: "tags.hostid",
             whenMatched: "replace",
         }
     }]));
@@ -70,12 +71,12 @@ let runMergeOnErrorTestCase = () => {
  */
 let runMergeOnTestCase = () => {
     var mergePipeline = [
-        {$project: {_id: 0, cpu: 1, idle: 1, hostid: 1, time: 1}},
+        {$project: {_id: 0, cpu: 1, idle: 1, "tags.hostid": 1, time: 1}},
         {$sort: {time: 1}},
         {
             $merge: {
                 into: "observer_out",
-                on: "hostid",
+                on: "tags.hostid",
                 whenMatched: "merge",
             }
         }
