@@ -1481,13 +1481,6 @@ tasks:
       - func: "fetch artifacts"
       - func: "unit test"
 
-  - name: unit-test-with-compile
-    tags: ["python"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "unit test"
-
   - name: unit-test-zstd
     tags: ["python"]
     depends_on:
@@ -1870,18 +1863,6 @@ tasks:
       - func: "format test script"
         vars:
           format_test_script_args: -t 110 -j 4 direct_io=1
-
-  # - name: linux-directio
-  #   depends_on:
-  #   - name: compile
-  #   commands:
-  #     - func: "fetch artifacts"
-  #     - func: "compile wiredtiger"
-  #     - func: "format test"
-  #       vars:
-  #         times: 3
-  #         config: ../../../test/format/CONFIG.stress
-  #         extra_args: -C "direct_io=[data]"
 
   - name: format-linux-no-ftruncate
     commands:
