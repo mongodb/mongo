@@ -14,6 +14,7 @@ selector:
   - jstests/core/max_doc_size.js
   - jstests/core/mr_bigobject.js
   - jstests/core/capped_large_docs.js
+  - jstests/core/exhaust.js
   # The following tests also create large oplog entries due to the maximum blocking sort size being
   # 100 MB.
   - jstests/core/explain_execution_error.js
