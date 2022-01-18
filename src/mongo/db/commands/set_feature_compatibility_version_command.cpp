@@ -69,6 +69,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -552,6 +553,16 @@ private:
         const bool preImagesFeatureFlagDisabledOnDowngradeVersion =
             !feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
                 requestedVersion);
+
+        // TODO SERVER-62693: remove the following scope once 6.0 branches out
+        if (requestedVersion == multiversion::GenericFCV::kLastLTS ||
+            // TODO SERVER-62584: remove the last-continuous check once 5.3 branches out
+            requestedVersion == multiversion::GenericFCV::kLastContinuous) {
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+                serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                sharding_util::downgradeCollectionBalancingFieldsToPre53(opCtx);
+            }
+        }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
