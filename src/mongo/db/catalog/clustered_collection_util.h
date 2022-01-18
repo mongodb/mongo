@@ -69,9 +69,11 @@ bool requiresLegacyFormat(const NamespaceString& nss);
 
 /**
  * listIndexes requires the ClusteredIndexSpec be formatted with an additional field 'clustered:
- * true' to indicate it is a clustered index.
+ * true' to indicate it is a clustered index and with the collection's default collation. If the
+ * collection has the 'simple' collation this expects an empty BSONObj.
  */
-BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo);
+BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
+                                       const BSONObj& collation);
 
 /**
  * Returns true if the BSON object matches the collection's cluster key. Caller's should ensure

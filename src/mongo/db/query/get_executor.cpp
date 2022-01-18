@@ -359,6 +359,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     if (collection->isClustered()) {
         plannerParams->clusteredInfo = collection->getClusteredInfo();
+        plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
     }
 }
 

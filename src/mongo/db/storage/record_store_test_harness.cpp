@@ -428,7 +428,7 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
         recordData.makeOwned();
 
         RecordId id = uassertStatusOK(
-            record_id_helpers::keyForDoc(doc, options.clusteredIndex->getIndexSpec()));
+            record_id_helpers::keyForDoc(doc, options.clusteredIndex->getIndexSpec(), nullptr));
         records.push_back({id, recordData});
     }
 

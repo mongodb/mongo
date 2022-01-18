@@ -159,9 +159,10 @@ public:
         // Set up the new collection scan to start from the 'minPreImageId'.
         void setupPlanExecutor(boost::optional<ChangeStreamPreImageId> minPreImageId) {
             const auto minRecordId =
-                (minPreImageId ? boost::optional<RecordId>(record_id_helpers::keyForElem(
-                                     BSON("_id" << minPreImageId->toBSON()).firstElement()))
-                               : boost::none);
+                (minPreImageId
+                     ? boost::optional<RecordId>(record_id_helpers::keyForElem(
+                           BSON("_id" << minPreImageId->toBSON()).firstElement(), nullptr))
+                     : boost::none);
             _planExecutor =
                 InternalPlanner::collectionScan(_opCtx,
                                                 _preImagesCollPtr,
@@ -237,19 +238,20 @@ void deleteExpiredChangeStreamPreImages(Client* client) {
     for (auto it = expiredPreImages.begin(); it != expiredPreImages.end(); ++it) {
         it.saveState();
 
-        writeConflictRetry(
-            opCtx.get(),
-            "ChangeStreamExpiredPreImagesRemover",
-            NamespaceString::kChangeStreamPreImagesNamespace.ns(),
-            [&] {
-                WriteUnitOfWork wuow(opCtx.get());
-                const auto recordId =
-                    record_id_helpers::keyForElem(it->getField(ChangeStreamPreImage::kIdFieldName));
-                preImagesColl->deleteDocument(
-                    opCtx.get(), kUninitializedStmtId, recordId, &CurOp::get(*opCtx)->debug());
-                wuow.commit();
-                numberOfRemovals++;
-            });
+        writeConflictRetry(opCtx.get(),
+                           "ChangeStreamExpiredPreImagesRemover",
+                           NamespaceString::kChangeStreamPreImagesNamespace.ns(),
+                           [&] {
+                               WriteUnitOfWork wuow(opCtx.get());
+                               const auto recordId = record_id_helpers::keyForElem(
+                                   it->getField(ChangeStreamPreImage::kIdFieldName), nullptr);
+                               preImagesColl->deleteDocument(opCtx.get(),
+                                                             kUninitializedStmtId,
+                                                             recordId,
+                                                             &CurOp::get(*opCtx)->debug());
+                               wuow.commit();
+                               numberOfRemovals++;
+                           });
 
         it.restoreState();
     }

@@ -715,20 +715,33 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
                 const auto clusterKey = params.clusteredInfo->getIndexSpec().getKey();
 
-                // Since the clusteredIndex doesn't have a specific collator, check if it is
-                // compatible with the max and min using the same collator as the query.
+                // Check if the query collator is compatible with the collection collator for the
+                // provided min and max values.
                 if ((!minObj.isEmpty() &&
-                     !indexCompatibleMaxMin(
-                         minObj, query.getCollator(), query.getCollator(), clusterKey)) ||
+                     !indexCompatibleMaxMin(minObj,
+                                            query.getCollator(),
+                                            params.clusteredCollectionCollator,
+                                            clusterKey)) ||
                     (!maxObj.isEmpty() &&
-                     !indexCompatibleMaxMin(
-                         maxObj, query.getCollator(), query.getCollator(), clusterKey))) {
+                     !indexCompatibleMaxMin(maxObj,
+                                            query.getCollator(),
+                                            params.clusteredCollectionCollator,
+                                            clusterKey))) {
                     return Status(ErrorCodes::Error(6137400),
                                   "The clustered index is not compatible with the values provided "
-                                  "for min/max");
+                                  "for min/max due to the query collation");
                 }
 
-                if (!minObj.isEmpty() && !maxObj.isEmpty() && minObj.woCompare(maxObj) >= 0) {
+                auto wellSorted = [&minObj, &maxObj, collator = query.getCollator()]() {
+                    if (collator) {
+                        auto min = stripFieldNamesAndApplyCollation(minObj, collator);
+                        auto max = stripFieldNamesAndApplyCollation(maxObj, collator);
+                        return min.woCompare(max) < 0;
+                    } else {
+                        return minObj.woCompare(maxObj) < 0;
+                    }
+                };
+                if (!minObj.isEmpty() && !maxObj.isEmpty() && !wellSorted()) {
                     return Status(ErrorCodes::Error(6137401), "max() must be greater than min()");
                 }
             }

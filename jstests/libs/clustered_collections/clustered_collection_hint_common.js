@@ -2,35 +2,13 @@
  * Validate $hint on a clustered collection.
  */
 
-const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
+function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     "use strict";
     load("jstests/libs/analyze_plan.js");
     load("jstests/libs/collection_drop_recreate.js");
 
     const clusterKeyFieldName = Object.keys(clusterKey)[0];
     const batchSize = 100;
-
-    function validateHint(coll, {expectedNReturned, cmd, expectedWinningPlanStats = {}}) {
-        const explain = assert.commandWorked(coll.runCommand({explain: cmd}));
-        assert.eq(explain.executionStats.nReturned, expectedNReturned, tojson(explain));
-
-        const actualWinningPlan = getWinningPlan(explain.queryPlanner);
-        const stageOfInterest = getPlanStage(actualWinningPlan, expectedWinningPlanStats.stage);
-        assert.neq(null, stageOfInterest);
-
-        for (const [key, value] of Object.entries(expectedWinningPlanStats)) {
-            assert(stageOfInterest[key], tojson(explain));
-            assert.eq(stageOfInterest[key], value, tojson(explain));
-        }
-
-        // Explicitly check that the plan is not bounded by default.
-        if (!expectedWinningPlanStats.hasOwnProperty("minRecord")) {
-            assert(!actualWinningPlan["minRecord"], tojson(explain));
-        }
-        if (!expectedWinningPlanStats.hasOwnProperty("maxRecord")) {
-            assert(!actualWinningPlan["maxRecord"], tojson(explain));
-        }
-    }
 
     function testHint(coll, clusterKey, clusterKeyName) {
         // Create clustered collection.
@@ -54,7 +32,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         const collName = coll.getName();
 
         // Basic find with hints on cluster key.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
             cmd: {
                 find: collName,
@@ -65,7 +43,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 direction: "forward",
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
             cmd: {
                 find: collName,
@@ -76,7 +54,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 direction: "forward",
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
             cmd: {
                 find: collName,
@@ -88,7 +66,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 direction: "forward",
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
             cmd: {
                 find: collName,
@@ -103,7 +81,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
 
         // Find with hints on cluster key that generate bounded collection scans.
         const arbitraryDocId = 12;
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
             cmd: {
                 find: collName,
@@ -117,7 +95,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 maxRecord: arbitraryDocId
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {
                 find: collName,
@@ -128,7 +106,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats:
                 {stage: "COLLSCAN", direction: "forward", minRecord: 101, maxRecord: MaxKey}
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {
                 find: collName,
@@ -139,7 +117,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats:
                 {stage: "COLLSCAN", direction: "forward", minRecord: MinKey, maxRecord: -2}
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
             cmd: {
                 find: collName,
@@ -153,7 +131,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 maxRecord: arbitraryDocId
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: arbitraryDocId,
             cmd: {
                 find: collName,
@@ -163,7 +141,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats:
                 {stage: "COLLSCAN", direction: "forward", maxRecord: arbitraryDocId}
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize - arbitraryDocId,
             cmd: {
                 find: collName,
@@ -175,7 +153,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Find with $natural hints.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
             cmd: {
                 find: collName,
@@ -186,7 +164,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 direction: "backward",
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
             cmd: {
                 find: collName,
@@ -197,7 +175,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 direction: "forward",
             }
         });
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
             cmd: {
                 find: collName,
@@ -211,7 +189,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Find on a standard index.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
             cmd: {find: collName, hint: idxA},
             expectedWinningPlanStats: {
@@ -221,7 +199,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Update with hint on cluster key.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {
                 update: collName,
@@ -232,7 +210,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Update with reverse $natural hint.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {
                 update: collName,
@@ -244,7 +222,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Update with hint on secondary index.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {update: collName, updates: [{q: {a: -2}, u: {$set: {a: 2}}, hint: idxA}]},
             expectedWinningPlanStats: {
@@ -254,7 +232,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Delete with hint on cluster key.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {
                 delete: collName,
@@ -265,7 +243,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Delete reverse $natural hint.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {
                 delete: collName,
@@ -276,7 +254,7 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
         });
 
         // Delete with hint on standard index.
-        validateHint(coll, {
+        validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
             cmd: {delete: collName, deletes: [{q: {a: -5}, limit: 0, hint: idxA}]},
             expectedWinningPlanStats: {
@@ -292,4 +270,27 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
     }
 
     return testHint(coll, clusterKey, clusterKeyName);
-};
+}
+
+function validateClusteredCollectionHint(coll,
+                                         {expectedNReturned, cmd, expectedWinningPlanStats = {}}) {
+    const explain = assert.commandWorked(coll.runCommand({explain: cmd}));
+    assert.eq(explain.executionStats.nReturned, expectedNReturned, tojson(explain));
+
+    const actualWinningPlan = getWinningPlan(explain.queryPlanner);
+    const stageOfInterest = getPlanStage(actualWinningPlan, expectedWinningPlanStats.stage);
+    assert.neq(null, stageOfInterest);
+
+    for (const [key, value] of Object.entries(expectedWinningPlanStats)) {
+        assert(stageOfInterest[key], tojson(explain));
+        assert.eq(stageOfInterest[key], value, tojson(explain));
+    }
+
+    // Explicitly check that the plan is not bounded by default.
+    if (!expectedWinningPlanStats.hasOwnProperty("minRecord")) {
+        assert(!actualWinningPlan["minRecord"], tojson(explain));
+    }
+    if (!expectedWinningPlanStats.hasOwnProperty("maxRecord")) {
+        assert(!actualWinningPlan["maxRecord"], tojson(explain));
+    }
+}

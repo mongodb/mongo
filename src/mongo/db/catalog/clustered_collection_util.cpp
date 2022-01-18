@@ -109,13 +109,16 @@ bool requiresLegacyFormat(const NamespaceString& nss) {
     return nss.isTimeseriesBucketsCollection() || nss.isChangeStreamPreImagesCollection();
 }
 
-BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo) {
+BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
+                                       const BSONObj& collation) {
     BSONObjBuilder bob;
     collInfo.getIndexSpec().serialize(&bob);
+    if (!collation.isEmpty()) {
+        bob.append("collation", collation);
+    }
     bob.append("clustered", true);
     return bob.obj();
 }
-
 
 bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo) {
     return clustered_util::matchesClusterKey(BSON("_id" << 1), collInfo);

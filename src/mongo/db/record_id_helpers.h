@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_format.h"
 
 namespace mongo {
@@ -49,8 +50,10 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
 /**
  * For clustered collections, converts various values into a RecordId.
  */
-StatusWith<RecordId> keyForDoc(const BSONObj& doc, const ClusteredIndexSpec& indexSpec);
-RecordId keyForElem(const BSONElement& elem);
+StatusWith<RecordId> keyForDoc(const BSONObj& doc,
+                               const ClusteredIndexSpec& indexSpec,
+                               const CollatorInterface* collator);
+RecordId keyForElem(const BSONElement& elem, const CollatorInterface* collator);
 RecordId keyForOID(OID oid);
 RecordId keyForDate(Date_t date);
 

@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
@@ -142,6 +143,10 @@ struct QueryPlannerParams {
     // Specifies the clusteredIndex information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
     boost::optional<ClusteredCollectionInfo> clusteredInfo;
+
+    // Specifies the collator information necessary to utilize the cluster key in bounded
+    // collection scans and other query operations.
+    const CollatorInterface* clusteredCollectionCollator;
 };
 
 }  // namespace mongo

@@ -211,11 +211,41 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
     return me->path() == repl::OpTime::kTimestampFieldName;
 }
 
+// True if the element type is affected by a collator (i.e. it is or contains a String).
+bool affectedByCollator(const BSONElement& element) {
+    switch (element.type()) {
+        case BSONType::String:
+            return true;
+        case BSONType::Array:
+        case BSONType::Object:
+            for (const auto& sub : element.Obj()) {
+                if (affectedByCollator(sub))
+                    return true;
+            }
+            return false;
+        default:
+            return false;
+    }
+}
+
+// Returns whether element is not affected by collators or query and collection collators are
+// compatible.
+bool compatibleCollator(const QueryPlannerParams& params,
+                        const CollatorInterface* queryCollator,
+                        const BSONElement& element) {
+    auto const collCollator = params.clusteredCollectionCollator;
+    bool compatible = !queryCollator || (collCollator && *queryCollator == *collCollator);
+    return compatible || !affectedByCollator(element);
+}
+
 /**
  * Helper function that checks to see if min() or max() were provided along with the query. If so,
  * adjusts the collection scan bounds to fit the constraints.
  */
-void handleRIDRangeMinMax(const CanonicalQuery& query, CollectionScanNode* collScan) {
+void handleRIDRangeMinMax(const CanonicalQuery& query,
+                          CollectionScanNode* collScan,
+                          const QueryPlannerParams& params,
+                          const CollatorInterface* collator) {
     BSONObj minObj = query.getFindCommandRequest().getMin();
     BSONObj maxObj = query.getFindCommandRequest().getMax();
     if (minObj.isEmpty() && maxObj.isEmpty()) {
@@ -232,17 +262,17 @@ void handleRIDRangeMinMax(const CanonicalQuery& query, CollectionScanNode* collS
         collScan->direction == 1);
 
     boost::optional<RecordId> newMinRecord, newMaxRecord;
-    if (!maxObj.isEmpty()) {
+    if (!maxObj.isEmpty() && compatibleCollator(params, collator, maxObj.firstElement())) {
         // max() is exclusive.
         // Assumes clustered collection scans are only supported with the forward direction.
         collScan->boundInclusion =
             CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
-        newMaxRecord = record_id_helpers::keyForElem(maxObj.firstElement());
+        newMaxRecord = record_id_helpers::keyForElem(maxObj.firstElement(), collator);
     }
 
-    if (!minObj.isEmpty()) {
+    if (!minObj.isEmpty() && compatibleCollator(params, collator, minObj.firstElement())) {
         // The min() is inclusive as are bounded collection scans by default.
-        newMinRecord = record_id_helpers::keyForElem(minObj.firstElement());
+        newMinRecord = record_id_helpers::keyForElem(minObj.firstElement(), collator);
     }
 
     if (!collScan->minRecord) {
@@ -271,7 +301,8 @@ void handleRIDRangeMinMax(const CanonicalQuery& query, CollectionScanNode* collS
  */
 void handleRIDRangeScan(const MatchExpression* conjunct,
                         CollectionScanNode* collScan,
-                        const QueryPlannerParams& params) {
+                        const QueryPlannerParams& params,
+                        const CollatorInterface* collator) {
     invariant(params.clusteredInfo);
 
     if (conjunct == nullptr) {
@@ -281,7 +312,7 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
     auto* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
     if (andMatchPtr != nullptr) {
         for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
-            handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params);
+            handleRIDRangeScan(andMatchPtr->getChild(index), collScan, params, collator);
         }
         return;
     }
@@ -292,31 +323,30 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
         return;
     }
 
-    const bool hasMaxRecord = collScan->maxRecord.has_value();
-    const bool hasMinRecord = collScan->minRecord.has_value();
-
-    if (!hasMinRecord && !hasMaxRecord) {
-        if (auto eq = dynamic_cast<const EqualityMatchExpression*>(conjunct)) {
-            collScan->minRecord = record_id_helpers::keyForElem(eq->getData());
-            collScan->maxRecord = collScan->minRecord;
-            return;
-        }
+    auto match = dynamic_cast<const ComparisonMatchExpression*>(conjunct);
+    if (match == nullptr) {
+        return;  // Not a comparison match expression.
     }
 
-    if (!hasMaxRecord) {
-        if (auto ltConjunct = dynamic_cast<const LTMatchExpression*>(conjunct)) {
-            collScan->maxRecord = record_id_helpers::keyForElem(ltConjunct->getData());
-        } else if (auto lteConjunct = dynamic_cast<const LTEMatchExpression*>(conjunct)) {
-            collScan->maxRecord = record_id_helpers::keyForElem(lteConjunct->getData());
-        }
+    const auto& element = match->getData();
+    bool compatible = compatibleCollator(params, collator, element);
+    if (!compatible) {
+        return;  // Collator affects probe and it's not compatible with collection's collator.
     }
 
-    if (!hasMinRecord) {
-        if (auto gtConjunct = dynamic_cast<const GTMatchExpression*>(conjunct)) {
-            collScan->minRecord = record_id_helpers::keyForElem(gtConjunct->getData());
-        } else if (auto gteConjunct = dynamic_cast<const GTEMatchExpression*>(conjunct)) {
-            collScan->minRecord = record_id_helpers::keyForElem(gteConjunct->getData());
-        }
+    auto& maxRecord = collScan->maxRecord;
+    auto& minRecord = collScan->minRecord;
+    if (dynamic_cast<const EqualityMatchExpression*>(match)) {
+        minRecord = record_id_helpers::keyForElem(element, collator);
+        maxRecord = minRecord;
+    } else if (!maxRecord &&
+               (dynamic_cast<const LTMatchExpression*>(match) ||
+                dynamic_cast<const LTEMatchExpression*>(match))) {
+        maxRecord = record_id_helpers::keyForElem(element, collator);
+    } else if (!minRecord &&
+               (dynamic_cast<const GTMatchExpression*>(match) ||
+                dynamic_cast<const GTEMatchExpression*>(match))) {
+        minRecord = record_id_helpers::keyForElem(element, collator);
     }
 }
 
@@ -404,8 +434,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     if (params.clusteredInfo && !csn->resumeAfterRecordId) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
         // via minRecord and maxRecord if applicable.
-        handleRIDRangeScan(csn->filter.get(), csn.get(), params);
-        handleRIDRangeMinMax(query, csn.get());
+        handleRIDRangeScan(csn->filter.get(), csn.get(), params, query.getCollator());
+        handleRIDRangeMinMax(query, csn.get(), params, query.getCollator());
     }
 
     return csn;

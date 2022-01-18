@@ -46,10 +46,6 @@ selector:
 
   # TODO (SERVER-61259): $text not supported: "No query solutions"
   - jstests/core/fts6.js
-  # TODO (SERVER-61260): _id collations not supported
-  - jstests/core/collation.js
-  - jstests/core/collation_convert_to_capped.js
-  - jstests/core/collation_update.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

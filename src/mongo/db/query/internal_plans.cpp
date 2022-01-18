@@ -77,13 +77,14 @@ CollectionScanParams convertIndexScanParamsToCollScanParams(
 
     dassert(collection->isClustered() &&
             clustered_util::matchesClusterKey(keyPattern, collection->getClusteredInfo()));
+    invariant(collection->getDefaultCollator() == nullptr);
 
     boost::optional<RecordId> startRecord, endRecord;
     if (!startKey.isEmpty()) {
-        startRecord = RecordId(record_id_helpers::keyForElem(startKey.firstElement()));
+        startRecord = RecordId(record_id_helpers::keyForElem(startKey.firstElement(), nullptr));
     }
     if (!endKey.isEmpty()) {
-        endRecord = RecordId(record_id_helpers::keyForElem(endKey.firstElement()));
+        endRecord = RecordId(record_id_helpers::keyForElem(endKey.firstElement(), nullptr));
     }
 
     // For a forward scan, the startKey is the minRecord. For a backward scan, it is the maxRecord.

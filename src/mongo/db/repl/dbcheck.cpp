@@ -247,10 +247,14 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                                            InternalPlanner::IXSCAN_FETCH);
     } else {
         CollectionScanParams params;
-        params.minRecord = uassertStatusOK(record_id_helpers::keyForDoc(
-            start.obj(), collection->getClusteredInfo()->getIndexSpec()));
-        params.maxRecord = uassertStatusOK(record_id_helpers::keyForDoc(
-            end.obj(), collection->getClusteredInfo()->getIndexSpec()));
+        params.minRecord = uassertStatusOK(
+            record_id_helpers::keyForDoc(start.obj(),
+                                         collection->getClusteredInfo()->getIndexSpec(),
+                                         collection->getDefaultCollator()));
+        params.maxRecord = uassertStatusOK(
+            record_id_helpers::keyForDoc(end.obj(),
+                                         collection->getClusteredInfo()->getIndexSpec(),
+                                         collection->getDefaultCollator()));
         params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
         _exec = InternalPlanner::collectionScan(
             opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);

@@ -732,13 +732,16 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                   "bounded collection scans only support forward scans");
                 }
 
+                auto collator = collection->getDefaultCollator();
                 boost::optional<RecordId> minRecord, maxRecord;
                 if (!startKey.isEmpty()) {
-                    minRecord = RecordId(record_id_helpers::keyForElem(startKey.firstElement()));
+                    minRecord =
+                        RecordId(record_id_helpers::keyForElem(startKey.firstElement(), collator));
                 }
 
                 if (!endKey.isEmpty()) {
-                    maxRecord = RecordId(record_id_helpers::keyForElem(endKey.firstElement()));
+                    maxRecord =
+                        RecordId(record_id_helpers::keyForElem(endKey.firstElement(), collator));
                 }
 
                 planExecutor = isFind

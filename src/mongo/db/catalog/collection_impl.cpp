@@ -824,8 +824,8 @@ Status CollectionImpl::insertDocumentForBulkLoader(
     RecordId recordId;
     if (isClustered()) {
         invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
-        recordId =
-            uassertStatusOK(record_id_helpers::keyForDoc(doc, getClusteredInfo()->getIndexSpec()));
+        recordId = uassertStatusOK(record_id_helpers::keyForDoc(
+            doc, getClusteredInfo()->getIndexSpec(), getDefaultCollator()));
     }
 
     // Using timestamp 0 for these inserts, which are non-oplog so we don't have an appropriate
@@ -908,8 +908,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         RecordId recordId;
         if (isClustered()) {
             invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
-            recordId = uassertStatusOK(
-                record_id_helpers::keyForDoc(doc, getClusteredInfo()->getIndexSpec()));
+            recordId = uassertStatusOK(record_id_helpers::keyForDoc(
+                doc, getClusteredInfo()->getIndexSpec(), getDefaultCollator()));
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {

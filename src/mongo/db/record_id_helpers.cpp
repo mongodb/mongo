@@ -37,6 +37,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/redaction.h"
@@ -83,7 +84,9 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     return keyForOptime(elem.timestamp());
 }
 
-StatusWith<RecordId> keyForDoc(const BSONObj& doc, const ClusteredIndexSpec& indexSpec) {
+StatusWith<RecordId> keyForDoc(const BSONObj& doc,
+                               const ClusteredIndexSpec& indexSpec,
+                               const CollatorInterface* collator) {
     // Get the collection's cluster key field name
     const auto clusterKeyField = clustered_util::getClusterKeyFieldName(indexSpec);
     // Build a RecordId using the cluster key.
@@ -94,15 +97,21 @@ StatusWith<RecordId> keyForDoc(const BSONObj& doc, const ClusteredIndexSpec& ind
                               << clusterKeyField << "' field"};
     }
 
-    return keyForElem(keyElement);
+    return keyForElem(keyElement, collator);
 }
 
-RecordId keyForElem(const BSONElement& elem) {
+RecordId keyForElem(const BSONElement& elem, const CollatorInterface* collator) {
     // Intentionally discard the TypeBits since the type information will be stored in the cluster
     // key of the original document. The consequence of this behavior is that cluster key values
     // that compare similarly, but are of different types may not be used concurrently.
     KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
-    keyBuilder.appendBSONElement(elem);
+    if (collator) {
+        BSONObjBuilder out;
+        CollationIndexKey::collationAwareIndexKeyAppend(elem, collator, &out);
+        keyBuilder.appendBSONElement(out.done().firstElement());
+    } else {
+        keyBuilder.appendBSONElement(elem);
+    }
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 

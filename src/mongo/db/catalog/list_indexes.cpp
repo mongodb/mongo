@@ -79,8 +79,12 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
         collection->getAllIndexes(&indexNames);
 
         if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
+            BSONObj collation;
+            if (auto collator = collection->getDefaultCollator()) {
+                collation = collator->getSpec().toBSON();
+            }
             auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
-                collection->getClusteredInfo().get());
+                collection->getClusteredInfo().get(), collation);
             if (additionalInclude == ListIndexesInclude::IndexBuildInfo) {
                 indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
             } else {

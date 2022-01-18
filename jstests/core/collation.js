@@ -19,6 +19,8 @@ load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 // For isReplSet
 load("jstests/libs/fixture_helpers.js");
 load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
+// For areAllCollectionsClustered.
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 var coll = db.collation;
 coll.drop();
@@ -31,6 +33,7 @@ var hello = db.runCommand("hello");
 assert.commandWorked(hello);
 var isMongos = (hello.msg === "isdbgrid");
 var isStandalone = !isMongos && !hello.hasOwnProperty('setName');
+var isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db);
 
 var assertIndexHasCollation = function(keyPattern, collation) {
     var indexSpecs = coll.getIndexes();
@@ -669,15 +672,6 @@ assert.commandWorked(
 assert.commandWorked(coll.insert({_id: "foo"}));
 assert.eq(1, coll.find({_id: "FOO"}).itcount());
 
-// Find on _id should use idhack stage when query inherits collection default collation.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
-assert.commandWorked(explainRes);
-let classicAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IDHACK");
-let sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
-
 // Find should return correct results for query containing $expr when no collation specified and
 // collection has a default collation.
 coll.drop();
@@ -708,28 +702,39 @@ assert.commandWorked(coll.insert({_id: "foo"}));
 assert.commandWorked(coll.insert({_id: "FOO"}));
 assert.eq(2, coll.find({_id: "foo"}).collation({locale: "en_US", strength: 2}).itcount());
 
-// Find on _id should use idhack stage when explicitly given query collation matches
-// collection default.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes =
-    coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
-assert.commandWorked(explainRes);
-classicAssert = null !== getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
+if (!isClustered) {
+    // Find on _id should use idhack stage when query inherits collection default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
+    assert.commandWorked(explainRes);
+    let classicAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IDHACK");
+    let sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+    engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
 
-// Find on _id should not use idhack stage when query collation does not match collection
-// default.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes =
-    coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
-assert.commandWorked(explainRes);
+    // Find on _id should use idhack stage when explicitly given query collation matches
+    // collection default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes =
+        coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
+    assert.commandWorked(explainRes);
+    classicAssert = null !== getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+    engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
 
-classicAssert = null === getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-sbeAssert = null === getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
+    // Find on _id should not use idhack stage when query collation does not match collection
+    // default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes =
+        coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
+    assert.commandWorked(explainRes);
+
+    classicAssert = null === getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    sbeAssert = null === getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
+    engineSpecificAssertion(classicAssert, sbeAssert, db, explainRes);
+}
 
 // Find should select compatible index when no collation specified and collection has a default
 // collation.
@@ -1053,13 +1058,15 @@ writeRes = coll.remove({_id: "FOO"}, {justOne: true, hint: {a: 1}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nRemoved);
 
-// Remove on _id should use idhack stage when query inherits collection default collation.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").remove({_id: "foo"});
-assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-assert.neq(null, planStage);
+if (!isClustered) {
+    // Remove on _id should use idhack stage when query inherits collection default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes = coll.explain("executionStats").remove({_id: "foo"});
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.neq(null, planStage);
+}
 
 // Remove should return correct results when "simple" collation specified and collection has
 // a default collation.
@@ -1081,23 +1088,27 @@ writeRes = coll.remove({_id: "FOO"}, {justOne: true, collation: {locale: "simple
 assert.commandWorked(writeRes);
 assert.eq(0, writeRes.nRemoved);
 
-// Remove on _id should use idhack stage when explicit query collation matches collection
-// default.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "en_US"}});
-assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-assert.neq(null, planStage);
+if (!isClustered) {
+    // Remove on _id should use idhack stage when explicit query collation matches collection
+    // default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes =
+        coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "en_US"}});
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.neq(null, planStage);
 
-// Remove on _id should not use idhack stage when query collation does not match collection
-// default.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
-assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-assert.eq(null, planStage);
+    // Remove on _id should not use idhack stage when query collation does not match collection
+    // default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes =
+        coll.explain("executionStats").remove({_id: "foo"}, {collation: {locale: "fr_CA"}});
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.eq(null, planStage);
+}
 
 //
 // Collation tests for update.
@@ -1149,13 +1160,15 @@ writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
 
-// Update on _id should use idhack stage when query inherits collection default collation.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}});
-assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-assert.neq(null, planStage);
+if (!isClustered) {
+    // Update on _id should use idhack stage when query inherits collection default collation.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}});
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.neq(null, planStage);
+}
 
 // Update should return correct results when "simple" collation specified and collection has
 // a default collation.
@@ -1177,27 +1190,29 @@ writeRes = coll.update({_id: "FOO"}, {$set: {other: 99}}, {collation: {locale: "
 assert.commandWorked(writeRes);
 assert.eq(0, writeRes.nModified);
 
-// Update on _id should use idhack stage when explicitly given query collation matches
-// collection default.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
-    collation: {locale: "en_US"}
-});
-assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-assert.neq(null, planStage);
+if (!isClustered) {
+    // Update on _id should use idhack stage when explicitly given query collation matches
+    // collection default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
+        collation: {locale: "en_US"}
+    });
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.neq(null, planStage);
 
-// Update on _id should not use idhack stage when query collation does not match collection
-// default.
-coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
-    collation: {locale: "fr_CA"}
-});
-assert.commandWorked(explainRes);
-planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
-assert.eq(null, planStage);
+    // Update on _id should not use idhack stage when query collation does not match collection
+    // default.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
+    explainRes = coll.explain("executionStats").update({_id: "foo"}, {$set: {other: 99}}, {
+        collation: {locale: "fr_CA"}
+    });
+    assert.commandWorked(explainRes);
+    planStage = getPlanStage(explainRes.executionStats.executionStages, "IDHACK");
+    assert.eq(null, planStage);
+}
 
 //
 // Collation tests for the $geoNear aggregation stage.
