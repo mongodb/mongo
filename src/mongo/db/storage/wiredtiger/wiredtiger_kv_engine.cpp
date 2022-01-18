@@ -1086,9 +1086,9 @@ public:
 
     ~StreamingCursorImpl() = default;
 
-    StatusWith<std::vector<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
+    StatusWith<std::vector<BackupBlock>> getNextBatch(const std::size_t batchSize) {
         int wtRet;
-        std::vector<StorageEngine::BackupBlock> backupBlocks;
+        std::vector<BackupBlock> backupBlocks;
 
         stdx::lock_guard<Latch> backupCursorLk(_wtBackup->wtBackupCursorMutex);
         while (backupBlocks.size() < batchSize) {
@@ -1145,7 +1145,8 @@ public:
                 // to an entire file. Full backups cannot open an incremental cursor, even if they
                 // are the initial incremental backup.
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
-                backupBlocks.push_back({filePath.string(), 0 /* offset */, length, fileSize});
+                backupBlocks.push_back(
+                    BackupBlock(filePath.string(), 0 /* offset */, length, fileSize));
             }
         }
 
@@ -1161,7 +1162,7 @@ private:
                                            boost::filesystem::path filePath,
                                            const std::uint64_t fileSize,
                                            const std::size_t batchSize,
-                                           std::vector<StorageEngine::BackupBlock>* backupBlocks) {
+                                           std::vector<BackupBlock>* backupBlocks) {
         // For each file listed, open a duplicate backup cursor and get the blocks to copy.
         std::stringstream ss;
         ss << "incremental=(file=" << filename << ")";
@@ -1197,13 +1198,14 @@ private:
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
-            backupBlocks->push_back({filePath.string(), offset, size, fileSize});
+            backupBlocks->push_back(BackupBlock(filePath.string(), offset, size, fileSize));
         }
 
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
         // to distinguish between an unchanged file and a deleted file in an incremental backup.
         if (fileUnchangedFlag) {
-            backupBlocks->push_back({filePath.string(), 0 /* offset */, 0 /* length */, fileSize});
+            backupBlocks->push_back(
+                BackupBlock(filePath.string(), 0 /* offset */, 0 /* length */, fileSize));
         }
 
         // If the duplicate backup cursor has been exhausted, close it and set

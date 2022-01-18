@@ -44,6 +44,7 @@
 
 namespace mongo {
 
+class BackupBlock;
 class JournalListener;
 class DurableCatalog;
 class KVEngine;
@@ -309,25 +310,6 @@ public:
         int blockSizeMB = 16;
         boost::optional<std::string> thisBackupName;
         boost::optional<std::string> srcBackupName;
-    };
-
-    /**
-     * Represents the file blocks returned by the storage engine during both full and incremental
-     * backups. In the case of a full backup, each block is an entire file with offset=0 and
-     * length=fileSize. In the case of the first basis for future incremental backups, each block is
-     * an entire file with offset=0 and length=0. In the case of a subsequent incremental backup,
-     * each block reflects changes made to data files since the basis (named 'thisBackupName') and
-     * each block has a maximum size of 'blockSizeMB'.
-     *
-     * If a file is unchanged in a subsequent incremental backup, a single block is returned with
-     * offset=0 and length=0. This allows consumers of the backup API to safely truncate files that
-     * are not returned by the backup cursor.
-     */
-    struct BackupBlock {
-        std::string filename;
-        std::uint64_t offset = 0;
-        std::uint64_t length = 0;
-        std::uint64_t fileSize = 0;
     };
 
     /**

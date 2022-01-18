@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,48 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <boost/filesystem.hpp>
+#include <set>
 
-#include <boost/optional.hpp>
-#include <string>
-#include <vector>
-
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/storage/backup_block.h"
-#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
-struct BackupCursorState {
-    UUID backupId;
-    boost::optional<Document> preamble;
-    std::unique_ptr<StorageEngine::StreamingCursor> streamingCursor;
-    // 'otherBackupBlocks' includes the backup blocks for the encrypted storage engine in the
-    // enterprise module.
-    std::vector<BackupBlock> otherBackupBlocks;
-};
+namespace {
 
-struct BackupCursorExtendState {
-    std::vector<std::string> filenames;
-};
+const std::set<std::string> kRequiredWTFiles = {
+    "WiredTiger", "WiredTiger.backup", "WiredTigerHS.wt"};
+
+const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.wt"};
+
+}  // namespace
+
+bool BackupBlock::isRequired() const {
+    // Extract the filename from the path.
+    boost::filesystem::path path(_filename);
+    const std::string filename = path.filename().string();
+
+    // Check whether this is a required WiredTiger file.
+    if (kRequiredWTFiles.find(filename) != kRequiredWTFiles.end()) {
+        return true;
+    }
+
+    // Check if this is a journal file.
+    if (StringData(filename).startsWith("WiredTigerLog.")) {
+        return true;
+    }
+
+    // Check whether this is a required MongoDB file.
+    if (kRequiredMDBFiles.find(filename) != kRequiredMDBFiles.end()) {
+        return true;
+    }
+
+    // TODO SERVER-62427: mark the following namespaces as required:
+    // - Any collection residing in an internal database (admin, local or config).
+    // - Each databases 'system.views' collection.
+    // - Collections with table logging enabled. See WiredTigerUtil::useTableLogging().
+    return false;
+}
 
 }  // namespace mongo

@@ -273,8 +273,7 @@ namespace {
 class StreamingCursorImpl : public StorageEngine::StreamingCursor {
 public:
     StreamingCursorImpl() = delete;
-    StreamingCursorImpl(StorageEngine::BackupOptions options,
-                        std::vector<StorageEngine::BackupBlock> backupBlocks)
+    StreamingCursorImpl(StorageEngine::BackupOptions options, std::vector<BackupBlock> backupBlocks)
         : StorageEngine::StreamingCursor(options), _backupBlocks(std::move(backupBlocks)) {
         _exhaustCursor = false;
     };
@@ -285,9 +284,9 @@ public:
         return BSONObj();
     }
 
-    StatusWith<std::vector<StorageEngine::BackupBlock>> getNextBatch(const std::size_t batchSize) {
+    StatusWith<std::vector<BackupBlock>> getNextBatch(const std::size_t batchSize) {
         if (_exhaustCursor) {
-            std::vector<StorageEngine::BackupBlock> emptyVector;
+            std::vector<BackupBlock> emptyVector;
             return emptyVector;
         }
         _exhaustCursor = true;
@@ -295,7 +294,7 @@ public:
     }
 
 private:
-    std::vector<StorageEngine::BackupBlock> _backupBlocks;
+    std::vector<BackupBlock> _backupBlocks;
     bool _exhaustCursor;
 };
 

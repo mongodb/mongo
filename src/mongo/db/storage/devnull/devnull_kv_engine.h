@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 
@@ -165,8 +166,8 @@ public:
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.
-    void setBackupBlocks_forTest(std::vector<StorageEngine::BackupBlock> newBackupBlocks) {
-        _mockBackupBlocks = newBackupBlocks;
+    void setBackupBlocks_forTest(std::vector<BackupBlock> newBackupBlocks) {
+        _mockBackupBlocks = std::move(newBackupBlocks);
     }
 
 private:
@@ -174,6 +175,6 @@ private:
 
     int _cachePressureForTest;
 
-    std::vector<StorageEngine::BackupBlock> _mockBackupBlocks = {{"filename.wt"}};
+    std::vector<BackupBlock> _mockBackupBlocks = {BackupBlock("filename.wt")};
 };
 }  // namespace mongo
