@@ -98,6 +98,7 @@ public:
 
     virtual void getStats(OperationContext* opCtx,
                           BSONObjBuilder* output,
+                          bool includeFreeStorage,
                           double scale = 1) const = 0;
 
     /**

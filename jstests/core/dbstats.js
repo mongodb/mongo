@@ -2,6 +2,7 @@
 //
 // @tags: [
 //   requires_dbstats,
+//   requires_fcv_52
 // ]
 
 (function() {
@@ -33,7 +34,7 @@ const doc = {
 };
 assert.commandWorked(coll.insert(doc));
 
-let dbStats = testDB.runCommand({dbStats: 1});
+let dbStats = testDB.runCommand({dbStats: 1, freeStorage: 1});
 assert.commandWorked(dbStats);
 
 assert.eq(1, dbStats.objects, tojson(dbStats));  // Includes testColl only
@@ -60,6 +61,13 @@ if (isUsingPersistentStorage) {
 
     assert(dbStats.hasOwnProperty("fsUsedSize"), tojson(dbStats));
     assert(dbStats.hasOwnProperty("fsTotalSize"), tojson(dbStats));
+
+    // Make sure free storage size is not included by default
+    const defaultStats = testDB.runCommand({dbStats: 1});
+    assert.commandWorked(defaultStats);
+    assert(!defaultStats.hasOwnProperty("freeStorageSize"), tojson(defaultStats));
+    assert(!defaultStats.hasOwnProperty("indexFreeStorageSize"), tojson(defaultStats));
+    assert(!defaultStats.hasOwnProperty("totalFreeStorageSize"), tojson(defaultStats));
 }
 
 // Confirm collection and view counts on mongoD

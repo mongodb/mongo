@@ -255,7 +255,10 @@ bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
     return _dropPending.load();
 }
 
-void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale) const {
+void DatabaseImpl::getStats(OperationContext* opCtx,
+                            BSONObjBuilder* output,
+                            bool includeFreeStorage,
+                            double scale) const {
 
     long long nCollections = 0;
     long long nViews = 0;
@@ -277,11 +280,14 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
             BSONObjBuilder temp;
             storageSize += collection->getRecordStore()->storageSize(opCtx, &temp);
-            freeStorageSize += collection->getRecordStore()->freeStorageSize(opCtx);
 
             indexes += collection->getIndexCatalog()->numIndexesTotal(opCtx);
             indexSize += collection->getIndexSize(opCtx);
-            indexFreeStorageSize += collection->getIndexFreeStorageBytes(opCtx);
+
+            if (includeFreeStorage) {
+                freeStorageSize += collection->getRecordStore()->freeStorageSize(opCtx);
+                indexFreeStorageSize += collection->getIndexFreeStorageBytes(opCtx);
+            }
 
             return true;
         });
@@ -298,12 +304,19 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     output->append("avgObjSize", objects == 0 ? 0 : double(size) / double(objects));
     output->appendNumber("dataSize", size / scale);
     output->appendNumber("storageSize", storageSize / scale);
-    output->appendNumber("freeStorageSize", freeStorageSize / scale);
-    output->appendNumber("indexes", indexes);
-    output->appendNumber("indexSize", indexSize / scale);
-    output->appendNumber("indexFreeStorageSize", indexFreeStorageSize / scale);
-    output->appendNumber("totalSize", (storageSize + indexSize) / scale);
-    output->appendNumber("totalFreeStorageSize", (freeStorageSize + indexFreeStorageSize) / scale);
+    if (includeFreeStorage) {
+        output->appendNumber("freeStorageSize", freeStorageSize / scale);
+        output->appendNumber("indexes", indexes);
+        output->appendNumber("indexSize", indexSize / scale);
+        output->appendNumber("indexFreeStorageSize", indexFreeStorageSize / scale);
+        output->appendNumber("totalSize", (storageSize + indexSize) / scale);
+        output->appendNumber("totalFreeStorageSize",
+                             (freeStorageSize + indexFreeStorageSize) / scale);
+    } else {
+        output->appendNumber("indexes", indexes);
+        output->appendNumber("indexSize", indexSize / scale);
+        output->appendNumber("totalSize", (storageSize + indexSize) / scale);
+    }
     output->appendNumber("scaleFactor", scale);
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {

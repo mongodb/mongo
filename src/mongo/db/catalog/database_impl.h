@@ -49,7 +49,10 @@ public:
 
     bool isDropPending(OperationContext* opCtx) const final;
 
-    void getStats(OperationContext* opCtx, BSONObjBuilder* output, double scale = 1) const final;
+    void getStats(OperationContext* opCtx,
+                  BSONObjBuilder* output,
+                  bool includeFreeStorage,
+                  double scale = 1) const final;
 
     /**
      * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if

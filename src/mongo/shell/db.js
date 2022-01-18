@@ -36,8 +36,19 @@ DB.prototype.getName = function() {
     return this._name;
 };
 
-DB.prototype.stats = function(scale) {
-    return this.runCommand({dbstats: 1, scale: scale});
+/**
+ * Gets DB level statistics. opt can be a number representing the scale for backwards compatibility
+ * or a document with options passed along to the dbstats command.
+ */
+DB.prototype.stats = function(opt) {
+    var cmd = {dbstats: 1};
+
+    if (opt === undefined)
+        return this.runCommand(cmd);
+    if (typeof (opt) !== "object")
+        return this.runCommand(Object.extend(cmd, {scale: opt}));
+
+    return this.runCommand(Object.extend(cmd, opt));
 };
 
 DB.prototype.getCollection = function(name) {
