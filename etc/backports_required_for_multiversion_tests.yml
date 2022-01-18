@@ -140,6 +140,8 @@ last-continuous:
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
     - ticket: SERVER-61977
       test_file: jstests/replsets/rollback_during_step_up.js
+    - ticket: SERVER-61755
+      test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -419,6 +421,8 @@ last-lts:
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
     - ticket: SERVER-61977
       test_file: jstests/replsets/rollback_during_step_up.js
+    - ticket: SERVER-61755
+      test_file: jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
