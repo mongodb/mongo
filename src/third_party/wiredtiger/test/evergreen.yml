@@ -480,6 +480,7 @@ functions:
         aws_key: ${aws_key}
         local_file: wt-hang-analyzer.tgz
         bucket: build_external
+        optional: true
         permissions: public-read
         content_type: application/tar
         display_name: WT Hang Analyzer Output - Execution ${execution}
