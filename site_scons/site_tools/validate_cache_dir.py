@@ -22,7 +22,6 @@
 
 import datetime
 import json
-import logging
 import os
 import pathlib
 import shutil
@@ -207,9 +206,11 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             super().CacheDebug(fmt, target, cachefile)
 
     def _log(self, msg, log_msg, json_info, realnode, cachefile):
-        logging.basicConfig(format='%(levelname)s:validate_cachedir: %(message)s')
-        logging.error(msg)
         self.CacheDebug(log_msg + cache_debug_suffix, realnode, cachefile)
+
+        # Write the exception and/or error info to the cache debug log file if in use.
+        if self.debugFP:
+            self.debugFP.write(msg + '\n')
         self.CacheDebugJson(json_info, realnode, cachefile)
 
     def print_cache_issue(self, node, ex):
