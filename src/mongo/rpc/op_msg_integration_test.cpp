@@ -538,6 +538,80 @@ TEST(OpMsg, MongosIgnoresExhaustForGetMore) {
     ASSERT_BSONOBJ_EQ(nextBatch[1].embeddedObject(), BSON("_id" << 1));
 }
 
+TEST(OpMsg, ExhaustWorksForAggCursor) {
+    auto conn = getIntegrationTestConnection();
+
+    // Only test exhaust against a standalone.
+    if (conn->isReplicaSetMember() || conn->isMongos()) {
+        return;
+    }
+
+    NamespaceString nss("test", "coll");
+
+    conn->dropCollection(nss.toString());
+
+    // Insert 5 documents so that a cursor using a batchSize of 2 requires three batches to get all
+    // the results.
+    for (int i = 0; i < 5; i++) {
+        conn->insert(nss.toString(), BSON("_id" << i));
+    }
+
+    // Issue an agg request to open a cursor but return 0 documents. Specify a sort in order to
+    // guarantee their return order.
+    auto aggCmd = BSON("aggregate" << nss.coll() << "cursor" << BSON("batchSize" << 0) << "pipeline"
+                                   << BSON_ARRAY(BSON("$sort" << BSON("_id" << 1))));
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), aggCmd);
+    auto request = opMsgRequest.serialize();
+
+    Message reply;
+    ASSERT(conn->call(request, reply));
+    auto res = OpMsg::parse(reply).body;
+    const long long cursorId = res["cursor"]["id"].numberLong();
+    ASSERT(res["cursor"]["firstBatch"].Array().empty());
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+
+    // Construct getMore request with exhaust flag. Set batch size so we will need multiple batches
+    // to exhaust the cursor.
+    int batchSize = 2;
+    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    getMoreRequest.setBatchSize(batchSize);
+    opMsgRequest = OpMsgRequest::fromDBAndBody(nss.db(), getMoreRequest.toBSON({}));
+    request = opMsgRequest.serialize();
+    OpMsg::setFlag(&request, OpMsg::kExhaustSupported);
+
+    auto assertNextBatch =
+        [](const Message& msg, CursorId expectedCursorId, std::vector<BSONObj> expectedBatch) {
+            auto cmdReply = OpMsg::parse(msg).body;
+            ASSERT_OK(getStatusFromCommandResult(cmdReply));
+            ASSERT_EQ(cmdReply["cursor"]["id"].numberLong(), expectedCursorId);
+            std::vector<BSONElement> nextBatch = cmdReply["cursor"]["nextBatch"].Array();
+            ASSERT_EQ(nextBatch.size(), expectedBatch.size());
+            auto it = expectedBatch.begin();
+            for (auto&& batchElt : nextBatch) {
+                ASSERT(it != expectedBatch.end());
+                ASSERT_BSONOBJ_EQ(batchElt.embeddedObject(), *it);
+                ++it;
+            }
+        };
+
+    // Run getMore to initiate the exhaust stream.
+    ASSERT(conn->call(request, reply));
+    auto lastRequestId = reply.header().getId();
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    assertNextBatch(reply, cursorId, {BSON("_id" << 0), BSON("_id" << 1)});
+
+    // Receive next exhaust batch.
+    ASSERT_OK(conn->recv(reply, lastRequestId));
+    lastRequestId = reply.header().getId();
+    ASSERT(OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    assertNextBatch(reply, cursorId, {BSON("_id" << 2), BSON("_id" << 3)});
+
+    // Receive terminal batch.
+    ASSERT_OK(conn->recv(reply, lastRequestId));
+    ASSERT(!OpMsg::isFlagSet(reply, OpMsg::kMoreToCome));
+    assertNextBatch(reply, 0, {BSON("_id" << 4)});
+}
+
 TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
     auto swConn = unittest::getFixtureConnectionString().connect("integration_test");
     uassertStatusOK(swConn.getStatus());
