@@ -94,7 +94,8 @@ public:
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         };
     }
 
@@ -148,7 +149,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     auto cursorId = cursorPin.getCursor()->cursorid();
@@ -178,7 +180,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     auto cursorId = cursorPin.getCursor()->cursorid();
@@ -219,7 +222,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
@@ -239,7 +243,8 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
     ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t::max()));
     ASSERT_EQ(0UL, cursorManager->numCursors());
@@ -263,7 +268,8 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     // The pin is still in scope, so it should not time out.
@@ -291,7 +297,8 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
     auto cursorId = cursorPin->cursorid();
 
@@ -328,7 +335,8 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     // A cursor will stay alive, but be marked as killed, if it is interrupted with a code other
@@ -364,7 +372,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
     auto usedCursorId = cursorPin.getCursor()->cursorid();
     cursorPin.release();
@@ -382,7 +391,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     // Advance the clock to simulate time passing.
@@ -423,7 +433,8 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
             BSONObj(),
             ClientCursorParams::LockPolicy::kLocksInternally,
             PrivilegeVector(),
-            false  // needsMerge
+            false,  // needsMerge
+            false   // isOpQueryExhaust
         });
 
     // Advance the clock to simulate time passing.

@@ -621,7 +621,8 @@ public:
                      _request.body,
                      ClientCursorParams::LockPolicy::kLockExternally,
                      {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
-                     expCtx->needsMerge});
+                     expCtx->needsMerge,
+                     false /*isOpQueryExhaust*/});
                 cursorId = pinnedCursor.getCursor()->cursorid();
 
                 invariant(!exec);

@@ -113,7 +113,7 @@ Message makeLegacyExhaustMessage(Message* m, const DbResponse& dbresponse) {
  * 'synthetic' exhaust request. Returns an empty message if exhaust is not allowed.
  */
 Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
-    if (requestMsg.operation() == dbQuery) {
+    if (requestMsg.operation() == dbQuery || requestMsg.operation() == dbGetMore) {
         return makeLegacyExhaustMessage(&requestMsg, *dbresponse);
     }
 

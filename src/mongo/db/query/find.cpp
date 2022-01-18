@@ -777,17 +777,16 @@ bool runQuery(OperationContext* opCtx,
         // Allocate a new ClientCursor and register it with the cursor manager.
         ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
-            {
-                std::move(exec),
-                nss,
-                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                opCtx->getWriteConcern(),
-                readConcernArgs,
-                upconvertedQuery,
-                ClientCursorParams::LockPolicy::kLockExternally,
-                {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
-                false  // needsMerge always 'false' for find().
-            });
+            {std::move(exec),
+             nss,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->getWriteConcern(),
+             readConcernArgs,
+             upconvertedQuery,
+             ClientCursorParams::LockPolicy::kLockExternally,
+             {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::find)},
+             false,  // needsMerge always 'false' for find().
+             opCtx->isExhaust()});
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOGV2_DEBUG(

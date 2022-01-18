@@ -193,6 +193,8 @@ all:
     test_file: jstests/auth/dbcheck.js
   - ticket: SERVER-62212
     test_file: jstests/replsets/dbcheck_write_concern.js
+  - ticket: SERVER-62147
+    test_file: jstests/core/exhaust.js
 
 
 suites:

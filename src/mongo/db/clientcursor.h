@@ -83,7 +83,8 @@ struct ClientCursorParams {
                        BSONObj originatingCommandObj,
                        LockPolicy lockPolicy,
                        PrivilegeVector originatingPrivileges,
-                       bool needsMerge)
+                       bool needsMerge,
+                       bool isOpQueryExhaust)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
           writeConcernOptions(std::move(writeConcernOptions)),
@@ -97,6 +98,15 @@ struct ClientCursorParams {
           needsMerge(needsMerge) {
         while (authenticatedUsersIter.more()) {
             authenticatedUsers.emplace_back(authenticatedUsersIter.next());
+        }
+
+        // There are separate implementations for exhaust cursors using OP_QUERY and exhaust cursors
+        // using OP_MSG. In the case of OP_QUERY exhaust, the OP_GET_MORE code consults the cursor's
+        // 'queryOptions' bit vector in order to determine whether another getMore should run again
+        // immediately without waiting for a request from the client. Here we set the exhaust bit if
+        // the cursor is being registered as an OP_QUERY exhaust cursor.
+        if (isOpQueryExhaust) {
+            queryOptions |= QueryOption_Exhaust;
         }
     }
 

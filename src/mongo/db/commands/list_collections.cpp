@@ -404,7 +404,8 @@ public:
                 ClientCursorParams::LockPolicy::kLocksInternally,
                 uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                                     ->checkAuthorizedToListCollections(dbname, jsobj)),
-                false  // needsMerge always 'false' for listCollections.
+                false,  // needsMerge always 'false' for listCollections.
+                false   // isOpQueryExhaust
             });
 
         appendCursorResponseObject(

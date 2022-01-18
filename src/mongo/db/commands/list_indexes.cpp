@@ -215,7 +215,8 @@ public:
                 cmdObj,
                 ClientCursorParams::LockPolicy::kLocksInternally,
                 {Privilege(ResourcePattern::forExactNamespace(nss), ActionType::listIndexes)},
-                false  // needsMerge always 'false' for listIndexes.
+                false,  // needsMerge always 'false' for listIndexes.
+                false   // isOpQueryExhaust
             });
 
         appendCursorResponseObject(

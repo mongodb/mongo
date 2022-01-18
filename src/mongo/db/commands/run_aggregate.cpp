@@ -796,7 +796,8 @@ Status runAggregate(OperationContext* opCtx,
             cmdObj,
             lockPolicy,
             privileges,
-            expCtx->needsMerge);
+            expCtx->needsMerge,
+            false /*isOpQueryExhaust*/);
         if (expCtx->tailableMode == TailableModeEnum::kTailable) {
             cursorParams.setTailable(true);
         } else if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
