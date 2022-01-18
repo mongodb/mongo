@@ -2948,10 +2948,15 @@ var ReplSetTest = function(opts) {
     this.freeze = _nodeParamToSingleNode(_nodeParamToConn(function(node) {
         assert.soon(() => {
             try {
-                // Ensure node is not primary. Ignore errors, probably means it's already secondary.
-                node.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true});
-                // Prevent node from running election. Fails if it already started an election.
-                assert.commandWorked(node.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
+                // Ensure node is authenticated.
+                asCluster(node, () => {
+                    // Ensure node is not primary. Ignore errors, probably means it's already
+                    // secondary.
+                    node.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true});
+                    // Prevent node from running election. Fails if it already started an election.
+                    assert.commandWorked(
+                        node.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
+                });
                 return true;
             } catch (e) {
                 if (isNetworkError(e) || e.code === ErrorCodes.NotSecondary ||
