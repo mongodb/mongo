@@ -517,7 +517,7 @@ __txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[], bool
         return (0);
 
     /* Retrieve the maximum operation time, defaulting to the database-wide configuration. */
-    WT_RET(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
+    WT_RET(__wt_config_gets_def(session, cfg, "operation_timeout_ms", 0, &cval));
 
     /*
      * The default configuration value is 0, we can't tell if they're setting it back to 0 or, if

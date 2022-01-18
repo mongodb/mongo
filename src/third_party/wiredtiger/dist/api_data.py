@@ -779,12 +779,12 @@ connection_runtime_config = [
             type='boolean')
         ]),
     Config('operation_timeout_ms', '0', r'''
-        when non-zero, a requested limit on the number of elapsed real time milliseconds
+        if non-zero, a requested limit on the number of elapsed real time milliseconds
         application threads will take to complete database operations. Time is measured from the
         start of each WiredTiger API call.  There is no guarantee any operation will not take
         longer than this amount of time. If WiredTiger notices the limit has been exceeded, an
-        operation may return a WT_ROLLBACK error. Default is to have no limit''',
-        min=1),
+        operation may return a WT_ROLLBACK error. The default of 0 is to have no limit''',
+        min=0),
     Config('operation_tracking', '', r'''
         enable tracking of performance-critical functions. See
         @ref operation_tracking for more information''',
