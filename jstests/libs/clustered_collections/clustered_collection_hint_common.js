@@ -227,10 +227,8 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 update: collName,
                 updates: [{q: {[clusterKeyFieldName]: 3}, u: {$inc: {a: -2}}, hint: clusterKey}]
             },
-            expectedWinningPlanStats: {
-                stage: "COLLSCAN",
-                direction: "forward",
-            }
+            expectedWinningPlanStats:
+                {stage: "COLLSCAN", direction: "forward", minRecord: 3, maxRecord: 3}
         });
 
         // Update with reverse $natural hint.
@@ -241,10 +239,8 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 updates:
                     [{q: {[clusterKeyFieldName]: 80}, u: {$inc: {a: 80}}, hint: {$natural: -1}}]
             },
-            expectedWinningPlanStats: {
-                stage: "COLLSCAN",
-                direction: "backward",
-            }
+            expectedWinningPlanStats:
+                {stage: "COLLSCAN", direction: "backward", minRecord: 80, maxRecord: 80}
         });
 
         // Update with hint on secondary index.
@@ -264,10 +260,8 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 delete: collName,
                 deletes: [{q: {[clusterKeyFieldName]: 2}, limit: 0, hint: clusterKey}]
             },
-            expectedWinningPlanStats: {
-                stage: "COLLSCAN",
-                direction: "forward",
-            }
+            expectedWinningPlanStats:
+                {stage: "COLLSCAN", direction: "forward", minRecord: 2, maxRecord: 2}
         });
 
         // Delete reverse $natural hint.
@@ -277,10 +271,8 @@ const testClusteredCollectionHint = function(coll, clusterKey, clusterKeyName) {
                 delete: collName,
                 deletes: [{q: {[clusterKeyFieldName]: 30}, limit: 0, hint: {$natural: -1}}]
             },
-            expectedWinningPlanStats: {
-                stage: "COLLSCAN",
-                direction: "backward",
-            }
+            expectedWinningPlanStats:
+                {stage: "COLLSCAN", direction: "backward", minRecord: 30, maxRecord: 30}
         });
 
         // Delete with hint on standard index.
