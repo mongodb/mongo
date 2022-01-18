@@ -96,10 +96,6 @@ main(int argc, char *argv[])
     TEST_OPTS *opts, _opts;
     const char *tablename;
 
-    /* Bypass this test for valgrind */
-    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
-        return (EXIT_SUCCESS);
-
     opts = &_opts;
     sharedopts = &_sharedopts;
     memset(opts, 0, sizeof(*opts));

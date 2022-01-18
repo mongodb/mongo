@@ -92,13 +92,6 @@ main(int argc, char *argv[])
     char tableconf[128];
     const char *tablename;
 
-    /*
-     * Bypass this test for valgrind or slow test machines. This test is timing sensitive.
-     */
-    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND") ||
-      testutil_is_flag_set("TESTUTIL_SLOW_MACHINE"))
-        return (EXIT_SUCCESS);
-
     opts = &_opts;
     sharedopts = &_sharedopts;
     memset(opts, 0, sizeof(*opts));

@@ -414,12 +414,6 @@ main(int argc, char *argv[])
 
     skip = false;
 
-    /*
-     * Bypass this test for valgrind. It has a fairly low thread limit.
-     */
-    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
-        skip = true;
-
 /*
  * Bypass this test for OS X. We periodically see it hang without error, leaving a zombie process
  * that never exits (WT-4613, BUILD-7616).

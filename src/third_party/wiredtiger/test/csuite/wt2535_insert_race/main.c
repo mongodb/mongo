@@ -96,10 +96,6 @@ main(int argc, char *argv[])
     int i;
     char tableconf[128];
 
-    /* Bypass this test for valgrind */
-    if (testutil_is_flag_set("TESTUTIL_BYPASS_VALGRIND"))
-        return (EXIT_SUCCESS);
-
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     opts->nthreads = 20;
