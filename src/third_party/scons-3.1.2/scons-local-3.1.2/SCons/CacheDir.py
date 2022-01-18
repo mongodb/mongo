@@ -131,8 +131,7 @@ def CachePushFunc(target, source, env):
         # the CacheDir being on a separate file system that's full.
         # In any case, inability to push a file to cache doesn't affect
         # the correctness of the build, so just print a warning.
-        msg = errfmt % (str(t), cachefile)
-        cd.CacheDebug(errfmt, str(t), cachefile)
+        msg = errfmt % (str(target), cachefile)
         SCons.Warnings.warn(SCons.Warnings.CacheWriteErrorWarning, msg)
 
 CachePush = SCons.Action.Action(CachePushFunc, None)
