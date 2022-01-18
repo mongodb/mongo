@@ -181,12 +181,9 @@ const nonReplicatedColl = nonReplicatedDB.coll;
 replicatedColl.drop();
 nonReplicatedColl.drop();
 
-runSuccessfulCreateNonClustered(
-    replicatedDB, replicatedColl, {clusteredIndex: false, expireAfterSeconds: 5});
-runSuccessfulCreateNonClustered(
-    nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false, expireAfterSeconds: 5});
-runSuccessfulCreateNonClustered(
-    nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false, expireAfterSeconds: 5});
+runSuccessfulCreateNonClustered(replicatedDB, replicatedColl, {clusteredIndex: false});
+runSuccessfulCreateNonClustered(nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false});
+runSuccessfulCreateNonClustered(nonReplicatedDB, nonReplicatedColl, {clusteredIndex: false});
 
 runSuccessfulCreate(replicatedDB, replicatedColl, {clusteredIndex: {key: {_id: 1}, unique: true}});
 runSuccessfulCreate(
@@ -224,6 +221,12 @@ runSuccessfulCreate(nonReplicatedDB,
 // Capped clustered collections creation.
 validateClusteredCappedCollections(replicatedDB, replicatedColl, {_id: 1});
 validateClusteredCappedCollections(nonReplicatedDB, nonReplicatedColl, {ts: 1});
+
+// Validate that the arguments aren't conflicting.
+assert.commandFailedWithCode(
+    replicatedDB.createCollection(replicatedColl.getName(),
+                                  {clusteredIndex: false, expireAfterSeconds: 5}),
+    ErrorCodes.InvalidOptions);
 
 // Validate that it's not possible to create a clustered collection as a view.
 assert.commandFailedWithCode(

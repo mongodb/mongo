@@ -459,12 +459,18 @@ Status _createCollection(OperationContext* opCtx,
                           str::stream() << "A view already exists. NS: " << nss);
         }
 
+        if (!collectionOptions.clusteredIndex && collectionOptions.expireAfterSeconds) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "'expireAfterSeconds' requires clustering to be enabled");
+        }
+
         if (!collectionOptions.clusteredIndex && (!idIndex || idIndex->isEmpty()) &&
             // Capped, clustered collections different in behavior significantly from normal capped
             // collections. Notably, they allow out-of-order insertion.
             !collectionOptions.capped && clusterAllCollectionsByDefault.shouldFail()) {
             collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
         }
+
         if (auto clusteredIndex = collectionOptions.clusteredIndex) {
             bool clusteredIndexesEnabled =
                 feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility);
