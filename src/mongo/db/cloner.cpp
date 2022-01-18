@@ -257,7 +257,7 @@ void Cloner::_copy(OperationContext* opCtx,
                            nullptr,
                            options,
                            0 /* batchSize */,
-                           repl::ReadConcernArgs::kImplicitDefault);
+                           repl::ReadConcernArgs::kLocal);
 }
 
 void Cloner::_copyIndexes(OperationContext* opCtx,

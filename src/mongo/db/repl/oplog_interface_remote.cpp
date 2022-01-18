@@ -85,7 +85,7 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() c
     findRequest.setProjection(BSON("ts" << 1 << "t" << 1LL));
     findRequest.setSort(BSON("$natural" << -1));
     findRequest.setBatchSize(_batchSize);
-    findRequest.setReadConcern(ReadConcernArgs::kImplicitDefault);
+    findRequest.setReadConcern(ReadConcernArgs::kLocal);
     return std::unique_ptr<OplogInterface::Iterator>(
         new OplogIteratorRemote(_getConnection()->find(std::move(findRequest))));
 }

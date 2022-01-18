@@ -68,7 +68,7 @@ int RollbackSourceImpl::getRollbackId() const {
 BSONObj RollbackSourceImpl::getLastOperation() const {
     FindCommandRequest findCmd{NamespaceString{_collectionName}};
     findCmd.setSort(BSON("$natural" << -1));
-    findCmd.setReadConcern(ReadConcernArgs::kImplicitDefault);
+    findCmd.setReadConcern(ReadConcernArgs::kLocal);
     return _getConnection()->findOne(std::move(findCmd),
                                      ReadPreferenceSetting{ReadPreference::SecondaryPreferred});
 }
@@ -76,7 +76,7 @@ BSONObj RollbackSourceImpl::getLastOperation() const {
 BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& filter) const {
     FindCommandRequest findCmd{nss};
     findCmd.setFilter(filter);
-    findCmd.setReadConcern(ReadConcernArgs::kImplicitDefault);
+    findCmd.setReadConcern(ReadConcernArgs::kLocal);
     return _getConnection()
         ->findOne(std::move(findCmd), ReadPreferenceSetting{ReadPreference::SecondaryPreferred})
         .getOwned();
@@ -87,7 +87,7 @@ std::pair<BSONObj, NamespaceString> RollbackSourceImpl::findOneByUUID(const std:
                                                                       const BSONObj& filter) const {
     FindCommandRequest findRequest{NamespaceStringOrUUID{db, uuid}};
     findRequest.setFilter(filter);
-    findRequest.setReadConcern(ReadConcernArgs::kImplicitDefault);
+    findRequest.setReadConcern(ReadConcernArgs::kLocal);
     findRequest.setLimit(1);
     findRequest.setSingleBatch(true);
 

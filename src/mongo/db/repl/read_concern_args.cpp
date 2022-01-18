@@ -62,6 +62,10 @@ const ReadConcernArgs& ReadConcernArgs::get(const OperationContext* opCtx) {
 // allowing it to be either local or available on sharded secondaries.
 const BSONObj ReadConcernArgs::kImplicitDefault;
 
+// The "kLocal" read concern just specifies that the read concern is local. This is used for
+// internal operations intended to be run only on a certain target cluster member.
+const BSONObj ReadConcernArgs::kLocal = BSON(kLevelFieldName << readConcernLevels::kLocalName);
+
 ReadConcernArgs::ReadConcernArgs() : _specified(false) {}
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<ReadConcernLevel> level)

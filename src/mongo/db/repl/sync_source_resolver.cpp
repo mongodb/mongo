@@ -172,7 +172,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                     << "projection"
                     << BSON(OplogEntryBase::kTimestampFieldName
                             << 1 << OplogEntryBase::kTermFieldName << 1)
-                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kImplicitDefault),
+                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal),
         [=](const StatusWith<Fetcher::QueryResponse>& response,
             Fetcher::NextAction*,
             BSONObjBuilder*) {
@@ -196,7 +196,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
         BSON("find" << kLocalOplogNss.coll() << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))
-                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kImplicitDefault),
+                    << ReadConcernArgs::kReadConcernFieldName << ReadConcernArgs::kLocal),
         [=](const StatusWith<Fetcher::QueryResponse>& response,
             Fetcher::NextAction*,
             BSONObjBuilder*) {

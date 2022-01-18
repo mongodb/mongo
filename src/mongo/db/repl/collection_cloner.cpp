@@ -174,7 +174,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
                                     QueryOption_SecondaryOk,
                                     0 /* limit */,
                                     0 /* skip */,
-                                    ReadConcernArgs::kImplicitDefault);
+                                    ReadConcernArgs::kLocal);
 
     // The count command may return a negative value after an unclean shutdown,
     // so we set it to zero here to avoid aborting the collection clone.
@@ -343,7 +343,7 @@ void CollectionCloner::runQuery() {
         QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
             (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
         _collectionClonerBatchSize,
-        ReadConcernArgs::kImplicitDefault);
+        ReadConcernArgs::kLocal);
 }
 
 void CollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) {

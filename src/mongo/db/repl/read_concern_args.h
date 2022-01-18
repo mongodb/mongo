@@ -58,6 +58,7 @@ public:
         "$_allowTransactionTableSnapshot"_sd;
 
     static const BSONObj kImplicitDefault;
+    static const BSONObj kLocal;
 
     /**
      * Represents the internal mechanism an operation uses to satisfy 'majority' read concern.
