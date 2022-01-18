@@ -28,6 +28,10 @@ const shardKeyValueInChunk = {
     x: 1
 };
 
+const shardKeyValueInFirstChunk = {
+    x: -2
+};
+
 const refinedShardKeyValueInChunk = {
     x: 1,
     y: 1
@@ -178,67 +182,82 @@ function test(st, description, testBody) {
              awaitResult();
          });
 
-    test(st,
-         "Migration recovery recovers correct decision for migration committed before shard key " +
-             "refine",
-         () => {
-             // Enable a failpoint that makes the migration donor hang before making a decision and
-             // begin a migration that hits this failpoint.
-             let hangBeforeWritingDecisionFailpoint =
-                 configureFailPoint(st.rs0.getPrimary(), "hangBeforeMakingCommitDecisionDurable");
-             const parallelMoveChunk = startParallelShell(
-                 funWithArgs(function(ns, shardKeyValueInChunk, toShardName) {
-                     assert.commandWorkedOrFailedWithCode(
-                         db.adminCommand(
-                             {moveChunk: ns, find: shardKeyValueInChunk, to: toShardName}),
-                         ErrorCodes.InterruptedDueToReplStateChange);
-                 }, ns, shardKeyValueInChunk, st.shard1.shardName), st.s.port);
+    test(
+        st,
+        "Migration recovery recovers correct decision for migration committed before shard key " +
+            "refine",
+        () => {
+            // This test must move the first chunk for refine shard key to work while migration
+            // recovery is blocked. Insert some documents into the first chunk.
+            for (let i = -100; i < -1; i++) {
+                st.s.getCollection(ns).insert({x: i});
+            }
+            assert.commandWorked(st.s.getCollection(ns).createIndex({x: 1, y: 1, z: 1}));
+            // Enable a failpoint that makes the migration donor hang before making a decision and
+            // begin a migration that hits this failpoint.
+            let hangBeforeWritingDecisionFailpoint =
+                configureFailPoint(st.rs0.getPrimary(), "hangBeforeMakingCommitDecisionDurable");
+            const parallelMoveChunk = startParallelShell(
+                funWithArgs(function(ns, shardKeyValueInChunk, toShardName) {
+                    assert.commandWorkedOrFailedWithCode(
+                        db.adminCommand(
+                            {moveChunk: ns, find: shardKeyValueInChunk, to: toShardName}),
+                        ErrorCodes.InterruptedDueToReplStateChange);
+                }, ns, shardKeyValueInFirstChunk, st.shard1.shardName), st.s.port);
 
-             jsTestLog("Waiting for the migration to hang before writing a decision");
-             hangBeforeWritingDecisionFailpoint.wait();
+            jsTestLog("Waiting for the migration to hang before writing a decision");
+            hangBeforeWritingDecisionFailpoint.wait();
 
-             // Step up a new primary, which will interrupt the migration and trigger the migration
-             // recovery process. Set a failpoint on the new primary that will pause the recovery
-             // before it can load the latest metadata.
-             jsTestLog("Stepping up a new primary");
-             const newPrimary = st.rs0.getSecondary();
-             st.rs0.stepUp(newPrimary);
-             st.rs0.waitForState(newPrimary, ReplSetTest.State.PRIMARY);
+            // Step up a new primary, which will interrupt the migration and trigger the migration
+            // recovery process. Set a failpoint on the new primary that will pause the recovery
+            // before it can load the latest metadata.
+            jsTestLog("Stepping up a new primary");
+            const newPrimary = st.rs0.getSecondary();
+            let hangInMigrationRecoveryFailpoint = configureFailPoint(
+                newPrimary, "hangInRefreshFilteringMetadataUntilSuccessInterruptible");
+            st.rs0.stepUp(newPrimary);
+            st.rs0.waitForState(newPrimary, ReplSetTest.State.PRIMARY);
 
-             // Clean up the failpoint on the old primary.
-             hangBeforeWritingDecisionFailpoint.off();
+            jsTestLog("Waiting for the new primary to hang in migration recovery");
+            hangInMigrationRecoveryFailpoint.wait();
 
-             // join the moveChunk command in the parallel shell
-             parallelMoveChunk();
+            // Clean up the failpoint on the old primary.
+            hangBeforeWritingDecisionFailpoint.off();
 
-             // Wait for relevant nodes to detect the new primary, which may take some time using
-             // the RSM protocols other than streamable.
-             awaitRSClientHosts(st.s, newPrimary, {ok: true, ismaster: true});
-             awaitRSClientHosts(st.rs1.getPrimary(), newPrimary, {ok: true, ismaster: true});
-             awaitRSClientHosts(st.configRS.getPrimary(), newPrimary, {ok: true, ismaster: true});
+            // join the moveChunk command in the parallel shell
+            parallelMoveChunk();
 
-             // Refine the collection's shard key while the recovery task is hung.
-             jsTestLog("Refining the shard key");
-             assert.commandWorked(st.s.getCollection(ns).createIndex({x: 1, y: 1, z: 1}));
-             assert.commandWorked(
-                 st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1, z: 1}}));
+            // Wait for relevant nodes to detect the new primary, which may take some time using
+            // the RSM protocols other than streamable.
+            awaitRSClientHosts(st.s, newPrimary, {ok: true, ismaster: true});
+            awaitRSClientHosts(st.rs1.getPrimary(), newPrimary, {ok: true, ismaster: true});
+            awaitRSClientHosts(st.configRS.getPrimary(), newPrimary, {ok: true, ismaster: true});
 
-             // Verify that despite the recovered migration has fewer fields in its bounds than in
-             // the current shard key, the decision should be recovered successfully and orphans
-             // should be removed from the donor.
-             jsTestLog("Waiting for orphans to be removed from shard 0");
-             assert.soon(() => {
-                 return st.rs0.getPrimary().getCollection(ns).find().itcount() == 0;
-             });
+            // Refine the collection's shard key while the recovery task is hung.
+            jsTestLog("Refining the shard key");
+            assert.commandWorked(
+                st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1, z: 1}}));
 
-             // Verify we can move the chunk back to the original donor once the orphans are gone.
-             assert.commandWorked(st.s.adminCommand({
-                 moveChunk: ns,
-                 find: {x: 1, y: 1, z: 1},
-                 to: st.shard0.shardName,
-                 _waitForDelete: true
-             }));
-         });
+            // Verify that despite the recovered migration has fewer fields in its bounds than in
+            // the current shard key, the decision should be recovered successfully and orphans
+            // from chunk 1 should be removed from the donor.
+            jsTestLog("Waiting for orphans to be removed from shard 0");
+            hangInMigrationRecoveryFailpoint.off();
+            assert.soon(() => {
+                return st.rs0.getPrimary().getCollection(ns).find({x: {$lt: -1}}).itcount() == 0;
+            });
+            assert.eq(
+                100,
+                st.rs0.getPrimary().getCollection(ns).find({x: {$gte: -1, $lt: MaxKey}}).itcount());
+
+            // Verify we can move the chunk back to the original donor once the orphans are gone.
+            assert.commandWorked(st.s.adminCommand({
+                moveChunk: ns,
+                find: {x: 1, y: 1, z: 1},
+                to: st.shard0.shardName,
+                _waitForDelete: true
+            }));
+        });
 
     // This test was created to reproduce a specific bug, which is why it may sound like an odd
     // thing to test. See SERVER-46386 for more details.

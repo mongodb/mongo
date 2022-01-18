@@ -1032,7 +1032,11 @@ void recoverMigrationCoordinations(OperationContext* opCtx, NamespaceString nss)
                 return true;
             }
 
-            if (currentMetadata.keyBelongsToMe(doc.getRange().getMin())) {
+            // Note this should only extend the range boundaries (if there has been a shard key
+            // refine since the migration began) and never truncate them.
+            auto chunkRangeToCompareToMetadata =
+                extendOrTruncateBoundsForMetadata(currentMetadata, doc.getRange());
+            if (currentMetadata.keyBelongsToMe(chunkRangeToCompareToMetadata.getMin())) {
                 coordinator.setMigrationDecision(DecisionEnum::kAborted);
             } else {
                 coordinator.setMigrationDecision(DecisionEnum::kCommitted);
