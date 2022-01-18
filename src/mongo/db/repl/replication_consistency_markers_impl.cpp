@@ -155,11 +155,7 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
     // first stable checkpoint taken after initial sync (when the stable timestamp is >= the
     // initialDataTimestamp). If we crash before the first stable checkpoint is taken, we are
     // guaranteed to come back up with the initial sync flag. In this corner case, this node has to
-    // be resynced. Invariant that we haven't taken a stable checkpoint.
-    auto stableTimestamp =
-        _storageInterface->getLastStableRecoveryTimestamp(opCtx->getServiceContext());
-    invariant(!stableTimestamp || stableTimestamp->isNull());
-
+    // be resynced.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     OpTimeAndWallTime opTimeAndWallTime = replCoord->getMyLastAppliedOpTimeAndWallTime();
     BSONObj update = BSON("$unset" << kInitialSyncFlag);
