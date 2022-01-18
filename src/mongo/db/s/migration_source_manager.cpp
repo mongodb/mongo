@@ -409,7 +409,10 @@ void MigrationSourceManager::enterCriticalSection() {
 void MigrationSourceManager::commitChunkOnRecipient() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCriticalSection);
-    ScopeGuard scopedGuard([&] { _cleanupOnError(); });
+    ScopeGuard scopedGuard([&] {
+        _cleanupOnError();
+        migrationutil::recoverMigrationUntilSuccess(_opCtx, _args.getNss());
+    });
 
     // Tell the recipient shard to fetch the latest changes.
     auto commitCloneStatus = _cloneDriver->commitClone(_opCtx, _acquireCSOnRecipient);
@@ -431,7 +434,10 @@ void MigrationSourceManager::commitChunkOnRecipient() {
 void MigrationSourceManager::commitChunkMetadataOnConfig() {
     invariant(!_opCtx->lockState()->isLocked());
     invariant(_state == kCloneCompleted);
-    ScopeGuard scopedGuard([&] { _cleanupOnError(); });
+    ScopeGuard scopedGuard([&] {
+        _cleanupOnError();
+        migrationutil::recoverMigrationUntilSuccess(_opCtx, _args.getNss());
+    });
 
     // If we have chunks left on the FROM shard, bump the version of one of them as well. This will
     // change the local collection major version, which indicates to other processes that the chunk
@@ -490,8 +496,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
         }
         scopedGuard.dismiss();
         _cleanup(false);
-        // Best-effort recover of the shard version.
-        onShardVersionMismatchNoExcept(_opCtx, _args.getNss(), boost::none).ignore();
+        migrationutil::recoverMigrationUntilSuccess(_opCtx, _args.getNss());
         uassertStatusOK(migrationCommitStatus);
     }
 

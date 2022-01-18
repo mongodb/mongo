@@ -915,8 +915,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 
                               hangBeforeFilteringMetadataRefresh.pauseWhileSet();
 
-                              onShardVersionMismatch(
-                                  opCtx.get(), nss, boost::none /* shardVersionReceived */);
+                              recoverMigrationUntilSuccess(opCtx.get(), nss);
                           })
                           .onError([](const Status& status) {
                               LOGV2_WARNING(4798512,
@@ -1186,6 +1185,26 @@ void drainMigrationsPendingRecovery(OperationContext* opCtx) {
             }
             return true;
         });
+    }
+}
+
+void recoverMigrationUntilSuccess(OperationContext* opCtx, const NamespaceString& nss) noexcept {
+    try {
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+            if (csr->getCurrentMetadataIfKnown()) {
+                return;
+            }
+        }
+
+        refreshFilteringMetadataUntilSuccess(opCtx, nss);
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(6228200,
+                    2,
+                    "Interrupted migration recovery",
+                    "namespace"_attr = nss,
+                    "error"_attr = redact(ex));
     }
 }
 

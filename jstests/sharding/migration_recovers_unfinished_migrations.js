@@ -17,7 +17,10 @@ const nodeOptions = {
 
 // Disable balancer in order to prevent balancing rounds from triggering shard version refreshes on
 // the shards that would interfere with the migration recovery interleaving this test requires.
-var st = new ShardingTest({shards: 2, other: {configOptions: nodeOptions, enableBalancer: false}});
+var st = new ShardingTest({
+    shards: {rs0: {nodes: 2}, rs1: {nodes: 1}},
+    other: {configOptions: nodeOptions, enableBalancer: false}
+});
 let staticMongod = MongoRunner.runMongod({});
 
 const dbName = "test";
@@ -44,6 +47,14 @@ let skipShardFilteringMetadataRefreshFailpoint =
     configureFailPoint(st.rs0.getPrimary(), "skipShardFilteringMetadataRefresh");
 
 moveChunkHangAtStep5Failpoint.off();
+migrationCommitNetworkErrorFailpoint.wait();
+
+//  Don't let the migration recovery finish on the secondary that will next be stepped-up.
+const rs0Secondary = st.rs0.getSecondary();
+let hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint =
+    configureFailPoint(rs0Secondary, "hangInEnsureChunkVersionIsGreaterThanInterruptible");
+
+assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: true}));
 joinMoveChunk1();
 migrationCommitNetworkErrorFailpoint.off();
 skipShardFilteringMetadataRefreshFailpoint.off();
@@ -62,6 +73,20 @@ let moveChunkHangAtStep3Failpoint = configureFailPoint(st.rs0.getPrimary(), "mov
 
 var joinMoveChunk2 = moveChunkParallel(
     staticMongod, st.s0.host, {_id: 0}, null, nsB, st.shard1.shardName, true /* expectSuccess */);
+
+// Check that second migration won't be able to persist its coordinator document until the shard has
+// been able to recover the first migration.
+sleep(5 * 1000);
+{
+    // There's still only one migration recovery document, corresponding to the first migration
+    let migrationCoordinatorDocuments =
+        st.rs0.getPrimary().getDB('config')['migrationCoordinators'].find().toArray();
+    assert.eq(1, migrationCoordinatorDocuments.length);
+    assert.eq(nsA, migrationCoordinatorDocuments[0].nss);
+}
+
+// Let the migration recovery complete
+hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint.off();
 moveChunkHangAtStep3Failpoint.wait();
 
 // Check that the first migration has been recovered. There must be only one
