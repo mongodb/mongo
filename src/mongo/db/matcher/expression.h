@@ -208,6 +208,7 @@ public:
 
     using Iterator = MatchExpressionIterator<false>;
     using ConstIterator = MatchExpressionIterator<true>;
+    using InputParamId = int64_t;
 
     /**
      * Tracks the information needed to generate a document validation error for a
@@ -320,6 +321,12 @@ public:
         sortTree(tree.get());
         return tree;
     }
+
+    /**
+     * Assigns an optional input parameter ID to each node which is eligible for
+     * auto-parameterization.
+     */
+    static void parameterize(MatchExpression* tree);
 
     MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> annotation = nullptr);
     virtual ~MatchExpression() {}

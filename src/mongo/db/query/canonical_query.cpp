@@ -204,6 +204,9 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     }
     auto unavailableMetadata = validStatus.getValue();
     _root = MatchExpression::normalize(std::move(root));
+    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        MatchExpression::parameterize(_root.get());
+    }
     // The tree must always be valid after normalization.
     dassert(isValid(_root.get(), *_findCommand).isOK());
     if (auto status = isValidNormalized(_root.get()); !status.isOK()) {

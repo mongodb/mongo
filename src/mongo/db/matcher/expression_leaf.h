@@ -183,6 +183,14 @@ public:
         return _collator;
     }
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 protected:
     /**
      * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
@@ -202,6 +210,8 @@ private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
+
+    boost::optional<InputParamId> _inputParamId;
 };
 
 /**
@@ -255,13 +265,16 @@ public:
         return kName;
     }
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<EqualityMatchExpression>(path(), Value(getData()), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
+        if (getInputParamId()) {
+            e->setInputParamId(*getInputParamId());
+        }
         return e;
     }
 
@@ -291,13 +304,16 @@ public:
         return kName;
     }
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<LTEMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
+        if (getInputParamId()) {
+            e->setInputParamId(*getInputParamId());
+        }
         return e;
     }
 
@@ -327,13 +343,16 @@ public:
         return kName;
     }
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<LTMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
+        if (getInputParamId()) {
+            e->setInputParamId(*getInputParamId());
+        }
         return e;
     }
 
@@ -368,13 +387,16 @@ public:
         return kName;
     }
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<GTMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
+        if (getInputParamId()) {
+            e->setInputParamId(*getInputParamId());
+        }
         return e;
     }
 
@@ -408,13 +430,16 @@ public:
         return kName;
     }
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<GTEMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
         e->setCollator(_collator);
+        if (getInputParamId()) {
+            e->setInputParamId(*getInputParamId());
+        }
         return e;
     }
 
@@ -449,11 +474,17 @@ public:
 
     ~RegexMatchExpression();
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<RegexMatchExpression> e =
             std::make_unique<RegexMatchExpression>(path(), _regex, _flags, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
+        }
+        if (getSourceRegexInputParamId()) {
+            e->setSourceRegexInputParamId(*getSourceRegexInputParamId());
+        }
+        if (getCompiledRegexInputParamId()) {
+            e->setCompiledRegexInputParamId(*getCompiledRegexInputParamId());
         }
         return e;
     }
@@ -485,6 +516,22 @@ public:
         visitor->visit(this);
     }
 
+    void setSourceRegexInputParamId(InputParamId paramId) {
+        _sourceRegexInputParamId = paramId;
+    }
+
+    void setCompiledRegexInputParamId(InputParamId paramId) {
+        _compiledRegexInputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getSourceRegexInputParamId() const {
+        return _sourceRegexInputParamId;
+    }
+
+    boost::optional<InputParamId> getCompiledRegexInputParamId() const {
+        return _compiledRegexInputParamId;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -495,6 +542,9 @@ private:
     std::string _regex;
     std::string _flags;
     std::unique_ptr<pcrecpp::RE> _re;
+
+    boost::optional<InputParamId> _sourceRegexInputParamId;
+    boost::optional<InputParamId> _compiledRegexInputParamId;
 };
 
 class ModMatchExpression : public LeafMatchExpression {
@@ -504,11 +554,17 @@ public:
                        long long remainder,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<ModMatchExpression> m =
             std::make_unique<ModMatchExpression>(path(), _divisor, _remainder, _errorAnnotation);
         if (getTag()) {
             m->setTag(getTag()->clone());
+        }
+        if (getDivisorInputParamId()) {
+            m->setDivisorInputParamId(*getDivisorInputParamId());
+        }
+        if (getRemainderInputParamId()) {
+            m->setRemainderInputParamId(*getRemainderInputParamId());
         }
         return m;
     }
@@ -536,6 +592,22 @@ public:
         visitor->visit(this);
     }
 
+    void setDivisorInputParamId(InputParamId paramId) {
+        _divisorInputParamId = paramId;
+    }
+
+    void setRemainderInputParamId(InputParamId paramId) {
+        _remainderInputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getDivisorInputParamId() const {
+        return _divisorInputParamId;
+    }
+
+    boost::optional<InputParamId> getRemainderInputParamId() const {
+        return _remainderInputParamId;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -543,6 +615,9 @@ private:
 
     long long _divisor;
     long long _remainder;
+
+    boost::optional<InputParamId> _divisorInputParamId;
+    boost::optional<InputParamId> _remainderInputParamId;
 };
 
 class ExistsMatchExpression : public LeafMatchExpression {
@@ -588,7 +663,7 @@ class InMatchExpression : public LeafMatchExpression {
 public:
     explicit InMatchExpression(StringData path, clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const;
+    std::unique_ptr<MatchExpression> shallowClone() const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -639,6 +714,14 @@ public:
         visitor->visit(this);
     }
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 
@@ -675,6 +758,8 @@ private:
     // When this $in is generated internally, e.g. via a rewrite, this is where we store the
     // data of the corresponding equality elements.
     BSONObj _equalityStorage;
+
+    boost::optional<InputParamId> _inputParamId;
 };
 
 /**
@@ -723,6 +808,14 @@ public:
 
     std::string name() const;
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -754,6 +847,8 @@ private:
 
     // Used to perform bit tests against numbers using a single bitwise operation.
     uint64_t _bitMask = 0;
+
+    boost::optional<InputParamId> _inputParamId;
 };
 
 class BitsAllSetMatchExpression : public BitTestMatchExpression {
@@ -775,12 +870,15 @@ public:
         : BitTestMatchExpression(
               BITS_ALL_SET, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAllSetMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            bitTestMatchExpression->setInputParamId(*getInputParamId());
         }
         return bitTestMatchExpression;
     }
@@ -813,12 +911,15 @@ public:
         : BitTestMatchExpression(
               BITS_ALL_CLEAR, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAllClearMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            bitTestMatchExpression->setInputParamId(*getInputParamId());
         }
         return bitTestMatchExpression;
     }
@@ -851,12 +952,15 @@ public:
         : BitTestMatchExpression(
               BITS_ANY_SET, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAnySetMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            bitTestMatchExpression->setInputParamId(*getInputParamId());
         }
         return bitTestMatchExpression;
     }
@@ -889,12 +993,15 @@ public:
         : BitTestMatchExpression(
               BITS_ANY_CLEAR, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAnyClearMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
         if (getTag()) {
             bitTestMatchExpression->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            bitTestMatchExpression->setInputParamId(*getInputParamId());
         }
         return bitTestMatchExpression;
     }

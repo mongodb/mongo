@@ -56,12 +56,22 @@ public:
         return _jsFunction;
     }
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 private:
     std::string _dbName;
 
     OperationContext* const _opCtx;
 
     JsFunction _jsFunction;
+
+    boost::optional<InputParamId> _inputParamId;
 };
 
 }  // namespace mongo

@@ -75,6 +75,9 @@ public:
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
+        if (getInputParamId()) {
+            expr->setInputParamId(*getInputParamId());
+        }
         return expr;
     }
 
@@ -122,6 +125,14 @@ public:
         return _typeSet;
     }
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
@@ -129,6 +140,8 @@ private:
 
     // The set of matching types.
     MatcherTypeSet _typeSet;
+
+    boost::optional<InputParamId> _inputParamId;
 };
 
 class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpression> {

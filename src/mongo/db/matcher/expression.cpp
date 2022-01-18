@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/expression_parameterization.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 
 namespace mongo {
@@ -111,6 +112,14 @@ void MatchExpression::sortTree(MatchExpression* tree) {
             return matchExpressionLessThan(lhs.get(), rhs.get());
         });
     }
+}
+
+// static
+void MatchExpression::parameterize(MatchExpression* tree) {
+    MatchExpressionParameterizationVisitorContext context{};
+    MatchExpressionParameterizationVisitor visitor{&context};
+    MatchExpressionParameterizationWalker walker{&visitor};
+    tree_walker::walk<false, MatchExpression>(tree, &walker);
 }
 
 std::string MatchExpression::toString() const {

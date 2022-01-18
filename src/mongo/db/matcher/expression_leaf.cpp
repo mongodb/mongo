@@ -442,6 +442,9 @@ std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
             static_cast<RegexMatchExpression*>(regex->shallowClone().release()));
         next->_regexes.push_back(std::move(clonedRegex));
     }
+    if (getInputParamId()) {
+        next->setInputParamId(*getInputParamId());
+    }
     return next;
 }
 

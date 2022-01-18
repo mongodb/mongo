@@ -188,11 +188,14 @@ public:
                         int size,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<SizeMatchExpression> e =
             std::make_unique<SizeMatchExpression>(path(), _size, _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
+        }
+        if (getInputParamId()) {
+            e->setInputParamId(*getInputParamId());
         }
         return e;
     }
@@ -229,11 +232,21 @@ public:
         visitor->visit(this);
     }
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 private:
     virtual ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
 
     int _size;  // >= 0 real, < 0, nothing will match
+
+    boost::optional<InputParamId> _inputParamId;
 };
 }  // namespace mongo

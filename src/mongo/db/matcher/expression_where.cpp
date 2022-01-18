@@ -69,6 +69,9 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     if (getTag()) {
         e->setTag(getTag()->clone());
     }
+    if (getInputParamId()) {
+        e->setInputParamId(*getInputParamId());
+    }
     return e;
 }
 }  // namespace mongo
