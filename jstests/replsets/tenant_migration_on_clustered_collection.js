@@ -6,7 +6,6 @@
  *   # Clustered collection specific.
  *   featureFlagClusteredIndexes,
  *   requires_fcv_52,
- *   # TODO SERVER-61449 - enable sharding.
  *   assumes_against_mongod_not_mongos,
  *   assumes_unsharded_collection,
  *   # Basic tags for tenant migration tests.
