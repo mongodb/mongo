@@ -724,6 +724,7 @@ public:
             errmsg = "scale has to be a number > 0";
             return false;
         }
+        bool includeFreeStorage = jsobj["freeStorage"].trueValue();
 
         const std::string ns = parseNs(dbname, jsobj);
         uassert(ErrorCodes::InvalidNamespace,
@@ -771,7 +772,7 @@ public:
                     dbname.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
             }
 
-            db->getStats(opCtx, &result, scale);
+            db->getStats(opCtx, &result, includeFreeStorage, scale);
         }
 
         return true;
