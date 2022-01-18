@@ -968,6 +968,10 @@ class RunPlugin(PluginInterface):
                                       metavar="PERF_REPORT",
                                       help="Writes a JSON file with performance test results.")
 
+        internal_options.add_argument("--cedarReportFile", dest="cedar_report_file",
+                                      metavar="CEDAR_REPORT",
+                                      help="Writes a JSON file with performance test results.")
+
         internal_options.add_argument(
             "--reportFailureStatus", action="store", dest="report_failure_status",
             choices=("fail", "silentfail"), metavar="STATUS",

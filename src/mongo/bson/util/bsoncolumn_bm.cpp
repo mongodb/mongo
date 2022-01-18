@@ -312,10 +312,7 @@ BENCHMARK_CAPTURE(BM_decompressTimestamps, Mean = 1 / Stddev = 0 / Skip = 90 %, 
 BENCHMARK_CAPTURE(BM_decompressTimestamps, Mean = 5 / Stddev = 2 / Skip = 90 %, 0, 1, 90);
 
 BENCHMARK_CAPTURE(BM_decompressObjectIds, Skip = 0 %, 0);
-BENCHMARK_CAPTURE(BM_decompressObjectIds, Skip = 0 %, 0);
 BENCHMARK_CAPTURE(BM_decompressObjectIds, Skip = 10 %, 10);
-BENCHMARK_CAPTURE(BM_decompressObjectIds, Skip = 10 %, 10);
-BENCHMARK_CAPTURE(BM_decompressObjectIds, Skip = 90 %, 90);
 BENCHMARK_CAPTURE(BM_decompressObjectIds, Skip = 90 %, 90);
 
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
@@ -353,10 +350,7 @@ BENCHMARK_CAPTURE(BM_compressTimestamps, Mean = 1 / Stddev = 0 / Skip = 90 %, 0,
 BENCHMARK_CAPTURE(BM_compressTimestamps, Mean = 5 / Stddev = 2 / Skip = 90 %, 0, 1, 90);
 
 BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 0 %, 0);
-BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 0 %, 0);
 BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 10 %, 10);
-BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 10 %, 10);
-BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 90 %, 90);
 BENCHMARK_CAPTURE(BM_compressObjectIds, Skip = 90 %, 90);
 
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds

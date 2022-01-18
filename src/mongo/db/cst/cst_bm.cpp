@@ -75,7 +75,7 @@ BSONObj buildSimpleMatch(int nFields) {
 
 }  // namespace
 
-void BM_Bison_match_simple(benchmark::State& state) {
+void BM_BisonMatchSimple(benchmark::State& state) {
     auto filter = buildSimpleMatch(state.range(0));
 
     QueryTestServiceContext testServiceContext;
@@ -98,7 +98,7 @@ void BM_Bison_match_simple(benchmark::State& state) {
 
 // The baseline benchmark is included here for comparison purposes, there's no interaction between
 // this and the CST benchmark.
-void BM_baseline_match_simple(benchmark::State& state) {
+void BM_BaselineMatchSimple(benchmark::State& state) {
     auto filter = buildSimpleMatch(state.range(0));
 
     QueryTestServiceContext testServiceContext;
@@ -119,7 +119,7 @@ void BM_baseline_match_simple(benchmark::State& state) {
 }
 
 // The argument to the simple filter tests is the number of fields to match on.
-BENCHMARK(BM_baseline_match_simple)->Arg(0)->Arg(10);
-BENCHMARK(BM_Bison_match_simple)->Arg(0)->Arg(10);
+BENCHMARK(BM_BaselineMatchSimple)->Arg(0)->Arg(10);
+BENCHMARK(BM_BisonMatchSimple)->Arg(0)->Arg(10);
 
 }  // namespace mongo

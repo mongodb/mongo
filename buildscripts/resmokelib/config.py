@@ -81,6 +81,7 @@ DEFAULTS = {
     "no_journal": False,
     "num_clients_per_fixture": 1,
     "perf_report_file": None,
+    "cedar_report_file": None,
     "repeat_suites": 1,
     "repeat_tests": 1,
     "repeat_tests_max": None,
@@ -418,6 +419,9 @@ NUM_CLIENTS_PER_FIXTURE = None
 
 # Report file for the Evergreen performance plugin.
 PERF_REPORT_FILE = None
+
+# Report file for Cedar.
+CEDAR_REPORT_FILE = None
 
 # If set, then the RNG is seeded with the specified value. Otherwise uses a seed based on the time
 # this module was loaded.

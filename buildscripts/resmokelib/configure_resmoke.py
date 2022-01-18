@@ -273,6 +273,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.NUM_REPLSET_NODES = config.pop("num_replset_nodes")
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
+    _config.CEDAR_REPORT_FILE = config.pop("cedar_report_file")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT_SUITES = config.pop("repeat_suites")
     _config.REPEAT_TESTS = config.pop("repeat_tests")

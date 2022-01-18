@@ -78,7 +78,7 @@ void BM_ItoACounter(benchmark::State& state) {
     state.SetItemsProcessed(items);
 }
 
-void BM_to_stringCounter(benchmark::State& state) {
+void BM_ToStringCounter(benchmark::State& state) {
     uint64_t items = 0;
     for (auto _ : state) {
         uint32_t count = state.range(1);
@@ -94,6 +94,6 @@ void BM_to_stringCounter(benchmark::State& state) {
 BENCHMARK(BM_decimalCounterPreInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_decimalCounterPostInc)->Args({10000, 0})->Args({{10, nonzeroStart}});
 BENCHMARK(BM_ItoACounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
-BENCHMARK(BM_to_stringCounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
+BENCHMARK(BM_ToStringCounter)->Args({10000, 0})->Args({{10, nonzeroStart}});
 
 }  // namespace mongo

@@ -74,3 +74,9 @@ class UnsafeExitError(ResmokeError):
     """
 
     pass
+
+
+class CedarReportError(ResmokeError):
+    """Exception raised while generating cedar report."""
+
+    pass

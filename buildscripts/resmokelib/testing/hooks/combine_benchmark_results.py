@@ -3,9 +3,47 @@
 import collections
 import datetime
 import json
+from dataclasses import dataclass
+from typing import Union, List, Dict, Any
 
 from buildscripts.resmokelib import config as _config
+from buildscripts.resmokelib.errors import CedarReportError
 from buildscripts.resmokelib.testing.hooks import interface
+
+
+@dataclass
+class _CedarMetric:
+    """Structure that holds metrics for Cedar."""
+
+    name: str
+    type: str
+    value: Union[int, float]
+    user_submitted: bool = False
+
+    def as_dict(self) -> dict:
+        """Return dictionary representation."""
+        return {
+            "name": self.name,
+            "type": self.type,
+            "value": self.value,
+            "user_submitted": self.user_submitted,
+        }
+
+
+@dataclass
+class _CedarTestReport:
+    """Structure that holds test report for Cedar."""
+
+    test_name: str
+    thread_level: int
+    metrics: List[_CedarMetric]
+
+    def as_dict(self) -> dict:
+        """Return dictionary representation."""
+        return {
+            "info": {"test_name": self.test_name, "args": {"thread_level": self.thread_level, }},
+            "metrics": [metric.as_dict() for metric in self.metrics],
+        }
 
 
 class CombineBenchmarkResults(interface.Hook):
@@ -24,7 +62,8 @@ class CombineBenchmarkResults(interface.Hook):
     def __init__(self, hook_logger, fixture):
         """Initialize CombineBenchmarkResults."""
         interface.Hook.__init__(self, hook_logger, fixture, CombineBenchmarkResults.DESCRIPTION)
-        self.report_file = _config.PERF_REPORT_FILE
+        self.legacy_report_file = _config.PERF_REPORT_FILE
+        self.cedar_report_file = _config.CEDAR_REPORT_FILE
 
         # Reports grouped by name without thread.
         self.benchmark_reports = {}
@@ -38,14 +77,14 @@ class CombineBenchmarkResults(interface.Hook):
 
     def after_test(self, test, test_report):
         """Update test report."""
-        if self.report_file is None:
+        if self.legacy_report_file is None:
             return
 
         bm_report_path = test.report_name()
 
-        with open(bm_report_path, "r") as report_file:
-            report_dict = json.load(report_file)
-            self._parse_report(report_dict)
+        with open(bm_report_path, "r") as bm_report_file:
+            bm_report_dict = json.load(bm_report_file)
+            self._parse_report(bm_report_dict)
 
     def before_suite(self, test_report):
         """Set suite start time."""
@@ -53,13 +92,22 @@ class CombineBenchmarkResults(interface.Hook):
 
     def after_suite(self, test_report, teardown_flag=None):
         """Update test report."""
-        if self.report_file is None:
+        if self.legacy_report_file is None:
             return
 
         self.end_time = datetime.datetime.now()
-        report = self._generate_perf_plugin_report()
-        with open(self.report_file, "w") as fh:
-            json.dump(report, fh)
+        legacy_report = self._generate_perf_plugin_report()
+        with open(self.legacy_report_file, "w") as fh:
+            json.dump(legacy_report, fh)
+
+        try:
+            cedar_report = self._generate_cedar_report()
+        except CedarReportError:
+            teardown_flag.set()
+            raise
+        else:
+            with open(self.cedar_report_file, "w") as fh:
+                json.dump(cedar_report, fh)
 
     def _generate_perf_plugin_report(self):
         """Format the data to look like a perf plugin report."""
@@ -80,15 +128,29 @@ class CombineBenchmarkResults(interface.Hook):
 
         return perf_report
 
+    def _generate_cedar_report(self) -> List[dict]:
+        """Format the data to look like a cedar report."""
+        cedar_report = []
+
+        for name, report in self.benchmark_reports.items():
+            cedar_metrics = report.generate_cedar_metrics()
+            for _, thread_metrics in cedar_metrics.items():
+                if report.check_dup_metric_names(thread_metrics):
+                    msg = f"The test '{name}' has duplicated metric names."
+                    raise CedarReportError(msg)
+
+            for threads_count, thread_metrics in cedar_metrics.items():
+                test_report = _CedarTestReport(test_name=name, thread_level=threads_count,
+                                               metrics=thread_metrics)
+                cedar_report.append(test_report.as_dict())
+
+        return cedar_report
+
     def _parse_report(self, report_dict):
         context = report_dict["context"]
 
         for benchmark_res in report_dict["benchmarks"]:
-            bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res["name"])
-
-            # Don't show Benchmark's included statistics to prevent cluttering up the graph.
-            if bm_name_obj.statistic_type is not None:
-                continue
+            bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res)
 
             if bm_name_obj.base_name not in self.benchmark_reports:
                 self.benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
@@ -111,7 +173,7 @@ class _BenchmarkThreadsReport(object):
     {
       "context": {
         "date": "2015/03/17-18:40:25",
-        "execuable": "./build/opt/mongo/db/concurrency/lock_manager_bm"
+        "executable": "./build/opt/mongo/db/concurrency/lock_manager_bm"
         "num_cpus": 40,
         "mhz_per_cpu": 2801,
         "cpu_scaling_enabled": false,
@@ -131,6 +193,17 @@ class _BenchmarkThreadsReport(object):
       ]
     }
     """
+
+    DEFAULT_CEDAR_METRIC_NAME = "latency_per_op"
+
+    # Map benchmark metric type to the type in Cedar
+    # https://github.com/evergreen-ci/cedar/blob/87e22df45845440cf299d4ee1f406e8c00ff05ae/perf.proto#L101-L115
+    BENCHMARK_TO_CEDAR_METRIC_TYPE_MAP = {
+        "latency": "LATENCY",
+        "mean": "MEAN",
+        "median": "MEDIAN",
+        "stddev": "STANDARD_DEVIATION",
+    }
 
     CONTEXT_FIELDS = [
         "date",
@@ -184,41 +257,83 @@ class _BenchmarkThreadsReport(object):
         res = {}
         for thread_count, reports in list(self.thread_benchmark_map.items()):
             thread_report = {
-                "error_values": [0 for _ in range(len(reports))],
-                "ops_per_sec_values": []  # This is actually storing latency per op, not ops/s
+                "error_values": [],
+                "ops_per_sec_values": [],  # This is actually storing latency per op, not ops/s
             }
 
-            # Take the negative of the latency numbers to preserve the higher is better semantics.
             for report in reports:
+                # Don't show Benchmark's included statistics to prevent cluttering up the graph.
+                if report.get("run_type") == "aggregate":
+                    continue
+                thread_report["error_values"].append(0)
+                # Take the negative of the latency numbers to preserve the higher is better semantics.
                 thread_report["ops_per_sec_values"].append(-1 * report["cpu_time"])
-            thread_report["ops_per_sec"] = sum(thread_report["ops_per_sec_values"]) / len(reports)
+            thread_report["ops_per_sec"] = sum(thread_report["ops_per_sec_values"]) / len(
+                thread_report["ops_per_sec_values"])
 
             res[thread_count] = thread_report
 
         return res
 
+    def generate_cedar_metrics(self) -> Dict[int, List[_CedarMetric]]:
+        """Generate metrics for Cedar."""
+
+        res = {}
+
+        for _, reports in self.thread_benchmark_map.items():
+            for report in reports:
+                aggregate_name = report.get("aggregate_name", "latency")
+
+                if aggregate_name == "latency":
+                    idx = report.get("repetition_index", 0)
+                    metric_name = f"{self.DEFAULT_CEDAR_METRIC_NAME}_{idx}"
+                else:
+                    metric_name = f"{self.DEFAULT_CEDAR_METRIC_NAME}_{aggregate_name}"
+
+                metric_type = self.BENCHMARK_TO_CEDAR_METRIC_TYPE_MAP[aggregate_name]
+
+                metric = _CedarMetric(name=metric_name, type=metric_type, value=report["cpu_time"])
+                threads = report["threads"]
+                if threads in res:
+                    res[threads].append(metric)
+                else:
+                    res[threads] = [metric]
+
+        return res
+
     @staticmethod
-    def parse_bm_name(name_str):
+    def check_dup_metric_names(metrics: List[_CedarMetric]) -> bool:
+        """Check duplicated metric names for Cedar."""
+        names = []
+        for metric in metrics:
+            if metric.name in names:
+                return True
+            names.append(metric.name)
+        return False
+
+    @staticmethod
+    def parse_bm_name(benchmark_res: Dict[str, Any]):
         """
         Split the benchmark name into base_name, thread_count and statistic_type.
 
         The base name is the benchmark name minus the thread count and any statistics.
         Testcases of the same group will be shown on a single perf graph.
 
-        name_str look like the following:
+        benchmark_res["name"] look like the following:
         "BM_SetInsert/arg name:1024/threads:10_mean"
         "BM_SetInsert/arg 1/arg 2"
         "BM_SetInsert_mean"
         """
 
+        name_str = benchmark_res["name"]
         base_name = None
         thread_count = None
-        statistic_type = None
+        statistic_type = benchmark_res.get("aggregate_name", None)
 
         # Step 1: get the statistic type.
-        if name_str.count("_") == 2:  # There is statistics.
-            statistic_type = name_str.rsplit("_", 1)[-1]
-            # Remove the statistic type suffix from the name.
+        statistic_type_candidate = name_str.rsplit("_", 1)[-1]
+        # Remove the statistic type suffix from the name.
+        if statistic_type_candidate == statistic_type:
             name_str = name_str[:-len(statistic_type) - 1]
 
         # Step 2: Get the thread count and name.

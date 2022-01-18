@@ -145,7 +145,8 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     --versionId=${version_id} \
     --spawnUsing=${spawn_resmoke_using} \
     --reportFile=report.json \
-    --perfReportFile=perf.json
+    --perfReportFile=perf.json \
+    --cedarReportFile=cedar_report.json
   resmoke_exit_code=$?
   set -o errexit
 
