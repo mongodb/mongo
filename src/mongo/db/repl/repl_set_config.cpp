@@ -427,7 +427,7 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
 
 Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
-    if (!writeConcern.wMode.empty() && writeConcern.wMode != WriteConcernOptions::kMajority) {
+    if (writeConcern.writeModeIsCustom()) {
         StatusWith<ReplSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode);
         if (!tagPatternStatus.isOK()) {
             return tagPatternStatus.getStatus();
@@ -736,6 +736,13 @@ bool ReplSetConfig::containsCustomizedGetLastErrorDefaults() const {
     const auto& getLastErrorDefaults = getDefaultWriteConcern();
     return !(getLastErrorDefaults.wNumNodes == 1 && getLastErrorDefaults.wTimeout == 0 &&
              getLastErrorDefaults.syncMode == WriteConcernOptions::SyncMode::UNSET);
+}
+
+Status ReplSetConfig::validateWriteConcern(const WriteConcernOptions& writeConcern) const {
+    if (writeConcern.writeModeIsCustom()) {
+        return findCustomWriteMode(writeConcern.wMode).getStatus();
+    }
+    return Status::OK();
 }
 
 bool ReplSetConfig::isSplitConfig() const {

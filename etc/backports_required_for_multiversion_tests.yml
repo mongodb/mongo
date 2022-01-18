@@ -138,6 +138,8 @@ last-continuous:
       test_file: jstests/replsets/dbcheck_write_concern.js
     - ticket: SERVER-62296
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
+    - ticket: SERVER-60817
+      test_file: jstests/replsets/dont_set_invalid_rwconcern.js
     - ticket: SERVER-61977
       test_file: jstests/replsets/rollback_during_step_up.js
     - ticket: SERVER-61755
@@ -419,6 +421,8 @@ last-lts:
       test_file: jstests/sharding/recover_multiple_migrations_on_stepup.js
     - ticket: SERVER-62296
       test_file: jstests/sharding/migration_recovers_unfinished_migrations.js
+    - ticket: SERVER-60817
+      test_file: jstests/replsets/dont_set_invalid_rwconcern.js
     - ticket: SERVER-61977
       test_file: jstests/replsets/rollback_during_step_up.js
     - ticket: SERVER-61755

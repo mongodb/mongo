@@ -372,6 +372,11 @@ Milliseconds ReplicationCoordinatorEmbedded::getConfigHeartbeatInterval() const 
     UASSERT_NOT_IMPLEMENTED;
 }
 
+Status ReplicationCoordinatorEmbedded::validateWriteConcern(
+    const WriteConcernOptions& writeConcern) const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 void ReplicationCoordinatorEmbedded::processReplSetGetConfig(BSONObjBuilder*,
                                                              bool commitmentStatus,
                                                              bool includeNewlyAdded) {

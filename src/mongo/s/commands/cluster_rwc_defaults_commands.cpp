@@ -36,6 +36,7 @@
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -70,6 +71,16 @@ public:
         // Quickly pick up the new defaults by setting them in the cache.
         auto newDefaults = RWConcernDefault::parse(
             IDLParserErrorContext("ClusterSetDefaultRWConcern"), cmdResponse.response);
+        if (auto optWC = newDefaults.getDefaultWriteConcern()) {
+            if (optWC->writeModeIsCustom()) {
+                LOGV2_WARNING(
+                    6081700,
+                    "A custom write concern is being set as the default write concern in a sharded "
+                    "cluster. This set is unchecked, but if the custom write concern does not "
+                    "exist on all shards in the cluster, errors will occur upon writes",
+                    "customWriteConcern"_attr = optWC->wMode);
+            }
+        }
         ReadWriteConcernDefaults::get(opCtx).setDefault(opCtx, std::move(newDefaults));
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);

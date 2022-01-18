@@ -116,6 +116,14 @@ public:
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
             auto newDefaults = rwcDefaults.generateNewCWRWCToBeSavedOnDisk(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
+            // We don't want to check if the custom write concern exists on the config servers
+            // because it only has to exist on the actual shards in order to be valid.
+            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                if (auto optWC = newDefaults.getDefaultWriteConcern()) {
+                    uassertStatusOK(
+                        repl::ReplicationCoordinator::get(opCtx)->validateWriteConcern(*optWC));
+                }
+            }
 
             updatePersistedDefaultRWConcernDocument(opCtx, newDefaults);
             LOGV2(20498,

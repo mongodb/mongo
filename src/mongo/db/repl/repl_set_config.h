@@ -536,6 +536,12 @@ public:
     bool containsCustomizedGetLastErrorDefaults() const;
 
     /**
+     * Returns Status::OK if write concern is valid for this config, or appropriate status
+     * otherwise.
+     */
+    Status validateWriteConcern(const WriteConcernOptions& writeConcern) const;
+
+    /**
      * Returns true if this config is a split config, which is determined by checking if it contains
      * a recipient config for a shard split operation.
      */
