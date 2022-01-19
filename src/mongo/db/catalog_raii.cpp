@@ -47,15 +47,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 
 /**
- * Returns true if 'nss' is a view. False if the namespace or view doesn't exist.
- */
-bool isSecondaryNssAView(OperationContext* opCtx, const NamespaceString& nss) {
-    TenantDatabaseName tenantDbName(boost::none, nss.db());
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, tenantDbName);
-    return viewCatalog && viewCatalog->lookup(opCtx, nss);
-}
-
-/**
  * Performs some sanity checks on the collection and database.
  */
 void verifyDbAndCollection(OperationContext* opCtx,
@@ -229,7 +220,7 @@ AutoGetCollection::AutoGetCollection(
     invariant(!opCtx->isLockFreeReadsOp());
     invariant(secondaryNssOrUUIDs.empty() || modeColl == MODE_IS);
 
-    // Get a unique list of 'secondary' database names to pass into AutoGetDbMulti below.
+    // Get a unique list of 'secondary' database names to pass into AutoGetDb below.
     std::set<StringData> secondaryDbNames;
     for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
         secondaryDbNames.emplace(secondaryNssOrUUID.db());
@@ -287,11 +278,6 @@ AutoGetCollection::AutoGetCollection(
                               secondaryResolvedNss,
                               secondaryColl,
                               databaseHolder->getDb(opCtx, secondaryTenantDbName));
-
-        // Flag if a secondary namespace is a view.
-        if (!_secondaryNssIsView && isSecondaryNssAView(opCtx, secondaryResolvedNss)) {
-            _secondaryNssIsView = true;
-        }
     }
 
     if (_coll) {
@@ -301,8 +287,8 @@ AutoGetCollection::AutoGetCollection(
         // table are consistent with the read request's shardVersion.
         //
         // Note: sharding versioning for an operation has no concept of multiple collections.
-        auto collDesc =
-            CollectionShardingState::get(opCtx, _resolvedNss)->getCollectionDescription(opCtx);
+        auto css = CollectionShardingState::getSharedForLockFreeReads(opCtx, _resolvedNss);
+        auto collDesc = css->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
         }
@@ -396,8 +382,8 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
         // operation. The shardVersion will be checked later if the shard filtering metadata is
         // fetched, ensuring both that the collection description info fetched here and the routing
         // table are consistent with the read request's shardVersion.
-        auto collDesc = CollectionShardingState::getSharedForLockFreeReads(opCtx, _collection->ns())
-                            ->getCollectionDescription(opCtx);
+        auto css = CollectionShardingState::getSharedForLockFreeReads(opCtx, _collection->ns());
+        auto collDesc = css->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
         }

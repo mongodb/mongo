@@ -876,14 +876,6 @@ public:
     void yield() const override;
     void restore() const override;
 
-    RestoreFn detachRestoreFn() {
-        return std::move(_restoreFn);
-    }
-
-    void attachRestoreFn(RestoreFn newRestoreFn) {
-        _restoreFn = std::move(newRestoreFn);
-    }
-
     friend std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll);
 
     void setShardKeyPattern(const BSONObj& shardKeyPattern) {

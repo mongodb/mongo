@@ -125,9 +125,9 @@ public:
      * avoid deadlocks, consistent with other locations in the code wherein we take multiple
      * collection locks.
      *
-     * Invariants if any 'secondaryNssOrUUIDs' represent a view namespace. Only MODE_IS is supported
-     * when 'secondaryNssOrUUIDs' namespaces are provided. It is safe for 'nsOrUUID' to be
-     * duplicated in 'secondaryNssOrUUIDs', or 'secondaryNssOrUUIDs' to contain duplicates.
+     * Only MODE_IS is supported when 'secondaryNssOrUUIDs' namespaces are provided. It is safe for
+     * 'nsOrUUID' to be duplicated in 'secondaryNssOrUUIDs', or 'secondaryNssOrUUIDs' to contain
+     * duplicates.
      */
     AutoGetCollection(
         OperationContext* opCtx,
@@ -190,13 +190,6 @@ public:
     }
 
     /**
-     * Indicates whether any of the 'secondaryNssOrUUIDs' namespaces are views.
-     */
-    bool isAnySecondaryNamespaceAView() const {
-        return _secondaryNssIsView;
-    }
-
-    /**
      * Returns a writable Collection copy that will be returned by current and future calls to this
      * function as well as getCollection(). Any previous Collection pointers that were returned may
      * be invalidated.
@@ -211,16 +204,6 @@ public:
             CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
 
 protected:
-    template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
-    friend class AutoGetCollectionForReadBase;
-
-    /**
-     * Allow access to the CollectionPtr as non-const, for friend classes.
-     */
-    CollectionPtr& _getCollectionPtrForModify() {
-        return _coll;
-    }
-
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.
     boost::optional<AutoGetDb> _autoDb;
@@ -228,9 +211,6 @@ protected:
 
     CollectionPtr _coll = nullptr;
     std::shared_ptr<const ViewDefinition> _view;
-
-    // Tracks whether any secondary collection namespaces is a view.
-    bool _secondaryNssIsView = false;
 
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
     // the same as the input namespace string
@@ -316,16 +296,6 @@ public:
     }
 
 private:
-    template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
-    friend class AutoGetCollectionForReadBase;
-
-    /**
-     * Allow access to the CollectionPtr as non-const, for friend classes.
-     */
-    CollectionPtr& _getCollectionPtrForModify() {
-        return _collectionPtr;
-    }
-
     // Indicate that we are lock-free on code paths that can run either lock-free or locked for
     // different kinds of operations. Note: this class member is currently declared first so that it
     // destructs last, as a safety measure, but not because it is currently depended upon behavior.

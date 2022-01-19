@@ -187,8 +187,6 @@ ReadSourceChange shouldChangeReadSource(OperationContext* opCtx, const Namespace
 
 bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
                                        boost::optional<Timestamp> readTimestamp) {
-    // This is the timestamp of the most recent catalog changes to this collection. If this is
-    // greater than any point in time read timestamps, we should either wait or return an error.
     if (!collectionMin) {
         return false;
     }
@@ -198,7 +196,10 @@ bool collectionChangesConflictWithRead(boost::optional<Timestamp> collectionMin,
         return false;
     }
 
-    // Return if there are no conflicting catalog changes with the readTimestamp.
+    // If the last change to the collection was before or at the read timestamp, then the storage
+    // snapshot will match the collection in-memory state. Return true only if there would be an
+    // inconsistency: a collection with a newer min timestamp would not match an older storage
+    // snapshot.
     return *collectionMin > readTimestamp;
 }
 }  // namespace SnapshotHelper
