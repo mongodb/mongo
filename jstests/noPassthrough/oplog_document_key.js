@@ -17,6 +17,10 @@ const mongos = st.s;
 const dbName = jsTestName();
 const db = mongos.getDB(dbName);
 
+Array.prototype.flatMap = function(lambda) {
+    return Array.prototype.concat.apply([], this.map(lambda));
+};
+
 const testWriteOplogDocumentKey = ({sharded, inTransaction}) => {
     const shardKey = {a: 1};
     const doc0 = {_id: 0, a: 0, b: 0};
@@ -59,11 +63,10 @@ const testWriteOplogDocumentKey = ({sharded, inTransaction}) => {
     const query = inTransaction ? {'o.applyOps.0.ns': ns} : {ns, op: {$in: ['i', 'u', 'd']}};
     let oplogs = primary.getDB("local").oplog.rs.find(query).sort({$natural: 1}).toArray();
     if (inTransaction) {
-        assert.eq(oplogs.length, 1);
-        oplogs = oplogs[0].o.applyOps;
+        oplogs = oplogs.flatMap(oplog => oplog.o.applyOps);
     }
 
-    assert.eq(oplogs.length, 4);
+    assert.eq(oplogs.length, 4, tojson(oplogs));
     const [insertOplog, replaceOplog, updateOplog, deleteOplog] = oplogs;
     const docKey = sharded ? docKeys.sharded : docKeys.unsharded;
     assert.eq(insertOplog.op, 'i', insertOplog);
