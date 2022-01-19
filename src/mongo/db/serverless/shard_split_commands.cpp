@@ -57,12 +57,6 @@ public:
                     "shard split is not available on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::None ||
                         serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-            // TODO SERVER-62079 : Remove check for scanning RSM as it does not exist anymore.
-            uassert(
-                6142502,
-                "feature \"shard split\" not supported when started with \"scanning\" replica set "
-                "monitor mode.",
-                gReplicaSetMonitorProtocol != ReplicaSetMonitorProtocol::kScanning);
 
             const auto& cmd = request();
             auto stateDoc = ShardSplitDonorDocument(cmd.getMigrationId());
@@ -137,12 +131,6 @@ public:
                     "feature \"shard split\" not supported",
                     repl::feature_flags::gShardSplit.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            // TODO SERVER-62079 : Remove check for scanning RSM as it does not exist anymore.
-            uassert(
-                6142506,
-                "feature \"shard split\" not supported when started with \"scanning\" replica set "
-                "monitor mode.",
-                gReplicaSetMonitorProtocol != ReplicaSetMonitorProtocol::kScanning);
 
             const RequestType& cmd = request();
 

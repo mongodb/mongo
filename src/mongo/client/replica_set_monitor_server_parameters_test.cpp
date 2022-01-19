@@ -32,7 +32,6 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
-#include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -77,23 +76,5 @@ TEST_F(ReplicaSetMonitorProtocolTest, checkRSMProtocolParamSdam) {
 }
 #endif
 
-/**
- * Checks that a ScanningReplicaSetMonitor is created when the replicaSetMonitorProtocol server
- * parameter is set to 'scanning'.
- */
-TEST_F(ReplicaSetMonitorProtocolTest, checkRSMProtocolParamScanning) {
-    ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
-    auto uri = MongoURI::parse("mongodb:a,b,c/?replicaSet=name");
-    ASSERT_OK(uri.getStatus());
-    auto createdMonitor = ReplicaSetMonitor::createIfNeeded(uri.getValue());
-
-    // If the created monitor does not point to a ScanningReplicaSetMonitor, the cast returns a
-    // nullptr.
-    auto scanningMonitorCast = dynamic_cast<ScanningReplicaSetMonitor*>(createdMonitor.get());
-    ASSERT(scanningMonitorCast);
-
-    auto streamableMonitorCast = dynamic_cast<StreamableReplicaSetMonitor*>(createdMonitor.get());
-    ASSERT_FALSE(streamableMonitorCast);
-}
 }  // namespace
 }  // namespace mongo

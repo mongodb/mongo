@@ -220,7 +220,6 @@ clientDriverEnv.Library(
         'replica_set_monitor.cpp',
         'replica_set_monitor_manager.cpp',
         'replica_set_monitor_stats.cpp',
-        'scanning_replica_set_monitor.cpp',
         'streamable_replica_set_monitor.cpp',
         'streamable_replica_set_monitor_query_processor.cpp',
         'streamable_replica_set_monitor_error_handler.cpp',

@@ -58,10 +58,6 @@ class TenantMigrationDonorServiceTest : public ServiceContextMongoDTest {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
 
-        // Only the ReplicaSetMonitor scanning protocol supports mock connections.
-        ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
-        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
-
         // Set up clocks.
         serviceContext->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(_clkSource));
         serviceContext->setPreciseClockSource(

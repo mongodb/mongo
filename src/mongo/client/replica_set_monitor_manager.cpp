@@ -40,7 +40,6 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
-#include "mongo/client/scanning_replica_set_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -75,34 +74,31 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
     const HostAndPort& remoteHost,
     const BSONObj& isMasterRequest,
     const executor::RemoteCommandResponse& isMasterReply) {
-    if (gReplicaSetMonitorProtocol != ReplicaSetMonitorProtocol::kScanning) {
-        auto monitor = ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost);
-        if (!monitor) {
-            return Status::OK();
-        }
+    auto monitor = ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost);
+    if (!monitor) {
+        return Status::OK();
+    }
 
-        if (std::shared_ptr<StreamableReplicaSetMonitor> streamableMonitor =
-                std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
-                    ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost))) {
+    if (auto streamableMonitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
+            ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost))) {
 
-            auto publisher = streamableMonitor->getEventsPublisher();
-            if (publisher) {
-                try {
-                    if (isMasterReply.status.isOK()) {
-                        publisher->onServerHandshakeCompleteEvent(
-                            *isMasterReply.elapsed, remoteHost, isMasterReply.data);
-                    } else {
-                        publisher->onServerHandshakeFailedEvent(
-                            remoteHost, isMasterReply.status, isMasterReply.data);
-                    }
-                } catch (const DBException& exception) {
-                    LOGV2_ERROR(4712101,
-                                "An error occurred publishing a ReplicaSetMonitor handshake event",
-                                "error"_attr = exception.toStatus(),
-                                "replicaSet"_attr = monitor->getName(),
-                                "handshakeStatus"_attr = isMasterReply.status);
-                    return exception.toStatus();
+        auto publisher = streamableMonitor->getEventsPublisher();
+        if (publisher) {
+            try {
+                if (isMasterReply.status.isOK()) {
+                    publisher->onServerHandshakeCompleteEvent(
+                        *isMasterReply.elapsed, remoteHost, isMasterReply.data);
+                } else {
+                    publisher->onServerHandshakeFailedEvent(
+                        remoteHost, isMasterReply.status, isMasterReply.data);
                 }
+            } catch (const DBException& exception) {
+                LOGV2_ERROR(4712101,
+                            "An error occurred publishing a ReplicaSetMonitor handshake event",
+                            "error"_attr = exception.toStatus(),
+                            "replicaSet"_attr = monitor->getName(),
+                            "handshakeStatus"_attr = isMasterReply.status);
+                return exception.toStatus();
             }
         }
     }
@@ -197,16 +193,10 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
           "protocol"_attr = toString(gReplicaSetMonitorProtocol),
           "uri"_attr = uri.toString());
     invariant(_taskExecutor);
-    if (gReplicaSetMonitorProtocol == ReplicaSetMonitorProtocol::kScanning) {
-        newMonitor =
-            std::make_shared<ScanningReplicaSetMonitor>(uri, _taskExecutor, cleanupCallback);
-        newMonitor->init();
-    } else {
-        // Both ReplicaSetMonitorProtocol::kSdam and ReplicaSetMonitorProtocol::kStreamable use the
-        // StreamableReplicaSetMonitor.
-        newMonitor = StreamableReplicaSetMonitor::make(
-            uri, _taskExecutor, _getConnectionManager(), cleanupCallback, _stats);
-    }
+
+    newMonitor = StreamableReplicaSetMonitor::make(
+        uri, _taskExecutor, _getConnectionManager(), cleanupCallback, _stats);
+
     _monitors[setName] = newMonitor;
     _numMonitorsCreated++;
     return newMonitor;

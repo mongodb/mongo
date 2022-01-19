@@ -56,7 +56,6 @@ const st = new ShardingTest({
         setParameter: {
             logComponentVerbosity: tojson({network: {verbosity: 2}}),
             // Force the mongos's replica set monitors to always include all the eligible nodes.
-            "failpoint.scanningServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
             "failpoint.sdamServerSelectorIgnoreLatencyWindow": tojson({mode: "alwaysOn"}),
             // Force the mongos to send requests to hosts in alphabetical order of host names.
             "failpoint.networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder":
