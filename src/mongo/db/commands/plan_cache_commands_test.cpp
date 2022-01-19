@@ -41,7 +41,7 @@ namespace {
 static const NamespaceString nss{"test.collection"_sd};
 
 PlanCacheKey makeKey(const CanonicalQuery& cq) {
-    CollectionMock coll(nss);
+    CollectionMock coll(TenantNamespace(boost::none, nss));
     return plan_cache_key_factory::make<PlanCacheKey>(cq, &coll);
 }
 

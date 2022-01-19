@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_namespace.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -76,9 +77,11 @@ void createCollections(OperationContext* opCtx, int numCollections) {
     BatchedCollectionCatalogWriter batched(opCtx);
 
     for (auto i = 0; i < numCollections; i++) {
-        const NamespaceString nss("collection_catalog_bm", std::to_string(i));
+        const TenantNamespace tenantNs(boost::none,
+                                       NamespaceString("collection_catalog_bm", std::to_string(i)));
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.registerCollection(opCtx, UUID::gen(), std::make_shared<CollectionMock>(nss));
+            catalog.registerCollection(
+                opCtx, UUID::gen(), std::make_shared<CollectionMock>(tenantNs));
         });
     }
 }

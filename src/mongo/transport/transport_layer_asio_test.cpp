@@ -377,7 +377,7 @@ TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
         ON_BLOCK_EXIT([&] { barrier.countDownAndWait(); });
 
         // Linger timeout = 0 causes a RST packet on close.
-        struct linger sl = {1, 0};
+        asio::socket_base::linger sl(true, 0);
         if (setsockopt(conn.socket().rawFD(),
                        SOL_SOCKET,
                        SO_LINGER,
