@@ -130,7 +130,39 @@ private:
                           const value::MaterializedRow& val,
                           const KeyString::TypeBits& typeBits,
                           bool update);
+    void spillRowToDisk(const value::MaterializedRow& key,
+                        const value::MaterializedRow& defaultVal);
 
+    /**
+     * We check amount of used memory every T processed incoming records, where T is calculated
+     * based on the estimated used memory and its recent growth. When the memory limit is exceeded,
+     * 'checkMemoryUsageAndSpillIfNecessary()' will create '_recordStore' and might spill some of
+     * the already accumulated data into it.
+     */
+    struct MemoryCheckData {
+        const double checkpointMargin = internalQuerySBEAggMemoryUseCheckMargin.load();
+        const long atMostCheckFrequency = internalQuerySBEAggMemoryCheckPerAdvanceAtMost.load();
+        const long atLeastMemoryCheckFrequency =
+            internalQuerySBEAggMemoryCheckPerAdvanceAtLeast.load();
+
+        // The check frequency upper bound, which start at 'atMost' and exponentially backs off
+        // to 'atLeast' as more data is accumulated. If 'atLeast' is less than 'atMost', the memory
+        // checks will be done every 'atLeast' incoming records.
+        long memoryCheckFrequency = 1;
+
+        // The number of incoming records to process before the next memory checkpoint.
+        long nextMemoryCheckpoint = 0;
+
+        // The counter of the incoming records between memory checkpoints.
+        long memoryCheckpointCounter = 0;
+
+        long long lastEstimatedMemoryUsage = 0;
+
+        MemoryCheckData() {
+            memoryCheckFrequency = std::min(atMostCheckFrequency, atLeastMemoryCheckFrequency);
+        }
+    };
+    void checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd);
 
     const value::SlotVector _gbs;
     const value::SlotMap<std::unique_ptr<EExpression>> _aggs;
@@ -140,14 +172,6 @@ private:
     // When this operator does not expect to be reopened (almost always) then it can close the child
     // early.
     const bool _optimizedClose{true};
-    // Memory tracking variables.
-    const long long _approxMemoryUseInBytesBeforeSpill =
-        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
-    const int _memoryUseSampleRate = internalQuerySBEAggMemoryUseSampleRate.load();
-    // Used in collaboration with memoryUseSampleRatePercentage to determine whether we should
-    // re-approximate memory usage.
-    PseudoRandom _pseudoRandom = PseudoRandom(Date_t::now().asInt64());
-
     value::SlotAccessorMap _outAccessors;
     std::vector<value::SlotAccessor*> _inKeyAccessors;
 
@@ -182,10 +206,14 @@ private:
     bool _compiled{false};
     bool _childOpened{false};
 
-    // Used when spilling to disk.
+    // Memory tracking and spilling to disk.
+    const long long _approxMemoryUseInBytesBeforeSpill =
+        internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
     std::unique_ptr<TemporaryRecordStore> _recordStore;
     bool _drainingRecordStore{false};
     std::unique_ptr<SeekableRecordCursor> _rsCursor;
+
+    HashAggStats _specificStats;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.

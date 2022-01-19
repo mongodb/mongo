@@ -242,6 +242,21 @@ void HashAggStage::makeTemporaryRecordStore() {
     assertIgnorePrepareConflictsBehavior(_opCtx);
     _recordStore = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
         _opCtx, KeyFormat::String);
+
+    _specificStats.usedDisk = true;
+}
+
+void HashAggStage::spillRowToDisk(const value::MaterializedRow& key,
+                                  const value::MaterializedRow& val) {
+    KeyString::Builder kb{KeyString::Version::kLatestVersion};
+    key.serializeIntoKeyString(kb);
+    auto typeBits = kb.getTypeBits();
+
+    auto rid = RecordId(kb.getBuffer(), kb.getSize());
+    auto valFromRs = getFromRecordStore(rid);
+    tassert(6031100, "Spilling a row doesn't support updating it in the store.", !valFromRs);
+
+    spillValueToDisk(rid, val, typeBits, false /*update*/);
 }
 
 void HashAggStage::spillValueToDisk(const RecordId& key,
@@ -249,7 +264,6 @@ void HashAggStage::spillValueToDisk(const RecordId& key,
                                     const KeyString::TypeBits& typeBits,
                                     bool update) {
     BufBuilder bufValue;
-
     val.serializeForSorter(bufValue);
 
     // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
@@ -263,21 +277,24 @@ void HashAggStage::spillValueToDisk(const RecordId& key,
     // touch.
     Lock::GlobalLock lk(_opCtx, MODE_IX);
     WriteUnitOfWork wuow(_opCtx);
-    auto result = [&]() {
-        if (update) {
-            auto status =
-                _recordStore->rs()->updateRecord(_opCtx, key, bufValue.buf(), bufValue.len());
-            return status;
-        } else {
-            auto status = _recordStore->rs()->insertRecord(
-                _opCtx, key, bufValue.buf(), bufValue.len(), Timestamp{});
-            return status.getStatus();
-        }
-    }();
+
+    auto result = mongo::Status::OK();
+    if (update) {
+        result = _recordStore->rs()->updateRecord(_opCtx, key, bufValue.buf(), bufValue.len());
+    } else {
+        auto status = _recordStore->rs()->insertRecord(
+            _opCtx, key, bufValue.buf(), bufValue.len(), Timestamp{});
+        result = status.getStatus();
+    }
     wuow.commit();
     tassert(5843600,
             str::stream() << "Failed to write to disk because " << result.reason(),
             result.isOK());
+
+    if (!update) {
+        _specificStats.spilledRecords++;
+    }
+    _specificStats.lastSpilledRecordSize = bufValue.len();
 }
 
 boost::optional<value::MaterializedRow> HashAggStage::getFromRecordStore(const RecordId& rid) {
@@ -288,6 +305,73 @@ boost::optional<value::MaterializedRow> HashAggStage::getFromRecordStore(const R
         return value::MaterializedRow::deserializeForSorter(valueReader, {});
     } else {
         return boost::none;
+    }
+}
+
+// Checks memory usage. Ideally, we'd want to know the exact size of already accumulated data, but
+// we cannot, so we estimate it based on the last updated/inserted row, if we have one, or the first
+// row in the '_ht' table. If the estimated memory usage exceeds the allowed, this method initiates
+// spilling (if haven't been done yet) and evicts some records from the '_ht' table into the temp
+// store to keep the memory usage under the limit.
+void HashAggStage::checkMemoryUsageAndSpillIfNecessary(MemoryCheckData& mcd) {
+    // The '_ht' table might become empty in the degenerate case when all rows had to be evicted to
+    // meet the memory constraint during a previous check -- we don't need to keep checking memory
+    // usage in this case because the table will never get new rows.
+    if (_ht->empty()) {
+        return;
+    }
+
+    mcd.memoryCheckpointCounter++;
+    if (mcd.memoryCheckpointCounter >= mcd.nextMemoryCheckpoint) {
+        if (_htIt == _ht->end()) {
+            _htIt = _ht->begin();
+        }
+        const long estimatedRowSize =
+            _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
+        long long estimatedTotalSize = _ht->size() * estimatedRowSize;
+        const double estimatedGainPerChildAdvance =
+            (static_cast<double>(estimatedTotalSize - mcd.lastEstimatedMemoryUsage) /
+             mcd.memoryCheckpointCounter);
+
+        if (estimatedTotalSize >= _approxMemoryUseInBytesBeforeSpill) {
+            uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+                    "Exceeded memory limit for $group, but didn't allow external spilling."
+                    " Pass allowDiskUse:true to opt in.",
+                    _allowDiskUse);
+            if (!_recordStore) {
+                makeTemporaryRecordStore();
+            }
+
+            // Evict enough rows into the temporary store to drop below the memory constraint.
+            const long rowsToEvictCount =
+                1 + (estimatedTotalSize - _approxMemoryUseInBytesBeforeSpill) / estimatedRowSize;
+            for (long i = 0; !_ht->empty() && i < rowsToEvictCount; i++) {
+                spillRowToDisk(_htIt->first, _htIt->second);
+                _ht->erase(_htIt);
+                _htIt = _ht->begin();
+            }
+            estimatedTotalSize = _ht->size() * estimatedRowSize;
+        }
+
+        // Calculate the next memory checkpoint. We estimate it based on the prior growth of the
+        // '_ht' and the remaining available memory. We have to keep doing this even after starting
+        // to spill because some accumulators can grow in size inside '_ht' (with no bounds).
+        // Value of 'estimatedGainPerChildAdvance' can be negative if the previous checkpoint
+        // evicted any records. And a value close to zero indicates a stable size of '_ht' so can
+        // delay the next check progressively.
+        const long nextCheckpointCandidate = (estimatedGainPerChildAdvance > 0.1)
+            ? mcd.checkpointMargin * (_approxMemoryUseInBytesBeforeSpill - estimatedTotalSize) /
+                estimatedGainPerChildAdvance
+            : (estimatedGainPerChildAdvance < -0.1) ? mcd.atMostCheckFrequency
+                                                    : mcd.nextMemoryCheckpoint * 2;
+        mcd.nextMemoryCheckpoint =
+            std::min<long>(mcd.memoryCheckFrequency,
+                           std::max<long>(mcd.atMostCheckFrequency, nextCheckpointCandidate));
+
+        mcd.lastEstimatedMemoryUsage = estimatedTotalSize;
+        mcd.memoryCheckpointCounter = 0;
+        mcd.memoryCheckFrequency =
+            std::min<long>(mcd.memoryCheckFrequency * 2, mcd.atLeastMemoryCheckFrequency);
     }
 }
 
@@ -313,12 +397,11 @@ void HashAggStage::open(bool reOpen) {
 
         _seekKeys.resize(_seekKeysAccessors.size());
 
-        // A counter to check memory usage periodically.
-        auto memoryUseCheckCounter = 0;
-
         // A default value for spilling a key to the record store.
         value::MaterializedRow defaultVal{_outAggAccessors.size()};
         bool updateAggStateHt = false;
+        MemoryCheckData memoryCheckData;
+
         while (_children[0]->getNext() == PlanState::ADVANCED) {
             value::MaterializedRow key{_inKeyAccessors.size()};
             // Copy keys in order to do the lookup.
@@ -344,8 +427,7 @@ void HashAggStage::open(bool reOpen) {
             } else {
                 // The memory limit has been reached, accumulate state in '_ht' only if we
                 // find the key in '_ht'.
-                auto it = _ht->find(key);
-                _htIt = it;
+                _htIt = _ht->find(key);
                 updateAggStateHt = _htIt != _ht->end();
             }
 
@@ -361,9 +443,8 @@ void HashAggStage::open(bool reOpen) {
                 // The memory limit has been reached and the key wasn't in the '_ht' so we need
                 // to spill it to the '_recordStore'.
                 KeyString::Builder kb{KeyString::Version::kLatestVersion};
-
-                // It's safe to ignore the use-after-move warning since it's logically impossible to
-                // enter this block after the move occurs.
+                // 'key' is moved only when 'updateAggStateHt' ends up "true", so it's safe to
+                // ignore the warning.
                 key.serializeIntoKeyString(kb);  // NOLINT(bugprone-use-after-move)
                 auto typeBits = kb.getTypeBits();
 
@@ -384,26 +465,8 @@ void HashAggStage::open(bool reOpen) {
                 spillValueToDisk(rid, _aggValueRecordStore, typeBits, valFromRs ? true : false);
             }
 
-            // Track memory usage only when we haven't started spilling to the '_recordStore'.
-            if (!_recordStore) {
-                auto shouldCalculateEstimatedSize =
-                    _pseudoRandom.nextCanonicalDouble() < _memoryUseSampleRate;
-                if (shouldCalculateEstimatedSize || ++memoryUseCheckCounter % 100 == 0) {
-                    memoryUseCheckCounter = 0;
-                    long estimatedSizeForOneRow =
-                        _htIt->first.memUsageForSorter() + _htIt->second.memUsageForSorter();
-                    long long estimatedTotalSize = _ht->size() * estimatedSizeForOneRow;
-
-                    if (estimatedTotalSize >= _approxMemoryUseInBytesBeforeSpill) {
-                        uassert(
-                            5843601,
-                            "Exceeded memory limit for $group, but didn't allow external spilling."
-                            " Pass allowDiskUse:true to opt in.",
-                            _allowDiskUse);
-                        makeTemporaryRecordStore();
-                    }
-                }
-            }
+            // Estimates how much memory is being used and might start spilling.
+            checkMemoryUsageAndSpillIfNecessary(memoryCheckData);
 
             if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
                 // During trial runs, we want to limit the amount of work done by opening a blocking
@@ -509,6 +572,7 @@ PlanState HashAggStage::getNext() {
 
 std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->specific = std::make_unique<HashAggStats>(_specificStats);
 
     if (includeDebugInfo) {
         DebugPrinter printer;
@@ -520,6 +584,12 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
                 childrenBob.append(str::stream() << slot, printer.print(expr->debugPrint()));
             }
         }
+        // Spilling stats.
+        bob.appendBool("usedDisk", _specificStats.usedDisk);
+        bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
+        bob.appendNumber("spilledBytesApprox",
+                         _specificStats.lastSpilledRecordSize * _specificStats.spilledRecords);
+
         ret->debugInfo = bob.obj();
     }
 
@@ -528,7 +598,7 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
 }
 
 const SpecificStats* HashAggStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 void HashAggStage::close() {
