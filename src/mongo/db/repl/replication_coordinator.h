@@ -673,11 +673,6 @@ public:
     virtual BSONObj getConfigBSON() const = 0;
 
     /**
-     * Validates the given WriteConcernOptions on the current ReplSetConfig.
-     */
-    virtual Status validateWriteConcern(const WriteConcernOptions& writeConcern) const = 0;
-
-    /**
      * Returns a pointer to the MemberConfig corresponding to the member with the given
      * HostAndPort in the current ReplSetConfig, or NULL if there is no member with that address.
      */

@@ -346,11 +346,6 @@ Milliseconds ReplicationCoordinatorNoOp::getConfigHeartbeatInterval() const {
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::validateWriteConcern(
-    const WriteConcernOptions& writeConcern) const {
-    MONGO_UNREACHABLE;
-}
-
 void ReplicationCoordinatorNoOp::processReplSetGetConfig(BSONObjBuilder* result,
                                                          bool commitmentStatus,
                                                          bool includeNewlyAdded) {

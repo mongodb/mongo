@@ -220,8 +220,6 @@ public:
     virtual const MemberConfig* findConfigMemberByHostAndPort(
         const HostAndPort& hap) const override;
 
-    virtual Status validateWriteConcern(const WriteConcernOptions& writeConcern) const override;
-
     virtual bool isConfigLocalHostAllowed() const override;
 
     virtual Milliseconds getConfigHeartbeatInterval() const override;

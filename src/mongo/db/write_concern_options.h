@@ -130,10 +130,6 @@ public:
         return usedDefaultConstructedWC || _provenance.isImplicitDefault();
     }
 
-    bool writeModeIsCustom() const {
-        return !wMode.empty() && wMode != WriteConcernOptions::kMajority;
-    }
-
     SyncMode syncMode;
 
     // The w parameter for this write concern. The wMode represents the string format and

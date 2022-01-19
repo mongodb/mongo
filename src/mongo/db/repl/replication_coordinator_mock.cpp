@@ -418,12 +418,6 @@ BSONObj ReplicationCoordinatorMock::getConfigBSON() const {
     return _getConfigReturnValue.toBSON();
 }
 
-Status ReplicationCoordinatorMock::validateWriteConcern(
-    const WriteConcernOptions& writeConcern) const {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _getConfigReturnValue.validateWriteConcern(writeConcern);
-}
-
 const MemberConfig* ReplicationCoordinatorMock::findConfigMemberByHostAndPort(
     const HostAndPort& hap) const {
     stdx::lock_guard<Mutex> lock(_mutex);

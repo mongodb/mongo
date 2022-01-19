@@ -206,8 +206,6 @@ public:
 
     Milliseconds getConfigHeartbeatInterval() const override;
 
-    Status validateWriteConcern(const WriteConcernOptions& writeConcern) const override;
-
     void processReplSetGetConfig(BSONObjBuilder*,
                                  bool commitmentStatus = false,
                                  bool includeNewlyAdded = false) override;
