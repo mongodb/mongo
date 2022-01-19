@@ -1204,7 +1204,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     auto optTxnRetryCounter = sessionTxnRecord.getTxnRetryCounter();
     uassert(ErrorCodes::InvalidOptions,
             "txnRetryCounter is only supported in sharded clusters",
-            !optTxnRetryCounter.has_value() || *optTxnRetryCounter == 0);
+            !optTxnRetryCounter.has_value());
 
     auto uniqueOpCtx = cc().makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
@@ -1216,9 +1216,6 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
         boost::make_optional<TenantMigrationRecipientInfo>(getMigrationUUID());
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNumber);
-    if (optTxnRetryCounter) {
-        opCtx->setTxnRetryCounter(*optTxnRetryCounter);
-    }
     opCtx->setInMultiDocumentTransaction();
     MongoDOperationContextSession ocs(opCtx);
 

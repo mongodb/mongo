@@ -242,17 +242,12 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
                         const auto lsid = *doc.getId().getSessionId();
                         const auto txnNumber = *doc.getId().getTxnNumber();
                         const auto txnRetryCounter = [&] {
-                            if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                                    serverGlobalParams.featureCompatibility)) {
-                                auto optTxnRetryCounter = doc.getId().getTxnRetryCounter();
-                                uassert(6032303,
-                                        str::stream()
-                                            << "Expected the "
-                                            << NamespaceString::kTransactionCoordinatorsNamespace
-                                            << " entry for transaction " << txnNumber
-                                            << " on session " << lsid
-                                            << " to have a 'txnRetryCounter' field",
-                                        optTxnRetryCounter.has_value());
+                            if (auto optTxnRetryCounter = doc.getId().getTxnRetryCounter()) {
+                                uassert(ErrorCodes::InvalidOptions,
+                                        "TxnRetryCounter is only supported when internal "
+                                        "transactions are enabled",
+                                        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                                            serverGlobalParams.featureCompatibility));
                                 return *optTxnRetryCounter;
                             }
                             return 0;

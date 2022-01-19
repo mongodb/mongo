@@ -1350,7 +1350,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    if (areInternalTransactionsEnabled) {
+    if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
         oplogEntry->getOperationSessionInfo().setTxnRetryCounter(txnRetryCounter);
     }
 
@@ -1364,7 +1364,7 @@ OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
             sessionTxnRecord.setLastWriteDate(times.wallClockTime);
             sessionTxnRecord.setState(txnState);
             sessionTxnRecord.setStartOpTime(startOpTime);
-            if (areInternalTransactionsEnabled) {
+            if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
                 sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
             }
             onWriteOpCompleted(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
@@ -1591,7 +1591,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    if (areInternalTransactionsEnabled) {
+    if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
         oplogEntry->getOperationSessionInfo().setTxnRetryCounter(txnRetryCounter);
     }
     oplogEntry->setPrevWriteOpTimeInTransaction(
@@ -1619,7 +1619,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
             sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
             sessionTxnRecord.setLastWriteDate(oplogEntry->getWallClockTime());
             sessionTxnRecord.setState(durableState);
-            if (areInternalTransactionsEnabled) {
+            if (areInternalTransactionsEnabled && !isDefaultTxnRetryCounter(txnRetryCounter)) {
                 sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
             }
             onWriteOpCompleted(opCtx, {}, sessionTxnRecord);

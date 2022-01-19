@@ -579,12 +579,9 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             auto optTxnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter();
             uassert(ErrorCodes::InvalidOptions,
                     "txnRetryCounter is only supported in sharded clusters",
-                    !optTxnRetryCounter.has_value() || *optTxnRetryCounter == 0);
+                    !optTxnRetryCounter.has_value());
             opCtx->setLogicalSessionId(sessionId);
             opCtx->setTxnNumber(txnNumber);
-            if (optTxnRetryCounter) {
-                opCtx->setTxnRetryCounter(*optTxnRetryCounter);
-            }
             opCtx->setInMultiDocumentTransaction();
             LOGV2_DEBUG(5351502,
                         1,

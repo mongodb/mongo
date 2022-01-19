@@ -93,6 +93,10 @@ bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId) {
     return sessionId.getTxnNumber().has_value();
 }
 
+bool isDefaultTxnRetryCounter(TxnRetryCounter txnRetryCounter) {
+    return txnRetryCounter == 0;
+}
+
 bool isInternalSessionForNonRetryableWrite(const LogicalSessionId& sessionId) {
     return sessionId.getTxnUUID() && !sessionId.getTxnNumber();
 }

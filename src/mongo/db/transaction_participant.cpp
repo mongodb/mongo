@@ -2657,15 +2657,12 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
         o(lg).activeTxnNumberAndRetryCounter.setTxnNumber(lastTxnRecord->getTxnNum());
         o(lg).activeTxnNumberAndRetryCounter.setTxnRetryCounter([&] {
             if (lastTxnRecord->getState()) {
-                if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    uassert(5875200,
-                            str::stream()
-                                << "Expected the config.transactions entry for transaction "
-                                << lastTxnRecord->getTxnNum() << " on session "
-                                << lastTxnRecord->getSessionId()
-                                << " to have a 'txnRetryCounter' field",
-                            lastTxnRecord->getTxnRetryCounter().has_value());
+                if (lastTxnRecord->getTxnRetryCounter().has_value()) {
+                    uassert(
+                        ErrorCodes::InvalidOptions,
+                        "TxnRetryCounter is only supported when internal transactions are enabled",
+                        feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                            serverGlobalParams.featureCompatibility));
                     return *lastTxnRecord->getTxnRetryCounter();
                 }
                 return 0;

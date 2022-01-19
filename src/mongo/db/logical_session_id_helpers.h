@@ -67,6 +67,12 @@ LogicalSessionId castToParentSessionId(const LogicalSessionId& sessionId);
 bool isInternalSessionForRetryableWrite(const LogicalSessionId& sessionId);
 
 /**
+ * Returns true if the txnRetryCounter is still the default value, meaning that for the relevant
+ * internal transaction, no retries have occurred.
+ */
+bool isDefaultTxnRetryCounter(TxnRetryCounter txnRetryCounter);
+
+/**
  * Returns true if the session with the given session id is an internal session for internal
  * transactions for non-retryable writes (i.e. writes in a session without a transaction number).
  */

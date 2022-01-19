@@ -124,8 +124,12 @@ repl::OpTime persistParticipantListBlocking(
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
     sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "TxnRetryCounter is only supported when internal transactions are enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
@@ -347,8 +351,12 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
     sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "TxnRetryCounter is only supported when internal transactions are enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 
@@ -558,8 +566,12 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(lsid);
     sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
-    if (feature_flags::gFeatureFlagInternalTransactions.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (auto txnRetryCounter = txnNumberAndRetryCounter.getTxnRetryCounter();
+        txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "TxnRetryCounter is only supported when internal transactions are enabled",
+                feature_flags::gFeatureFlagInternalTransactions.isEnabled(
+                    serverGlobalParams.featureCompatibility));
         sessionInfo.setTxnRetryCounter(*txnNumberAndRetryCounter.getTxnRetryCounter());
     }
 

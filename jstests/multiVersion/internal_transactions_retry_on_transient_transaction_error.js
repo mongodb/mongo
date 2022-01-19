@@ -100,6 +100,33 @@ function runTest(downgradeFCV) {
         assert.eq(insertCmdObj.txnRetryCounter, oplogEntry.txnRetryCounter, oplogEntry);
     });
 
+    jsTest.log("Verify that the config.transactions doc does not contain txnRetryCounter if " +
+               "txnRetryCounter is still the default value");
+
+    const lsid2 = {id: UUID()};
+    const txnNumber2 = NumberLong(2);
+    assert.commandWorked(testDB.runCommand({
+        insert: kCollName,
+        documents: [{x: 2}],
+        lsid: lsid2,
+        txnNumber: txnNumber2,
+        txnRetryCounter: NumberInt(0),
+        startTransaction: true,
+        autocommit: false,
+    }));
+    assert.commandWorked(testDB.adminCommand(
+        {commitTransaction: 1, lsid: lsid2, txnNumber: txnNumber2, autocommit: false}));
+
+    shard0Rst.awaitReplication();
+    shard0Rst.nodes.forEach(node => {
+        const txnDoc = node.getCollection(kConfigTxnNs).findOne({"_id.id": lsid2.id});
+        assert.neq(null, txnDoc);
+        assert.eq(null, txnDoc.txnRetryCounter, txnDoc);
+        const oplogEntry = node.getCollection(kOplogNs).findOne({"lsid.id": lsid2.id});
+        assert.neq(null, oplogEntry);
+        assert.eq(null, oplogEntry.txnRetryCounter, oplogEntry);
+    });
+
     st.stop();
 }
 

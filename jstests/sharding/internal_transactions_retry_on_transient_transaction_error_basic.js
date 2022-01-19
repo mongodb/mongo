@@ -193,6 +193,45 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
         db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
 }
 
+function testNoPersistenceOfDefaultTxnRetryCounter(
+    shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilter) {
+    let db = shardRst.getPrimary().getDB(kDbName);
+
+    const insertCmdObj = {
+        insert: kCollName,
+        documents: [{x: 0}],
+        lsid: lsid,
+        txnNumber: txnNumber,
+        txnRetryCounter: NumberInt(0),
+        startTransaction: true,
+        autocommit: false,
+    };
+    assert.commandWorked(db.runCommand(insertCmdObj));
+
+    const commitCmdObj = {
+        commitTransaction: 1,
+        lsid: lsid,
+        txnNumber: txnNumber,
+        autocommit: false,
+    };
+    assert.commandWorked(db.adminCommand(Object.assign({}, commitCmdObj)));
+
+    jsTest.log("Verify that txnRetryCounter is not persisted for any of the nodes if " +
+               "txnRetryCounter is the default value");
+    shardRst.awaitReplication();
+    shardRst.nodes.forEach(node => {
+        const txnDoc = node.getCollection(kConfigTxnNs).findOne(txnDocFilter);
+        assert.neq(null, txnDoc);
+        assert.eq(txnNumber, txnDoc.txnNum);
+        assert.eq(null, txnDoc.txnRetryCounter);
+        assert.eq("committed", txnDoc.state);
+        const oplogEntry = node.getCollection(kOplogNs).findOne(oplogEntryFilter);
+        assert.neq(null, oplogEntry);
+        assert.eq(txnNumber, oplogEntry.txnNumber, tojson(oplogEntry));
+        assert.eq(null, oplogEntry.txnRetryCounter, tojson(oplogEntry));
+    });
+}
+
 (() => {
     jsTest.log("Test transactions in a sharded cluster");
     const sessionUUID = UUID();
@@ -269,6 +308,18 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
         assert.neq(null, txnDoc);
         assert(!txnDoc.hasOwnProperty("txnRetryCounter"));
     });
+})();
+
+(() => {
+    jsTest.log("Test that txnRetryCounter is not persisted in the config.transactions doc if the " +
+               "txnRetryCounter is the default value.");
+    const sessionUUID = UUID();
+    const lsid0 = {id: sessionUUID};
+    const txnNumber0 = NumberLong(0);
+    const txnDocFilter0 = {"_id.id": lsid0.id};
+    const oplogEntryFilter0 = {"lsid.id": lsid0.id};
+    testNoPersistenceOfDefaultTxnRetryCounter(
+        shard0Rst, lsid0, txnNumber0, txnDocFilter0, oplogEntryFilter0);
 })();
 
 st.stop();
