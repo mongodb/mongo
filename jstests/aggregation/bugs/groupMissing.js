@@ -38,12 +38,6 @@ coll.insert({});
 res = coll.aggregate({$group: {_id: {a: "$a"}}});
 assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
 
-// Correct behavior after SERVER-21992 is fixed.
-if (0) {
-    res = coll.aggregate({$group: {_id: {a: "$a"}}});
-    assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {a: {}}}]));
-}
-
 // Bug, see SERVER-21992.
 coll.createIndex({a: 1});
 res = coll.aggregate({$group: {_id: {a: "$a"}}});
@@ -52,7 +46,7 @@ assert(resultsEq(res.toArray(), [{_id: {a: null}}]));
 // Correct behavior after SERVER-21992 is fixed.
 if (0) {
     res = coll.aggregate({$group: {_id: {a: "$a"}}});
-    assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {a: {}}}]));
+    assert(resultsEq(res.toArray(), [{_id: {a: null}}, {_id: {}}]));
 }
 
 coll.drop();

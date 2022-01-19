@@ -1486,12 +1486,16 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
     *ss << "key = ";
     auto idx = 0;
-    for (auto&& [groupName, expr] : groupByExpressions) {
-        if (idx > 0) {
-            *ss << ", ";
+    if (auto exprObj = dynamic_cast<const ExpressionObject*>(groupByExpression.get()); exprObj) {
+        for (auto&& [groupName, expr] : exprObj->getChildExpressions()) {
+            if (idx > 0) {
+                *ss << ", ";
+            }
+            *ss << "{" << groupName << ": " << exprObj->serialize(false).toString() << "}";
+            ++idx;
         }
-        *ss << "{" << groupName << ": " << expr->serialize(false).toString() << "}";
-        ++idx;
+    } else {
+        *ss << "{_id: " << groupByExpression->serialize(false).toString() << "}";
     }
     *ss << '\n';
     addIndent(ss, indent + 1);
@@ -1514,7 +1518,7 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
 QuerySolutionNode* GroupNode::clone() const {
     auto copy =
         std::make_unique<GroupNode>(std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
-                                    groupByExpressions,
+                                    groupByExpression,
                                     accumulators,
                                     doingMerge);
     return copy.release();

@@ -919,11 +919,10 @@ struct StageBuilderState {
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
 
-    // This map is used to plumb through pre-generated field expressions ('sbe::EExpression')
+    // This map is used to plumb through pre-generated field expressions ('EvalExpr')
     // corresponding to field paths to 'generateExpression' to avoid repeated expression generation.
     // Key is expected to represent field paths in form CURRENT.<field_name>[.<field_name>]*.
-    stdx::unordered_map<std::string /*field path*/, std::unique_ptr<sbe::EExpression>>
-        preGeneratedExprs;
+    stdx::unordered_map<std::string /*field path*/, EvalExpr> preGeneratedExprs;
 };
 
 }  // namespace mongo::stage_builder

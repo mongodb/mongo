@@ -221,7 +221,8 @@ assertResultsMatchWithAndWithoutPushdown(
               assertResultsMatchWithAndWithoutPushdown(
                   coll, pipeline, [{_id: "a", ss: 30}, {_id: "b", ss: 60}, {_id: "c", ss: 10}], 2));
 
-// The second $group stage refers to both a top-level field and a sub-field twice.
+// The second $group stage refers to both a top-level field and a sub-field twice which does not
+// exist.
 assertResultsMatchWithAndWithoutPushdown(
     coll,
     [
@@ -235,9 +236,15 @@ assertResultsMatchWithAndWithoutPushdown(
     ],
     2);
 
-// TODO SERVER-59951: Add more test cases that the second $group stage refers to sub-fields when we
-// enable $mergeObject or document id expression. As of now we don't have a way to produce valid
-// subdocuments from a $group stage.
+// The second $group stage refers to a sub-field which does exist.
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: {i: "$item", p: {$divide: ["$price", 5]}}}},
+        {$group: {_id: "$_id.p", s: {$sum: 1}}}
+    ],
+    [{"_id": 1, "s": 2}, {"_id": 2, "s": 2}, {"_id": 4, "s": 1}],
+    2);
 
 // Run a group with a supported $stdDevSamp accumultor and check that it gets pushed down.
 assertGroupPushdown(coll,
@@ -249,10 +256,10 @@ assertGroupPushdown(coll,
                     ],
                     1);
 
-// Run a simple group with $sum and object _id, check if it doesn't get pushed down.
-assertNoGroupPushdown(coll,
-                      [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}],
-                      [{_id: {i: "a"}, s: 15}, {_id: {i: "b"}, s: 30}, {_id: {i: "c"}, s: 5}]);
+// Run a simple group with $sum and object _id, check if it gets pushed down.
+assertGroupPushdown(coll,
+                    [{$group: {_id: {"i": "$item"}, s: {$sum: "$price"}}}],
+                    [{_id: {i: "a"}, s: 15}, {_id: {i: "b"}, s: 30}, {_id: {i: "c"}, s: 5}]);
 
 // Run a group with spilling on and check that $group is pushed down.
 assertGroupPushdown(coll,

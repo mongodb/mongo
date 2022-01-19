@@ -99,7 +99,7 @@ protected:
             inputDocs, VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
 
         auto groupNode = std::make_unique<GroupNode>(std::move(virtScanNode),
-                                                     docSrcGroup->getIdFields(),
+                                                     docSrcGroup->getIdExpression(),
                                                      docSrcGroup->getAccumulatedFields(),
                                                      false /*doingMerge*/);
 
@@ -141,6 +141,19 @@ protected:
         ASSERT_TRUE(valueEquals(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal))
             << "expected: " << std::make_pair(expectedTag, expectedVal)
             << " but got: " << std::make_pair(sortedResultsTag, sortedResultsVal);
+    }
+
+    void runGroupAggregationToFail(StringData groupSpec,
+                                   std::vector<BSONArray> inputDocs,
+                                   ErrorCodes::Error expectedError,
+                                   std::unique_ptr<CollatorInterface> collator = nullptr) {
+        try {
+            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs, std::move(collator));
+            ASSERT(false) << "Expected error: " << expectedError << " for " << groupSpec
+                          << " but succeeded";
+        } catch (const DBException& e) {
+            ASSERT_TRUE(e.code() == expectedError) << "group spec: " << groupSpec;
+        }
     }
 
     /**
@@ -262,6 +275,152 @@ double computeStdDev(const std::vector<double>& vec, bool isSamp) {
         return sqrt(accum / (vec.size() - 1));
     }
     return sqrt(accum / vec.size());
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdEmptyObject) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+
+    runGroupAggregationTest(R"({_id: {}})", docs, BSON_ARRAY(BSON("_id" << BSONObj{})));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdEmptyString) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+
+    runGroupAggregationTest(R"({_id: ""})",
+                            docs,
+                            BSON_ARRAY(BSON("_id"
+                                            << "")));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdConstString) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+
+    runGroupAggregationTest(R"({_id: "abc"})",
+                            docs,
+                            BSON_ARRAY(BSON("_id"
+                                            << "abc")));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdNumericConst) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+
+    runGroupAggregationTest(R"({_id: 1})", docs, BSON_ARRAY(BSON("_id" << 1)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdNumericExpression) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+
+    runGroupAggregationTest(R"({_id: {"$add": ["$a", "$b"]}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 2) << BSON("_id" << 3) << BSON("_id" << 5)));
+
+    runGroupAggregationTest(
+        R"({_id: {"$multiply": ["$b", 1000]}})",
+        docs,
+        BSON_ARRAY(BSON("_id" << 1000) << BSON("_id" << 2000) << BSON("_id" << 3000)));
+
+    runGroupAggregationTest(R"({_id: {"$divide": [{"$multiply": ["$b", 1000]}, 500]}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << 2) << BSON("_id" << 4) << BSON("_id" << 6)));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdNumericExprOnNonNumericData) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 1)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b"
+                                                           << "2"))};
+
+    runGroupAggregationToFail(
+        R"({_id: {"$add": ["$a", "$b"]}})", docs, static_cast<ErrorCodes::Error>(4974201));
+
+    runGroupAggregationToFail(
+        R"({_id: {"$multiply": ["$b", 1000]}})", docs, static_cast<ErrorCodes::Error>(5073102));
+
+    runGroupAggregationToFail(R"({_id: {"$divide": [{"$multiply": ["$a", 1000]}, "$b"]}})",
+                              docs,
+                              static_cast<ErrorCodes::Error>(5073101));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdObjectExpression) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("b" << 1)),
+                                       BSON_ARRAY(BSON("a" << BSONNULL << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
+                                       BSON_ARRAY(BSON("a" << 2 << "b" << 3))};
+
+    // Document id with a special field name such as "_id".
+    // 'Nothing' is converted to 'Null' when there's only one field and both {_id: Nothing} / {_id:
+    // null} becomes {_id: null}.
+    runGroupAggregationTest(R"({_id: {_id: "$a"}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSON("_id" << BSONNULL))
+                                       << BSON("_id" << BSON("_id" << 1))
+                                       << BSON("_id" << BSON("_id" << 2))));
+
+    runGroupAggregationTest(R"({_id: {b: "$b"}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSON("b" << 1))
+                                       << BSON("_id" << BSON("b" << 2))
+                                       << BSON("_id" << BSON("b" << 3))));
+
+    // Duplicated field expressions.
+    // When there are multiple fields, 'Nothing' is not converted to 'Null' and {_id: Nothing, b:
+    // Nothing} becomes {}.
+    runGroupAggregationTest(R"({_id: {_id: "$a", a: "$a"}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONObj{})
+                                       << BSON("_id" << BSON("_id" << BSONNULL << "a" << BSONNULL))
+                                       << BSON("_id" << BSON("_id" << 1 << "a" << 1))
+                                       << BSON("_id" << BSON("_id" << 2 << "a" << 2))));
+
+    // A missing field for a group-by key must generate an _id document without such field when
+    // there are multiple fields. {a: Nothing, c: Nothing} becomes {}.
+    runGroupAggregationTest(R"({_id: {a: "$a", c: "$c"}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSONObj{})
+                                       << BSON("_id" << BSON("a" << BSONNULL))
+                                       << BSON("_id" << BSON("a" << 1))
+                                       << BSON("_id" << BSON("a" << 2))));
+
+    // A missing field for a group-by key must generate an _id document without such field when
+    // there are multiple fields. {a: Nothing, b: 1} becomes {b: 1}.
+    runGroupAggregationTest(R"({_id: {a: "$a", b: "$b"}})",
+                            docs,
+                            BSON_ARRAY(BSON("_id" << BSON("a" << BSONNULL << "b" << 2))
+                                       << BSON("_id" << BSON("a" << 1 << "b" << 2))
+                                       << BSON("_id" << BSON("a" << 2 << "b" << 2))
+                                       << BSON("_id" << BSON("a" << 2 << "b" << 3))
+                                       << BSON("_id" << BSON("b" << 1))));
+}
+
+TEST_F(SbeStageBuilderGroupTest, TestIdObjectSubFieldExpression) {
+    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("d" << BSON("a" << 1 << "b" << 1))),
+                                       BSON_ARRAY(BSON("d" << BSON("a" << 1 << "b" << 2))),
+                                       BSON_ARRAY(BSON("d" << BSON("a" << 1 << "b" << 2))),
+                                       BSON_ARRAY(BSON("d" << BSON("a" << 2 << "b" << 2))),
+                                       BSON_ARRAY(BSON("d" << BSON("a" << 2 << "b" << 3)))};
+
+    runGroupAggregationTest(
+        R"({_id: {da: "$d.a"}})",
+        docs,
+        BSON_ARRAY(BSON("_id" << BSON("da" << 1)) << BSON("_id" << BSON("da" << 2))));
+
+    // 'Nothing' is converted to 'Null' when there's only one field and both {dc: Nothing} becomes
+    // {_id: null}.
+    runGroupAggregationTest(
+        R"({_id: {dc: "$d.c"}})", docs, BSON_ARRAY(BSON("_id" << BSON("dc" << BSONNULL))));
 }
 
 TEST_F(SbeStageBuilderGroupTest, TestGroupMultipleAccumulators) {
@@ -1479,13 +1638,12 @@ TEST_F(SbeStageBuilderGroupTest, SbeGroupCompatibleFlag) {
         R"(_id: null, agg: {$stdDevSamp: "$item"})",
         R"(_id: null, agg: {$sum: "$item"})",
         R"(_id: null, agg: {$sum: {$not: "$item"}})",
-        // R"(_id: {a: "$a", b: "$b"})",
+        R"(_id: {a: "$a", b: "$b"})",
         // All supported case.
         R"(_id: null, agg1: {$sum: "$item"}, agg2: {$stdDevPop: "$price"}, agg3: {$stdDevSamp: "$quantity"})",
         // Mix of supported/unsupported accumulators.
         R"(_id: null, agg1: {$sum: "$item"}, agg2: {$incompatible: "$item"}, agg3: {$avg: "$a"})",
-        R"(_id: null, agg1: {$incompatible: "$item"}, agg2: {$min: "$item"}, agg3: {$avg:
-         "$quantity"})",
+        R"(_id: null, agg1: {$incompatible: "$item"}, agg2: {$min: "$item"}, agg3: {$avg: "$quantity"})",
         // No accumulator case
         R"(_id: "$a")",
     };

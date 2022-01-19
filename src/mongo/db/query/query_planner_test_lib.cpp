@@ -1154,9 +1154,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         BSONObjBuilder bob;
-        for (auto&& [groupName, expr] : actualGroupNode->groupByExpressions) {
-            expr->serialize(true).addToBsonObj(&bob, groupName);
-        }
+        actualGroupNode->groupByExpression->serialize(true).addToBsonObj(&bob, "_id");
         auto actualGroupByObj = bob.done();
         if (!SimpleBSONObjComparator::kInstance.evaluate(actualGroupByObj ==
                                                          expectedGroupByElem.Obj())) {

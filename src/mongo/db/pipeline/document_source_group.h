@@ -143,6 +143,13 @@ public:
     void setIdExpression(boost::intrusive_ptr<Expression> idExpression);
 
     /**
+     * Returns the expression to use to determine the group id of each document.
+     */
+    const boost::intrusive_ptr<Expression> getIdExpression() const {
+        return _idExpression;
+    }
+
+    /**
      * Returns true if this $group stage represents a 'global' $group which is merging together
      * results from earlier partial groups.
      */
@@ -277,7 +284,13 @@ private:
 
     std::shared_ptr<Sorter<Value, Value>::File> _file;
 
-    std::vector<std::string> _idFieldNames;  // used when id is a document
+    // The expression for the '_id' field.
+    boost::intrusive_ptr<Expression> _idExpression;
+    // If the expression for the '_id' field represents a non-empty object, we track its fields'
+    // names in '_idFieldNames'.
+    std::vector<std::string> _idFieldNames;
+    // Expressions for the individual fields when '_id' produces a document in the order of
+    // '_idFieldNames' or the whole expression if '_id' produces a scalar value.
     std::vector<boost::intrusive_ptr<Expression>> _idExpressions;
 
     bool _initialized;

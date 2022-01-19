@@ -1829,13 +1829,19 @@ public:
     }
     void visit(const ExpressionFieldPath* expr) final {
         // There's a chance that we've already generated a SBE plan stage tree for this field path,
-        // in which case we avoid regeration of the same plan stage tree.
+        // in which case we avoid regeneration of the same plan stage tree.
         if (auto it = _context->state.preGeneratedExprs.find(expr->getFieldPath().fullPath());
             it != _context->state.preGeneratedExprs.end()) {
             tassert(6089301,
                     "Expressions for top-level document or a variable must not be pre-generated",
                     expr->getFieldPath().getPathLength() != 1 && !expr->isVariableReference());
-            _context->pushExpr(it->second->clone());
+            if (auto optionalSlot = it->second.getSlot(); optionalSlot) {
+                _context->pushExpr(*optionalSlot);
+            } else {
+                auto expr = it->second.extractExpr();
+                _context->pushExpr(expr->clone());
+                it->second = std::move(expr);
+            }
             return;
         }
 
@@ -2390,7 +2396,28 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(notExpr)));
     }
     void visit(const ExpressionObject* expr) final {
-        unsupportedExpression("$object");
+        auto&& childExprs = expr->getChildExpressions();
+        tassert(5995102,
+                "All child expressions must have been compiled",
+                childExprs.size() == _context->evalStack.topFrame().exprsCount());
+
+        // The expression argument for 'newObj' must be a sequence of a field name constant
+        // expression and an expression for the value. So, we need 2 * childExprs.size() elements in
+        // the expression vector.
+        sbe::EExpression::Vector exprs(childExprs.size() * 2);
+        size_t i = exprs.size();
+        for (auto rit = childExprs.rbegin(); rit != childExprs.rend(); ++rit) {
+            exprs[--i] = _context->popExpr();
+            exprs[--i] = makeConstant(rit->first);
+        }
+
+        auto fieldSlot{_context->state.slotIdGenerator->generate()};
+        auto stage = makeProject(_context->extractCurrentEvalStage(),
+                                 _context->planNodeId,
+                                 fieldSlot,
+                                 sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs)));
+
+        _context->pushExpr(fieldSlot, std::move(stage));
     }
     void visit(const ExpressionOr* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicOr);

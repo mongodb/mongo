@@ -1252,7 +1252,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                 groupStage != nullptr);
 
         solnForAgg = std::make_unique<GroupNode>(std::move(solnForAgg),
-                                                 groupStage->getIdFields(),
+                                                 groupStage->getIdExpression(),
                                                  groupStage->getAccumulatedFields(),
                                                  groupStage->doingMerge());
     }

@@ -1279,19 +1279,17 @@ struct TextMatchNode : public QuerySolutionNodeWithSortSet {
 
 struct GroupNode : public QuerySolutionNode {
     GroupNode(std::unique_ptr<QuerySolutionNode> child,
-              StringMap<boost::intrusive_ptr<Expression>> groupByExprs,
+              boost::intrusive_ptr<Expression> groupByExpression,
               std::vector<AccumulationStatement> accs,
               bool merging)
         : QuerySolutionNode(std::move(child)),
-          groupByExpressions(std::move(groupByExprs)),
+          groupByExpression(groupByExpression),
           accumulators(std::move(accs)),
           doingMerge(merging) {
-        // Use the DepsTracker to extract the fields that the 'groupByExpressions' and accumulator
+        // Use the DepsTracker to extract the fields that the 'groupByExpression' and accumulator
         // expressions depend on.
-        for (auto&& [field, expr] : groupByExpressions) {
-            for (auto& groupByExprField : expr->getDependencies().fields) {
-                requiredFields.insert(groupByExprField);
-            }
+        for (auto& groupByExprField : groupByExpression->getDependencies().fields) {
+            requiredFields.insert(groupByExprField);
         }
         for (auto&& acc : accumulators) {
             auto argExpr = acc.expr.argument;
@@ -1324,7 +1322,7 @@ struct GroupNode : public QuerySolutionNode {
 
     QuerySolutionNode* clone() const override;
 
-    StringMap<boost::intrusive_ptr<Expression>> groupByExpressions;
+    boost::intrusive_ptr<Expression> groupByExpression;
     std::vector<AccumulationStatement> accumulators;
     bool doingMerge;
 
