@@ -179,6 +179,7 @@ MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(fpAfterFetchingCommittedTransactions);
 MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
 MONGO_FAIL_POINT_DEFINE(fpBeforeAdvancingStableTimestamp);
+MONGO_FAIL_POINT_DEFINE(hangMigrationBeforeRetryCheck);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -1914,9 +1915,7 @@ void TenantMigrationRecipientService::Instance::_interrupt(Status status,
     stdx::lock_guard lk(_mutex);
 
     if (skipWaitingForForgetMigration) {
-        // We only get here on receiving the recipientForgetMigration command or on
-        // stepDown/shutDown. On receiving the recipientForgetMigration, the promise should have
-        // already been set.
+        // We only get here on stepDown/shutDown.
         setPromiseErrorifNotReady(lk, _receivedRecipientForgetMigrationPromise, status);
     }
 
@@ -1945,8 +1944,7 @@ void TenantMigrationRecipientService::Instance::_interrupt(Status status,
         }
     }
 
-    _taskState.setState(
-        TaskState::kInterrupted, status, skipWaitingForForgetMigration /* isExternalInterrupt */);
+    _taskState.setState(TaskState::kInterrupted, status);
 }
 
 void TenantMigrationRecipientService::Instance::interrupt(Status status) {
@@ -2487,14 +2485,25 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
            })
         .until([this, self = shared_from_this()](
                    StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
-            auto status = applierStatus.getStatus();
+            hangMigrationBeforeRetryCheck.pauseWhileSet();
+
+            auto shouldRetryMigration = [&](WithLock, Status status) -> bool {
+                // We shouldn't retry migration after receiving the recipientForgetMigration command
+                // or on stepDown/shutDown.
+                if (_receivedRecipientForgetMigrationPromise.getFuture().isReady())
+                    return false;
+
+                if (!_stateDocPersistedPromise.getFuture().isReady())
+                    return false;
+
+                return ErrorCodes::isRetriableError(status) || isRetriableOplogFetcherError(status);
+            };
+
             stdx::unique_lock lk(_mutex);
-            if (_taskState.isInterrupted()) {
-                status = _taskState.getInterruptStatus();
-            }
-            if ((ErrorCodes::isRetriableError(status) || isRetriableOplogFetcherError(status)) &&
-                !_taskState.isExternalInterrupt() &&
-                _stateDocPersistedPromise.getFuture().isReady()) {
+            auto status = _taskState.isInterrupted() ? _taskState.getInterruptStatus()
+                                                     : applierStatus.getStatus();
+
+            if (shouldRetryMigration(lk, status)) {
                 // Reset the task state and clear the interrupt status.
                 if (!_taskState.isRunning()) {
                     _taskState.setState(TaskState::kRunning);
