@@ -1051,6 +1051,19 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         auto opCtx = newOpCtxPtr.get();
 
         cloneCollectionIndexesAndOptions(opCtx, _nss, donorCollectionOptionsAndIndexes);
+        // We need to ensure the index is created and majority committed regardless of fcv version.
+        if (!_useFCV44RangeDeleterProtocol) {
+            runWithoutSession(
+                outerOpCtx,
+                [&] {
+                    WriteConcernResult ignoreResult;
+                    auto latestOpTime =
+                        repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+                    uassertStatusOK(waitForWriteConcern(
+                        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcern, &ignoreResult));
+                },
+                _useFCV44RangeDeleterProtocol);
+        }
         timing.done(2);
         migrateThreadHangAtStep2.pauseWhileSet();
     }
