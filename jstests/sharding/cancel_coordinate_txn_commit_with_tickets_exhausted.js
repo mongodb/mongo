@@ -14,7 +14,7 @@
  * Step 5. Turn off the `hangWithLockDuringBatchRemoveFp`
  * and join the parallel remove operations and transaction thread.
  *
- * @tags: [uses_multi_shard_transaction]
+ * @tags: [uses_multi_shard_transaction, uses_prepare_transaction]
  */
 
 (function() {
