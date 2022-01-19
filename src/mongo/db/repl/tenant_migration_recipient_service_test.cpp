@@ -3556,6 +3556,78 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnExternalInter
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
+TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnReceivingForgetMigrationCmd) {
+    auto hangAfterStartingOplogFetcherFp =
+        globalFailPointRegistry().find("fpAfterStartingOplogFetcherMigrationRecipientInstance");
+    auto hangAfterStartingOplogFetcherFpTimesEntered =
+        hangAfterStartingOplogFetcherFp->setMode(FailPoint::alwaysOn,
+                                                 0,
+                                                 BSON("action"
+                                                      << "hang"));
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // Create and start the instance.
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        // Create and start the instance.
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    hangAfterStartingOplogFetcherFp->waitForTimesEntered(
+        hangAfterStartingOplogFetcherFpTimesEntered + 1);
+    auto oplogFetcher = checked_cast<OplogFetcherMock*>(getDonorOplogFetcher(instance.get()));
+    ASSERT_TRUE(oplogFetcher != nullptr);
+    ASSERT_TRUE(oplogFetcher->isActive());
+
+    // Hang the migration before it attempts to retry.
+    auto hangMigrationBeforeRetryCheckFp =
+        globalFailPointRegistry().find("hangMigrationBeforeRetryCheck");
+    auto hangMigrationBeforeRetryCheckFpTimesEntered =
+        hangMigrationBeforeRetryCheckFp->setMode(FailPoint::alwaysOn);
+
+    // Make oplog fetcher to fail with a retryable error which will interrupt the migration.
+    ASSERT_TRUE(ErrorCodes::isRetriableError(ErrorCodes::SocketException));
+    oplogFetcher->shutdownWith({ErrorCodes::SocketException, "Injected retryable error"});
+    hangAfterStartingOplogFetcherFp->setMode(FailPoint::off);
+
+    hangMigrationBeforeRetryCheckFp->waitForTimesEntered(
+        hangMigrationBeforeRetryCheckFpTimesEntered + 1);
+
+    // After the migration is interrupted successfully, signal migration that we received
+    // recipientForgetMigration command. And, that should make the migration not to retry
+    // on retryable error.
+    instance->onReceiveRecipientForgetMigration(opCtx.get());
+    hangMigrationBeforeRetryCheckFp->setMode(FailPoint::off);
+
+    // Wait for task completion failure.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    auto doc = getStateDoc(instance.get());
+    ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 0);
+    ASSERT_EQ(doc.getNumRestartsDueToRecipientFailure(), 0);
+    checkStateDocPersisted(opCtx.get(), instance.get());
+}
+
 TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableClonerError) {
     stopFailPointEnableBlock stopFp("fpAfterCollectionClonerDone");
     auto fp =

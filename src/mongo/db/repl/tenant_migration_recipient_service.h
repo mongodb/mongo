@@ -245,9 +245,7 @@ public:
                 MONGO_UNREACHABLE;
             }
 
-            void setState(StateFlag state,
-                          boost::optional<Status> interruptStatus = boost::none,
-                          bool isExternalInterrupt = false) {
+            void setState(StateFlag state, boost::optional<Status> interruptStatus = boost::none) {
                 invariant(checkIfValidTransition(state),
                           str::stream() << "current state: " << toString(_state)
                                         << ", new state: " << toString(state));
@@ -261,11 +259,6 @@ public:
 
                 _state = state;
                 _interruptStatus = (interruptStatus) ? interruptStatus.get() : _interruptStatus;
-                _isExternalInterrupt = isExternalInterrupt;
-            }
-
-            bool isExternalInterrupt() const {
-                return (_state == kInterrupted) && _isExternalInterrupt;
             }
 
             bool isNotStarted() const {
@@ -312,9 +305,6 @@ public:
             // task interrupt status. Set to Status::OK() only when the recipient service has not
             // been interrupted so far, and is used to remember the initial interrupt error.
             Status _interruptStatus = Status::OK();
-            // Indicates if the task was interrupted externally due to a 'recipientForgetMigration'
-            // or stepdown/shutdown.
-            bool _isExternalInterrupt = false;
         };
 
         /*
