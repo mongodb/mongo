@@ -1,4 +1,11 @@
-// This test ensures that explain of an aggregate through mongos has the intended format.
+/* This test ensures that explain of an aggregate through mongos has the intended format.
+
+ * @tags: [
+ * # $mergeCursors was added to explain output in 5.3.
+ * requires_fcv_53
+ * ]
+ */
+
 (function() {
 "use strict";
 
@@ -32,6 +39,27 @@ for (let shardId in explain.shards) {
     assert(shardExplain.hasOwnProperty("stages") || shardExplain.hasOwnProperty("queryPlanner"),
            shardExplain);
 }
+
+// Test that the $mergeCursors stage is present in the mergerPart of the pipeline.
+explain = coll.explain().aggregate(
+    [{$match: {mykey: {'$in': [0, 1, 3, 7]}}}, {'$sort': {favColor: 1}}, {$limit: 5}]);
+
+assert(explain.hasOwnProperty("splitPipeline"), explain);
+assert(explain.splitPipeline.hasOwnProperty("shardsPart"), explain.splitPipeline);
+assert(explain.splitPipeline.hasOwnProperty("mergerPart"), explain.splitPipeline);
+assert(explain.splitPipeline.mergerPart[0], explain.splitPipeline);
+assert(explain.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"), explain.splitPipeline);
+
+const mergeCursors = explain.splitPipeline.mergerPart[0]["$mergeCursors"];
+assert.eq(mergeCursors.sort, {favColor: 1}, mergeCursors);
+assert.eq(mergeCursors.compareWholeSortKey, false, mergeCursors);
+assert(!mergeCursors.hasOwnProperty("remotes"), mergeCursors);
+assert.eq(mergeCursors.tailableMode, "normal", mergeCursors);
+assert.eq(mergeCursors.nss,
+          "test.agg_explain_fmt",
+          mergeCursors);  // This test manually sets collection and db at the top.
+assert.eq(mergeCursors.allowPartialResults, false, mergeCursors);
+assert.eq(mergeCursors.recordRemoteOpWaitTime, false, mergeCursors);
 
 // Do a sharded explain from a mongod, not mongos, to ensure that it does not have a
 // SHARDING_FILTER stage.");

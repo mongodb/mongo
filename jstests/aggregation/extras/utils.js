@@ -464,7 +464,8 @@ function getExplainPipelineFromAggregationResult(db, result) {
         if (result.splitPipeline) {
             assert(result.splitPipeline.shardsPart[0].$_internalInhibitOptimization, result);
             const shardsPart = result.splitPipeline.shardsPart.slice(1);
-            const mergerPart = result.splitPipeline.mergerPart;
+            assert(result.splitPipeline.mergerPart[0].$mergeCursors, result);
+            const mergerPart = result.splitPipeline.mergerPart.slice(1);
             return [].concat(shardsPart).concat(mergerPart);
         } else if (result.stages) {
             // Required for aggregation_mongos_passthrough.

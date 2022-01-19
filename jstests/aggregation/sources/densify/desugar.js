@@ -2,8 +2,8 @@
  * Test how $densify desugars.
  *
  * @tags: [
- *   # Needed as $densify is a 51 feature.
- *   requires_fcv_51,
+ *   # $mergeCursors was added to explain output in 5.3.
+ *   requires_fcv_53,
  *   # We're testing the explain plan, not the query results, so the facet passthrough would fail.
  *   do_not_wrap_aggregations_in_facets,
  * ]

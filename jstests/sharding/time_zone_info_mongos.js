@@ -1,6 +1,7 @@
 // Test that mongoS accepts --timeZoneInfo <timezoneDBPath> as a command-line argument and that an
 // aggregation pipeline with timezone expressions executes correctly on mongoS.
-// @tags: [live_record_incompatible]
+// Requires FCV 5.3 since $mergeCursors was added to explain output in 5.3.
+// @tags: [live_record_incompatible, requires_fcv_53]
 (function() {
 const tzGoodInfoFat = "jstests/libs/config_files/good_timezone_info_fat";
 const tzGoodInfoSlim = "jstests/libs/config_files/good_timezone_info_slim";
@@ -99,7 +100,9 @@ function testWithGoodTimeZoneDir(tzGoodInfoDir) {
         let timeZonePipeline = buildTimeZonePipeline(tz);
         const tzExplain = assert.commandWorked(mongosColl.explain().aggregate(timeZonePipeline));
         assert.eq(tzExplain.splitPipeline.shardsPart, [timeZonePipeline[0]]);
-        assert.eq(tzExplain.splitPipeline.mergerPart, timeZonePipeline.slice(1));
+        // The first stage in the mergerPart will be $mergeCursors, so start comparing the pipelines
+        // at the 1st index.
+        assert.eq(tzExplain.splitPipeline.mergerPart.slice(1), timeZonePipeline.slice(1));
         assert.eq(tzExplain.mergeType, "mongos");
 
         // Confirm that both documents are output by the pipeline, demonstrating that the date has

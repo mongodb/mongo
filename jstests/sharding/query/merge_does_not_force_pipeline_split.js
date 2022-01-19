@@ -1,5 +1,11 @@
-// Tests that a $merge stage does not force a pipeline to split into a "shards part" and a "merging
-// part" if no other stage in the pipeline would force such a split.
+/*
+ * Tests that a $merge stage does not force a pipeline to split into a "shards part" and a "merging
+ * part" if no other stage in the pipeline would force such a split.
+ * @tags: [
+ *   # $mergeCursors was added to explain output in 5.3.
+ *   requires_fcv_53,
+ * ]
+ */
 (function() {
 "use strict";
 
@@ -39,7 +45,9 @@ function assertMergeRunsOnShards(explain) {
         1,
         tojson(explain));
     assert(explain.splitPipeline.hasOwnProperty("mergerPart"), tojson(explain));
-    assert.eq([], explain.splitPipeline.mergerPart, tojson(explain));
+    // Since merge runs on each shard, the mergerPart should only have a $mergeCursors stage.
+    assert.eq(1, explain.splitPipeline.mergerPart.length, tojson(explain));
+    assert(explain.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"), tojson(explain));
 }
 
 // Test that a simple $merge can run in parallel. Note that we still expect a 'splitPipeline' in

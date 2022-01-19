@@ -1077,36 +1077,44 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                         exchangeSpec};
 }
 
-void addMergeCursorsSource(Pipeline* mergePipeline,
-                           BSONObj cmdSentToShards,
-                           std::vector<OwnedRemoteCursor> ownedCursors,
-                           const std::vector<ShardId>& targetedShards,
-                           boost::optional<BSONObj> shardCursorsSortSpec,
-                           bool hasChangeStream) {
-    auto* opCtx = mergePipeline->getContext()->opCtx;
+
+AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                        std::vector<RemoteCursor> remoteCursors,
+                                        boost::optional<BSONObj> shardCursorsSortSpec) {
     AsyncResultsMergerParams armParams;
     armParams.setSort(shardCursorsSortSpec);
-    armParams.setTailableMode(mergePipeline->getContext()->tailableMode);
-    armParams.setNss(mergePipeline->getContext()->ns);
+    armParams.setTailableMode(expCtx->tailableMode);
+    armParams.setNss(expCtx->ns);
 
     OperationSessionInfoFromClient sessionInfo;
     boost::optional<LogicalSessionFromClient> lsidFromClient;
 
-    auto lsid = opCtx->getLogicalSessionId();
+    auto lsid = expCtx->opCtx->getLogicalSessionId();
     if (lsid) {
         lsidFromClient.emplace(lsid->getId());
         lsidFromClient->setUid(lsid->getUid());
     }
 
     sessionInfo.setSessionId(lsidFromClient);
-    sessionInfo.setTxnNumber(opCtx->getTxnNumber());
+    sessionInfo.setTxnNumber(expCtx->opCtx->getTxnNumber());
 
-    if (TransactionRouter::get(opCtx)) {
+    if (TransactionRouter::get(expCtx->opCtx)) {
         sessionInfo.setAutocommit(false);
     }
 
     armParams.setOperationSessionInfo(sessionInfo);
 
+    armParams.setRemotes(std::move(remoteCursors));
+
+    return armParams;
+}
+
+void addMergeCursorsSource(Pipeline* mergePipeline,
+                           BSONObj cmdSentToShards,
+                           std::vector<OwnedRemoteCursor> ownedCursors,
+                           const std::vector<ShardId>& targetedShards,
+                           boost::optional<BSONObj> shardCursorsSortSpec,
+                           bool hasChangeStream) {
     // Convert owned cursors into a vector of remote cursors to be transferred to the merge
     // pipeline.
     std::vector<RemoteCursor> remoteCursors;
@@ -1114,8 +1122,8 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
         // Transfer ownership of the remote cursor to the $mergeCursors stage.
         remoteCursors.emplace_back(cursor.releaseCursor());
     }
-
-    armParams.setRemotes(std::move(remoteCursors));
+    auto armParams = buildArmParams(
+        mergePipeline->getContext(), std::move(remoteCursors), std::move(shardCursorsSortSpec));
 
     auto mergeCursorsStage =
         DocumentSourceMergeCursors::create(mergePipeline->getContext(), std::move(armParams));
@@ -1159,9 +1167,26 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         }
         // We specify "queryPlanner" verbosity because execution stats are not currently
         // supported when building the output for "mergerPart".
-        pipelinesDoc.addField(
-            "mergerPart",
-            Value(mergePipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)));
+        auto explainOps = mergePipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+
+        // No cursors to remote shards are established for an explain, and the $mergeCursors
+        // aggregation stage which is normally built in addMergeCursorsSource() requires vectors of
+        // cursors and ShardIDs. For explain output, we construct the armParams that would normally
+        // be used in the serialization of the $mergeCursors stage and add it to the serialization
+        // of the pipeline.
+        auto armParams =
+            // Since no cursors are actually established for an explain, construct ARM params with
+            // an empty vector and then remove it from the explain BSON.
+            buildArmParams(dispatchResults.splitPipeline->mergePipeline->getContext(),
+                           std::vector<RemoteCursor>(),
+                           std::move(dispatchResults.splitPipeline->shardCursorsSortSpec))
+                .toBSON()
+                .removeField(AsyncResultsMergerParams::kRemotesFieldName);
+
+        // See DocumentSourceMergeCursors::serialize().
+        explainOps.insert(explainOps.begin(), Value(Document{{"$mergeCursors"_sd, armParams}}));
+
+        pipelinesDoc.addField("mergerPart", Value(explainOps));
 
         *result << "splitPipeline" << pipelinesDoc.freeze();
     } else {

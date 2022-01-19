@@ -3,6 +3,8 @@
  * config.cache.chunks is pushed down to shards to execute as part of the split pipeline.
  *
  * @tags: [
+ *   # $mergeCursors was added to explain output in 5.3.
+ *   requires_fcv_53,
  * ]
  */
 (function() {
@@ -21,7 +23,9 @@ function assertLookupRunsOnShards(explain) {
         1,
         tojson(explain));
     assert(explain.splitPipeline.hasOwnProperty("mergerPart"), tojson(explain));
-    assert.eq([], explain.splitPipeline.mergerPart, tojson(explain));
+    // mergerPart will only have a $mergeCursors stage since other work happens in the shardsPart.
+    assert.eq(1, explain.splitPipeline.mergerPart.length, tojson(explain));
+    assert(explain.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"), tojson(explain));
 }
 
 // Test that the explain's shardsPart section includes $lookup stage when executing the resharding

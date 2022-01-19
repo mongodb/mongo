@@ -3,8 +3,9 @@
  * waiting for results from shards.
  *
  * @tags: [
- * # Meaning of attribute durationMillis for change streams changed in 5.1.
- * requires_fcv_51]
+ * # $mergeCursors was added to explain output in 5.3.
+ * requires_fcv_53
+ * ]
  *
  */
 (function() {
@@ -41,16 +42,16 @@ assert.commandWorked(
 const pipeline = [{$sort: {x: 1}}];
 const pipelineComment = 'example_pipeline_should_have_remote_op_wait';
 
-// Explain plans do not explicitly include the $mergeCursors stage, which does the merge sort. So to
-// verify that the query will do a merge sort as we expect, we can check that:
-// 1. The query targets both shards
-// 2. The sort stage is pushed down
 {
     const explain = coll.explain().aggregate(pipeline);
     assert(explain.shards, explain);
     assert.eq(2, Object.keys(explain.shards).length, explain);
     assert.eq(explain.splitPipeline.shardsPart, [{$sort: {sortKey: {x: 1}}}], explain);
-    assert.eq(explain.splitPipeline.mergerPart, [], explain);
+    // The mergerPart will only have a $mergeCursors stage that merge-sorts the results from each
+    // shard.
+    assert.eq(1, explain.splitPipeline.mergerPart.length, tojson(explain));
+    assert(explain.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"), tojson(explain));
+    assert.eq({x: 1}, explain.splitPipeline.mergerPart[0]["$mergeCursors"]["sort"]);
 }
 
 // Set the slow query logging threshold (slowMS) to -1 to ensure every query gets logged.
