@@ -816,7 +816,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, AbandonSnapshotAbortMode) {
-    ru1->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+    ASSERT(ru1->abandonSnapshotMode() == RecoveryUnit::AbandonSnapshotMode::kAbort);
 
     OperationContext* opCtx = clientAndCtx1.second.get();
     const char* const key = "key";

@@ -541,6 +541,7 @@ public:
             auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                 opCtx,
                 {std::move(exec),
+                 nullptr, /* recoveryUnit */
                  cursorNss,
                  AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                  APIParameters::get(opCtx),

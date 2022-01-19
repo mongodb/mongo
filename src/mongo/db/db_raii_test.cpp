@@ -95,6 +95,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
                                   &collection,
                                   std::move(cq),
                                   nullptr /* extractAndAttachPipelineStages */,
+                                  true, /* allow saving cursors across commands */
                                   permitYield);
     ASSERT_OK(swExec.getStatus());
     return std::move(swExec.getValue());

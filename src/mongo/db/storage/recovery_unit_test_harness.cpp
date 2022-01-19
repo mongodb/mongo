@@ -191,7 +191,8 @@ TEST_F(RecoveryUnitTestHarness, AbortUnitOfWorkIncrementsSnapshotId) {
 TEST_F(RecoveryUnitTestHarness, AbandonSnapshotCommitMode) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
 
-    ru->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
+    ru->incAbandonSnapshotCommitModeCount();
+    ASSERT(ru->abandonSnapshotMode() == RecoveryUnit::AbandonSnapshotMode::kCommit);
 
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     opCtx->lockState()->beginWriteUnitOfWork();

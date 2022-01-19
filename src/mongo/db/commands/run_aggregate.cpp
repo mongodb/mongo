@@ -118,40 +118,53 @@ bool canOptimizeAwayPipeline(const Pipeline* pipeline,
  * and thus will be different from that in 'request'.
  */
 bool handleCursorCommand(OperationContext* opCtx,
+                         bool stashResourceForGetMore,
                          boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nsForCursor,
-                         std::vector<ClientCursor*> cursors,
+                         std::vector<ClientCursorPin>& pins,
                          const AggregateCommandRequest& request,
                          const BSONObj& cmdObj,
                          rpc::ReplyBuilderInterface* result) {
-    invariant(!cursors.empty());
+    invariant(!pins.empty());
     long long batchSize =
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize);
 
-    if (cursors.size() > 1) {
+    if (pins.size() > 1) {
 
         uassert(
             ErrorCodes::BadValue, "the exchange initial batch size must be zero", batchSize == 0);
 
         BSONArrayBuilder cursorsBuilder;
-        for (size_t idx = 0; idx < cursors.size(); ++idx) {
-            invariant(cursors[idx]);
+        for (size_t idx = 0; idx < pins.size(); ++idx) {
+            auto* cursor = pins[idx].getCursor();
+
+            // Each ClientCursorPin has its own stashed operation state associated with it, in the
+            // form of a RecoveryUnit. Since we may have many pins at once here, we cannot unstash
+            // that state on pin creation. Therefore, when we use a ClientCursorPin, we must fetch
+            // the Pin's resources onto the OperationContext and stash them away again on
+            // completion; then go onto the next pin, etc.
+            boost::optional<MoveResourcesFromPinToOpCtxBlock> unstashedResourceBlock;
+            if (stashResourceForGetMore) {
+                unstashedResourceBlock.emplace(&pins[idx]);
+            }
+
+            invariant(cursor);
 
             BSONObjBuilder cursorResult;
             appendCursorResponseObject(
-                cursors[idx]->cursorid(), nsForCursor.ns(), BSONArray(), &cursorResult);
+                cursor->cursorid(), nsForCursor.ns(), BSONArray(), &cursorResult);
             cursorResult.appendBool("ok", 1);
 
             cursorsBuilder.append(cursorResult.obj());
 
             // If a time limit was set on the pipeline, remaining time is "rolled over" to the
             // cursor (for use by future getmore ops).
-            cursors[idx]->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+            cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
 
             // Cursor needs to be in a saved state while we yield locks for getmore. State
             // will be restored in getMore().
-            cursors[idx]->getExecutor()->saveState();
-            cursors[idx]->getExecutor()->detachFromOperationContext();
+            cursor->getExecutor()->saveState();
+            cursor->getExecutor()->detachFromOperationContext();
         }
 
         auto bodyBuilder = result->getBodyBuilder();
@@ -168,7 +181,12 @@ bool handleCursorCommand(OperationContext* opCtx,
     CursorResponseBuilder responseBuilder(result, options);
 
     auto curOp = CurOp::get(opCtx);
-    auto cursor = cursors[0];
+    auto cursor = pins[0].getCursor();
+    boost::optional<MoveResourcesFromPinToOpCtxBlock> unstashedResourceBlock;
+    if (stashResourceForGetMore) {
+        unstashedResourceBlock.emplace(&pins[0]);
+    }
+
     invariant(cursor);
     auto exec = cursor->getExecutor();
     invariant(exec);
@@ -573,8 +591,10 @@ Status runAggregate(OperationContext* opCtx,
     // re-running the expanded aggregation.
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
 
-    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
+    std::vector<std::unique_ptr<RecoveryUnit>> recoveryUnits;
+    std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
+    bool stashResourcesForGetMore = false;
     auto curOp = CurOp::get(opCtx);
     {
         // If we are in a transaction, check whether the parsed pipeline supports being in
@@ -790,6 +810,11 @@ Status runAggregate(OperationContext* opCtx,
         auto attachExecutorCallback =
             PipelineD::buildInnerQueryExecutor(collection, nss, &request, pipeline.get());
 
+        if (attachExecutorCallback.second) {
+            stashResourcesForGetMore =
+                attachExecutorCallback.second->isSaveRecoveryUnitAcrossCommandsEnabled();
+        }
+
         if (canOptimizeAwayPipeline(pipeline.get(),
                                     attachExecutorCallback.second.get(),
                                     request,
@@ -801,6 +826,13 @@ Status runAggregate(OperationContext* opCtx,
             // PlanExecutor by itself. The resulting cursor will look like what the client would
             // have gotten from find command.
             execs.emplace_back(std::move(attachExecutorCallback.second));
+
+            if (stashResourcesForGetMore) {
+                // When the PlanExecutor is created, the cursors it sets up are tied to the
+                // RecoveryUnit. For that reason, we must save the recovery unit made when the
+                // executor was set up, and not re-use it for other executors.
+                recoveryUnits.push_back(opCtx->releaseAndReplaceRecoveryUnit());
+            }
         } else {
             // Complete creation of the initial $cursor stage, if needed.
             PipelineD::attachInnerQueryExecutorToPipeline(collection,
@@ -820,6 +852,19 @@ Status runAggregate(OperationContext* opCtx,
                     std::move(pipelineIt),
                     aggregation_request_helper::getResumableScanType(
                         request, liteParsedPipeline.hasChangeStream())));
+            }
+
+            if (request.getExchange()) {
+                // Exchange pipelines should never use the behavior of stashing the recovery unit
+                // across getMores.
+                invariant(!stashResourcesForGetMore);
+            } else if (stashResourcesForGetMore) {
+                // For non-exchange queries, there should only be one pipeline.
+                invariant(pipelines.size() == 1);
+                // When the PlanExecutor is created, the cursors it sets up are tied to the
+                // RecoveryUnit. For that reason, we must save the recovery unit made when the
+                // executor was set up, and not re-use it for other executors.
+                recoveryUnits.push_back(opCtx->releaseAndReplaceRecoveryUnit());
             }
 
             // With the pipelines created, we can relinquish locks as they will manage the locks
@@ -844,16 +889,24 @@ Status runAggregate(OperationContext* opCtx,
     // invalidations and kill notifications themselves, not the cursor we create here.
 
     std::vector<ClientCursorPin> pins;
-    std::vector<ClientCursor*> cursors;
 
     ScopeGuard cursorFreer([&] {
         for (auto& p : pins) {
             p.deleteUnderlying();
         }
     });
+
+    size_t i = 0;
+    invariant(!stashResourcesForGetMore || recoveryUnits.size() == execs.size());
     for (auto&& exec : execs) {
+        std::unique_ptr<RecoveryUnit> recoveryUnit;
+        if (stashResourcesForGetMore) {
+            recoveryUnit = std::move(recoveryUnits[i]);
+        }
+
         ClientCursorParams cursorParams(
             std::move(exec),
+            std::move(recoveryUnit),
             origNss,
             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
             APIParameters::get(opCtx),
@@ -867,8 +920,8 @@ Status runAggregate(OperationContext* opCtx,
         auto pin = CursorManager::get(opCtx)->registerCursor(opCtx, std::move(cursorParams));
 
         pin->incNBatches();
-        cursors.emplace_back(pin.getCursor());
         pins.emplace_back(std::move(pin));
+        ++i;
     }
 
     // Report usage statistics for each stage in the pipeline.
@@ -877,6 +930,12 @@ Status runAggregate(OperationContext* opCtx,
     // If both explain and cursor are specified, explain wins.
     if (expCtx->explain) {
         auto explainExecutor = pins[0]->getExecutor();
+
+        boost::optional<MoveResourcesFromPinToOpCtxBlock> unstashedResourceBlock;
+        if (stashResourcesForGetMore) {
+            unstashedResourceBlock.emplace(&pins[0]);
+        }
+
         auto bodyBuilder = result->getBodyBuilder();
         if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
             Explain::explainPipeline(
@@ -898,7 +957,7 @@ Status runAggregate(OperationContext* opCtx,
     } else {
         // Cursor must be specified, if explain is not.
         const bool keepCursor = handleCursorCommand(
-            opCtx, expCtx, origNss, std::move(cursors), request, cmdObj, result);
+            opCtx, stashResourcesForGetMore, expCtx, origNss, pins, request, cmdObj, result);
         if (keepCursor) {
             cursorFreer.dismiss();
         }

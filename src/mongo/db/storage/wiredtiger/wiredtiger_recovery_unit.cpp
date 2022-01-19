@@ -352,7 +352,7 @@ void WiredTigerRecoveryUnit::doAbandonSnapshot() {
     if (_isActive()) {
         // Can't be in a WriteUnitOfWork, so safe to rollback if the AbandonSnapshotMode is
         // kAbort. If kCommit, however, then any active cursors will remain positioned and valid.
-        _txnClose(_abandonSnapshotMode == AbandonSnapshotMode::kCommit /* commit */);
+        _txnClose(abandonSnapshotMode() == AbandonSnapshotMode::kCommit /* commit */);
     }
     _setState(State::kInactive);
 }
@@ -379,7 +379,7 @@ void WiredTigerRecoveryUnit::refreshSnapshot() {
     invariant(_isActive());
     invariant(!_inUnitOfWork());
     invariant(!_noEvictionAfterRollback);
-    invariant(_abandonSnapshotMode == AbandonSnapshotMode::kAbort);
+    invariant(abandonSnapshotMode() == AbandonSnapshotMode::kAbort);
 
     auto newSession = _sessionCache->getSession();
     WiredTigerBeginTxnBlock txnOpen(newSession->getSession(),
@@ -493,7 +493,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
         LOGV2_DEBUG(
             22412, 3, "WT commit_transaction", "snapshotId"_attr = getSnapshotId().toNumber());
     } else {
-        invariant(_abandonSnapshotMode == AbandonSnapshotMode::kAbort);
         StringBuilder config;
         if (_noEvictionAfterRollback) {
             // The only point at which rollback_transaction() can time out is in the bonus-eviction

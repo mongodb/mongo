@@ -98,6 +98,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _originatingPrivileges(std::move(params.originatingPrivileges)),
       _tailableMode(params.tailableMode),
       _isNoTimeout(params.isNoTimeout),
+      _stashedRecoveryUnit(std::move(params.recoveryUnit)),
       _exec(std::move(params.exec)),
       _operationUsingCursor(operationUsingCursor),
       _lastUseDate(now),
@@ -123,12 +124,6 @@ ClientCursor::~ClientCursor() {
     // Cursors must be unpinned and deregistered from their cursor manager before being deleted.
     invariant(!_operationUsingCursor);
     invariant(_disposed);
-
-    if (_stashedRecoveryUnit) {
-        // Now that the associated PlanExecutor is being destroyed, the recovery unit no longer
-        // needs to keep data pinned.
-        _stashedRecoveryUnit->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
-    }
 
     cursorStatsOpen.decrement();
     if (isNoTimeout()) {
@@ -184,7 +179,13 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);
-    _shouldSaveRecoveryUnit = _cursor->getExecutor()->isSaveRecoveryUnitAcrossCommandsEnabled();
+
+    // If the feature is enabled, we want to ensure that the RecoveryUnit is stashed on the
+    // ClientCursor when the ClientCursorPin is destroyed. If there is already a stashed recovery
+    // unit on the cursor at the time this pin is constructed, the caller may unstash it and
+    // re-stash it if they want to use the associated PlanExecutor.
+    _shouldSaveRecoveryUnit = !_cursor->_stashedRecoveryUnit &&
+        _cursor->getExecutor()->isSaveRecoveryUnitAcrossCommandsEnabled();
 
     // We keep track of the number of cursors currently pinned. The cursor can become unpinned
     // either by being released back to the cursor manager or by being deleted. A cursor may be
@@ -254,7 +255,6 @@ void ClientCursorPin::release() {
 
     if (_shouldSaveRecoveryUnit) {
         stashResourcesFromOperationContext();
-        _shouldSaveRecoveryUnit = false;
     }
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
@@ -300,7 +300,11 @@ void ClientCursorPin::unstashResourcesOntoOperationContext() {
     invariant(_opCtx == _cursor->_operationUsingCursor);
 
     if (auto& ru = _cursor->_stashedRecoveryUnit) {
+        // If unstashResourcesOntoOperationContext() is called, the pin is responsible for
+        // re-stashing the resources onto the cursor, unless the caller decides to call
+        // stashResourcesFromOperationContext() directly.
         _shouldSaveRecoveryUnit = true;
+
         invariant(!_opCtx->recoveryUnit()->isActive());
         _opCtx->setRecoveryUnit(std::move(ru),
                                 WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
@@ -311,6 +315,7 @@ void ClientCursorPin::stashResourcesFromOperationContext() {
     // Move the recovery unit from the operation context onto the cursor and create a new RU for
     // the current OperationContext.
     _cursor->stashRecoveryUnit(_opCtx->releaseAndReplaceRecoveryUnit());
+    _shouldSaveRecoveryUnit = false;
 }
 
 namespace {

@@ -105,13 +105,11 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 // flag for the duration of yield will force any calls to abandonSnapshot() to
                 // commit the transaction, rather than abort it, in order to leave the cursors
                 // valid.
-                opCtx->recoveryUnit()->setAbandonSnapshotMode(
-                    RecoveryUnit::AbandonSnapshotMode::kCommit);
+                opCtx->recoveryUnit()->incAbandonSnapshotCommitModeCount();
                 exitGuard.emplace([&] {
                     invariant(opCtx->recoveryUnit()->abandonSnapshotMode() ==
                               RecoveryUnit::AbandonSnapshotMode::kCommit);
-                    opCtx->recoveryUnit()->setAbandonSnapshotMode(
-                        RecoveryUnit::AbandonSnapshotMode::kAbort);
+                    opCtx->recoveryUnit()->decAbandonSnapshotCommitModeCount();
                 });
             }
 

@@ -100,6 +100,7 @@ public:
     ClientCursorParams makeParams(OperationContext* opCtx) {
         return {
             makeFakePlanExecutor(opCtx),
+            nullptr, /* recoveryUnit */
             kTestNss,
             {},
             APIParameters(),
@@ -152,6 +153,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
     auto cursorPin = cursorManager->registerCursor(
         pinningOpCtx,
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          kTestNss,
          {},
          APIParameters(),
@@ -179,6 +181,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
     auto cursorPin = cursorManager->registerCursor(
         pinningOpCtx,
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          kTestNss,
          {},
          APIParameters(),
@@ -217,6 +220,7 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
 
     cursorManager->registerCursor(_opCtx.get(),
                                   {makeFakePlanExecutor(),
+                                   nullptr, /* recoveryUnit */
                                    NamespaceString{"test.collection"},
                                    {},
                                    APIParameters(),
@@ -234,6 +238,7 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
 
     cursorManager->registerCursor(_opCtx.get(),
                                   {makeFakePlanExecutor(),
+                                   nullptr, /* recoveryUnit */
                                    NamespaceString{"test.collection"},
                                    {},
                                    APIParameters(),
@@ -256,6 +261,7 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          NamespaceString{"test.collection"},
          {},
          APIParameters(),
@@ -282,6 +288,7 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          NamespaceString{"test.collection"},
          {},
          APIParameters(),
@@ -317,6 +324,7 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          NamespaceString{"test.collection"},
          {},
          APIParameters(),
@@ -351,6 +359,7 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          kTestNss,
          {},
          APIParameters(),
@@ -366,6 +375,7 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
     // schedule.
     cursorManager->registerCursor(_opCtx.get(),
                                   {makeFakePlanExecutor(),
+                                   nullptr, /* recoveryUnit */
                                    kTestNss,
                                    {},
                                    APIParameters(),
@@ -405,6 +415,7 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          kTestNss,
          {},
          APIParameters(),
@@ -448,6 +459,7 @@ TEST_F(CursorManagerTest, CursorStoresAPIParameters) {
     auto cursorPin = cursorManager->registerCursor(
         _opCtx.get(),
         {makeFakePlanExecutor(),
+         nullptr, /* recoveryUnit */
          kTestNss,
          {},
          apiParams,

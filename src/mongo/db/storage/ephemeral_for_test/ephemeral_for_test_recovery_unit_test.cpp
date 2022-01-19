@@ -87,7 +87,7 @@ public:
 TEST_F(EphemeralForTestRecoveryUnitTestHarness, AbandonSnapshotAbortMode) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_IX);
 
-    ru->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
+    ASSERT(ru->abandonSnapshotMode() == RecoveryUnit::AbandonSnapshotMode::kAbort);
 
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     opCtx->lockState()->beginWriteUnitOfWork();

@@ -358,11 +358,13 @@ public:
 
             // Get the execution plan for the query.
             bool permitYield = true;
+            const bool allowMaintainValidCursorsAcrossCommands = true;
             auto exec =
                 uassertStatusOK(getExecutorFind(opCtx,
                                                 &collection,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
+                                                allowMaintainValidCursorsAcrossCommands,
                                                 permitYield));
 
             auto bodyBuilder = result->getBodyBuilder();
@@ -558,18 +560,8 @@ public:
                                                 &collection,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
+                                                true, /* allow saving cursors across commands */
                                                 permitYield));
-
-            // If the executor supports it, find operations will maintain the storage engine state
-            // across commands.
-            if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                feature_flags::gYieldingSupportForSBE.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
-                !opCtx->inMultiDocumentTransaction() &&
-                repl::ReadConcernArgs::get(opCtx).getLevel() !=
-                    repl::ReadConcernLevel::kSnapshotReadConcern) {
-                exec->enableSaveRecoveryUnitAcrossCommandsIfSupported();
-            }
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -657,6 +649,9 @@ public:
                 ClientCursorPin pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                     opCtx,
                     {std::move(exec),
+                     nullptr,  // nullptr RecoveryUnit. The opCtx's RecoveryUnit will be stashed on
+                               // Pin destruct if saving cursors across find/getMore commands is
+                               // supported.
                      nss,
                      AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                      APIParameters::get(opCtx),

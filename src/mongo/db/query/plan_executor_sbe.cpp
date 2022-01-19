@@ -124,11 +124,12 @@ void PlanExecutorSBE::saveState() {
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
         _root->saveState(false /* NOT relinquishing cursor */);
 
-        // Put the RU into 'kCommit' mode so that subsequent calls to abandonSnapshot() keep
+        // Ensure the RU is in 'kCommit' mode so that the following call to abandonSnapshot() keeps
         // cursors positioned. This ensures that no pointers into memory owned by the storage
         // engine held by the SBE PlanStage tree become invalid while the executor is in a saved
         // state.
-        _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
+        invariant(_opCtx->recoveryUnit()->abandonSnapshotMode() ==
+                  RecoveryUnit::AbandonSnapshotMode::kCommit);
         _opCtx->recoveryUnit()->abandonSnapshot();
     } else {
         _root->saveState(true /* relinquish cursor */);
@@ -142,12 +143,9 @@ void PlanExecutorSBE::restoreState(const RestoreContext& context) {
     _yieldPolicy->setYieldable(context.collection());
 
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
+        invariant(_opCtx->recoveryUnit()->abandonSnapshotMode() ==
+                  RecoveryUnit::AbandonSnapshotMode::kCommit);
         _root->restoreState(false /* NOT relinquishing cursor */);
-
-        // Put the RU back into 'kAbort' mode. Since the executor is now in a restored state, calls
-        // to doAbandonSnapshot() only happen if the query has failed and the executor will not be
-        // used again. In this case, we do not rely on the guarantees provided by 'kCommit' mode.
-        _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kAbort);
     } else {
         _root->restoreState(true /* relinquish cursor */);
     }
@@ -393,6 +391,19 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
         }
     }
     return state;
+}
+
+void PlanExecutorSBE::enableSaveRecoveryUnitAcrossCommandsIfSupported() {
+    // If we enable saving the recovery unit across commands, we must put the RecoveryUnit into a
+    // state where calls to abandonSnapshot() result in a transaction commit, instead of abort. The
+    // transaction commit guarantees that all open cursors will remain positioned and valid.
+    //
+    // To put the RecoveryUnit in this state, we bump a reference counter on it which tracks how
+    // many callers require that it be in commit mode. Note that under one RecoveryUnit there may
+    // be multiple PlanExecutors which require cursors to remain valid across abandonSnapshot()
+    // calls (for example, a pipeline containing $lookup).
+    _recoveryUnitCommitModeBlock.emplace(_opCtx->recoveryUnit());
+    _isSaveRecoveryUnitAcrossCommandsEnabled = true;
 }
 
 }  // namespace mongo

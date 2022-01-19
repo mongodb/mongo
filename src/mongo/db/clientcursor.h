@@ -57,6 +57,7 @@ class RecoveryUnit;
  */
 struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
+                       std::unique_ptr<RecoveryUnit> recoveryUnit,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
                        APIParameters apiParameters,
@@ -65,7 +66,8 @@ struct ClientCursorParams {
                        ReadPreferenceSetting readPreferenceSetting,
                        BSONObj originatingCommandObj,
                        PrivilegeVector originatingPrivileges)
-        : exec(std::move(planExecutor)),
+        : recoveryUnit(std::move(recoveryUnit)),
+          exec(std::move(planExecutor)),
           nss(std::move(nss)),
           apiParameters(std::move(apiParameters)),
           writeConcernOptions(std::move(writeConcernOptions)),
@@ -91,6 +93,7 @@ struct ClientCursorParams {
         tailableMode = newMode;
     }
 
+    std::unique_ptr<RecoveryUnit> recoveryUnit;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
     std::vector<UserName> authenticatedUsers;
@@ -294,11 +297,8 @@ public:
         return _opKey;
     }
 
-    std::unique_ptr<RecoveryUnit> releaseStashedRecoveryUnit() {
-        return std::move(_stashedRecoveryUnit);
-    }
-
     void stashRecoveryUnit(std::unique_ptr<RecoveryUnit> ru) {
+        invariant(!_stashedRecoveryUnit);
         _stashedRecoveryUnit = std::move(ru);
     }
 
@@ -533,6 +533,10 @@ public:
     /**
      * Inverse of above: Transfers resources which need the same lifetime as the cursor from the
      * operation context to the cursor itself.
+
+     * If this method is not called after unstashing the resources onto the OperationContext, the
+     * pin will re-stash the resources on destruction, unless the pin was moved from or
+     * deleteUnderlying() was called.
      */
     void stashResourcesFromOperationContext();
 
@@ -545,6 +549,26 @@ private:
     ClientCursor* _cursor = nullptr;
     CursorManager* _cursorManager = nullptr;
     bool _shouldSaveRecoveryUnit = false;
+};
+
+/**
+ * RAII type for unstashing resources from a pinned cursor onto the operation context. Generally a
+ * ClientCursorPin will handle the logic of re-stashing resources from the operation context on
+ * destruction. If there are multiple pinned cursors, however, only one cursor may have its
+ * resources unstashed at a time. In such cases, this class should be used.
+ */
+class MoveResourcesFromPinToOpCtxBlock {
+public:
+    MoveResourcesFromPinToOpCtxBlock(ClientCursorPin* pin) : _pin(pin) {
+        _pin->unstashResourcesOntoOperationContext();
+    }
+
+    ~MoveResourcesFromPinToOpCtxBlock() {
+        _pin->stashResourcesFromOperationContext();
+    }
+
+private:
+    ClientCursorPin* _pin;
 };
 
 void startClientCursorMonitor();

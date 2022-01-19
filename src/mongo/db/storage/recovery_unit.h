@@ -233,12 +233,23 @@ public:
         assignNextSnapshotId();
     }
 
-    void setAbandonSnapshotMode(AbandonSnapshotMode mode) {
-        _abandonSnapshotMode = mode;
-    }
     AbandonSnapshotMode abandonSnapshotMode() const {
-        return _abandonSnapshotMode;
+        return (_abandonSnapshotCommitModeCounter > 0) ? AbandonSnapshotMode::kCommit
+                                                       : AbandonSnapshotMode::kAbort;
     }
+
+    /**
+     * Methods for modifying the 'abandonSnapshotModeCount.' When the count is greater than 0, the
+     * RecoveryUnit is in 'commit' mode, and calls to abandonSnapshot() will result in a transaction
+     * commit, preserving cursor positions.
+     *
+     * If the count is 0, the RecoveryUnit is in 'abort' mode and calls to abandonSnapshot() will
+     * result in a transaction abort.
+     *
+     * The count may not go below zero.
+     */
+    void incAbandonSnapshotCommitModeCount();
+    void decAbandonSnapshotCommitModeCount();
 
     /**
      * Informs the RecoveryUnit that a snapshot will be needed soon, if one was not already
@@ -800,8 +811,6 @@ protected:
 
     bool _noEvictionAfterRollback = false;
 
-    AbandonSnapshotMode _abandonSnapshotMode = AbandonSnapshotMode::kAbort;
-
 private:
     // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.
     void assignNextSnapshotId();
@@ -819,6 +828,10 @@ private:
     std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
     uint64_t _mySnapshotId;
+
+    // Causes transactions to be committed instead of aborted by abandonSnapshot() if set higher
+    // than 0.
+    int _abandonSnapshotCommitModeCounter = 0;
 };
 
 /**
@@ -841,4 +854,19 @@ private:
     RecoveryUnit* const _recoveryUnit;
 };
 
+class AbandonSnapshotCommitModeBlock final {
+    AbandonSnapshotCommitModeBlock(const AbandonSnapshotCommitModeBlock&) = delete;
+    AbandonSnapshotCommitModeBlock& operator=(const AbandonSnapshotCommitModeBlock&) = delete;
+
+public:
+    AbandonSnapshotCommitModeBlock(RecoveryUnit* ru) : _recoveryUnit(ru) {
+        ru->incAbandonSnapshotCommitModeCount();
+    }
+    ~AbandonSnapshotCommitModeBlock() {
+        _recoveryUnit->decAbandonSnapshotCommitModeCount();
+    }
+
+private:
+    RecoveryUnit* _recoveryUnit;
+};
 }  // namespace mongo

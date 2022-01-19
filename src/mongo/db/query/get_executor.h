@@ -154,6 +154,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
+    bool allowMaintainValidCursorsAcrossCommands = true,
     bool permitYield = false,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
 
