@@ -623,7 +623,7 @@ std::unique_ptr<MatchExpression> createTypeEqualityPredicate(
 }
 
 std::unique_ptr<MatchExpression> createComparisonPredicate(
-    const ComparisonMatchExpression* matchExpr,
+    const ComparisonMatchExpressionBase* matchExpr,
     const BucketSpec& bucketSpec,
     int bucketMaxSpanSeconds,
     ExpressionContext::CollationMatchesDefault collationMatchesDefault,
@@ -853,12 +853,13 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
         }
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr) ||
                ComparisonMatchExpressionBase::isInternalExprComparison(matchExpr->matchType())) {
-        return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
-                                         _bucketUnpacker.bucketSpec(),
-                                         _bucketMaxSpanSeconds,
-                                         pExpCtx->collationMatchesDefault,
-                                         pExpCtx,
-                                         _assumeNoMixedSchemaData);
+        return createComparisonPredicate(
+            static_cast<const ComparisonMatchExpressionBase*>(matchExpr),
+            _bucketUnpacker.bucketSpec(),
+            _bucketMaxSpanSeconds,
+            pExpCtx->collationMatchesDefault,
+            pExpCtx,
+            _assumeNoMixedSchemaData);
     } else if (matchExpr->matchType() == MatchExpression::GEO) {
         auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
         if (geoExpr.getPred() == GeoExpression::WITHIN ||
