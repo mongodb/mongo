@@ -36,8 +36,6 @@ function forEachNode(f) {
 let dbName = "dbCheck-test";
 let collName = "dbcheck-collection";
 
-const debugBuild = replSet.getPrimary().getDB('admin').adminCommand('buildInfo').debug;
-
 // Clear local.system.healthlog.
 function clearLog() {
     forEachNode(conn => conn.getDB("local").system.healthlog.drop());
@@ -102,6 +100,8 @@ function awaitDbCheckCompletion(db, collName, maxKey, maxSize, maxCount) {
 // inconsistencies.
 function checkLogAllConsistent(conn) {
     let healthlog = conn.getDB("local").system.healthlog;
+
+    const debugBuild = conn.getDB('admin').adminCommand('buildInfo').debug;
 
     if (debugBuild) {
         // These tests only run on debug builds because they rely on dbCheck health-logging
@@ -169,6 +169,7 @@ function checkLogAllConsistent(conn) {
 function healthLogCounts(healthlog) {
     // These tests only run on debug builds because they rely on dbCheck health-logging
     // all info-level batch results.
+    const debugBuild = healthlog.getDB().getSiblingDB('admin').adminCommand('buildInfo').debug;
     if (!debugBuild) {
         return;
     }
@@ -191,6 +192,7 @@ function healthLogCounts(healthlog) {
 function checkTotalCounts(conn, coll) {
     // These tests only run on debug builds because they rely on dbCheck health-logging
     // all info-level batch results.
+    const debugBuild = conn.getDB('admin').adminCommand('buildInfo').debug;
     if (!debugBuild) {
         return;
     }
@@ -287,12 +289,13 @@ function testDbCheckParameters() {
     let docSize = bsonsize({_id: 10});
 
     function checkEntryBounds(start, end) {
-        // These tests only run on debug builds because they rely on dbCheck health-logging
-        // all info-level batch results.
-        if (!debugBuild) {
-            return;
-        }
         forEachNode(function(node) {
+            // These tests only run on debug builds because they rely on dbCheck health-logging
+            // all info-level batch results.
+            const debugBuild = node.getDB('admin').adminCommand('buildInfo').debug;
+            if (!debugBuild) {
+                return;
+            }
             let healthlog = node.getDB("local").system.healthlog;
             let keyBoundsResult = healthlog.aggregate([
                 {$match: {operation: "dbCheckBatch"}},
@@ -349,6 +352,7 @@ function testDbCheckParameters() {
     // The remaining tests only run on debug builds because they rely on dbCheck health-logging
     // all info-level batch results.
 
+    const debugBuild = master.getDB('admin').adminCommand('buildInfo').debug;
     if (!debugBuild) {
         return;
     }
