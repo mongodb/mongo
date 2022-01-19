@@ -21,7 +21,7 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
     let st = new ShardingTest(
         {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": egressPort}}});
 
-    const uri = `mongodb://localhost:${ingressPort}/?loadBalanced=true`;
+    const uri = `mongodb://127.0.0.1:${ingressPort}/?loadBalanced=true`;
     const conn = new Mongo(uri);
     assert.neq(null, conn, 'Client was unable to connect to the load balancer port');
     assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
