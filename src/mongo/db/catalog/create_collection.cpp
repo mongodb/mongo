@@ -80,6 +80,12 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
 
     bool clusterKeyOnId =
         SimpleBSONObjComparator::kInstance.evaluate(spec.getKey() == BSON("_id" << 1));
+
+    if (!clusterKeyOnId && !gSupportArbitraryClusterKeyIndex) {
+        return Status(ErrorCodes::InvalidIndexSpecificationOption,
+                      "The clusteredIndex option is only supported for key: {_id: 1}");
+    }
+
     if (nss.isReplicated() && !clusterKeyOnId) {
         return Status(ErrorCodes::Error(5979701),
                       "The clusteredIndex option is only supported for key: {_id: 1} on replicated "

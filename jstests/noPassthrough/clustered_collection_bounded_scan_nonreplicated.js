@@ -14,7 +14,7 @@
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js");
 
-const conn = MongoRunner.runMongod();
+const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 
 if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');

@@ -12,7 +12,8 @@
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 // Run TTL monitor constantly to speed up this test.
-const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
+const conn = MongoRunner.runMongod(
+    {setParameter: {ttlMonitorSleepSecs: 1, supportArbitraryClusterKeyIndex: true}});
 
 if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
@@ -79,7 +80,7 @@ function testCollMod(coll, clusterKey, clusterKeyName) {
         6011800);
 }
 
-testCollMod(conn.getDB(jsTestName())["coll"], {_id: 1}, "_id_");
+testCollMod(conn.getDB("local")["coll"], {ts: 1}, "ts_1");
 
 MongoRunner.stopMongod(conn);
 })();

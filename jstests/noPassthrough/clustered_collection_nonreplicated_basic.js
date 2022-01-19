@@ -23,16 +23,21 @@
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
-if (ClusteredCollectionUtil.areClusteredIndexesEnabled(db.getMongo()) == false) {
+const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
+
+if (ClusteredCollectionUtil.areClusteredIndexesEnabled(conn) == false) {
     jsTestLog('Skipping test because the clustered indexes feature flag is disabled');
+    MongoRunner.stopMongod(conn);
     return;
 }
 
-const nonReplicatedDB = db.getSiblingDB('local');
+const nonReplicatedDB = conn.getDB('local');
 const collName = 'clustered_collection';
 const nonReplicatedColl = nonReplicatedDB[collName];
 
 nonReplicatedColl.drop();
 
 ClusteredCollectionUtil.testBasicClusteredCollection(nonReplicatedDB, collName, 'ts');
+
+MongoRunner.stopMongod(conn);
 })();

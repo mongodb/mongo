@@ -32,6 +32,17 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+server_parameters:
+    supportArbitraryClusterKeyIndex:
+        description: >-
+            Enables arbitrary cluster index key support.
+        set_at:
+            - startup
+        cpp_varname: "gSupportArbitraryClusterKeyIndex"
+        cpp_vartype: bool
+        test_only: true
+        default: false
+
 structs:
     ClusteredIndexSpec:
         description: "The specifications for a given clusteredIndex"

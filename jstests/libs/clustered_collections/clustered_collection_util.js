@@ -27,6 +27,15 @@ var ClusteredCollectionUtil = class {
         return true;
     }
 
+    static isArbitraryKeySupportEnabled(conn) {
+        const arbitraryKeySupportEnabled =
+            assert
+                .commandWorked(
+                    conn.adminCommand({getParameter: 1, supportArbitraryClusterKeyIndex: 1}))
+                .supportArbitraryClusterKeyIndex.value;
+        return arbitraryKeySupportEnabled;
+    }
+
     // Returns a copy of the 'createOptions' used to create the clustered collection with default
     // values for fields absent in the user provided 'createOptions'.
     static constructFullCreateOptions(createOptions) {
