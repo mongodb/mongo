@@ -164,6 +164,11 @@ structs:
                 description: An internal flag indicating whether the change stream may be opened on
                              a system collection.
 
+            showExpandedEvents:
+                type: optionalBool
+                description: A flag indicating whether the change stream output should include the
+                             expanded events and parameters that may not be part of the stable API.
+
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
         description: A document used to specify the $_internalChangeStreamOplogMatch stage of an

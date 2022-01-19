@@ -74,7 +74,7 @@ using std::vector;
 REGISTER_DOCUMENT_SOURCE(changeStream,
                          DocumentSourceChangeStream::LiteParsed::parse,
                          DocumentSourceChangeStream::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+                         AllowedWithApiStrict::kConditionally);
 
 constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
@@ -366,6 +366,12 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
                 spec.getFullDocument() == FullDocumentModeEnum::kDefault ||
                     spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
     }
+
+    uassert(6188501,
+            "the 'featureFlagChangeStreamsVisibility' should be enabled to use "
+            "'showEnhancedEvents:true' in the change stream spec",
+            feature_flags::gFeatureFlagChangeStreamsVisibility.isEnabledAndIgnoreFCV() ||
+                !spec.getShowExpandedEvents());
 
     uassert(31123,
             "Change streams from mongos may not show migration events",

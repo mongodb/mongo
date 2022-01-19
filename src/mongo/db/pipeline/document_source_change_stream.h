@@ -53,11 +53,16 @@ public:
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss);
+            uassert(6188500,
+                    str::stream() << "$changeStream must take a nested object but found: " << spec,
+                    spec.type() == BSONType::Object);
+            return std::make_unique<LiteParsed>(spec.fieldName(), nss, spec);
         }
 
-        explicit LiteParsed(std::string parseTimeName, NamespaceString nss)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+        explicit LiteParsed(std::string parseTimeName, NamespaceString nss, const BSONElement& spec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _nss(std::move(nss)),
+              _spec(spec) {}
 
         bool isChangeStream() const final {
             return true;
@@ -101,8 +106,20 @@ public:
             transactionNotSupported(kStageName);
         }
 
+        void assertPermittedInAPIVersion(const APIParameters& apiParameters) const final {
+            if (apiParameters.getAPIVersion() && *apiParameters.getAPIVersion() == "1" &&
+                apiParameters.getAPIStrict().value_or(false)) {
+                uassert(ErrorCodes::APIStrictError,
+                        "The 'showExpandedEvents' parameter to $changeStream is not supported in "
+                        "API Version 1",
+                        _spec.Obj()[DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName]
+                            .eoo());
+            }
+        }
+
     private:
         const NamespaceString _nss;
+        BSONElement _spec;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
@@ -245,12 +262,14 @@ class LiteParsedDocumentSourceChangeStreamInternal final
 public:
     static std::unique_ptr<LiteParsedDocumentSourceChangeStreamInternal> parse(
         const NamespaceString& nss, const BSONElement& spec) {
-        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(spec.fieldName(),
-                                                                              nss);
+        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(
+            spec.fieldName(), nss, spec);
     }
 
-    LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName, NamespaceString nss)
-        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss)) {}
+    LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName,
+                                                 NamespaceString nss,
+                                                 const BSONElement& spec)
+        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss), spec) {}
 
     PrivilegeVector requiredPrivileges(bool isMongos,
                                        bool bypassDocumentValidation) const override final {

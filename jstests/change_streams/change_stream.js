@@ -19,7 +19,8 @@ assertDropAndRecreateCollection(db, "t2");
 // Test that $changeStream only accepts an object as its argument.
 function checkArgFails(arg) {
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: "t1", pipeline: [{$changeStream: arg}], cursor: {}}), 50808);
+        db.runCommand({aggregate: "t1", pipeline: [{$changeStream: arg}], cursor: {}}),
+        [6188500, 50808]);
 }
 
 checkArgFails(1);
