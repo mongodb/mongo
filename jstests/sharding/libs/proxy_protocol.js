@@ -53,8 +53,8 @@ class ProxyProtocolServer {
             "-u",
             this.web_server_py,
             "--service",
-            "localhost:" + this.ingress_port,
-            "localhost:" + this.egress_port + "?pp=v" + this.version
+            "127.0.0.1:" + this.ingress_port,
+            "127.0.0.1:" + this.egress_port + "?pp=v" + this.version
         ];
 
         clearRawMongoProgramOutput();
