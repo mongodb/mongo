@@ -172,6 +172,16 @@ protected:
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item);
     void getKey(OperationContext* opCtx, WT_CURSOR* cursor, WT_ITEM* key);
 
+    /**
+     * If this returns true, the cursor will be positioned on the first matching the input 'key'.
+     */
+    bool _keyExists(OperationContext* opCtx, WT_CURSOR* c, const char* buffer, size_t size);
+
+    /**
+     * Ensures correctly inserting a unique key. This should only be used by non-id indexes.
+     */
+    Status _checkDups(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& keyString);
+
     /*
      * Determines the data format version from application metadata and verifies compatibility.
      * Returns the corresponding KeyString version.
@@ -234,11 +244,6 @@ protected:
                   bool dupsAllowed) override;
 
 private:
-    /**
-     * If this returns true, the cursor will be positioned on the first matching the input 'key'.
-     */
-    bool _keyExists(OperationContext* opCtx, WT_CURSOR* c, const char* buffer, size_t size);
-
     bool _partial;
 };
 
@@ -283,6 +288,13 @@ protected:
                   WT_CURSOR* c,
                   const KeyString::Value& keyString,
                   bool dupsAllowed) override;
+
+    /**
+     * This is not applicable to id indexes. See base class comments.
+     */
+    Status _checkDups(OperationContext* opCtx,
+                      WT_CURSOR* c,
+                      const KeyString::Value& keyString) = delete;
 };
 
 class WiredTigerIndexStandard : public WiredTigerIndex {

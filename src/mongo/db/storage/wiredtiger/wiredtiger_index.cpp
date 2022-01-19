@@ -527,6 +527,107 @@ Status WiredTigerIndex::compact(OperationContext* opCtx) {
     return Status::OK();
 }
 
+bool WiredTigerIndex::_keyExists(OperationContext* opCtx,
+                                 WT_CURSOR* c,
+                                 const char* buffer,
+                                 size_t size) {
+    WiredTigerItem prefixKeyItem(buffer, size);
+    setKey(c, prefixKeyItem.Get());
+
+    // An index entry key is KeyString of the prefix key + RecordId. To prevent duplicate prefix
+    // key, search a record matching the prefix key.
+    int cmp;
+    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search_near(c, &cmp); });
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementOneCursorSeek();
+
+    if (ret == WT_NOTFOUND)
+        return false;
+    invariantWTOK(ret);
+
+    if (cmp == 0)
+        return true;
+
+    WT_ITEM item;
+    // Obtain the key from the record returned by search near.
+    getKey(opCtx, c, &item);
+    if (std::memcmp(buffer, item.data, std::min(size, item.size)) == 0) {
+        return true;
+    }
+
+    // If the prefix does not match, look at the logically adjacent key.
+    if (cmp < 0) {
+        // We got the smaller key adjacent to prefix key, check the next key too.
+        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
+    } else {
+        // We got the larger key adjacent to prefix key, check the previous key too.
+        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->prev(c); });
+    }
+
+    if (ret == WT_NOTFOUND) {
+        return false;
+    }
+    invariantWTOK(ret);
+
+    getKey(opCtx, c, &item);
+    return std::memcmp(buffer, item.data, std::min(size, item.size)) == 0;
+}
+
+Status WiredTigerIndex::_checkDups(OperationContext* opCtx,
+                                   WT_CURSOR* c,
+                                   const KeyString::Value& keyString) {
+    int ret;
+    // A prefix key is KeyString of index key. It is the component of the index entry that
+    // should be unique.
+    auto sizeWithoutRecordId = (_rsKeyFormat == KeyFormat::Long)
+        ? KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize())
+        : KeyString::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
+    WiredTigerItem prefixKeyItem(keyString.getBuffer(), sizeWithoutRecordId);
+
+    // First phase inserts the prefix key to prohibit concurrent insertions of same key
+    setKey(c, prefixKeyItem.Get());
+    c->set_value(c, emptyItem.Get());
+    ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
+
+    // An entry with prefix key already exists. This can happen only during rolling upgrade when
+    // both timestamp unsafe and timestamp safe index format keys could be present.
+    if (ret == WT_DUPLICATE_KEY) {
+        auto key = KeyString::toBson(
+            keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
+        return buildDupKeyErrorStatus(
+            key, _desc->getEntry()->getNSSFromCatalog(opCtx), _indexName, _keyPattern, _collation);
+    }
+    invariantWTOK(ret,
+                  fmt::format("WiredTigerIndex::_insert: insert: {}; uri: {}", _indexName, _uri));
+
+    // Remove the prefix key, our entry will continue to conflict with any concurrent
+    // transactions, but will not conflict with any transaction that begins after this
+    // operation commits.
+    setKey(c, prefixKeyItem.Get());
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
+    invariantWTOK(ret,
+                  fmt::format("WiredTigerIndex::_insert: remove: {}; uri: {}", _indexName, _uri));
+
+    // Second phase looks up for existence of key to avoid insertion of duplicate key
+    // The usage of 'prefix_search=true' enables an optimization that allows this search to
+    // return more quickly. See SERVER-56509.
+    c->reconfigure(c, "prefix_search=true");
+    ON_BLOCK_EXIT([c] { c->reconfigure(c, "prefix_search=false"); });
+    auto keyExists = _keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId);
+    if (keyExists) {
+        auto key = KeyString::toBson(
+            keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
+        auto entry = _desc->getEntry();
+        return buildDupKeyErrorStatus(key,
+                                      entry ? entry->getNSSFromCatalog(opCtx) : NamespaceString(),
+                                      _indexName,
+                                      _keyPattern,
+                                      _collation);
+    }
+    return Status::OK();
+}
+
 KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                        const std::string& uri,
                                                        const IndexDescriptor* desc,
@@ -1395,59 +1496,12 @@ bool WiredTigerIndexUnique::isTimestampSafeUniqueIdx() const {
     return true;
 }
 
-bool WiredTigerIndexUnique::_keyExists(OperationContext* opCtx,
-                                       WT_CURSOR* c,
-                                       const char* buffer,
-                                       size_t size) {
-    WiredTigerItem prefixKeyItem(buffer, size);
-    setKey(c, prefixKeyItem.Get());
-
-    // An index entry key is KeyString of the prefix key + RecordId. To prevent duplicate prefix
-    // key, search a record matching the prefix key.
-    int cmp;
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search_near(c, &cmp); });
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneCursorSeek();
-
-    if (ret == WT_NOTFOUND)
-        return false;
-    invariantWTOK(ret);
-
-    if (cmp == 0)
-        return true;
-
-    WT_ITEM item;
-    // Obtain the key from the record returned by search near.
-    getKey(opCtx, c, &item);
-    if (std::memcmp(buffer, item.data, std::min(size, item.size)) == 0) {
-        return true;
-    }
-
-    // If the prefix does not match, look at the logically adjacent key.
-    if (cmp < 0) {
-        // We got the smaller key adjacent to prefix key, check the next key too.
-        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
-    } else {
-        // We got the larger key adjacent to prefix key, check the previous key too.
-        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->prev(c); });
-    }
-
-    if (ret == WT_NOTFOUND) {
-        return false;
-    }
-    invariantWTOK(ret);
-
-    getKey(opCtx, c, &item);
-    return std::memcmp(buffer, item.data, std::min(size, item.size)) == 0;
-}
-
 bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
                                   WT_CURSOR* c,
                                   const KeyString::Value& prefixKey) {
     // This procedure to determine duplicates is exclusive for timestamp safe unique indexes.
     // Check if a prefix key already exists in the index. When keyExists() returns true, the cursor
-    // will be positioned on the first occurence of the 'prefixKey'.
+    // will be positioned on the first occurrence of the 'prefixKey'.
     if (!_keyExists(opCtx, c, prefixKey.getBuffer(), prefixKey.getSize())) {
         return false;
     }
@@ -1537,58 +1591,9 @@ StatusWith<bool> WiredTigerIndexUnique::_insert(OperationContext* opCtx,
 
     // Pre-checks before inserting on a primary.
     if (!dupsAllowed) {
-        // A prefix key is KeyString of index key. It is the component of the index entry that
-        // should be unique.
-        auto sizeWithoutRecordId = (_rsKeyFormat == KeyFormat::Long)
-            ? KeyString::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize())
-            : KeyString::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(), keyString.getSize());
-        WiredTigerItem prefixKeyItem(keyString.getBuffer(), sizeWithoutRecordId);
-
-        // First phase inserts the prefix key to prohibit concurrent insertions of same key
-        setKey(c, prefixKeyItem.Get());
-        c->set_value(c, emptyItem.Get());
-        ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
-
-        // An entry with prefix key already exists. This can happen only during rolling upgrade when
-        // both timestamp unsafe and timestamp safe index format keys could be present.
-        if (ret == WT_DUPLICATE_KEY) {
-            auto key = KeyString::toBson(
-                keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
-            return buildDupKeyErrorStatus(key,
-                                          _desc->getEntry()->getNSSFromCatalog(opCtx),
-                                          _indexName,
-                                          _keyPattern,
-                                          _collation);
-        }
-        invariantWTOK(ret,
-                      str::stream() << "WiredTigerIndexUnique::_insert: insert: index: "
-                                    << _indexName << "; uri: " << _uri);
-
-        // Remove the prefix key, our entry will continue to conflict with any concurrent
-        // transactions, but will not conflict with any transaction that begins after this
-        // operation commits.
-        setKey(c, prefixKeyItem.Get());
-        ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
-        invariantWTOK(
-            ret,
-            fmt::format("WiredTigerIndexUnique::_insert: remove: {}; uri: {}", _indexName, _uri));
-
-        // Second phase looks up for existence of key to avoid insertion of duplicate key
-        // The usage of 'prefix_search=true' enables an optimization that allows this search to
-        // return more quickly. See SERVER-56509.
-        c->reconfigure(c, "prefix_search=true");
-        ON_BLOCK_EXIT([c] { c->reconfigure(c, "prefix_search=false"); });
-        auto keyExists = _keyExists(opCtx, c, keyString.getBuffer(), sizeWithoutRecordId);
-        if (keyExists) {
-            auto key = KeyString::toBson(
-                keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
-            auto entry = _desc->getEntry();
-            return buildDupKeyErrorStatus(key,
-                                          entry ? entry->getNSSFromCatalog(opCtx)
-                                                : NamespaceString(),
-                                          _indexName,
-                                          _keyPattern,
-                                          _collation);
+        auto status = _checkDups(opCtx, c, keyString);
+        if (!status.isOK()) {
+            return status;
         }
     }
 
@@ -1762,7 +1767,15 @@ StatusWith<bool> WiredTigerIndexStandard::_insert(OperationContext* opCtx,
                                                   WT_CURSOR* c,
                                                   const KeyString::Value& keyString,
                                                   bool dupsAllowed) {
-    invariant(dupsAllowed);
+    int ret;
+
+    // Pre-checks before inserting on a primary.
+    if (!dupsAllowed) {
+        auto status = _checkDups(opCtx, c, keyString);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
 
     WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
 
@@ -1773,7 +1786,7 @@ StatusWith<bool> WiredTigerIndexStandard::_insert(OperationContext* opCtx,
 
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
+    ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(keyItem.size);

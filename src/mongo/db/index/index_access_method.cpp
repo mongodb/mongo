@@ -197,23 +197,33 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
         *numInserted = 0;
     }
     bool unique = _descriptor->unique();
-    // Oplog application should avoid checking for duplicates on unique indexes except when:
-    // 1. Building an index. We have to use the duplicate key error to record possible conflicts.
-    // 2. Inserting into the '_id' index. We never allow duplicates in the '_id' index.
-    //
-    // Additionally, unique indexes conflict checking can cause out-of-order updates in wiredtiger.
-    // See SERVER-59831.
-    bool dupsAllowed = !_descriptor->isIdIndex() && !opCtx->isEnforcingConstraints() &&
-            coll->isIndexReady(_descriptor->indexName())
-        ? true
-        : !unique;
+    bool dupsAllowed;
+    if (!_descriptor->isIdIndex() && !opCtx->isEnforcingConstraints() &&
+        coll->isIndexReady(_descriptor->indexName())) {
+        // Oplog application should avoid checking for duplicates on unique indexes except when:
+        // 1. Building an index. We have to use the duplicate key error to record possible
+        // conflicts.
+        // 2. Inserting into the '_id' index. We never allow duplicates in the '_id' index.
+        //
+        // Additionally, unique indexes conflict checking can cause out-of-order updates in
+        // wiredtiger. See SERVER-59831.
+        dupsAllowed = true;
+    } else if (isEnforcingDuplicateConstraints()) {
+        // This currently is only used by collMod command when converting a regular index to a
+        // unique index. The regular index will start rejecting duplicates even before the
+        // conversion finishes.
+        dupsAllowed = false;
+    } else {
+        dupsAllowed = !unique;
+    }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
         auto result = _newInterface->insert(opCtx, keyString, dupsAllowed);
 
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.
-        if (ErrorCodes::DuplicateKey == result.getStatus().code() && options.dupsAllowed) {
+        if (ErrorCodes::DuplicateKey == result.getStatus().code() && options.dupsAllowed &&
+            !isEnforcingDuplicateConstraints()) {
             invariant(unique);
 
             result = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
@@ -469,7 +479,8 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
 
     // Add all new data keys into the index.
     for (const auto& keyString : ticket.added) {
-        auto result = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
+        bool dupsAllowed = !isEnforcingDuplicateConstraints() && ticket.dupsAllowed;
+        auto result = _newInterface->insert(opCtx, keyString, dupsAllowed);
         if (!result.isOK())
             return result.getStatus();
     }

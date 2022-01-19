@@ -246,14 +246,108 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
         KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(2));
     KeyStringSet keys{keyString1.release(), keyString2.release()};
     struct InsertDeleteOptions options; /* options.dupsAllowed = false */
+    int64_t numInserted;
 
     // Checks duplicates and returns the error code when constraints are enforced.
-    auto status = indexAccessMethod->insertKeys(opCtx, coll, keys, {}, options, {}, nullptr);
+    auto status = indexAccessMethod->insertKeys(opCtx, coll, keys, {}, options, {}, &numInserted);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    ASSERT_EQ(numInserted, 0);
 
     // Skips the check on duplicates when constraints are not enforced.
     opCtx->setEnforceConstraints(false);
-    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, keys, {}, options, {}, nullptr));
+    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, keys, {}, options, {}, &numInserted));
+    ASSERT_EQ(numInserted, 2);
+}
+
+TEST(IndexAccessMethodInsertKeys, InsertWhenEnforcingDuplicateConstraints) {
+    ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    NamespaceString nss("unittests.InsertWhenEnforcingDuplicateConstraints");
+    auto indexName = "a_1";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                 << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns(), indexSpec));
+
+    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
+    const auto& coll = autoColl.getCollection();
+    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    IndexAccessMethod* indexAccessMethod =
+        coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod();
+
+    KeyString::HeapBuilder keyString1(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
+    KeyString::HeapBuilder keyString2(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(2));
+    KeyString::HeapBuilder keyString3(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(3));
+    KeyStringSet keys1{keyString1.release(), keyString2.release()};
+    KeyStringSet keys2{keyString3.release()};
+    struct InsertDeleteOptions options;
+    int64_t numInserted;
+
+    // Allows duplicates in a regular index.
+    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, keys1, {}, options, {}, &numInserted));
+    ASSERT_EQ(numInserted, 2);
+
+    // Enforces the duplicate constraint on the index and rejects duplicates when inserting.
+    indexAccessMethod->setEnforceDuplicateConstraints(true);
+    auto status = indexAccessMethod->insertKeys(opCtx, coll, keys2, {}, options, {}, &numInserted);
+    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    ASSERT_EQ(numInserted, 0);
+
+    // Resets the duplicate constraint and accepts duplicates again.
+    indexAccessMethod->setEnforceDuplicateConstraints(false);
+    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, keys2, {}, options, {}, &numInserted));
+    ASSERT_EQ(numInserted, 1);
+}
+
+TEST(IndexAccessMethodUpdateKeys, UpdateWhenEnforcingDuplicateConstraints) {
+    ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    NamespaceString nss("unittests.UpdateWhenEnforcingDuplicateConstraints");
+    auto indexName = "a_1";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "v"
+                                 << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns(), indexSpec));
+
+    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
+    const auto& coll = autoColl.getCollection();
+    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    IndexAccessMethod* indexAccessMethod =
+        coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod();
+
+    KeyString::HeapBuilder keyString1(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
+    KeyString::HeapBuilder keyString2_old(
+        KeyString::Version::kLatestVersion, BSON("" << 2), Ordering::make(BSONObj()), RecordId(2));
+    KeyString::HeapBuilder keyString2_new(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(2));
+    KeyStringSet key1{keyString1.release()};
+    KeyStringSet key2_old{keyString2_old.release()};
+    KeyStringSet key2_new{keyString2_new.release()};
+    struct InsertDeleteOptions options;
+    UpdateTicket ticket{true, {}, {}, {}, key2_old, key2_new, RecordId(2), true, {}};
+    int64_t numInserted;
+    int64_t numDeleted;
+
+    // Inserts two keys.
+    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, key1, {}, options, {}, &numInserted));
+    ASSERT_EQ(numInserted, 1);
+    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, key2_old, {}, options, {}, &numInserted));
+    ASSERT_EQ(numInserted, 1);
+
+    // Enforces the duplicate constraint on the index and rejects duplicates when updating.
+    indexAccessMethod->setEnforceDuplicateConstraints(true);
+    auto status = indexAccessMethod->update(opCtx, coll, ticket, &numInserted, &numDeleted);
+    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+    ASSERT_EQ(numInserted, 0);
+    ASSERT_EQ(numDeleted, 0);
+
+    // Resets the duplicate constraint and accepts duplicates again.
+    indexAccessMethod->setEnforceDuplicateConstraints(false);
+    ASSERT_OK(indexAccessMethod->update(opCtx, coll, ticket, &numInserted, &numDeleted));
+    ASSERT_EQ(numInserted, 1);
+    ASSERT_EQ(numDeleted, 1);
 }
 
 }  // namespace

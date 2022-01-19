@@ -266,6 +266,37 @@ TEST(SortedDataInterface, InsertNoDups2) {
     }
 }
 
+TEST(SortedDataInterface, InsertNoDups3) {
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
+    const std::unique_ptr<SortedDataInterface> sorted(
+        harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)), false));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        {
+            WriteUnitOfWork uow(opCtx.get());
+            ASSERT_NOT_OK(sorted->insert(
+                opCtx.get(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 4)), false));
+            uow.commit();
+        }
+    }
+
+    {
+        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+    }
+}
+
 TEST(SortedDataInterface, Unindex1) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(

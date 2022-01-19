@@ -1579,6 +1579,23 @@ StatusWith<bool> SortedDataInterfaceStandard::insert(OperationContext* opCtx,
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     RecordId loc = decodeRecordId(keyString, rsKeyFormat());
 
+    if (!dupsAllowed) {
+        std::string prefix_key = createRadixKeyWithoutLocFromKS(keyString, _prefix, _rsKeyFormat);
+        auto it = workingCopy->lower_bound(prefix_key);
+        if (it != workingCopy->end()) {
+            auto keyStringFound =
+                createKeyStringEntryFromRadixKey(it->first, it->second, _ordering, _rsKeyFormat)
+                    .get()
+                    .keyString;
+            bool hasSameKey = loc.isLong()
+                ? keyString.compareWithoutRecordIdLong(keyStringFound) == 0
+                : keyString.compareWithoutRecordIdStr(keyStringFound) == 0;
+            if (hasSameKey) {
+                return buildDupKeyErrorStatus(opCtx, keyString, _ordering, _desc);
+            }
+        }
+    }
+
     std::string key = createRadixKeyWithLocFromKS(keyString, loc, _prefix);
     bool inserted =
         workingCopy->insert({std::move(key), IndexDataEntry::create(loc, keyString.getTypeBits())})
