@@ -59,7 +59,8 @@ structs:
         type: date
         optional: true
       nDocsReturned:
-        description: The number of docs returned by the cursor.
+        description: "The number of docs returned by the cursor. Tracked for display in $currentOp
+                     output."
         type: long
         optional: true
       nBatchesReturned:

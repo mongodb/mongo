@@ -156,7 +156,7 @@ GenericCursor ClientCursor::toGenericCursor() const {
     GenericCursor gc;
     gc.setCursorId(cursorid());
     gc.setNs(nss());
-    gc.setNDocsReturned(nReturnedSoFar());
+    gc.setNDocsReturned(_nReturnedSoFar);
     gc.setTailable(isTailable());
     gc.setAwaitData(isAwaitData());
     gc.setNoCursorTimeout(isNoTimeout());

@@ -202,13 +202,6 @@ public:
     void getOriginatingPrivileges() && = delete;
 
     /**
-     * Returns the total number of query results returned by the cursor so far.
-     */
-    std::uint64_t nReturnedSoFar() const {
-        return _nReturnedSoFar;
-    }
-
-    /**
      * Increments the cursor's tracked number of query results returned so far by 'n'.
      */
     void incNReturnedSoFar(std::uint64_t n) {
@@ -386,7 +379,8 @@ private:
     // an error to use a ClientCursor once it has been disposed.
     bool _disposed = false;
 
-    // Tracks the number of results returned by this cursor so far.
+    // Tracks the number of results returned by this cursor so far. Tracked only as debugging info
+    // for display in $currentOp output.
     std::uint64_t _nReturnedSoFar = 0;
 
     // Tracks the number of batches returned by this cursor so far.

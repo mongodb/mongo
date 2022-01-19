@@ -2549,12 +2549,8 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
     // Update lastFetched before it is updated by getting the next batch.
     lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
 
-    auto cursorRes = CursorResponse(NamespaceString::kRsOplogNamespace,
-                                    cursorId,
-                                    firstBatch,
-                                    boost::none,
-                                    boost::none,
-                                    resumeTokenObj);
+    auto cursorRes = CursorResponse(
+        NamespaceString::kRsOplogNamespace, cursorId, firstBatch, boost::none, resumeTokenObj);
 
     BSONObjBuilder bob(cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse));
     bob.appendElementsUnique(metadataObj);

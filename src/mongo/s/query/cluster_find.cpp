@@ -745,7 +745,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     std::vector<BSONObj> batch;
     size_t bytesBuffered = 0;
     long long batchSize = cmd.getBatchSize().value_or(0);
-    long long startingFrom = pinnedCursor.getValue()->getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     BSONObj postBatchResumeToken;
     bool stashedResult = false;
@@ -853,7 +852,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                           std::move(batch),
                           atClusterTime ? atClusterTime->asTimestamp()
                                         : boost::optional<Timestamp>{},
-                          startingFrom,
                           postBatchResumeToken,
                           boost::none,
                           boost::none,

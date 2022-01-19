@@ -312,7 +312,7 @@ public:
             // already returned its first batch of results.
             auto pinnedCursor =
                 unittest::assertGet(CursorManager::get(&_opCtx)->pinCursor(&_opCtx, cursorId));
-            ASSERT_EQUALS(std::uint64_t(2), pinnedCursor.getCursor()->nReturnedSoFar());
+            ASSERT_EQUALS(1ull, pinnedCursor.getCursor()->getNBatches());
         }
 
         int counter = 0;

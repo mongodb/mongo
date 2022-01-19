@@ -1344,8 +1344,7 @@ DEATH_TEST_REGEX_F(
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
-        CursorResponse(
-            kTestNss, 123, {firstCursorResponse}, boost::none, boost::none, pbrtFirstCursor)));
+        CursorResponse(kTestNss, 123, {firstCursorResponse}, boost::none, pbrtFirstCursor)));
     // Create a second cursor whose initial batch has no PBRT.
     cursors.push_back(
         makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 456, {})));
@@ -1378,8 +1377,7 @@ DEATH_TEST_REGEX_F(AsyncResultsMergerTest,
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
-        CursorResponse(
-            kTestNss, 123, {firstCursorResponse}, boost::none, boost::none, pbrtFirstCursor)));
+        CursorResponse(kTestNss, 123, {firstCursorResponse}, boost::none, pbrtFirstCursor)));
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
@@ -1407,13 +1405,11 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfRemoteHasLowerPostB
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[0],
         kTestShardHosts[0],
-        CursorResponse(
-            kTestNss, 123, {firstCursorResponse}, boost::none, boost::none, pbrtFirstCursor)));
+        CursorResponse(kTestNss, 123, {firstCursorResponse}, boost::none, pbrtFirstCursor)));
     auto tooLowPBRT = makePostBatchResumeToken(Timestamp(1, 2));
-    cursors.push_back(
-        makeRemoteCursor(kTestShardIds[1],
-                         kTestShardHosts[1],
-                         CursorResponse(kTestNss, 456, {}, boost::none, boost::none, tooLowPBRT)));
+    cursors.push_back(makeRemoteCursor(kTestShardIds[1],
+                                       kTestShardHosts[1],
+                                       CursorResponse(kTestNss, 456, {}, boost::none, tooLowPBRT)));
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
@@ -1459,8 +1455,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
                       << firstDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch1 = {firstCursorResponse};
     auto firstDoc = batch1.front();
-    responses.emplace_back(
-        kTestNss, CursorId(123), batch1, boost::none, boost::none, pbrtFirstCursor);
+    responses.emplace_back(kTestNss, CursorId(123), batch1, boost::none, pbrtFirstCursor);
     scheduleNetworkResponses(std::move(responses));
 
     // Should be ready now.
@@ -1472,7 +1467,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
     newCursors.push_back(
         makeRemoteCursor(kTestShardIds[1],
                          kTestShardHosts[1],
-                         CursorResponse(kTestNss, 456, {}, boost::none, boost::none, tooLowPBRT)));
+                         CursorResponse(kTestNss, 456, {}, boost::none, tooLowPBRT)));
     arm->addNewShardCursors(std::move(newCursors));
 
     // Now shouldn't be ready, our guarantee from the new shard isn't sufficiently advanced.
@@ -1489,8 +1484,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
                       << secondDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch2 = {secondCursorResponse};
     auto secondDoc = batch2.front();
-    responses.emplace_back(
-        kTestNss, CursorId(456), batch2, boost::none, boost::none, pbrtSecondCursor);
+    responses.emplace_back(kTestNss, CursorId(456), batch2, boost::none, pbrtSecondCursor);
     scheduleNetworkResponses(std::move(responses));
     executor()->waitForEvent(readyEvent);
     ASSERT_TRUE(arm->ready());
@@ -1538,8 +1532,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
                       << "', documentKey: {_id: 1}}, $sortKey: [{_data: '"
                       << firstDocSortKey.firstElement().String() << "'}]}");
     std::vector<BSONObj> batch1 = {firstCursorResponse};
-    responses.emplace_back(
-        kTestNss, CursorId(123), batch1, boost::none, boost::none, pbrtFirstCursor);
+    responses.emplace_back(kTestNss, CursorId(123), batch1, boost::none, pbrtFirstCursor);
     scheduleNetworkResponses(std::move(responses));
 
     // Should be ready now.
@@ -1551,7 +1544,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     newCursors.push_back(
         makeRemoteCursor(kTestShardIds[1],
                          kTestShardHosts[1],
-                         CursorResponse(kTestNss, 456, {}, boost::none, boost::none, tooLowPBRT)));
+                         CursorResponse(kTestNss, 456, {}, boost::none, tooLowPBRT)));
     arm->addNewShardCursors(std::move(newCursors));
 
     // Now shouldn't be ready, our guarantee from the new shard isn't sufficiently advanced.
@@ -1569,8 +1562,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting
     std::vector<BSONObj> batch2 = {secondCursorResponse};
     // The last observed time should still be later than the first shard, so we can get the data
     // from it.
-    responses.emplace_back(
-        kTestNss, CursorId(456), batch2, boost::none, boost::none, pbrtSecondCursor);
+    responses.emplace_back(kTestNss, CursorId(456), batch2, boost::none, pbrtSecondCursor);
     scheduleNetworkResponses(std::move(responses));
     executor()->waitForEvent(readyEvent);
     ASSERT_TRUE(arm->ready());
@@ -1598,20 +1590,20 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     std::vector<RemoteCursor> cursors;
     // Create three cursors with empty initial batches. Each batch has a PBRT.
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
-    cursors.push_back(makeRemoteCursor(
-        kTestShardIds[0],
-        kTestShardHosts[0],
-        CursorResponse(kTestNss, 123, {}, boost::none, boost::none, pbrtFirstCursor)));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(kTestNss, 123, {}, boost::none, pbrtFirstCursor)));
     auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 1));
-    cursors.push_back(makeRemoteCursor(
-        kTestShardIds[1],
-        kTestShardHosts[1],
-        CursorResponse(kTestNss, 456, {}, boost::none, boost::none, pbrtSecondCursor)));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(kTestNss, 456, {}, boost::none, pbrtSecondCursor)));
     auto pbrtThirdCursor = makePostBatchResumeToken(Timestamp(1, 4));
-    cursors.push_back(makeRemoteCursor(
-        kTestShardIds[2],
-        kTestShardHosts[2],
-        CursorResponse(kTestNss, 789, {}, boost::none, boost::none, pbrtThirdCursor)));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[2],
+                         kTestShardHosts[2],
+                         CursorResponse(kTestNss, 789, {}, boost::none, pbrtThirdCursor)));
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
@@ -1629,35 +1621,26 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorReturnsHighWaterMarkSortKey) 
     // each cursor to be updated in-order, so we keep the first and third PBRTs constant.
     pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 3));
     std::vector<BSONObj> emptyBatch = {};
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(123), emptyBatch, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), emptyBatch, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(123), emptyBatch, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), emptyBatch, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(789), emptyBatch, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtSecondCursor);
     ASSERT_FALSE(arm->ready());
 
     // Advance the second cursor again, so that it surpasses the other two. The third cursor becomes
     // the new high water mark.
     pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 6));
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(123), emptyBatch, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), emptyBatch, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(123), emptyBatch, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), emptyBatch, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(789), emptyBatch, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtThirdCursor);
     ASSERT_FALSE(arm->ready());
 
     // Advance the third cursor such that the first cursor becomes the high water mark.
     pbrtThirdCursor = makePostBatchResumeToken(Timestamp(1, 7));
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(123), emptyBatch, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), emptyBatch, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(789), emptyBatch, boost::none, boost::none, pbrtThirdCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(123), emptyBatch, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), emptyBatch, boost::none, pbrtSecondCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(789), emptyBatch, boost::none, pbrtThirdCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtFirstCursor);
     ASSERT_FALSE(arm->ready());
 
@@ -1675,20 +1658,20 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     // Create three cursors with empty initial batches. Each batch has a PBRT. The third cursor is
     // the $changeStream opened on "config.shards" to monitor for the addition of new shards.
     auto pbrtFirstCursor = makePostBatchResumeToken(Timestamp(1, 5));
-    cursors.push_back(makeRemoteCursor(
-        kTestShardIds[0],
-        kTestShardHosts[0],
-        CursorResponse(kTestNss, 123, {}, boost::none, boost::none, pbrtFirstCursor)));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0],
+                         kTestShardHosts[0],
+                         CursorResponse(kTestNss, 123, {}, boost::none, pbrtFirstCursor)));
     auto pbrtSecondCursor = makePostBatchResumeToken(Timestamp(1, 3));
-    cursors.push_back(makeRemoteCursor(
-        kTestShardIds[1],
-        kTestShardHosts[1],
-        CursorResponse(kTestNss, 456, {}, boost::none, boost::none, pbrtSecondCursor)));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1],
+                         kTestShardHosts[1],
+                         CursorResponse(kTestNss, 456, {}, boost::none, pbrtSecondCursor)));
     auto pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 1));
     cursors.push_back(makeRemoteCursor(
         kTestShardIds[2],
         kTestShardHosts[2],
-        CursorResponse(ShardType::ConfigNS, 789, {}, boost::none, boost::none, pbrtConfigCursor)));
+        CursorResponse(ShardType::ConfigNS, 789, {}, boost::none, pbrtConfigCursor)));
     params.setRemotes(std::move(cursors));
     params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     params.setSort(change_stream_constants::kSortSpec);
@@ -1714,12 +1697,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     // already returned. As above, the guards against the possibility that the user requested a
     // stream with a start point at an arbitrary point in the future.
     pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 2));
+    scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
     scheduleNetworkResponse(
-        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {}, boost::none, boost::none, pbrtConfigCursor});
+        {ShardType::ConfigNS, CursorId(789), {}, boost::none, pbrtConfigCursor});
 
     // The high water mark has not advanced from its previous value.
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
@@ -1735,16 +1716,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     pbrtConfigCursor = makeResumeToken(Timestamp(1, 11), configUUID, configEvent);
     configEvent =
         configEvent.addField(BSON("$sortKey" << BSON_ARRAY(pbrtConfigCursor)).firstElement());
+    scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
     scheduleNetworkResponse(
-        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse({ShardType::ConfigNS,
-                             CursorId(789),
-                             {configEvent},
-                             boost::none,
-                             boost::none,
-                             pbrtConfigCursor});
+        {ShardType::ConfigNS, CursorId(789), {configEvent}, boost::none, pbrtConfigCursor});
 
     // The config cursor has a lower sort key than the other shards, so we can retrieve the event.
     ASSERT_TRUE(arm->ready());
@@ -1757,12 +1732,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
 
     // If the next config batch is empty but the PBRT is still the resume token of the addShard
     // event, it does not advance the ARM's high water mark sort key.
+    scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
     scheduleNetworkResponse(
-        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {}, boost::none, boost::none, pbrtConfigCursor});
+        {ShardType::ConfigNS, CursorId(789), {}, boost::none, pbrtConfigCursor});
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_FALSE(arm->ready());
 
@@ -1771,12 +1744,10 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorDoesNotAdvanceHighWaterMarkFo
     // in advancing of the high water mark at all is so that we cannot end up in a situation where
     // the config cursor is always the lowest and the high water mark can therefore never advance.
     pbrtConfigCursor = makePostBatchResumeToken(Timestamp(1, 12));
+    scheduleNetworkResponse({kTestNss, CursorId(123), {}, boost::none, pbrtFirstCursor});
+    scheduleNetworkResponse({kTestNss, CursorId(456), {}, boost::none, pbrtSecondCursor});
     scheduleNetworkResponse(
-        {kTestNss, CursorId(123), {}, boost::none, boost::none, pbrtFirstCursor});
-    scheduleNetworkResponse(
-        {kTestNss, CursorId(456), {}, boost::none, boost::none, pbrtSecondCursor});
-    scheduleNetworkResponse(
-        {ShardType::ConfigNS, CursorId(789), {}, boost::none, boost::none, pbrtConfigCursor});
+        {ShardType::ConfigNS, CursorId(789), {}, boost::none, pbrtConfigCursor});
     ASSERT_BSONOBJ_GT(arm->getHighWaterMark(), initialHighWaterMark);
     ASSERT_BSONOBJ_EQ(arm->getHighWaterMark(), pbrtConfigCursor);
     ASSERT_FALSE(arm->ready());
