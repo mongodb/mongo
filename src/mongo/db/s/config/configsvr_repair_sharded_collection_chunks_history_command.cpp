@@ -96,7 +96,8 @@ public:
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "_configsvrRepairShardedCollectionChunksHistory must be called with majority writeConcern, got "
+                str::stream() << "_configsvrRepairShardedCollectionChunksHistory must be called "
+                                 "with majority writeConcern, got "
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
