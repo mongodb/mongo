@@ -55,19 +55,22 @@ VCXPROJ_FIELDS_TO_PRESERVE = [
 VCXPROJ_TOOLSVERSION = {
     "14.1": "15.0",
     "14.2": "16.0",
+    "14.3": "17.0",
 }
 
 VCXPROJ_PLATFORM_TOOLSET = {
     "14.1": "v141",
     "14.2": "v142",
+    "14.3": "v143",
 }
 
 VCXPROJ_WINDOWS_TARGET_SDK = {
     "14.1": "10.0.17763.0",
     "14.2": "10.0.18362.0",
+    "14.3": "10.0.19041.0",
 }
 
-VCXPROJ_MSVC_DEFAULT_VERSION = "14.1"  # Visual Studio 2017
+VCXPROJ_MSVC_DEFAULT_VERSION = "14.3"  # Visual Studio 2022
 
 
 def get_defines(args):
