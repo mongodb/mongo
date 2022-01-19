@@ -13,7 +13,6 @@ env.Library(
         'matcher.cpp',
         'matcher_core.cpp',
         'temp_dir.cpp',
-        'unittest_helpers.cpp',
         'unittest.cpp',
         'unittest.idl',
     ],

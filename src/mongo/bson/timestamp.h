@@ -149,4 +149,12 @@ private:
     unsigned secs = 0;
 };
 
+inline std::ostream& operator<<(std::ostream& s, const Timestamp& t) {
+    return (s << t.toString());
+}
+
+inline StringBuilder& operator<<(StringBuilder& s, const Timestamp& t) {
+    return (s << t.toString());
+}
+
 }  // namespace mongo

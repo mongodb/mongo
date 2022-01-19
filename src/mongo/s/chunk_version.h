@@ -54,10 +54,10 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch, Timestamp timestamp)
+    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch, const Timestamp& timestamp)
         : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)),
           _epoch(epoch),
-          _timestamp(std::move(timestamp)) {}
+          _timestamp(timestamp) {}
 
     ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
 
@@ -130,7 +130,6 @@ public:
 
     static bool isIgnoredVersion(const ChunkVersion& version) {
         return version.majorVersion() == 0 && version.minorVersion() == 0 &&
-            version.epoch() == IGNORED().epoch() &&
             version.getTimestamp() == IGNORED().getTimestamp();
     }
 
@@ -188,17 +187,24 @@ public:
     }
 
     bool operator==(const ChunkVersion& otherVersion) const {
-        return otherVersion.epoch() == epoch() && otherVersion.getTimestamp() == getTimestamp() &&
-            otherVersion._combined == _combined;
+        return otherVersion.getTimestamp() == getTimestamp() && otherVersion._combined == _combined;
     }
 
     bool operator!=(const ChunkVersion& otherVersion) const {
         return !(otherVersion == *this);
     }
 
+    bool isSameCollection(const Timestamp& timestamp) const {
+        return getTimestamp() == timestamp;
+    }
+
+    bool isSameCollection(const ChunkVersion& other) const {
+        return isSameCollection(other.getTimestamp());
+    }
+
     // Can we write to this data and not have a problem?
     bool isWriteCompatibleWith(const ChunkVersion& other) const {
-        return epoch() == other.epoch() && majorVersion() == other.majorVersion();
+        return isSameCollection(other) && majorVersion() == other.majorVersion();
     }
 
     // Unsharded timestamp cannot be compared with other timestamps
@@ -212,7 +218,7 @@ public:
      * current version is older than the other one. Returns false otherwise.
      */
     bool isOlderThan(const ChunkVersion& otherVersion) const {
-        if (this->isNotComparableWith(otherVersion))
+        if (isNotComparableWith(otherVersion))
             return false;
 
         if (getTimestamp() != otherVersion.getTimestamp())
@@ -264,6 +270,7 @@ public:
      * legacy reasons.
      */
     void legacyToBSON(StringData field, BSONObjBuilder* builder) const;
+
     std::string toString() const;
 
 private:

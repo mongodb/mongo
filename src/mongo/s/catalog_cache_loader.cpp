@@ -42,8 +42,8 @@ const auto catalogCacheLoaderDecoration =
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks() = default;
 
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
-    OID collEpoch,
-    Timestamp collCreationTime,
+    OID epoch,
+    Timestamp timestamp,
     UUID collUuid,
     const BSONObj& collShardKeyPattern,
     const BSONObj& collDefaultCollation,
@@ -55,8 +55,8 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     bool allowMigrations,
     SupportingLongNameStatusEnum supportingLongName,
     std::vector<ChunkType> chunks)
-    : epoch(std::move(collEpoch)),
-      creationTime(std::move(collCreationTime)),
+    : epoch(std::move(epoch)),
+      timestamp(std::move(timestamp)),
       uuid(std::move(collUuid)),
       shardKeyPattern(collShardKeyPattern),
       defaultCollation(collDefaultCollation),

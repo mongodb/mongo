@@ -67,8 +67,8 @@ public:
     struct CollectionAndChangedChunks {
         CollectionAndChangedChunks();
         CollectionAndChangedChunks(
-            OID collEpoch,
-            Timestamp collCreationTime,
+            OID epoch,
+            Timestamp timestamp,
             UUID uuid,
             const BSONObj& collShardKeyPattern,
             const BSONObj& collDefaultCollation,
@@ -83,7 +83,7 @@ public:
 
         // Information about the entire collection
         OID epoch;
-        Timestamp creationTime;
+        Timestamp timestamp;
         boost::optional<UUID> uuid;  // This value can never be boost::none,
                                      // except under the default constructor
         BSONObj shardKeyPattern;

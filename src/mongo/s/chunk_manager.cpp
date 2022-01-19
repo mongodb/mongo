@@ -110,6 +110,22 @@ std::vector<std::shared_ptr<ChunkInfo>> flatten(const std::vector<ChunkType>& ch
     return flattened;
 }
 
+void validateChunkIsNotOlderThan(const std::shared_ptr<ChunkInfo>& chunk,
+                                 const ChunkVersion& version) {
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Changed chunk " << chunk->toString()
+                          << " has timestamp different from that of the collection "
+                          << version.getTimestamp(),
+            version.getTimestamp() == chunk->getLastmod().getTimestamp());
+
+    uassert(626840,
+            str::stream()
+                << "Changed chunk " << chunk->toString()
+                << " doesn't have version that's greater or equal than that of the collection "
+                << version.toString(),
+            version.isOlderOrEqualThan(chunk->getLastmod()));
+}
+
 }  // namespace
 
 ShardVersionMap ChunkMap::constructShardVersionMap() const {
@@ -210,15 +226,6 @@ std::shared_ptr<ChunkInfo> ChunkMap::findIntersectingChunk(const BSONObj& shardK
     return std::shared_ptr<ChunkInfo>();
 }
 
-void validateChunk(const std::shared_ptr<ChunkInfo>& chunk, const ChunkVersion& version) {
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Changed chunk " << chunk->toString()
-                          << " has epoch different from that of the collection " << version.epoch(),
-            version.epoch() == chunk->getLastmod().epoch());
-
-    invariant(version.isOlderOrEqualThan(chunk->getLastmod()));
-}
-
 ChunkMap ChunkMap::createMerged(
     const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const {
     size_t chunkMapIndex = 0;
@@ -229,7 +236,7 @@ ChunkMap ChunkMap::createMerged(
 
     while (chunkMapIndex < _chunkMap.size() || changedChunkIndex < changedChunks.size()) {
         if (chunkMapIndex >= _chunkMap.size()) {
-            validateChunk(changedChunks[changedChunkIndex], getVersion());
+            validateChunkIsNotOlderThan(changedChunks[changedChunkIndex], getVersion());
             updatedChunkMap.appendChunk(changedChunks[changedChunkIndex++]);
             continue;
         }
@@ -249,7 +256,7 @@ ChunkMap ChunkMap::createMerged(
             auto bytesInReplacedChunk = chunkInfo->getWritesTracker()->getBytesWritten();
             changedChunk->getWritesTracker()->addBytesWritten(bytesInReplacedChunk);
 
-            validateChunk(changedChunk, getVersion());
+            validateChunkIsNotOlderThan(changedChunk, getVersion());
             updatedChunkMap.appendChunk(changedChunk);
         } else {
             updatedChunkMap.appendChunk(_chunkMap[chunkMapIndex++]);
@@ -820,7 +827,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
     auto chunkMap = _chunkMap.createMerged(changedChunkInfos);
 
     // Only update the same collection.
-    invariant(getVersion().epoch() == chunkMap.getVersion().epoch());
+    invariant(getVersion().isSameCollection(chunkMap.getVersion()));
 
     return RoutingTableHistory(_nss,
                                _uuid,

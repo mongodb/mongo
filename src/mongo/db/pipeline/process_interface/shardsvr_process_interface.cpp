@@ -68,7 +68,6 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionVersion) const {
-
     auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
@@ -84,10 +83,10 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
         routingInfo.isSharded() ? routingInfo.getVersion() : ChunkVersion::UNSHARDED();
 
     uassert(StaleEpochInfo(nss),
-            str::stream() << "could not act as router for " << nss.ns() << ", wanted "
+            str::stream() << "Could not act as router for " << nss.ns() << ", wanted "
                           << targetCollectionVersion.toString() << ", but found "
                           << foundVersion.toString(),
-            foundVersion.epoch() == targetCollectionVersion.epoch());
+            foundVersion.isSameCollection(targetCollectionVersion));
 }
 
 std::pair<std::vector<FieldPath>, bool>

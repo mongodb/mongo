@@ -365,8 +365,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         _nss, receivedShardVersion, wantedShardVersion, ShardingState::get(opCtx)->shardId());
 
     uassert(std::move(sci),
-            str::stream() << "epoch mismatch detected for " << _nss.ns(),
-            wantedShardVersion.epoch() == receivedShardVersion.epoch());
+            str::stream() << "timestamp mismatch detected for " << _nss.ns(),
+            wantedShardVersion.isSameCollection(receivedShardVersion));
 
     if (!wantedShardVersion.isSet() && receivedShardVersion.isSet()) {
         uasserted(std::move(sci),

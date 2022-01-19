@@ -119,7 +119,9 @@ protected:
         NamespaceString nss,
         const BSONObj& shardKey,
         boost::optional<std::string> primaryShardId = boost::none,
-        UUID uuid = UUID::gen());
+        UUID uuid = UUID::gen(),
+        OID epoch = OID::gen(),
+        Timestamp timestamp = Timestamp(1));
 
     /**
      * Mocks network responses for loading a sharded database and collection from the config server.

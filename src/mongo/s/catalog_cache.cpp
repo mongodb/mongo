@@ -706,10 +706,11 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         }();
 
         auto newRoutingHistory = [&] {
-            // If we have routing info already and it's for the same collection epoch, we're
-            // updating. Otherwise, we're making a whole new routing table.
+            // If we have routing info already and it's for the same collection, we're updating.
+            // Otherwise, we are making a whole new routing table.
             if (isIncremental &&
-                existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
+                existingHistory->optRt->getVersion().isSameCollection(
+                    collectionAndChunks.timestamp)) {
                 return existingHistory->optRt->makeUpdated(collectionAndChunks.timeseriesFields,
                                                            collectionAndChunks.reshardingFields,
                                                            maxChunkSize,
@@ -733,7 +734,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                                 std::move(defaultCollator),
                                                 collectionAndChunks.shardKeyIsUnique,
                                                 collectionAndChunks.epoch,
-                                                collectionAndChunks.creationTime,
+                                                collectionAndChunks.timestamp,
                                                 collectionAndChunks.timeseriesFields,
                                                 std::move(collectionAndChunks.reshardingFields),
                                                 maxChunkSize,

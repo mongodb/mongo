@@ -254,9 +254,9 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
     NamespaceString nss,
     const BSONObj& shardKey,
     boost::optional<std::string> primaryShardId,
-    UUID uuid) {
-    const OID epoch = OID::gen();
-    const Timestamp timestamp(1);
+    UUID uuid,
+    OID epoch,
+    Timestamp timestamp) {
     const ShardKeyPattern shardKeyPattern(shardKey);
 
     auto future = scheduleRoutingInfoForcedRefresh(nss);

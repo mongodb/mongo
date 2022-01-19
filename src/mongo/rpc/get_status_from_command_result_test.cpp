@@ -33,7 +33,6 @@
 #include "mongo/db/json.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/unittest/unittest_helpers.h"
 
 namespace mongo {
 

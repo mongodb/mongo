@@ -51,7 +51,7 @@ using namespace fmt::literals;
 class ReshardingDonorRecipientCommonInternalsTest : public ShardServerTestFixture {
 public:
     const UUID kExistingUUID = UUID::gen();
-    const Timestamp kExistingTimestamp = Timestamp();
+    const Timestamp kExistingTimestamp = Timestamp(10, 5);
     const NamespaceString kOriginalNss = NamespaceString("db", "foo");
 
     const NamespaceString kTemporaryReshardingNss =

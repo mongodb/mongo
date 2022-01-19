@@ -120,7 +120,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     // Set the collection entry.
     ShardCollectionType update(nss,
                                collAndChunks.epoch,
-                               collAndChunks.creationTime,
+                               collAndChunks.timestamp,
                                *collAndChunks.uuid,
                                collAndChunks.shardKeyPattern,
                                collAndChunks.shardKeyIsUnique);
@@ -280,7 +280,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
 
     // If the persisted epoch doesn't match what the CatalogCache requested, read everything.
     // If the epochs are the same we can safely take the timestamp from the shard coll entry.
-    ChunkVersion startingVersion = (shardCollectionEntry.getEpoch() == version.epoch())
+    ChunkVersion startingVersion = version.isSameCollection(shardCollectionEntry.getTimestamp())
         ? ChunkVersion(version.majorVersion(),
                        version.minorVersion(),
                        version.epoch(),
@@ -816,17 +816,18 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
     auto& collAndChunks = swCollectionAndChangedChunks.getValue();
 
-    if (collAndChunks.changedChunks.back().getVersion().epoch() != collAndChunks.epoch) {
+    if (!collAndChunks.changedChunks.back().getVersion().isSameCollection(
+            collAndChunks.timestamp)) {
         return Status{ErrorCodes::ConflictingOperationInProgress,
                       str::stream()
                           << "Invalid chunks found when reloading '" << nss.toString()
-                          << "' Previous collection epoch was '" << collAndChunks.epoch.toString()
-                          << "', but found a new epoch '"
-                          << collAndChunks.changedChunks.back().getVersion().epoch().toString()
+                          << "' Previous collection timestamp was '" << collAndChunks.timestamp
+                          << "', but found a new timestamp '"
+                          << collAndChunks.changedChunks.back().getVersion().getTimestamp()
                           << "'."};
     }
 
-    if (maxLoaderVersion.isSet() && maxLoaderVersion.epoch() == collAndChunks.epoch &&
+    if (maxLoaderVersion.isSameCollection(collAndChunks.timestamp) && maxLoaderVersion.isSet() &&
         lastSupportLongName != collAndChunks.supportingLongName) {
         _waitForTasksToCompleteAndRenameChunks(
             opCtx, nss, *collAndChunks.uuid, collAndChunks.supportingLongName);
@@ -1013,7 +1014,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         }
 
         // The collection info in enqueued metadata may be more recent than the persisted metadata
-        persisted.creationTime = enqueued.creationTime;
+        persisted.timestamp = enqueued.timestamp;
         persisted.timeseriesFields = std::move(enqueued.timeseriesFields);
         persisted.reshardingFields = std::move(enqueued.reshardingFields);
         persisted.maxChunkSizeBytes = enqueued.maxChunkSizeBytes;
@@ -1410,7 +1411,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
         maxQueryVersion = ChunkVersion(highestVersion.majorVersion(),
                                        highestVersion.minorVersion(),
                                        highestVersion.epoch(),
-                                       collectionAndChangedChunks->creationTime);
+                                       collectionAndChangedChunks->timestamp);
     } else {
         invariant(statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
         dropped = true;
