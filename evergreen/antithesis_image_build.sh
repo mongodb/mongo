@@ -25,6 +25,7 @@ mkdir -p antithesis/topologies/replica_set/{logs,data}/workload
 mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/database{1,2,3,4,5,6}
 mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/configsvr{1,2,3}
 mkdir -p antithesis/topologies/sharded_cluster/{logs,data}/{mongos,workload}
+echo "${revision}" > antithesis/topologies/sharded_cluster/data/workload/mongo_version.txt
 
 # copy ... to the build context
 # resmoke
