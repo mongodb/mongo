@@ -23,6 +23,7 @@
 import datetime
 import json
 import os
+import sys
 import pathlib
 import shutil
 import tempfile
@@ -93,8 +94,8 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             raise UnsupportedError(cls.__name__, "timestamp-newer")
 
         src_file = cls.get_file_contents_path(src)
-
-        if cls.get_bad_cachefile_path(src).exists():
+        # using os.path.exists here because: https://bugs.python.org/issue35306
+        if os.path.exists(str(cls.get_bad_cachefile_path(src))):
             raise InvalidChecksum(cls.get_hash_path(src_file), dst, f"cachefile marked as bad checksum")
 
         csig = None
@@ -129,10 +130,10 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         # dst is bsig/file from cachepath method, so
         # we make sure to make the bsig dir first
         dst = pathlib.Path(dst)
-        os.makedirs(dst, exist_ok=True)
-
         dst_file = dst / dst.name.split('.')[0]
+
         try:
+            os.makedirs(dst, exist_ok=True)
             super().copy_to_cache(env, src, dst_file)
         except OSError as ex:
             raise CacheTransferFailed(src, dst_file, f"failed to copy to cache: {ex}") from ex
@@ -198,33 +199,31 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
                 'cache_dir': str(pathlib.Path(cachefile).parent.parent),
             })
 
+            # capture exception information
+            if sys.exc_info()[1]:
+                json_data.update({'error': self._format_exception_msg()})
+
             self.json_log.write(json.dumps(json_data) + '\n')
 
     def CacheDebug(self, fmt, target, cachefile):
-        # The target cachefile will live in a directory with the special
-        # extension for this cachedir class. Check if this cachefile is
-        # in a directory like that and customize the debug logs.
-        cksum_cachefile = str(pathlib.Path(cachefile).parent)
-        if cksum_cachefile.endswith(self.get_ext()):
-            super().CacheDebug(fmt, target, cksum_cachefile)
-        else:
-            super().CacheDebug(fmt, target, cachefile)
 
-    def _log(self, msg, log_msg, json_info, realnode, cachefile):
+        super().CacheDebug(fmt, target, cachefile)
+        # Capture exception information into the cache debug log
+        if sys.exc_info()[1] and self.debugFP:
+            self.debugFP.write(self._format_exception_msg())
+
+    def _format_exception_msg(self):
+        return ('An exception was detected while using the cache:\n' +
+                '    ' + "\n    ".join("".join(traceback.format_exc()).split("\n"))) + '\n'
+
+    def _log(self, log_msg, json_info, realnode, cachefile):
         self.CacheDebug(log_msg + cache_debug_suffix, realnode, cachefile)
-
-        # Write the exception and/or error info to the cache debug log file if in use.
-        if self.debugFP:
-            self.debugFP.write(msg + '\n')
         self.CacheDebugJson(json_info, realnode, cachefile)
 
     def print_cache_issue(self, node, ex):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1])
-        msg = ('An issue was detected while validating the cache:\n' +
-              '    ' + "\n    ".join("".join(traceback.format_exc()).split("\n")))
-
-        self._log(msg, str(ex), {'type': 'error', 'error': msg}, node, cksum_dir)
+        self._log(str(ex), {'type': 'error'}, node, cksum_dir)
 
     def clean_bad_cachefile(self, node, cache_csig, computed_csig):
 
@@ -238,11 +237,11 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             cksum_dir.replace(rm_path)
         except OSError as ex:
             msg = f"Failed to rename {cksum_dir} to {rm_path}: {ex}"
-            self._log(msg, msg, {'type': 'error', 'error': msg}, node, cksum_dir)
+            self._log(msg, {'type': 'error'}, node, cksum_dir)
             return
 
         msg = f"Removed bad cachefile {cksum_dir} found in cache."
-        self._log(msg, msg, {
+        self._log(msg, {
             'type': 'invalid_checksum',
             'cache_csig': cache_csig,
             'computed_csig': computed_csig
