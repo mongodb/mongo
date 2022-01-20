@@ -371,7 +371,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip, 
      * outside the constraints of transactions. Therefore, there is no need for snapshot based
      * visibility checks.
      */
-    F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
+    F_SET(hs_cursor, WT_CURSTD_HS_READ_ALL);
 
     /*
      * Scan the history store for the given btree and key with maximum start timestamp to let the

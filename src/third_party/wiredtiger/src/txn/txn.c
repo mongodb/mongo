@@ -427,6 +427,14 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
     prev_metadata_pinned = txn_global->metadata_pinned;
     prev_oldest_id = txn_global->oldest_id;
 
+    /*
+     * Do not modify the oldest ID during recovery. Modifying the oldest ID during recovery can lead
+     * to a scenario where the current generation oldest ID leads to wrong global visibility of the
+     * data whereas it doesn't according to the recovered checkpoint snapshot.
+     */
+    if (F_ISSET(conn, WT_CONN_RECOVERING))
+        return (0);
+
     /* Try to move the pinned timestamp forward. */
     if (strict)
         WT_RET(__wt_txn_update_pinned_timestamp(session, false));
