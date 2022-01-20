@@ -43,6 +43,8 @@ selector:
   - jstests/core/list_indexes.js
   # Expects createIndex with 'clustered' option fails on a non-clustered collection.
   - jstests/core/clustered_collection_create_index_clustered.js
+  # Will do clustering on the explicitly non-clustered collections
+  - jstests/core/clustered_collection_creation.js
 
   # TODO (SERVER-61259): $text not supported: "No query solutions"
   - jstests/core/fts6.js
