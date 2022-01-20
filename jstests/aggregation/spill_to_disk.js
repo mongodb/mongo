@@ -62,7 +62,7 @@ assert.commandWorked(db.adminCommand({
     internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1024
 }));
 assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast: 1}));
+    {setParameter: 1, internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate: 1.0}));
 
 test({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}],
