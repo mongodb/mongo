@@ -57,6 +57,9 @@ public:
      */
     virtual bool isDefragmentingCollection(const UUID& uuid) = 0;
 
+    virtual MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
+                                                 stdx::unordered_set<ShardId>* usedShards) = 0;
+
     /**
      * Generates a descriptor detailing the next defragmentation action (and the targeted
      * collection/chunk[s]) to be performed.
@@ -93,5 +96,9 @@ public:
     virtual void acknowledgeDataSizeResult(OperationContext* opCtx,
                                            DataSizeInfo action,
                                            const StatusWith<DataSizeResponse>& result) = 0;
+
+    virtual void acknowledgeMoveResult(OperationContext* opCtx,
+                                       MigrateInfo action,
+                                       const Status& result) = 0;
 };
 }  // namespace mongo

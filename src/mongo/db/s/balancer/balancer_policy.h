@@ -191,6 +191,7 @@ typedef stdx::variant<MergeInfo,
                       AutoSplitVectorInfo,
                       DataSizeInfo,
                       SplitInfoWithKeyPattern,
+                      MigrateInfo,
                       EndOfActionStream>
     DefragmentationAction;
 
@@ -375,7 +376,7 @@ public:
      */
     static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            std::set<ShardId>* usedShards,
+                                            stdx::unordered_set<ShardId>* usedShards,
                                             bool forceJumbo);
 
     /**
@@ -394,7 +395,7 @@ private:
     static ShardId _getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
                                                 const DistributionStatus& distribution,
                                                 const std::string& tag,
-                                                const std::set<ShardId>& excludedShards);
+                                                const stdx::unordered_set<ShardId>& excludedShards);
 
     /**
      * Return the shard which has the least number of chunks with the specified tag. If the tag is
@@ -403,7 +404,7 @@ private:
     static ShardId _getMostOverloadedShard(const ShardStatisticsVector& shardStats,
                                            const DistributionStatus& distribution,
                                            const std::string& chunkTag,
-                                           const std::set<ShardId>& excludedShards);
+                                           const stdx::unordered_set<ShardId>& excludedShards);
 
     /**
      * Selects one chunk for the specified zone (if appropriate) to be moved in order to bring the
@@ -422,7 +423,7 @@ private:
                                    const std::string& tag,
                                    size_t idealNumberOfChunksPerShardForTag,
                                    std::vector<MigrateInfo>* migrations,
-                                   std::set<ShardId>* usedShards,
+                                   stdx::unordered_set<ShardId>* usedShards,
                                    MoveChunkRequest::ForceJumbo forceJumbo);
 };
 

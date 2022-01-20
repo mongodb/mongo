@@ -322,7 +322,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 }
 
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
-    OperationContext* opCtx) {
+    OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) {
     auto shardStatsStatus = _clusterStats->getStats(opCtx);
     if (!shardStatsStatus.isOK()) {
         return shardStatsStatus.getStatus();
@@ -340,7 +340,6 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
     MigrateInfoVector candidateChunks;
-    std::set<ShardId> usedShards;
 
     std::shuffle(collections.begin(), collections.end(), _random);
 
@@ -361,7 +360,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         }
 
         auto candidatesStatus =
-            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, &usedShards);
+            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, usedShards);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
@@ -395,7 +394,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     // doesn't.
     Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
 
-    std::set<ShardId> usedShards;
+    stdx::unordered_set<ShardId> usedShards;
 
     auto candidatesStatus = _getMigrateCandidatesForCollection(opCtx, nss, shardStats, &usedShards);
     if (!candidatesStatus.isOK()) {
@@ -519,7 +518,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
-    std::set<ShardId>* usedShards) {
+    stdx::unordered_set<ShardId>* usedShards) {
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
     if (!routingInfoStatus.isOK()) {

@@ -115,7 +115,7 @@ std::vector<MigrateInfo> balanceChunks(const ShardStatisticsVector& shardStats,
                                        const DistributionStatus& distribution,
                                        bool shouldAggressivelyBalance,
                                        bool forceJumbo) {
-    std::set<ShardId> usedShards;
+    stdx::unordered_set<ShardId> usedShards;
     return BalancerPolicy::balance(shardStats, distribution, &usedShards, forceJumbo);
 }
 
@@ -253,7 +253,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
          {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
-    std::set<ShardId> usedShards{kShardId0};
+    stdx::unordered_set<ShardId> usedShards{kShardId0};
     const auto migrations(BalancerPolicy::balance(
         cluster.first, DistributionStatus(kNamespace, cluster.second), &usedShards, false));
     ASSERT_EQ(1U, migrations.size());
@@ -273,7 +273,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNo
          {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
-    std::set<ShardId> usedShards{kShardId0};
+    stdx::unordered_set<ShardId> usedShards{kShardId0};
     const auto migrations(BalancerPolicy::balance(
         cluster.first, DistributionStatus(kNamespace, cluster.second), &usedShards, false));
     ASSERT_EQ(0U, migrations.size());
@@ -287,7 +287,7 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
          {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1}});
 
     // Here kShardId2 would have been selected as a recipient
-    std::set<ShardId> usedShards{kShardId2};
+    stdx::unordered_set<ShardId> usedShards{kShardId2};
     const auto migrations(BalancerPolicy::balance(
         cluster.first, DistributionStatus(kNamespace, cluster.second), &usedShards, false));
     ASSERT_EQ(1U, migrations.size());
@@ -644,7 +644,7 @@ TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleTagsSkipTagWithShardInU
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 1), BSON("x" << 3), "b")));
     ASSERT_OK(distribution.addRangeToZone(ZoneRange(BSON("x" << 3), BSON("x" << 5), "c")));
 
-    std::set<ShardId> usedShards{kShardId1};
+    stdx::unordered_set<ShardId> usedShards{kShardId1};
     const auto migrations(BalancerPolicy::balance(cluster.first, distribution, &usedShards, false));
     ASSERT_EQ(1U, migrations.size());
 

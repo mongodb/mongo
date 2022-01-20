@@ -209,8 +209,9 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
                 shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
                 shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
+                stdx::unordered_set<ShardId> usedShards;
                 auto candidateChunksStatus =
-                    _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
+                    _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get(), &usedShards);
                 ASSERT_OK(candidateChunksStatus.getStatus());
 
                 // The balancer does not bubble up the IllegalOperation error, but it is expected
@@ -315,7 +316,9 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
         shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
-        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
+        stdx::unordered_set<ShardId> usedShards;
+        auto candidateChunksStatus =
+            _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get(), &usedShards);
         ASSERT_OK(candidateChunksStatus.getStatus());
 
         ASSERT_EQUALS(1, candidateChunksStatus.getValue().size());

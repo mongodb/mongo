@@ -278,7 +278,9 @@ private:
      * Schedules migrations for the specified set of chunks and returns how many chunks were
      * successfully processed.
      */
-    int _moveChunks(OperationContext* opCtx, const MigrateInfoVector& candidateChunks);
+    int _moveChunks(OperationContext* opCtx,
+                    const MigrateInfoVector& chunksToRebalance,
+                    const MigrateInfoVector& chunksToDefragment);
 
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");

@@ -46,7 +46,8 @@ public:
     StatusWith<SplitInfoVector> selectChunksToSplit(OperationContext* opCtx,
                                                     const NamespaceString& ns) override;
 
-    StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx) override;
+    StatusWith<MigrateInfoVector> selectChunksToMove(
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override;
 
     StatusWith<MigrateInfoVector> selectChunksToMove(OperationContext* opCtx,
                                                      const NamespaceString& ns) override;
@@ -76,7 +77,7 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
-        std::set<ShardId>* usedShards);
+        stdx::unordered_set<ShardId>* usedShards);
 
     // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
     // policy object is destroyed.

@@ -50,7 +50,7 @@ public:
         OperationContext* opCtx) = 0;
 
     virtual boost::optional<MigrateInfo> popNextMigration(
-        const stdx::unordered_set<ShardId>& unavailableShards) = 0;
+        OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) = 0;
 
     virtual void applyActionResult(OperationContext* opCtx,
                                    const DefragmentationAction& action,
@@ -73,6 +73,9 @@ public:
         return _defragmentationStates.contains(uuid);
     }
 
+    MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
+                                         stdx::unordered_set<ShardId>* usedShards) override;
+
     SemiFuture<DefragmentationAction> getNextStreamingAction(OperationContext* opCtx) override;
 
     void acknowledgeMergeResult(OperationContext* opCtx,
@@ -90,6 +93,10 @@ public:
     void acknowledgeDataSizeResult(OperationContext* opCtx,
                                    DataSizeInfo action,
                                    const StatusWith<DataSizeResponse>& result) override;
+
+    void acknowledgeMoveResult(OperationContext* opCtx,
+                               MigrateInfo action,
+                               const Status& result) override;
 
     void closeActionStream() override;
 
@@ -110,6 +117,12 @@ private:
      * Returns the phase that should run after the input phase.
      */
     DefragmentationPhaseEnum _getNextPhase(DefragmentationPhaseEnum currentPhase);
+
+    /**
+     * Advances the defragmentation state of the specified collection to the next actionable phase
+     * (or sets the related DefragmentationPhase object to nullptr if nothing more can be done).
+     */
+    void _refreshDefragmentationPhaseFor(OperationContext* opCtx, const UUID& collUuid);
 
     /**
      * Move to the next phase and persist the phase change. This will end defragmentation if the

@@ -476,6 +476,10 @@ void Balancer::_consumeActionStreamLoop() {
                                     opCtx.get(), splitAction, status);
                             });
                 },
+                [](MigrateInfo _) {
+                    uasserted(ErrorCodes::BadValue,
+                              "Migrations cannot be processed as Streaming Actions");
+                },
                 [](EndOfActionStream eoa) {}},
             action);
     }
@@ -587,17 +591,24 @@ void Balancer::_mainThread() {
                     LOGV2_DEBUG(21861, 1, "Done enforcing tag range boundaries.");
                 }
 
-                const auto candidateChunks =
-                    uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx.get()));
+                stdx::unordered_set<ShardId> usedShards;
 
-                if (candidateChunks.empty()) {
+                const auto chunksToDefragment =
+                    _defragmentationPolicy->selectChunksToMove(opCtx.get(), &usedShards);
+
+                const auto chunksToRebalance = uassertStatusOK(
+                    _chunkSelectionPolicy->selectChunksToMove(opCtx.get(), &usedShards));
+
+                if (chunksToRebalance.empty() && chunksToDefragment.empty()) {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
                     _balancedLastTime = 0;
                 } else {
-                    _balancedLastTime = _moveChunks(opCtx.get(), candidateChunks);
+                    _balancedLastTime =
+                        _moveChunks(opCtx.get(), chunksToRebalance, chunksToDefragment);
 
-                    roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
-                                              _balancedLastTime);
+                    roundDetails.setSucceeded(
+                        static_cast<int>(chunksToRebalance.size() + chunksToDefragment.size()),
+                        _balancedLastTime);
 
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
@@ -826,7 +837,9 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
     return Status::OK();
 }
 
-int Balancer::_moveChunks(OperationContext* opCtx, const MigrateInfoVector& candidateChunks) {
+int Balancer::_moveChunks(OperationContext* opCtx,
+                          const MigrateInfoVector& chunksToRebalance,
+                          const MigrateInfoVector& chunksToDefragment) {
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
     auto catalogClient = Grid::get(opCtx)->catalogClient();
 
@@ -836,12 +849,9 @@ int Balancer::_moveChunks(OperationContext* opCtx, const MigrateInfoVector& cand
         return 0;
     }
 
-    std::vector<std::pair<size_t, SemiFuture<void>>> migrateInfoIdxsAndResponses;
-    migrateInfoIdxsAndResponses.reserve(candidateChunks.size());
-    for (size_t migrateInfoIndex = 0; migrateInfoIndex < candidateChunks.size();
-         ++migrateInfoIndex) {
-        const auto& migrateInfo = candidateChunks[migrateInfoIndex];
-
+    std::vector<std::pair<const MigrateInfo&, SemiFuture<void>>> rebalanceMigrationsAndResponses,
+        defragmentationMigrationsAndResponses;
+    auto requestMigration = [&](const MigrateInfo& migrateInfo) -> SemiFuture<void> {
         ChunkType chunk;
         chunk.setMin(migrateInfo.minKey);
         chunk.setMax(migrateInfo.maxKey);
@@ -852,20 +862,25 @@ int Balancer::_moveChunks(OperationContext* opCtx, const MigrateInfoVector& cand
                                    balancerConfig->getSecondaryThrottle(),
                                    balancerConfig->waitForDelete(),
                                    migrateInfo.forceJumbo);
-        auto response = _commandScheduler->requestMoveChunk(
+        return _commandScheduler->requestMoveChunk(
             opCtx, migrateInfo.nss, chunk, migrateInfo.to, settings);
-        migrateInfoIdxsAndResponses.emplace_back(
-            std::make_pair(migrateInfoIndex, std::move(response)));
+    };
+
+    for (const auto& rebalanceOp : chunksToRebalance) {
+        rebalanceMigrationsAndResponses.emplace_back(rebalanceOp, requestMigration(rebalanceOp));
+    }
+    for (const auto& defragmentationOp : chunksToDefragment) {
+        defragmentationMigrationsAndResponses.emplace_back(defragmentationOp,
+                                                           requestMigration(defragmentationOp));
     }
 
     int numChunksProcessed = 0;
-    for (const auto& migrateInfoIdxAndResponse : migrateInfoIdxsAndResponses) {
-        const Status status = migrateInfoIdxAndResponse.second.getNoThrow();
+    for (const auto& [migrateInfo, futureStatus] : rebalanceMigrationsAndResponses) {
+        auto status = futureStatus.getNoThrow();
         if (status.isOK()) {
-            numChunksProcessed++;
+            ++numChunksProcessed;
             continue;
         }
-        const auto& migrateInfo = candidateChunks[migrateInfoIdxAndResponse.first];
 
         // ChunkTooBig is returned by the source shard during the cloning phase if the migration
         // manager finds that the chunk is larger than some calculated size, the source shard is
@@ -874,7 +889,7 @@ int Balancer::_moveChunks(OperationContext* opCtx, const MigrateInfoVector& cand
         // of whether the source shard is in draining mode or the value if the 'froceJumbo' balancer
         // setting.
         if (status == ErrorCodes::ChunkTooBig || status == ErrorCodes::ExceededMemoryLimit) {
-            numChunksProcessed++;
+            ++numChunksProcessed;
 
             LOGV2(21871,
                   "Migration {migrateInfo} failed with {error}, going to try splitting the chunk",
@@ -897,6 +912,15 @@ int Balancer::_moveChunks(OperationContext* opCtx, const MigrateInfoVector& cand
               "error"_attr = redact(status));
     }
 
+    for (const auto& [migrateInfo, futureStatus] : defragmentationMigrationsAndResponses) {
+        auto status = futureStatus.getNoThrow();
+        if (status.isOK()) {
+            ++numChunksProcessed;
+        }
+        _defragmentationPolicy->acknowledgeMoveResult(opCtx, migrateInfo, status);
+    }
+
+
     return numChunksProcessed;
 }
 
@@ -907,7 +931,6 @@ void Balancer::notifyPersistedBalancerSettingsChanged() {
 
 Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
                                                           const NamespaceString& ns) {
-    // TODO (SERVER-61727) update this with phase 2
     try {
         auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
         bool isMerging = coll.getBalancerShouldMergeChunks();

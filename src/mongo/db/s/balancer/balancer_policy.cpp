@@ -282,10 +282,11 @@ Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardSta
     return Status::OK();
 }
 
-ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
-                                                     const DistributionStatus& distribution,
-                                                     const string& tag,
-                                                     const set<ShardId>& excludedShards) {
+ShardId BalancerPolicy::_getLeastLoadedReceiverShard(
+    const ShardStatisticsVector& shardStats,
+    const DistributionStatus& distribution,
+    const string& tag,
+    const stdx::unordered_set<ShardId>& excludedShards) {
     ShardId best;
     unsigned minChunks = numeric_limits<unsigned>::max();
 
@@ -310,10 +311,11 @@ ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector
     return best;
 }
 
-ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& shardStats,
-                                                const DistributionStatus& distribution,
-                                                const string& chunkTag,
-                                                const set<ShardId>& excludedShards) {
+ShardId BalancerPolicy::_getMostOverloadedShard(
+    const ShardStatisticsVector& shardStats,
+    const DistributionStatus& distribution,
+    const string& chunkTag,
+    const stdx::unordered_set<ShardId>& excludedShards) {
     ShardId worst;
     unsigned maxChunks = 0;
 
@@ -401,7 +403,7 @@ MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
 
 vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            std::set<ShardId>* usedShards,
+                                            stdx::unordered_set<ShardId>* usedShards,
                                             bool forceJumbo) {
     vector<MigrateInfo> migrations;
 
@@ -595,7 +597,7 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
     const string tag = distribution.getTagForChunk(chunk);
 
     ShardId newShardId =
-        _getLeastLoadedReceiverShard(shardStats, distribution, tag, set<ShardId>());
+        _getLeastLoadedReceiverShard(shardStats, distribution, tag, stdx::unordered_set<ShardId>());
     if (!newShardId.isValid() || newShardId == chunk.getShard()) {
         return boost::optional<MigrateInfo>();
     }
@@ -612,7 +614,7 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
                                         const string& tag,
                                         size_t idealNumberOfChunksPerShardForTag,
                                         vector<MigrateInfo>* migrations,
-                                        set<ShardId>* usedShards,
+                                        stdx::unordered_set<ShardId>* usedShards,
                                         MoveChunkRequest::ForceJumbo forceJumbo) {
     const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag, *usedShards);
     if (!from.isValid())
