@@ -1961,15 +1961,6 @@ methods = {
 ]),
 
 'WT_CONNECTION.set_timestamp' : Method([
-    Config('commit_timestamp', '', r'''
-        (deprecated) reset the maximum commit timestamp tracked by WiredTiger.
-        This will cause future calls to WT_CONNECTION::query_timestamp to
-        ignore commit timestamps greater than the specified value until the
-        next commit moves the tracked commit timestamp forwards.  This is only
-        intended for use where the application is rolling back locally
-        committed transactions. The supplied value must not be older than the
-        current oldest and stable timestamps.
-        See @ref transaction_timestamps'''),
     Config('durable_timestamp', '', r'''
         reset the maximum durable timestamp tracked by WiredTiger.  This will
         cause future calls to WT_CONNECTION::query_timestamp to ignore durable

@@ -341,21 +341,10 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_STAT_CONN_INCR(session, txn_set_ts);
 
-    /*
-     * TODO: When we remove all_committed, we need to remove this too. For now, we're temporarily
-     * aliasing the global commit timestamp to the global durable timestamp.
-     */
-    WT_RET(__wt_config_gets_def(session, cfg, "commit_timestamp", 0, &durable_cval));
+    WT_RET(__wt_config_gets_def(session, cfg, "durable_timestamp", 0, &durable_cval));
     has_durable = durable_cval.len != 0;
     if (has_durable)
         WT_STAT_CONN_INCR(session, txn_set_ts_durable);
-
-    if (!has_durable) {
-        WT_RET(__wt_config_gets_def(session, cfg, "durable_timestamp", 0, &durable_cval));
-        has_durable = durable_cval.len != 0;
-        if (has_durable)
-            WT_STAT_CONN_INCR(session, txn_set_ts_durable);
-    }
 
     WT_RET(__wt_config_gets_def(session, cfg, "oldest_timestamp", 0, &oldest_cval));
     has_oldest = oldest_cval.len != 0;

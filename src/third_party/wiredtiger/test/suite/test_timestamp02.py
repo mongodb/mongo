@@ -102,10 +102,10 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         # Everything up to and including timestamp 200 has been committed.
         self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(200))
 
-        # Test that we can manually move the commit timestamp back
-        self.conn.set_timestamp('commit_timestamp=' + self.timestamp_str(150))
+        # Test that we can manually move the durable timestamp back
+        self.conn.set_timestamp('durable_timestamp=' + self.timestamp_str(150))
         self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(150))
-        self.conn.set_timestamp('commit_timestamp=' + self.timestamp_str(200))
+        self.conn.set_timestamp('durable_timestamp=' + self.timestamp_str(200))
 
         # Now the stable timestamp before we read.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(200))

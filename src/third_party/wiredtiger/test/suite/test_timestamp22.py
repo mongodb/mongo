@@ -311,17 +311,17 @@ class test_timestamp22(wttest.WiredTigerTestCase):
             raise e
         cursor.close()
 
-    def make_timestamp_config(self, oldest, stable, commit, durable):
+    def make_timestamp_config(self, oldest, stable, durable):
         configs = []
         # Get list of 'oldest_timestamp=value' etc. that have non-negative values.
-        for ts_name in ['oldest', 'stable', 'commit', 'durable']:
+        for ts_name in ['oldest', 'stable', 'durable']:
             val = eval(ts_name)
             if val >= 0:
                 configs.append(ts_name + '_timestamp=' + self.timestamp_str(val))
         return ','.join(configs)
 
     # Determine whether we expect the set_timestamp to succeed.
-    def expected_result_set_timestamp(self, oldest, stable, commit, durable):
+    def expected_result_set_timestamp(self, oldest, stable, durable):
 
         # Update the current expected value.  ts is the timestamp being set.
         # If "ts" is negative, ignore it, it's not being set in this call.
@@ -350,20 +350,14 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         if oldest >= 0 and stable < 0:
             expected = expected_newer(expected, self.stable_ts, oldest, self.oldest_ts)
         expected = expected_newer(expected, stable, oldest, self.oldest_ts)
-        expected = expected_newer(expected, commit, oldest, self.oldest_ts)
-        expected = expected_newer(expected, commit, stable, self.stable_ts)
-
-        # If commit timestamp is set, durable timestamp is ignored.  This seems to be
-        # a temporary situation, see TODO in txn_timestamp.c.
-        if commit < 0:
-            expected = expected_newer(expected, durable, oldest, self.oldest_ts)
-            expected = expected_newer(expected, durable, stable, self.stable_ts)
+        expected = expected_newer(expected, durable, oldest, self.oldest_ts)
+        expected = expected_newer(expected, durable, stable, self.stable_ts)
 
         return expected
 
-    def set_global_timestamps(self, oldest, stable, commit, durable):
-        config = self.make_timestamp_config(oldest, stable, commit, durable)
-        expected = self.expected_result_set_timestamp(oldest, stable, commit, durable)
+    def set_global_timestamps(self, oldest, stable, durable):
+        config = self.make_timestamp_config(oldest, stable, durable)
+        expected = self.expected_result_set_timestamp(oldest, stable, durable)
 
         with self.expect(expected, 'set_timestamp(' + config + ')'):
             self.conn.set_timestamp(config)
@@ -409,7 +403,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         create_params = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, create_params)
 
-        self.set_global_timestamps(1, 1, -1, -1)
+        self.set_global_timestamps(1, 1, -1)
 
         # Create tables with no entries
         ds = SimpleDataSet(
@@ -459,7 +453,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
                 stable = maybe_ts((r & 0x2) != 0, iternum)
                 commit = maybe_ts((r & 0x4) != 0, iternum)
                 durable = maybe_ts((r & 0x8) != 0, iternum)
-                self.set_global_timestamps(oldest, stable, commit, durable)
+                self.set_global_timestamps(oldest, stable, durable)
 
         # Make sure the resulting rows are what we expect.
         cursor = self.session.open_cursor(self.uri)
