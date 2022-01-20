@@ -158,6 +158,8 @@ public:
     void verifyContract(const AuthorizationContract* contract) const override;
 
 protected:
+    friend class AuthorizationSessionImplTestHelper;
+
     // Builds a vector of all roles held by users who are authenticated on this connection. The
     // vector is stored in _authenticatedRoleNames. This function is called when users are
     // logged in or logged out, as well as when the user cache is determined to be out of date.

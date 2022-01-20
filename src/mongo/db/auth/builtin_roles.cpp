@@ -692,6 +692,10 @@ void addRootRolePrivileges(PrivilegeVector* privileges) {
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forAnyResource(), ActionType::validate));
 
+    // Root users may specify `$tenant` override to command parameters.
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant));
+
     // Grant privilege to 'root' to perform 'find' and 'remove' on pre-images collection.
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,

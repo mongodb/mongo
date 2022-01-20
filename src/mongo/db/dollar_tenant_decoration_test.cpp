@@ -32,6 +32,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/multitenancy.h"
@@ -40,6 +41,27 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+/**
+ * Encapsulation thwarting helper for authorizing a user without
+ * having to set up any externalstate mocks or transport layers.
+ */
+class AuthorizationSessionImplTestHelper {
+public:
+    /**
+     * Synthesize a user with the useTenant privilege and add them to the authorization session.
+     */
+    static void grantUseTenant(OperationContext* opCtx) {
+        User user(UserName("useTenant", "admin"));
+        user.setPrivileges(
+            {Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant)});
+        auto* as =
+            dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(opCtx->getClient()));
+        as->_authenticatedUsers.add(std::move(user));
+        as->_buildAuthenticatedRolesVector();
+    }
+};
+
 namespace {
 
 class DollarTenantDecorationTest : public ScopedGlobalServiceContextForTest, public unittest::Test {
@@ -85,9 +107,8 @@ TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSecurityTokenAlre
     ASSERT(getActiveTenant(opCtx));
     ASSERT_EQ(*getActiveTenant(opCtx), kTenantId);
 
-    // TODO SERVER-62406 use the new ActionType for use with $tenant.
-    // Grant internal auth so that we're authenticated as the internal __system user.
-    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
+    // Grant authorization to set $tenant.
+    AuthorizationSessionImplTestHelper::grantUseTenant(opCtx);
 
     // The dollarTenantDecoration should not be set because the security token is already set.
     const auto kTenantParameter = OID::gen();
@@ -100,11 +121,11 @@ TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSecurityTokenAlre
     ASSERT_EQ(*getActiveTenant(opCtx), kTenantId);
 }
 
-TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestNotInternalSecurityUser) {
+TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestUnauthorized) {
     gMultitenancySupport = true;
     const auto kOid = OID::gen();
 
-    // We are not authenticated as the internal security user.
+    // We are not authenticated at all.
     auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kOid));
     ASSERT_THROWS_CODE(parseDollarTenantFromRequest(opCtx, opMsgRequest),
                        AssertionException,
@@ -116,9 +137,8 @@ TEST_F(DollarTenantDecorationTest, ParseDollarTenantMultitenancySupportDisabled)
     gMultitenancySupport = false;
     const auto kOid = OID::gen();
 
-    // TODO SERVER-62406 use the new ActionType for use with $tenant.
-    // Grant internal auth so that we're authenticated as the internal __system user.
-    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
+    // Grant authorization to set $tenant.
+    AuthorizationSessionImplTestHelper::grantUseTenant(opCtx);
 
     // TenantId is passed as the '$tenant' parameter. "multitenancySupport" is disabled, so we
     // should throw when attempting to set this tenantId on the opCtx.
@@ -133,12 +153,11 @@ TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSuccess) {
     gMultitenancySupport = true;
     const auto kOid = OID::gen();
 
-    // TODO SERVER-62406 use the new ActionType for use with $tenant.
-    // Grant internal auth so that we're authenticated as the internal __system user.
-    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
+    // Grant authorization to set $tenant.
+    AuthorizationSessionImplTestHelper::grantUseTenant(opCtx);
 
     // The tenantId should be successfully set because "multitenancySupport" is enabled and we're
-    // authenticated as the internal __system user.
+    // authorized.
     auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kOid));
     parseDollarTenantFromRequest(opCtx, opMsgRequest);
 

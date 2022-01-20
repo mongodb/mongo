@@ -44,10 +44,9 @@ function runTest(conn, enabled, rst = undefined) {
     const admin = conn.getDB('admin');
     const tenantAdmin = conn.getDB(tenantID.str + '_admin');
 
-    // Must be authenticated as the internal __system user in order to use $tenant
-    assert.commandWorked(
-        admin.runCommand({createUser: 'system', pwd: 'system', roles: ['__system']}));
-    assert(admin.auth('system', 'system'));
+    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant
+    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
+    assert(admin.auth('admin', 'pwd'));
 
     // Create a tenant-local user.
     const createUserCmd =

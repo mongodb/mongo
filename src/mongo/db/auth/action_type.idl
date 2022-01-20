@@ -173,6 +173,7 @@ enums:
            touch :  "touch"
            trafficRecord :  "trafficRecord"
            unlock :  "unlock"
+           useTenant : "useTenant"
            useUUID :  "useUUID"
            update :  "update"
            updateRole :  "updateRole"  # ID only

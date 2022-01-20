@@ -54,12 +54,11 @@ void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request)
             "Multitenancy not enabled, cannot set $tenant in command body",
             gMultitenancySupport);
 
-    // TODO SERVER-62406 check for the new ActionType for use with $tenant.
     uassert(ErrorCodes::Unauthorized,
-            "'$tenant' may only be specified with the internal action type",
+            "'$tenant' may only be specified with the useTenant action type",
             AuthorizationSession::get(opCtx->getClient())
                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                   ActionType::internal));
+                                                   ActionType::useTenant));
 
     auto tenantId = TenantId::parseFromBSON(tenantElem);
 
