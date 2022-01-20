@@ -104,12 +104,26 @@ IndexConsistency::IndexConsistency(OperationContext* opCtx,
 }
 
 void IndexConsistency::addMultikeyMetadataPath(const KeyString::Value& ks, IndexInfo* indexInfo) {
-    indexInfo->hashedMultikeyMetadataPaths.emplace(_hashKeyString(ks, indexInfo->indexNameHash));
+    auto hash = _hashKeyString(ks, indexInfo->indexNameHash);
+    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+        LOGV2(6208500,
+              "[validate](multikeyMetadataPath) Adding with the hash",
+              "hash"_attr = hash,
+              "keyString"_attr = ks.toString());
+    }
+    indexInfo->hashedMultikeyMetadataPaths.emplace(hash);
 }
 
 void IndexConsistency::removeMultikeyMetadataPath(const KeyString::Value& ks,
                                                   IndexInfo* indexInfo) {
-    indexInfo->hashedMultikeyMetadataPaths.erase(_hashKeyString(ks, indexInfo->indexNameHash));
+    auto hash = _hashKeyString(ks, indexInfo->indexNameHash);
+    if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
+        LOGV2(6208501,
+              "[validate](multikeyMetadataPath) Removing with the hash",
+              "hash"_attr = hash,
+              "keyString"_attr = ks.toString());
+    }
+    indexInfo->hashedMultikeyMetadataPaths.erase(hash);
 }
 
 size_t IndexConsistency::getMultikeyMetadataPathCount(IndexInfo* indexInfo) {
@@ -534,6 +548,6 @@ BSONObj IndexConsistency::_generateInfo(const std::string& indexName,
 
 uint32_t IndexConsistency::_hashKeyString(const KeyString::Value& ks,
                                           uint32_t indexNameHash) const {
-    return ks.hash(indexNameHash) % kNumHashBuckets;
+    return ks.hash(indexNameHash);
 }
 }  // namespace mongo
