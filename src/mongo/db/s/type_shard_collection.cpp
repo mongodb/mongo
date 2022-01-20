@@ -35,13 +35,13 @@ namespace mongo {
 
 ShardCollectionType::ShardCollectionType(NamespaceString nss,
                                          OID epoch,
-                                         Timestamp creationTime,
+                                         Timestamp timestamp,
                                          UUID uuid,
                                          KeyPattern keyPattern,
                                          bool unique)
     : ShardCollectionTypeBase(std::move(nss),
                               std::move(epoch),
-                              std::move(creationTime),
+                              std::move(timestamp),
                               std::move(uuid),
                               std::move(keyPattern),
                               unique) {}

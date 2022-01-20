@@ -93,16 +93,6 @@ public:
     }
 
     /**
-     * NOTE: This format should not be used. Use fromBSONThrowing instead.
-     *
-     * A throwing version of 'parseLegacyWithField' to resolve a compatibility issue with the
-     * ShardCollectionType IDL type.
-     */
-    static ChunkVersion legacyFromBSONThrowing(const BSONElement& element) {
-        return uassertStatusOK(parseLegacyWithField(element.wrap(), element.fieldNameStringData()));
-    }
-
-    /**
      * NOTE: This format is being phased out. Use parseWithField instead.
      *
      * Parses the BSON formatted by appendLegacyWithField. If the field is missing, returns
@@ -265,13 +255,13 @@ public:
         appendWithField(builder, fieldName);
     }
 
-    /**
-     * NOTE: This format serializes chunk version as a timestamp (without the epoch) for
-     * legacy reasons.
-     */
-    void legacyToBSON(StringData field, BSONObjBuilder* builder) const;
-
     std::string toString() const;
+
+    // Methods that are here for the purposes of parsing of ShardCollectionType only
+    static ChunkVersion parseMajorMinorVersionOnlyFromShardCollectionType(
+        const BSONElement& element);
+    void serialiseMajorMinorVersionOnlyForShardCollectionType(StringData field,
+                                                              BSONObjBuilder* builder) const;
 
 private:
     uint64_t _combined;

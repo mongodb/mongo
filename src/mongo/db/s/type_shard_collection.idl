@@ -81,6 +81,15 @@ imports:
     - "mongo/s/resharding/type_collection_fields.idl"
     - "mongo/s/type_collection_common_types.idl"
 
+types:
+    ChunkVersionLegacy:
+        bson_serialization_type: any
+        description: "An object representing a chunk version for a collection. Ignores the epoch
+                      component in the chunk version for legacy reasons."
+        cpp_type: ChunkVersion
+        serializer: ChunkVersion::serialiseMajorMinorVersionOnlyForShardCollectionType
+        deserializer: ChunkVersion::parseMajorMinorVersionOnlyFromShardCollectionType
+
 structs:
     ShardCollectionTypeBase:
         description: "Represents the layout and contents of documents contained in the shard 
@@ -156,7 +165,8 @@ structs:
                 optional: true
             allowAutoSplit: 
                 type: bool
-                description: "Specifies whether the auto-splitter should be running or not for this collection."
+                description: "Specifies whether the auto-splitter should be running or not for this
+                              collection."
                 default: true
             allowMigrations:
                 cpp_name: pre50CompatibleAllowMigrations

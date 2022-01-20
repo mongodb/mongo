@@ -184,13 +184,26 @@ BSONObj ChunkVersion::toBSON() const {
     return b.arr();
 }
 
-void ChunkVersion::legacyToBSON(StringData field, BSONObjBuilder* out) const {
-    out->appendTimestamp(field, this->toLong());
-}
-
 std::string ChunkVersion::toString() const {
     return str::stream() << majorVersion() << "|" << minorVersion() << "||" << _epoch << "||"
                          << _timestamp.toString();
+}
+
+ChunkVersion ChunkVersion::parseMajorMinorVersionOnlyFromShardCollectionType(
+    const BSONElement& element) {
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Invalid type " << element.type()
+                          << " for version major and minor part.",
+            element.type() == bsonTimestamp || element.type() == Date);
+
+    ChunkVersion version;
+    version._combined = element._numberLong();
+    return version;
+}
+
+void ChunkVersion::serialiseMajorMinorVersionOnlyForShardCollectionType(StringData field,
+                                                                        BSONObjBuilder* out) const {
+    out->appendTimestamp(field, toLong());
 }
 
 }  // namespace mongo

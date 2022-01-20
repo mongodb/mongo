@@ -42,11 +42,3 @@ types:
         cpp_type: ChunkVersion
         serializer: ChunkVersion::toBSON
         deserializer: ChunkVersion::fromBSONThrowing
-
-    ChunkVersionLegacy:
-        bson_serialization_type: any
-        description: An object representing a chunk version for a collection. Ignores the epoch 
-                     component in the chunk version for legacy reasons.
-        cpp_type: ChunkVersion
-        serializer: ChunkVersion::legacyToBSON
-        deserializer: ChunkVersion::legacyFromBSONThrowing
