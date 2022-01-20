@@ -23,13 +23,13 @@ configureFailPoint = function(conn, failPointName, data = {}, failPointMode = "a
                               {configureFailPoint: failPointName, mode: failPointMode, data: data}))
                           .count,
         wait:
-            function(maxTimeMS = kDefaultWaitForFailPointTimeout) {
+            function(maxTimeMS = kDefaultWaitForFailPointTimeout, timesEntered = 1) {
                 // Can only be called once because this function does not keep track of the
                 // number of times the fail point is entered between the time it returns
                 // and the next time it gets called.
                 assert.commandWorked(conn.adminCommand({
                     waitForFailPoint: failPointName,
-                    timesEntered: this.timesEntered + 1,
+                    timesEntered: this.timesEntered + timesEntered,
                     maxTimeMS: maxTimeMS
                 }));
             },
