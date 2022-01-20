@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 class TenantDatabaseName {
@@ -45,7 +46,7 @@ public:
      *
      * If featureFlagRequireTenantID is set, tenantId is required.
      */
-    TenantDatabaseName(boost::optional<mongo::OID> tenantId, StringData dbName) {
+    TenantDatabaseName(boost::optional<TenantId> tenantId, StringData dbName) {
         // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
         if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV())
             invariant(tenantId);
@@ -57,7 +58,7 @@ public:
             _tenantId ? boost::make_optional(_tenantId->toString() + "_" + _dbName) : boost::none;
     }
 
-    const boost::optional<mongo::OID> tenantId() const {
+    const boost::optional<TenantId> tenantId() const {
         return _tenantId;
     }
 
@@ -95,7 +96,7 @@ public:
     }
 
 private:
-    boost::optional<mongo::OID> _tenantId;
+    boost::optional<TenantId> _tenantId;
     std::string _dbName;
     boost::optional<std::string> _tenantDbName;
 };

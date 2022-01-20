@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -92,7 +93,7 @@ namespace {
 
 // Temporary placeholder pending availability of NamespaceWithTenant.
 NamespaceString getNamespaceWithTenant(const NamespaceString& nss,
-                                       const boost::optional<OID>& tenant) {
+                                       const boost::optional<TenantId>& tenant) {
     if (tenant) {
         return NamespaceString(str::stream() << tenant.get() << '_' << nss.db(), nss.coll());
     } else {
@@ -100,11 +101,11 @@ NamespaceString getNamespaceWithTenant(const NamespaceString& nss,
     }
 }
 
-NamespaceString getUsersCollection(const boost::optional<OID>& tenant) {
+NamespaceString getUsersCollection(const boost::optional<TenantId>& tenant) {
     return getNamespaceWithTenant(AuthorizationManager::usersCollectionNamespace, tenant);
 }
 
-NamespaceString getRolesCollection(const boost::optional<OID>& tenant) {
+NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
     return getNamespaceWithTenant(AuthorizationManager::rolesCollectionNamespace, tenant);
 }
 
@@ -273,7 +274,7 @@ bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* 
 }
 
 AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
-                                                       const boost::optional<OID>& tenant) {
+                                                       const boost::optional<TenantId>& tenant) {
     if (!storageGlobalParams.disableLockFreeReads) {
         _readLockFree = std::make_unique<AutoReadLockFree>(opCtx);
     } else {
@@ -291,7 +292,7 @@ AuthzManagerExternalStateLocal::RolesLocks::~RolesLocks() {
 }
 
 AuthzManagerExternalStateLocal::RolesLocks AuthzManagerExternalStateLocal::_lockRoles(
-    OperationContext* opCtx, const boost::optional<OID>& tenant) {
+    OperationContext* opCtx, const boost::optional<TenantId>& tenant) {
     return AuthzManagerExternalStateLocal::RolesLocks(opCtx, tenant);
 }
 
@@ -318,7 +319,7 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(OperationContext*
         }
 
         V2UserDocumentParser userDocParser;
-        userDocParser.setTenantID(userReq.name.getTenant());
+        userDocParser.setTenantId(userReq.name.getTenant());
         uassertStatusOK(userDocParser.initializeUserFromUserDocument(userDoc, &user));
         for (auto iter = user.getRoles(); iter.more();) {
             directRoles.push_back(iter.next());
@@ -775,18 +776,18 @@ public:
         return _type;
     }
 
-    const boost::optional<OID>& getTenant() const {
+    const boost::optional<TenantId>& getTenant() const {
         return _tenant;
     }
 
 private:
     /**
-     * Attempt to parse "{tenant}_admin" into an OID.
+     * Attempt to parse "{tenant}_admin" into a Tenant ID.
      * Returns boost::none if the db is not in the above format.
      *
      * Temporary fixture pending availability of NamespaceWithTenant.
      */
-    static boost::optional<OID> isAdminDBWithTenant(StringData db) {
+    static boost::optional<TenantId> isAdminDBWithTenant(StringData db) {
         constexpr std::size_t len =
             (OID::kOIDSize * 2) + 1 /* '_' */ + NamespaceString::kAdminDb.size();
         if (db.size() != len) {
@@ -804,17 +805,17 @@ private:
             return boost::none;
         }
 
-        auto swTenant = OID::parse(db.substr(0, OID::kOIDSize * 2));
-        if (!swTenant.isOK()) {
+        auto swOID = OID::parse(db.substr(0, OID::kOIDSize * 2));
+        if (!swOID.isOK()) {
             // Not a valid OID
             return boost::none;
         }
 
-        return swTenant.getValue();
+        return TenantId(swOID.getValue());
     }
 
     AuthzCollectionType _type = AuthzCollectionType::kNone;
-    boost::optional<OID> _tenant;
+    boost::optional<TenantId> _tenant;
 };
 
 constexpr auto kOpInsert = "i"_sd;

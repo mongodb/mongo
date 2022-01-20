@@ -39,7 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo {
@@ -55,7 +55,7 @@ public:
     AuthName() = default;
 
     template <typename Name, typename DB>
-    AuthName(Name name, DB db, boost::optional<OID> tenant = boost::none) {
+    AuthName(Name name, DB db, boost::optional<TenantId> tenant = boost::none) {
         if constexpr (std::is_same_v<Name, std::string>) {
             _name = std::move(name);
         } else {
@@ -74,16 +74,18 @@ public:
     /**
      * Parses a string of the form "db.name" into an AuthName object with an optional tenant.
      */
-    static StatusWith<T> parse(StringData str, const boost::optional<OID>& tenant = boost::none);
+    static StatusWith<T> parse(StringData str,
+                               const boost::optional<TenantId>& tenant = boost::none);
 
     /**
      * These methods support parsing usernames from IDL
      */
     static T parseFromVariant(const stdx::variant<std::string, mongo::BSONObj>& name,
-                              const boost::optional<OID>& tenant = boost::none);
-    static T parseFromBSONObj(const BSONObj& obj, const boost::optional<OID>& tenant = boost::none);
+                              const boost::optional<TenantId>& tenant = boost::none);
+    static T parseFromBSONObj(const BSONObj& obj,
+                              const boost::optional<TenantId>& tenant = boost::none);
     static T parseFromBSON(const BSONElement& elem,
-                           const boost::optional<OID>& tenant = boost::none);
+                           const boost::optional<TenantId>& tenant = boost::none);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
     void appendToBSON(BSONObjBuilder* bob, bool encodeTenant = false) const;
@@ -104,9 +106,9 @@ public:
     }
 
     /**
-     * Gets the TenantID, if any, associated with this AuthName.
+     * Gets the TenantId, if any, associated with this AuthName.
      */
-    const boost::optional<OID>& getTenant() const {
+    const boost::optional<TenantId>& getTenant() const {
         return _tenant;
     }
 
@@ -169,7 +171,7 @@ public:
     friend H AbslHashValue(H h, const AuthName& name) {
         auto state = std::move(h);
         if (name._tenant) {
-            state = H::combine(std::move(state), OID::Hasher()(name._tenant.get()), '_');
+            state = H::combine(std::move(state), TenantId::Hasher()(name._tenant.get()), '_');
         }
         return H::combine(std::move(state), name._db, '.', name._name);
     }
@@ -177,7 +179,7 @@ public:
 private:
     std::string _name;
     std::string _db;
-    boost::optional<OID> _tenant;
+    boost::optional<TenantId> _tenant;
 };
 
 template <typename Stream, typename T>

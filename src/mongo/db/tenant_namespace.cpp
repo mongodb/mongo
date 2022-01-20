@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-TenantNamespace::TenantNamespace(boost::optional<mongo::OID> tenantId, NamespaceString nss) {
+TenantNamespace::TenantNamespace(boost::optional<mongo::TenantId> tenantId, NamespaceString nss) {
     // TODO SERVER-62114 Check instead if gMultitenancySupport is enabled.
     if (gFeatureFlagRequireTenantID.isEnabledAndIgnoreFCV())
         invariant(tenantId);
@@ -54,7 +54,7 @@ TenantNamespace TenantNamespace::parseTenantNamespaceFromDisk(StringData ns) {
     if (tenantDelim == std::string::npos)
         return TenantNamespace(boost::none, NamespaceString(ns));
 
-    auto tenantId = OID(ns.substr(0, tenantDelim));
+    const TenantId tenantId(OID(ns.substr(0, tenantDelim)));
     auto nss = NamespaceString(ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
     return TenantNamespace(tenantId, nss);
 }

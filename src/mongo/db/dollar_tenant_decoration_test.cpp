@@ -79,25 +79,25 @@ TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSecurityTokenAlre
     gMultitenancySupport = true;
 
     // Ensure the security token is set on the opCtx.
-    const auto kOid = OID::gen();
-    auto token = makeSecurityToken(UserName("user", "admin", kOid));
+    const auto kTenantId = TenantId(OID::gen());
+    auto token = makeSecurityToken(UserName("user", "admin", kTenantId));
     auth::readSecurityTokenMetadata(opCtx, token);
     ASSERT(getActiveTenant(opCtx));
-    ASSERT_EQ(*getActiveTenant(opCtx), kOid);
+    ASSERT_EQ(*getActiveTenant(opCtx), kTenantId);
 
     // TODO SERVER-62406 use the new ActionType for use with $tenant.
     // Grant internal auth so that we're authenticated as the internal __system user.
     AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
 
     // The dollarTenantDecoration should not be set because the security token is already set.
-    const auto kOidParameter = OID::gen();
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kOidParameter));
+    const auto kTenantParameter = OID::gen();
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody("test", BSON("$tenant" << kTenantParameter));
     ASSERT_THROWS_CODE(
         parseDollarTenantFromRequest(opCtx, opMsgRequest), AssertionException, 6223901);
 
     // getActiveTenant should still return the tenantId in the security token.
     ASSERT(getActiveTenant(opCtx));
-    ASSERT_EQ(*getActiveTenant(opCtx), kOid);
+    ASSERT_EQ(*getActiveTenant(opCtx), kTenantId);
 }
 
 TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestNotInternalSecurityUser) {
@@ -144,7 +144,7 @@ TEST_F(DollarTenantDecorationTest, ParseDollarTenantFromRequestSuccess) {
 
     auto tenantId = getActiveTenant(opCtx);
     ASSERT(tenantId);
-    ASSERT_EQ(*tenantId, kOid);
+    ASSERT_EQ(tenantId->toString(), kOid.toString());
 }
 
 }  // namespace

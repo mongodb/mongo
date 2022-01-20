@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
@@ -123,8 +124,8 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     builder.append(constants::kComponentFieldName,
                    extract<LogComponent>(attributes::component(), rec).get().getNameForLog());
     builder.append(constants::kIdFieldName, extract<int32_t>(attributes::id(), rec).get());
-    if (auto ptr = extract<OID>(attributes::tenant(), rec).get_ptr()) {
-        builder.append(constants::kTenantFieldName, *ptr);
+    if (auto ptr = extract<TenantId>(attributes::tenant(), rec).get_ptr()) {
+        builder.append(constants::kTenantFieldName, ptr->toString());
     }
     builder.append(constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get());

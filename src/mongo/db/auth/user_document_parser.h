@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 
@@ -45,7 +45,7 @@ public:
     /**
      * Apply a tenant identifier to every tenant aware object during parsing.
      */
-    void setTenantID(boost::optional<OID> tenant) {
+    void setTenantId(boost::optional<TenantId> tenant) {
         _tenant = std::move(tenant);
     }
 
@@ -64,7 +64,7 @@ public:
                                                                 User* user) const;
 
 private:
-    boost::optional<OID> _tenant;
+    boost::optional<TenantId> _tenant;
 };
 
 }  // namespace mongo

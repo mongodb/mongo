@@ -41,6 +41,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/security_token.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/bson_formatter.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/composite_backend.h"
@@ -79,6 +80,7 @@ using constants::kIdFieldName;
 using constants::kMessageFieldName;
 using constants::kSeverityFieldName;
 using constants::kTagsFieldName;
+using constants::kTenantFieldName;
 using constants::kTimestampFieldName;
 
 struct TypeWithoutBSON {
@@ -361,7 +363,8 @@ class LogV2TypesTest : public LogV2Test {
 public:
     using LogV2Test::LogV2Test;
     LogV2TypesTest() : LogV2Test() {
-        detail::setGetTenantIDCallback([this]() -> boost::optional<OID> { return this->tenant; });
+        detail::setGetTenantIDCallback(
+            [this]() -> boost::optional<TenantId> { return this->tenant; });
     }
     ~LogV2TypesTest() {
         detail::setGetTenantIDCallback(nullptr);
@@ -374,16 +377,17 @@ public:
         std::istringstream json_stream(json.back());
         pt::ptree ptree;
         pt::json_parser::read_json(json_stream, ptree);
-        ASSERT_EQUALS(OID(ptree.get<std::string>("tenant")), OID(tenant));
+        ASSERT_EQUALS(ptree.get<std::string>(std::string(kTenantFieldName)), tenant.toString());
         ASSERT_EQUALS(ptree.get<T>(std::string(kAttributesFieldName) + ".name"), expected);
     }
 
     auto lastBSONElement() {
-        ASSERT_EQUALS(BSONObj(bson.back().data()).getField("tenant").OID(), tenant);
+        ASSERT_EQUALS(BSONObj(bson.back().data()).getField(kTenantFieldName).str(),
+                      tenant.toString());
         return BSONObj(bson.back().data()).getField(kAttributesFieldName).Obj().getField("name"_sd);
     }
 
-    OID tenant = OID::gen();
+    TenantId tenant = TenantId(OID::gen());
     LineCapture text = makeLineCapture(PlainFormatter());
     LineCapture json = makeLineCapture(JSONFormatter());
     LineCapture bson = makeLineCapture(BSONFormatter());

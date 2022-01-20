@@ -30,23 +30,18 @@
 
 #include "mongo/db/multitenancy.h"
 
-#include "mongo/bson/oid.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 
-const OID kSystemTenantID(
-    "15650000"   /* timestamp: 1981-05-17 */
-    "0102030405" /* process id */
-    "060708" /* counter */);
-
 // Holds the tenantId for the operation if it was provided in the request on the $tenant field only
 // if the tenantId was not also provided in the security token.
 const auto dollarTenantDecoration =
-    OperationContext::declareDecoration<boost::optional<mongo::OID>>();
+    OperationContext::declareDecoration<boost::optional<mongo::TenantId>>();
 
 void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request) {
     // The internal security user is allowed to run commands on behalf of a tenant by passing
@@ -66,7 +61,7 @@ void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request)
                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                    ActionType::internal));
 
-    auto tenantId = tenantElem.OID();
+    auto tenantId = TenantId::parseFromBSON(tenantElem);
 
     uassert(6223901,
             str::stream() << "Cannot pass $tenant id if also passing securityToken, securityToken: "
@@ -80,7 +75,7 @@ void parseDollarTenantFromRequest(OperationContext* opCtx, const OpMsg& request)
         6223900, 4, "Setting tenantId from $tenant request parameter", "tenantId"_attr = tenantId);
 }
 
-boost::optional<OID> getActiveTenant(OperationContext* opCtx) {
+boost::optional<TenantId> getActiveTenant(OperationContext* opCtx) {
     auto token = auth::getSecurityToken(opCtx);
     if (!token) {
         return dollarTenantDecoration(opCtx);

@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -65,7 +66,7 @@ template <typename T, typename Name, typename Db>
 void checkValueAssertions(const T& obj,
                           Name name,
                           Db db,
-                          const boost::optional<OID>& tenant = boost::none) {
+                          const boost::optional<TenantId>& tenant = boost::none) {
     const bool expectEmpty = StringData(name).empty() && StringData(db).empty() && !tenant;
     ASSERT_EQ(obj.empty(), expectEmpty);
 
@@ -112,14 +113,15 @@ TEST(AuthName, ConstructorTest) {
 
 template <typename T, typename Name, typename Db>
 void doBSONParseTest(Name name, Db db) {
-    // Without TenantID.
+    // Without TenantId.
     auto obj = BSON(T::kFieldName << name << "db" << db);
     checkValueAssertions(T::parseFromBSON(BSON("" << obj).firstElement()), name, db);
     checkValueAssertions(T::parseFromBSONObj(obj), name, db);
 
-    // With TenantID.
-    const auto tenant = OID::gen();
-    auto tobj = BSON(T::kFieldName << name << "db" << db << "tenant" << tenant);
+    // With TenantId.
+    auto oid = OID::gen();
+    auto tenant = TenantId(oid);
+    auto tobj = BSON(T::kFieldName << name << "db" << db << "tenant" << oid);
     checkValueAssertions(T::parseFromBSON(BSON("" << tobj).firstElement()), name, db, tenant);
     checkValueAssertions(T::parseFromBSONObj(tobj), name, db, tenant);
 }

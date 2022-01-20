@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,45 +27,44 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <boost/log/core/record_view.hpp>
-#include <boost/log/utility/formatting_ostream_fwd.hpp>
-
 #include "mongo/db/tenant_id.h"
-#include "mongo/logv2/attribute_storage.h"
-#include "mongo/logv2/constants.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_format.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_tag.h"
-#include "mongo/logv2/log_truncation.h"
-#include "mongo/util/time_support.h"
 
-namespace mongo::logv2 {
+#include "mongo/bson/oid.h"
 
-class JSONFormatter {
-public:
-    JSONFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB = nullptr,
-                  LogTimestampFormat timestampFormat = LogTimestampFormat::kISO8601UTC)
-        : _maxAttributeSizeKB(maxAttributeSizeKB), _timestampFormat(timestampFormat) {}
+namespace mongo {
 
-    void format(fmt::memory_buffer& buffer,
-                LogSeverity severity,
-                LogComponent component,
-                Date_t date,
-                int32_t id,
-                StringData context,
-                StringData message,
-                const TypeErasedAttributeStorage& attrs,
-                LogTag tags,
-                const TenantId* tenant,
-                LogTruncation truncation) const;
-    void operator()(boost::log::record_view const& rec, boost::log::formatting_ostream& strm) const;
+const TenantId TenantId::kSystemTenantId(
+    OID("15650000"   /* timestamp: 1981-05-17 */
+        "0102030405" /* process id */
+        "060708" /* counter */));
 
-private:
-    const AtomicWord<int32_t>* _maxAttributeSizeKB;
-    const LogTimestampFormat _timestampFormat;
-};
+TenantId TenantId::parseFromBSON(const BSONElement& elem) {
+    if (elem.isNull()) {
+        uasserted(ErrorCodes::BadValue, "Could not deserialize TenantId from empty element");
+    }
 
-}  // namespace mongo::logv2
+    // Expect objectid in the element for tenant.
+    if (elem.type() != BSONType::jstOID) {
+        uasserted(ErrorCodes::BadValue,
+                  fmt::format("Could not deserialize TenantId with type {}", elem.type()));
+    }
+    return TenantId(elem.OID());
+}
+
+void TenantId::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    // Append objectid to the builder.
+    builder->append(fieldName, _oid);
+}
+
+void TenantId::serializeToBSON(BSONArrayBuilder* builder) const {
+    builder->append(_oid);
+}
+
+template <>
+BSONObjBuilder& BSONObjBuilderValueStream::operator<<<TenantId>(TenantId value) {
+    value.serializeToBSON(_fieldName, _builder);
+    _fieldName = StringData();
+    return *_builder;
+}
+
+}  // namespace mongo

@@ -33,6 +33,7 @@ imports:
     - "mongo/db/auth/auth_types.idl"
     - "mongo/db/auth/address_restriction.idl"
     - "mongo/db/auth/user_management_commands_parser.idl"
+    - "mongo/db/multitenancy.idl"
 
 structs:
     dropAllUsersFromDatabaseReply:
@@ -130,7 +131,7 @@ commands:
             "$tenant":
                 # Only available with enableTestCommands and multitenancySupport
                 description: "Associate this user with a specific tenant"
-                type: objectid
+                type: tenant_id
                 cpp_name: tenantOverride
                 optional: true
 

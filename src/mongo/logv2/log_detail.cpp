@@ -33,6 +33,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_domain.h"
@@ -178,7 +179,7 @@ void doLogImpl(int32_t id,
                 record.attribute_values().insert(
                     attributes::tenant(),
                     boost::log::attribute_value(
-                        new boost::log::attributes::attribute_value_impl<OID>(tenant.get())));
+                        new boost::log::attributes::attribute_value_impl<TenantId>(tenant.get())));
             }
         }
 

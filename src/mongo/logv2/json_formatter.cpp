@@ -217,7 +217,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
                            StringData message,
                            const TypeErasedAttributeStorage& attrs,
                            LogTag tags,
-                           const OID* tenant,
+                           const TenantId* tenant,
                            LogTruncation truncation) const {
     namespace c = constants;
     static constexpr auto kFmt = JsonStringFormat::ExtendedRelaxedV2_0_0;
@@ -350,7 +350,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
            extract<StringData>(attributes::message(), rec).get(),
            extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get(),
            extract<LogTag>(attributes::tags(), rec).get(),
-           extract<OID>(attributes::tenant(), rec).get_ptr(),
+           extract<TenantId>(attributes::tenant(), rec).get_ptr(),
            extract<LogTruncation>(attributes::truncation(), rec).get());
 
     // Write final JSON object to output stream

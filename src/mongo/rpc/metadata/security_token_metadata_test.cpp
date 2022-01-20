@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -65,7 +66,7 @@ class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {};
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
     const auto kPingBody = BSON(kPingFieldName << 1);
-    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", OID::gen()));
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
 
     gMultitenancySupport = false;
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
@@ -76,9 +77,9 @@ TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
 }
 
 TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
-    const auto kOid = OID::gen();
+    const auto kTenantId = TenantId(OID::gen());
     const auto kPingBody = BSON(kPingFieldName << 1);
-    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", kOid));
+    const auto kTokenBody = makeSecurityToken(UserName("user", "admin", kTenantId));
 
     gMultitenancySupport = true;
     auto msg = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody}.parse();
@@ -97,7 +98,7 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     ASSERT_EQ(authedUser.getUser(), "user");
     ASSERT_EQ(authedUser.getDB(), "admin");
     ASSERT_TRUE(authedUser.getTenant() != boost::none);
-    ASSERT_EQ(authedUser.getTenant().get(), kOid);
+    ASSERT_EQ(authedUser.getTenant().get(), kTenantId);
 }
 
 }  // namespace

@@ -39,6 +39,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -137,7 +138,7 @@ protected:
     class RolesLocks {
     public:
         RolesLocks() = default;
-        RolesLocks(OperationContext*, const boost::optional<OID>&);
+        RolesLocks(OperationContext*, const boost::optional<TenantId>&);
         ~RolesLocks();
 
     private:
@@ -152,7 +153,7 @@ protected:
      *
      * virtual to allow Mock to not lock anything.
      */
-    virtual RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<OID>&);
+    virtual RolesLocks _lockRoles(OperationContext* opCtx, const boost::optional<TenantId>&);
 
 private:
     /**

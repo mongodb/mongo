@@ -72,6 +72,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/factory.h"
@@ -209,7 +210,7 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
 
 // Temporary placeholder pending availability of NamespaceWithTenant.
 NamespaceString getNamespaceWithTenant(const NamespaceString& nss,
-                                       const boost::optional<OID>& tenant) {
+                                       const boost::optional<TenantId>& tenant) {
     if (tenant) {
         return NamespaceString(str::stream() << tenant.get() << '_' << nss.db(), nss.coll());
     } else {
@@ -455,7 +456,7 @@ Status removeRoleDocuments(OperationContext* opCtx,
  */
 Status insertPrivilegeDocument(OperationContext* opCtx,
                                const BSONObj& userObj,
-                               const boost::optional<OID>& tenant = boost::none) {
+                               const boost::optional<TenantId>& tenant = boost::none) {
     auto nss = getNamespaceWithTenant(AuthorizationManager::usersCollectionNamespace, tenant);
     Status status = insertAuthzDocument(opCtx, nss, userObj);
     if (status.isOK()) {

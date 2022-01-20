@@ -36,9 +36,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
 
 namespace mongo {
@@ -55,7 +54,7 @@ public:
      *
      * If featureFlagRequireTenantID is set, tenantId is required.
      */
-    TenantNamespace(boost::optional<mongo::OID> tenantId, NamespaceString nss);
+    TenantNamespace(boost::optional<mongo::TenantId> tenantId, NamespaceString nss);
 
     /**
      * Constructs a TenantNamespace from the string "ns". When the server parameter
@@ -77,7 +76,7 @@ public:
      */
     static TenantNamespace parseTenantNamespaceFromDisk(StringData ns);
 
-    boost::optional<mongo::OID> tenantId() const {
+    boost::optional<TenantId> tenantId() const {
         return _tenantId;
     }
 
@@ -131,7 +130,7 @@ public:
     }
 
 private:
-    boost::optional<mongo::OID> _tenantId;
+    boost::optional<TenantId> _tenantId;
     NamespaceString _nss;
     boost::optional<std::string> _tenantNsStr;  // Only set if _tenantId exists
 };

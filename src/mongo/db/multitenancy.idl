@@ -28,6 +28,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/tenant_id.h"
 
 server_parameters:
   multitenancySupport:
@@ -36,4 +38,12 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gMultitenancySupport
     default: false
+
+types:
+  tenant_id:
+    bson_serialization_type: any
+    description: "A struct representing a tenant id"
+    cpp_type: "TenantId"
+    deserializer: "mongo::TenantId::parseFromBSON"
+    serializer: "mongo::TenantId::serializeToBSON"
 

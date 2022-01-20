@@ -38,7 +38,7 @@ constexpr auto kTenantFieldName = "tenant"_sd;
 }  // namespace
 
 template <typename T>
-StatusWith<T> AuthName<T>::parse(StringData str, const boost::optional<OID>& tenant) {
+StatusWith<T> AuthName<T>::parse(StringData str, const boost::optional<TenantId>& tenant) {
     auto split = str.find('.');
 
     if (split == std::string::npos) {
@@ -52,7 +52,7 @@ StatusWith<T> AuthName<T>::parse(StringData str, const boost::optional<OID>& ten
 
 template <typename T>
 T AuthName<T>::parseFromVariant(const stdx::variant<std::string, BSONObj>& name,
-                                const boost::optional<OID>& tenant) {
+                                const boost::optional<TenantId>& tenant) {
     if (stdx::holds_alternative<std::string>(name)) {
         return uassertStatusOK(parse(stdx::get<std::string>(name)));
     }
@@ -61,19 +61,20 @@ T AuthName<T>::parseFromVariant(const stdx::variant<std::string, BSONObj>& name,
 }
 
 template <typename T>
-T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<OID>& activeTenant) {
+T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<TenantId>& activeTenant) {
     std::bitset<3> usedFields;
     constexpr size_t kNameFieldBit = 0;
     constexpr size_t kDbFieldBit = 1;
     constexpr size_t kTenantFieldBit = 2;
     StringData name, db;
-    boost::optional<OID> tenant = activeTenant;
+    boost::optional<TenantId> tenant = activeTenant;
 
     const auto validateField = [&](const BSONElement& elem, const size_t bit, BSONType expType) {
         const auto fieldName = elem.fieldNameStringData();
         uassert(ErrorCodes::BadValue,
                 str::stream() << T::kName << " must contain a " << typeName(expType)
-                              << " field named: " << fieldName,
+                              << " field named: " << fieldName << ". But, has type "
+                              << typeName(elem.type()),
                 elem.type() == expType);
         uassert(ErrorCodes::BadValue,
                 str::stream() << T::kName << " has more than one field named: " << fieldName,
@@ -94,12 +95,12 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<OID>& 
 
         } else if (fieldName == kTenantFieldName) {
             validateField(element, kTenantFieldBit, jstOID);
-            tenant = element.OID();
+            tenant = TenantId::parseFromBSON(element);
             if (activeTenant) {
                 uassert(ErrorCodes::BadValue,
                         str::stream()
                             << T::kName
-                            << " contains a TenantID which does not match the active tenant",
+                            << " contains a TenantId which does not match the active tenant",
                         tenant == activeTenant);
             }
 
@@ -123,7 +124,8 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<OID>& 
 }
 
 template <typename T>
-T AuthName<T>::parseFromBSON(const BSONElement& elem, const boost::optional<OID>& activeTenant) {
+T AuthName<T>::parseFromBSON(const BSONElement& elem,
+                             const boost::optional<TenantId>& activeTenant) {
     if (elem.type() == String) {
         return uassertStatusOK(parse(elem.valueStringData(), activeTenant));
     } else if (elem.type() == Object) {

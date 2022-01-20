@@ -86,11 +86,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        'auth/auth',
-        'auth/security_token',
         'multitenancy_params',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/idl/feature_flag',
         'namespace_string',
         'server_feature_flags',
@@ -279,6 +279,7 @@ env.Library(
     target='multitenancy_params',
     source=[
         'multitenancy.idl',
+        'tenant_id.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

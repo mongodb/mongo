@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/multitenancy.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/tenant_database_name.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/platform/basic.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -44,7 +43,7 @@ TEST(TenantDatabaseNameTest, MultitenancySupportDisabled) {
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant1.dbName());
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant1.fullName());
 
-    mongo::OID tenantId = OID::gen();
+    TenantId tenantId = TenantId(OID::gen());
     TenantDatabaseName tdnWithTenant(tenantId, "a");
     ASSERT(tdnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *tdnWithTenant.tenantId());
@@ -61,7 +60,7 @@ TEST(TenantDatabaseNameTest, MultitenancySupportEnabledTenantIDNotRequired) {
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant.dbName());
     ASSERT_EQUALS(std::string("a"), tdnWithoutTenant.fullName());
 
-    mongo::OID tenantId = OID::gen();
+    TenantId tenantId = TenantId(OID::gen());
     TenantDatabaseName tdnWithTenant(tenantId, "a");
     ASSERT(tdnWithTenant.tenantId());
     ASSERT_EQUALS(tenantId, *tdnWithTenant.tenantId());
@@ -82,7 +81,7 @@ TEST(TenantDatabaseNameTest, TenantIDRequiredBasic) {
     // TODO SERVER-62114 Remove enabling this feature flag.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
-    mongo::OID tenantId = OID::gen();
+    TenantId tenantId = TenantId(OID::gen());
     TenantDatabaseName tdn(tenantId, "a");
     ASSERT(tdn.tenantId());
     ASSERT_EQUALS(tenantId, *tdn.tenantId());
@@ -91,18 +90,19 @@ TEST(TenantDatabaseNameTest, TenantIDRequiredBasic) {
 }
 
 TEST(TenantDatabaseNameTest, VerifyEqualsOperator) {
-    mongo::OID tenantId = OID::gen();
+    TenantId tenantId = TenantId(OID::gen());
     TenantDatabaseName tdn(tenantId, "a");
     ASSERT_TRUE(TenantDatabaseName(tenantId, "a") == tdn);
     ASSERT_TRUE(TenantDatabaseName(tenantId, "b") != tdn);
 
-    ASSERT_TRUE(TenantDatabaseName(OID::gen(), "a") != tdn);
+    TenantId otherTenantId = TenantId(OID::gen());
+    ASSERT_TRUE(TenantDatabaseName(otherTenantId, "a") != tdn);
     ASSERT_TRUE(TenantDatabaseName(boost::none, "a") != tdn);
 }
 
 TEST(TenantDatabaseNameTest, VerifyHashFunction) {
-    mongo::OID tenantId1 = OID::gen();
-    mongo::OID tenantId2 = OID::gen();
+    TenantId tenantId1 = TenantId(OID::gen());
+    TenantId tenantId2 = TenantId(OID::gen());
     TenantDatabaseName tdn1 = TenantDatabaseName(tenantId1, "a");
     TenantDatabaseName tdn2 = TenantDatabaseName(tenantId2, "a");
     TenantDatabaseName tdn3 = TenantDatabaseName(boost::none, "a");
