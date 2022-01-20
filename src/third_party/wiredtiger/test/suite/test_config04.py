@@ -88,7 +88,7 @@ class test_config04(wttest.WiredTigerTestCase):
         cursor.close()
 
     def common_log_test(self, path, dirname):
-        self.common_test('log=(archive=false,enabled,' + path + ')')
+        self.common_test('log=(enabled,' + path + ',remove=false)')
         self.assertTrue(os.path.exists(dirname + os.sep + self.log1))
 
     def test_bad_config(self):

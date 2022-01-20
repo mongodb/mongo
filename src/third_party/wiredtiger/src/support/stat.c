@@ -1352,7 +1352,7 @@ static const char *const __stats_connection_desc[] = {
   "lock: txn global read lock acquisitions",
   "lock: txn global write lock acquisitions",
   "log: busy returns attempting to switch slots",
-  "log: force archive time sleeping (usecs)",
+  "log: force log remove time sleeping (usecs)",
   "log: log bytes of payload data",
   "log: log bytes written",
   "log: log files manually zero-filled",
@@ -1912,7 +1912,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lock_txn_global_read_count = 0;
     stats->lock_txn_global_write_count = 0;
     stats->log_slot_switch_busy = 0;
-    stats->log_force_archive_sleep = 0;
+    stats->log_force_remove_sleep = 0;
     stats->log_bytes_payload = 0;
     stats->log_bytes_written = 0;
     stats->log_zero_fills = 0;
@@ -2478,7 +2478,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lock_txn_global_read_count += WT_STAT_READ(from, lock_txn_global_read_count);
     to->lock_txn_global_write_count += WT_STAT_READ(from, lock_txn_global_write_count);
     to->log_slot_switch_busy += WT_STAT_READ(from, log_slot_switch_busy);
-    to->log_force_archive_sleep += WT_STAT_READ(from, log_force_archive_sleep);
+    to->log_force_remove_sleep += WT_STAT_READ(from, log_force_remove_sleep);
     to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
     to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
     to->log_zero_fills += WT_STAT_READ(from, log_zero_fills);

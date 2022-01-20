@@ -1464,8 +1464,7 @@ __session_truncate(
 
     /*
      * If the URI is specified, we don't need a start/stop, if start/stop is specified, we don't
-     * need a URI. One exception is the log URI which may truncate (archive) log files for a backup
-     * cursor.
+     * need a URI. One exception is the log URI which may remove log files for a backup cursor.
      *
      * If no URI is specified, and both cursors are specified, start/stop must reference the same
      * object.

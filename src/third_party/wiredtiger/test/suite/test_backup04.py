@@ -44,7 +44,7 @@ class test_backup_target(backup_base):
     # enough data to generate more than one log file each time we add data.
     # First we populate and take a full backup.  Then we loop, checkpointing
     # running an incremental backup with a targeted cursor and then calling
-    # truncate to archive the logs.
+    # truncate to remove the logs.
     #
     # At the same time, we take a full backup during each loop.
     # We run recovery and verify the full backup with the incremental
@@ -59,7 +59,7 @@ class test_backup_target(backup_base):
 
     # Create a large cache, otherwise this test runs quite slowly.
     def conn_config(self):
-        return 'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
+        return 'cache_size=1G,log=(enabled,file_max=%s,remove=false)' % \
             self.logmax
 
     def populate_with_string(self, uri, dsize, rows):
@@ -76,7 +76,7 @@ class test_backup_target(backup_base):
             cursor[simple_key(cursor, i)] = str(i) + ':' + upd * dsize
         cursor.close()
 
-    # Take an incremental backup and then truncate/archive the logs.
+    # Take an incremental backup and then truncate/remove the logs.
     def take_log_incr_backup(self, dir):
         config = 'target=("log:")'
         cursor = self.session.open_cursor('backup:', None, config)
@@ -105,7 +105,7 @@ class test_backup_target(backup_base):
         #   Do more work
         #   Checkpoint
         #   Copy log files returned by log targeted backup cursor
-        #   Truncate (archive) the log files
+        #   Truncate (remove) the log files
         #   Close the backup cursor
         updstr="bcdefghi"
         for increment in range(0, 5):

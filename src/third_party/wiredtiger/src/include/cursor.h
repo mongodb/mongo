@@ -448,8 +448,8 @@ struct __wt_cursor_log {
     uint64_t txnid;                   /* Record txnid */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CURLOG_ARCHIVE_LOCK 0x1u /* Archive lock held */
-                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+#define WT_CURLOG_REMOVE_LOCK 0x1u /* Remove lock held */
+                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };
 

@@ -206,7 +206,7 @@ Incremental backups may also save time when the tables are very large.
 By default, WiredTiger automatically removes log files no longer
 required for recovery.  Applications wanting to use log files for
 incremental backup must first disable automatic log file removal using
-the \c log=(archive=false) configuration to ::wiredtiger_open.
+the \c log=(remove=false) configuration to ::wiredtiger_open.
 
 The following is the procedure for incrementally backing up a database
 and removing log files from the original database home:
@@ -222,13 +222,13 @@ and removing log files from the original database home:
    before, but care should be taken to ensure each log file is completely copied
    as the most recent log file may grow in size while being copied.
 
-4. If all log files have been successfully copied, archive the log
+4. If all log files have been successfully copied, remove the log
    files by calling the WT_SESSION::truncate method with the URI
    <code>log:</code> and specifying the backup cursor as the start
    cursor to that method. (Note there is no requirement backups be
    coordinated with database checkpoints, however, an incremental backup
    will repeatedly copy the same files, and will not make additional log
-   files available for archival, unless there was a checkpoint after the
+   files available for removal, unless there was a checkpoint after the
    previous incremental backup.)
 
 5. Close the backup cursor.

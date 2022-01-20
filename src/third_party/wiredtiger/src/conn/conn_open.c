@@ -232,7 +232,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_hs_open(session, cfg));
 
     /*
-     * Start the optional logging/archive threads. NOTE: The log manager must be started before
+     * Start the optional logging/removal threads. NOTE: The log manager must be started before
      * checkpoints so that the checkpoint server knows if logging is enabled. It must also be
      * started before any operation that can commit, or the commit can block.
      */

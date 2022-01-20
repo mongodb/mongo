@@ -88,8 +88,8 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
         return compat_str
 
     def conn_config(self):
-        # Set archive false on the home directory.
-        log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax
+        # Set remove=false on the home directory.
+        log_str = 'log=(enabled,file_max=%s,remove=false),' % self.logmax
         compat_str = self.make_compat_str(True)
         self.pr("Conn config:" + log_str + compat_str)
         return log_str + compat_str
@@ -117,10 +117,10 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
 
         if not reconfig:
             #
-            # Close and open the connection to force recovery and log archiving
-            # even if archive is turned off (in some circumstances). If we are
-            # downgrading we must archive newer logs. Verify the log files
-            # have or have not been archived.
+            # Close and open the connection to force recovery and log removal
+            # even if remove is turned off (in some circumstances). If we are
+            # downgrading we must remove newer logs. Verify the log files
+            # have or have not been removed.
             #
             exist = True
             if self.logv1 < self.min_logv:
@@ -128,7 +128,7 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
             self.check_prev_lsn(exist, True)
 
             self.conn.close()
-            log_str = 'log=(enabled,file_max=%s,archive=false),' % self.logmax
+            log_str = 'log=(enabled,file_max=%s,remove=false),' % self.logmax
             restart_config = log_str + compat_str
             self.pr("Restart conn " + restart_config)
             #
@@ -143,9 +143,9 @@ class test_compat01(wttest.WiredTigerTestCase, suite_subprocess):
             check_close = True
 
             #
-            # Archiving is turned off explicitly.
+            # Removal is turned off explicitly.
             #
-            # Check logs. The original logs should have been archived only if
+            # Check logs. The original logs should have been removed only if
             # we downgraded.  In all other cases the original logs should be there.
             # Downgrade means not running the latest possible log version, not
             # the difference between original and current.

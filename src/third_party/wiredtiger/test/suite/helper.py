@@ -121,7 +121,7 @@ def copy_wiredtiger_home(testcase, olddir, newdir, aligned=True):
                     # If the copy failed it means the file was removed underneath us in the
                     # short time after we verified the files existence. This can happen if we
                     # are copying wiredtiger log files at the same time they are getting
-                    # archived by the background log server thread. To avoid failing in this case
+                    # removed by the background log server thread. To avoid failing in this case
                     # we can log/print the removed file and continue.
                     if "WiredTigerLog" not in fullname:
                         raise e

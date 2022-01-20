@@ -89,11 +89,11 @@ static volatile THREAD_TS th_ts[MAX_TH];
 #define ENV_CONFIG_DEF                                        \
     "create,"                                                 \
     "eviction_updates_trigger=95,eviction_updates_target=80," \
-    "log=(archive=false,file_max=10M,enabled)"
+    "log=(enabled,file_max=10M,remove=false)"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their

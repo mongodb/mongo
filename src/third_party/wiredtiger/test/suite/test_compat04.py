@@ -83,7 +83,7 @@ class test_compat04(wttest.WiredTigerTestCase, suite_subprocess):
     # compatibility settings on the initial database creation.
     def conn_config(self):
         config_str = 'create,config_base=%s,' % self.basecfg
-        log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax
+        log_str = 'log=(enabled,file_max=%s,remove=false),' % self.logmax
         compat_str = ''
         if (self.create_rel != 'none'):
             compat_str += 'compatibility=(release="%s"),' % self.create_rel

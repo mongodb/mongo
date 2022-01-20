@@ -81,7 +81,7 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
         prune=20, prunelong=5000)
 
     def conn_config(self):
-        return 'log=(archive=false,enabled=%s),' % int(self.log_enabled) + \
+        return 'log=(enabled=%s,remove=false),' % int(self.log_enabled) + \
             'transaction_sync=(enabled=false)'
 
     # Check that a cursor (optionally started in a new transaction), sees the

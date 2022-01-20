@@ -98,14 +98,14 @@ static uint32_t flush_calls = 1;
     "M,create,"                                               \
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
-    "log=(archive=true,file_max=10M,enabled),session_max=%d," \
+    "log=(enabled,file_max=10M,remove=true),session_max=%d,"  \
     "statistics=(fast),statistics_log=(wait=1,json=true),"    \
     "tiered_storage=(bucket=%s,bucket_prefix=pfx,local_retention=%d,name=local_store)"
 #define ENV_CONFIG_TXNSYNC                                \
     ENV_CONFIG_DEF                                        \
     ",eviction_dirty_target=20,eviction_dirty_trigger=90" \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their

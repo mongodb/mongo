@@ -39,7 +39,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_txn02'
     uri = 'table:' + tablename
-    archive_list = ['true', 'false']
+    remove_list = ['true', 'false']
     conn_list = ['reopen', 'stay_open']
     sync_list = [
         '(method=dsync,enabled)',
@@ -106,13 +106,13 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             self.scenario_number % len(self.sync_list)]
         #
         # We don't want to run zero fill with only the same settings, such
-        # as archive or sync, which are an even number of options.
+        # as remove or sync, which are an even number of options.
         #
         freq = 3
         zerofill = 'false'
         if self.scenario_number % freq == 0:
             zerofill = 'true'
-        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+        return 'log=(enabled,file_max=%s,remove=false),' % self.logmax + \
             'log=(zero_fill=%s),' % zerofill + \
             'transaction_sync="%s",' % txn_sync
 
@@ -159,16 +159,15 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         self.backup(self.backup_dir)
         #
         # Open and close the backup connection a few times to force
-        # repeated recovery and log archiving even if later recoveries
+        # repeated recovery and log removal even if later recoveries
         # are essentially no-ops. Confirm that the backup contains
         # the committed operations after recovery.
         #
-        # Cycle through the different archive values in a
-        # deterministic manner.
-        self.archive = self.archive_list[
-            self.scenario_number % len(self.archive_list)]
+        # Cycle through the different removal values in a deterministic manner.
+        self.remove = self.remove_list[
+            self.scenario_number % len(self.remove_list)]
         backup_conn_params = \
-            'log=(enabled,file_max=%s,archive=%s)' % (self.logmax, self.archive)
+            'log=(enabled,file_max=%s,remove=%s)' % (self.logmax, self.remove)
         orig_logs = fnmatch.filter(os.listdir(self.backup_dir), "*gerLog*")
         endcount = 2
         count = 0
@@ -179,19 +178,19 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
                 session = backup_conn.open_session()
             finally:
                 self.check(backup_conn.open_session(), None, committed)
-                # Sleep long enough so that the archive thread is guaranteed
+                # Sleep long enough so that the remove thread is guaranteed
                 # to run before we close the connection.
                 time.sleep(1.0)
                 backup_conn.close()
             count += 1
         #
         # Check logs after repeated openings. The first log should
-        # have been archived if configured. Subsequent openings would not
-        # archive because no checkpoint is written due to no modifications.
+        # have been remove if configured. Subsequent openings would not
+        # remove because no checkpoint is written due to no modifications.
         #
         cur_logs = fnmatch.filter(os.listdir(self.backup_dir), "*gerLog*")
         for o in orig_logs:
-            if self.archive == 'true':
+            if self.remove == 'true':
                 self.assertEqual(False, o in cur_logs)
             else:
                 self.assertEqual(True, o in cur_logs)

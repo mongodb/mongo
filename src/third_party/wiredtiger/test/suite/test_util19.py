@@ -61,7 +61,7 @@ class test_util19(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(create_release, downgrade_release)
 
     def conn_config(self):
-        conf_str = 'log=(archive=false,enabled,file_max=%s),' % self.log_max
+        conf_str = 'log=(enabled,file_max=%s,remove=false),' % self.log_max
         if (self.create_rel != 'none'):
             conf_str += 'compatibility=(release="%s"),' % (self.create_rel)
         return conf_str
@@ -82,7 +82,7 @@ class test_util19(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
         # Call the downgrade utility to reconfigure our database with the specified compatibility version.
-        wt_config = 'log=(archive=false,enabled,file_max=%s),verbose=[log]' % self.log_max
+        wt_config = 'log=(enabled,file_max=%s,remove=false),verbose=[log]' % self.log_max
         downgrade_opt = '-V %s' % self.downgrade_rel
         self.runWt(['-C', wt_config , 'downgrade', downgrade_opt], reopensession=False, outfilename='downgrade.out')
         # Based on the downgrade version we can test if the corresponding log compatibility version

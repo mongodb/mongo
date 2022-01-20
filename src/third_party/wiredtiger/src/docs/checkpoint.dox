@@ -8,7 +8,7 @@ application or system failure without impacting performance (although
 the creation of each checkpoint is a relatively heavy-weight operation).
 See @ref durability for information on commit-level durability.
 
-Checkpoints with transactional logging enabled allow logging to archive
+Checkpoints with transactional logging enabled allow logging to remove
 older log files (if configured to do so) while still retaining
 commit-level durability and the ability to run recovery.
 
@@ -50,7 +50,7 @@ since the last checkpoint via \c log_size, or both.  If both periods are
 defined then the checkpoint occurs as soon as either threshold has occurred
 and both are reset once the checkpoint is complete.  If using \c log_size,
 we recommend that the size selected be a multiple of the log file size for
-archiving purposes.
+automatic log file removal purposes.
 
 @section checkpoint_cursors Checkpoint cursors
 

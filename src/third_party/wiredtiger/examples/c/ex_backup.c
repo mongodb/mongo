@@ -39,7 +39,7 @@ static const char *const incr_out = "./backup_incr";
 
 static const char *const uri = "table:logtest";
 
-#define CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true,file_max=100K)"
+#define CONN_CONFIG "create,cache_size=100MB,log=(enabled=true,file_max=100K,remove=false)"
 #define MAX_ITERATIONS 5
 #define MAX_KEYS 10000
 
@@ -213,8 +213,8 @@ take_incr_backup(WT_SESSION *session, int i)
     scan_end_check(ret == WT_NOTFOUND);
 
     /*
-     * With an incremental cursor, we want to truncate on the backup cursor to archive the logs.
-     * Only do this if the copy process was entirely successful.
+     * With an incremental cursor, we want to truncate on the backup cursor to remove the logs. Only
+     * do this if the copy process was entirely successful.
      */
     /*! [Truncate a backup cursor] */
     error_check(session->truncate(session, "log:", cursor, NULL, NULL));
@@ -259,7 +259,7 @@ main(int argc, char *argv[])
         printf("Iteration %d: taking full backup\n", i);
         take_full_backup(session, i);
         /*
-         * Taking the incremental backup also calls truncate to archive the log files, if the copies
+         * Taking the incremental backup also calls truncate to remove the log files, if the copies
          * were successful. See that function for details on that call.
          */
         printf("Iteration %d: taking incremental backup\n", i);

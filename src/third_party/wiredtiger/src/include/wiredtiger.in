@@ -2123,8 +2123,8 @@ struct __wt_connection {
 	 * @config{debug_mode = (, control the settings of various extended debugging features., a
 	 * set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * checkpoint_retention, adjust log archiving to retain the log records of this number of
-	 * checkpoints.  Zero or one means perform normal archiving., an integer between 0 and 1024;
+	 * checkpoint_retention, adjust log removal to retain the log records of this number of
+	 * checkpoints.  Zero or one means perform normal removal., an integer between 0 and 1024;
 	 * default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;corruption_abort, if true\, dump the core
 	 * in the diagnostic mode on encountering the data corruption., a boolean flag; default \c
@@ -2138,7 +2138,7 @@ struct __wt_connection {
 	 * not limited to not skewing newest\, not favoring leaf pages\, and modifying the eviction
 	 * score mechanism., a boolean flag; default \c false.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;
-	 * log_retention, adjust log archiving to retain at least this number of log files\, ignored
+	 * log_retention, adjust log removal to retain at least this number of log files\, ignored
 	 * if set to 0. (Warning: this option can remove log files required for recovery if no
 	 * checkpoints have yet been done and the number of log files exceeds the configured value.
 	 * As WiredTiger cannot detect the difference between a system that has not yet checkpointed
@@ -2248,17 +2248,17 @@ struct __wt_connection {
 	 * with values chosen from the following options: \c "error"\, \c "message"; default \c [].}
 	 * @config{log = (, enable logging.  Enabling logging uses three sessions from the
 	 * configured session_max., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive unneeded log files., a
-	 * boolean flag; default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct,
-	 * maximum dirty system buffer cache usage\, as a percentage of the log's \c file_max.  If
-	 * non-zero\, schedule writes for dirty blocks belonging to the log in the system buffer
-	 * cache after that percentage of the log has been written into the buffer cache without an
-	 * intervening file sync., an integer between 0 and 100; default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate log files., a boolean flag;
-	 * default \c true.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into
-	 * log files., a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;os_cache_dirty_pct, maximum dirty system buffer cache
+	 * usage\, as a percentage of the log's \c file_max.  If non-zero\, schedule writes for
+	 * dirty blocks belonging to the log in the system buffer cache after that percentage of the
+	 * log has been written into the buffer cache without an intervening file sync., an integer
+	 * between 0 and 100; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc, pre-allocate
+	 * log files., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove,
+	 * automatically remove unneeded log files., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log files., a
+	 * boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree management.  The
 	 * LSM manager is started automatically the first time an LSM tree is opened.  The LSM
@@ -2857,11 +2857,10 @@ struct __wt_connection {
  * @config{debug_mode = (, control the settings of various extended debugging features., a set of
  * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * checkpoint_retention, adjust log archiving to retain the log records of this number of
- * checkpoints.  Zero or one means perform normal archiving., an integer between 0 and 1024; default
- * \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;corruption_abort, if true\, dump the core in the
- * diagnostic mode on encountering the data corruption., a boolean flag; default \c true.}
+ * checkpoint_retention, adjust log removal to retain the log records of this number of checkpoints.
+ * Zero or one means perform normal removal., an integer between 0 and 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;corruption_abort, if true\, dump the core in the diagnostic mode
+ * on encountering the data corruption., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;cursor_copy, if true\, use the system allocator to make a copy of
  * any data returned by a cursor operation and return the copy instead.  The copy is freed on the
  * next cursor operation.  This allows memory sanitizers to detect inappropriate references to
@@ -2870,29 +2869,26 @@ struct __wt_connection {
  * eviction, if true\, modify internal algorithms to change skew to force history store eviction to
  * happen more aggressively.  This includes but is not limited to not skewing newest\, not favoring
  * leaf pages\, and modifying the eviction score mechanism., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log archiving to retain at least this
- * number of log files\, ignored if set to 0. (Warning: this option can remove log files required
- * for recovery if no checkpoints have yet been done and the number of log files exceeds the
- * configured value.  As WiredTiger cannot detect the difference between a system that has not yet
- * checkpointed and one that will never checkpoint\, it might discard log files before any
- * checkpoint is done.)., an integer between 0 and 1024; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if true\, reallocation of memory will only provide
- * the exact amount requested.  This will help with spotting memory allocation issues more easily.,
- * a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a
- * WT_ROLLBACK error from a transaction operation about every Nth operation to simulate a
- * collision., an integer between 0 and 10M; default \c 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;
- * slow_checkpoint, if true\, slow down checkpoint creation by slowing down internal page
- * processing., a boolean flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if
- * true\, write transaction related information to the log for all operations\, even operations for
- * tables with logging turned off.  This setting introduces a log format change that may break older
- * versions of WiredTiger.  These operations are informational and skipped in recovery., a boolean
- * flag; default \c false.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control
- * all dirty page evictions through forcing update restore eviction., a boolean flag; default \c
- * false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_retention, adjust log removal to retain at least this number
+ * of log files\, ignored if set to 0. (Warning: this option can remove log files required for
+ * recovery if no checkpoints have yet been done and the number of log files exceeds the configured
+ * value.  As WiredTiger cannot detect the difference between a system that has not yet checkpointed
+ * and one that will never checkpoint\, it might discard log files before any checkpoint is done.).,
+ * an integer between 0 and 1024; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;realloc_exact, if
+ * true\, reallocation of memory will only provide the exact amount requested.  This will help with
+ * spotting memory allocation issues more easily., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;rollback_error, return a WT_ROLLBACK error from a transaction
+ * operation about every Nth operation to simulate a collision., an integer between 0 and 10M;
+ * default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;slow_checkpoint, if true\, slow down checkpoint
+ * creation by slowing down internal page processing., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;table_logging, if true\, write transaction related information to
+ * the log for all operations\, even operations for tables with logging turned off.  This setting
+ * introduces a log format change that may break older versions of WiredTiger.  These operations are
+ * informational and skipped in recovery., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page evictions
+ * through forcing update restore eviction., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c FILE_FLAG_NO_BUFFERING on Windows to
  * access files.  Options are given as a list\, such as <code>"direct_io=[data]"</code>. Configuring
@@ -3034,10 +3030,8 @@ struct __wt_connection {
  * the following options: \c "error"\, \c "message"; default \c [].}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from the configured
  * session_max., a set of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive unneeded log files., a boolean
- * flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for
- * log records.  Permitted values are \c "none" or custom compression engine name created with
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor for log records.  Permitted
+ * values are \c "none" or custom compression engine name created with
  * WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for \c "lz4"\, \c "snappy"\, \c
  * "zlib" or \c "zstd" compression\, these names are also available.  See @ref compression for more
  * information., a string; default \c none.}
@@ -3057,8 +3051,10 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if recovery needs to run
  * after an unclean shutdown., a string\, chosen from the following options: \c "error"\, \c "on";
  * default \c on.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log files.,
- * a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;remove, automatically remove unneeded log files.,
+ * a boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write
+ * zeroes into log files., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree management.  The LSM
  * manager is started automatically the first time an LSM tree is opened.  The LSM manager uses a
@@ -5854,8 +5850,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOCK_TXN_GLOBAL_WRITE_COUNT	1289
 /*! log: busy returns attempting to switch slots */
 #define	WT_STAT_CONN_LOG_SLOT_SWITCH_BUSY		1290
-/*! log: force archive time sleeping (usecs) */
-#define	WT_STAT_CONN_LOG_FORCE_ARCHIVE_SLEEP		1291
+/*! log: force log remove time sleeping (usecs) */
+#define	WT_STAT_CONN_LOG_FORCE_REMOVE_SLEEP		1291
 /*! log: log bytes of payload data */
 #define	WT_STAT_CONN_LOG_BYTES_PAYLOAD			1292
 /*! log: log bytes written */

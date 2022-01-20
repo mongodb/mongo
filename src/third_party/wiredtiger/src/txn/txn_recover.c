@@ -1059,7 +1059,7 @@ done:
     if (do_checkpoint || rts_executed)
         /*
          * Forcibly log a checkpoint so the next open is fast and keep the metadata up to date with
-         * the checkpoint LSN and archiving.
+         * the checkpoint LSN and removal.
          */
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
@@ -1073,7 +1073,7 @@ done:
     __wt_dhandle_update_write_gens(session);
 
     /*
-     * If we're downgrading and have newer log files, force an archive, no matter what the archive
+     * If we're downgrading and have newer log files, force log removal, no matter what the remove
      * setting is.
      */
     if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_FORCE_DOWNGRADE))

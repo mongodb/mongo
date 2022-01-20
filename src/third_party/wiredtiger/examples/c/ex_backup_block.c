@@ -499,7 +499,7 @@ main(int argc, char *argv[])
         printf("Iteration %d: taking full backup\n", i);
         take_full_backup(session, i);
         /*
-         * Taking the incremental backup also calls truncate to archive the log files, if the copies
+         * Taking the incremental backup also calls truncate to remove the log files, if the copies
          * were successful. See that function for details on that call.
          */
         printf("Iteration %d: taking incremental backup\n", i);

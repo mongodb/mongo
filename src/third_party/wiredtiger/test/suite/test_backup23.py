@@ -37,10 +37,10 @@ import wiredtiger, wttest
 class test_backup23(wttest.WiredTigerTestCase, suite_subprocess):
     '''Test backup, verifying metadata and an error opening the backup'''
 
-    #conn_config = 'config_base=false,log=(archive=false,enabled),verbose=(recovery,log)'
-    conn_config = 'config_base=false,log=(archive=false,enabled)'
-    conn_config_err = 'config_base=false,log=(archive=false,enabled),verify_metadata=true'
-    #conn_config_err = 'config_base=false,log=(archive=false,enabled),verify_metadata=true,verbose=(recovery,log)'
+    #conn_config = 'config_base=false,log=(enabled,remove=false),verbose=(recovery,log)'
+    conn_config = 'config_base=false,log=(enabled,remove=false)'
+    conn_config_err = 'config_base=false,log=(enabled,remove=false),verify_metadata=true'
+    #conn_config_err = 'config_base=false,log=(enabled,remove=false),verify_metadata=true,verbose=(recovery,log)'
     dir='backup.dir'
     nentries = 10
     uri = 'file:backup.wt'

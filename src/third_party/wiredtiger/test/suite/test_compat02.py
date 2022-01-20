@@ -115,9 +115,9 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
                                prune=100, prunelong=100000)
 
     def conn_config(self):
-        # Set archive false on the home directory.
+        # Set remove=false on the home directory.
         config_str = 'config_base=%s,' % self.basecfg
-        log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax
+        log_str = 'log=(enabled,file_max=%s,remove=false),' % self.logmax
         compat_str = ''
         if (self.create_rel != 'none'):
             compat_str += 'compatibility=(release="%s"),' % self.create_rel
@@ -157,7 +157,7 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
             compat_str += 'compatibility=(require_min="%s"),' % self.min_req
         if (self.rel != 'none'):
             compat_str += 'compatibility=(release="%s"),' % self.rel
-        log_str = 'log=(enabled,file_max=%s,archive=false),' % self.logmax
+        log_str = 'log=(enabled,file_max=%s,remove=false),' % self.logmax
         restart_config = log_str + compat_str
         self.pr("Restart conn " + restart_config)
 

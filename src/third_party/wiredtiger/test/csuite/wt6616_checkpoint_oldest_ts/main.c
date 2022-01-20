@@ -64,11 +64,11 @@ static const char *const ckpt_file = "checkpoint_done";
     "cache_size=50M,"                                         \
     "create,"                                                 \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
-    "log=(archive=true,file_max=10M,enabled),"                \
+    "log=(enabled,file_max=10M,remove=true),"                 \
     "statistics=(fast),statistics_log=(wait=1,json=true),"    \
     "timing_stress_for_test=[checkpoint_slow]"
 
-#define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));

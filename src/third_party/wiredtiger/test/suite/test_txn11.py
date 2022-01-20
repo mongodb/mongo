@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_txn11.py
-#   Transactions: Empty checkpoints and log archiving
+#   Transactions: Empty checkpoints and log removal.
 
 import fnmatch, os, time
 from suite_subprocess import suite_subprocess
@@ -35,7 +35,7 @@ from wtdataset import SimpleDataSet
 import wttest
 
 class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
-    archive = 'true'
+    remove = 'true'
     conn_config = 'verbose=[transaction]'
     logmax = "100K"
     nrows = 700
@@ -45,7 +45,7 @@ class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Turn on logging for this test.
     def conn_config(self):
-        return 'log=(archive=%s,' % self.archive + \
+        return 'log=(remove=%s,' % self.remove + \
             'enabled,file_max=%s,prealloc=false),' % self.logmax + \
             'transaction_sync=(enabled=false),'
 
@@ -69,7 +69,7 @@ class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
         # Run forced checkpoints
         self.run_checkpoints()
 
-        self.archive = 'false'
+        self.remove = 'false'
         # Close and reopen the connection
         self.reopen_conn()
 

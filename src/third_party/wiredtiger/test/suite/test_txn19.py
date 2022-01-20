@@ -72,7 +72,7 @@ def copy_for_crash_restart(olddir, newdir):
             shutil.copy(fullname, newdir)
 
 class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
-    base_config = 'log=(archive=false,enabled,file_max=100K),' + \
+    base_config = 'log=(enabled,file_max=100K,remove=false),' + \
                   'transaction_sync=(enabled,method=none),cache_size=1GB,' + \
                   'debug_mode=(corruption_abort=false),'
     conn_config = base_config
@@ -356,7 +356,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         self.checks(expect)
 
 class test_txn19_meta(wttest.WiredTigerTestCase, suite_subprocess):
-    base_config = 'log=(archive=false,enabled,file_max=100K),' + \
+    base_config = 'log=(enabled,file_max=100K,remove=false),' + \
                   'transaction_sync=(enabled,method=none),cache_size=1GB,' + \
                   'debug_mode=(corruption_abort=false),'
     conn_config = base_config

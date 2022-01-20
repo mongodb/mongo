@@ -52,7 +52,7 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
         ('readonly', dict(dirchmod=True)),
     ]
     log_list = [
-        ('logging', dict(logcfg='log=(archive=false,enabled,file_max=100K),')),
+        ('logging', dict(logcfg='log=(enabled,file_max=100K,remove=false),')),
         ('no_logging', dict(logcfg='log=(enabled=false),')),
     ]
 

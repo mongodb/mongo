@@ -54,7 +54,7 @@ class test_timestamp07(wttest.WiredTigerTestCase, suite_subprocess):
 
     conncfg = [
         ('nolog', dict(conn_config='create,cache_size=2M', using_log=False)),
-        ('log', dict(conn_config='create,log=(file_max=1M,archive=false,enabled),cache_size=2M', using_log=True)),
+        ('log', dict(conn_config='create,log=(enabled,file_max=1M,remove=false),cache_size=2M', using_log=True)),
     ]
 
     nkeys = [

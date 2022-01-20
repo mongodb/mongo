@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 
 class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
     t1 = 'table:test_txn18'
-    conn_config = 'log=(archive=false,enabled,file_max=100K),' + \
+    conn_config = 'log=(enabled,file_max=100K,remove=false),' + \
                 'transaction_sync=(method=dsync,enabled)'
     conn_recerror = conn_config + ',log=(recover=error)'
     conn_recon = conn_config + ',log=(recover=on)'

@@ -166,13 +166,13 @@ CONFIG configuration_list[] = {
 
 {"logging", "configure logging", C_BOOL, 50, 0, 0}
 
-{"logging.archive", "configure log file archival", C_BOOL, 50, 0, 0}
-
 {"logging.compression", "logging compression (off | lz4 | snappy | zlib | zstd)", C_IGNORE | C_STRING, 0, 0, 0}
 
 {"logging.file_max", "maximum log file size (KB)", 0x0, 100, 512000, 2097152}
 
 {"logging.prealloc", "configure log file pre-allocation", C_BOOL, 50, 0, 0}
+
+{"logging.remove", "configure log file removal", C_BOOL, 50, 0, 0}
 
 {"lsm.auto_throttle", "throttle LSM inserts", C_BOOL | C_TABLE | C_TYPE_LSM, 90, 0, 0}
 

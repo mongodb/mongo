@@ -47,7 +47,7 @@ class test_backup07(backup_base):
 
     # Create a large cache, otherwise this test runs quite slowly.
     def conn_config(self):
-        return 'cache_size=1G,log=(archive=false,enabled,file_max=%s)' % \
+        return 'cache_size=1G,log=(enabled,file_max=%s,remove=false)' % \
             self.logmax
 
     # Run background inserts while running checkpoints repeatedly.

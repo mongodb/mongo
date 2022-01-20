@@ -40,7 +40,7 @@ from wtscenario import make_scenarios
 class test_schema08(wttest.WiredTigerTestCase, suite_subprocess):
     # We want to copy, truncate and run recovery so keep the log
     # file small and don't pre-allocate any. We expect a small log.
-    conn_config = 'log=(enabled,archive=false,file_max=100k,prealloc=false)'
+    conn_config = 'log=(enabled,file_max=100k,prealloc=false,remove=false)'
     types = [
         ('file', dict(uri='file:', use_cg=False, use_index=False)),
         ('lsm', dict(uri='lsm:', use_cg=False, use_index=False)),

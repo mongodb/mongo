@@ -391,8 +391,8 @@ config_backup_incr(void)
     }
 
     /*
-     * Incremental backup using log files is incompatible with logging archival. Testing log file
-     * archival doesn't seem as useful as testing backup, let the backup configuration override.
+     * Incremental backup using log files is incompatible with automatic log removals. Testing log
+     * file removal doesn't seem as useful as testing backup, let the backup configuration override.
      */
     if (config_explicit(NULL, "backup.incremental")) {
         if (g.backup_incr_flag == INCREMENTAL_LOG)
@@ -403,7 +403,7 @@ config_backup_incr(void)
     }
 
     /*
-     * Choose a type of incremental backup, where the log archival setting can eliminate incremental
+     * Choose a type of incremental backup, where the log remove setting can eliminate incremental
      * backup based on log files.
      */
     switch (mmrand(NULL, 1, 10)) {
@@ -415,9 +415,9 @@ config_backup_incr(void)
     case 4: /* 30% log based incremental */
     case 5:
     case 6:
-        if (!GV(LOGGING_ARCHIVE) || !config_explicit(NULL, "logging.archive")) {
-            if (GV(LOGGING_ARCHIVE))
-                config_off(NULL, "logging.archive");
+        if (!GV(LOGGING_REMOVE) || !config_explicit(NULL, "logging.remove")) {
+            if (GV(LOGGING_REMOVE))
+                config_off(NULL, "logging.remove");
             config_single(NULL, "backup.incremental=log", false);
             break;
         }
@@ -885,15 +885,15 @@ static void
 config_backup_incr_log_compatibility_check(void)
 {
     /*
-     * Incremental backup using log files is incompatible with logging archival. Disable logging
-     * archival if log incremental backup is set.
+     * Incremental backup using log files is incompatible with automatic log file removal. Disable
+     * logging removal if log incremental backup is set.
      */
-    if (GV(LOGGING_ARCHIVE) && config_explicit(NULL, "logging.archive"))
+    if (GV(LOGGING_REMOVE) && config_explicit(NULL, "logging.remove"))
         WARN("%s",
-          "backup.incremental=log is incompatible with logging.archive, turning off "
-          "logging.archive");
-    if (GV(LOGGING_ARCHIVE))
-        config_off(NULL, "logging.archive");
+          "backup.incremental=log is incompatible with logging.remove, turning off "
+          "logging.remove");
+    if (GV(LOGGING_REMOVE))
+        config_off(NULL, "logging.remove");
 }
 
 /*

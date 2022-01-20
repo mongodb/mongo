@@ -613,7 +613,7 @@ backup(void *arg)
         active_prev = active_now;
 
         /*
-         * If automatic log archival isn't configured, optionally do incremental backups after each
+         * If automatic log removal isn't configured, optionally do incremental backups after each
          * full backup. If we're not doing any more incrementals, verify the backup (we can't verify
          * intermediate states, once we perform recovery on the backup database, we can't do any
          * more incremental backups).
@@ -621,7 +621,7 @@ backup(void *arg)
         if (full) {
             incremental = 1;
             if (g.backup_incr_flag == INCREMENTAL_LOG)
-                incremental = GV(LOGGING_ARCHIVE) ? 1 : mmrand(NULL, 1, 8);
+                incremental = GV(LOGGING_REMOVE) ? 1 : mmrand(NULL, 1, 8);
             else if (g.backup_incr_flag == INCREMENTAL_BLOCK)
                 incremental = mmrand(NULL, 1, 8);
         }

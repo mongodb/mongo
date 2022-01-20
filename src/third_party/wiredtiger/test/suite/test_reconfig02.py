@@ -36,7 +36,7 @@ import wiredtiger, wttest
 # test_reconfig02.py
 #    Smoke-test the connection reconfiguration operations.
 class test_reconfig02(wttest.WiredTigerTestCase):
-    init_config = 'log=(archive=false,enabled,file_max=100K,prealloc=false,zero_fill=false)'
+    init_config = 'log=(enabled,file_max=100K,prealloc=false,remove=false,zero_fill=false)'
     uri = "table:reconfig02"
     entries = 1000
 
@@ -46,11 +46,11 @@ class test_reconfig02(wttest.WiredTigerTestCase):
 
     # Logging: reconfigure the things we can reconfigure.
     def test_reconfig02_simple(self):
-        self.conn.reconfigure("log=(archive=false)")
+        self.conn.reconfigure("log=(remove=false)")
         self.conn.reconfigure("log=(prealloc=false)")
         self.conn.reconfigure("log=(zero_fill=false)")
 
-        self.conn.reconfigure("log=(archive=true)")
+        self.conn.reconfigure("log=(remove=true)")
         self.conn.reconfigure("log=(prealloc=true)")
         self.conn.reconfigure("log=(zero_fill=true)")
 
@@ -93,26 +93,26 @@ class test_reconfig02(wttest.WiredTigerTestCase):
 
         self.assertNotEqual(0, len(prep_logs))
 
-    # Logging starts on, but archive is off.  Verify it is off.
+    # Logging starts on, but remove is off.  Verify it is off.
     # Reconfigure it on and run again, making sure that log files
-    # get archived.
-    def test_reconfig02_archive(self):
+    # get removed.
+    def test_reconfig02_remove(self):
         self.session.create(self.uri, 'key_format=i,value_format=i')
         c = self.session.open_cursor(self.uri, None, None)
         for i in range(self.entries):
             c[i] = i + 1
         c.close()
         # Close and reopen connection to write a checkpoint, move to the
-        # next log file and verify that archive did not run.
+        # next log file and verify that removal did not run.
         orig_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         self.reopen_conn()
         cur_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")
         for o in orig_logs:
             self.assertEqual(True, o in cur_logs)
 
-        # Now turn on archive, sleep a bit to allow the archive thread
+        # Now turn on removal, sleep a bit to allow the removal thread
         # to run and then confirm that all original logs are gone.
-        self.conn.reconfigure("log=(archive=true)")
+        self.conn.reconfigure("log=(remove=true)")
         self.session.checkpoint("force")
         time.sleep(2)
         cur_logs = fnmatch.filter(os.listdir('.'), "*gerLog*")

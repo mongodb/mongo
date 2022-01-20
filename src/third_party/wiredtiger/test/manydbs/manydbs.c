@@ -34,8 +34,8 @@ static char home[HOME_SIZE];    /* Base home directory */
 static char hometmp[HOME_SIZE]; /* Each conn home directory */
 static const char *const uri = "table:main";
 
-#define WTOPEN_CFG_COMMON                              \
-    "create,log=(file_max=10M,archive=false,enabled)," \
+#define WTOPEN_CFG_COMMON                             \
+    "create,log=(enabled,file_max=10M,remove=false)," \
     "statistics=(fast),statistics_log=(wait=5),"
 #define WT_CONFIG0    \
     WTOPEN_CFG_COMMON \

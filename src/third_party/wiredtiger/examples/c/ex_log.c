@@ -35,7 +35,7 @@ static const char *home2 = "WT_HOME_LOG_2";
 
 static const char *const uri = "table:logtest";
 
-#define CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
+#define CONN_CONFIG "create,cache_size=100MB,log=(enabled=true,remove=false)"
 #define MAX_KEYS 10
 
 static void
@@ -297,7 +297,7 @@ main(int argc, char *argv[])
 
     /*
      * Close and reopen the connection so that the log ends up with a variety of records such as
-     * file sync and checkpoint. We have archiving turned off.
+     * file sync and checkpoint. We have removal turned off.
      */
     error_check(wt_conn->close(wt_conn, NULL));
     error_check(wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn));

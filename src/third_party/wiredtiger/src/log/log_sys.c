@@ -108,7 +108,7 @@ __wt_verbose_dump_log(WT_SESSION_IMPL *session)
      * Logging is enabled, print out the other information.
      */
     WT_RET(__wt_msg(
-      session, "Archiving: %s", FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE) ? "yes" : "no"));
+      session, "Removing: %s", FLD_ISSET(conn->log_flags, WT_CONN_LOG_REMOVE) ? "yes" : "no"));
     WT_RET(__wt_msg(session, "Running downgraded: %s",
       FLD_ISSET(conn->log_flags, WT_CONN_LOG_DOWNGRADED) ? "yes" : "no"));
     WT_RET(__wt_msg(session, "Zero fill files: %s",

@@ -98,12 +98,12 @@ static volatile uint64_t global_ts = 1;
     "M,create,"                                               \
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
-    "log=(archive=true,file_max=10M,enabled),session_max=%d," \
+    "log=(enabled,file_max=10M,remove=true),session_max=%d,"  \
     "statistics=(fast),statistics_log=(wait=1,json=true)"
 #define ENV_CONFIG_TXNSYNC \
     ENV_CONFIG_DEF         \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -199,7 +199,7 @@ thread_ts_run(void *arg)
             first = false;
             /*
              * Set and reset the checkpoint retention setting on a regular basis. We want to test
-             * racing with the internal archive thread while we're here.
+             * racing with the internal log removal thread while we're here.
              */
             dbg = __wt_random(&rnd) % 2;
             if (dbg == 0)

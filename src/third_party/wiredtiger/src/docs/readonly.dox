@@ -15,7 +15,7 @@ The \c readonly configuration affects other configuration settings.
 Where a default setting contradicts read-only operation, WiredTiger
 defaults are overridden to perform in a read-only mode. For example, LSM
 tree merges are turned off when LSM trees are configured, and log file
-archiving is disabled when logging is configured.
+removal is disabled when logging is configured.
 
 Where a user configured setting contradicts read-only operation, WiredTiger
 will return an error.  For example, zero-filling
@@ -32,7 +32,7 @@ required.
 @section readonly_logging Readonly configuration and logging
 
 If logging is enabled on the database when opened in read-only mode, log
-file archiving and log file pre-allocation are disabled and the log files
+file removal and log file pre-allocation are disabled and the log files
 will not be modified any way.
 
 @section readonly_lsm Readonly configuration and LSM trees

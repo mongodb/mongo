@@ -623,7 +623,7 @@ struct __wt_connection_stats {
     int64_t lock_txn_global_read_count;
     int64_t lock_txn_global_write_count;
     int64_t log_slot_switch_busy;
-    int64_t log_force_archive_sleep;
+    int64_t log_force_remove_sleep;
     int64_t log_bytes_payload;
     int64_t log_bytes_written;
     int64_t log_zero_fills;

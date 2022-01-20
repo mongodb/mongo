@@ -33,7 +33,7 @@
 
 #define NUM_RECORDS 800000
 
-#define ENV_CONFIG_REC "log=(archive=false,recover=on)"
+#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
 /* Constants and variables declaration. */
 /*
  * You may want to add "verbose=[compact,compact_progress]" to the connection config string to get

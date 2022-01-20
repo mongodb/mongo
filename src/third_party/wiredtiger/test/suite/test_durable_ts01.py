@@ -106,7 +106,7 @@ class test_durable_ts01(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.next(), 0)
         session.commit_transaction()
 
-        # Check that latest value is same as first  update value.
+        # Check that latest value is same as first update value.
         self.assertEquals(cursor.reset(), 0)
         session.begin_transaction()
         self.assertEquals(cursor.next(), 0)

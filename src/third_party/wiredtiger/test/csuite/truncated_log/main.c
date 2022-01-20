@@ -36,8 +36,8 @@ static bool use_columns = false;
 
 #define RECORDS_FILE "records"
 
-#define ENV_CONFIG                                      \
-    "create,log=(file_max=100K,archive=false,enabled)," \
+#define ENV_CONFIG                                     \
+    "create,log=(enabled,file_max=100K,remove=false)," \
     "transaction_sync=(enabled,method=none)"
 #define ENV_CONFIG_REC "log=(recover=on)"
 

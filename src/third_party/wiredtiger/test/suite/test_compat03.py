@@ -106,7 +106,7 @@ class test_compat03(wttest.WiredTigerTestCase, suite_subprocess):
         testdir = 'TEST'
         os.mkdir(testdir)
         config_str = 'create,'
-        log_str = 'log=(archive=false,enabled,file_max=%s),' % self.logmax
+        log_str = 'log=(enabled,file_max=%s,remove=false),' % self.logmax
         compat_str = ''
 
         if (self.rel != 'none'):

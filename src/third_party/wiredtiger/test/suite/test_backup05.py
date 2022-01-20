@@ -29,7 +29,7 @@
 # test_backup05.py
 #   Test that backups can be performed similar to MongoDB's fsyncLock.
 #   We assume writes are not being performed, a checkpoint is done and
-#   then we open a backup cursor to prevent log archiving and other file
+#   then we open a backup cursor to prevent log removal and other file
 #   manipulations.  Manually copy the directory and verify it.
 #
 

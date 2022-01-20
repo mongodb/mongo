@@ -34,15 +34,14 @@ See \ref log_threads for a discussion of pre-allocation.
 @section log_configuration Configuration choices and their implications
 
 Once the logging subsystem is enabled for the system, then other configuration settings
-control the finer details of the logging subsystem. The \c archive=true setting turns
-on log file archiving. That means that log files earlier than the most recently
-completed checkpoint can be removed. (In this use, archive means removal not a form
-of cold storage.) There are times, even when configured on, that log archiving is
-temporarily disabled inside the WiredTiger library.
+control the finer details of the logging subsystem. The \c remove=true setting turns on
+automatic log file removal. That means that log files earlier than the most recently
+completed checkpoint are removed.  There are times, even when configured on, that
+automatic log removal is temporarily disabled inside the WiredTiger library.
 
-Log archiving is disabled when a backup cursor is open. WiredTiger must guarantee
+Log removal is disabled when a backup cursor is open. WiredTiger must guarantee
 that any log file name that may have been returned to a backup cursor remains in
-existence for the lifetime of that cursor. Log archiving is also disabled when
+existence for the lifetime of that cursor. Log removal is also disabled when
 a log cursor is open. This cursor could be positioned anywhere in the log that
 existed when the cursor was opened and walking the records, so all log files that
 existed at open must continue to exist.
@@ -50,7 +49,7 @@ existed at open must continue to exist.
 The (default) log file pre-allocation setting \c prealloc=true allows the system to
 pre-allocate log files so that when application threads are writing their log
 records, on the critical path, they do not incur the penalties of file creation
-and having to sync the header or directory to the disk. Similar to archiving,
+and having to sync the header or directory to the disk. Similar to automatic removal,
 there are times when log file pre-allocation is disabled internally. Pre-allocation is
 disabled when a backup cursor is open. The user may not walk the list of files returned in
 the backup cursor, but can, instead, copy the directory contents itself. Therefore,
@@ -128,7 +127,7 @@ log_server, is a general thread, meaning it performs several unrelated
 tasks. It flushes out the current slot to the file system. It does
 this flush every 50 milliseconds and this is done so that if a
 system becomes idle, buffered log records in the memory of a slot
-do not languish. The thread also performs log archiving to remove
+do not languish. The thread also performs log removal to discard
 any log files that are no longer needed based on the checkpoint
 LSN. Finally the main thread performs log file pre-allocation, if
 configured. The pre-allocation algorithm is adaptable. If the thread

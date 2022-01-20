@@ -27,7 +27,7 @@ that the log files do not contain or make visible operations that are added to t
 the backup started that could have adverse affects during recovery and restore. Therefore
 WiredTiger forces a log file switch when opening the backup cursor. To fulfill the earlier
 contract that all files must exist during backup, WiredTiger does not use any pre-allocated
-log files nor does it archive or remove old log files during the time the backup cursor is open.
+log files nor does it remove log files during the time the backup cursor is open.
 
 Once the backup is opened successfully, any checkpoints that exist on the database before
 backup starts must be retained until the backup cursor is closed. All the newer checkpoints
@@ -51,7 +51,7 @@ renamed or imported into the database after the incremental backup cursor is ope
 When the backup cursor is opened with the \c target configuration string as \c "target=(\"log:\\")"
 the log-based incremental backup is performed by adding all the existing log files in the database
 to the list of files that needs to be copied. Applications wanting to use log files for incremental
-backup must first disable automatic log file removal using the \c log=(archive=false) configuration
+backup must first disable automatic log file removal using the \c log=(remove=false) configuration
 to ::wiredtiger_open. By default, WiredTiger automatically removes log files no longer required
 for recovery. Refer to @ref backup_incremental for more information on how to use the log-based
 incremental backup.

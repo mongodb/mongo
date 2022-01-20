@@ -43,8 +43,7 @@ main(int argc, char *argv[])
         /*! [Create a configuration parser] */
         WT_CONFIG_ITEM k, v;
         WT_CONFIG_PARSER *parser;
-        const char *config_string =
-          "path=/dev/loop,page_size=1024,log=(archive=true,file_max=20MB)";
+        const char *config_string = "path=/dev/loop,page_size=1024,log=(file_max=20MB,remove=true)";
 
         error_check(
           wiredtiger_config_parser_open(NULL, config_string, strlen(config_string), &parser));

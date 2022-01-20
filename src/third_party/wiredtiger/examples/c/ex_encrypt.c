@@ -394,7 +394,7 @@ simple_walk_log(WT_SESSION *session)
 #define WT_OPEN_CONFIG_COMMON                             \
     "create,cache_size=100MB,extensions=[" EXTENSION_NAME \
     "],"                                                  \
-    "log=(archive=false,enabled=true),"
+    "log=(enabled=true,remove=false),"
 
 #define WT_OPEN_CONFIG_GOOD \
     WT_OPEN_CONFIG_COMMON   \

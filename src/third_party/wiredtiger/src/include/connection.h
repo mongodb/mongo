@@ -449,17 +449,17 @@ struct __wt_connection_impl {
     uint32_t tiered_threads_min; /* Min tiered threads */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_LOG_ARCHIVE 0x001u         /* Archive is enabled */
-#define WT_CONN_LOG_CONFIG_ENABLED 0x002u  /* Logging is configured */
-#define WT_CONN_LOG_DEBUG_MODE 0x004u      /* Debug-mode logging enabled */
-#define WT_CONN_LOG_DOWNGRADED 0x008u      /* Running older version */
-#define WT_CONN_LOG_ENABLED 0x010u         /* Logging is enabled */
-#define WT_CONN_LOG_EXISTED 0x020u         /* Log files found */
-#define WT_CONN_LOG_FORCE_DOWNGRADE 0x040u /* Force downgrade */
-#define WT_CONN_LOG_RECOVER_DIRTY 0x080u   /* Recovering unclean */
-#define WT_CONN_LOG_RECOVER_DONE 0x100u    /* Recovery completed */
-#define WT_CONN_LOG_RECOVER_ERR 0x200u     /* Error if recovery required */
-#define WT_CONN_LOG_RECOVER_FAILED 0x400u  /* Recovery failed */
+#define WT_CONN_LOG_CONFIG_ENABLED 0x001u  /* Logging is configured */
+#define WT_CONN_LOG_DEBUG_MODE 0x002u      /* Debug-mode logging enabled */
+#define WT_CONN_LOG_DOWNGRADED 0x004u      /* Running older version */
+#define WT_CONN_LOG_ENABLED 0x008u         /* Logging is enabled */
+#define WT_CONN_LOG_EXISTED 0x010u         /* Log files found */
+#define WT_CONN_LOG_FORCE_DOWNGRADE 0x020u /* Force downgrade */
+#define WT_CONN_LOG_RECOVER_DIRTY 0x040u   /* Recovering unclean */
+#define WT_CONN_LOG_RECOVER_DONE 0x080u    /* Recovery completed */
+#define WT_CONN_LOG_RECOVER_ERR 0x100u     /* Error if recovery required */
+#define WT_CONN_LOG_RECOVER_FAILED 0x200u  /* Recovery failed */
+#define WT_CONN_LOG_REMOVE 0x400u          /* Removal is enabled */
 #define WT_CONN_LOG_ZERO_FILL 0x800u       /* Manually zero files */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t log_flags;                    /* Global logging configuration */

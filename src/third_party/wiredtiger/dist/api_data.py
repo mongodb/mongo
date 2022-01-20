@@ -612,8 +612,8 @@ connection_runtime_config = [
             if true, dump the core in the diagnostic mode on encountering the data corruption.''',
             type='boolean'),
         Config('checkpoint_retention', '0', r'''
-            adjust log archiving to retain the log records of this number
-            of checkpoints. Zero or one means perform normal archiving.''',
+            adjust log removal to retain the log records of this number
+            of checkpoints. Zero or one means perform normal removal.''',
             min='0', max='1024'),
         Config('cursor_copy', 'false', r'''
             if true, use the system allocator to make a copy of any data
@@ -629,7 +629,7 @@ connection_runtime_config = [
             and modifying the eviction score mechanism.''',
             type='boolean'),
         Config('log_retention', '0', r'''
-            adjust log archiving to retain at least this number of log files, ignored if set to 0.
+            adjust log removal to retain at least this number of log files, ignored if set to 0.
             (Warning: this option can remove log files required for recovery if no checkpoints
             have yet been done and the number of log files exceeds the configured value. As
             WiredTiger cannot detect the difference between a system that has not yet checkpointed
@@ -951,8 +951,8 @@ wiredtiger_open_compatibility_configuration = [
 # wiredtiger_open and WT_CONNECTION.reconfigure log configurations.
 log_configuration_common = [
     Config('archive', 'true', r'''
-        automatically archive unneeded log files''',
-        type='boolean'),
+        automatically remove unneeded log files (deprecated)''',
+        type='boolean', undoc=True),
     Config('os_cache_dirty_pct', '0', r'''
         maximum dirty system buffer cache usage, as a percentage of the
         log's \c file_max.  If non-zero, schedule writes for dirty blocks
@@ -962,6 +962,9 @@ log_configuration_common = [
         min='0', max='100'),
     Config('prealloc', 'true', r'''
         pre-allocate log files''',
+        type='boolean'),
+    Config('remove', 'true', r'''
+        automatically remove unneeded log files''',
         type='boolean'),
     Config('zero_fill', 'false', r'''
         manually write zeroes into log files''',

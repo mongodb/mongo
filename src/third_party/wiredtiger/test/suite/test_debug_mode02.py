@@ -47,16 +47,16 @@ class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
         logs = fnmatch.filter(os.listdir(self.home), "*gerLog*")
         return set(logs)
 
-    def check_archive(self, logfile):
-        archived = False
+    def check_remove(self, logfile):
+        removed = False
         for i in range(1,90):
-            # Sleep and then see if archive ran. We do this in a loop
+            # Sleep and then see if log removal ran. We do this in a loop
             # for slow machines. Max out at 90 seconds.
             time.sleep(1.0)
             if not os.path.exists(logfile):
-                archived = True
+                removed = True
                 break
-        self.assertTrue(archived)
+        self.assertTrue(removed)
 
     def advance_log_checkpoint(self):
         # Advance the log file to the next file and write a checkpoint.
@@ -76,14 +76,14 @@ class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_checkpoint_retain(self):
         self.session.create(self.uri, 'key_format=i,value_format=i')
-        # No log files should be archived while we have fewer than the
+        # No log files should be removed while we have fewer than the
         # retention number of logs. Make sure each iteration the new
         # logs are a proper superset of the previous time.
         for i in range(1, self.retain):
             cur_set = self.log_set()
             self.advance_log_checkpoint()
             # We don't accomodate slow machines here because we don't expect
-            # the files the change and there is no way to know if archive ran
+            # the files the change and there is no way to know if log removal ran
             # otherwise.
             time.sleep(1.0)
             new_set = self.log_set()
@@ -91,11 +91,11 @@ class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.assertTrue(os.path.exists(self.log1))
         self.advance_log_checkpoint()
-        self.check_archive(self.log1)
+        self.check_remove(self.log1)
         self.conn.reconfigure("debug_mode=(table_logging=true)")
         self.conn.reconfigure("verbose=(temporary)")
 
-    # Test that both zero and one archive as usual. And test reconfigure.
+    # Test that both zero and one remove as usual. And test reconfigure.
     def test_checkpoint_retain_reconfig(self):
         # We can turn checkpoint retention off.
         # We can turn checkpoint retention on to some value.
@@ -106,7 +106,7 @@ class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.reconfigure("debug_mode=(checkpoint_retention=0)")
         self.session.create(self.uri, 'key_format=i,value_format=i')
         self.advance_log_checkpoint()
-        self.check_archive(self.log1)
+        self.check_remove(self.log1)
 
         cfg = 'debug_mode=(checkpoint_retention=%d)' % self.retain
         self.conn.reconfigure(cfg)
@@ -124,7 +124,7 @@ class test_debug_mode02(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.conn.reconfigure("debug_mode=(checkpoint_retention=0)")
         self.advance_log_checkpoint()
-        self.check_archive(self.log2)
+        self.check_remove(self.log2)
 
         self.conn.reconfigure(cfg)
 

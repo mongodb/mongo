@@ -108,7 +108,7 @@ class test_debug_mode03(wttest.WiredTigerTestCase):
         count = self.find_log_recs()
         self.assertEqual(count, self.entries)
 
-    # Test that both zero and one archive as usual. And test reconfigure.
+    # Test that both zero and one remove as usual. And test reconfigure.
     def test_table_logging_off(self):
         self.conn.reconfigure("debug_mode=(table_logging=false)")
         self.session.create(self.uri, 'key_format=i,value_format=u,log=(enabled=false)')

@@ -51,7 +51,7 @@ class test_util18(wttest.WiredTigerTestCase, suite_subprocess):
     scenarios = make_scenarios(print_user_data)
 
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%dK)' % self.logmax
+        return 'log=(enabled,file_max=%dK,remove=false)' % self.logmax
 
     # Populate our test table with data we can check against in the printlog output.
     def populate(self):

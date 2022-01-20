@@ -96,11 +96,11 @@ trace_init(void)
         testutil_checkfmt(system(p), "%s", "logging directory creation failed");
         free(p);
 
-        /* Configure logging with archival, and keep the last N log files. */
+        /* Configure logging with automatic removal, and keep the last N log files. */
         len = strlen(g.home) * strlen(TRACE_DIR) + 10;
         p = dmalloc(len);
         testutil_check(__wt_snprintf(p, len, "%s/%s", g.home, TRACE_DIR));
-        config = "create,log=(enabled,archive),debug_mode=(log_retention=10)";
+        config = "create,log=(enabled=true,remove=true),debug_mode=(log_retention=10)";
         testutil_checkfmt(wiredtiger_open(p, NULL, config, &conn), "%s: %s", p, config);
         free(p);
     }

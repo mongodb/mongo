@@ -38,12 +38,12 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
- * __logmgr_force_archive --
- *     Force a checkpoint out and then force an archive, waiting for the first log to be archived up
+ * __logmgr_force_remove --
+ *     Force a checkpoint out and then force a removal, waiting for the first log to be removed up
  *     to the given log number.
  */
 static int
-__logmgr_force_archive(WT_SESSION_IMPL *session, uint32_t lognum)
+__logmgr_force_remove(WT_SESSION_IMPL *session, uint32_t lognum)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
@@ -57,7 +57,7 @@ __logmgr_force_archive(WT_SESSION_IMPL *session, uint32_t lognum)
     WT_RET(__wt_open_internal_session(conn, "compatibility-reconfig", true, 0, 0, &tmp_session));
     while (log->first_lsn.l.file < lognum) {
         /*
-         * Force a checkpoint to be written in the new log file and force the archiving of all
+         * Force a checkpoint to be written in the new log file and force the removal of all
          * previous log files. We do the checkpoint in the loop because the checkpoint LSN in the
          * log record could still reflect the previous log file in cases such as the write LSN has
          * not yet advanced into the new log file due to another group of threads still in progress
@@ -69,7 +69,7 @@ __logmgr_force_archive(WT_SESSION_IMPL *session, uint32_t lognum)
          * gradual.
          */
         __wt_spin_backoff(&yield_cnt, &sleep_usecs);
-        WT_STAT_CONN_INCRV(session, log_force_archive_sleep, sleep_usecs);
+        WT_STAT_CONN_INCRV(session, log_force_remove_sleep, sleep_usecs);
 
         WT_RET(WT_SESSION_CHECK_PANIC(tmp_session));
         WT_RET(__wt_log_truncate_files(tmp_session, NULL, true));
@@ -174,7 +174,8 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
     /*
      * If we are reconfiguring and at a new version we need to force the log file to advance so that
      * we write out a log file at the correct version. When we are downgrading we must force a
-     * checkpoint and finally archive, even if disabled, so that all new version log files are gone.
+     * checkpoint and finally log removal, even if disabled, so that all new version log files are
+     * gone.
      *
      * All of the version changes must be handled with locks on reconfigure because other threads
      * may be changing log files, using pre-allocated files.
@@ -185,7 +186,7 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
      */
     WT_RET(__wt_log_set_version(session, new_version, first_record, downgrade, reconfig, &lognum));
     if (reconfig && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DOWNGRADED))
-        WT_RET(__logmgr_force_archive(session, lognum));
+        WT_RET(__logmgr_force_remove(session, lognum));
     return (0);
 }
 
@@ -269,9 +270,16 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
     if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_CONFIG_ENABLED))
         return (0);
 
-    WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
+    /*
+     * The configuration string log.archive is deprecated, only take it if it's explicitly set by
+     * the application, that is, ignore its default value. Look for an explicit log.remove setting,
+     * then an explicit log.archive setting, then the default log.remove setting.
+     */
+    if (__wt_config_gets(session, cfg + 1, "log.remove", &cval) != 0 &&
+      __wt_config_gets(session, cfg + 1, "log.archive", &cval) != 0)
+        WT_RET(__wt_config_gets(session, cfg, "log.remove", &cval));
     if (cval.val != 0)
-        FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
+        FLD_SET(conn->log_flags, WT_CONN_LOG_REMOVE);
 
     /*
      * The file size cannot be reconfigured. The amount of memory allocated to the log slots may be
@@ -343,11 +351,11 @@ __wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
- * __log_archive_once_int --
- *     Helper for __log_archive_once. Intended to be called while holding the hot backup read lock.
+ * __log_remove_once_int --
+ *     Helper for __log_remove_once. Intended to be called while holding the hot backup read lock.
  */
 static int
-__log_archive_once_int(
+__log_remove_once_int(
   WT_SESSION_IMPL *session, char **logfiles, u_int logcount, uint32_t min_lognum)
 {
     uint32_t lognum;
@@ -363,11 +371,11 @@ __log_archive_once_int(
 }
 
 /*
- * __log_archive_once --
- *     Perform one iteration of log archiving. Must be called with the log archive lock held.
+ * __log_remove_once --
+ *     Perform one iteration of log removal. Must be called with the log removal lock held.
  */
 static int
-__log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
+__log_remove_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -411,23 +419,23 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
         else
             min_lognum = WT_MIN(log->fileid - (dbg_val + 1), min_lognum);
     }
-    __wt_verbose(session, WT_VERB_LOG, "log_archive: archive to log number %" PRIu32, min_lognum);
+    __wt_verbose(session, WT_VERB_LOG, "log_remove: remove to log number %" PRIu32, min_lognum);
 
     /*
-     * Main archive code. Get the list of all log files and remove any earlier than the minimum log
+     * Main remove code. Get the list of all log files and remove any earlier than the minimum log
      * number.
      */
     WT_ERR(__wt_fs_directory_list(session, conn->log_path, WT_LOG_FILENAME, &logfiles, &logcount));
 
     /*
      * If backup_file is non-zero we know we're coming from an incremental backup cursor. In that
-     * case just perform the archive operation without the lock.
+     * case just perform the remove operation without the lock.
      */
     if (backup_file != 0)
-        ret = __log_archive_once_int(session, logfiles, logcount, min_lognum);
+        ret = __log_remove_once_int(session, logfiles, logcount, min_lognum);
     else
         WT_WITH_HOTBACKUP_READ_LOCK(
-          session, ret = __log_archive_once_int(session, logfiles, logcount, min_lognum), NULL);
+          session, ret = __log_remove_once_int(session, logfiles, logcount, min_lognum), NULL);
     WT_ERR(ret);
 
     /*
@@ -438,7 +446,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 
     if (0)
 err:
-        __wt_err(session, ret, "log archive server error");
+        __wt_err(session, ret, "log removal server error");
     WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
     return (ret);
 }
@@ -509,7 +517,7 @@ err:
 
 /*
  * __wt_log_truncate_files --
- *     Truncate log files via archive once. Requires that the server is not currently running.
+ *     Truncate log files via remove once. Requires that the server is not currently running.
  */
 int
 __wt_log_truncate_files(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool force)
@@ -523,8 +531,8 @@ __wt_log_truncate_files(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool force)
     if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
         return (0);
     if (!force && FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LOG) &&
-      FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE))
-        WT_RET_MSG(session, EINVAL, "Attempt to archive manually while a server is running");
+      FLD_ISSET(conn->log_flags, WT_CONN_LOG_REMOVE))
+        WT_RET_MSG(session, EINVAL, "Attempt to remove manually while a server is running");
 
     log = conn->log;
 
@@ -535,11 +543,11 @@ __wt_log_truncate_files(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool force)
     }
     WT_ASSERT(session, backup_file <= log->alloc_lsn.l.file);
     __wt_verbose(
-      session, WT_VERB_LOG, "log_truncate_files: Archive once up to %" PRIu32, backup_file);
+      session, WT_VERB_LOG, "log_truncate_files: remove once up to %" PRIu32, backup_file);
 
-    __wt_writelock(session, &log->log_archive_lock);
-    ret = __log_archive_once(session, backup_file);
-    __wt_writeunlock(session, &log->log_archive_lock);
+    __wt_writelock(session, &log->log_remove_lock);
+    ret = __log_remove_once(session, backup_file);
+    __wt_writeunlock(session, &log->log_remove_lock);
     return (ret);
 }
 
@@ -841,7 +849,7 @@ __log_server(void *arg)
     signalled = false;
 
     /*
-     * Set this to the number of milliseconds we want to run archive and pre-allocation. Start it so
+     * Set this to the number of milliseconds we want to run remove and pre-allocation. Start it so
      * that we run on the first time through.
      */
     timediff = WT_THOUSAND;
@@ -849,7 +857,7 @@ __log_server(void *arg)
 
     /*
      * The log server thread does a variety of work. It forces out any buffered log writes. It
-     * pre-allocates log files and it performs log archiving. The reason the wrlsn thread does not
+     * pre-allocates log files and it performs log removal. The reason the wrlsn thread does not
      * force out the buffered writes is because we want to process and move the write_lsn forward as
      * quickly as possible. The same reason applies to why the log file server thread does not force
      * out the writes. That thread does fsync calls which can take a long time and we don't want log
@@ -866,7 +874,7 @@ __log_server(void *arg)
         WT_ERR_ERROR_OK(__wt_log_force_write(session, 0, &did_work), EBUSY, false);
 
         /*
-         * We don't want to archive or pre-allocate files as often as we want to force out log
+         * We don't want to remove or pre-allocate files as often as we want to force out log
          * buffers. Only do it once per second or if the condition was signalled.
          */
         if (timediff >= WT_THOUSAND || signalled) {
@@ -884,16 +892,16 @@ __log_server(void *arg)
             }
 
             /*
-             * Perform the archive.
+             * Perform the removal.
              */
-            if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
-                if (__wt_try_writelock(session, &log->log_archive_lock) == 0) {
-                    ret = __log_archive_once(session, 0);
-                    __wt_writeunlock(session, &log->log_archive_lock);
+            if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_REMOVE)) {
+                if (__wt_try_writelock(session, &log->log_remove_lock) == 0) {
+                    ret = __log_remove_once(session, 0);
+                    __wt_writeunlock(session, &log->log_remove_lock);
                     WT_ERR(ret);
                 } else
                     __wt_verbose(session, WT_VERB_LOG, "%s",
-                      "log_archive: Blocked due to open log cursor holding archive lock");
+                      "log_remove: Blocked due to open log cursor holding remove lock");
             }
             time_start = __wt_clock(session);
         }
@@ -941,7 +949,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session)
     WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
     WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
     WT_RET(__wt_spin_init(session, &log->log_writelsn_lock, "log write LSN"));
-    WT_RET(__wt_rwlock_init(session, &log->log_archive_lock));
+    WT_RET(__wt_rwlock_init(session, &log->log_remove_lock));
     if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
         log->allocsize = (uint32_t)WT_MAX(conn->buffer_alignment, WT_LOG_ALIGN);
     else
@@ -1014,9 +1022,9 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
     conn->log_wrlsn_tid_set = true;
 
     /*
-     * If a log server thread exists, the user may have reconfigured archiving or pre-allocation.
-     * Signal the thread. Otherwise the user wants archiving and/or allocation and we need to start
-     * up the thread.
+     * If a log server thread exists, the user may have reconfigured removal or pre-allocation.
+     * Signal the thread. Otherwise the user wants removal and/or allocation and we need to start up
+     * the thread.
      */
     if (conn->log_session != NULL) {
         WT_ASSERT(session, conn->log_cond != NULL);
@@ -1042,7 +1050,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 
 /*
  * __wt_logmgr_destroy --
- *     Destroy the log archiving server thread and logging subsystem.
+ *     Destroy the log removal server thread and logging subsystem.
  */
 int
 __wt_logmgr_destroy(WT_SESSION_IMPL *session)
@@ -1102,7 +1110,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 
     __wt_cond_destroy(session, &conn->log->log_sync_cond);
     __wt_cond_destroy(session, &conn->log->log_write_cond);
-    __wt_rwlock_destroy(session, &conn->log->log_archive_lock);
+    __wt_rwlock_destroy(session, &conn->log->log_remove_lock);
     __wt_spin_destroy(session, &conn->log->log_lock);
     __wt_spin_destroy(session, &conn->log->log_fs_lock);
     __wt_spin_destroy(session, &conn->log->log_slot_lock);

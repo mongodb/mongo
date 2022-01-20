@@ -49,7 +49,7 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Turn on logging for this test.
     def conn_config(self):
-        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+        return 'log=(enabled,file_max=%s,remove=false),' % self.logmax + \
             'transaction_sync="(method=dsync,enabled)"'
 
     def test_printlog_unicode(self):

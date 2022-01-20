@@ -44,10 +44,10 @@ class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
     # Set the log file size small so we generate checkpoints
     # with LSNs in different files.
     conn_config = 'config_base=false,' + \
-        'log=(archive=false,enabled,file_max=100K),' + \
+        'log=(enabled,file_max=100K,remove=false),' + \
         'transaction_sync=(method=dsync,enabled)'
     conn_on = 'config_base=false,' + \
-        'log=(archive=false,enabled,file_max=100K),' + \
+        'log=(enabled,file_max=100K,remove=false),' + \
         'transaction_sync=(method=dsync,enabled)'
     conn_off = 'config_base=false,log=(enabled=false)'
 

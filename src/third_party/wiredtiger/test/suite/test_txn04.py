@@ -74,8 +74,8 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         # deterministic manner.
         txn_sync = self.sync_list[
             self.scenario_number % len(self.sync_list)]
-        # Set archive false on the home directory.
-        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+        # Set remove=false on the home directory.
+        return 'log=(enabled,file_max=%s,remove=false),' % self.logmax + \
             'transaction_sync="%s",' % txn_sync
 
     # Check that a cursor (optionally started in a new transaction), sees the

@@ -41,7 +41,7 @@ application or periodically based on elapsed time or data size with the
 \c checkpoint configuration to ::wiredtiger_open.
 
 Database checkpoints are necessary for two reasons: First, log files can
-only be archived after a checkpoint completes, and so the frequency of
+only be removed after a checkpoint completes, and so the frequency of
 checkpoints determines the disk space required by log files.  Second,
 checkpoints bound the time required for recovery to complete after
 application or system failure by limiting the log records that need to
@@ -72,7 +72,7 @@ to ::wiredtiger_open.
 
 By default, WiredTiger automatically removes log files no longer
 required for recovery.  Applications wanting to archive log files
-instead must disable log file removal using the \c log=(archive=false)
+instead must disable log file removal using the \c log=(remove=false)
 configuration to ::wiredtiger_open.
 
 Log files may be removed or archived after a checkpoint has completed,
