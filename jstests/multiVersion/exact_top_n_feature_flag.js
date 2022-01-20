@@ -146,10 +146,10 @@ function runTest(downgradeVersion) {
     primary = rst.getPrimary();
     testDB = primary.getDB(dbName);
 
-    // Shouldn't pass until the FCV is set.
+    // Despite the upgrade, the test shouldn't pass because the FCV has not been explicitly set.
     assertExpectedBehavior(false, testDB);
 
-    // Set the FCV. The tests should pass now pass.
+    // Set the FCV; the test should now pass.
     primary = rst.getPrimary();
     adminDB = primary.getDB("admin");
     checkFCV(adminDB, downgradeVersion);
@@ -169,30 +169,25 @@ function runTest(downgradeVersion) {
         }
     });
 
-    assert.binVersion(st.shard0, downgradeVersion);
-    assert.binVersion(st.shard1, downgradeVersion);
-    assert.binVersion(st.s, downgradeVersion);
-
     testDB = st.s.getDB(dbName);
     coll = testDB[collName];
     assert.commandWorked(coll.insert({}));
 
-    // Shouldn't pass in 'downgradeVersion'.
+    // The test shouldn't pass in 'downgradeVersion'.
+    adminDB = st.s.getDB("admin");
+    checkFCV(adminDB, downgradeVersion);
     assertExpectedBehavior(false, testDB);
 
     // Upgrade the cluster.
     st.upgradeCluster("latest", {waitUntilStable: true});
-    assert.binVersion(st.shard0, "latest");
-    assert.binVersion(st.shard1, "latest");
-    assert.binVersion(st.s, "latest");
     testDB = st.s.getDB(dbName);
 
-    // Shouldn't pass in until FCV is set.
-    assertExpectedBehavior(false, testDB);
-
-    // Should pass now that the FCV is set.
+    // Despite the upgrade, the test shouldn't pass because the FCV has not been explicitly set.
     adminDB = st.s.getDB("admin");
     checkFCV(adminDB, downgradeVersion);
+    assertExpectedBehavior(false, testDB);
+
+    // Set the FCV; the test should now pass.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(adminDB, latestFCV);
     assertExpectedBehavior(true, testDB);
