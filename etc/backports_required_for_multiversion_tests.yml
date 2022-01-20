@@ -128,6 +128,8 @@ all:
     test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
   - ticket: SERVER-60685
     test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+  - ticket: SERVER-62147
+    test_file: jstests/core/exhaust.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

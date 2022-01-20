@@ -106,7 +106,7 @@ Message makeLegacyExhaustMessage(Message* m, const DbResponse& dbresponse) {
  * Currently only supports exhaust for 'getMore' commands.
  */
 Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
-    if (requestMsg.operation() == dbQuery) {
+    if (requestMsg.operation() == dbQuery || requestMsg.operation() == dbGetMore) {
         return makeLegacyExhaustMessage(&requestMsg, *dbresponse);
     }
 

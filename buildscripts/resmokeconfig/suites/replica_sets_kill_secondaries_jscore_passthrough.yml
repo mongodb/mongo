@@ -20,6 +20,7 @@ selector:
   # primary's oplog when run as a part of burn_in_tests.
   - jstests/core/max_doc_size.js
   - jstests/core/mr_bigobject.js
+  - jstests/core/exhaust.js
   exclude_with_any_tags:
   # emptycapped is not supported with rollback using recover-to-timestamp.
   - requires_emptycapped
