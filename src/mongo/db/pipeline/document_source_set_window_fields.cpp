@@ -461,9 +461,11 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     MutableDocument addFieldsSpec;
     for (auto&& [fieldName, function] : _executableOutputs) {
         try {
-            // If we hit a uassert while evaluating expressions on user data, delete the temporary
-            // table before aborting the operation.
-            addFieldsSpec.addField(fieldName, function->getNext());
+            // Wrap the projected value in a $literal since there are limitations on a user-facing
+            // $addFields that we don't want to enforce here (e.g. empty object). If we hit a
+            // uassert while evaluating expressions on user data, delete the temporary table before
+            // aborting the operation.
+            addFieldsSpec.addField(fieldName, Value(DOC("$literal" << function->getNext())));
         } catch (const DBException&) {
             _iterator.finalize();
             throw;
@@ -506,6 +508,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             _iterator.finalize();
             break;
     }
+
     auto projExec = projection_executor::AddFieldsProjectionExecutor::create(
         pExpCtx, addFieldsSpec.freeze().toBson());
 

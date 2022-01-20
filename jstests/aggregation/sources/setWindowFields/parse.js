@@ -213,8 +213,7 @@ assert.commandWorked(run({
 }));
 
 // Not every accumulator is automatically a window function.
-
-var err = assert.commandFailedWithCode(run({$setWindowFields: {output: {a: {b: {$sum: "$a"}}}}}),
+let err = assert.commandFailedWithCode(run({$setWindowFields: {output: {a: {b: {$sum: "$a"}}}}}),
                                        ErrorCodes.FailedToParse);
 assert.includes(err.errmsg, 'Expected a $-prefixed window function, b');
 
@@ -250,4 +249,13 @@ err = assert.commandFailedWithCode(
     }),
     ErrorCodes.FailedToParse);
 assert.includes(err.errmsg, 'Unrecognized window function, $summ');
+
+// Test that an empty object is a valid projected field.
+assert.commandWorked(coll.insert({}));
+assert.commandWorked(run({$setWindowFields: {output: {v: {$max: {mergeObjects: {}}}}}}));
+
+// However conflicting field paths is always an error.
+err = assert.commandFailedWithCode(
+    run({$setWindowFields: {output: {a: {$sum: 1}, 'a.b': {$sum: 1}}}}), 40176);
+assert.includes(err.errmsg, 'specification contains two conflicting paths');
 })();
