@@ -143,7 +143,7 @@ if (groupPushdownEnabled) {
         db: testDB.getSiblingDB("admin"),
         cmdObj: {
             setParameter: 1,
-            "internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate": 1,
+            "internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast": 1,
         }
     });
     FixtureHelpers.runCommandOnEachPrimary({
@@ -241,7 +241,7 @@ if (groupPushdownEnabled) {
         db: testDB.getSiblingDB("admin"),
         cmdObj: {
             setParameter: 1,
-            "internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate": 1,
+            "internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast": 1,
         }
     });
     FixtureHelpers.runCommandOnEachPrimary({

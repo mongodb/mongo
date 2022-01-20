@@ -260,6 +260,28 @@ struct TraverseStats : public SpecificStats {
     size_t innerCloses{0};
 };
 
+struct HashAggStats : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<HashAggStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
+        visitor->visit(this);
+    }
+
+    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
+        visitor->visit(this);
+    }
+
+    bool usedDisk{false};
+    long long spilledRecords{0};
+    long long lastSpilledRecordSize{0};
+};
+
 /**
  * Visitor for calculating the number of storage reads during plan execution.
  */

@@ -511,18 +511,45 @@ server_parameters:
         gt: 0
         lte: { expr: BSONObjMaxInternalSize }
 
-  internalQuerySlotBasedExecutionHashAggMemoryUseSampleRate:
-    description: "The percent chance that the size of the hash table in a HashAgg stage is re-estimated
-    when an entry is updated. The estimated size of the hash table is used to determine if we should
-    spill to disk. [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]"
+  internalQuerySlotBasedExecutionHashAggMemoryUseCheckMargin:
+    description: "The memory check in HashAgg stage is done on every T'th processed record, where T
+    is calculated adaptively based on the estimated memory used and its recent growth. This setting
+    defines the percent of the remaining available memory to be used before the next check, given
+    the estimated growth speed per advance [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQuerySBEAggMemoryUseSampleRate"
+    cpp_varname: "internalQuerySBEAggMemoryUseCheckMargin"
     cpp_vartype: AtomicDouble
     default:
-      expr: 0.5
+      expr: 0.7
     validator:
         gt: 0.0
         lte: 1.0
+
+  internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost:
+    description: "The memory check in HashAgg stage is done on every T'th processed record, where T
+    is calculated adaptively based on the estimated memory used and its recent growth. This setting
+    defines the lower bound for T [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtMost"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 2
+    validator:
+        gt: 0
+
+  internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast:
+    description: "The memory check in HashAgg stage is done on every T'th processed record, where T
+    is calculated adaptively based on the estimated memory used and its recent growth. This setting
+    defines the upper bound for T. If this setting is less than [see internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtMost],
+    the check will be done on every internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast'th
+    processed record [see internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill]."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySBEAggMemoryCheckPerAdvanceAtLeast"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 1024
+    validator:
+        gt: 0
 
   internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
     description: "The max size in bytes that the hash table in a HashAgg stage can be
