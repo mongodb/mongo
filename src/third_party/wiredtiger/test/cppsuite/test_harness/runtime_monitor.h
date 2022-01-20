@@ -62,8 +62,9 @@ class statistics {
     int64_t get_max() const;
     int64_t get_min() const;
     const std::string &get_name() const;
-    bool get_runtime();
-    bool get_postrun();
+    bool get_postrun() const;
+    bool get_runtime() const;
+    bool get_save() const;
 
     protected:
     int field;
@@ -72,6 +73,7 @@ class statistics {
     std::string name;
     bool postrun;
     bool runtime;
+    bool save;
 };
 
 class cache_limit_statistic : public statistics {
@@ -112,7 +114,8 @@ class runtime_monitor : public component {
     static void get_stat(scoped_cursor &, int, int64_t *);
 
     public:
-    explicit runtime_monitor(configuration *config, database &database);
+    explicit runtime_monitor(
+      const std::string &test_name, configuration *config, database &database);
     virtual ~runtime_monitor() = default;
 
     /* Delete the copy constructor and the assignment operator. */
@@ -124,8 +127,12 @@ class runtime_monitor : public component {
     void finish() override final;
 
     private:
+    void save_stats(const std::string &filename);
+
+    private:
     scoped_session _session;
     scoped_cursor _cursor;
+    const std::string _test_name;
     std::vector<std::unique_ptr<statistics>> _stats;
     database &_database;
 };

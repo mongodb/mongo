@@ -576,6 +576,11 @@ functions:
         set -o verbose
         ${test_env_vars|} test/csuite/${test_binary}/smoke.sh ${test_args|} 2>&1
 
+  "upload cpp test stats":
+    - command: perf.send
+      params:
+        file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
+
   "upload-perf-test-stats":
     - command: shell.exec
       params:
@@ -952,6 +957,9 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/base_test_default.txt
           test_name: base_test
+      - func: "upload cpp test stats"
+        vars:
+          test_name: base_test
 
   - name: cppsuite-hs-cleanup-default
     tags: ["pull_request"]
@@ -964,6 +972,9 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/hs_cleanup_default.txt
           test_name: hs_cleanup
+      - func: "upload cpp test stats"
+        vars:
+          test_name: hs_cleanup
 
   - name: cppsuite-search-near-01-default
     tags: ["pull_request"]
@@ -974,6 +985,9 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config_filename: configs/search_near_01_default.txt
+          test_name: search_near_01
+      - func: "upload cpp test stats"
+        vars:
           test_name: search_near_01
 
   - name: cppsuite-search-near-02-default
@@ -986,6 +1000,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_02_default.txt
           test_name: search_near_02
+      - func: "upload cpp test stats"
+        vars:
+          test_name: search_near_02
 
   - name: cppsuite-search-near-03-default
     tags: ["pull_request"]
@@ -997,6 +1014,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_03_default.txt
           test_name: search_near_03
+      - func: "upload cpp test stats"
+        vars:
+          test_name: search_near_03
 
   - name: cppsuite-base-test-stress
     depends_on:
@@ -1006,6 +1026,9 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config_filename: configs/base_test_stress.txt
+          test_name: base_test
+      - func: "upload cpp test stats"
+        vars:
           test_name: base_test
 
   - name: cppsuite-hs-cleanup-stress
@@ -1017,7 +1040,10 @@ tasks:
         vars:
           test_config_filename: configs/hs_cleanup_stress.txt
           test_name: hs_cleanup
-  
+      - func: "upload cpp test stats"
+        vars:
+          test_name: hs_cleanup
+
   - name: cppsuite-search-near-01-stress
     depends_on:
       - name: compile
@@ -1026,6 +1052,9 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config_filename: configs/search_near_01_stress.txt
+          test_name: search_near_01
+      - func: "upload cpp test stats"
+        vars:
           test_name: search_near_01
 
   - name: cppsuite-search-near-02-stress
@@ -1037,6 +1066,9 @@ tasks:
         vars:
           test_config_filename: configs/search_near_02_stress.txt
           test_name: search_near_02
+      - func: "upload cpp test stats"
+        vars:
+          test_name: search_near_02
 
   - name: cppsuite-search-near-03-stress
     depends_on:
@@ -1046,6 +1078,9 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config_filename: configs/search_near_03_stress.txt
+          test_name: search_near_03
+      - func: "upload cpp test stats"
+        vars:
           test_name: search_near_03
 
   # End of cppsuite test tasks.

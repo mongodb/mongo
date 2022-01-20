@@ -15,6 +15,7 @@ runtime_monitor=
         #1.15GB, the history store isn't significant. Give the workload an extra 200MB of margin.
         max=1350000000,
         runtime=true,
+        save=true,
     )
 ),
 timestamp_manager=

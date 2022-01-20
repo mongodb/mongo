@@ -9,29 +9,29 @@ static const WT_CONFIG_CHECK confchk_checkpoint_manager_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_cache_hs_insert_subconfigs[] = {
   {"max", "string", NULL, NULL, NULL, 0}, {"min", "int", NULL, "min=0", NULL, 0},
   {"postrun", "boolean", NULL, NULL, NULL, 0}, {"runtime", "boolean", NULL, NULL, NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"save", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_cc_pages_removed_subconfigs[] = {
   {"max", "string", NULL, NULL, NULL, 0}, {"min", "int", NULL, "min=0", NULL, 0},
   {"postrun", "boolean", NULL, NULL, NULL, 0}, {"runtime", "boolean", NULL, NULL, NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"save", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_stat_cache_size_subconfigs[] = {
   {"max", "string", NULL, NULL, NULL, 0}, {"min", "int", NULL, "min=0", NULL, 0},
   {"postrun", "boolean", NULL, NULL, NULL, 0}, {"runtime", "boolean", NULL, NULL, NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"save", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_stat_db_size_subconfigs[] = {
   {"max", "string", NULL, NULL, NULL, 0}, {"min", "int", NULL, "min=0", NULL, 0},
   {"postrun", "boolean", NULL, NULL, NULL, 0}, {"runtime", "boolean", NULL, NULL, NULL, 0},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
+  {"save", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_runtime_monitor_subconfigs[] = {
-  {"cache_hs_insert", "category", NULL, NULL, confchk_cache_hs_insert_subconfigs, 4},
-  {"cc_pages_removed", "category", NULL, NULL, confchk_cc_pages_removed_subconfigs, 4},
+  {"cache_hs_insert", "category", NULL, NULL, confchk_cache_hs_insert_subconfigs, 5},
+  {"cc_pages_removed", "category", NULL, NULL, confchk_cc_pages_removed_subconfigs, 5},
   {"enabled", "boolean", NULL, NULL, NULL, 0}, {"op_rate", "string", NULL, NULL, NULL, 0},
-  {"stat_cache_size", "category", NULL, NULL, confchk_stat_cache_size_subconfigs, 4},
-  {"stat_db_size", "category", NULL, NULL, confchk_stat_db_size_subconfigs, 4},
+  {"stat_cache_size", "category", NULL, NULL, confchk_stat_cache_size_subconfigs, 5},
+  {"stat_db_size", "category", NULL, NULL, confchk_stat_db_size_subconfigs, 5},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_statistics_config_subconfigs[] = {
@@ -184,10 +184,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"
@@ -205,10 +206,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"
@@ -225,10 +227,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"
@@ -245,10 +248,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"
@@ -265,10 +269,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "search_near_threads=10,statistics_config=(enable_logging=true,"
     "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
     "op_rate=1s,stable_lag=1),workload_generator=(enabled=true,"
@@ -285,10 +290,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"
@@ -305,10 +311,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "cache_size_mb=0,checkpoint_manager=(enabled=false,op_rate=1s),"
     "compression_enabled=false,duration_seconds=0,"
     "enable_logging=false,runtime_monitor=(cache_hs_insert=(max=1,"
-    "min=0,postrun=false,runtime=false),cc_pages_removed=(max=1,min=0"
-    ",postrun=false,runtime=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false),"
-    "stat_db_size=(max=1,min=0,postrun=false,runtime=false)),"
+    "min=0,postrun=false,runtime=false,save=false),"
+    "cc_pages_removed=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),enabled=true,op_rate=1s,stat_cache_size=(max=1,min=0"
+    ",postrun=false,runtime=false,save=false),stat_db_size=(max=1,"
+    "min=0,postrun=false,runtime=false,save=false)),"
     "statistics_config=(enable_logging=true,type=all),"
     "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
     "stable_lag=1),workload_generator=(enabled=true,"

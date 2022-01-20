@@ -20,6 +20,7 @@ runtime_monitor=
         max=497000,
         min=457000,
         postrun=true,
+        save=true,
     ),
     # Seems to remove 160K records. Give it a similar margin.
     cc_pages_removed=
@@ -27,6 +28,7 @@ runtime_monitor=
         max=170000,
         min=150000,
         postrun=true,
+        save=true,
     ),
     stat_cache_size=
     (
@@ -39,6 +41,7 @@ runtime_monitor=
     (
         max=1900000000,
         runtime=true,
+        save=true,
     ),
 ),
 timestamp_manager=

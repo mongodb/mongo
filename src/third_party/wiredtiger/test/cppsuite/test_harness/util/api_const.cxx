@@ -60,6 +60,7 @@ const std::string POPULATE_CONFIG = "populate_config";
 const std::string POSTRUN_STATISTICS = "postrun";
 const std::string READ_CONFIG = "read_config";
 const std::string RUNTIME_STATISTICS = "runtime";
+const std::string SAVE = "save";
 const std::string STABLE_LAG = "stable_lag";
 const std::string STAT_CACHE_SIZE = "stat_cache_size";
 const std::string STAT_DB_SIZE = "stat_db_size";

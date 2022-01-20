@@ -100,6 +100,8 @@ stat_config = range_config + [
         Whether the stat needs to be checked post run.''', type='boolean'),
     Config('runtime', 'false', r'''
         Whether the stat needs to be checked at runtime.''', type='boolean'),
+    Config('save', 'false', r'''
+        Whether the stat needs to be saved in a JSON file post run.''', type='boolean'),
 ]
 
 component_config = throttle_config

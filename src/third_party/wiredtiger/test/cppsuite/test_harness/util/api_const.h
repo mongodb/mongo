@@ -63,6 +63,7 @@ extern const std::string POPULATE_CONFIG;
 extern const std::string POSTRUN_STATISTICS;
 extern const std::string READ_CONFIG;
 extern const std::string RUNTIME_STATISTICS;
+extern const std::string SAVE;
 extern const std::string STABLE_LAG;
 extern const std::string STAT_CACHE_SIZE;
 extern const std::string STAT_DB_SIZE;

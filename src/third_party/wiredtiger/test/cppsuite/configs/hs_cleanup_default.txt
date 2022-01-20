@@ -19,15 +19,17 @@ runtime_monitor=
         max=10,
         max=100000000,
         postrun=true,
+        save=true,
     ),
     cc_pages_removed=
     (
         max=10000000,
         postrun=true,
+        save=true,
     ),
     stat_cache_size=
     (
-        max=1000,
+        max=100,
         runtime=true,
     ),
     stat_db_size=
@@ -35,6 +37,7 @@ runtime_monitor=
         #10GB
         max=10000000000,
         runtime=true,
+        save=true,
     ),
 ),
 timestamp_manager=

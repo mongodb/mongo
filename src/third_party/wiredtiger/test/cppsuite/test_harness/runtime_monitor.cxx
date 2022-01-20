@@ -26,6 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <fstream>
+
 #include "connection_manager.h"
 #include "core/component.h"
 #include "core/configuration.h"
@@ -70,7 +72,8 @@ get_stat_field(const std::string &name)
 /* statistics class implementation */
 statistics::statistics(configuration &config, const std::string &stat_name, int stat_field)
     : field(stat_field), max(config.get_int(MAX)), min(config.get_int(MIN)), name(stat_name),
-      postrun(config.get_bool(POSTRUN_STATISTICS)), runtime(config.get_bool(RUNTIME_STATISTICS))
+      postrun(config.get_bool(POSTRUN_STATISTICS)), runtime(config.get_bool(RUNTIME_STATISTICS)),
+      save(config.get_bool(SAVE))
 {
 }
 
@@ -121,15 +124,21 @@ statistics::get_name() const
 }
 
 bool
-statistics::get_postrun()
+statistics::get_postrun() const
 {
     return postrun;
 }
 
 bool
-statistics::get_runtime()
+statistics::get_runtime() const
 {
     return runtime;
+}
+
+bool
+statistics::get_save() const
+{
+    return save;
 }
 
 /* cache_limit_statistic class implementation */
@@ -252,8 +261,9 @@ runtime_monitor::get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep
     testutil_check(cursor->reset(cursor.get()));
 }
 
-runtime_monitor::runtime_monitor(configuration *config, database &database)
-    : component("runtime_monitor", config), _database(database)
+runtime_monitor::runtime_monitor(
+  const std::string &test_name, configuration *config, database &database)
+    : component("runtime_monitor", config), _test_name(test_name), _database(database)
 {
 }
 
@@ -303,6 +313,9 @@ runtime_monitor::finish()
 {
     component::finish();
 
+    /* Save stats. */
+    save_stats(_test_name);
+
     /* Check the post run statistics now. */
     bool success = true;
     int64_t stat_max, stat_min, stat_value;
@@ -336,6 +349,30 @@ runtime_monitor::finish()
         testutil_die(-1,
           "runtime_monitor: One or more postrun statistics were outside of their specified "
           "limits.");
+}
+
+/*
+ * This function generates a file that contains the values of the different statistics that need to
+ * be saved as indicated by the configuration file.
+ */
+void
+runtime_monitor::save_stats(const std::string &filename)
+{
+    std::string stat_info = "[{\"info\":{\"test_name\": \"" + filename + "\"},\"metrics\": [";
+
+    for (const auto &stat : _stats) {
+        if (stat->get_save())
+            stat_info += "{\"name\":\"" + stat->get_name() +
+              "\",\"value\":" + stat->get_value_str(_cursor) + "},";
+    }
+
+    /* Remove last extra comma. */
+    if (stat_info.back() == ',')
+        stat_info.pop_back();
+
+    std::ofstream file(filename + ".json");
+    file << stat_info << "]}]";
+    file.close();
 }
 
 } // namespace test_harness
