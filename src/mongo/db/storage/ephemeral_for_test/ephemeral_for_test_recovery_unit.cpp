@@ -113,7 +113,7 @@ void RecoveryUnit::prepareUnitOfWork() {
 
 void RecoveryUnit::doAbandonSnapshot() {
     invariant(!_inUnitOfWork(), toString(_getState()));
-    if (abandonSnapshotMode() == RecoveryUnit::AbandonSnapshotMode::kCommit) {
+    if (_abandonSnapshotMode == RecoveryUnit::AbandonSnapshotMode::kCommit) {
         invariant(!_dirty);  // Cannot commit written data outside WUOW.
     }
 

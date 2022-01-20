@@ -155,7 +155,6 @@ public:
         const auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
             opCtx,
             {std::move(exec),
-             nullptr, /* recoveryUnit */
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              APIParameters::get(opCtx),

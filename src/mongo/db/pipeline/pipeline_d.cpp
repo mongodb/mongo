@@ -259,9 +259,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     }
 
     auto permitYield = true;
-    // Maintaining valid cursors across commands is not supported for exchange aggregations.
-    const bool allowMaintainValidCursorsAcrossCommands =
-        !static_cast<bool>(aggRequest && aggRequest->getExchange());
     return getExecutorFind(expCtx->opCtx,
                            &collection,
                            std::move(cq.getValue()),
@@ -269,7 +266,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
                                canonicalQuery->setPipeline(extractSbeCompatibleGroupsForPushdown(
                                    expCtx, collection, canonicalQuery, pipeline));
                            },
-                           allowMaintainValidCursorsAcrossCommands,
                            permitYield,
                            plannerOpts);
 }

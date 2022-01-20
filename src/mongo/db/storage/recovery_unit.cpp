@@ -50,15 +50,6 @@ RecoveryUnit::RecoveryUnit() {
     assignNextSnapshotId();
 }
 
-void RecoveryUnit::incAbandonSnapshotCommitModeCount() {
-    ++_abandonSnapshotCommitModeCounter;
-}
-
-void RecoveryUnit::decAbandonSnapshotCommitModeCount() {
-    invariant(_abandonSnapshotCommitModeCounter > 0);
-    --_abandonSnapshotCommitModeCounter;
-}
-
 void RecoveryUnit::assignNextSnapshotId() {
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
 }

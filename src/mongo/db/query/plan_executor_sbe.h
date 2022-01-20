@@ -50,7 +50,6 @@ public:
                     NamespaceString nss,
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
-    ~PlanExecutorSBE() {}
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
@@ -132,7 +131,9 @@ public:
         return *_planExplainer;
     }
 
-    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override;
+    void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {
+        _isSaveRecoveryUnitAcrossCommandsEnabled = true;
+    }
     bool isSaveRecoveryUnitAcrossCommandsEnabled() const override {
         return _isSaveRecoveryUnitAcrossCommandsEnabled;
     }
@@ -178,10 +179,6 @@ private:
     bool _isDisposed{false};
 
     bool _isSaveRecoveryUnitAcrossCommandsEnabled = false;
-    // If engaged, forces the recovery unit to commit instead of abort on calls to
-    // abandonSnapshot(). This field is only used when '_isSaveRecoveryUnitAcrossCommandsEnabled'
-    // is true.
-    boost::optional<AbandonSnapshotCommitModeBlock> _recoveryUnitCommitModeBlock;
 };
 
 /**

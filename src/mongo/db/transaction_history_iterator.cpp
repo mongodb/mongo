@@ -90,7 +90,6 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                                                 &oplogRead.getCollection(),
                                                 std::move(cq),
                                                 nullptr /*extractAndAttachPipelineStages */,
-                                                true, /* allow saving cursors across commands */
                                                 permitYield));
 
     PlanExecutor::ExecState getNextResult;

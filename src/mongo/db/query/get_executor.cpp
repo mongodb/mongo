@@ -1270,7 +1270,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*)> extractAndAttachPipelineStages,
-    bool allowMaintainValidCursorsAcrossCommands,
     bool permitYield,
     size_t plannerOptions) {
     auto yieldPolicy = (permitYield && !opCtx->inMultiDocumentTransaction())
@@ -1280,25 +1279,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     if (OperationShardingState::isOperationVersioned(opCtx)) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
-    auto executor = getExecutor(opCtx,
-                                collection,
-                                std::move(canonicalQuery),
-                                extractAndAttachPipelineStages,
-                                yieldPolicy,
-                                plannerOptions);
-
-    // If the executor supports it and the operation is eligible, we will maintain the storage
-    // engine state across commands.
-    if (allowMaintainValidCursorsAcrossCommands && executor.isOK() &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gYieldingSupportForSBE.isEnabled(serverGlobalParams.featureCompatibility) &&
-        !opCtx->inMultiDocumentTransaction() &&
-        repl::ReadConcernArgs::get(opCtx).getLevel() !=
-            repl::ReadConcernLevel::kSnapshotReadConcern) {
-        executor.getValue()->enableSaveRecoveryUnitAcrossCommandsIfSupported();
-    }
-
-    return executor;
+    return getExecutor(opCtx,
+                       collection,
+                       std::move(canonicalQuery),
+                       extractAndAttachPipelineStages,
+                       yieldPolicy,
+                       plannerOptions);
 }
 
 namespace {
