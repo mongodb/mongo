@@ -246,15 +246,6 @@ have switched that lock from a spin lock to a read-write lock, and consequently
 changed the statistics tracking lock related wait time.
 </dd>
 
-<dt>Logging subsystem statistics</dt>
-<dd>
-Two logging subsystem statistics have been removed as they were a duplicate of
-other statistics.  The \c log_slot_joins and \c log_slot_transitions statistics
-are no longer present.  They were duplicates of \c log_writes and
-\c log_slot_closes respectively.  Several new logging related statistics have
-been added.
-</dd>
-
 <dt>Forced and named checkpoint error conditions changed</dt>
 <dd>
 There are new cases where checkpoints created with an explicit name or the
