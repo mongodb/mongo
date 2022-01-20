@@ -66,7 +66,7 @@ protected:
         boost::optional<int64_t> maxChunkSizeBytes = boost::none) {
         CollectionType shardedCollection(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid);
         shardedCollection.setKeyPattern(kShardKeyPattern);
-        shardedCollection.setBalancerShouldMergeChunks(true);
+        shardedCollection.setDefragmentCollection(true);
         shardedCollection.setDefragmentationPhase(phase);
         if (maxChunkSizeBytes) {
             shardedCollection.setMaxChunkSizeBytes(maxChunkSizeBytes.get());
@@ -82,10 +82,10 @@ protected:
         setupShards(kShardList);
         setupCollection(kNss, kShardKeyPattern, chunkList);
         auto updateClause = startingPhase.has_value()
-            ? BSON("$set" << BSON(CollectionType::kBalancerShouldMergeChunksFieldName
+            ? BSON("$set" << BSON(CollectionType::kDefragmentCollectionFieldName
                                   << true << CollectionType::kDefragmentationPhaseFieldName
                                   << DefragmentationPhase_serializer(*startingPhase)))
-            : BSON("$set" << BSON(CollectionType::kBalancerShouldMergeChunksFieldName << true));
+            : BSON("$set" << BSON(CollectionType::kDefragmentCollectionFieldName << true));
         ASSERT_OK(updateToConfigCollection(operationContext(),
                                            CollectionType::ConfigNS,
                                            BSON(CollectionType::kUuidFieldName << kUuid),
@@ -184,7 +184,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestAddEmptyCollectionDoesNotTriggerDe
 TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionWhenCollectionRemovedFailsGracefully) {
     CollectionType coll(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid);
     coll.setKeyPattern(kShardKeyPattern);
-    coll.setBalancerShouldMergeChunks(true);
+    coll.setDefragmentCollection(true);
     // Collection entry is not persisted (to simulate collection dropped), defragmentation should
     // not begin.
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
@@ -336,7 +336,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                                                CollectionType::ConfigNS,
                                                BSON(CollectionType::kUuidFieldName << kUuid))
                          .getValue();
-    ASSERT_TRUE(configDoc.getBoolField(CollectionType::kBalancerShouldMergeChunksFieldName));
+    ASSERT_TRUE(configDoc.getBoolField(CollectionType::kDefragmentCollectionFieldName));
     auto storedDefragmentationPhase = DefragmentationPhase_parse(
         IDLParserErrorContext("BalancerDefragmentationPolicyTest"),
         configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));

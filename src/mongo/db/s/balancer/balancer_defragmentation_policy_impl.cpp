@@ -946,7 +946,7 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     OperationContext* opCtx, const CollectionType& coll) {
     stdx::lock_guard<Latch> lk(_streamingMutex);
     const auto& uuid = coll.getUuid();
-    if (coll.getBalancerShouldMergeChunks() && !_defragmentationStates.contains(uuid)) {
+    if (coll.getDefragmentCollection() && !_defragmentationStates.contains(uuid)) {
         _initializeCollectionState(lk, opCtx, coll);
         // Fulfill pending promise of actionable operation if needed
         if (_nextStreamingActionPromise) {
@@ -958,7 +958,7 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
                 return;
             }
         }
-    } else if (!coll.getBalancerShouldMergeChunks() && _defragmentationStates.contains(uuid)) {
+    } else if (!coll.getDefragmentCollection() && _defragmentationStates.contains(uuid)) {
         _transitionPhases(opCtx, coll, DefragmentationPhaseEnum::kFinished);
         _defragmentationStates.erase(uuid);
     }
@@ -1254,7 +1254,7 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
                                     << DefragmentationPhase_serializer(phase)))));
         } else {
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
-                "$unset" << BSON(CollectionType::kBalancerShouldMergeChunksFieldName
+                "$unset" << BSON(CollectionType::kDefragmentCollectionFieldName
                                  << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
         }
         return entry;

@@ -510,7 +510,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Can't commit auto-split while `" << nss.ns()
                           << "` is undergoing a defragmentation.",
-            !(coll.getBalancerShouldMergeChunks() && fromChunkSplitter));
+            !(coll.getDefragmentCollection() && fromChunkSplitter));
 
     // Get the max chunk version for this namespace.
     auto swCollVersion = getCollectionVersion(opCtx, nss);

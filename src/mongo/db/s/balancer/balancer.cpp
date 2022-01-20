@@ -933,7 +933,7 @@ Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCt
                                                           const NamespaceString& ns) {
     try {
         auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
-        bool isMerging = coll.getBalancerShouldMergeChunks();
+        bool isMerging = coll.getDefragmentCollection();
         if (isMerging) {
             return {false, kBalancerPolicyStatusChunksMerging.toString()};
         }

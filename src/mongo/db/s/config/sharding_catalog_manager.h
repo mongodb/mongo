@@ -417,7 +417,7 @@ public:
     void configureCollectionBalancing(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       boost::optional<int64_t> chunkSizeBytes,
-                                      boost::optional<bool> balancerShouldMergeChunks,
+                                      boost::optional<bool> defragmentCollection,
                                       boost::optional<bool> enableAutoSplitter);
 
     //

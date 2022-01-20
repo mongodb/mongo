@@ -357,7 +357,7 @@ public:
                         DBDirectClient client(opCtx);
 
                         const BSONObj collBeingDefragmentedQuery =
-                            BSON(CollectionType::kBalancerShouldMergeChunksFieldName
+                            BSON(CollectionType::kDefragmentCollectionFieldName
                                  << BSON("$exists" << true));
 
                         const bool isDefragmenting = client.count(CollectionType::ConfigNS,

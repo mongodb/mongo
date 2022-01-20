@@ -53,9 +53,9 @@ structs:
                 type: bool
                 description: "Specifies whether the auto-splitter should be running or not for this collection."
                 optional: true
-            balancerShouldMergeChunks:
+            defragmentCollection:
                 type: bool
-                description: "Tell the balancer to merge chunks until they reach the new default chunk size"
+                description: "Tell the balancer to defragment the collection"
                 optional: true
 
 commands:

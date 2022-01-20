@@ -576,7 +576,7 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
         write_ops::UpdateOpEntry entry;
         entry.setQ(BSON(CollectionType::kUuidFieldName << collUuid));
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$set" << BSON(CollectionType::kBalancerShouldMergeChunksFieldName << true))));
+            BSON("$set" << BSON(CollectionType::kDefragmentCollectionFieldName << true))));
         return entry;
     }()});
     dbClient.update(updateOp);

@@ -553,7 +553,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<int64_t> chunkSizeBytes,
-    boost::optional<bool> balancerShouldMergeChunks,
+    boost::optional<bool> defragmentCollection,
     boost::optional<bool> enableAutoSplitter) {
 
     // Hold the FCV region to serialize with the setFeatureCompatibilityVersion command
@@ -566,7 +566,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
 
     uassert(ErrorCodes::InvalidOptions,
             "invalid collection auto splitter config update",
-            chunkSizeBytes || balancerShouldMergeChunks || enableAutoSplitter);
+            chunkSizeBytes || defragmentCollection || enableAutoSplitter);
 
     short updatedFields = 0;
     bool doMerge, doSplit = false;
@@ -584,9 +584,9 @@ void ShardingCatalogManager::configureCollectionBalancing(
             setBuilder.append(CollectionType::kMaxChunkSizeBytesFieldName, *chunkSizeBytes);
             updatedFields++;
         }
-        if (balancerShouldMergeChunks) {
-            doMerge = balancerShouldMergeChunks.get();
-            setBuilder.append(CollectionType::kBalancerShouldMergeChunksFieldName, doMerge);
+        if (defragmentCollection) {
+            doMerge = defragmentCollection.get();
+            setBuilder.append(CollectionType::kDefragmentCollectionFieldName, doMerge);
             updatedFields++;
         }
         if (enableAutoSplitter) {

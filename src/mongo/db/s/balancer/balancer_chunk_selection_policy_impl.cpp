@@ -347,7 +347,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         const NamespaceString& nss(coll.getNss());
 
         if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
-            coll.getBalancerShouldMergeChunks()) {
+            coll.getDefragmentCollection()) {
             LOGV2_DEBUG(5966401,
                         1,
                         "Not balancing explicitly disabled collection",
@@ -355,7 +355,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
                         "allowBalance"_attr = coll.getAllowBalance(),
                         "allowMigrations"_attr = coll.getAllowMigrations(),
                         "permitMigrations"_attr = coll.getPermitMigrations(),
-                        "balancerShouldMergeChunks"_attr = coll.getBalancerShouldMergeChunks());
+                        "defragmentCollection"_attr = coll.getDefragmentCollection());
             continue;
         }
 

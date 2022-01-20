@@ -88,7 +88,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             ActionSet actions({ActionType::splitChunk});
-            if (request().getBalancerShouldMergeChunks().get_value_or(false)) {
+            if (request().getDefragmentCollection().get_value_or(false)) {
                 actions.addAction(ActionType::moveChunk);
             }
             uassert(ErrorCodes::Unauthorized,

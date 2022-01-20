@@ -87,7 +87,7 @@ public:
                 opCtx,
                 nss,
                 chunkSizeBytes,
-                request().getBalancerShouldMergeChunks(),
+                request().getDefragmentCollection(),
                 request().getEnableAutoSplitter());
         }
 

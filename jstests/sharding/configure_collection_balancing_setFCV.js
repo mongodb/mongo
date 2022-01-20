@@ -27,16 +27,15 @@ for (const downgradeVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Test that downgrade is not allowed if a collection is undergoing defragmentation
     {
         // Set collection under defragmentation to block downgrade
-        assert.commandWorked(st.s.adminCommand(
-            {configureCollectionBalancing: fullNs, balancerShouldMergeChunks: true}));
+        assert.commandWorked(
+            st.s.adminCommand({configureCollectionBalancing: fullNs, defragmentCollection: true}));
 
         var setFCVCmdResult = st.s.adminCommand({setFeatureCompatibilityVersion: downgradeVersion});
         assert.commandFailedWithCode(setFCVCmdResult, ErrorCodes.CannotDowngrade);
 
         // Rollback the change to allow downgrade
-        assert.commandWorked(
-            st.config.collections.updateOne({balancerShouldMergeChunks: {$exists: true}},
-                                            {$unset: {balancerShouldMergeChunks: 1}}));
+        assert.commandWorked(st.config.collections.updateOne(
+            {defragmentCollection: {$exists: true}}, {$unset: {defragmentCollection: 1}}));
     }
 
     // Check that per-collection balancing fields are removed upon setFCV < 5.3

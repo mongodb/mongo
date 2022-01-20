@@ -84,8 +84,8 @@ public:
     static constexpr auto kUuidFieldName = kPre50CompatibleUuidFieldName;
     static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
 
-    using CollectionTypeBase::kBalancerShouldMergeChunksFieldName;
     using CollectionTypeBase::kDefragmentationPhaseFieldName;
+    using CollectionTypeBase::kDefragmentCollectionFieldName;
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
     using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;
@@ -106,8 +106,8 @@ public:
     using CollectionTypeBase::getTimestamp;
     using CollectionTypeBase::getUnique;
     using CollectionTypeBase::getUpdatedAt;
-    using CollectionTypeBase::setBalancerShouldMergeChunks;
     using CollectionTypeBase::setDefragmentationPhase;
+    using CollectionTypeBase::setDefragmentCollection;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
     using CollectionTypeBase::setTimeseriesFields;
@@ -150,8 +150,8 @@ public:
 
     void setMaxChunkSizeBytes(int64_t value);
 
-    bool getBalancerShouldMergeChunks() const {
-        return CollectionTypeBase::getBalancerShouldMergeChunks().get_value_or(false);
+    bool getDefragmentCollection() const {
+        return CollectionTypeBase::getDefragmentCollection().get_value_or(false);
     }
 
     bool getAllowAutoSplit() const {
@@ -159,7 +159,7 @@ public:
     }
 
     bool getAllowBalance() const {
-        return !getNoBalance() && !getBalancerShouldMergeChunks();
+        return !getNoBalance() && !getDefragmentCollection();
     }
 
     bool getAllowMigrations() const {
