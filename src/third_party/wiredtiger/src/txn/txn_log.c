@@ -476,7 +476,7 @@ __wt_txn_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_
     case WT_TXN_LOG_CKPT_PREPARE:
         txn->full_ckpt = true;
 
-        if (conn->compat_major >= WT_LOG_V2_MAJOR) {
+        if (__wt_version_gte(conn->compat_version, WT_LOG_V2_VERSION)) {
             /*
              * Write the system log record containing a checkpoint start operation.
              */

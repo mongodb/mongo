@@ -23,9 +23,9 @@ __metadata_config(WT_SESSION_IMPL *session, char **metaconfp)
 
     /* Create a turtle file with default values. */
     WT_RET(__wt_scr_alloc(session, 0, &buf));
-    WT_ERR(
-      __wt_buf_fmt(session, buf, "key_format=S,value_format=S,id=%d,version=(major=%d,minor=%d)",
-        WT_METAFILE_ID, WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
+    WT_ERR(__wt_buf_fmt(session, buf,
+      "key_format=S,value_format=S,id=%d,version=(major=%" PRIu16 ",minor=%" PRIu16 ")",
+      WT_METAFILE_ID, WT_BTREE_VERSION_MAX.major, WT_BTREE_VERSION_MAX.minor));
     cfg[1] = buf->data;
     ret = __wt_config_collapse(session, cfg, metaconfp);
 
@@ -153,8 +153,10 @@ int
 __wt_turtle_validate_version(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
-    uint32_t major, minor, patch;
+    WT_VERSION version;
     char *version_string;
+
+    version = WT_NO_VERSION;
 
     WT_WITH_TURTLE_LOCK(
       session, ret = __wt_turtle_read(session, WT_METADATA_VERSION, &version_string));
@@ -162,18 +164,16 @@ __wt_turtle_validate_version(WT_SESSION_IMPL *session)
     if (ret != 0)
         WT_ERR_MSG(session, ret, "Unable to read version string from turtle file");
 
-    if ((ret = sscanf(version_string, "major=%u,minor=%u,patch=%u", &major, &minor, &patch)) != 3)
+    if ((ret = sscanf(version_string, "major=%" SCNu16 ",minor=%" SCNu16 ",patch=%" SCNu16,
+           &version.major, &version.minor, &version.patch)) != 3)
         WT_ERR_MSG(session, ret, "Unable to parse turtle file version string");
 
     ret = 0;
 
-    if (major < WT_MIN_STARTUP_VERSION_MAJOR ||
-      (major == WT_MIN_STARTUP_VERSION_MAJOR && minor < WT_MIN_STARTUP_VERSION_MINOR))
+    if (__wt_version_lt(version, WT_MIN_STARTUP_VERSION))
         WT_ERR_MSG(session, WT_ERROR, "WiredTiger version incompatible with current binary");
 
-    S2C(session)->recovery_major = major;
-    S2C(session)->recovery_minor = minor;
-    S2C(session)->recovery_patch = patch;
+    S2C(session)->recovery_version = version;
 
 err:
     __wt_free(session, version_string);
@@ -432,8 +432,8 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
     if (F_ISSET(conn, WT_CONN_COMPATIBILITY))
         WT_ERR(__wt_fprintf(session, fs,
           "%s\n"
-          "major=%d,minor=%d\n",
-          WT_METADATA_COMPAT, conn->compat_major, conn->compat_minor));
+          "major=%" PRIu16 ",minor=%" PRIu16 "\n",
+          WT_METADATA_COMPAT, conn->compat_version.major, conn->compat_version.minor));
 
     version = wiredtiger_version(&vmajor, &vminor, &vpatch);
     WT_ERR(__wt_fprintf(session, fs,

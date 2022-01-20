@@ -1366,23 +1366,25 @@ err:
 static int
 __ckpt_version_chk(WT_SESSION_IMPL *session, const char *fname, const char *config)
 {
+    WT_BTREE_VERSION version;
     WT_CONFIG_ITEM a, v;
-    int majorv, minorv;
+
+    version = WT_NO_VERSION;
 
     WT_RET(__wt_config_getones(session, config, "version", &v));
     WT_RET(__wt_config_subgets(session, &v, "major", &a));
-    majorv = (int)a.val;
+    version.major = (uint16_t)a.val;
     WT_RET(__wt_config_subgets(session, &v, "minor", &a));
-    minorv = (int)a.val;
+    version.minor = (uint16_t)a.val;
 
-    if (majorv < WT_BTREE_MAJOR_VERSION_MIN || majorv > WT_BTREE_MAJOR_VERSION_MAX ||
-      (majorv == WT_BTREE_MAJOR_VERSION_MIN && minorv < WT_BTREE_MINOR_VERSION_MIN) ||
-      (majorv == WT_BTREE_MAJOR_VERSION_MAX && minorv > WT_BTREE_MINOR_VERSION_MAX))
+    if (__wt_version_gt(version, WT_BTREE_VERSION_MAX) ||
+      __wt_version_lt(version, WT_BTREE_VERSION_MIN))
         WT_RET_MSG(session, EACCES,
-          "%s is an unsupported WiredTiger source file version %d.%d; this WiredTiger build only "
-          "supports versions from %d.%d to %d.%d",
-          fname, majorv, minorv, WT_BTREE_MAJOR_VERSION_MIN, WT_BTREE_MINOR_VERSION_MIN,
-          WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX);
+          "%s is an unsupported WiredTiger source file version %" PRIu16 ".%" PRIu16
+          "; this WiredTiger build only supports versions from %" PRIu16 ".%" PRIu16 " to %" PRIu16
+          ".%" PRIu16,
+          fname, version.major, version.minor, WT_BTREE_VERSION_MIN.major,
+          WT_BTREE_VERSION_MIN.minor, WT_BTREE_VERSION_MAX.major, WT_BTREE_VERSION_MAX.minor);
     return (0);
 }
 

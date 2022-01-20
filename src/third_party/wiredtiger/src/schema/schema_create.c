@@ -260,9 +260,9 @@ __create_file(
         if (!import_repair) {
             WT_ERR(__wt_scr_alloc(session, 0, &val));
             WT_ERR(__wt_buf_fmt(session, val,
-              "id=%" PRIu32 ",version=(major=%d,minor=%d),checkpoint_lsn=",
-              ++S2C(session)->next_file_id, WT_BTREE_MAJOR_VERSION_MAX,
-              WT_BTREE_MINOR_VERSION_MAX));
+              "id=%" PRIu32 ",version=(major=%" PRIu16 ",minor=%" PRIu16 "),checkpoint_lsn=",
+              ++S2C(session)->next_file_id, WT_BTREE_VERSION_MAX.major,
+              WT_BTREE_VERSION_MAX.minor));
             for (p = filecfg; *p != NULL; ++p)
                 ;
             *p = val->data;
@@ -904,9 +904,9 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
          */
         WT_ERR(__wt_buf_fmt(session, tmp,
           ",tiered_storage=(bucket=%s,bucket_prefix=%s)"
-          ",id=%" PRIu32 ",version=(major=%d,minor=%d),checkpoint_lsn=",
+          ",id=%" PRIu32 ",version=(major=%" PRIu16 ",minor=%" PRIu16 "),checkpoint_lsn=",
           conn->bstorage->bucket, conn->bstorage->bucket_prefix, ++conn->next_file_id,
-          WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
+          WT_BTREE_VERSION_MAX.major, WT_BTREE_VERSION_MAX.minor));
         cfg[1] = tmp->data;
         cfg[2] = config;
         cfg[3] = "tiers=()";

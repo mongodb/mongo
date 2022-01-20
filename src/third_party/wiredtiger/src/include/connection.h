@@ -246,21 +246,15 @@ struct __wt_connection_impl {
     uint64_t hash_size;       /* General hash bucket array size */
     int is_new;               /* Connection created database */
 
-    uint32_t recovery_major; /* Database recovery major version */
-    uint32_t recovery_minor; /* Database recovery minor version */
-    uint32_t recovery_patch; /* Database recovery patch version */
+    WT_VERSION recovery_version; /* Version of the database being recovered */
 
 #ifndef WT_STANDALONE_BUILD
     bool unclean_shutdown; /* Flag to indicate the earlier shutdown status */
 #endif
 
-    uint16_t compat_major; /* Compatibility major version */
-    uint16_t compat_minor; /* Compatibility minor version */
-#define WT_CONN_COMPAT_NONE UINT16_MAX
-    uint16_t req_max_major; /* Compatibility maximum major */
-    uint16_t req_max_minor; /* Compatibility maximum minor */
-    uint16_t req_min_major; /* Compatibility minimum major */
-    uint16_t req_min_minor; /* Compatibility minimum minor */
+    WT_VERSION compat_version; /* WiredTiger version for compatibility checks */
+    WT_VERSION compat_req_max; /* Maximum allowed version of WiredTiger for compatibility checks */
+    WT_VERSION compat_req_min; /* Minimum allowed version of WiredTiger for compatibility checks */
 
     WT_EXTENSION_API extension_api; /* Extension API */
 

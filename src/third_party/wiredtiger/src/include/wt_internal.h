@@ -361,6 +361,8 @@ struct __wt_update_vector;
 typedef struct __wt_update_vector WT_UPDATE_VECTOR;
 struct __wt_verbose_multi_category;
 typedef struct __wt_verbose_multi_category WT_VERBOSE_MULTI_CATEGORY;
+struct __wt_version;
+typedef struct __wt_version WT_VERSION;
 union __wt_lsn;
 typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
@@ -438,6 +440,7 @@ typedef uint64_t wt_timestamp_t;
 #include "verbose.h"
 
 #include "session.h" /* required by connection.h */
+#include "version.h" /* required by connection.h */
 #include "connection.h"
 
 #include "extern.h"

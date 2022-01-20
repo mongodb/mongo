@@ -751,7 +751,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
      * code requires log file format changes, it's not available in all versions.
      */
     if ((WT_STREQ(cursor->value_format, "S") || WT_STREQ(cursor->value_format, "u")) &&
-      S2C(session)->compat_major >= WT_LOG_V2_MAJOR)
+      __wt_version_gte(S2C(session)->compat_version, WT_LOG_V2_VERSION))
         cursor->modify = __curfile_modify;
 
     /* Cursors on metadata should not be cached, doing so interferes with named checkpoints. */

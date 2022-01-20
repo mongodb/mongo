@@ -79,29 +79,25 @@ __logmgr_force_remove(WT_SESSION_IMPL *session, uint32_t lognum)
 }
 
 /*
- * __logmgr_set_majmin --
- *     Set the required major or minor of the given field. Wrapper for setting the required minimum
- *     and maximum fields in the connection.
+ * __logmgr_get_log_version --
+ *     Get the log version required for the given WiredTiger version.
  */
-static void
-__logmgr_set_majmin(uint16_t req_major, uint16_t req_minor, uint16_t *log_req)
+static uint16_t
+__logmgr_get_log_version(WT_VERSION version)
 {
-    /*
-     * Set up the maximum and minimum log version required if needed.
-     */
-    if (req_major != WT_CONN_COMPAT_NONE) {
-        if (req_major == WT_LOG_V5_MAJOR)
-            *log_req = WT_LOG_VERSION;
-        else if (req_major == WT_LOG_V4_MAJOR)
-            if (req_minor == WT_LOG_V4_MINOR)
-                *log_req = 4;
-            else if (req_minor > WT_LOG_V2_MINOR)
-                *log_req = 3;
-            else
-                *log_req = 2;
-        else
-            *log_req = 1;
-    }
+    if (!__wt_version_defined(version))
+        return WT_NO_VALUE;
+
+    if (__wt_version_lt(version, WT_LOG_V2_VERSION))
+        return 1;
+    else if (__wt_version_lt(version, WT_LOG_V3_VERSION))
+        return 2;
+    else if (__wt_version_lt(version, WT_LOG_V4_VERSION))
+        return 3;
+    else if (__wt_version_lt(version, WT_LOG_V5_VERSION))
+        return 4;
+    else
+        return WT_LOG_VERSION;
 }
 
 /*
@@ -116,8 +112,8 @@ __wt_logmgr_compat_version(WT_SESSION_IMPL *session)
     WT_CONNECTION_IMPL *conn;
 
     conn = S2C(session);
-    __logmgr_set_majmin(conn->req_max_major, conn->req_max_minor, &conn->log_req_max);
-    __logmgr_set_majmin(conn->req_min_major, conn->req_min_minor, &conn->log_req_min);
+    conn->log_req_max = __logmgr_get_log_version(conn->compat_req_max);
+    conn->log_req_min = __logmgr_get_log_version(conn->compat_req_min);
 }
 
 /*
@@ -139,30 +135,17 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
         return (0);
 
     /*
-     * Set the log file format versions based on compatibility versions set in the connection. We
-     * must set this before we call log_open to open or create a log file.
-     *
-     * Note: downgrade in this context means the new version is not the latest possible version. It
-     * does not mean the direction of change from the release we may be running currently.
+     * Set the log file format versions based on compatibility versions set in the connection. The
+     * compatibility version must be set at this point. We must set this before we call log_open to
+     * open or create a log file.
      */
-    if (conn->compat_major == WT_LOG_V5_MAJOR) {
-        new_version = WT_LOG_VERSION;
+    WT_ASSERT(session, __wt_version_defined(conn->compat_version));
+    new_version = __logmgr_get_log_version(conn->compat_version);
+
+    if (new_version > 1)
         first_record = WT_LOG_END_HEADER + log->allocsize;
-        downgrade = false;
-    } else if (conn->compat_major == WT_LOG_V4_MAJOR) {
-        if (conn->compat_minor == WT_LOG_V4_MINOR)
-            new_version = 4;
-        else if (conn->compat_minor > WT_LOG_V2_MINOR)
-            new_version = 3;
-        else
-            new_version = 2;
-        first_record = WT_LOG_END_HEADER + log->allocsize;
-        downgrade = true;
-    } else {
-        new_version = 1;
+    else
         first_record = WT_LOG_END_HEADER;
-        downgrade = true;
-    }
 
     __wt_logmgr_compat_version(session);
 
@@ -171,6 +154,13 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
      */
     if (log->log_version == new_version)
         return (0);
+
+    /*
+     * Note: downgrade in this context means the new version is not the latest possible version. It
+     * does not mean the direction of change from the release we may be running currently.
+     */
+    downgrade = new_version != WT_LOG_VERSION;
+
     /*
      * If we are reconfiguring and at a new version we need to force the log file to advance so that
      * we write out a log file at the correct version. When we are downgrading we must force a
