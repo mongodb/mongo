@@ -104,27 +104,60 @@ TEST(ChunkVersionParsing, FromBSONMissingMajorAndMinor) {
                        ErrorCodes::TypeMismatch);
 }
 
-TEST(ChunkVersionParsing, FromBSONLegacy) {
+TEST(ChunkVersionParsing, FromBSONLegacy_WithTimestamp_WithEpoch) {
     const OID oid = OID::gen();
-    const Timestamp timestamp(42);
     ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseLegacyWithField(
         BSON("lastmod" << Timestamp(Seconds(2), 3) << "lastmodEpoch" << oid << "lastmodTimestamp"
-                       << timestamp),
+                       << Timestamp(42)),
         "lastmod"));
-
-    ASSERT(chunkVersionComplete.epoch().isSet());
+    ASSERT_EQ(Timestamp(42), chunkVersionComplete.getTimestamp());
     ASSERT_EQ(oid, chunkVersionComplete.epoch());
     ASSERT_EQ(2u, chunkVersionComplete.majorVersion());
     ASSERT_EQ(3u, chunkVersionComplete.minorVersion());
 }
 
-TEST(ChunkVersionParsing, FromBSONLegacyEpochAndTimestampOptional) {
-    ChunkVersion chunkVersionNoEpoch = assertGet(
-        ChunkVersion::parseLegacyWithField(BSON("lastmod" << Timestamp(Seconds(3), 4)), "lastmod"));
+TEST(ChunkVersionParsing, FromBSONLegacy_NoTimestamp_WithUnshardedEpoch) {
+    ChunkVersion chunkVersion = assertGet(ChunkVersion::parseLegacyWithField(
+        BSON("lastmod" << Timestamp() << "lastmodEpoch" << ChunkVersion::UNSHARDED().epoch()),
+        "lastmod"));
+    ASSERT_EQ(ChunkVersion::UNSHARDED().getTimestamp(), chunkVersion.getTimestamp());
+    ASSERT_EQ(ChunkVersion::UNSHARDED().epoch(), chunkVersion.epoch());
+    ASSERT_EQ(0u, chunkVersion.majorVersion());
+    ASSERT_EQ(0u, chunkVersion.minorVersion());
+}
 
-    ASSERT(!chunkVersionNoEpoch.epoch().isSet());
-    ASSERT_EQ(3u, chunkVersionNoEpoch.majorVersion());
-    ASSERT_EQ(4u, chunkVersionNoEpoch.minorVersion());
+TEST(ChunkVersionParsing, FromBSONLegacy_NoTimestamp_WithIgnoredEpoch) {
+    ChunkVersion chunkVersion = assertGet(ChunkVersion::parseLegacyWithField(
+        BSON("lastmod" << Timestamp() << "lastmodEpoch" << ChunkVersion::IGNORED().epoch()),
+        "lastmod"));
+    ASSERT_EQ(ChunkVersion::IGNORED().getTimestamp(), chunkVersion.getTimestamp());
+    ASSERT_EQ(ChunkVersion::IGNORED().epoch(), chunkVersion.epoch());
+    ASSERT_EQ(0u, chunkVersion.majorVersion());
+    ASSERT_EQ(0u, chunkVersion.minorVersion());
+}
+
+TEST(ChunkVersionParsing, FromBSONLegacy_NoTimestamp_WithShardedEpoch_Throws) {
+    ASSERT_THROWS(uassertStatusOK(ChunkVersion::parseLegacyWithField(
+                      BSON("lastmod" << Timestamp(Seconds(3), 4) << "lastmodEpoch" << OID::gen()),
+                      "lastmod")),
+                  DBException);
+}
+
+TEST(ChunkVersionParsing, FromBSONLegacy_WithTimestamp_NoEpoch_Throws) {
+    ASSERT_THROWS(
+        uassertStatusOK(ChunkVersion::parseLegacyWithField(
+            BSON("lastmod" << Timestamp(Seconds(3), 4) << "lastmodTimestamp" << Timestamp(42)),
+            "lastmod")),
+        DBException);
+}
+
+TEST(ChunkVersionParsing, FromBSONLegacy_NoTimestamp_NoEpoch) {
+    ChunkVersion chunkVersion = assertGet(
+        ChunkVersion::parseLegacyWithField(BSON("lastmod" << Timestamp(Seconds(3), 4)), "lastmod"));
+    ASSERT_EQ(Timestamp(), chunkVersion.getTimestamp());
+    ASSERT(!chunkVersion.epoch().isSet());
+    ASSERT_EQ(3u, chunkVersion.majorVersion());
+    ASSERT_EQ(4u, chunkVersion.minorVersion());
 }
 
 TEST(ChunkVersionComparison, EqualityOperators) {
@@ -161,19 +194,20 @@ TEST(ChunkVersionComparison, OlderThan) {
 }
 
 TEST(ChunkVersionConstruction, CreateWithLargeValues) {
-    const auto minorVersion = std::numeric_limits<uint32_t>::max();
-    const uint32_t majorVersion = 1 << 24;
+    const uint32_t majorVersion = std::numeric_limits<uint32_t>::max();
+    const uint32_t minorVersion = std::numeric_limits<uint32_t>::max();
     const auto epoch = OID::gen();
 
     ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp(1, 1));
     ASSERT_EQ(majorVersion, version.majorVersion());
     ASSERT_EQ(minorVersion, version.minorVersion());
     ASSERT_EQ(epoch, version.epoch());
+    ASSERT_EQ(Timestamp(1, 1), version.getTimestamp());
 }
 
 TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMajorVersion) {
-    const uint32_t minorVersion = 0;
     const uint32_t majorVersion = std::numeric_limits<uint32_t>::max();
+    const uint32_t minorVersion = 0;
     const auto epoch = OID::gen();
 
     ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp(1, 1));
@@ -185,8 +219,8 @@ TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMajorVersion) 
 }
 
 TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMinorVersion) {
-    const uint32_t minorVersion = std::numeric_limits<uint32_t>::max();
     const uint32_t majorVersion = 0;
+    const uint32_t minorVersion = std::numeric_limits<uint32_t>::max();
     const auto epoch = OID::gen();
 
     ChunkVersion version(majorVersion, minorVersion, epoch, Timestamp(1, 1));
@@ -196,5 +230,6 @@ TEST(ChunkVersionManipulation, ThrowsErrorIfOverflowIsAttemptedForMinorVersion) 
 
     ASSERT_THROWS_CODE(version.incMinor(), DBException, 31181);
 }
+
 }  // namespace
 }  // namespace mongo

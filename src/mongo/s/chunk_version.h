@@ -123,14 +123,6 @@ public:
             version.getTimestamp() == IGNORED().getTimestamp();
     }
 
-    /**
-     * Needed for parsing IGNORED and UNSHARDED from 5.0 that didn't include a timestamp. Should be
-     * removed after 6.0 is last-lts.
-     */
-    bool is50IgnoredOrUnsharded() {
-        return _combined == 0 && (_epoch == UNSHARDED().epoch() || _epoch == IGNORED().epoch());
-    }
-
     void incMajor() {
         uassert(
             31180,

@@ -56,28 +56,26 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
     if (!it.more())
         return {ErrorCodes::BadValue, "Unexpected empty version array"};
 
-    ChunkVersion version;
-
-    // Expect the major and minor versions
+    // Expect the major and minor versions (must be present)
+    uint64_t combined;
     {
         BSONElement tsPart = it.next();
         if (tsPart.type() != bsonTimestamp)
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "Invalid type " << tsPart.type()
                                   << " for version major and minor part."};
-
-        version._combined = tsPart.timestamp().asULL();
+        combined = tsPart.timestamp().asULL();
     }
 
-    // Expect the epoch OID
+    // Expect the epoch OID (must be present)
+    boost::optional<OID> epoch;
     {
         BSONElement epochPart = it.next();
         if (epochPart.type() != jstOID)
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "Invalid type " << epochPart.type()
                                   << " for version epoch part."};
-
-        version._epoch = epochPart.OID();
+        epoch = epochPart.OID();
     }
 
     BSONElement nextElem = it.next();
@@ -90,33 +88,37 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
     }
 
     // Check for timestamp
+    boost::optional<Timestamp> timestamp;
     if (nextElem.type() == bsonTimestamp) {
-        version._timestamp = nextElem.timestamp();
-    } else if (nextElem.eoo() && version.is50IgnoredOrUnsharded()) {
+        timestamp = nextElem.timestamp();
+    } else if (nextElem.eoo() && (epoch == UNSHARDED().epoch() || epoch == IGNORED().epoch())) {
         // In 5.0 binaries, the timestamp is not present in UNSHARDED and IGNORED versions
-        version._timestamp =
-            (version.epoch() == UNSHARDED().epoch()) ? Timestamp() : Timestamp::max();
+        timestamp =
+            (epoch == UNSHARDED().epoch() ? UNSHARDED().getTimestamp() : IGNORED().getTimestamp());
     } else {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "Invalid type " << nextElem.type()
                               << " for version timestamp part."};
     }
 
+    ChunkVersion version;
+    version._combined = combined;
+    version._epoch = *epoch;
+    version._timestamp = *timestamp;
     return version;
 }
 
 StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, StringData field) {
-    auto versionElem = obj[field];
-    if (versionElem.eoo())
-        return {ErrorCodes::NoSuchKey,
-                str::stream() << "Expected field " << field << " not found."};
-
-    ChunkVersion version;
-
-    // Expect the major and minor
+    // Expect the major and minor (must always exist)
+    uint64_t combined;
     {
+        auto versionElem = obj[field];
+        if (versionElem.eoo())
+            return {ErrorCodes::NoSuchKey,
+                    str::stream() << "Expected field " << field << " not found."};
+
         if (versionElem.type() == bsonTimestamp || versionElem.type() == Date) {
-            version._combined = versionElem._numberLong();
+            combined = versionElem._numberLong();
         } else {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "Invalid type " << versionElem.type()
@@ -124,14 +126,16 @@ StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, 
         }
     }
 
-    bool fullVersion = false;
     // Expect the epoch OID
+    //
+    // TODO: Confirm whether the epoch can still be missing in upgrade chains that started from
+    //       pre-2.4 versions anymore (after FCV 4.4 -> 5.0 upgrade) ?
+    boost::optional<OID> epoch;
     {
         const auto epochField = field + "Epoch";
         auto epochElem = obj[epochField];
         if (epochElem.type() == jstOID) {
-            version._epoch = epochElem.OID();
-            fullVersion = true;
+            epoch = epochElem.OID();
         } else if (!epochElem.eoo()) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "Invalid type " << epochElem.type()
@@ -139,27 +143,42 @@ StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, 
         }
     }
 
-    // Expect the timestamp
+    // Expect the timestamp (can be missing only in the case of pre-5.0 UNSHARDED and IGNORED
+    // versions)
+    boost::optional<Timestamp> timestamp;
     {
         const auto timestampField = field + "Timestamp";
         auto timestampElem = obj[timestampField];
-        if (fullVersion) {
-            if (timestampElem.type() == bsonTimestamp) {
-                version._timestamp = timestampElem.timestamp();
-            } else if (timestampElem.eoo() && version.is50IgnoredOrUnsharded()) {
-                // In 5.0 binaries, the timestamp is not present in UNSHARDED and IGNORED versions
-                version._timestamp =
-                    (version.epoch() == UNSHARDED().epoch()) ? Timestamp() : Timestamp::max();
-            } else {
-                return {ErrorCodes::TypeMismatch,
-                        str::stream() << "Invalid type " << timestampElem.type()
-                                      << " for version timestamp part."};
-            }
-        } else {
-            invariant(timestampElem.eoo());
+        if (timestampElem.type() == bsonTimestamp) {
+            timestamp = timestampElem.timestamp();
+        } else if (!timestampElem.eoo()) {
+            return {ErrorCodes::TypeMismatch,
+                    str::stream() << "Invalid type " << timestampElem.type()
+                                  << " for version timestamp part."};
         }
     }
 
+    if (epoch && timestamp) {
+        // Expected situation
+    } else if (epoch && !timestamp) {
+        if (epoch == UNSHARDED().epoch() || epoch == IGNORED().epoch()) {
+            // In 5.0 binaries, the timestamp is not present in UNSHARDED and IGNORED versions
+            timestamp = (epoch == UNSHARDED().epoch() ? UNSHARDED().getTimestamp()
+                                                      : IGNORED().getTimestamp());
+        } else {
+            uasserted(6278300, "Timestamp must be present if epoch exists.");
+        }
+    } else if (!epoch && timestamp) {
+        uasserted(6278301, "Epoch must be present if timestamp exists.");
+    } else {
+        // Can happen in upgrade chains that started from pre-2.4 versions or in the case of
+        // persistence for ShardCollectionType
+    }
+
+    ChunkVersion version;
+    version._combined = combined;
+    version._epoch = epoch.value_or(OID());
+    version._timestamp = timestamp.value_or(Timestamp());
     return version;
 }
 
