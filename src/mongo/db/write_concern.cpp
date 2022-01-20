@@ -189,10 +189,10 @@ Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& 
         return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
     }
 
-    if (replMode != repl::ReplicationCoordinator::modeReplSet && !writeConcern.wMode.empty() &&
-        writeConcern.wMode != WriteConcernOptions::kMajority) {
+    if (replMode != repl::ReplicationCoordinator::modeReplSet &&
+        writeConcern.hasCustomWriteMode()) {
         return Status(ErrorCodes::BadValue,
-                      string("cannot use non-majority 'w' mode ") + writeConcern.wMode +
+                      string("cannot use custom 'w' mode ") + writeConcern.wMode +
                           " when a host is not a member of a replica set");
     }
 

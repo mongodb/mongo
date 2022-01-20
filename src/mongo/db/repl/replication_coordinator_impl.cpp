@@ -3223,6 +3223,12 @@ Milliseconds ReplicationCoordinatorImpl::getConfigHeartbeatInterval() const {
     return _rsConfig.getHeartbeatInterval();
 }
 
+Status ReplicationCoordinatorImpl::validateWriteConcern(
+    const WriteConcernOptions& writeConcern) const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.validateWriteConcern(writeConcern);
+}
+
 WriteConcernOptions ReplicationCoordinatorImpl::_getOplogCommitmentWriteConcern(WithLock lk) {
     auto syncMode = getWriteConcernMajorityShouldJournal_inlock()
         ? WriteConcernOptions::SyncMode::JOURNAL
