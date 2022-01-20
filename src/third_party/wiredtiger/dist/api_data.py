@@ -1142,7 +1142,10 @@ wiredtiger_open_common =\
         in-memory alignment (in bytes) for buffers used for I/O.  The
         default value of -1 indicates a platform-specific alignment value
         should be used (4KB on Linux systems when direct I/O is configured,
-        zero elsewhere)''',
+        zero elsewhere). If the configured alignment is larger than default
+        or configured object page sizes, file allocation and page sizes are
+        silently increased to the buffer alignment size. Requires the \c
+        posix_memalign API. See @ref tuning_system_buffer_cache_direct_io''',
         min='-1', max='1MB'),
     Config('builtin_extension_config', '', r'''
         A structure where the keys are the names of builtin extensions and the
@@ -1163,10 +1166,11 @@ wiredtiger_open_common =\
         Windows to access files.  Options are given as a list, such as
         <code>"direct_io=[data]"</code>.  Configuring \c direct_io requires
         care, see @ref tuning_system_buffer_cache_direct_io for important
-        warnings.  Including \c "data" will cause WiredTiger data files to use
-        direct I/O, including \c "log" will cause WiredTiger log files to use
-        direct I/O, and including \c "checkpoint" will cause WiredTiger data
-        files opened at a checkpoint (i.e: read-only) to use direct I/O.
+        warnings.  Including \c "data" will cause WiredTiger data files,
+        including WiredTiger internal data files, to use direct I/O;
+        including \c "log" will cause WiredTiger log files to use direct
+        I/O; including \c "checkpoint" will cause WiredTiger data files
+        opened using a (read-only) checkpoint cursor to use direct I/O.
         \c direct_io should be combined with \c write_through to get the
         equivalent of \c O_DIRECT on Windows''',
         type='list', choices=['checkpoint', 'data', 'log']),
