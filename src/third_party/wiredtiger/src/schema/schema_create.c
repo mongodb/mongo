@@ -37,9 +37,8 @@ __wt_direct_io_size_check(
      * document that setting a larger buffer alignment than the allocation size silently increases
      * the allocation size: direct I/O isn't a heavily used feature, that should be sufficient.
      */
-    if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_CHECKPOINT | WT_DIRECT_IO_DATA)) {
-        /* If direct I/O is configured, the alignment must also be set, or the default. */
-        WT_ASSERT(session, conn->buffer_alignment != 0);
+    if (conn->buffer_alignment != 0 &&
+      FLD_ISSET(conn->direct_io, WT_DIRECT_IO_CHECKPOINT | WT_DIRECT_IO_DATA)) {
 
         if (allocsize < conn->buffer_alignment)
             allocsize = (uint32_t)conn->buffer_alignment;
