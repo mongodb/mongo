@@ -42,7 +42,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
-#include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"

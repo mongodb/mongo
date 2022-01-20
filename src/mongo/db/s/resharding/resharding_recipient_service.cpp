@@ -55,7 +55,6 @@
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/executor/network_interface_factory.h"

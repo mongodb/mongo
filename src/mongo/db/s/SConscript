@@ -38,6 +38,7 @@ env.Library(
         'active_migrations_registry.cpp',
         'auto_split_vector.cpp',
         'chunk_move_write_concern_options.cpp',
+        'chunk_split_state_driver.cpp',
         'chunk_splitter.cpp',
         'collection_critical_section_document.idl',
         'collection_sharding_runtime.cpp',
@@ -63,8 +64,8 @@ env.Library(
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
         'recoverable_critical_section_service.cpp',
-        'resharding_util.cpp',
-        'resharding/coordinator_document.idl','resharding/document_source_resharding_iterate_transaction.cpp',
+        'resharding/coordinator_document.idl',
+        'resharding/document_source_resharding_iterate_transaction.cpp',
         'resharding/document_source_resharding_ownership_match.cpp',
         'resharding/donor_document.idl',
         'resharding/donor_oplog_id.idl',
@@ -95,6 +96,7 @@ env.Library(
         'resharding/resharding_server_parameters.idl',
         'resharding/resharding_txn_cloner.cpp',
         'resharding/resharding_txn_cloner_progress.idl',
+        'resharding/resharding_util.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
         'session_catalog_migration.cpp',
         'session_catalog_migration_destination.cpp',
@@ -138,7 +140,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_initialization',
-        'chunk_splitter',
         'sharding_api_d',
         'sharding_catalog_manager',
         'sharding_logging',
@@ -189,17 +190,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
         'sharding_api_d',
     ]
-)
-
-env.Library(
-    target='chunk_splitter',
-    source=[
-        'chunk_split_state_driver.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/chunk_writes_tracker'
-    ],
 )
 
 env.Library(
