@@ -26,7 +26,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import struct, wiredtiger, wttest
+
+def timestamp(kind, ts):
+    return "{}_timestamp={:X}".format(kind, ts)
 
 # test_debug_mode03.py
 #    Test the debug mode settings. Test table_logging use.
@@ -43,6 +46,11 @@ class test_debug_mode03(wttest.WiredTigerTestCase):
         for k in keys:
             c[k] = self.value
         c.close()
+
+    def add_data_at_ts(self, ts):
+        self.session.begin_transaction()
+        self.add_data()
+        self.session.commit_transaction(timestamp("commit", ts))
 
     def find_log_recs(self):
         # Open a log cursor. We should find log records that have
@@ -61,6 +69,39 @@ class test_debug_mode03(wttest.WiredTigerTestCase):
         c.close()
         return count
 
+    def pack_large_int(self, large):
+        # This line in intpacking.py tells us how to pack a large integer:
+        #
+        #    First byte | Next bytes | Min Value        | Max Value
+        #   [11 10llll] | l          | 2^13 + 2^6       | 2^64 - 1
+        #
+        # An 8 byte integer is packed as byte 0xe8, followed by 8 bytes packed for big endian.
+        LARGE_INT = 2**13 + 2**6
+        self.assertGreaterEqual(large, LARGE_INT)
+        packed_int = b'\xe8' + struct.pack('>Q', large - LARGE_INT)   # >Q == 8 bytes big endian
+        return packed_int
+
+    def find_ts_log_rec(self, ts):
+        # The timestamp we're looking for will be encoded as a 'packed integer' in the log file.  We
+        # don't need a general purpose encoder here, we just need to know how to pack large integers.
+        packed_int = self.pack_large_int(ts)
+
+        # Open a log cursor, and we look for the timestamp somewhere in the values.
+        c = self.session.open_cursor("log:", None)
+        count = 0
+        while c.next() == 0:
+            # lsn.file, lsn.offset, opcount
+            keys = c.get_key()
+            # txnid, rectype, optype, fileid, logrec_key, logrec_value
+            values = c.get_value()
+
+            #self.tty('LOG: keys={}, values={}\n    val5={}\n    packed={}'.format(
+            #    str(keys), str(values), values[5].hex(), packed_int.hex()))
+            if packed_int in values[5]:  # logrec_value
+                count += 1
+        c.close()
+        return count
+
     def test_table_logging(self):
         self.session.create(self.uri, 'key_format=i,value_format=u,log=(enabled=false)')
         self.add_data()
@@ -74,6 +115,31 @@ class test_debug_mode03(wttest.WiredTigerTestCase):
         self.add_data()
         count = self.find_log_recs()
         self.assertEqual(count, 0)
+
+    # Debug table logging with operations from timestamp_transaction
+    def test_table_logging_ts(self):
+        # We pick a large timestamp because encoding a large integer is relatively easy
+        # and we won't get any false positives when searching the log file.
+        base_ts = 0x1020304050600000
+
+        self.session.create(self.uri, 'key_format=i,value_format=u,log=(enabled=false)')
+        self.add_data_at_ts(base_ts + 0x100)
+
+        self.session.begin_transaction()
+        c = self.session.open_cursor(self.uri, None)
+        c[self.entries] = self.value
+        c.close()
+        self.session.timestamp_transaction(timestamp("read", base_ts + 0x200))
+        self.session.prepare_transaction(timestamp("prepare", base_ts + 0x201))
+        self.session.timestamp_transaction(timestamp("commit", base_ts + 0x202))
+        self.session.timestamp_transaction(timestamp("durable", base_ts + 0x203))
+        self.session.commit_transaction()
+
+        self.assertGreater(self.find_ts_log_rec(base_ts + 0x100), 0)
+        self.assertGreater(self.find_ts_log_rec(base_ts + 0x200), 0)
+        self.assertGreater(self.find_ts_log_rec(base_ts + 0x201), 0)
+        self.assertGreater(self.find_ts_log_rec(base_ts + 0x202), 0)
+        self.assertGreater(self.find_ts_log_rec(base_ts + 0x203), 0)
 
 if __name__ == '__main__':
     wttest.run()
