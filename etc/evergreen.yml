@@ -4999,21 +4999,19 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_metrics
+- <<: *gen_task_template
+  name: concurrency_metrics_gen
   tags: ["concurrency"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_replication_metrics
+- <<: *gen_task_template
+  name: concurrency_replication_metrics_gen
   tags: ["concurrency", "repl", "disabled_on_code_coverage"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
       resmoke_jobs_max: 1
 
