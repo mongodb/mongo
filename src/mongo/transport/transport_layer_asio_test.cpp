@@ -52,7 +52,6 @@
 #include "mongo/transport/session_asio.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
@@ -128,18 +127,24 @@ public:
         return _s;
     }
 
+    void wait() {
+        _ready.get();
+    }
+
 private:
     void _run() {
         _s.connect(SockAddr::create("localhost", _port, AF_INET));
         LOGV2(6109502, "connected", "port"_attr = _port);
         if (_onConnect)
             _onConnect(*this);
+        _ready.set();
         _stopRequest.get();
         LOGV2(6109503, "connection: Rx stop request");
     }
 
     int _port;
     std::function<void(ConnectionThread&)> _onConnect;
+    Notification<void> _ready;
     Notification<bool> _stopRequest;
     Socket _s;
     JoinThread _thread;  // Appears after the members _run uses.
@@ -328,13 +333,25 @@ TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
     connected.get();
 }
 
+void setNoLinger(ConnectionThread& conn) {
+    // Linger timeout = 0 causes a RST packet on close.
+    struct linger sl = {1, 0};
+    if (setsockopt(conn.socket().rawFD(),
+                   SOL_SOCKET,
+                   SO_LINGER,
+                   reinterpret_cast<SetsockoptPtr>(&sl),
+                   sizeof(sl)) != 0) {
+        auto err = make_error_code(std::errc{errno});
+        LOGV2_ERROR(6276301, "setsockopt", "error"_attr = err.message());
+    }
+}
+
 /**
  * Test that the server appropriately handles a client-side socket disconnection, and that the
  * client sends an RST packet when the socket is forcibly closed.
  */
 TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
     TestFixture tf;
-    unittest::Barrier barrier(2);
 
     AtomicWord<int> sessionsCreated{0};
     tf.sep().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
@@ -342,23 +359,11 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
     LOGV2(6109515, "connecting");
     auto& fp = transport::transportLayerASIOhangBeforeAccept;
     auto timesEntered = fp.setMode(FailPoint::alwaysOn);
-    ConnectionThread connectThread(tf.tla().listenerPort(), [&](ConnectionThread& conn) {
-        // Linger timeout = 0 causes a RST packet on close.
-        struct linger sl = {1, 0};
-        if (setsockopt(conn.socket().rawFD(),
-                       SOL_SOCKET,
-                       SO_LINGER,
-                       reinterpret_cast<SetsockoptPtr>(&sl),
-                       sizeof(sl)) != 0) {
-            auto err = make_error_code(std::errc{errno});
-            LOGV2_ERROR(6109517, "setsockopt", "error"_attr = err.message());
-        }
-        barrier.countDownAndWait();
-    });
+    ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
     fp.waitForTimesEntered(timesEntered + 1);
     // Test case thread does not close socket until client thread has set options to ensure that an
     // RST packet will be set on close.
-    barrier.countDownAndWait();
+    connectThread.wait();
 
     LOGV2(6109516, "closing");
     connectThread.close();
@@ -372,21 +377,7 @@ TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
     Notification<SessionThread*> mockSessionCreated;
     tf.sep().setOnStartSession([&](SessionThread& st) { mockSessionCreated.set(&st); });
 
-    unittest::Barrier barrier(2);
-    ConnectionThread connectThread(tf.tla().listenerPort(), [&](ConnectionThread& conn) {
-        ON_BLOCK_EXIT([&] { barrier.countDownAndWait(); });
-
-        // Linger timeout = 0 causes a RST packet on close.
-        asio::socket_base::linger sl(true, 0);
-        if (setsockopt(conn.socket().rawFD(),
-                       SOL_SOCKET,
-                       SO_LINGER,
-                       reinterpret_cast<SetsockoptPtr>(&sl),
-                       sizeof(sl)) != 0) {
-            auto err = make_error_code(std::errc{errno});
-            LOGV2_ERROR(6060300, "setsockopt", "error"_attr = err.message());
-        }
-    });
+    ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
 
     // We set the timeout to ensure that the setsockopt calls are actually made in ensureSync()
     auto& st = *mockSessionCreated.get();
@@ -394,7 +385,7 @@ TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
 
     // Synchronize with the connection thread to ensure the connection is closed only after the
     // connection thread returns from calling `setsockopt`.
-    barrier.countDownAndWait();
+    connectThread.wait();
     connectThread.close();
 
     // On Mac, setsockopt will immediately throw a SocketException since the socket is closed.
