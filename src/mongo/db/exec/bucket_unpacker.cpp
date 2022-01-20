@@ -54,6 +54,13 @@ public:
                                           const BSONElement& metaValue,
                                           bool includeTimeField,
                                           bool includeMetaField) = 0;
+
+    // Provides an upper bound on the number of fields in each measurement.
+    virtual std::size_t numberOfFields() = 0;
+
+protected:
+    // Data field count is variable, but time and metadata are fixed.
+    constexpr static std::size_t kFixedFieldNumber = 2;
 };
 
 namespace {
@@ -98,6 +105,7 @@ public:
                                   const BSONElement& metaValue,
                                   bool includeTimeField,
                                   bool includeMetaField) override;
+    std::size_t numberOfFields() override;
 
 private:
     // Iterates the timestamp section of the bucket to drive the unpacking iteration.
@@ -202,6 +210,12 @@ void BucketUnpackerV1::extractSingleMeasurement(MutableDocument& measurement,
     }
 }
 
+std::size_t BucketUnpackerV1::numberOfFields() {
+    // The data fields are tracked by _fieldIters, but we need to account also for the time field
+    // and possibly the meta field.
+    return kFixedFieldNumber + _fieldIters.size();
+}
+
 // Unpacker for V2 compressed buckets
 class BucketUnpackerV2 : public BucketUnpacker::UnpackingImpl {
 public:
@@ -222,6 +236,7 @@ public:
                                   const BSONElement& metaValue,
                                   bool includeTimeField,
                                   bool includeMetaField) override;
+    std::size_t numberOfFields() override;
 
 private:
     struct ColumnStore {
@@ -320,6 +335,12 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
     }
 }
 
+std::size_t BucketUnpackerV2::numberOfFields() {
+    // The data fields are tracked by _fieldColumns, but we need to account also for the time field
+    // and possibly the meta field.
+    return kFixedFieldNumber + _fieldColumns.size();
+}
+
 /**
  * Erase computed meta projection fields if they are present in the exclusion field set.
  */
@@ -365,7 +386,10 @@ Document BucketUnpacker::getNext() {
     tassert(5521503, "'getNext()' requires the bucket to be owned", _bucket.isOwned());
     tassert(5422100, "'getNext()' was called after the bucket has been exhausted", hasNext());
 
-    auto measurement = MutableDocument{};
+    // MutableDocument reserves memory based on the number of fields, but uses a fixed size of 25
+    // bytes plus an allowance of 7 characters for the field name. Doubling the number of fields
+    // should give us enough overhead for longer field names without wasting too much memory.
+    auto measurement = MutableDocument{2 * _unpackingImpl->numberOfFields()};
     _hasNext = _unpackingImpl->getNext(
         measurement, _spec, _metaValue, _includeTimeField, _includeMetaField);
 
