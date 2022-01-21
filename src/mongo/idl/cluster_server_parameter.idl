@@ -47,3 +47,9 @@ structs:
             generation:
                 description: Unique identifier for this version of the setting
                 type: objectid
+
+feature_flags:
+    featureFlagClusterWideConfig:
+        description: Mechanism for cluster-wide configuration options
+        cpp_varname: gFeatureFlagClusterWideConfig
+        default: false
