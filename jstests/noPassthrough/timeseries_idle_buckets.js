@@ -13,7 +13,7 @@
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 const rst = new ReplSetTest({nodes: 1});
-rst.startSet({setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600}});
+rst.startSet({setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 10485760}});
 rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());
@@ -57,34 +57,43 @@ for (let i = 0; i < numDocs; i++) {
     }));
 }
 
-// Insert a document with the metadata of a bucket which should have been expired. Thus, a new
-// bucket will be created.
-assert.commandWorked(coll.insert(
-    {[timeFieldName]: ISODate(), [metaFieldName]: {0: metaValue}, [valueFieldName]: 3}));
+// No go back and insert documents with the same metadata, and verify that we at some point
+// insert into a new bucket, indicating the old one was expired.
+let foundExpiredBucket = false;
+for (let i = 0; i < numDocs; i++) {
+    assert.commandWorked(coll.insert({
+        [timeFieldName]: ISODate(),
+        [metaFieldName]: {[i.toString()]: metaValue},
+        [valueFieldName]: 3
+    }));
 
-// Check buckets.
-let bucketDocs = bucketsColl.find({meta: {0: metaValue}}).sort({'control.min._id': 1}).toArray();
-assert.eq(bucketDocs.length, 2, 'Invalid number of buckets for metadata 0: ' + tojson(bucketDocs));
+    // Check buckets.
+    let bucketDocs = bucketsColl.find({meta: {[i.toString()]: metaValue}})
+                         .sort({'control.min._id': 1})
+                         .toArray();
+    if (bucketDocs.length > 1) {
+        // If bucket compression is enabled the expired bucket should have been compressed
+        assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
+                  bucketDocs[0].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        assert.eq(1,
+                  bucketDocs[1].control.version,
+                  'unexpected control.version in second bucket: ' + tojson(bucketDocs));
 
-// If bucket compression is enabled the expired bucket should have been compressed
-assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
-          bucketDocs[0].control.version,
-          'unexpected control.version in first bucket: ' + tojson(bucketDocs));
-assert.eq(1,
-          bucketDocs[1].control.version,
-          'unexpected control.version in second bucket: ' + tojson(bucketDocs));
-
-// Insert a document with the metadata of a bucket with should still be open. Thus, the existing
-// bucket will be used.
-assert.commandWorked(
-    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {[numDocs - 1]: metaValue}}));
-bucketDocs = bucketsColl.find({meta: {[numDocs - 1]: metaValue}}).toArray();
-assert.eq(bucketDocs.length,
-          1,
-          'Invalid number of buckets for metadata ' + (numDocs - 1) + ': ' + tojson(bucketDocs));
-assert.eq(1,
-          bucketDocs[0].control.version,
-          'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+        foundExpiredBucket = true;
+        break;
+    } else {
+        // The insert landed in an existing bucket, verify that compression didn't take place yet.
+        assert.eq(
+            bucketDocs.length,
+            1,
+            'Invalid number of buckets for metadata ' + (numDocs - 1) + ': ' + tojson(bucketDocs));
+        assert.eq(1,
+                  bucketDocs[0].control.version,
+                  'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+    }
+}
+assert(foundExpiredBucket, "Did not find an expired bucket");
 
 rst.stopSet();
 })();

@@ -12,8 +12,11 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-const conn = MongoRunner.runMongod(
-    {setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600}});
+const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
+const conn = MongoRunner.runMongod({
+    setParameter:
+        {timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold}
+});
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
@@ -62,9 +65,28 @@ const checkCollStats = function(empty = false) {
     assert.eq(coll.getFullName(), stats.ns);
 
     for (let [stat, value] of Object.entries(expectedStats)) {
-        assert.eq(stats.timeseries[stat],
-                  value,
-                  "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats));
+        if (stat === 'numBucketsClosedDueToMemoryThreshold') {
+            // Idle bucket expiration behavior will be non-deterministic since buckets are hashed
+            // into shards within the catalog based on metadata, and expiration is done on a
+            // per-shard basis. We just want to make sure that if we are expecting the number to be
+            // sufficiently large under a global-expiry regime, that it is at least greater than 0,
+            // signifying we have expired something from some shard.
+            //
+            // The value 33 was chosen as "sufficiently large" simply because we use 32 shards in
+            // the BucketCatalog and so we can apply the pigeon-hole principle to conclude that at
+            // least one of those inserted buckets that we expect to have triggered an expiration
+            // did in fact land in a shard with an existing idle bucket that it could expire.
+            if (value > 33) {
+                assert.gte(
+                    stats.timeseries[stat],
+                    1,
+                    "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats));
+            }
+        } else {
+            assert.eq(stats.timeseries[stat],
+                      value,
+                      "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats));
+        }
     }
 
     if (empty) {
@@ -217,17 +239,17 @@ expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
 checkCollStats();
 
-const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 100;
 numDocs = 70;
 largeValue = 'a'.repeat(1024 * 1024);
 
 const testIdleBucketExpiry = function(docFn) {
     clearCollection();
 
+    let memoryUsage = 0;
     let shouldExpire = false;
     for (let i = 0; i < numDocs; i++) {
         assert.commandWorked(coll.insert(docFn(i), {ordered: false}));
-        const memoryUsage = assert.commandWorked(testDB.serverStatus()).bucketCatalog.memoryUsage;
+        memoryUsage = assert.commandWorked(testDB.serverStatus()).bucketCatalog.memoryUsage;
 
         expectedStats.bucketCount++;
         expectedStats.numBucketInserts++;
@@ -244,7 +266,9 @@ const testIdleBucketExpiry = function(docFn) {
         shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;
     }
 
-    assert(shouldExpire, 'Memory usage did not reach idle bucket expiry threshold');
+    assert(shouldExpire,
+           `Memory usage did not reach idle bucket expiry threshold: ${memoryUsage} < ${
+               kIdleBucketExpiryMemoryUsageThreshold}`);
 };
 
 testIdleBucketExpiry(i => {
