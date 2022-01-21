@@ -8,6 +8,7 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load('jstests/replsets/rslib.js');
+load('jstests/libs/feature_flag_util.js');
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
@@ -187,6 +188,16 @@ function test(st, description, testBody) {
         "Migration recovery recovers correct decision for migration committed before shard key " +
             "refine",
         () => {
+            if (FeatureFlagUtil.isEnabled(st.configRS.getPrimary().getDB('admin'),
+                                          "RecoverableRefineCollectionShardKeyCoordinator")) {
+                // Skip because when RecoverableRefineCollectionShardKeyCoordinator is enabled,
+                // migrations will be stopped (and thus any migration pending recovery will be
+                // recovered) before committing the refineCollectionShardKey metadata changes, which
+                // makes this test case not possible anymore.
+                jsTestLog("Skip");
+                return;
+            }
+
             // This test must move the first chunk for refine shard key to work while migration
             // recovery is blocked. Insert some documents into the first chunk.
             for (let i = -100; i < -1; i++) {

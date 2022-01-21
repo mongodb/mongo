@@ -1,4 +1,4 @@
-# Copyright (C) 2021-present MongoDB, Inc.
+# Copyright (C) 2022-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,35 +26,17 @@
 # it in the license file.
 #
 
-# This file defines the format of documents stored in config.ddl.refineCollectionShardKey, used by the
-# shard coordinator to serialize with other DDL operations.
+# Feature flag related to RefineCollectionShardKeyCoordinator
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::feature_flags"
 
 imports:
     - "mongo/idl/basic_types.idl"
-    - "mongo/db/s/sharding_ddl_coordinator.idl"
-    - "mongo/s/request_types/sharded_ddl_commands.idl"
 
-enums:
-    RefineCollectionShardKeyCoordinatorPhase:
-        description: "Current refine collection shard key coordinator's operation state."
-        type: string
-        values:
-            kUnset: "unset"
-            kRefineCollectionShardKey: "RefineCollectionShardKey"
-
-structs:
-    RefineCollectionShardKeyCoordinatorDocument:
-        description: "Object with neccessary fields to refine a collection's shard key"
-        generate_comparison_operators: false
-        strict: true
-        chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
-        fields:
-            phase:
-                type: RefineCollectionShardKeyCoordinatorPhase
-                description: "Coordinator phase."
-                default: kUnset
+feature_flags:
+    featureFlagRecoverableRefineCollectionShardKeyCoordinator:
+        description: Feature flag for enabling the recoverable RefineCollectionShardKeyCoordinator which
+            disallows migrations during its execution.
+        cpp_varname: gFeatureFlagRecoverableRefineCollectionShardKeyCoordinator
+        default: false

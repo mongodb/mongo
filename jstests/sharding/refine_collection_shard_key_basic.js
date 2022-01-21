@@ -361,7 +361,7 @@ assert.commandWorked(mongos.getCollection(kNsName).createIndex(
 
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.OperationFailed);
+    ErrorCodes.InvalidOptions);
 
 // Should fail because only a multikey index exists for new shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});
@@ -370,7 +370,7 @@ assert.commandWorked(mongos.getCollection(kNsName).insert({aKey: [1, 2, 3, 4, 5]
 
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}}),
-    ErrorCodes.OperationFailed);
+    ErrorCodes.InvalidOptions);
 
 // Should fail because current shard key {a: 1} is unique, new shard key is {a: 1, b: 1}, and an
 // index only exists on {a: 1, b: 1, c: 1}.
@@ -709,38 +709,6 @@ if (!isStepdownSuite) {
     // Clean up.
     assert.commandWorked(minKeyShardDB.setProfilingLevel(0));
     assert(minKeyShardDB.system.profile.drop());
-})();
-
-(() => {
-    //
-    // Verify refineCollectionShardKey can return a StaleConfig error without crashing the config
-    // server.
-    //
-
-    // Create a sharded collection with one chunk on shard0.
-    const dbName = "testReturnStaleConfig";
-    const ns = dbName + ".fooReturnStaleConfig";
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
-    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
-
-    // Move the last chunk away from shard0 without refreshing shard1 so it will be stale when its
-    // indexes are read during the next refine. Disable refreshes on shard1 so it will repeatedly
-    // return StaleConfig until refineCollectionShardKey runs out of retries.
-    ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns, st.shard0, st.shard1, {x: 1});
-
-    let disableRefreshesFailPoint =
-        configureFailPoint(st.rs1.getPrimary(), "skipShardFilteringMetadataRefresh");
-
-    assert.commandWorked(st.rs1.getPrimary().getCollection(ns).createIndex({x: 1, y: 1}));
-    assert.commandFailedWithCode(
-        st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1}}),
-        ErrorCodes.StaleConfig);
-
-    disableRefreshesFailPoint.off();
-
-    // The refresh should succeed now.
-    assert.commandWorked(st.s.adminCommand({refineCollectionShardKey: ns, key: {x: 1, y: 1}}));
 })();
 
 // Assumes the given arrays are sorted by the max field.

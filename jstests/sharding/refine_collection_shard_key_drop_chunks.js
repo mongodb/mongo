@@ -6,7 +6,6 @@
 (function() {
 'use strict';
 
-load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/catalog_cache_loader_helpers.js');
 
 const st = new ShardingTest({shards: 1});
@@ -53,27 +52,17 @@ assert.eq({a: 5, b: 5}, chunkArr[1].max);
 assert.eq({a: 5, b: 5}, chunkArr[2]._id);
 assert.eq({a: MaxKey, b: MaxKey}, chunkArr[2].max);
 
-// Enable failpoint 'hangPersistCollectionAndChangedChunksAfterDropChunks' and flush the routing
-// table cache.
-let hangAfterDropChunksFailPoint =
-    configureFailPoint(shard, 'hangPersistCollectionAndChangedChunksAfterDropChunks');
-
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: newKeyDoc}));
-
-// Verify that all chunks belonging to 'db.foo' have been deleted.
-hangAfterDropChunksFailPoint.wait();
-chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
-assert.eq(0, chunkArr.length);
-
-// Disable failpoint 'hangPersistCollectionAndChangedChunksAfterDropChunks' and continue
-// flushing the routing table cache.
-hangAfterDropChunksFailPoint.off();
 
 // Verify that 'config.cache.chunks.db.foo' is as expected after refineCollectionShardKey. NOTE: We
 // use assert.soon here because refineCollectionShardKey doesn't block for each shard to refresh.
 assert.soon(() => {
+    let collectionCacheArr =
+        shard.getCollection('config.cache.collections').find({_id: kNsName}).toArray();
+
     chunkArr = shard.getCollection(configCacheChunks).find({}).sort({min: 1}).toArray();
-    return (3 === chunkArr.length);
+    return collectionCacheArr.length === 1 && collectionCacheArr[0].epoch != collEntry.epoch &&
+        3 === chunkArr.length;
 });
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, chunkArr[0]._id);
 assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, chunkArr[0].max);

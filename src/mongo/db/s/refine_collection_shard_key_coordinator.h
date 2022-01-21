@@ -35,8 +35,11 @@
 
 namespace mongo {
 
-class RefineCollectionShardKeyCoordinator final : public ShardingDDLCoordinator {
+class RefineCollectionShardKeyCoordinator : public ShardingDDLCoordinator {
 public:
+    using StateDoc = RefineCollectionShardKeyCoordinatorDocument;
+    using Phase = RefineCollectionShardKeyCoordinatorPhaseEnum;
+
     RefineCollectionShardKeyCoordinator(ShardingDDLCoordinatorService* service,
                                         const BSONObj& initialState);
 
@@ -46,6 +49,11 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
+protected:
+    RefineCollectionShardKeyCoordinator(ShardingDDLCoordinatorService* service,
+                                        const BSONObj& initialState,
+                                        bool persistCoordinatorDocument);
+
 private:
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();
@@ -54,8 +62,35 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    template <typename Func>
+    auto _executePhase(const Phase& newPhase, Func&& func) {
+        return [=] {
+            const auto& currPhase = _doc.getPhase();
+
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return func();
+        };
+    }
+
+    void _enterPhase(Phase newPhase);
+
     RefineCollectionShardKeyCoordinatorDocument _doc;
     const KeyPattern _newShardKey;
+    const bool _persistCoordinatorDocument;  // TODO: SERVER-62850 remove this then 6.0 branches out
+};
+
+// TODO: SERVER-62850 remove this then 6.0 branches out
+class RefineCollectionShardKeyCoordinator_NORESILIENT : public RefineCollectionShardKeyCoordinator {
+public:
+    RefineCollectionShardKeyCoordinator_NORESILIENT(ShardingDDLCoordinatorService* service,
+                                                    const BSONObj& initialState);
 };
 
 }  // namespace mongo
