@@ -63,8 +63,10 @@ const kCollName = "testColl";
     assert.commandWorked(testDB.adminCommand(
         {commitTransaction: 1, lsid: childLsid1, txnNumber: NumberLong(0), autocommit: false}));
 
-    const parentDocBeforeDowngrade =
-        shard0Primary.getCollection(kConfigTxnNs).findOne({"_id.id": sessionUUID});
+    const parentDocBeforeDowngrade = shard0Primary.getCollection(kConfigTxnNs).findOne({
+        "_id.id": sessionUUID,
+        "_id.txnNumber": {"$exists": false}
+    });
 
     assert.commandWorked(shard0Primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
