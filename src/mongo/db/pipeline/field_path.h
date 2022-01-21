@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include <limits>
 #include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/db/exec/document_value/document_internal.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -111,6 +113,20 @@ public:
     }
 
     /**
+     * Return the ith field name from this path using zero-based indexes, with pre-computed hash.
+     */
+    HashedFieldName getFieldNameHashed(size_t i) const {
+        dassert(i < getPathLength());
+        const auto begin = _fieldPathDotPosition[i] + 1;
+        const auto end = _fieldPathDotPosition[i + 1];
+        StringData fieldName{&_fieldPath[begin], end - begin};
+        if (_fieldHash[i] == kHashUninitialized) {
+            _fieldHash[i] = FieldNameHasher()(fieldName);
+        }
+        return HashedFieldName{fieldName, _fieldHash[i]};
+    }
+
+    /**
      * Returns the full path, not including the prefix 'FieldPath::prefix'.
      */
     const std::string& fullPath() const {
@@ -142,8 +158,10 @@ public:
     FieldPath concat(const FieldPath& tail) const;
 
 private:
-    FieldPath(std::string string, std::vector<size_t> dots)
-        : _fieldPath(std::move(string)), _fieldPathDotPosition(std::move(dots)) {
+    FieldPath(std::string string, std::vector<size_t> dots, std::vector<size_t> hashes)
+        : _fieldPath(std::move(string)),
+          _fieldPathDotPosition(std::move(dots)),
+          _fieldHash(std::move(hashes)) {
         uassert(ErrorCodes::Overflow,
                 "FieldPath is too long",
                 _fieldPathDotPosition.size() <= BSONDepth::getMaxAllowableDepth());
@@ -158,6 +176,11 @@ private:
     // string::npos (which evaluates to -1) and the last contains _fieldPath.size() to facilitate
     // lookup.
     std::vector<size_t> _fieldPathDotPosition;
+
+    // Contains the cached hash value for the field. Will initially be set to 'kHashUninitialized',
+    // and only generated when it is first retrieved via 'getFieldNameHashed'.
+    mutable std::vector<size_t> _fieldHash;
+    static constexpr std::size_t kHashUninitialized = std::numeric_limits<std::size_t>::max();
 };
 
 inline bool operator<(const FieldPath& lhs, const FieldPath& rhs) {

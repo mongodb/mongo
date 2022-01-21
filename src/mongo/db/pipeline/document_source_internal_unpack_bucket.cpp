@@ -272,7 +272,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5346504,
                     str::stream() << "timeField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::String);
-            bucketSpec.timeField = elem.str();
+            bucketSpec.setTimeField(elem.str());
             hasTimeField = true;
         } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5346505,
@@ -282,7 +282,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5545700,
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
-            bucketSpec.metaField = std::move(metaField);
+            bucketSpec.setMetaField(std::move(metaField));
         } else if (fieldName == kBucketMaxSpanSeconds) {
             uassert(5510600,
                     str::stream() << "bucketMaxSpanSeconds field must be an integer, got: "
@@ -345,7 +345,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5612401,
                     str::stream() << "timeField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::String);
-            bucketSpec.timeField = elem.str();
+            bucketSpec.setTimeField(elem.str());
             hasTimeField = true;
         } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5612402,
@@ -355,7 +355,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5612403,
                     str::stream() << "metaField field must be a single-element field path",
                     metaField.find('.') == std::string::npos);
-            bucketSpec.metaField = std::move(metaField);
+            bucketSpec.setMetaField(std::move(metaField));
         } else {
             uasserted(5612404,
                       str::stream() << "unrecognized parameter to $_unpackBucket: " << fieldName);
@@ -382,16 +382,16 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     if (((_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kInclude) ||
          (!_bucketUnpacker.includeMetaField() &&
-          _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kExclude && spec.metaField)) &&
+          _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kExclude && spec.metaField())) &&
         std::find(spec.computedMetaProjFields.cbegin(),
                   spec.computedMetaProjFields.cend(),
-                  *spec.metaField) == spec.computedMetaProjFields.cend())
-        fields.emplace_back(*spec.metaField);
+                  *spec.metaField()) == spec.computedMetaProjFields.cend())
+        fields.emplace_back(*spec.metaField());
 
     out.addField(behavior, Value{std::move(fields)});
-    out.addField(timeseries::kTimeFieldName, Value{spec.timeField});
-    if (spec.metaField) {
-        out.addField(timeseries::kMetaFieldName, Value{*spec.metaField});
+    out.addField(timeseries::kTimeFieldName, Value{spec.timeField()});
+    if (spec.metaField()) {
+        out.addField(timeseries::kMetaFieldName, Value{*spec.metaField()});
     }
     out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
 
@@ -450,7 +450,7 @@ bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     if (std::next(itr) == container->end()) {
         return nextStageWasRemoved;
     }
-    if (!_bucketUnpacker.bucketSpec().metaField) {
+    if (!_bucketUnpacker.bucketSpec().metaField()) {
         return nextStageWasRemoved;
     }
 
@@ -460,7 +460,7 @@ bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
         (nextTransform->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
          nextTransform->getType() == TransformerInterface::TransformerType::kComputedProjection)) {
 
-        auto& metaName = _bucketUnpacker.bucketSpec().metaField.get();
+        auto& metaName = _bucketUnpacker.bucketSpec().metaField().get();
         auto [addFieldsSpec, deleteStage] =
             nextTransform->extractComputedProjections(metaName,
                                                       timeseries::kBucketMetaFieldName.toString(),
@@ -622,9 +622,9 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     }
 
     // We must avoid mapping predicates on the meta field onto the control field.
-    if (bucketSpec.metaField &&
-        (matchExprPath == bucketSpec.metaField.get() ||
-         expression::isPathPrefixOf(bucketSpec.metaField.get(), matchExprPath)))
+    if (bucketSpec.metaField() &&
+        (matchExprPath == bucketSpec.metaField().get() ||
+         expression::isPathPrefixOf(bucketSpec.metaField().get(), matchExprPath)))
         return nullptr;
 
     // We must avoid mapping predicates on fields computed via $addFields or a computed $project.
@@ -632,7 +632,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         return nullptr;
     }
 
-    const auto isTimeField = (matchExprPath == bucketSpec.timeField);
+    const auto isTimeField = (matchExprPath == bucketSpec.timeField());
     if (isTimeField && matchExprData.type() != BSONType::Date) {
         // Users are not allowed to insert non-date measurements into time field. So this query
         // would not match anything. We do not need to optimize for this case.
@@ -813,7 +813,7 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
 std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
     boost::intrusive_ptr<DocumentSourceMatch> match) {
-    if (auto&& metaField = _bucketUnpacker.bucketSpec().metaField) {
+    if (auto&& metaField = _bucketUnpacker.bucketSpec().metaField()) {
         return std::move(*match).extractMatchOnFieldsAndRemainder(
             {*metaField}, {{*metaField, timeseries::kBucketMetaFieldName.toString()}});
     }
@@ -823,10 +823,10 @@ DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
     DocumentSource* src) const {
     if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
-        _bucketUnpacker.bucketSpec().metaField && nextProject &&
+        _bucketUnpacker.bucketSpec().metaField() && nextProject &&
         nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
         return nextProject->extractProjectOnFieldAndRename(
-            _bucketUnpacker.bucketSpec().metaField.get(), timeseries::kBucketMetaFieldName);
+            _bucketUnpacker.bucketSpec().metaField().get(), timeseries::kBucketMetaFieldName);
     }
 
     return {BSONObj{}, false};
@@ -841,7 +841,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     }
 
     const auto& idFields = groupPtr->getIdFields();
-    if (idFields.size() != 1 || !_bucketUnpacker.bucketSpec().metaField.has_value()) {
+    if (idFields.size() != 1 || !_bucketUnpacker.bucketSpec().metaField().has_value()) {
         return {};
     }
 
@@ -853,7 +853,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
 
     const auto& idPath = exprIdPath->getFieldPath();
     if (idPath.getPathLength() < 2 ||
-        idPath.getFieldName(1) != _bucketUnpacker.bucketSpec().metaField.get()) {
+        idPath.getFieldName(1) != _bucketUnpacker.bucketSpec().metaField().get()) {
         return {};
     }
 
@@ -874,7 +874,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
         if (const auto* exprArgPath = dynamic_cast<const ExpressionFieldPath*>(exprArg)) {
             const auto& path = exprArgPath->getFieldPath();
             if (path.getPathLength() <= 1 ||
-                path.getFieldName(1) == _bucketUnpacker.bucketSpec().timeField) {
+                path.getFieldName(1) == _bucketUnpacker.bucketSpec().timeField()) {
                 // Rewrite not valid for time field. We want to eliminate the bucket
                 // unpack stage here.
                 suitable = false;
@@ -946,12 +946,13 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
     // Some optimizations may not be safe to do if we have computed the metaField via an $addFields
     // or a computed $project. We won't do those optimizations if 'haveComputedMetaField' is true.
-    bool haveComputedMetaField = _bucketUnpacker.bucketSpec().metaField &&
-        fieldIsComputed(_bucketUnpacker.bucketSpec(), _bucketUnpacker.bucketSpec().metaField.get());
+    bool haveComputedMetaField = _bucketUnpacker.bucketSpec().metaField() &&
+        fieldIsComputed(_bucketUnpacker.bucketSpec(),
+                        _bucketUnpacker.bucketSpec().metaField().get());
 
     // Before any other rewrites for the current stage, consider reordering with $sort.
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {
-        if (auto metaField = _bucketUnpacker.bucketSpec().metaField;
+        if (auto metaField = _bucketUnpacker.bucketSpec().metaField();
             metaField && !haveComputedMetaField) {
             if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.get())) {
                 // We have a sort on metadata field following this stage. Reorder the two stages
@@ -995,7 +996,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
             nextNear->getQuery().binaryEqual(BSONObj()));
 
-        auto metaField = _bucketUnpacker.bucketSpec().metaField;
+        auto metaField = _bucketUnpacker.bucketSpec().metaField();
         if (metaField && *metaField == keyField->front()) {
             // Make sure we actually re-write the key field for the buckets collection so we can
             // locate the index.
@@ -1049,8 +1050,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         auto deps = Pipeline::getDependenciesForContainer(
             pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
         if (deps.hasNoRequirements()) {
-            _bucketUnpacker.setBucketSpecAndBehavior({_bucketUnpacker.bucketSpec().timeField,
-                                                      _bucketUnpacker.bucketSpec().metaField,
+            _bucketUnpacker.setBucketSpecAndBehavior({_bucketUnpacker.bucketSpec().timeField(),
+                                                      _bucketUnpacker.bucketSpec().metaField(),
                                                       {}},
                                                      BucketUnpacker::Behavior::kInclude);
 

@@ -29,6 +29,7 @@
 
 #pragma once
 
+
 #include <algorithm>
 #include <set>
 
@@ -39,14 +40,29 @@ namespace mongo {
 /**
  * Carries parameters for unpacking a bucket.
  */
-struct BucketSpec {
+class BucketSpec {
+public:
+    BucketSpec() = default;
+    BucketSpec(const std::string& timeField,
+               const boost::optional<std::string>& metaField,
+               const std::set<std::string>& fields = {},
+               const std::vector<std::string>& computedProjections = {});
+    BucketSpec(const BucketSpec&);
+    BucketSpec(BucketSpec&&);
+
+    BucketSpec& operator=(const BucketSpec&);
+
     // The user-supplied timestamp field name specified during time-series collection creation.
-    std::string timeField;
+    void setTimeField(std::string&& field);
+    const std::string& timeField() const;
+    HashedFieldName timeFieldHashed() const;
 
     // An optional user-supplied metadata field name specified during time-series collection
     // creation. This field name is used during materialization of metadata fields of a measurement
     // after unpacking.
-    boost::optional<std::string> metaField;
+    void setMetaField(boost::optional<std::string>&& field);
+    const boost::optional<std::string>& metaField() const;
+    boost::optional<HashedFieldName> metaFieldHashed() const;
 
     // The set of field names in the data region that should be included or excluded.
     std::set<std::string> fieldSet;
@@ -54,6 +70,13 @@ struct BucketSpec {
     // Vector of computed meta field projection names. Added at the end of materialized
     // measurements.
     std::vector<std::string> computedMetaProjFields;
+
+private:
+    std::string _timeField;
+    boost::optional<HashedFieldName> _timeFieldHashed;
+
+    boost::optional<std::string> _metaField = boost::none;
+    boost::optional<HashedFieldName> _metaFieldHashed = boost::none;
 };
 
 /**
@@ -185,12 +208,12 @@ private:
  */
 inline bool eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior unpackerBehavior,
                                                          BucketSpec* bucketSpec) {
-    if (!bucketSpec->metaField ||
+    if (!bucketSpec->metaField() ||
         std::find(bucketSpec->computedMetaProjFields.cbegin(),
                   bucketSpec->computedMetaProjFields.cend(),
-                  *bucketSpec->metaField) != bucketSpec->computedMetaProjFields.cend()) {
+                  *bucketSpec->metaField()) != bucketSpec->computedMetaProjFields.cend()) {
         return false;
-    } else if (auto itr = bucketSpec->fieldSet.find(*bucketSpec->metaField);
+    } else if (auto itr = bucketSpec->fieldSet.find(*bucketSpec->metaField());
                itr != bucketSpec->fieldSet.end()) {
         bucketSpec->fieldSet.erase(itr);
         return unpackerBehavior == BucketUnpacker::Behavior::kInclude;
@@ -205,7 +228,7 @@ inline bool eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavio
 inline bool determineIncludeTimeField(BucketUnpacker::Behavior unpackerBehavior,
                                       BucketSpec* bucketSpec) {
     return (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
-        (bucketSpec->fieldSet.find(bucketSpec->timeField) != bucketSpec->fieldSet.end());
+        (bucketSpec->fieldSet.find(bucketSpec->timeField()) != bucketSpec->fieldSet.end());
 }
 
 /**

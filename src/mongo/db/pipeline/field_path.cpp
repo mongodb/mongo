@@ -70,7 +70,9 @@ string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
 }
 
 FieldPath::FieldPath(std::string inputPath)
-    : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{string::npos} {
+    : _fieldPath(std::move(inputPath)),
+      _fieldPathDotPosition{string::npos},
+      _fieldHash{kHashUninitialized} {
     uassert(40352, "FieldPath cannot be constructed with empty string", !_fieldPath.empty());
     uassert(40353, "FieldPath must not end with a '.'.", _fieldPath[_fieldPath.size() - 1] != '.');
 
@@ -79,6 +81,7 @@ FieldPath::FieldPath(std::string inputPath)
     size_t startPos = 0;
     while (string::npos != (dotPos = _fieldPath.find('.', startPos))) {
         _fieldPathDotPosition.push_back(dotPos);
+        _fieldHash.push_back(kHashUninitialized);
         startPos = dotPos + 1;
     }
 
@@ -139,19 +142,26 @@ FieldPath FieldPath::concat(const FieldPath& tail) const {
         head._fieldPathDotPosition.size() + tail._fieldPathDotPosition.size() - 2 + 1;
     newDots.reserve(expectedDotSize);
 
+    std::vector<size_t> newHashes;
+    // We don't need the extra entry in hashes.
+    newHashes.reserve(expectedDotSize - 1);
+
     // The first one in head._fieldPathDotPosition is npos. The last one, is, conveniently, the
     // size of head fieldPath, which also happens to be the index at which we added a new dot.
     newDots.insert(
         newDots.begin(), head._fieldPathDotPosition.begin(), head._fieldPathDotPosition.end());
+    newHashes.insert(newHashes.begin(), head._fieldHash.begin(), head._fieldHash.end());
 
     invariant(tail._fieldPathDotPosition.size() >= 2);
     for (size_t i = 1; i < tail._fieldPathDotPosition.size(); ++i) {
         // Move each index back by size of the first field path, plus one, for the newly added dot.
         newDots.push_back(tail._fieldPathDotPosition[i] + head._fieldPath.size() + 1);
+        newHashes.push_back(tail._fieldHash[i - 1]);
     }
     invariant(newDots.back() == concat.size());
     invariant(newDots.size() == expectedDotSize);
+    invariant(newHashes.size() == expectedDotSize - 1);
 
-    return FieldPath(std::move(concat), std::move(newDots));
+    return FieldPath(std::move(concat), std::move(newDots), std::move(newHashes));
 }
 }  // namespace mongo
