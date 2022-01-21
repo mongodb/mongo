@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -112,22 +113,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
 
     // If the change stream spec includes a resumeToken with a shard key, populate the document key
     // cache with the field paths.
-    if (!tokenData.documentKey.missing() && tokenData.uuid) {
-        std::vector<FieldPath> docKeyFields;
-        auto docKey = tokenData.documentKey.getDocument();
-
-        auto iter = docKey.fieldIterator();
-        while (iter.more()) {
-            auto fieldPair = iter.next();
-            docKeyFields.push_back(fieldPair.first);
-        }
-
-        // If the document key from the resume token has more than one field, that means it
-        // includes the shard key and thus should never change.
-        const bool isFinal = docKeyFields.size() > 1;
-
-        _documentKeyCache[tokenData.uuid.get()] = DocumentKeyCacheEntry({docKeyFields, isFinal});
-    }
+    _documentKeyCache = change_stream_legacy::buildDocumentKeyCache(tokenData);
 }
 
 StageConstraints DocumentSourceChangeStreamTransform::constraints(
@@ -196,31 +182,11 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     Value ns = input[repl::OplogEntry::kNssFieldName];
     checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    std::vector<FieldPath> documentKeyFields;
 
     // Deal with CRUD operations and commands.
     auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
 
     NamespaceString nss(ns.getString());
-    // Ignore commands in the oplog when looking up the document key fields since a command implies
-    // that the change stream is about to be invalidated (e.g. collection drop).
-    if (!uuid.missing() && opType != repl::OpTypeEnum::kCommand) {
-        checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
-        // We need to retrieve the document key fields if our cache does not have an entry for this
-        // UUID or if the cache entry is not definitively final, indicating that the collection was
-        // unsharded when the entry was last populated.
-        auto it = _documentKeyCache.find(uuid.getUuid());
-        if (it == _documentKeyCache.end() || !it->second.isFinal) {
-            auto docKeyFields =
-                pExpCtx->mongoProcessInterface->collectDocumentKeyFieldsForHostedCollection(
-                    pExpCtx->opCtx, nss, uuid.getUuid());
-            if (it == _documentKeyCache.end() || docKeyFields.second) {
-                _documentKeyCache[uuid.getUuid()] = DocumentKeyCacheEntry(docKeyFields);
-            }
-        }
-
-        documentKeyFields = _documentKeyCache.find(uuid.getUuid())->second.documentKeyFields;
-    }
     Value id = input.getNestedField("o._id");
     // Non-replace updates have the _id in field "o2".
     StringData operationType;
@@ -232,8 +198,23 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         case repl::OpTypeEnum::kInsert: {
             operationType = DocumentSourceChangeStream::kInsertOpType;
             fullDocument = input[repl::OplogEntry::kObjectFieldName];
-            documentKey = Value(document_path_support::extractPathsFromDoc(
-                fullDocument.getDocument(), documentKeyFields));
+            documentKey = input[repl::OplogEntry::kObject2FieldName];
+            // For oplog entries written on an older version of the server, the documentKey may be
+            // missing.
+            if (documentKey.missing()) {
+                // If we are resuming from an 'insert' oplog entry that does not have a documentKey,
+                // it may have been read on an older version of the server that populated the
+                // documentKey fields from the sharding catalog. We populate the fields we observed
+                // in the resume token in order to retain consistent event ordering around the
+                // resume point during upgrade. Otherwise, we default to _id as the only document
+                // key field.
+                if (_documentKeyCache && _documentKeyCache->first == uuid.getUuid()) {
+                    documentKey = Value(document_path_support::extractPathsFromDoc(
+                        fullDocument.getDocument(), _documentKeyCache->second));
+                } else {
+                    documentKey = Value(Document{{"_id", id}});
+                }
+            }
             break;
         }
         case repl::OpTypeEnum::kDelete: {

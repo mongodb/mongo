@@ -184,11 +184,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext*, const NamespaceString&, UUID) const override {
-        MONGO_UNREACHABLE;
-    }
-
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override {
         MONGO_UNREACHABLE;

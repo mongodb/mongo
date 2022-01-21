@@ -122,5 +122,22 @@ boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionCo
     return Document{opLogEntry.getObject().getOwned()};
 }
 
+boost::optional<std::pair<UUID, std::vector<FieldPath>>> buildDocumentKeyCache(
+    const ResumeTokenData& tokenData) {
+    if (!tokenData.documentKey.missing() && tokenData.uuid) {
+        std::vector<FieldPath> docKeyFields;
+        auto docKey = tokenData.documentKey.getDocument();
+
+        auto iter = docKey.fieldIterator();
+        while (iter.more()) {
+            auto fieldPair = iter.next();
+            docKeyFields.push_back(fieldPair.first);
+        }
+
+        return std::make_pair(tokenData.uuid.get(), docKeyFields);
+    }
+    return {};
+}
+
 }  // namespace change_stream_legacy
 }  // namespace mongo

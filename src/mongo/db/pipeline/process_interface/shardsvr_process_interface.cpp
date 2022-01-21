@@ -89,33 +89,6 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
             foundVersion.isSameCollection(targetCollectionVersion));
 }
 
-std::pair<std::vector<FieldPath>, bool>
-ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(OperationContext* opCtx,
-                                                                         const NamespaceString& nss,
-                                                                         UUID uuid) const {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-
-    auto* const catalogCache = Grid::get(opCtx)->catalogCache();
-    auto swCM = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-    if (swCM.isOK()) {
-        const auto& cm = swCM.getValue();
-        if (cm.isSharded() && cm.uuidMatches(uuid)) {
-            // Unpack the shard key. Collection is now sharded so the document key fields will never
-            // change, mark as final.
-            return {_shardKeyToDocumentKeyFields(cm.getShardKeyPattern().getKeyPatternFields()),
-                    true};
-        }
-    } else if (swCM != ErrorCodes::NamespaceNotFound) {
-        uassertStatusOK(std::move(swCM));
-    }
-
-    // An unsharded collection can still become sharded so is not final. If the uuid doesn't match
-    // the one stored in the ScopedCollectionDescription, this implies that the collection has been
-    // dropped and recreated as sharded. We don't know what the old document key fields might have
-    // been in this case so we return just _id.
-    return {{"_id"}, false};
-}
-
 boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,

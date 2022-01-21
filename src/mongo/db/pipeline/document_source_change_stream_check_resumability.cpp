@@ -47,19 +47,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
 
 // Returns ResumeStatus::kFoundToken if the document retrieved from the resumed pipeline satisfies
 // the client's resume token, ResumeStatus::kCheckNextDoc if it is older than the client's token,
-// and ResumeToken::kCannotResume if it is more recent than the client's resume token (indicating
-// that we will never see the token). If the resume token's documentKey contains only the _id field
-// while the pipeline documentKey contains additional fields, then the collection has become sharded
-// since the resume token was generated. In that case, we relax the requirements such that only the
-// timestamp, version, txnOpIndex, UUID and documentKey._id need match. This remains correct, since
-// the only circumstances under which the resume token omits the shard key is if it was generated
-// either (1) before the collection was sharded, (2) after the collection was sharded but before the
-// primary shard became aware of that fact, implying that it was before the first chunk moved off
-// the shard, or (3) by a malicious client who has constructed their own resume token. In the first
-// two cases, we can be guaranteed that the _id is unique and the stream can therefore be resumed
-// seamlessly; in the third case, the worst that can happen is that some entries are missed or
-// duplicated. Note that the simple collation is used to compare the resume tokens, and that we
-// purposefully avoid the user's requested collation if present.
+// and ResumeToken::kSurpassedToken if it is more recent than the client's resume token (indicating
+// that we will never see the token).
 DocumentSourceChangeStreamCheckResumability::ResumeStatus
 DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
     const intrusive_ptr<ExpressionContext>& expCtx,
@@ -127,50 +116,11 @@ DocumentSourceChangeStreamCheckResumability::compareAgainstClientResumeToken(
 
     // At this point, we know that the tokens differ only by documentKey. The status we return will
     // depend on whether the stream token is logically before or after the client token. If the
-    // latter, then we will never see the resume token and the stream cannot be resumed. However,
-    // before we can return this value, we need to check the possibility that the resumed stream is
-    // on a sharded collection and the client token is from before the collection was sharded.
-    const auto defaultResumeStatus =
-        ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.documentKey >
-                                            tokenDataFromClient.documentKey)
+    // latter, then we will never see the resume token and the stream cannot be resumed.
+    return ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.documentKey >
+                                               tokenDataFromClient.documentKey)
         ? ResumeStatus::kSurpassedToken
         : ResumeStatus::kCheckNextDoc;
-
-    // If we're not running in a sharded context, we don't need to proceed any further.
-    if (!expCtx->needsMerge && !expCtx->inMongos) {
-        return defaultResumeStatus;
-    }
-
-    // If we reach here, we still need to check the possibility that the collection has become
-    // sharded in the time since the client's resume token was generated. If so, then the client
-    // token will only have an _id field, while the token from the new pipeline may have additional
-    // shard key fields.
-
-    // We expect the documentKey to be an object in both the client and stream tokens. If either is
-    // not, then we cannot compare the embedded _id values in each, and so the stream token does not
-    // satisfy the client token.
-    if (tokenDataFromClient.documentKey.getType() != BSONType::Object ||
-        tokenDataFromResumedStream.documentKey.getType() != BSONType::Object) {
-        return defaultResumeStatus;
-    }
-
-    auto documentKeyFromResumedStream = tokenDataFromResumedStream.documentKey.getDocument();
-    auto documentKeyFromClient = tokenDataFromClient.documentKey.getDocument();
-
-    // In order for the relaxed comparison to be applicable, the client token must have a single _id
-    // field, and the resumed stream token must have additional fields beyond _id.
-    if (!(documentKeyFromClient.computeSize() == 1 &&
-          documentKeyFromResumedStream.computeSize() > 1)) {
-        return defaultResumeStatus;
-    }
-
-    // If the resume token's documentKey only contains the _id field while the pipeline's
-    // documentKey contains additional fields, we require only that the _ids match.
-    return (!documentKeyFromClient["_id"].missing() &&
-                    ValueComparator::kInstance.evaluate(documentKeyFromResumedStream["_id"] ==
-                                                        documentKeyFromClient["_id"])
-                ? ResumeStatus::kFoundToken
-                : defaultResumeStatus);
 }
 
 DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResumability(

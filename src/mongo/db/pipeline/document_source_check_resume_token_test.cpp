@@ -501,32 +501,6 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
     ASSERT_TRUE(checkResumeToken->getNext().isEOF());
 }
 
-TEST_F(CheckResumeTokenTest, UnshardedTokenSucceedsForShardedResumeOnMongosIfIdMatchesFirstDoc) {
-    // Verify that a resume token whose documentKey only contains _id can be used to resume a stream
-    // on a sharded collection as long as its _id matches the first document. We set 'inMongos'
-    // since this behaviour is only applicable when DSCSEnsureResumeTokenPresent is running on
-    // mongoS.
-    Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
-
-    auto checkResumeToken =
-        createDSEnsureResumeTokenPresent(resumeTimestamp, Document{{"_id"_sd, 1}});
-
-    Timestamp doc1Timestamp(100, 1);
-    addOplogEntryOnTestNS(doc1Timestamp, {{"x"_sd, 0}, {"_id"_sd, 1}});
-    Timestamp doc2Timestamp(100, 2);
-    Document doc2DocKey{{"x"_sd, 0}, {"_id"_sd, 2}};
-    addOplogEntryOnTestNS(doc2Timestamp, doc2DocKey);
-
-    // We should skip doc1 since it satisfies the resume token, and retrieve doc2.
-    const auto firstDocAfterResume = checkResumeToken->getNext();
-    const auto tokenFromFirstDocAfterResume =
-        ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
-
-    ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, doc2Timestamp);
-    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), doc2DocKey);
-}
-
 TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoesNotMatchFirstDoc) {
     Timestamp resumeTimestamp(100, 1);
     getExpCtx()->inMongos = true;

@@ -59,12 +59,6 @@ std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContex
         opCtx, ns, includeBuildUUIDs ? ListIndexesInclude::BuildUUID : ListIndexesInclude::Nothing);
 }
 
-std::pair<std::vector<FieldPath>, bool>
-NonShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(
-    OperationContext* opCtx, const NamespaceString& nss, UUID uuid) const {
-    return {{"_id"}, false};  // Nothing is sharded.
-}
-
 std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     return {"_id"};  // Nothing is sharded.

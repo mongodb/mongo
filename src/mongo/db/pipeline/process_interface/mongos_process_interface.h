@@ -165,11 +165,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const final {
-        MONGO_UNREACHABLE;
-    }
-
     /**
      * The following methods only make sense for data-bearing nodes and should never be called on
      * a mongos.

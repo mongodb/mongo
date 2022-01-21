@@ -53,9 +53,6 @@ public:
                                       const NamespaceString& nss,
                                       ChunkVersion targetCollectionVersion) const final;
 
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const final;
-
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final {
         // We don't expect anyone to use this method on the shard itself (yet). This is currently

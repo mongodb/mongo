@@ -75,8 +75,6 @@ public:
                                               ChunkVersion targetCollectionVersion) const override {
         uasserted(51020, "unexpected request to consult sharding catalog on non-shardsvr");
     }
-    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const final;
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const final;

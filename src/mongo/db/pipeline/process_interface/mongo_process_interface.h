@@ -330,16 +330,6 @@ public:
     virtual std::string getHostAndPort(OperationContext* opCtx) const = 0;
 
     /**
-     * Returns the fields of the document key (in order) for the collection corresponding to 'uuid',
-     * including the shard key and _id. If _id is not in the shard key, it is added last. If the
-     * collection is not sharded or no longer exists, returns only _id. Also returns a boolean that
-     * indicates whether the returned fields of the document key are final and will never change for
-     * the given collection, either because the collection was dropped or has become sharded.
-     */
-    virtual std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFieldsForHostedCollection(
-        OperationContext* opCtx, const NamespaceString&, UUID) const = 0;
-
-    /**
      * Returns the fields of the document key (in order) for the collection 'nss', according to the
      * CatalogCache. The document key fields are the shard key (if sharded) and the _id (if not
      * already in the shard key). If _id is not in the shard key, it is added last. If the

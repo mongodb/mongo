@@ -155,19 +155,19 @@ function testUnshardedBecomesSharded(collToWatch) {
     assert.commandWorked(mongosColl.insert({_id: -1, z: -1}));
     assert.commandWorked(mongosColl.insert({_id: 1, z: 1}));
 
-    // Verify that the change stream picks up the inserts, however the shard key is missing
-    // since the collection has since been dropped and recreated.
+    // Verify that the change stream picks up the inserts. The shard keys are present since they are
+    // recorded in the oplog.
     cst.assertNextChangesEqual({
         cursor: cursor,
         expectedChanges: [
             {
-                documentKey: {_id: -2},
+                documentKey: {x: -2, _id: -2},
                 fullDocument: {_id: -2, x: -2},
                 ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
                 operationType: "insert",
             },
             {
-                documentKey: {_id: -3},
+                documentKey: {x: -3, _id: -3},
                 fullDocument: {_id: -3, x: -3},
                 ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
                 operationType: "insert",

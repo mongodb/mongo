@@ -73,22 +73,6 @@ private:
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         DocumentSourceChangeStreamSpec spec);
 
-    struct DocumentKeyCacheEntry {
-        DocumentKeyCacheEntry() = default;
-
-        DocumentKeyCacheEntry(std::pair<std::vector<FieldPath>, bool> documentKeyFieldsIn)
-            : documentKeyFields(documentKeyFieldsIn.first), isFinal(documentKeyFieldsIn.second){};
-        // Fields of the document key, in order, including "_id" and the shard key if the
-        // collection is sharded. Empty until the first oplog entry with a uuid is encountered.
-        // Needed for transforming 'insert' oplog entries.
-        std::vector<FieldPath> documentKeyFields;
-
-        // Set to true if the document key fields for this entry are definitively known and will
-        // not change. This implies that either the collection has become sharded or has been
-        // dropped.
-        bool isFinal;
-    };
-
     /**
      * Helper used for determining what resume token to return.
      */
@@ -96,8 +80,8 @@ private:
 
     DocumentSourceChangeStreamSpec _changeStreamSpec;
 
-    // Map of collection UUID to document key fields.
-    std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;
+    // Records the documentKey fields from the client's resume token, if present.
+    boost::optional<std::pair<UUID, std::vector<FieldPath>>> _documentKeyCache;
 
     // Set to true if this transformation stage can be run on the collectionless namespace.
     bool _isIndependentOfAnyCollection;

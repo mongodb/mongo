@@ -47,4 +47,12 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
 boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
                                                const Document& preImageId);
 
+/**
+ * Builds document key cache from the resume token. The cache will be used when the insert oplog
+ * entry does not contain the documentKey. This can happen when reading an oplog entry written by an
+ * older version of the server.
+ */
+boost::optional<std::pair<UUID, std::vector<FieldPath>>> buildDocumentKeyCache(
+    const ResumeTokenData& data);
+
 }  // namespace mongo::change_stream_legacy
