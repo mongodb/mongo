@@ -46,6 +46,8 @@ public:
 
     virtual DefragmentationPhaseEnum getType() const = 0;
 
+    virtual DefragmentationPhaseEnum getNextPhase() const = 0;
+
     virtual boost::optional<DefragmentationAction> popNextStreamableAction(
         OperationContext* opCtx) = 0;
 
@@ -154,12 +156,6 @@ private:
      * Must be called while holding the _streamingMutex.
      */
     void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
-
-    void _applyActionResult(OperationContext* opCtx,
-                            const UUID& uuid,
-                            const NamespaceString& nss,
-                            const DefragmentationAction& action,
-                            const DefragmentationActionResponse& response);
 
     void _processEndOfAction(WithLock, OperationContext* opCtx);
 

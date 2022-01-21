@@ -325,8 +325,28 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsR
     ASSERT_FALSE(future.isReady());
 }
 
-TEST_F(BalancerDefragmentationPolicyTest,
-       TestNonRetriableErrorEndsDefragmentationButLeavesPersistedFields) {
+TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentation) {
+    auto coll = makeConfigCollectionEntry();
+    makeConfigChunkEntry();
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
+
+    auto resp = StatusWith(DataSizeResponse(2000, 4));
+    _defragmentationPolicy.acknowledgeDataSizeResult(operationContext(), dataSizeAction, resp);
+
+    // Remove collection entry from config.collections
+    ASSERT_OK(deleteToConfigCollection(
+        operationContext(), CollectionType::ConfigNS, coll.toBSON(), false));
+
+    // getCollection should fail with NamespaceNotFound and end defragmentation on the collection.
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_FALSE(future.isReady());
+    // Defragmentation should have stopped on the collection
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPhase) {
     auto coll = makeConfigCollectionEntry();
     makeConfigChunkEntry();
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
@@ -336,23 +356,59 @@ TEST_F(BalancerDefragmentationPolicyTest,
     _defragmentationPolicy.acknowledgeDataSizeResult(
         operationContext(),
         failingDataSizeAction,
+        Status(ErrorCodes::IllegalOperation, "Testing error response"));
+    future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+
+    // 1. The collection should be marked as undergoing through phase 1 of the algorithm...
+    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeChunks);
+    // 2. The action returned by the stream should be now an actionable DataSizeCommand...
+    ASSERT_TRUE(future.isReady());
+    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
+    // 3. with the expected content
+    // TODO refactor chunk builder
+    ASSERT_EQ(coll.getNss(), dataSizeAction.nss);
+    ASSERT_BSONOBJ_EQ(kKeyAtZero, dataSizeAction.chunkRange.getMin());
+    ASSERT_BSONOBJ_EQ(kKeyAtTen, dataSizeAction.chunkRange.getMax());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest,
+       TestNonRetriableErrorWaitsForAllOutstandingActionsToComplete) {
+    auto coll = makeConfigCollectionEntry();
+    ChunkType chunk1(kUuid, ChunkRange(kKeyAtZero, kKeyAtTen), kCollectionVersion, kShardId0);
+    ChunkType chunk2(
+        kUuid, ChunkRange(BSON("x" << 11), kKeyAtTwenty), kCollectionVersion, kShardId0);
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), ChunkType::ConfigNS, chunk1.toConfigBSON()));
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), ChunkType::ConfigNS, chunk2.toConfigBSON()));
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(future.get());
+    auto future2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    DataSizeInfo secondDataSizeAction = stdx::get<DataSizeInfo>(future2.get());
+
+    _defragmentationPolicy.acknowledgeDataSizeResult(
+        operationContext(),
+        failingDataSizeAction,
         Status(ErrorCodes::NamespaceNotFound, "Testing error response"));
 
-    // Defragmentation should have stopped on the collection
-    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
     // There should be no new actions.
     future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future.isReady());
-    // The defragmentation flags should still be present
-    auto configDoc = findOneOnConfigCollection(operationContext(),
-                                               CollectionType::ConfigNS,
-                                               BSON(CollectionType::kUuidFieldName << kUuid))
-                         .getValue();
-    ASSERT_TRUE(configDoc.getBoolField(CollectionType::kDefragmentCollectionFieldName));
-    auto storedDefragmentationPhase = DefragmentationPhase_parse(
-        IDLParserErrorContext("BalancerDefragmentationPolicyTest"),
-        configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
-    ASSERT_TRUE(storedDefragmentationPhase == DefragmentationPhaseEnum::kMergeChunks);
+    // Defragmentation should be waiting for second datasize action to complete
+    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    // Defragmentation policy should ignore content of next acknowledge
+    _defragmentationPolicy.acknowledgeDataSizeResult(
+        operationContext(),
+        secondDataSizeAction,
+        Status(ErrorCodes::NetworkTimeout, "Testing error response"));
+    // Phase 1 should restart.
+    future2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_TRUE(future.isReady());
+    ASSERT_TRUE(future2.isReady());
+    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
+    DataSizeInfo dataSizeAction2 = stdx::get<DataSizeInfo>(future2.get());
 }
 
 
@@ -516,6 +572,25 @@ TEST_F(BalancerDefragmentationPolicyTest,
     ASSERT_FALSE(future.isReady());
 }
 
+TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPhase1) {
+    auto coll = makeConfigCollectionEntry(DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    setDefaultClusterStats();
+    makeConfigChunkEntry();
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+
+    // Should be in phase 1
+    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeChunks);
+    // There should be a datasize entry and no migrations
+    stdx::unordered_set<ShardId> usedShards;
+    auto pendingMigrations =
+        _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
+    ASSERT_EQ(0, pendingMigrations.size());
+    auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_TRUE(future.isReady());
+    auto dataSizeAction = stdx::get<DataSizeInfo>(future.get());
+}
+
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWithSibling) {
     ChunkType biggestChunk(
         kUuid,
@@ -611,14 +686,14 @@ TEST_F(BalancerDefragmentationPolicyTest,
         ChunkRange(kKeyAtThirty, kKeyAtForty),
         ChunkVersion(1, 4, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
         kShardId0);
-    firstChunkOnShard0.setEstimatedSizeBytes(1);
+    secondChunkOnShard0.setEstimatedSizeBytes(1);
 
     ChunkType secondChunkOnShard1(
         kUuid,
         ChunkRange(kKeyAtForty, kKeyAtMax),
         ChunkVersion(1, 5, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
         kShardId1);
-    firstChunkOnShard1.setEstimatedSizeBytes(1);
+    secondChunkOnShard1.setEstimatedSizeBytes(1);
 
     auto coll = setupCollectionWithPhase({firstChunkOnShard0,
                                           firstChunkOnShard1,
