@@ -554,12 +554,6 @@ public:
             (cmd->getChangeStreamPreAndPostImages() &&
              cmd->getChangeStreamPreAndPostImages()->getEnabled());
 
-        // Acquire shared lock on FCV if 'changeStreamPreAndPostImages' is enabled.
-        boost::optional<FixedFCVRegion> fcvRegion;
-        if (isChangeStreamPreAndPostImagesEnabled) {
-            fcvRegion.emplace(opCtx);
-        }
-
         if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             const auto isRecordPreImagesEnabled = cmd->getRecordPreImages().get_value_or(false);
@@ -568,7 +562,7 @@ public:
                     "to true simultaneously",
                     !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
         } else {
-            uassert(5846901,
+            uassert(ErrorCodes::InvalidOptions,
                     "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
                     !cmd->getChangeStreamPreAndPostImages().has_value());
         }

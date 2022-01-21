@@ -55,10 +55,10 @@ function testCreateAndCollModCommandsInUpgradedDowngradedFCVStates(downgradeFCV)
     assert.commandFailedWithCode(
         testDB.createCollection("anotherTestCollection",
                                 {"changeStreamPreAndPostImages": {enabled: false}}),
-        5846900);
+        ErrorCodes.InvalidOptions);
     assert.commandFailedWithCode(
         testDB.runCommand({"collMod": collName, "changeStreamPreAndPostImages": {enabled: false}}),
-        5846901);
+        ErrorCodes.InvalidOptions);
 
     // Set the FCV to the latest.
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
