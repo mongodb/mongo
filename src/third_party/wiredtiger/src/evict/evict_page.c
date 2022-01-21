@@ -499,7 +499,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     WT_DECL_RET;
     WT_PAGE *page;
     uint32_t flags;
-    bool closing, modified, snapshot_acquired;
+    bool closing, modified;
     bool is_eviction_thread, use_snapshot_for_app_thread;
 
     *inmem_splitp = false;
@@ -509,7 +509,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     page = ref->page;
     flags = WT_REC_EVICT;
     closing = FLD_ISSET(evict_flags, WT_EVICT_CALL_CLOSING);
-    snapshot_acquired = false;
 
     /*
      * Fail if an internal has active children, the children must be evicted first. The test is
@@ -651,12 +650,6 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * in the later part of the code to detect updates that belonged to the last running application
      * transaction.
      */
-
-    /*
-     * TODO: We are deliberately not using a snapshot when checkpoint is active. This will ensure
-     * that point-in-time checkpoints have a consistent version of data. Remove this condition once
-     * fuzzy transaction ID based checkpoints work is merged (WT-6673).
-     */
     use_snapshot_for_app_thread = !F_ISSET(session, WT_SESSION_INTERNAL) &&
       !WT_IS_METADATA(session->dhandle) && WT_SESSION_TXN_SHARED(session)->id != WT_TXN_NONE &&
       F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT);
@@ -666,72 +659,26 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     WT_ASSERT(session, !use_snapshot_for_app_thread || !is_eviction_thread);
 
     /*
-     * History store data is always evictable.
-     *
      * If checkpoint is running concurrently, set the checkpoint running flag and we will abort the
      * eviction if we detect out of order timestamp updates.
      */
-    if (WT_IS_HS(btree->dhandle)) {
+    if (conn->txn_global.checkpoint_running)
+        LF_SET(WT_REC_CHECKPOINT_RUNNING);
+
+    /* Eviction thread doing eviction. */
+    if (is_eviction_thread)
         /*
-         * FIX-ME-WT-5316: remove this when we have removed history store score and
-         * __rec_update_stable. No need to set visibility flag for history store.
+         * Eviction threads do not need to pin anything in the cache. We have an exclusive lock for
+         * the page being evicted so we are sure that the page will always be there while it is
+         * being processed. Therefore, we use snapshot API that doesn't publish shared IDs to the
+         * outside world.
          */
+        __wt_txn_bump_snapshot(session);
+    else if (use_snapshot_for_app_thread)
+        LF_SET(WT_REC_APP_EVICTION_SNAPSHOT);
+    else {
         if (!WT_SESSION_BTREE_SYNC(session))
             LF_SET(WT_REC_VISIBLE_ALL);
-    } else {
-        if (is_eviction_thread) {
-            /* Eviction thread doing eviction. */
-            if (!conn->txn_global.checkpoint_running) {
-                /*
-                 * Eviction threads do not need to pin anything in the cache. We have an exclusive
-                 * lock for the page being evicted so we are sure that the page will always be there
-                 * while it is being processed. Therefore, we use snapshot API that doesn't publish
-                 * shared IDs to the outside world.
-                 */
-                __wt_txn_bump_snapshot(session);
-                snapshot_acquired = true;
-
-                /*
-                 * Make sure once more that there is no checkpoint running. A new checkpoint might
-                 * have started between previous check and acquiring snapshot. If there is a
-                 * checkpoint running, release the snapshot and fallback to global visibility
-                 * checks.
-                 *
-                 * There should be a read barrier here otherwise the second read may be optimized
-                 * away by the compiler. However, we should have already met a barrier when we bump
-                 * the snapshot so the barrier is omitted here.
-                 */
-                if (conn->txn_global.checkpoint_running) {
-                    __wt_txn_release_snapshot(session);
-                    snapshot_acquired = false;
-                    LF_SET(WT_REC_VISIBLE_ALL | WT_REC_CHECKPOINT_RUNNING);
-                }
-            } else {
-                if (!WT_SESSION_BTREE_SYNC(session))
-                    LF_SET(WT_REC_VISIBLE_ALL);
-                LF_SET(WT_REC_CHECKPOINT_RUNNING);
-            }
-        } else if (use_snapshot_for_app_thread) {
-            /* Application thread that has a snapshot doing eviction. */
-            if (!conn->txn_global.checkpoint_running)
-                /*
-                 * Use application snapshot for eviction only when checkpoint is not running.
-                 *
-                 * Checkpoint may start concurrently at this point but that is OK as it should have
-                 * obtained a newer snapshot than the application thread.
-                 */
-                LF_SET(WT_REC_APP_EVICTION_SNAPSHOT);
-            else {
-                if (!WT_SESSION_BTREE_SYNC(session))
-                    LF_SET(WT_REC_VISIBLE_ALL);
-                LF_SET(WT_REC_CHECKPOINT_RUNNING);
-            }
-        } else {
-            if (conn->txn_global.checkpoint_running)
-                LF_SET(WT_REC_CHECKPOINT_RUNNING);
-            if (!WT_SESSION_BTREE_SYNC(session))
-                LF_SET(WT_REC_VISIBLE_ALL);
-        }
     }
 
     WT_ASSERT(session, LF_ISSET(WT_REC_VISIBLE_ALL) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
@@ -740,7 +687,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * Reconcile the page. Force read-committed isolation level if we are using snapshots for
      * eviction workers or application threads.
      */
-    if (LF_ISSET(WT_REC_APP_EVICTION_SNAPSHOT) || snapshot_acquired)
+    if (LF_ISSET(WT_REC_APP_EVICTION_SNAPSHOT) || is_eviction_thread)
         WT_WITH_TXN_ISOLATION(
           session, WT_ISO_READ_COMMITTED, ret = __wt_reconcile(session, ref, NULL, flags));
     else
@@ -749,7 +696,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     if (ret != 0)
         WT_STAT_CONN_INCR(session, cache_eviction_fail_in_reconciliation);
 
-    if (snapshot_acquired)
+    if (is_eviction_thread)
         __wt_txn_release_snapshot(session);
 
     WT_RET(ret);
