@@ -83,12 +83,6 @@ bool matchesClusterKey(const BSONObj& keyPatternObj,
                        const boost::optional<ClusteredCollectionInfo>& collInfo);
 
 /**
- * Returns an error if any field of the indexSpec conflicts with the field of the clusteredIndex.
- */
-Status checkSpecDoesNotConflictWithClusteredIndex(const BSONObj& indexSpec,
-                                                  const ClusteredIndexSpec& clusteredIndexSpec);
-
-/**
  * Returns true if the collection is clustered on the _id field.
  */
 bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo);

@@ -140,48 +140,6 @@ bool matchesClusterKey(const BSONObj& keyPatternObj,
         collInfo->getIndexSpec().getKey().firstElement().fieldNameStringData();
 }
 
-Status checkSpecDoesNotConflictWithClusteredIndex(const BSONObj& indexSpec,
-                                                  const ClusteredIndexSpec& clusteredIndexSpec) {
-    auto name = indexSpec.getStringField("name");
-    bool namesMatch = clusteredIndexSpec.getName().get() == name;
-
-    auto key = indexSpec.getObjectField("key");
-    bool keysMatch = clusteredIndexSpec.getKey().woCompare(key) == 0;
-
-    if (!keysMatch && !namesMatch) {
-        // The indexes don't conflict at all.
-        return Status::OK();
-    }
-
-    if (namesMatch && !keysMatch) {
-        // Prohibit creating an index with the same 'name' as the cluster key but different key
-        // pattern.
-        return Status(ErrorCodes::Error(6100906),
-                      str::stream() << "Cannot create an index where the name matches the "
-                                       "clusteredIndex but the key does not -"
-                                    << " indexSpec: " << indexSpec
-                                    << ", clusteredIndex: " << clusteredIndexSpec.toBSON());
-    }
-
-    // Users should be able to call createIndexes on the cluster key. If a name isn't specified, a
-    // default one is generated. Silently ignore mismatched names.
-
-    BSONElement vElt = indexSpec["v"];
-    auto version = representAs<int>(vElt.number());
-    if (clusteredIndexSpec.getV() != version) {
-        return Status(ErrorCodes::Error(6100908),
-                      "Cannot create an index with the same key pattern as the collection's "
-                      "clusteredIndex but a different 'v' field");
-    }
-
-    if (indexSpec.hasField("unique") && indexSpec.getBoolField("unique") == false) {
-        return Status(ErrorCodes::Error(6100909),
-                      "Cannot create an index with the same key pattern as the collection's "
-                      "clusteredIndex but a different 'unique' field");
-    }
-    return Status::OK();
-};
-
 StringData getClusterKeyFieldName(const ClusteredIndexSpec& indexSpec) {
     return indexSpec.getKey().firstElement().fieldNameStringData();
 }

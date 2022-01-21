@@ -102,6 +102,77 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 
 const BSONObj IndexCatalogImpl::_idObj = BSON("_id" << 1);
 
+namespace {
+/**
+ * Similar to _isSpecOK(), checks if the indexSpec is valid, conflicts, or already exists as a
+ * clustered index.
+ *
+ * Returns Status::OK() if no clustered index exists or the 'indexSpec' does not conflict with it.
+ * Returns ErrorCodes::IndexAlreadyExists if the 'indexSpec' already exists as the clustered index.
+ * Returns an error if the indexSpec fields conflict with the clustered index.
+ */
+Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
+                                   const boost::optional<ClusteredCollectionInfo>& collInfo) {
+    auto key = indexSpec.getObjectField("key");
+    bool keysMatch = clustered_util::matchesClusterKey(key, collInfo);
+
+    bool clusteredOptionPresent =
+        indexSpec.hasField("clustered") && indexSpec.getBoolField("clustered");
+
+    if (clusteredOptionPresent && !keysMatch) {
+        // The 'clustered' option implies the indexSpec must match the clustered index.
+        return Status(ErrorCodes::Error(6243700),
+                      "Cannot create index with option 'clustered' that does not match an existing "
+                      "clustered index");
+    }
+
+    auto name = indexSpec.getStringField("name");
+    bool namesMatch =
+        !collInfo.is_initialized() || collInfo->getIndexSpec().getName().get() == name;
+
+
+    if (!keysMatch && !namesMatch) {
+        // The indexes don't conflict at all.
+        return Status::OK();
+    }
+
+    // The collection is guaranteed to be clustered since at least the name or key matches a
+    // clustered index.
+    auto clusteredIndexSpec = collInfo->getIndexSpec();
+
+    if (namesMatch && !keysMatch) {
+        // Prohibit creating an index with the same 'name' as the cluster key but different key
+        // pattern.
+        return Status(ErrorCodes::Error(6100906),
+                      str::stream() << "Cannot create an index where the name matches the "
+                                       "clusteredIndex but the key does not -"
+                                    << " indexSpec: " << indexSpec
+                                    << ", clusteredIndex: " << collInfo->getIndexSpec().toBSON());
+    }
+
+    // Users should be able to call createIndexes on the cluster key. If a name isn't specified, a
+    // default one is generated. Silently ignore mismatched names.
+
+    BSONElement vElt = indexSpec["v"];
+    auto version = representAs<int>(vElt.number());
+    if (clusteredIndexSpec.getV() != version) {
+        return Status(ErrorCodes::Error(6100908),
+                      "Cannot create an index with the same key pattern as the collection's "
+                      "clusteredIndex but a different 'v' field");
+    }
+
+    if (indexSpec.hasField("unique") && indexSpec.getBoolField("unique") == false) {
+        return Status(ErrorCodes::Error(6100909),
+                      "Cannot create an index with the same key pattern as the collection's "
+                      "clusteredIndex but a different 'unique' field");
+    }
+
+    // The indexSpec matches the clustered index, which already exists implicitly.
+    return Status(ErrorCodes::IndexAlreadyExists,
+                  "The index already exists implicitly as the collection's clustered index");
+};
+}  // namespace
+
 // -------------
 
 std::unique_ptr<IndexCatalog> IndexCatalogImpl::clone() const {
@@ -807,22 +878,12 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     }
 
     BSONElement clusteredElt = spec["clustered"];
-    if (clusteredElt && clusteredElt.trueValue() && !collection->isClustered()) {
-        return Status(ErrorCodes::Error(6100905),
-                      "Cannot have the 'clustered' option on a non-clustered collection");
-    }
-
-    if (collection->isClustered()) {
-        auto status = clustered_util::checkSpecDoesNotConflictWithClusteredIndex(
-            spec, collection->getClusteredInfo()->getIndexSpec());
+    if (collection->isClustered() || (clusteredElt && clusteredElt.trueValue())) {
+        // Clustered collections require checks to ensure the spec does not conflict with the
+        // implicit clustered index that exists on the clustered collection.
+        auto status = isSpecOKClusteredIndexCheck(spec, collection->getClusteredInfo());
         if (!status.isOK()) {
             return status;
-        }
-
-        if (clustered_util::matchesClusterKey(key, collection->getClusteredInfo())) {
-            // The index matches the clusteredIndex which already exists implicitly.
-            return Status(ErrorCodes::IndexAlreadyExists,
-                          "The collection is clustered implicitly by the index");
         }
     }
 
@@ -891,14 +952,10 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
 
     const BSONObj key = spec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
 
-    // Check if the spec conflicts with the clusteredIndex.
     if (spec["clustered"]) {
-        uassert(6243700,
-                "Cannot create index with option 'clustered' that does not match an existing "
-                "clustered index",
-                clustered_util::matchesClusterKey(
-                    spec.getObjectField(IndexDescriptor::kKeyPatternFieldName),
-                    collection->getClusteredInfo()));
+        // Not an error, but the spec is already validated against the collection options by
+        // _isSpecOK now and we know that if 'clustered' is true, then the index already exists.
+        return Status(ErrorCodes::IndexAlreadyExists, "The clustered index is implicitly built");
     }
 
     {

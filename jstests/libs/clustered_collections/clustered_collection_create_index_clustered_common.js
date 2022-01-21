@@ -16,9 +16,9 @@ const CreateIndexesClusteredTest = (function() {
 
         // Start with the collection empty.
         assert.commandFailedWithCode(
-            testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6100905);
+            testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6243700);
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
-                                     6100905);
+                                     6243700);
 
         // Insert some docs. Sometimes empty collections are treated as special when it comes to
         // index builds.
@@ -29,9 +29,9 @@ const CreateIndexesClusteredTest = (function() {
         }
         assert.commandWorked(bulk.execute());
         assert.commandFailedWithCode(
-            testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6100905);
+            testColl.createIndex({_id: 1}, {clustered: true, unique: true}), 6243700);
         assert.commandFailedWithCode(testColl.createIndex({a: 1}, {clustered: true, unique: true}),
-                                     6100905);
+                                     6243700);
     };
 
     /**
