@@ -1162,17 +1162,14 @@ std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
     PlanYieldPolicy::YieldPolicy requestedYieldPolicy,
     const Yieldable* yieldable,
     NamespaceString nss) {
-    return std::make_unique<PlanYieldPolicySBE>(
-        requestedYieldPolicy,
-        opCtx->getServiceContext()->getFastClockSource(),
-        internalQueryExecYieldIterations.load(),
-        Milliseconds{internalQueryExecYieldPeriodMS.load()},
-        yieldable,
-        std::make_unique<YieldPolicyCallbacksImpl>(nss),
-        // Use the new yielding behavior if it is enabled.
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            feature_flags::gYieldingSupportForSBE.isEnabled(
-                serverGlobalParams.featureCompatibility));
+    return std::make_unique<PlanYieldPolicySBE>(requestedYieldPolicy,
+                                                opCtx->getServiceContext()->getFastClockSource(),
+                                                internalQueryExecYieldIterations.load(),
+                                                Milliseconds{internalQueryExecYieldPeriodMS.load()},
+                                                yieldable,
+                                                std::make_unique<YieldPolicyCallbacksImpl>(nss),
+                                                // Use the new yielding behavior if it is enabled.
+                                                gYieldingSupportForSBE);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExecutor(
@@ -1279,6 +1276,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     if (OperationShardingState::isOperationVersioned(opCtx)) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
+
     return getExecutor(opCtx,
                        collection,
                        std::move(canonicalQuery),

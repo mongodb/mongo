@@ -107,6 +107,13 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gRoundtripBsonColumnOnValidate
         default: false
+    maintainValidCursorsAcrossSBEYieldandReadCommands:
+        description: "Enable retaining valid cursor across SBE query yield and getMore"
+        set_at: startup
+        cpp_varname: gYieldingSupportForSBE
+        cpp_vartype: bool
+        default: false
+
 
 feature_flags:
     featureFlagClusteredIndexes:
@@ -127,11 +134,6 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesBucketCompression
         default: true
         version: 5.2
-    featureFlagYieldingSupportForSBE:
-        description: "Enable retaining valid cursor across query yield"
-        cpp_varname: feature_flags::gYieldingSupportForSBE
-        default: true
-        version: 5.3
     featureFlagCollModIndexUnique:
         description: "When enabled, collMod supports making an index unique"
         cpp_varname: feature_flags::gCollModIndexUnique

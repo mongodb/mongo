@@ -562,10 +562,7 @@ public:
 
             // If the executor supports it, find operations will maintain the storage engine state
             // across commands.
-            if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                feature_flags::gYieldingSupportForSBE.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
-                !opCtx->inMultiDocumentTransaction() &&
+            if (gYieldingSupportForSBE && !opCtx->inMultiDocumentTransaction() &&
                 repl::ReadConcernArgs::get(opCtx).getLevel() !=
                     repl::ReadConcernLevel::kSnapshotReadConcern) {
                 exec->enableSaveRecoveryUnitAcrossCommandsIfSupported();
