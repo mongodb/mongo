@@ -33,6 +33,7 @@
 
 #include "mongo/db/dbhelpers.h"
 
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -163,21 +164,19 @@ bool Helpers::findById(OperationContext* opCtx,
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
 
-    bool isTimeseriesBucketNs = nss.isTimeseriesBucketsCollection();
-    if (!desc && !isTimeseriesBucketNs) {
+    if (!desc && !clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
         return false;
     }
 
     if (indexFound)
         *indexFound = 1;
 
-    // A time-series buckets collection does not have an index on _id. However, the RecordId can be
-    // constructed using the _id field. So we can retrieve the document by using the RecordId
-    // instead.
-    if (isTimeseriesBucketNs) {
+    if (collection->isClustered()) {
         Snapshotted<BSONObj> doc;
-        if (collection->findDoc(
-                opCtx, RecordId(record_id_helpers::keyForOID(query["_id"].OID())), &doc)) {
+        if (collection->findDoc(opCtx,
+                                RecordId(record_id_helpers::keyForElem(
+                                    query["_id"], collection->getDefaultCollator())),
+                                &doc)) {
             result = std::move(doc.value());
             return true;
         }
@@ -198,6 +197,13 @@ RecordId Helpers::findById(OperationContext* opCtx,
     verify(collection);
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
+    if (!desc && clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
+        // There is no explicit IndexDescriptor for _id on a collection clustered by _id. However,
+        // the RecordId can be constructed directly from the input.
+        return RecordId(
+            record_id_helpers::keyForElem(idquery["_id"], collection->getDefaultCollator()));
+    }
+
     uassert(13430, "no _id index", desc);
     return catalog->getEntry(desc)->accessMethod()->findSingle(
         opCtx, collection, idquery["_id"].wrap());
