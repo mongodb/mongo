@@ -1,6 +1,13 @@
 /**
  * Tests that while there is an unfinished migration pending recovery, if a new migration (of a
  * different collection) attempts to start, it will first need to recover the unfinished migration.
+ *
+ * @tags: [
+ *     # In the event of a config server step down, the new primary balancer may attempt to recover
+ *     # that migration by sending a new `moveChunk` command to the donor shard causing the test to
+ *     # hang.
+ *     does_not_support_stepdowns,
+ * ]
  */
 (function() {
 "use strict";
