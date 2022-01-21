@@ -84,7 +84,7 @@ structs:
         strict: false
         fields:
             collectionVersion:
-                type: ChunkVersion
+                type: ChunkVersionArrayWronglyEncodedAsBSONObjFormat
                 description: "Latest version of the collection"
                 optional: false
 
@@ -141,7 +141,7 @@ structs:
                 description: "UUID of the created collection"
                 optional: true
             collectionVersion:
-                type: ChunkVersion
+                type: ChunkVersionArrayWronglyEncodedAsBSONObjFormat
                 description: "Latest version of the collection"
                 optional: false
 

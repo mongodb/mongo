@@ -34,11 +34,23 @@ global:
         - "mongo/s/chunk_version.h"
 
 types:
-    # serializes as { 0: <major/minor>, 1: <epoch>, 2: <timestamp> }
-    # equivalent to using ChunkVersion::toBSON / ChunkVersion::fromBSON
+    # The canonical serialisation format for ChunkVersions, which is written as:
+    #   [ <major/minor>, <epoch>, <timestamp> ]
     ChunkVersion:
+        bson_serialization_type: any
+        description: An object representing a chunk version for a collection.
+        cpp_type: ChunkVersion
+        serializer: ChunkVersion::serializeToBSON
+        deserializer: ChunkVersion::parsePositionalFormat
+
+    # DO NOT add any new usages of this format, use ChunkVersion above instead
+    #
+    # Serialisation format wrongly introduced in 4.4, which needs to be kept around for backwards
+    # compatibility with certain on-disk documents and on-wire messages. It is written as:
+    #   { 0: <major/minor>, 1: <epoch>, 2: <timestamp> } (note the array encoded as a BSON object)
+    ChunkVersionArrayWronglyEncodedAsBSONObjFormat:
         bson_serialization_type: object
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
-        serializer: ChunkVersion::toBSON
-        deserializer: ChunkVersion::fromBSONThrowing
+        serializer: ChunkVersion::toArrayWronglyEncodedAsBSONObj
+        deserializer: ChunkVersion::parsePositionalFormat

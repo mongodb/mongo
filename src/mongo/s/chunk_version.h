@@ -62,23 +62,24 @@ public:
     ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
 
     /**
-     * Parses 'obj', which is expected to have three elements: the major/minor versions, the object
-     * id, and the timestamp. The field names don't matter, so 'obj' can be a BSONArray.
+     * The methods below parse the "positional" formats of:
+     *
+     *  [major, minor, epoch, <optional canThrowSSVOnIgnored> timestamp]
+     *      OR
+     *  {0: major, 1:minor, 2:epoch, 3:<optional canThrowSSVOnIgnored>, 4:timestamp}
+     *
+     * The latter format was introduced by mistake in 4.4 and is no longer generated from 5.3
+     * onwards, but it is backwards compatible with the 5.2 and older binaries.
      */
-    static StatusWith<ChunkVersion> fromBSON(const BSONObj& obj);
-
-    /**
-     * A throwing version of 'fromBSON'.
-     */
-    static ChunkVersion fromBSONThrowing(const BSONObj& obj) {
-        return uassertStatusOK(fromBSON(obj));
+    static ChunkVersion parsePositionalFormat(const BSONObj& obj);
+    static ChunkVersion parsePositionalFormat(const BSONElement& element) {
+        return parsePositionalFormat(element.Obj());
     }
-
     static ChunkVersion fromBSONArrayThrowing(const BSONElement& element) {
         uassert(ErrorCodes::TypeMismatch,
                 "Invalid type for chunkVersion element. Expected an array",
                 element.type() == Array);
-        return fromBSONThrowing(element.Obj());
+        return parsePositionalFormat(element);
     }
 
     /**
@@ -210,6 +211,13 @@ public:
     }
 
     /**
+     * Serializes the version held by this object to 'out' in the form:
+     *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
+     */
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    BSONObj toArrayWronglyEncodedAsBSONObj() const;
+
+    /**
      * NOTE: This format is being phased out. Use serializeToBSON instead.
      *
      * Serializes the version held by this object to 'out' in the legacy form:
@@ -218,14 +226,6 @@ public:
      *         <field>Timestamp: [ <Timestamp> ] ... }
      */
     void appendLegacyWithField(BSONObjBuilder* out, StringData field) const;
-
-    BSONObj toBSON() const;
-
-    /**
-     * Serializes the version held by this object to 'out' in the form:
-     *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
-     */
-    void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
 

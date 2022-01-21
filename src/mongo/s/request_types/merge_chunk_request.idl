@@ -31,14 +31,14 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/util/uuid.h"
-        - "mongo/s/chunk_version.h"
         - "mongo/s/request_types/merge_chunk_request_valid.h"
+        - "mongo/util/uuid.h"
     
 imports:
     - "mongo/idl/basic_types.idl"
-    - "mongo/s/sharding_types.idl"
     - "mongo/s/chunk_range.idl"
+    - "mongo/s/chunk_version.idl"
+    - "mongo/s/sharding_types.idl"
 
 types:
     # Non-IDL response used UUIDtoBSON instead of UUID::toCDR
@@ -49,22 +49,13 @@ types:
         deserializer: UUID::parse
         serializer: UUID::toBSON
 
-    # serialize [<major/minor>, <epoch>, <timestamp>]
-    # equivalent to using ChunkVersion::appendToCommand / ChunkVersion::parseFromCommand
-    ChunkVersionArray:
-       bson_serialization_type: any
-       description: "An object representing a chunk version for a collection."
-       cpp_type: "ChunkVersion"
-       serializer: "ChunkVersion::serializeToBSON"
-       deserializer: "ChunkVersion::fromBSONArrayThrowing"
-
 structs:
     ConfigSvrMergeResponse:
         description: "Response of the _configsvrCommitChunksMerge command."
         strict: false
         fields:
             shardVersion:
-                type: ChunkVersionArray
+                type: ChunkVersion
                 description: "Latest version of the shard."
 
 commands:

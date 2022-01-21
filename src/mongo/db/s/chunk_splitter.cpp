@@ -411,7 +411,7 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
               "namespace"_attr = nss,
               "minKey"_attr = redact(chunk.getMin()),
               "maxKey"_attr = redact(chunk.getMax()),
-              "lastmod"_attr = redact(chunk.getLastmod().toBSON()),
+              "lastmod"_attr = chunk.getLastmod(),
               "splitPoints"_attr = splitPoints.size(),
               "maxChunkSizeBytes"_attr = maxChunkSizeBytes,
               "extraInfo"_attr =

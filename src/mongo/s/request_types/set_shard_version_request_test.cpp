@@ -35,10 +35,9 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 using unittest::assertGet;
-
-namespace {
 
 TEST(SetShardVersionRequest, ParseFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen(), Timestamp(1, 1));
@@ -109,7 +108,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
     ASSERT(!ssv.shouldForceRefresh());
     ASSERT(!ssv.isAuthoritative());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
+    ASSERT_EQ(ssv.getNSVersion().toString(), chunkVersion.toString());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
@@ -129,7 +128,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     ASSERT(!ssv.shouldForceRefresh());
     ASSERT(ssv.isAuthoritative());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
+    ASSERT_EQ(ssv.getNSVersion().toString(), chunkVersion.toString());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"
@@ -149,7 +148,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullForceRefresh) {
     ASSERT(ssv.shouldForceRefresh());
     ASSERT(!ssv.isAuthoritative());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
-    ASSERT_BSONOBJ_EQ(ssv.getNSVersion().toBSON(), chunkVersion.toBSON());
+    ASSERT_EQ(ssv.getNSVersion().toString(), chunkVersion.toString());
 
     ASSERT_BSONOBJ_EQ(ssv.toBSON(),
                       BSON("setShardVersion"

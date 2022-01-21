@@ -94,7 +94,7 @@ structs:
                 type: chunk_range
                 description: "The range being migrated."
             preMigrationChunkVersion:
-                type: ChunkVersion
+                type: ChunkVersionArrayWronglyEncodedAsBSONObjFormat
                 description: "The version, at the start of the migration, of the chunk being moved."
             decision:
                 type: Decision

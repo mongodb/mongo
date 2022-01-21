@@ -37,19 +37,18 @@ namespace mongo {
 
 constexpr StringData ChunkVersion::kShardVersionField;
 
-StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
+ChunkVersion ChunkVersion::parsePositionalFormat(const BSONObj& obj) {
     BSONObjIterator it(obj);
-    if (!it.more())
-        return {ErrorCodes::BadValue, "Unexpected empty version array"};
+    uassert(ErrorCodes::BadValue, "Unexpected empty version array", it.more());
 
     // Expect the major and minor versions (must be present)
     uint64_t combined;
     {
         BSONElement tsPart = it.next();
-        if (tsPart.type() != bsonTimestamp)
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << "Invalid type " << tsPart.type()
-                                  << " for version major and minor part."};
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Invalid type " << tsPart.type()
+                              << " for version major and minor part.",
+                tsPart.type() == bsonTimestamp);
         combined = tsPart.timestamp().asULL();
     }
 
@@ -57,10 +56,9 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
     boost::optional<OID> epoch;
     {
         BSONElement epochPart = it.next();
-        if (epochPart.type() != jstOID)
-            return {ErrorCodes::TypeMismatch,
-                    str::stream() << "Invalid type " << epochPart.type()
-                                  << " for version epoch part."};
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Invalid type " << epochPart.type() << " for version epoch part.",
+                epochPart.type() == jstOID);
         epoch = epochPart.OID();
     }
 
@@ -82,9 +80,9 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
         timestamp =
             (epoch == UNSHARDED().epoch() ? UNSHARDED().getTimestamp() : IGNORED().getTimestamp());
     } else {
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Invalid type " << nextElem.type()
-                              << " for version timestamp part."};
+        uasserted(ErrorCodes::TypeMismatch,
+                  str::stream() << "Invalid type " << nextElem.type()
+                                << " for version timestamp part.");
     }
 
     ChunkVersion version;
@@ -175,18 +173,18 @@ void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) co
     arr.append(_timestamp);
 }
 
+BSONObj ChunkVersion::toArrayWronglyEncodedAsBSONObj() const {
+    BSONArrayBuilder arr;
+    arr.appendTimestamp(_combined);
+    arr.append(_epoch);
+    arr.append(_timestamp);
+    return arr.obj();
+}
+
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {
     out->appendTimestamp(field, _combined);
     out->append(field + "Epoch", _epoch);
     out->append(field + "Timestamp", _timestamp);
-}
-
-BSONObj ChunkVersion::toBSON() const {
-    BSONArrayBuilder b;
-    b.appendTimestamp(_combined);
-    b.append(_epoch);
-    b.append(_timestamp);
-    return b.arr();
 }
 
 std::string ChunkVersion::toString() const {
