@@ -72,6 +72,14 @@ public:
         return MatchCategory::kOther;
     }
 
+    void setInputParamId(InputParamId paramId) {
+        _inputParamId = paramId;
+    }
+
+    boost::optional<InputParamId> getInputParamId() const {
+        return _inputParamId;
+    }
+
 protected:
     const std::string& getCode() const {
         return _code;
@@ -83,6 +91,8 @@ private:
     }
 
     const std::string _code;
+
+    boost::optional<InputParamId> _inputParamId;
 };
 
 }  // namespace mongo
