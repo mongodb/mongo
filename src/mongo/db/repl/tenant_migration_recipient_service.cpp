@@ -2412,6 +2412,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            // Otherwise, there is a real conflict so we should throw
                            // ConflictingInProgress.
                            auto opCtx = cc().makeOperationContext();
+                           lk.unlock();
                            auto deleted =
                                uassertStatusOK(tenantMigrationRecipientEntryHelpers::
                                                    deleteStateDocIfMarkedAsGarbageCollectable(
@@ -2421,6 +2422,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                        << "Found active migration for tenantId \"" << _tenantId
                                        << "\" with migration id " << mtab->getMigrationId(),
                                    deleted);
+                           lk.lock();
                        }
 
                        if (_stateDoc.getState() !=
