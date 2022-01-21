@@ -139,7 +139,10 @@ public:
             auto splitService = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                                     ->lookupServiceByName(ShardSplitDonorService::kServiceName);
             auto instance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-                opCtx, splitService, BSON("_id" << cmd.getMigrationId()));
+                opCtx,
+                splitService,
+                BSON("_id" << cmd.getMigrationId() << ShardSplitDonorDocument::kStateFieldName
+                           << ShardSplitDonorState_serializer(ShardSplitDonorStateEnum::kAborted)));
 
             invariant(instance);
 

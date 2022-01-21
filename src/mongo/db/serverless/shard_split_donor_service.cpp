@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/executor/cancelable_executor.h"
 #include "mongo/executor/connection_pool.h"
@@ -56,7 +57,50 @@ bool shouldStopInsertingDonorStateDoc(Status status) {
     return status.isOK() || status == ErrorCodes::ConflictingOperationInProgress;
 }
 
+void setStateDocTimestamps(WithLock,
+                           ShardSplitDonorStateEnum nextState,
+                           repl::OpTime time,
+                           ShardSplitDonorDocument& stateDoc) {
+    switch (nextState) {
+        case ShardSplitDonorStateEnum::kDataSync:
+        case ShardSplitDonorStateEnum::kUninitialized:
+            break;
+        case ShardSplitDonorStateEnum::kBlocking:
+            stateDoc.setBlockTimestamp(time.getTimestamp());
+            break;
+        case ShardSplitDonorStateEnum::kAborted:
+            stateDoc.setCommitOrAbortOpTime(time);
+            break;
+        case ShardSplitDonorStateEnum::kCommitted:
+            stateDoc.setCommitOrAbortOpTime(time);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+bool isAbortedDocumentPersistent(WithLock, ShardSplitDonorDocument& stateDoc) {
+    return !!stateDoc.getAbortReason();
+}
+
+void setMtabToBlockingForTenants(ServiceContext* context,
+                                 OperationContext* opCtx,
+                                 const std::vector<StringData>& tenantIds) {
+    // Start blocking writes before getting an oplog slot to guarantee no
+    // writes to the tenant's data can commit with a timestamp after the
+    // block timestamp.
+    for (const auto& tenantId : tenantIds) {
+        auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(context,
+                                                                                          tenantId);
+        invariant(mtab);
+        mtab->startBlockingWrites();
+
+        opCtx->recoveryUnit()->onRollback([mtab] { mtab->rollBackStartBlocking(); });
+    }
+}
+
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterInitialSync);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 
 }  // namespace
 
@@ -137,7 +181,9 @@ ThreadPool::Limits ShardSplitDonorService::getThreadPoolLimits() const {
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ShardSplitDonorService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<DonorStateMachine>(
-        _serviceContext, this, ShardSplitDonorDocument::parse({"DonorStateMachine"}, initialState));
+        _serviceContext,
+        this,
+        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), initialState));
 }
 
 ShardSplitDonorService::DonorStateMachine::DonorStateMachine(
@@ -181,7 +227,7 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     auto abortToken = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         _abortSource = CancellationSource(primaryToken);
-        if (_abortRequested) {
+        if (_abortRequested || _stateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
             _abortSource->cancel();
         }
 
@@ -211,8 +257,14 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 // AsyncTryUntilWithDelay::on(...)
                 return _enterDataSyncState(executor, abortToken).thenRunOn(cancelableExecutor);
             })
-            .then([this, cancelableExecutor] { pauseShardSplitAfterInitialSync.pauseWhileSet(); })
-            .then([this, cancelableExecutor, executor, abortToken] {
+            .then([this] { pauseShardSplitAfterInitialSync.pauseWhileSet(); })
+            .then([this, executor, cancelableExecutor, abortToken] {
+                // Passing executor as a TaskExecutor is required by the downstream call to
+                // AsyncTryUntilWithDelay::on(...)
+                return _enterBlockingState(executor, abortToken).thenRunOn(cancelableExecutor);
+            })
+            .then([this] { pauseShardSplitAfterBlocking.pauseWhileSet(); })
+            .then([this, executor, cancelableExecutor, abortToken] {
                 // Passing executor as a TaskExecutor is required by the downstream call to
                 // AsyncTry::on(...)
                 return _waitForRecipientToAcceptSplit(executor, abortToken)
@@ -255,19 +307,33 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterDataSyncState(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
-
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() != ShardSplitDonorStateEnum::kUninitialized) {
+        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kDataSync) {
             return ExecutorFuture(**executor);
         }
-
-        _stateDoc.setState(ShardSplitDonorStateEnum::kDataSync);
     }
 
     LOGV2(6086507, "Shard split entering data sync state {id}", "id"_attr = _migrationId);
 
-    return _updateStateDocument(executor, abortToken)
+    return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kDataSync)
+        .then([this, executor, abortToken](repl::OpTime opTime) {
+            return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
+        });
+}
+
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_enterBlockingState(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kBlocking) {
+            return ExecutorFuture(**executor);
+        }
+    }
+
+    LOGV2(6177200, "Shard split entering blocking state {id}", "id"_attr = _migrationId);
+
+    return _updateStateDocument(executor, abortToken, ShardSplitDonorStateEnum::kBlocking)
         .then([this, executor, abortToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
         });
@@ -288,12 +354,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
     return _recipientAcceptedSplit.getFuture().thenRunOn(**executor).then([this, executor, token] {
         LOGV2(6142503, "Recipient has accepted the split, committing shard split decision");
 
-        {
-            stdx::lock_guard<Latch> lg(_mutex);
-            _stateDoc.setState(ShardSplitDonorStateEnum::kCommitted);
-        }
-
-        return _updateStateDocument(executor, token)
+        return _updateStateDocument(executor, token, ShardSplitDonorStateEnum::kCommitted)
             .then([this, executor, token](repl::OpTime opTime) {
                 return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
             });
@@ -303,20 +364,37 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDocument(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryServiceToken) {
 
-    {
+    const auto initialState = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() != ShardSplitDonorStateEnum::kUninitialized) {
-            // If the state is not uninitialized, the document has already been written.
+        return _stateDoc.getState();
+    }();
+
+    if (initialState == ShardSplitDonorStateEnum::kAborted) {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (isAbortedDocumentPersistent(lg, _stateDoc)) {
+            // Node has step up and created an instance using a document in abort state. No need to
+            // write the document as it already exists.
             return ExecutorFuture(**executor);
         }
 
-        LOGV2(6086504,
-              "Inserting initial state document {id} {state}",
-              "id"_attr = _migrationId,
-              "state"_attr = _stateDoc.getState());
+        _abortReason =
+            Status(ErrorCodes::TenantMigrationAborted, "Aborted due to abortShardSplit.");
+        BSONObjBuilder bob;
+        _abortReason->serializeErrorToBSON(&bob);
+        _stateDoc.setAbortReason(bob.obj());
+
+    } else if (initialState != ShardSplitDonorStateEnum::kUninitialized) {
+        // Node has step up and resumed a shard split. No need to write the document as it already
+        // exists.
+        return ExecutorFuture(**executor);
     }
 
-    return AsyncTry([this, uuid = _migrationId]() {
+    LOGV2(6086504,
+          "Inserting initial state document {id} {state}",
+          "id"_attr = _migrationId,
+          "state"_attr = initialState);
+
+    return AsyncTry([this, nextState = initialState, uuid = _migrationId]() {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
 
@@ -325,18 +403,38 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
                writeConflictRetry(
                    opCtx, "ShardSplitDonorInsertStateDoc", _stateDocumentsNS.ns(), [&] {
                        const auto filter = BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
-                       const auto updateMod = [&]() {
+                       const auto getUpdatedStateDocBson = [&]() {
                            stdx::lock_guard<Latch> lg(_mutex);
-                           return BSON("$setOnInsert" << _stateDoc.toBSON());
-                       }();
-                       auto updateResult = Helpers::upsert(opCtx,
-                                                           _stateDocumentsNS.ns(),
-                                                           filter,
-                                                           updateMod,
-                                                           /*fromMigrate=*/false);
+                           return _stateDoc.toBSON();
+                       };
 
-                       // We only want to insert, not modify, document
-                       invariant(updateResult.numDocsModified == 0);
+                       if (nextState == ShardSplitDonorStateEnum::kAborted) {
+                           WriteUnitOfWork wuow(opCtx);
+
+                           // Reserve an opTime for the write.
+                           auto oplogSlot =
+                               LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+                           setStateDocTimestamps(
+                               stdx::lock_guard<Latch>{_mutex}, nextState, oplogSlot, _stateDoc);
+                           auto updateResult = Helpers::upsert(opCtx,
+                                                               _stateDocumentsNS.ns(),
+                                                               filter,
+                                                               getUpdatedStateDocBson(),
+                                                               /*fromMigrate=*/false);
+
+                           // We only want to insert, not modify, document
+                           invariant(updateResult.numDocsModified == 0);
+                           wuow.commit();
+                       } else {
+                           auto updateResult = Helpers::upsert(opCtx,
+                                                               _stateDocumentsNS.ns(),
+                                                               filter,
+                                                               getUpdatedStateDocBson(),
+                                                               /*fromMigrate=*/false);
+
+                           // We only want to insert, not modify, document
+                           invariant(updateResult.numDocsModified == 0);
+                       }
                    });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -352,7 +450,9 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_writeInitialDoc
 }
 
 ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateStateDocument(
-    const ScopedTaskExecutorPtr& executor, const CancellationToken& token) {
+    const ScopedTaskExecutorPtr& executor,
+    const CancellationToken& token,
+    ShardSplitDonorStateEnum nextState) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         LOGV2(6086505,
@@ -361,26 +461,48 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
               "state"_attr = _stateDoc.getState());
     }
 
-    return AsyncTry([this, uuid = _migrationId] {
+    auto tenantIds = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _stateDoc.setState(nextState);
+
+        return _stateDoc.getTenantIds();
+    }();
+
+    return AsyncTry([this, tenantIds = std::move(tenantIds), uuid = _migrationId, nextState] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
 
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
+               uassert(ErrorCodes::NamespaceNotFound,
+                       str::stream() << _stateDocumentsNS.ns() << " does not exist",
+                       collection);
 
                writeConflictRetry(
                    opCtx, "ShardSplitDonorUpdateStateDoc", _stateDocumentsNS.ns(), [&] {
+                       WriteUnitOfWork wuow(opCtx);
+
+                       if (nextState == ShardSplitDonorStateEnum::kBlocking) {
+                           invariant(tenantIds);
+                           setMtabToBlockingForTenants(_serviceContext, opCtx, tenantIds.get());
+                       }
+                       // Reserve an opTime for the write.
+                       auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
+                       setStateDocTimestamps(
+                           stdx::lock_guard<Latch>{_mutex}, nextState, oplogSlot, _stateDoc);
+
                        const auto filter = BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
-                       const auto updateMod = [&]() {
+                       const auto updatedStateDocBson = [&]() {
                            stdx::lock_guard<Latch> lg(_mutex);
                            return BSON("$set" << _stateDoc.toBSON());
                        }();
                        auto updateResult = Helpers::upsert(opCtx,
                                                            _stateDocumentsNS.ns(),
                                                            filter,
-                                                           updateMod,
+                                                           updatedStateDocBson,
                                                            /*fromMigrate=*/false);
 
                        invariant(updateResult.numDocsModified == 1);
+                       wuow.commit();
                    });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -408,15 +530,8 @@ void ShardSplitDonorService::DonorStateMachine::_createReplicaSetMonitor(
         return _stateDoc.getRecipientConnectionString();
     }();
 
-    // TODO SERVER-61772 : remove once we ensure this will not be hit when abort creates the
-    // instance.
-    if (!connectionString) {
-        _recipientAcceptedSplit.setError(Status(
-            ErrorCodes::CallbackCanceled, "Cannot look for a recipient replica set without URI"));
-        _replicaSetMonitorCreatedPromise.setError(Status(
-            ErrorCodes::CallbackCanceled, "Cannot look for a recipient replica set without URI"));
-        return;
-    }
+
+    invariant(connectionString);
 
     _recipientAcceptedSplit.setFrom(
         getRecipientAcceptSplitFuture(
@@ -439,13 +554,13 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
           "Shard split error handling {id} {status}",
           "id"_attr = _migrationId,
           "status"_attr = statusWithState.getStatus());
+
     {
-
         stdx::lock_guard<Latch> lg(_mutex);
-
-        if (_stateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
-            // The shard split was resumed on stepup and it was already aborted
-            return ExecutorFuture(**executor, statusWithState);
+        if (isAbortedDocumentPersistent(lg, _stateDoc)) {
+            // The document is already in aborted state. No need to write it.
+            return ExecutorFuture(**executor,
+                                  DurableState{ShardSplitDonorStateEnum::kAborted, _abortReason});
         }
     }
 
@@ -453,7 +568,7 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
         return ExecutorFuture(
             **executor,
             StatusWith<DurableState>(ErrorCodes::InterruptedDueToReplStateChange,
-                                     "Interrupted due to replicat set state change"));
+                                     "Interrupted due to replica set state change"));
     }
 
     // There is no use to check the parent token the executor would not run if the parent token
@@ -470,16 +585,20 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
         LOGV2(6086508, "Shard split aborted {id}", "id"_attr = _migrationId);
 
         _abortReason = statusWithState.getStatus();
-        _stateDoc.setState(ShardSplitDonorStateEnum::kAborted);
+        BSONObjBuilder bob;
+        _abortReason->serializeErrorToBSON(&bob);
+        _stateDoc.setAbortReason(bob.obj());
     }
 
-    return _updateStateDocument(executor, primaryToken)
+    return ExecutorFuture<void>(**executor)
+        .then([this, executor, primaryToken] {
+            return _updateStateDocument(executor, primaryToken, ShardSplitDonorStateEnum::kAborted);
+        })
         .then([this, executor, primaryToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), primaryToken);
         })
         .then([this, executor] {
             stdx::lock_guard<Latch> lg(_mutex);
-
             return DurableState{_stateDoc.getState(), _abortReason};
         });
 }

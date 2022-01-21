@@ -130,6 +130,9 @@ private:
     ExecutorFuture<void> _enterDataSyncState(const ScopedTaskExecutorPtr& executor,
                                              const CancellationToken& token);
 
+    ExecutorFuture<void> _enterBlockingState(const ScopedTaskExecutorPtr& executor,
+                                             const CancellationToken& token);
+
     ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
                                                         const CancellationToken& token);
 
@@ -138,7 +141,8 @@ private:
                                                const CancellationToken& token);
 
     ExecutorFuture<repl::OpTime> _updateStateDocument(const ScopedTaskExecutorPtr& executor,
-                                                      const CancellationToken& token);
+                                                      const CancellationToken& token,
+                                                      ShardSplitDonorStateEnum nextState);
 
     ExecutorFuture<void> _waitForMajorityWriteConcern(const ScopedTaskExecutorPtr& executor,
                                                       repl::OpTime opTime,

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -34,6 +34,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
+#include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
@@ -44,8 +45,10 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/db/serverless/shard_split_test_utils.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
@@ -116,7 +119,7 @@ public:
         auto serviceContext = getServiceContext();
 
         // Fake replSet just for creating consistent URI for monitor
-        _rsmMonitor.setup(_validRepl.getURI());
+        _rsmMonitor.setup(_replSet.getURI());
 
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
@@ -156,6 +159,7 @@ public:
             opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
             opObserverRegistry->addObserver(
                 std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
+            opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
 
             _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
             std::unique_ptr<ShardSplitDonorService> service =
@@ -163,6 +167,8 @@ public:
             _registry->registerService(std::move(service));
             _registry->onStartup(opCtx.get());
         }
+
+        _openDatabase();
         stepUp();
 
         _service = _registry->lookupServiceByName(ShardSplitDonorService::kServiceName);
@@ -208,34 +214,47 @@ public:
 protected:
     repl::PrimaryOnlyServiceRegistry* _registry;
     repl::PrimaryOnlyService* _service;
-    MockReplicaSet _validRepl{
-        "replInScope", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     long long _term = 0;
+    UUID _uuid = UUID::gen();
+    MockReplicaSet _replSet{
+        "donorSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
+    const NamespaceString _nss = NamespaceString("testDB2", "testColl2");
+    std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
+    std::string _connectionStr = _replSet.getConnectionString();
 
 private:
+    void _openDatabase() {
+        auto opCtx = cc().makeOperationContext();
+
+        // The DB needs to be open before using shard split donor service.
+        AutoGetDb autoDb(opCtx.get(), NamespaceString::kTenantSplitDonorsNamespace.db(), MODE_X);
+        auto db = autoDb.ensureDbExists(opCtx.get());
+        ASSERT_TRUE(db);
+    }
+
     std::shared_ptr<ClockSourceMock> _clkSource = std::make_shared<ClockSourceMock>();
     StreamableReplicaSetMonitorForTesting _rsmMonitor;
 };
 
 TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
-    const UUID migrationUUID = UUID::gen();
-
-    ShardSplitDonorDocument initialStateDocument(migrationUUID);
-
-    initialStateDocument.setRecipientConnectionString(StringData(_validRepl.getConnectionString()));
-    // Create and start the instance.
     auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+
+    auto document = test::shard_split::createDocument(
+        _uuid, ShardSplitDonorStateEnum::kUninitialized, _tenantIds, _connectionStr);
+
+    // Create and start the instance.
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-        opCtx.get(), _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, document.toBSON());
     ASSERT(serviceInstance.get());
-    ASSERT_EQ(migrationUUID, serviceInstance->getId());
+    ASSERT_EQ(_uuid, serviceInstance->getId());
 
     auto completionFuture = serviceInstance->completionFuture();
 
     std::shared_ptr<TopologyDescription> topologyDescriptionOld =
         std::make_shared<sdam::TopologyDescription>(sdam::SdamConfiguration());
     std::shared_ptr<TopologyDescription> topologyDescriptionNew =
-        createTopologyDescription(_validRepl);
+        createTopologyDescription(_replSet);
 
     // construct task executor
     std::shared_ptr<executor::NetworkInterface> networkInterface = executor::makeNetworkInterface(
@@ -254,7 +273,7 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 
     // Retrieve monitor installed by _rsmMonitor.setup(...)
     auto monitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
-        ReplicaSetMonitor::createIfNeeded(_validRepl.getURI()));
+        ReplicaSetMonitor::createIfNeeded(_replSet.getURI()));
     invariant(monitor);
     auto publisher = monitor->getEventsPublisher();
 
@@ -267,24 +286,18 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
 }
 
-TEST_F(ShardSplitDonorServiceTest, Abort) {
-    const UUID migrationUUID = UUID::gen();
-    ShardSplitDonorDocument initialStateDocument(migrationUUID);
+// Abort scenario : abortSplit called before startSplit.
+TEST_F(ShardSplitDonorServiceTest, CreateInstanceInAbortState) {
     auto opCtx = makeOperationContext();
-    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
-    {
-        FailPointEnableBlock fp("pauseShardSplitAfterInitialSync");
-        auto initialTimesEntered = fp.initialTimesEntered();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
 
-        serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-            opCtx.get(), _service, initialStateDocument.toBSON());
-        ASSERT(serviceInstance.get());
+    auto document = ShardSplitDonorDocument(_uuid);
+    document.setState(ShardSplitDonorStateEnum::kAborted);
 
-        fp->waitForTimesEntered(initialTimesEntered + 1);
-
-        serviceInstance->tryAbort();
-    }
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+        opCtx.get(), _service, document.toBSON());
+    ASSERT(serviceInstance.get());
 
     auto result = serviceInstance->completionFuture().get(opCtx.get());
 
@@ -293,10 +306,42 @@ TEST_F(ShardSplitDonorServiceTest, Abort) {
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
 }
 
-TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
-    const UUID migrationUUID = UUID::gen();
-    ShardSplitDonorDocument initialStateDocument(migrationUUID);
+// Abort scenario : instance created through startSplit then calling abortSplit.
+TEST_F(ShardSplitDonorServiceTest, CreateInstanceThenAbort) {
     auto opCtx = makeOperationContext();
+
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+
+    auto document = test::shard_split::createDocument(
+        _uuid, ShardSplitDonorStateEnum::kUninitialized, _tenantIds, _connectionStr);
+
+    std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
+    {
+        FailPointEnableBlock fp("pauseShardSplitAfterInitialSync");
+        auto initialTimesEntered = fp.initialTimesEntered();
+
+        serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+            opCtx.get(), _service, document.toBSON());
+        ASSERT(serviceInstance.get());
+
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+
+        serviceInstance->tryAbort();
+    }
+    auto result = serviceInstance->completionFuture().get(opCtx.get());
+
+    ASSERT(!!result.abortReason);
+    ASSERT_EQ(result.abortReason->code(), ErrorCodes::TenantMigrationAborted);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
+}
+
+TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+
+    auto document = test::shard_split::createDocument(
+        _uuid, ShardSplitDonorStateEnum::kUninitialized, _tenantIds, _connectionStr);
+
     std::shared_ptr<ShardSplitDonorService::DonorStateMachine> serviceInstance;
 
     {
@@ -304,7 +349,7 @@ TEST_F(ShardSplitDonorServiceTest, StepDownTest) {
         auto initialTimesEntered = fp.initialTimesEntered();
 
         serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-            opCtx.get(), _service, initialStateDocument.toBSON());
+            opCtx.get(), _service, document.toBSON());
         ASSERT(serviceInstance.get());
 
         fp->waitForTimesEntered(initialTimesEntered + 1);

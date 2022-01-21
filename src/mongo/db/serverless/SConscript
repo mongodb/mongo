@@ -49,10 +49,14 @@ env.Library(
     target='shard_split_donor_service',
     source=[
         'shard_split_donor_service.cpp',
+        'shard_split_donor_op_observer.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
+        '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
-        'shard_split_state_machine'
+        '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
+        'shard_split_state_machine',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/db_raii',
@@ -64,7 +68,9 @@ env.Library(
 env.CppUnitTest(
     target='db_serverless_test',
     source=[
+        'shard_split_donor_op_observer_test.cpp',
         'shard_split_donor_service_test.cpp',
+        'shard_split_test_utils.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

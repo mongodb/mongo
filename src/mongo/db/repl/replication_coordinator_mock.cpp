@@ -627,8 +627,12 @@ Status ReplicationCoordinatorMock::updateTerm(OperationContext* opCtx, long long
 
 void ReplicationCoordinatorMock::clearCommittedSnapshot() {}
 
+void ReplicationCoordinatorMock::setCurrentCommittedSnapshotOpTime(OpTime time) {
+    _currentCommittedSnapshotOpTime = time;
+}
+
 OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() const {
-    return OpTime();
+    return _currentCommittedSnapshotOpTime;
 }
 
 void ReplicationCoordinatorMock::waitUntilSnapshotCommitted(OperationContext* opCtx,

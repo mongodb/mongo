@@ -312,6 +312,8 @@ public:
 
     virtual void clearCommittedSnapshot() override;
 
+    void setCurrentCommittedSnapshotOpTime(OpTime time);
+
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
@@ -415,6 +417,7 @@ private:
     Date_t _myLastDurableWallTime;
     OpTime _myLastAppliedOpTime;
     Date_t _myLastAppliedWallTime;
+    OpTime _currentCommittedSnapshotOpTime;
 
     long long _term = OpTime::kInitialTerm;
     bool _resetLastOpTimesCalled = false;
