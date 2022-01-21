@@ -7,7 +7,7 @@ set -o errexit
 set -o verbose
 
 activate_venv
-$python -m pip --disable-pip-version-check install "db-contrib-tool==0.1.6"
+$python -m pip --disable-pip-version-check install "db-contrib-tool==0.1.7"
 
 rm -rf /data/install dist-test/bin
 
