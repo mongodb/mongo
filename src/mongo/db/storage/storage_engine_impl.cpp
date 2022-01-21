@@ -236,6 +236,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
         }
     }
 
+    BatchedCollectionCatalogWriter catalogBatchWriter{opCtx};
     for (DurableCatalog::Entry entry : catalogEntries) {
         if (loadingFromUncleanShutdownOrRepair) {
             // If we are loading the catalog after an unclean shutdown or during repair, it's
