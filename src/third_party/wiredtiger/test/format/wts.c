@@ -236,8 +236,9 @@ create_database(const char *home, WT_CONNECTION **connp)
     if (GV(LOGGING)) {
         s = GVS(LOGGING_COMPRESSION);
         CONFIG_APPEND(p,
-          ",log=(enabled=true,remove=%d,prealloc=%d,file_max=%" PRIu32 ",compressor=\"%s\")",
-          GV(LOGGING_REMOVE) ? 1 : 0, GV(LOGGING_PREALLOC) ? 1 : 0, KILOBYTE(GV(LOGGING_FILE_MAX)),
+          ",log=(enabled=true,%s=%d,prealloc=%d,file_max=%" PRIu32 ",compressor=\"%s\")",
+          g.backward_compatible ? "archive" : "remove", GV(LOGGING_REMOVE) ? 1 : 0,
+          GV(LOGGING_PREALLOC) ? 1 : 0, KILOBYTE(GV(LOGGING_FILE_MAX)),
           strcmp(s, "off") == 0 ? "none" : s);
     }
 

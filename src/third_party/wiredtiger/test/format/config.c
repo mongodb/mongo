@@ -1129,16 +1129,24 @@ config_print_one(FILE *fp, CONFIG *cp, CONFIGV *v, const char *prefix)
 {
     const char *cstr;
 
+    /* Historic versions of format expect "none", instead of "off", for a few configurations. */
     if (F_ISSET(cp, C_STRING)) {
-        /* Historic versions of format expect "none", instead of "off", for a few configurations. */
         cstr = v->vstr == NULL ? "off" : v->vstr;
         if (strcmp(cstr, "off") == 0 &&
           (cp->off == V_GLOBAL_DISK_ENCRYPTION || cp->off == V_GLOBAL_LOGGING_COMPRESSION ||
             cp->off == V_TABLE_BTREE_COMPRESSION))
             cstr = "none";
         fprintf(fp, "%s%s=%s\n", prefix, cp->name, cstr);
-    } else
-        fprintf(fp, "%s%s=%" PRIu32 "\n", prefix, cp->name, v->v);
+        return;
+    }
+
+    /* Historic versions of format expect log=(archive), not log=(remove). */
+    if (g.backward_compatible && cp->off == V_GLOBAL_LOGGING_REMOVE) {
+        fprintf(fp, "%slogging.archive=%" PRIu32 "\n", prefix, v->v);
+        return;
+    }
+
+    fprintf(fp, "%s%s=%" PRIu32 "\n", prefix, cp->name, v->v);
 }
 
 /*
