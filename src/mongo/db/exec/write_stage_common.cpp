@@ -26,24 +26,28 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 #include "mongo/db/exec/write_stage_common.h"
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
 
 namespace mongo {
 
 namespace {
 
-bool isStandaloneOrPrimary(OperationContext* opCtx) {
+bool computeIsStandaloneOrPrimary(OperationContext* opCtx) {
     const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
     return replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
         replCoord->getMemberState() == repl::MemberState::RS_PRIMARY;
@@ -52,6 +56,65 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
 }  // namespace
 
 namespace write_stage_common {
+
+PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
+    : _opCtx(opCtx), _nss(std::move(nss)) {
+    _isStandaloneOrPrimary = computeIsStandaloneOrPrimary(_opCtx);
+    auto& fcv = serverGlobalParams.featureCompatibility;
+    _isEnabled = fcv.isVersionInitialized() &&
+        feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(fcv);
+}
+
+PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
+    // Skip the checks if the Filter is not enabled.
+    if (!_isEnabled)
+        return Action::kWrite;
+
+    if (!_isStandaloneOrPrimary) {
+        // Secondaries do not apply any filtering logic as the primary already did.
+        return Action::kWrite;
+    }
+
+    // SERVER-61847 will remove this if-stmt.
+    if (!OperationShardingState::isOperationVersioned(_opCtx)) {
+        // Direct writes to shards (not forwarded by router) are allowed.
+        return Action::kWrite;
+    }
+
+    const auto docBelongsToMe = _documentBelongsToMe(doc.toBson());
+    return (docBelongsToMe) ? Action::kWrite : Action::kSkip;
+}
+
+bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {
+    if (!_shardFilterer) {
+        _shardFilterer = [&] {
+            const auto css{CollectionShardingState::get(_opCtx, _nss)};
+            return std::make_unique<ShardFiltererImpl>(css->getOwnershipFilter(
+                _opCtx,
+                CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
+                true /*supportNonVersionedOperations*/));
+        }();
+    }
+
+    const auto docBelongsToMe = _shardFilterer->documentBelongsToMe(doc);
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "No shard key found in document " << redact(doc)
+                          << " and shard key pattern "
+                          << _shardFilterer->getKeyPattern().toString(),
+            docBelongsToMe != ShardFilterer::DocumentBelongsResult::kNoShardKey);
+
+    if (docBelongsToMe == ShardFilterer::DocumentBelongsResult::kBelongs) {
+        return true;
+    } else {
+        invariant(docBelongsToMe == ShardFilterer::DocumentBelongsResult::kDoesNotBelong);
+        return false;
+    }
+}
+
+void PreWriteFilter::restoreState() {
+    _isStandaloneOrPrimary = computeIsStandaloneOrPrimary(_opCtx);
+    _shardFilterer.reset();
+}
 
 bool ensureStillMatches(const CollectionPtr& collection,
                         OperationContext* opCtx,
@@ -80,42 +143,6 @@ bool ensureStillMatches(const CollectionPtr& collection,
         member->makeObjOwnedIfNeeded();
     }
     return true;
-}
-
-bool skipWriteToOrphanDocument(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const BSONObj& doc) {
-    if (!isStandaloneOrPrimary(opCtx)) {
-        // Secondaries do not apply any filtering logic as the primary already did.
-        return false;
-    }
-
-    if (!feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return false;
-    }
-
-    const auto css{CollectionShardingState::get(opCtx, nss)};
-    const auto collFilter{
-        css->getOwnershipFilter(opCtx,
-                                CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup,
-                                true /* supportNonVersionedOperations */)};
-
-    if (!collFilter.isSharded()) {
-        // NOTE: Sharded collections queried by direct writes are identified by CSS as unsharded
-        // collections. This behavior may be fine because direct writes to orphan documents are
-        // currently allowed, making subsequent check on the shard version useless.
-        return false;
-    }
-
-    if (!OperationShardingState::get(opCtx).getShardVersion(nss)) {
-        // Direct writes to shards (not forwarded by router) are allowed.
-        return false;
-    }
-
-    const auto shardKey{collFilter.getShardKeyPattern().extractShardKeyFromDocThrows(doc)};
-
-    return !collFilter.keyBelongsToMe(shardKey);
 }
 
 }  // namespace write_stage_common

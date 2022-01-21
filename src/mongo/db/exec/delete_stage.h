@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/remove_saver.h"
@@ -125,7 +126,9 @@ public:
     const SpecificStats* getSpecificStats() const final;
 
 protected:
-    void doSaveStateRequiresCollection() final {}
+    void doSaveStateRequiresCollection() final {
+        _preWriteFilter.saveState();
+    }
 
     void doRestoreStateRequiresCollection() final;
 
@@ -149,6 +152,16 @@ private:
 
     // Stats
     DeleteStats _specificStats;
+
+    /**
+     * This member is used to check whether the write should be performed, and if so, any other
+     * behavior that should be done as part of the write (e.g. skipping it because it affects an
+     * orphan document). A yield cannot happen between the check and the write, so the checks are
+     * embedded in the stage.
+     *
+     * It's refreshed after yielding and reacquiring the locks.
+     */
+    write_stage_common::PreWriteFilter _preWriteFilter;
 };
 
 }  // namespace mongo

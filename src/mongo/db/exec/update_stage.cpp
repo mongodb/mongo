@@ -42,12 +42,14 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
@@ -132,7 +134,8 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
       _doc(params.driver->getDocument()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
-      _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr) {
+      _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr),
+      _preWriteFilter(opCtx(), collection->ns()) {
 
     // Should the modifiers validate their embedded docs via storage_validation::scanDocument()?
     // Only user updates should be checked. Any system or replication stuff should pass through.
@@ -450,18 +453,15 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
-        {
-            BSONObj unownedOldDoc = member->doc.value().toBson();
-
-            if (!_params.request->explain() && _isUserInitiatedWrite &&
-                write_stage_common::skipWriteToOrphanDocument(
-                    opCtx(), collection()->ns(), unownedOldDoc)) {
+        if (!_params.request->explain() && _isUserInitiatedWrite) {
+            const auto action = _preWriteFilter.computeAction(member->doc.value());
+            if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
                 LOGV2_DEBUG(5983200,
                             1,
                             "Abort update operation to orphan document to prevent a wrong change "
                             "stream event",
                             "namespace"_attr = collection()->ns(),
-                            "record"_attr = redact(unownedOldDoc));
+                            "record"_attr = member->doc.value());
 
                 return PlanStage::NEED_TIME;
             }
@@ -582,6 +582,8 @@ void UpdateStage::doRestoreStateRequiresCollection() {
     // date index information.
     const auto& updateIndexData = CollectionQueryInfo::get(collection()).getIndexKeys(opCtx());
     _params.driver->refreshIndexKeys(&updateIndexData);
+
+    _preWriteFilter.restoreState();
 }
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {

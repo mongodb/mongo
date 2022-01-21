@@ -31,7 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -39,10 +41,46 @@ class CanonicalQuery;
 class Collection;
 class CollectionPtr;
 class OperationContext;
-class NamespaceString;
 class BSONObj;
+class Document;
 
 namespace write_stage_common {
+
+class PreWriteFilter {
+public:
+    /**
+     * This class represents the different kind of actions we can take when handling a write
+     * operation:
+     *   -  kSkip: skip the current write operation.
+     *   - kWrite: perform the current write operation.
+     */
+    enum class Action { kWrite, kSkip };
+
+    PreWriteFilter(OperationContext* opCtx, NamespaceString nss);
+
+    void saveState() {}
+
+    void restoreState();
+
+    /**
+     * Returns which PreWriteFilterAction we should take for the current write operation over doc.
+     */
+    Action computeAction(const Document& doc);
+
+private:
+    /**
+     * Returns true if the operation is not versioned or if the doc is owned by the shard.
+     *
+     * May thow a ShardKeyNotFound if the document has an invalid shard key.
+     */
+    bool _documentBelongsToMe(const BSONObj& doc);
+
+    OperationContext* _opCtx;
+    NamespaceString _nss;
+    bool _isEnabled;
+    bool _isStandaloneOrPrimary;
+    std::unique_ptr<ShardFilterer> _shardFilterer;
+};
 
 /**
  * Returns true if the document referred to by 'id' still exists and matches the query predicate
@@ -57,15 +95,6 @@ bool ensureStillMatches(const CollectionPtr& collection,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq);
-
-/**
- * Returns true if (1) the operation is configured to not modify orphan documents and (2) the
- * document is an orphan. In these circumstances, write operations must be prevented in order to
- * avoid wrong change stream events.
- */
-bool skipWriteToOrphanDocument(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const BSONObj& doc);
 
 }  // namespace write_stage_common
 }  // namespace mongo

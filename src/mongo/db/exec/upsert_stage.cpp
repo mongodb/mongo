@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
