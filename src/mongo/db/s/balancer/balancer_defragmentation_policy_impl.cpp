@@ -348,7 +348,6 @@ public:
 
     boost::optional<MigrateInfo> popNextMigration(
         OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) override {
-        invariant(!_outstandingMigration);
         for (const auto& shardId : _shardProcessingOrder) {
             if (usedShards->count(shardId) != 0) {
                 // the shard is already busy in a migration
@@ -357,7 +356,8 @@ public:
 
             ChunkRangeInfoIterator nextSmallChunk;
             std::list<ChunkRangeInfoIterator> candidateSiblings;
-            if (!_findNextSmallChunkInShard(shardId, &nextSmallChunk, &candidateSiblings)) {
+            if (!_findNextSmallChunkInShard(
+                    shardId, *usedShards, &nextSmallChunk, &candidateSiblings)) {
                 // there isn't a chunk in this shard that can currently be moved and merged with one
                 // of its siblings.
                 continue;
@@ -383,8 +383,8 @@ public:
             usedShards->insert(nextSmallChunk->shard);
             usedShards->insert(targetSibling->shard);
             auto smallChunkVersion = getShardVersion(opCtx, nextSmallChunk->shard, _uuid);
-            _outstandingMigration = MoveAndMergeRequest(nextSmallChunk, targetSibling);
-            return _outstandingMigration->asMigrateInfo(_uuid, _nss, smallChunkVersion);
+            _outstandingMigrations.emplace_back(nextSmallChunk, targetSibling);
+            return _outstandingMigrations.back().asMigrateInfo(_uuid, _nss, smallChunkVersion);
         }
 
         return boost::none;
@@ -395,26 +395,35 @@ public:
                            const DefragmentationActionResponse& response) override {
         stdx::visit(
             visit_helper::Overloaded{
-                [&](const MigrateInfo& migration) {
+                [&](const MigrateInfo& migrationAction) {
                     auto& migrationResponse = stdx::get<Status>(response);
+                    auto match =
+                        std::find_if(_outstandingMigrations.begin(),
+                                     _outstandingMigrations.end(),
+                                     [&migrationAction](const MoveAndMergeRequest& request) {
+                                         return (migrationAction.minKey.woCompare(
+                                                     request.getMigrationMinKey()) == 0);
+                                     });
+                    invariant(match != _outstandingMigrations.end());
+                    MoveAndMergeRequest moveRequest(std::move(*match));
+                    _outstandingMigrations.erase(match);
+
                     auto onSuccess = [&] {
-                        auto transferredAmount = _outstandingMigration->getMovedDataSizeBytes();
-                        _shardInfos.at(_outstandingMigration->getSourceShard()).currentSizeBytes -=
+                        auto transferredAmount = moveRequest.getMovedDataSizeBytes();
+                        _shardInfos.at(moveRequest.getSourceShard()).currentSizeBytes -=
                             transferredAmount;
-                        _shardInfos.at(_outstandingMigration->getDestinationShard())
-                            .currentSizeBytes += transferredAmount;
+                        _shardInfos.at(moveRequest.getDestinationShard()).currentSizeBytes +=
+                            transferredAmount;
                         _shardProcessingOrder.sort([this](const ShardId& lhs, const ShardId& rhs) {
                             return _shardInfos.at(lhs).currentSizeBytes >=
                                 _shardInfos.at(rhs).currentSizeBytes;
                         });
-                        _actionableMerges.push_back(std::move(*_outstandingMigration));
-                        _outstandingMigration = boost::none;
+                        _actionableMerges.push_back(std::move(moveRequest));
                     };
 
-                    auto onRetriableError = [this] {
-                        _outstandingMigration->chunkToMove->busyInOperation = false;
-                        _outstandingMigration->chunkToMergeWith->busyInOperation = false;
-                        _outstandingMigration = boost::none;
+                    auto onRetriableError = [&moveRequest] {
+                        moveRequest.chunkToMove->busyInOperation = false;
+                        moveRequest.chunkToMergeWith->busyInOperation = false;
                     };
 
                     handleActionResult(migrationResponse, onSuccess, onRetriableError);
@@ -477,7 +486,7 @@ public:
     }
 
     bool isComplete() const override {
-        return _smallChunksByShard.empty() && !_outstandingMigration.has_value() &&
+        return _smallChunksByShard.empty() && _outstandingMigrations.empty() &&
             _actionableMerges.empty() && _outstandingMerges.empty();
     }
 
@@ -595,7 +604,7 @@ private:
     std::list<ShardId> _shardProcessingOrder;
 
     // Set of attributes representing the currently active move&merge sequences
-    boost::optional<MoveAndMergeRequest> _outstandingMigration;
+    std::list<MoveAndMergeRequest> _outstandingMigrations;
     std::list<MoveAndMergeRequest> _actionableMerges;
     std::list<MoveAndMergeRequest> _outstandingMerges;
 
@@ -615,7 +624,7 @@ private:
           _smallChunksByShard(),
           _shardInfos(std::move(shardInfos)),
           _shardProcessingOrder(),
-          _outstandingMigration(boost::none),
+          _outstandingMigrations(),
           _actionableMerges(),
           _outstandingMerges(),
           _zoneInfo(std::move(collectionZones)),
@@ -678,6 +687,7 @@ private:
     // Returns true on success (storing the related info in nextSmallChunk + smallChunkSiblings),
     // false otherwise.
     bool _findNextSmallChunkInShard(const ShardId& shard,
+                                    const stdx::unordered_set<ShardId>& usedShards,
                                     ChunkRangeInfoIterator* nextSmallChunk,
                                     std::list<ChunkRangeInfoIterator>* smallChunkSiblings) {
         auto matchingShardInfo = _smallChunksByShard.find(shard);
@@ -698,7 +708,7 @@ private:
                 continue;
             }
             for (const auto& sibling : candidateSiblings) {
-                if (!sibling->busyInOperation) {
+                if (!sibling->busyInOperation && usedShards.count(sibling->shard) == 0) {
                     smallChunkSiblings->push_back(sibling);
                 }
             }
@@ -966,30 +976,35 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
 
 MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
     OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) {
+    MigrateInfoVector chunksToMove;
     stdx::lock_guard<Latch> lk(_streamingMutex);
     // TODO (SERVER-61635) evaluate fairness
-    MigrateInfoVector chunksToMove;
-    for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
-        try {
-            _refreshDefragmentationPhaseFor(opCtx, it->first);
-            auto& collDefragmentationPhase = it->second;
-            if (!collDefragmentationPhase) {
+    bool done = false;
+    while (!done) {
+        auto selectedChunksFromPreviousRound = chunksToMove.size();
+        for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
+            try {
+                _refreshDefragmentationPhaseFor(opCtx, it->first);
+                auto& collDefragmentationPhase = it->second;
+                if (!collDefragmentationPhase) {
+                    it = _defragmentationStates.erase(it, std::next(it));
+                    continue;
+                }
+                auto actionableMigration =
+                    collDefragmentationPhase->popNextMigration(opCtx, usedShards);
+                if (actionableMigration.has_value()) {
+                    chunksToMove.push_back(std::move(*actionableMigration));
+                }
+                ++it;
+            } catch (DBException& e) {
+                LOGV2_ERROR(6172700,
+                            "Error while getting next migration",
+                            "uuid"_attr = it->first,
+                            "error"_attr = redact(e));
                 it = _defragmentationStates.erase(it, std::next(it));
-                continue;
             }
-            auto actionableMigration =
-                collDefragmentationPhase->popNextMigration(opCtx, usedShards);
-            if (actionableMigration.has_value()) {
-                chunksToMove.push_back(std::move(*actionableMigration));
-            }
-            ++it;
-        } catch (DBException& e) {
-            LOGV2_ERROR(6172700,
-                        "Error while getting next migration",
-                        "uuid"_attr = it->first,
-                        "error"_attr = redact(e));
-            it = _defragmentationStates.erase(it, std::next(it));
         }
+        done = (chunksToMove.size() == selectedChunksFromPreviousRound);
     }
     return chunksToMove;
 }
@@ -1010,11 +1025,18 @@ SemiFuture<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStre
 
 void BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(OperationContext* opCtx,
                                                                         const UUID& collUuid) {
+    auto& currentPhase = _defragmentationStates.at(collUuid);
+    auto currentPhaseCompleted = [&currentPhase] {
+        return currentPhase && currentPhase->isComplete();
+    };
+
+    if (!currentPhaseCompleted()) {
+        return;
+    }
+
     auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, collUuid);
-    auto& collectionDegragmentationState = _defragmentationStates.at(collUuid);
-    while (collectionDegragmentationState && collectionDegragmentationState->isComplete()) {
-        collectionDegragmentationState = _transitionPhases(
-            opCtx, coll, _getNextPhase(collectionDegragmentationState->getType()));
+    while (currentPhaseCompleted()) {
+        currentPhase = _transitionPhases(opCtx, coll, _getNextPhase(currentPhase->getType()));
     }
 }
 

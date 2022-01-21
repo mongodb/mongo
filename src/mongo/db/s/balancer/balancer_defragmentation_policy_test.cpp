@@ -44,20 +44,32 @@ protected:
     const UUID kUuid = UUID::gen();
     const ShardId kShardId0 = ShardId("shard0");
     const ShardId kShardId1 = ShardId("shard1");
+    const ShardId kShardId2 = ShardId("shard2");
+    const ShardId kShardId3 = ShardId("shard3");
     const ChunkVersion kCollectionVersion = ChunkVersion(1, 1, OID::gen(), Timestamp(10));
     const KeyPattern kShardKeyPattern = KeyPattern(BSON("x" << 1));
+    const BSONObj kKeyAtMin = BSONObjBuilder().appendMinKey("x").obj();
     const BSONObj kKeyAtZero = BSON("x" << 0);
     const BSONObj kKeyAtTen = BSON("x" << 10);
     const BSONObj kKeyAtTwenty = BSON("x" << 20);
+    const BSONObj kKeyAtThirty = BSON("x" << 30);
+    const BSONObj kKeyAtForty = BSON("x" << 40);
+    const BSONObj kKeyAtMax = BSONObjBuilder().appendMaxKey("x").obj();
+
     const long long kMaxChunkSizeBytes{2048};
     const HostAndPort kShardHost0 = HostAndPort("TestHost0", 12345);
     const HostAndPort kShardHost1 = HostAndPort("TestHost1", 12346);
+    const HostAndPort kShardHost2 = HostAndPort("TestHost2", 12347);
+    const HostAndPort kShardHost3 = HostAndPort("TestHost3", 12348);
+
     const int64_t kPhase3DefaultChunkSize =
         129 * 1024 * 1024;  // > 128MB should trigger AutoSplitVector
 
     const std::vector<ShardType> kShardList{
         ShardType(kShardId0.toString(), kShardHost0.toString()),
-        ShardType(kShardId1.toString(), kShardHost1.toString())};
+        ShardType(kShardId1.toString(), kShardHost1.toString()),
+        ShardType(kShardId2.toString(), kShardHost2.toString()),
+        ShardType(kShardId3.toString(), kShardHost3.toString())};
 
     BalancerDefragmentationPolicyTest() : _clusterStats(), _defragmentationPolicy(&_clusterStats) {}
 
@@ -505,18 +517,15 @@ TEST_F(BalancerDefragmentationPolicyTest,
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWithSibling) {
-    std::vector<ChunkType> chunkList;
-    BSONObjBuilder minKeyBuilder;
-    BSONObjBuilder maxKeyBuilder;
     ChunkType biggestChunk(
         kUuid,
-        ChunkRange(minKeyBuilder.appendMinKey("x").obj(), BSON("x" << 0)),
+        ChunkRange(kKeyAtMin, kKeyAtZero),
         ChunkVersion(1, 0, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
         kShardId0);
     biggestChunk.setEstimatedSizeBytes(2048);
     ChunkType smallestChunk(
         kUuid,
-        ChunkRange(BSON("x" << 0), maxKeyBuilder.appendMaxKey("x").obj()),
+        ChunkRange(kKeyAtZero, kKeyAtMax),
         ChunkVersion(1, 1, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
         kShardId1);
     smallestChunk.setEstimatedSizeBytes(1024);
@@ -534,6 +543,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
     auto pendingMigrations =
         _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
     ASSERT_EQ(1, pendingMigrations.size());
+    ASSERT_EQ(2, usedShards.size());
     auto moveAction = pendingMigrations.back();
     // The chunk belonging to the "fullest" shard is expected to be moved - even though it is bigger
     // than its sibling.
@@ -547,8 +557,10 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
 
     _defragmentationPolicy.acknowledgeMoveResult(operationContext(), moveAction, Status::OK());
     ASSERT_TRUE(future.isReady());
+    usedShards.clear();
     pendingMigrations = _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
     ASSERT_TRUE(pendingMigrations.empty());
+    ASSERT_EQ(0, usedShards.size());
 
     auto mergeAction = stdx::get<MergeInfo>(future.get());
     ASSERT_EQ(smallestChunk.getShard(), mergeAction.shardId);
@@ -560,6 +572,71 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
     ASSERT_FALSE(future.isReady());
     pendingMigrations = _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
     ASSERT_TRUE(pendingMigrations.empty());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest,
+       TestPhaseTwoMultipleCollectionChunkMigrationsMayBeIssuedConcurrently) {
+    // Define a single collection, distributing 6 chunks across the 4 shards so that there cannot be
+    // a merge without migrations
+    ChunkType firstChunkOnShard0(
+        kUuid,
+        ChunkRange(kKeyAtMin, kKeyAtZero),
+        ChunkVersion(1, 0, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
+        kShardId0);
+    firstChunkOnShard0.setEstimatedSizeBytes(1);
+
+    ChunkType firstChunkOnShard1(
+        kUuid,
+        ChunkRange(kKeyAtZero, kKeyAtTen),
+        ChunkVersion(1, 1, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
+        kShardId1);
+    firstChunkOnShard1.setEstimatedSizeBytes(1);
+
+    ChunkType chunkOnShard2(
+        kUuid,
+        ChunkRange(kKeyAtTen, kKeyAtTwenty),
+        ChunkVersion(1, 2, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
+        kShardId2);
+    chunkOnShard2.setEstimatedSizeBytes(1);
+
+    ChunkType chunkOnShard3(
+        kUuid,
+        ChunkRange(kKeyAtTwenty, kKeyAtThirty),
+        ChunkVersion(1, 3, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
+        kShardId3);
+    chunkOnShard3.setEstimatedSizeBytes(1);
+
+    ChunkType secondChunkOnShard0(
+        kUuid,
+        ChunkRange(kKeyAtThirty, kKeyAtForty),
+        ChunkVersion(1, 4, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
+        kShardId0);
+    firstChunkOnShard0.setEstimatedSizeBytes(1);
+
+    ChunkType secondChunkOnShard1(
+        kUuid,
+        ChunkRange(kKeyAtForty, kKeyAtMax),
+        ChunkVersion(1, 5, kCollectionVersion.epoch(), kCollectionVersion.getTimestamp()),
+        kShardId1);
+    firstChunkOnShard1.setEstimatedSizeBytes(1);
+
+    auto coll = setupCollectionWithPhase({firstChunkOnShard0,
+                                          firstChunkOnShard1,
+                                          chunkOnShard2,
+                                          chunkOnShard3,
+                                          secondChunkOnShard0,
+                                          secondChunkOnShard1},
+                                         DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    setDefaultClusterStats();
+    _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
+
+    // Two move operation should be returned within a single invocation, using all the possible
+    // shards
+    stdx::unordered_set<ShardId> usedShards;
+    auto pendingMigrations =
+        _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
+    ASSERT_EQ(4, usedShards.size());
+    ASSERT_EQ(2, pendingMigrations.size());
 }
 
 /** Phase 3 tests. By passing in DefragmentationPhaseEnum::kSplitChunks to
