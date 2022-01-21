@@ -186,7 +186,7 @@ class test_truncate07(wttest.WiredTigerTestCase):
         # Truncate the data, including what we prepared.
         self.session.begin_transaction()
         err = self.truncate(ds.uri, ds.key, nrows // 4, nrows - nrows // 4)
-        self.assertEqual(err, WT_PREPARE_CONFLICT)
+        self.assertEqual(err, WT_ROLLBACK)
         self.session.rollback_transaction()
 
         # Move the stable timestamp forward before exiting so we don't waste time rolling

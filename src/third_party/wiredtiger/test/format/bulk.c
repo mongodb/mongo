@@ -150,7 +150,8 @@ wts_load(TABLE *table, void *arg)
          * row counter and continue.
          */
         if ((ret = cursor->insert(cursor)) != 0) {
-            testutil_assert(ret == WT_CACHE_FULL || ret == WT_ROLLBACK);
+            testutil_assertfmt(
+              ret == WT_CACHE_FULL || ret == WT_ROLLBACK, "WT_CURSOR.insert failed: %d", ret);
 
             if (g.transaction_timestamps_config) {
                 bulk_rollback_transaction(session);

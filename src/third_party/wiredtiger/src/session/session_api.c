@@ -1498,16 +1498,21 @@ __session_truncate(
         WT_ERR(__wt_session_range_truncate(session, uri, start, stop));
 
 err:
+    /* Map prepare-conflict to rollback. */
+    if (ret == WT_PREPARE_CONFLICT)
+        ret = WT_ROLLBACK;
+
     TXN_API_END(session, ret, false);
 
     if (ret != 0)
         WT_STAT_CONN_INCR(session, session_table_truncate_fail);
     else
         WT_STAT_CONN_INCR(session, session_table_truncate_success);
-    /*
-     * Only map WT_NOTFOUND to ENOENT if a URI was specified.
-     */
-    return (ret == WT_NOTFOUND && uri != NULL ? ENOENT : ret);
+
+    /* Map WT_NOTFOUND to ENOENT if a URI was specified. */
+    if (ret == WT_NOTFOUND && uri != NULL)
+        ret = ENOENT;
+    return (ret);
 }
 
 /*

@@ -91,13 +91,14 @@ class test_prepare13(wttest.WiredTigerTestCase):
             cursor.close()
 
             # Truncate the middle chunk and expect a conflict.
-            preparemsg = '/conflict with a prepared update/'
+            msg = preparemsg = '/conflict between concurrent operations/'
             s.begin_transaction()
             c1 = s.open_cursor(uri, None)
             c1.set_key(simple_key(c1, 100))
             c2 = s.open_cursor(uri, None)
             c2.set_key(simple_key(c1, nrows))
-            self.assertRaisesException(wiredtiger.WiredTigerError, lambda:s.truncate(None, c1, c2, None), preparemsg)
+            self.assertRaisesException(
+                wiredtiger.WiredTigerError, lambda:s.truncate(None, c1, c2, None), msg)
             c1.close()
             c2.close()
             s.rollback_transaction()

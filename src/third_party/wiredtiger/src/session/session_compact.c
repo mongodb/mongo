@@ -420,6 +420,11 @@ err:
     else
         WT_STAT_CONN_INCR(session, session_table_compact_success);
     WT_STAT_CONN_SET(session, session_table_compact_running, 0);
+
+    /* Map prepare-conflict to rollback. */
+    if (ret == WT_PREPARE_CONFLICT)
+        ret = WT_ROLLBACK;
+
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 

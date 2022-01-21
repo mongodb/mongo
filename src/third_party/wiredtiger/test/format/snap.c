@@ -586,7 +586,7 @@ snap_repeat(TINFO *tinfo, SNAP_OPS *snap)
          */
         if ((ret = snap_verify(tinfo, snap)) == 0)
             break;
-        testutil_assert(ret == WT_ROLLBACK);
+        testutil_assertfmt(ret == WT_ROLLBACK, "operation failed: %d", ret);
 
         testutil_check(session->rollback_transaction(session, NULL));
     }
