@@ -38,12 +38,12 @@ namespace mongo {
 namespace rpc {
 namespace {
 
-static const OperationContext::Decoration<MaybeImpersonatedUserMetadata> getForOpCtx =
-    OperationContext::declareDecoration<MaybeImpersonatedUserMetadata>();
+static const auto getForOpCtx =
+    OperationContext::declareDecoration<synchronized_value<MaybeImpersonatedUserMetadata>>();
 }  // namespace
 
 MaybeImpersonatedUserMetadata getImpersonatedUserMetadata(OperationContext* opCtx) {
-    return opCtx ? getForOpCtx(opCtx) : boost::none;
+    return opCtx ? getForOpCtx(opCtx).get() : boost::none;
 }
 
 void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opCtx) {
@@ -53,7 +53,7 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
     }
 
     // Always reset the current impersonation data to boost::none.
-    getForOpCtx(opCtx) = boost::none;
+    MaybeImpersonatedUserMetadata newData;
     if (elem.type() == Object) {
         IDLParserErrorContext errCtx(kImpersonationMetadataSectionName);
         auto data = ImpersonatedUserMetadata::parse(errCtx, elem.embeddedObject());
@@ -61,9 +61,10 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
         // Set the impersonation data only if there are actually impersonated
         // users/roles.
         if ((!data.getUsers().empty()) || (!data.getRoles().empty())) {
-            getForOpCtx(opCtx) = std::move(data);
+            newData = std::move(data);
         }
     }
+    *getForOpCtx(opCtx) = std::move(newData);
 }
 
 void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBuilder* out) {
