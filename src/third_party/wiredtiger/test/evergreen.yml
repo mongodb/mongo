@@ -4068,7 +4068,8 @@ buildvariants:
       -DENABLE_STRICT=1
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    # Use half number of vCPU to avoid OOM kill failure
+    smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
     cmake_generator: Ninja
     make_command: ninja
   tasks:
@@ -4098,7 +4099,8 @@ buildvariants:
       -DENABLE_STRICT=1
       -DCMAKE_INSTALL_PREFIX=$(pwd)/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    # Use half number of vCPU to avoid OOM kill failure
+    smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
     cmake_generator: Ninja
     make_command: ninja
   tasks:
