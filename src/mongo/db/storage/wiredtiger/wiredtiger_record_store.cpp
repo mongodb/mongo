@@ -123,6 +123,14 @@ void appendNumericStats(WT_SESSION* s, const std::string& uri, BSONObjBuilder& b
         bob.append("reason", status.reason());
     }
 }
+
+std::size_t computeRecordIdSize(const RecordId& id) {
+    // We previously weren't accounting for WiredTiger key size when it was an int64_t, thus we
+    // return 0 in those cases. With the clustering capabilities we now support potentially large
+    // keys as they are byte arrays, thus having to take it into account for the read/write metrics.
+    return id.isStr() ? id.getStr().size() : 0;
+}
+
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
@@ -694,7 +702,9 @@ public:
         invariantWTOK(_cursor->get_value(_cursor, &value));
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneDocRead(value.size);
+
+        auto keyLength = computeRecordIdSize(id);
+        metricsCollector.incrementOneDocRead(value.size + keyLength);
 
         return {
             {std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
@@ -1100,7 +1110,8 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 
     *out = _getData(curwrap);
 
-    metricsCollector.incrementOneDocRead(out->size());
+    auto keyLength = computeRecordIdSize(id);
+    metricsCollector.incrementOneDocRead(out->size() + keyLength);
 
     return true;
 }
@@ -1134,7 +1145,8 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     invariantWTOK(ret);
 
-    metricsCollector.incrementOneDocWritten(old_length);
+    auto keyLength = computeRecordIdSize(id);
+    metricsCollector.incrementOneDocWritten(old_length + keyLength);
 
     _changeNumRecords(opCtx, -1);
     _increaseDataSize(opCtx, -old_length);
@@ -1387,7 +1399,9 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         // requires that each record be accounted for separately.
         if (!_isOplog) {
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-            metricsCollector.incrementOneDocWritten(value.size);
+
+            auto keyLength = computeRecordIdSize(record.id);
+            metricsCollector.incrementOneDocWritten(value.size + keyLength);
         }
     }
 
@@ -1540,8 +1554,10 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                 // Account for both the amount of old data we are overwriting (size) and new data we
                 // are inserting (data.size).
                 modifiedDataSize += entries[i].size + entries[i].data.size;
-            };
-            metricsCollector.incrementOneDocWritten(modifiedDataSize);
+            }
+
+            auto keyLength = computeRecordIdSize(id);
+            metricsCollector.incrementOneDocWritten(modifiedDataSize + keyLength);
 
             WT_ITEM new_value;
             dassert(nentries == 0 ||
@@ -1556,7 +1572,9 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     if (!skip_update) {
         c->set_value(c, value.Get());
         ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
-        metricsCollector.incrementOneDocWritten(value.size);
+
+        auto keyLength = computeRecordIdSize(id);
+        metricsCollector.incrementOneDocWritten(value.size + keyLength);
     }
     invariantWTOK(ret);
 
@@ -1605,7 +1623,9 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
         invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(opCtx, c, entries.data(), nentries)));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneDocWritten(modifiedDataSize);
+
+    auto keyLength = computeRecordIdSize(id);
+    metricsCollector.incrementOneDocWritten(modifiedDataSize + keyLength);
 
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
@@ -2095,7 +2115,9 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     invariantWTOK(c->get_value(c, &value));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneDocRead(value.size);
+
+    auto keyLength = computeRecordIdSize(id);
+    metricsCollector.incrementOneDocRead(value.size + keyLength);
 
     _lastReturnedId = id;
     return {{std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
@@ -2131,7 +2153,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
 
-    metricsCollector.incrementOneDocRead(value.size);
+    auto keyLength = computeRecordIdSize(id);
+    metricsCollector.incrementOneDocRead(value.size + keyLength);
 
     _lastReturnedId = id;
     _eof = false;
@@ -2200,7 +2223,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
 
-    metricsCollector.incrementOneDocRead(value.size);
+    auto keyLength = computeRecordIdSize(id);
+    metricsCollector.incrementOneDocRead(value.size + keyLength);
 
     _lastReturnedId = curId;
     _eof = false;

@@ -1307,7 +1307,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            assert.eq(profileDoc.docBytesWritten, 194);
+            assert.eq(profileDoc.docBytesWritten, 207);
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
@@ -1329,7 +1329,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            assert.eq(profileDoc.docBytesWritten, 194);
+            assert.eq(profileDoc.docBytesWritten, 207);
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
@@ -1347,11 +1347,11 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': true},
         profileAssert: (db, profileDoc) => {
-            assert.eq(profileDoc.docBytesRead, 194);
+            assert.eq(profileDoc.docBytesRead, 207);
             assert.eq(profileDoc.docUnitsRead, 2);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            assert.eq(profileDoc.docBytesWritten, 220);
+            assert.eq(profileDoc.docBytesWritten, 233);
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
@@ -1369,11 +1369,11 @@ const operations = [
         },
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': false},
         profileAssert: (db, profileDoc) => {
-            assert.eq(profileDoc.docBytesRead, 194);
+            assert.eq(profileDoc.docBytesRead, 207);
             assert.eq(profileDoc.docUnitsRead, 2);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            assert.eq(profileDoc.docBytesWritten, 220);
+            assert.eq(profileDoc.docBytesWritten, 233);
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
@@ -1389,7 +1389,7 @@ const operations = [
         },
         profileFilter: {op: 'query', 'command.find': 'ts'},
         profileAssert: (db, profileDoc) => {
-            assert.eq(profileDoc.docBytesRead, 110 * 4);
+            assert.eq(profileDoc.docBytesRead, 466);
             assert.eq(profileDoc.docUnitsRead, 4);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
