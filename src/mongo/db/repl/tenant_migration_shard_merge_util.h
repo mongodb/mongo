@@ -30,8 +30,13 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/util/cancellation.h"
 
 namespace mongo::repl {
 /**
@@ -40,4 +45,10 @@ namespace mongo::repl {
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                                       const std::vector<CollectionImportMetadata>& metadatas,
                                       const std::string& importPath);
+
+SemiFuture<void> keepBackupCursorAlive(CancellationSource cancellationSource,
+                                       std::shared_ptr<executor::TaskExecutor> executor,
+                                       HostAndPort hostAndPort,
+                                       CursorId cursorId,
+                                       NamespaceString namespaceString);
 }  // namespace mongo::repl

@@ -366,7 +366,7 @@ public:
         /**
          * Kills the Donor backup cursor
          */
-        void _killBackupCursor(WithLock lk);
+        ExecutorFuture<void> _killBackupCursor();
 
         /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
@@ -568,9 +568,11 @@ public:
         std::unique_ptr<DBClientConnection> _client;              // (S)
         std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (S)
 
-        CursorId _donorFilenameBackupCursorId = 0;                       // (M)
+        CursorId _donorFilenameBackupCursorId;                           // (M)
         NamespaceString _donorFilenameBackupCursorNamespaceString;       // (M)
         std::unique_ptr<Fetcher> _donorFilenameBackupCursorFileFetcher;  // (M)
+        CancellationSource _backupCursorKeepAliveCancellation = {};      // (X)
+        boost::optional<SemiFuture<void>> _backupCursorKeepAliveFuture;  // (M)
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
             std::make_unique<CreateOplogFetcherFn>();                               // (M)

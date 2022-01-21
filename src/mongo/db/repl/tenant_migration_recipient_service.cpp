@@ -911,42 +911,54 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
         .semi();
 }
 
-void TenantMigrationRecipientService::Instance::_killBackupCursor(WithLock lk) {
-    if (!_donorFilenameBackupCursorId || _donorFilenameBackupCursorNamespaceString.isEmpty()) {
-        return;
+ExecutorFuture<void> TenantMigrationRecipientService::Instance::_killBackupCursor() {
+    stdx::lock_guard lk(_mutex);
+
+    if (_backupCursorKeepAliveFuture) {
+        _backupCursorKeepAliveCancellation.cancel();
     }
 
-    // TODO (SERVER-61132) likely want to cancel getMore/keepalive here as well
+    return std::exchange(_backupCursorKeepAliveFuture, {})
+        .value_or(SemiFuture<void>::makeReady())
+        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
+        .then([this, self = shared_from_this()] {
+            stdx::lock_guard lk(_mutex);
+            if (!_donorFilenameBackupCursorId ||
+                _donorFilenameBackupCursorNamespaceString.isEmpty()) {
+                return;
+            }
 
-    executor::RemoteCommandRequest request(
-        _client->getServerHostAndPort(),
-        _donorFilenameBackupCursorNamespaceString.db().toString(),
-        BSON("killCursors" << _donorFilenameBackupCursorNamespaceString.coll().toString()
-                           << "cursors" << BSON_ARRAY(_donorFilenameBackupCursorId)),
-        nullptr);
-    request.sslMode = transport::kGlobalSSLMode;
+            executor::RemoteCommandRequest request(
+                _client->getServerHostAndPort(),
+                _donorFilenameBackupCursorNamespaceString.db().toString(),
+                BSON("killCursors" << _donorFilenameBackupCursorNamespaceString.coll().toString()
+                                   << "cursors" << BSON_ARRAY(_donorFilenameBackupCursorId)),
+                nullptr);
+            request.sslMode = _donorUri.getSSLMode();
 
-    auto scheduleResult =
-        (**_scopedExecutor)
-            ->scheduleRemoteCommand(
-                request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-                    if (!args.response.isOK()) {
-                        LOGV2_WARNING(6113005,
-                                      "killCursors command task failed",
-                                      "error"_attr = redact(args.response.status));
-                        return;
-                    }
-                    auto status = getStatusFromCommandResult(args.response.data);
-                    if (!status.isOK()) {
-                        LOGV2_WARNING(
-                            6113006, "killCursors command failed", "error"_attr = redact(status));
-                    }
-                });
-    if (!scheduleResult.isOK()) {
-        LOGV2_WARNING(6113004,
-                      "Failed to run killCursors command on backup cursor",
-                      "status"_attr = scheduleResult.getStatus());
-    }
+            auto scheduleResult =
+                (_recipientService->getInstanceCleanupExecutor())
+                    ->scheduleRemoteCommand(
+                        request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                            if (!args.response.isOK()) {
+                                LOGV2_WARNING(6113005,
+                                              "killCursors command task failed",
+                                              "error"_attr = redact(args.response.status));
+                                return;
+                            }
+                            auto status = getStatusFromCommandResult(args.response.data);
+                            if (!status.isOK()) {
+                                LOGV2_WARNING(6113006,
+                                              "killCursors command failed",
+                                              "error"_attr = redact(status));
+                            }
+                        });
+            if (!scheduleResult.isOK()) {
+                LOGV2_WARNING(6113004,
+                              "Failed to run killCursors command on backup cursor",
+                              "status"_attr = scheduleResult.getStatus());
+            }
+        });
 }
 
 ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenames(
@@ -994,7 +1006,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                 const auto& metadata = doc["metadata"].Obj();
                 auto startApplyingDonorOpTime =
                     OpTime(metadata["checkpointTimestamp"].timestamp(), OpTime::kUninitializedTerm);
-                // TODO (SERVER-61132) Uncomment the following lines when we skip
+                // TODO (SERVER-61133) Uncomment the following lines when we skip
                 // _getStartopTimesFromDonor entirely
                 // _stateDoc.setStartApplyingDonorOpTime(startApplyingDonorOpTime);
                 // _stateDoc.setStartFetchingDonorOpTime(startApplyingDonorOpTime);
@@ -1099,7 +1111,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
 
     // We only expect to already have start optimes populated if we are not
     // resuming a migration and this is a multitenant migration.
-    // TODO (SERVER-61132) Eventually we'll skip _getStartopTimesFromDonor entirely
+    // TODO (SERVER-61133) Eventually we'll skip _getStartopTimesFromDonor entirely
     // for shard merge, but currently _getDonorFilenames will populate optimes for
     // the shard merge case. We can just overwrite here since we aren't doing anything
     // with the backup cursor results yet.
@@ -2213,6 +2225,8 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
 
         _donorFilenameBackupCursorId = 0;
         _donorFilenameBackupCursorFileFetcher = nullptr;
+        _backupCursorKeepAliveCancellation = {};
+        _backupCursorKeepAliveFuture = boost::none;
     }
 
     // Perform join outside the lock to avoid deadlocks.
@@ -2549,6 +2563,24 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            })
                            .on(**_scopedExecutor, token);
                    })
+                   .then([this, self = shared_from_this(), token] {
+                       if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
+                           return;
+                       }
+
+                       LOGV2_DEBUG(6113200,
+                                   1,
+                                   "Starting periodic 'getMore' requests to keep "
+                                   "backup cursor alive.");
+                       stdx::lock_guard lk(_mutex);
+                       _backupCursorKeepAliveCancellation = CancellationSource(token);
+                       _backupCursorKeepAliveFuture =
+                           keepBackupCursorAlive(_backupCursorKeepAliveCancellation,
+                                                 **_scopedExecutor,
+                                                 _client->getServerHostAndPort(),
+                                                 _donorFilenameBackupCursorId,
+                                                 _donorFilenameBackupCursorNamespaceString);
+                   })
                    .then([this, self = shared_from_this()] {
                        if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
                            return;
@@ -2558,12 +2590,15 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        _stateDoc.setState(TenantMigrationRecipientStateEnum::kLearnedFilenames);
                    })
                    .then([this, self = shared_from_this()] {
-                       stdx::lock_guard lk(_mutex);
                        // TODO (SERVER-61133) temporarily stop fetcher/backup cursor here for
-                       // now. We shut down the backup cursor in onCompletion continuation, but
-                       // some tests fail unless we do this here, punting on dealing with those
+                       // now. We'll need to move this call elsewhere eventually to shut down
+                       // the backup cursor and/or keepalive.
+                       // Some tests fail unless we do this here, punting on dealing with those
                        // tests until later ticket(s)
-                       _killBackupCursor(lk);
+                       return _killBackupCursor();
+                   })
+                   .then([this, self = shared_from_this()] {
+                       stdx::lock_guard lk(_mutex);
                        _getStartOpTimesFromDonor(lk);
                        return _updateStateDocForMajority(lk);
                    })
@@ -2778,10 +2813,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this()](
                           StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
-            {
-                stdx::lock_guard lk(_mutex);
-                _killBackupCursor(lk);
-            }
             // On shutDown/stepDown, the _scopedExecutor may have already been shut down. So we
             // need to schedule the clean up work on the parent executor.
 
