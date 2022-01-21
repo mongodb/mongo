@@ -34,5 +34,6 @@
 namespace mongo {
 
 extern AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes;
+uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes();
 
 }  // namespace mongo

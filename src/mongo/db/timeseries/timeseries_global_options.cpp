@@ -31,7 +31,24 @@
 
 namespace mongo {
 
-AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes{static_cast<long long>(
-    ProcessInfo::getSystemMemSizeMB() * 25 * 1024)};  // ~2.5% of system memory
+AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes{-1};
+
+uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() {
+    long long userValue = gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.load();
+    if (userValue > 0) {
+        return static_cast<uint64_t>(userValue);
+    }
+
+    const uint64_t systemBasedValue{ProcessInfo::getSystemMemSizeMB() * 25 *
+                                    1024};  // ~2.5% of system memory
+    while (!gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.compareAndSwap(&userValue,
+                                                                                systemBasedValue)) {
+        if (userValue > 0) {
+            return static_cast<uint64_t>(userValue);
+        }
+    }
+
+    return systemBasedValue;
+}
 
 }  // namespace mongo

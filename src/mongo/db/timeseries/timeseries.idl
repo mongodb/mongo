@@ -50,10 +50,11 @@ server_parameters:
         validator: { gte: 1 }
     "timeseriesIdleBucketExpiryMemoryUsageThreshold":
         description: "The threshold in bytes for bucket catalog memory usage above which idle
-                      buckets will be expired"
+                      buckets will be expired. If set to a non-positive number, the threshold will
+                      be automatically over-written to be 2.5% of system memory."
         set_at: [ startup, runtime ]
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
-        validator: { gte: 1 }
+        default: 0
     "timeseriesIdleBucketExpiryMaxCountPerAttempt":
         description: "The maximum number of buckets that may be closed due to expiry at each attempt"
         set_at: [ startup ]
