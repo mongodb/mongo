@@ -62,6 +62,9 @@ public:
     const NamespaceString _testBarNss = NamespaceString("test.bar");
     const UUID _othertestFooUUID = UUID::gen();
     const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
+    const std::string _tenantId{"tenant"};
+    const NamespaceString _testTenantFooNss{_tenantId + "_test.test"};
+    const UUID _testFooTenantUUID = UUID::gen();
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
@@ -76,6 +79,7 @@ void IndexBuildsCoordinatorMongodTest::setUp() {
     createCollection(_testFooNss, _testFooUUID);
     createCollection(_testBarNss, _testBarUUID);
     createCollection(_othertestFooNss, _othertestFooUUID);
+    createCollection(_testTenantFooNss, _testFooTenantUUID);
 
     _indexBuildsCoord = std::make_unique<IndexBuildsCoordinatorMongod>();
 }
@@ -329,7 +333,6 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumF
 }
 
 TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumFromOnToOff) {
-    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     const IndexBuildsCoordinator::IndexBuildOptions indexBuildOptionsWithCQOn = {
         CommitQuorumOptions(1)};
@@ -354,12 +357,42 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumF
                                            CommitQuorumOptions(CommitQuorumOptions::kDisabled));
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 
-    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
-
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(), buildUUID, HostAndPort("test1", 1234)));
 
     assertGet(testFoo1Future.getNoThrow());
+}
+
+TEST_F(IndexBuildsCoordinatorMongodTest, AbortBuildIndexDueToTenantMigration) {
+    const IndexBuildsCoordinator::IndexBuildOptions indexBuildOptionsWithCQOn = {
+        CommitQuorumOptions(1)};
+
+    // Start an index build on _testFooNss with commit quorum enabled.
+    ASSERT_EQ(0, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
+    const auto buildUUID = UUID::gen();
+    auto testTenantFoo1Future =
+        assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                     _testTenantFooNss.db().toString(),
+                                                     _testFooTenantUUID,
+                                                     makeSpecs(_testTenantFooNss, {"a"}),
+                                                     buildUUID,
+                                                     IndexBuildProtocol::kTwoPhase,
+                                                     indexBuildOptionsWithCQOn));
+
+    // we currently have one index build in progress.
+    ASSERT_EQ(1, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
+    ASSERT_THROWS(_indexBuildsCoord->assertNoIndexBuildInProgress(), mongo::DBException);
+
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(), buildUUID, HostAndPort("test1", 1234)));
+
+    // This call may see the index build active and wait for it to be unregistered, or the index
+    // build may already have been unregistered.
+    _indexBuildsCoord->abortTenantIndexBuilds(operationContext(), _tenantId, "tenant migration");
+
+    ASSERT_EQ(0, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
+
+    assertGet(testTenantFoo1Future.getNoThrow());
 }
 
 }  // namespace

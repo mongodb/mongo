@@ -792,6 +792,11 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
         };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
+
+    std::vector<std::shared_ptr<ReplIndexBuildState>> buildsWaitingToFinish;
+    buildsWaitingToFinish.reserve(builds.size());
+    const auto indexBuildActionStr =
+        indexBuildActionToString(IndexBuildAction::kTenantMigrationAbort);
     for (auto replState : builds) {
         if (!abortIndexBuildByBuildUUID(
                 opCtx, replState->buildUUID, IndexBuildAction::kTenantMigrationAbort, reason)) {
@@ -801,8 +806,22 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
                   "tenantId"_attr = tenantId,
                   "buildUUID"_attr = replState->buildUUID,
                   "db"_attr = replState->dbName,
-                  "collectionUUID"_attr = replState->collectionUUID);
+                  "collectionUUID"_attr = replState->collectionUUID,
+                  "buildAction"_attr = indexBuildActionStr);
+            buildsWaitingToFinish.push_back(replState);
         }
+    }
+    for (const auto& replState : buildsWaitingToFinish) {
+        LOGV2(6221600,
+              "Waiting on the index build to unregister before continuing the tenant "
+              " migration.",
+              "tenantId"_attr = tenantId,
+              "buildUUID"_attr = replState->buildUUID,
+              "db"_attr = replState->dbName,
+              "collectionUUID"_attr = replState->collectionUUID,
+              "buildAction"_attr = indexBuildActionStr);
+        awaitNoIndexBuildInProgressForCollection(
+            opCtx, replState->collectionUUID, replState->protocol);
     }
 }
 

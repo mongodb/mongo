@@ -274,8 +274,7 @@ public:
     /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.
      *
-     * Returns true if the index build was aborted or the index build is already in the process of
-     * being aborted.
+     * Returns true if the index build was aborted or the index build is already aborted.
      * Returns false if the index build does not exist or the index build is already in the process
      * of committing and cannot be aborted.
      */
