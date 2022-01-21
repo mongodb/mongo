@@ -93,13 +93,18 @@ function(define_build_mode mode)
 
     set(CMAKE_SHARED_LINKER_FLAGS_${build_mode}
         "${linker_flags}" CACHE STRING
-        "Linker lags to be used to create shared libraries for ${mode} build type." FORCE)
+        "Linker flags to be used to create shared libraries for ${mode} build type." FORCE)
+
+    set(CMAKE_MODULE_LINKER_FLAGS_${build_mode}
+        "${linker_flags}" CACHE STRING
+        "Linker flags to be used to create shared modules for ${mode} build type." FORCE)
 
     mark_as_advanced(
         CMAKE_CXX_FLAGS_${build_mode}
         CMAKE_C_FLAGS_${build_mode}
         CMAKE_EXE_LINKER_FLAGS_${build_mode}
         CMAKE_SHARED_LINKER_FLAGS_${build_mode}
+        CMAKE_MODULE_LINKER_FLAGS_${build_mode}
     )
     set(BUILD_MODES "${BUILD_MODES};${mode}" CACHE INTERNAL "")
 endfunction()
@@ -179,6 +184,8 @@ define_build_mode(Coverage
     # Disable Coverage on MSVC compilers (unsupported).
     DEPENDS "NOT MSVC"
 )
+
+define_build_mode(None)
 
 if(NOT CMAKE_BUILD_TYPE)
     string(REPLACE ";" " " build_modes_doc "${BUILD_MODES}")

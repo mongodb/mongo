@@ -206,10 +206,6 @@ function(get_cl_base_flags flags)
 
     # Warning level 3.
     list(APPEND cl_flags "/WX")
-    # Ignore warning about mismatched const qualifiers.
-    list(APPEND cl_flags "/wd4090")
-    # Ignore deprecated functions.
-    list(APPEND cl_flags "/wd4996")
     # Complain about unreferenced format parameter.
     list(APPEND cl_flags "/we4100")
     # Enable security check.

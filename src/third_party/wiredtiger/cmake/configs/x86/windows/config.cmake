@@ -22,6 +22,10 @@ add_compile_options(/Gy)
 add_compile_options(/Zc:wchar_t)
 # Use the __cdecl calling convention for all functions.
 add_compile_options(/Gd)
+# Ignore deprecated functions.
+add_compile_options(/wd4996)
+# Ignore warning about mismatched const qualifiers.
+add_compile_options(/wd4090)
 
 # Disable incremental linking.
 string(APPEND win_link_flags " /INCREMENTAL:NO")
