@@ -782,6 +782,16 @@ tasks:
         vars:
           test_control: "bestbuy_query"
 
+  - name: tpch_1_normalized
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 1,
+             schema: normalized}
+
   - name: non_sharded_workloads
     priority: 5
     commands:
@@ -1044,6 +1054,7 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
+      - name: tpch_1_normalized
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
@@ -1105,6 +1116,7 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_manual_bucketing
       - name: tpcc
+      - name: tpch_1_normalized
       - name: industry_benchmarks_wmajority
       - name: sb_large_scale
       - name: sb_timeseries
@@ -1458,6 +1470,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpch_1_normalized
       - name: linkbench
       - name: linkbench2
       - name: tsbs_load
@@ -1509,6 +1522,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpch_1_normalized
       - name: linkbench
       - name: linkbench2
       # Time-series collections are available since v5.0.
@@ -1560,6 +1574,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpch_1_normalized
       - name: linkbench
       - name: linkbench2
       # Time-series collections are available since v5.0.
@@ -1613,6 +1628,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpch_1_normalized
       - name: linkbench
       - name: linkbench2
       # Time-series collections are available since v5.0.
