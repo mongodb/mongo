@@ -80,8 +80,7 @@ protected:
         if (!OperationShardingState::isOperationVersioned(opCtx)) {
             const auto version = cm.getVersion(ShardId("0"));
             BSONObjBuilder builder;
-            version.appendToCommand(&builder);
-
+            version.appendWithField(&builder, ChunkVersion::kShardVersionField);
             auto& oss = OperationShardingState::get(opCtx);
             oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
         }

@@ -44,12 +44,13 @@ template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
     auto batchRequest = BatchedCommandRequest{T::parse(request)};
 
-    auto chunkVersion = ChunkVersion::parseFromCommand(request.body);
-    if (chunkVersion != ErrorCodes::NoSuchKey) {
-        if (chunkVersion == ChunkVersion::UNSHARDED()) {
+    auto shardVersionField = request.body[ChunkVersion::kShardVersionField];
+    if (!shardVersionField.eoo()) {
+        auto shardVersion = ChunkVersion::fromBSONArrayThrowing(shardVersionField);
+        if (shardVersion == ChunkVersion::UNSHARDED()) {
             batchRequest.setDbVersion(DatabaseVersion(request.body));
         }
-        batchRequest.setShardVersion(uassertStatusOK(std::move(chunkVersion)));
+        batchRequest.setShardVersion(shardVersion);
     }
 
     auto writeConcernField = request.body[kWriteConcern];
@@ -187,7 +188,7 @@ void BatchedCommandRequest::setWriteCommandRequestBase(
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     _visit([&](auto&& op) { op.serialize({}, builder); });
     if (_shardVersion) {
-        _shardVersion->appendToCommand(builder);
+        _shardVersion->appendWithField(builder, ChunkVersion::kShardVersionField);
     }
 
     if (_dbVersion) {

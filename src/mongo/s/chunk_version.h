@@ -61,10 +61,6 @@ public:
 
     ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
 
-    static StatusWith<ChunkVersion> parseFromCommand(const BSONObj& obj) {
-        return parseWithField(obj, kShardVersionField);
-    }
-
     /**
      * Parses the BSON formatted by appendWithField. If the field is missing, returns 'NoSuchKey',
      * otherwise if the field is not properly formatted can return any relevant parsing error
@@ -218,10 +214,6 @@ public:
      */
     bool isOlderOrEqualThan(const ChunkVersion& otherVersion) const {
         return isOlderThan(otherVersion) || (*this == otherVersion);
-    }
-
-    void appendToCommand(BSONObjBuilder* out) const {
-        appendWithField(out, kShardVersionField);
     }
 
     /**

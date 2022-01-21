@@ -158,7 +158,7 @@ public:
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
                              firstChunk.getShardId().toString());
         remoteCmdObjB.append("epoch", shardVersion.epoch());
-        shardVersion.appendToCommand(&remoteCmdObjB);
+        shardVersion.appendWithField(&remoteCmdObjB, ChunkVersion::kShardVersionField);
 
         BSONObj remoteResult;
 

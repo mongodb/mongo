@@ -239,7 +239,7 @@ public:
             .append(kShardName, getTarget().toString())
             .append(kEpoch, _version.epoch());
 
-        _version.appendToCommand(&commandBuilder);
+        _version.appendWithField(&commandBuilder, ChunkVersion::kShardVersionField);
 
         return commandBuilder.obj();
     }
@@ -314,7 +314,7 @@ public:
             .append(kMaxValue, _upperBoundKey)
             .append(kEstimatedValue, _estimatedValue);
 
-        _version.appendToCommand(&commandBuilder);
+        _version.appendWithField(&commandBuilder, ChunkVersion::kShardVersionField);
 
         return commandBuilder.obj();
     }

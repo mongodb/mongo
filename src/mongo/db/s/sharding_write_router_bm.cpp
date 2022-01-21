@@ -156,7 +156,8 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
     ShardingState::get(opCtx->getServiceContext())->setInitialized(originatorShard, clusterId);
 
     BSONObjBuilder builder;
-    chunkManager.getVersion(originatorShard).appendToCommand(&builder);
+    chunkManager.getVersion(originatorShard)
+        .appendWithField(&builder, ChunkVersion::kShardVersionField);
     // necessary to set the _shardVersions and _databaseVersions to true. Which is needed to get
     // `getCollectionDescription` to work
     OperationShardingState::get(opCtx).initializeClientRoutingVersionsFromCommand(kNss,

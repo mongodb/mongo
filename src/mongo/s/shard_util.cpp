@@ -232,7 +232,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     cmd.append("epoch", epoch);
-    shardVersion.appendToCommand(&cmd);
+    shardVersion.appendWithField(&cmd, ChunkVersion::kShardVersionField);
 
     chunkRange.append(&cmd);
     cmd.append("splitKeys", splitPoints);

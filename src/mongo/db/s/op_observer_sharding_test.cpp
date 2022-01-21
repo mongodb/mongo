@@ -48,9 +48,9 @@ void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata 
     CollectionShardingRuntime::get(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 
-    auto& oss = OperationShardingState::get(opCtx);
     BSONObjBuilder builder;
-    version.appendToCommand(&builder);
+    version.appendWithField(&builder, ChunkVersion::kShardVersionField);
+    auto& oss = OperationShardingState::get(opCtx);
     oss.initializeClientRoutingVersionsFromCommand(kTestNss, builder.obj());
 }
 
