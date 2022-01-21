@@ -83,6 +83,11 @@ public:
             return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
         }
 
+        std::pair<value::TypeTags, value::Value> copyOrMoveValue() const {
+            // Always make a copy.
+            return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+        }
+
         void reset(bool owned, value::TypeTags tag, value::Value val) {
             release();
 
@@ -167,6 +172,14 @@ public:
     std::unique_ptr<RuntimeEnvironment> makeCopy() const;
 
     /**
+     * Make a "deep" copy of this environment. The new environment will have its own set of
+     * SlotAccessors pointing to data copied from this RuntimeEnvironment. All the slot values are
+     * made owned by the new environment as much as possible. There could be some uncopyable types
+     * which can not be owned by the new environment, e.g. TimeZoneDatabase.
+     */
+    std::unique_ptr<RuntimeEnvironment> makeDeepCopy() const;
+
+    /**
      * Dumps all the slots currently defined in this environment into the given string builder.
      */
     void debugString(StringBuilder* builder);
@@ -191,6 +204,19 @@ private:
             uassert(5645901, str::stream() << "undefined slot: " << slot, slots.count(slot));
             auto [_, inserted] = namedSlots.emplace(name, slot);
             uassert(5645902, str::stream() << "duplicate named slot: " << name, inserted);
+        }
+
+        std::unique_ptr<State> makeCopyWithoutValues() {
+            auto state = std::make_unique<State>();
+            state->namedSlots = namedSlots;
+            state->slots = slots;
+
+            // Populate slot values with default value.
+            state->typeTags.resize(typeTags.size(), value::TypeTags::Nothing);
+            state->vals.resize(vals.size(), 0);
+            state->owned.resize(owned.size(), false);
+
+            return state;
         }
 
         StringMap<value::SlotId> namedSlots;

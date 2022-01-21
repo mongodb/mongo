@@ -228,13 +228,13 @@ struct PlanStageData {
     explicit PlanStageData(std::unique_ptr<sbe::RuntimeEnvironment> env)
         : env(env.get()), ctx(std::move(env)) {}
 
-    PlanStageData(const PlanStageData& other) : PlanStageData(other.env->makeCopy()) {
+    PlanStageData(const PlanStageData& other) : PlanStageData(other.env->makeDeepCopy()) {
         copyFrom(other);
     }
 
     PlanStageData& operator=(const PlanStageData& other) {
         if (this != &other) {
-            auto envCopy = other.env->makeCopy();
+            auto envCopy = other.env->makeDeepCopy();
             env = envCopy.get();
             ctx = sbe::CompileCtx(std::move(envCopy));
             copyFrom(other);

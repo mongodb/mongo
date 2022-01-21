@@ -998,6 +998,22 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopy() const {
     return std::unique_ptr<RuntimeEnvironment>(new RuntimeEnvironment(*this));
 }
 
+std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeDeepCopy() const {
+    auto env = std::make_unique<RuntimeEnvironment>();
+
+    env->_state = _state->makeCopyWithoutValues();
+    for (auto&& [slotId, index] : _state->slots) {
+        // Copy the slot value.
+        auto [tag, val] = _accessors.at(slotId).copyOrMoveValue();
+
+        env->emplaceAccessor(slotId, index);
+        env->resetSlot(slotId, tag, val, true /* owned */);
+    }
+    env->_isSmp = _isSmp;
+
+    return env;
+}
+
 std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopyForParallelUse() {
     // Once this environment is used to create a copy for a parallel plan execution, it becomes
     // a parallel environment itself.
