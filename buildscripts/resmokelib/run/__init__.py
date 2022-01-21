@@ -230,22 +230,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                 "please consider adding documentation for it in %s", task_name,
                 os.path.join(config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml"))
 
-        if config.FUZZ_MONGOD_CONFIGS:
-            local_args = to_local_args()
-            local_args = strip_fuzz_config_params(local_args)
-            self._resmoke_logger.info(
-                "resmoke.py invocation for local usage: %s %s %s",
-                os.path.join("buildscripts", "resmoke.py"), " ".join(local_args),
-                "--fuzzMongodConfigs --configFuzzSeed=" + str(config.CONFIG_FUZZ_SEED))
-            self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s",
-                                      config.MONGOD_SET_PARAMETERS)
-            self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: %s",
-                                      config.WT_ENGINE_CONFIG)
-        elif config.EVERGREEN_TASK_ID:
-            local_args = to_local_args()
-            self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
-                                      os.path.join("buildscripts", "resmoke.py"),
-                                      " ".join(local_args))
+        self._log_local_resmoke_invocation()
 
         suites = None
         try:
@@ -279,6 +264,30 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         suite.record_suite_end()
         self._log_suite_summary(suite)
         return interrupted
+
+    def _log_local_resmoke_invocation(self):
+        """Log local resmoke invocation example."""
+        local_args = to_local_args()
+        local_resmoke_invocation = (
+            f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}")
+
+        if config.FUZZ_MONGOD_CONFIGS:
+            local_args = strip_fuzz_config_params(local_args)
+            local_resmoke_invocation = (
+                f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}"
+                f" --fuzzMongodConfigs --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}")
+
+            self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s",
+                                      config.MONGOD_SET_PARAMETERS)
+            self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: %s",
+                                      config.WT_ENGINE_CONFIG)
+
+        self._resmoke_logger.info("resmoke.py invocation for local usage: %s",
+                                  local_resmoke_invocation)
+
+        if config.EVERGREEN_TASK_ID:
+            with open("local-resmoke-invocation.txt", "w") as fh:
+                fh.write(local_resmoke_invocation)
 
     def _log_resmoke_summary(self, suites):
         """Log a summary of the resmoke run."""
