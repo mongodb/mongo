@@ -71,8 +71,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         serviceContext = mongo::getGlobalServiceContext();
         serviceContext->setServiceEntryPoint(
             std::make_unique<mongo::ServiceEntryPointMongod>(serviceContext));
-        client = serviceContext->makeClient("test", session);
-        // opCtx = serviceContext->makeOperationContext(client.get());
 
         localExternalState = std::make_unique<mongo::AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
@@ -88,6 +86,8 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
         ASSERT_OK(replCoord->setFollowerMode(mongo::repl::MemberState::RS_PRIMARY));
         mongo::repl::ReplicationCoordinator::set(mongo::getGlobalServiceContext(),
                                                  std::move(replCoord));
+
+        client = serviceContext->makeClient("test", session);
 
         return ret;
     }();
