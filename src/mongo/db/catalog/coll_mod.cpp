@@ -708,7 +708,8 @@ Status _collModInternal(OperationContext* opCtx,
         const CollectionOptions& oldCollOptions = coll->getCollectionOptions();
 
         // TODO SERVER-58584: remove the feature flag.
-        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             // If 'changeStreamPreAndPostImagesOptions' are enabled, 'recordPreImages' must be set
             // to false. If 'recordPreImages' is set to true, 'changeStreamPreAndPostImagesOptions'
             // must be disabled.
@@ -720,6 +721,13 @@ Status _collModInternal(OperationContext* opCtx,
             if (cmrNew.recordPreImages) {
                 cmrNew.changeStreamPreAndPostImagesOptions =
                     ChangeStreamPreAndPostImagesOptions(false);
+            }
+        } else {
+            // If the FCV has changed while executing the command to the version, where the feature
+            // flag is disabled, specifying changeStreamPreAndPostImagesOptions is not allowed.
+            if (cmrNew.changeStreamPreAndPostImagesOptions) {
+                return Status(ErrorCodes::InvalidOptions,
+                              "The 'changeStreamPreAndPostImages' is an unknown field.");
             }
         }
 
@@ -757,9 +765,7 @@ Status _collModInternal(OperationContext* opCtx,
             coll.getWritableCollection()->setRecordPreImages(opCtx, cmrNew.recordPreImages);
         }
 
-        // TODO SERVER-58584: remove the feature flag.
-        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV() &&
-            cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
+        if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&
             *cmrNew.changeStreamPreAndPostImagesOptions !=
                 oldCollOptions.changeStreamPreAndPostImagesOptions) {
             coll.getWritableCollection()->setChangeStreamPreAndPostImages(

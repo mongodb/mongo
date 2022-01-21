@@ -459,6 +459,16 @@ Status _createCollection(OperationContext* opCtx,
                           str::stream() << "A view already exists. NS: " << nss);
         }
 
+        // If the FCV has changed while executing the command to the version, where the feature flag
+        // is disabled, enabling changeStreamPreAndPostImagesOptions is not allowed.
+        // TODO SERVER-58584: remove the feature flag.
+        if (!feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The 'changeStreamPreAndPostImages' is an unknown field.");
+        }
+
         if (!collectionOptions.clusteredIndex && (!idIndex || idIndex->isEmpty()) &&
             // Capped, clustered collections different in behavior significantly from normal capped
             // collections. Notably, they allow out-of-order insertion.
