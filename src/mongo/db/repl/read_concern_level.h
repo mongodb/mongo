@@ -31,6 +31,8 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 namespace repl {
 
