@@ -36,6 +36,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
@@ -79,6 +80,7 @@
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/transaction_participant.h"
@@ -243,6 +245,13 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
+            if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault"); fp &&
+                fp->shouldFail() &&
+                feature_flags::gClusteredIndexes.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                defaultCollectionOptions.clusteredIndex =
+                    clustered_util::makeDefaultClusteredIdIndex();
+            }
             auto db = autoDb.ensureDbExists(opCtx);
             uassertStatusOK(db->userCreateNS(opCtx, ns, defaultCollectionOptions));
             wuow.commit();

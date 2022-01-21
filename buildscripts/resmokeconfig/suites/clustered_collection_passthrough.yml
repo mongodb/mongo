@@ -34,6 +34,9 @@ selector:
   - jstests/core/explain_shell_helpers.js
   - jstests/core/projection_dotted_paths.js
   - jstests/core/wildcard_index_projection.js
+  - jstests/core/find_and_modify_pipeline_update.js
+  - jstests/core/update_pipeline_shell_helpers.js
+  - jstests/core/idhack.js
   # Uses the unsupported 'autoIndexId' option.
   - jstests/core/queryoptimizera.js
   - jstests/core/index9.js
@@ -45,9 +48,31 @@ selector:
   - jstests/core/clustered_collection_create_index_clustered.js
   # Will do clustering on the explicitly non-clustered collections
   - jstests/core/clustered_collection_creation.js
-
+  # Tries to drop the clustered index.
+  - jstests/core/drop_index.js
+  - jstests/core/drop_indexes.js
+  # Expects to see IXSCAN over _id (cluster key).
+  - jstests/core/find_and_modify_hint.js
+  - jstests/core/covered_index_sort_2.js
+  # TODO (SERVER-60824): Resolve sort exceeded memory limit.
+  - jstests/core/sortg.js
+  # Expects duplicate key error to have _id index use specified.
+  - jstests/core/uniqueness.js
+  # Expects to see the usage of _id_ index by using $indexStats.
+  - jstests/core/index_stats.js
+  # TODO (SERVER-62826): Investigate the following failures
+  - jstests/core/profile_update.js
+  - jstests/core/profile_findandmodify.js
+  - jstests/core/profile_delete.js
+  - jstests/core/orf.js
+  - jstests/core/index_filter_commands.js
+  - jstests/core/index_bounds_pipe.js
+  - jstests/core/index_many2.js
+  - jstests/core/profile_insert.js
+  - jstests/core/covered_index_simple_id.js
   # TODO (SERVER-61259): $text not supported: "No query solutions"
   - jstests/core/fts6.js
+  - jstests/core/fts_projection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

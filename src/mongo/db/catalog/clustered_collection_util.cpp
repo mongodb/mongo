@@ -130,17 +130,6 @@ bool matchesClusterKey(const BSONObj& keyPatternObj,
         return false;
     }
 
-    if (kDebugBuild) {
-        if (keyPatternObj.hasField("key")) {
-            // Double check the caller didn't accidentally provide the full index spec instead of
-            // key pattern.
-            tassert(6243701,
-                    "matchesClusterKey should be provided the raw key pattern object, not the full "
-                    "index spec",
-                    collInfo->getIndexSpec().getKey().hasField("key"));
-        }
-    }
-
     const auto nFields = keyPatternObj.nFields();
     invariant(nFields > 0);
     if (nFields > 1) {
