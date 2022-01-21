@@ -43,7 +43,7 @@ public:
     virtual int measurementCount(const BSONElement& timeField) const = 0;
     virtual bool getNext(MutableDocument& measurement,
                          const BucketSpec& spec,
-                         const BSONElement& metaValue,
+                         const Value& metaValue,
                          bool includeTimeField,
                          bool includeMetaField) = 0;
     virtual void extractSingleMeasurement(MutableDocument& measurement,
@@ -51,7 +51,7 @@ public:
                                           const BucketSpec& spec,
                                           BucketUnpacker::Behavior behavior,
                                           const BSONObj& bucket,
-                                          const BSONElement& metaValue,
+                                          const Value& metaValue,
                                           bool includeTimeField,
                                           bool includeMetaField) = 0;
 
@@ -94,7 +94,7 @@ public:
     int measurementCount(const BSONElement& timeField) const override;
     bool getNext(MutableDocument& measurement,
                  const BucketSpec& spec,
-                 const BSONElement& metaValue,
+                 const Value& metaValue,
                  bool includeTimeField,
                  bool includeMetaField) override;
     void extractSingleMeasurement(MutableDocument& measurement,
@@ -102,7 +102,7 @@ public:
                                   const BucketSpec& spec,
                                   BucketUnpacker::Behavior behavior,
                                   const BSONObj& bucket,
-                                  const BSONElement& metaValue,
+                                  const Value& metaValue,
                                   bool includeTimeField,
                                   bool includeMetaField) override;
     std::size_t numberOfFields() override;
@@ -158,7 +158,7 @@ int BucketUnpackerV1::measurementCount(const BSONElement& timeField) const {
 
 bool BucketUnpackerV1::getNext(MutableDocument& measurement,
                                const BucketSpec& spec,
-                               const BSONElement& metaValue,
+                               const Value& metaValue,
                                bool includeTimeField,
                                bool includeMetaField) {
     auto&& timeElem = _timeFieldIter.next();
@@ -167,8 +167,8 @@ bool BucketUnpackerV1::getNext(MutableDocument& measurement,
     }
 
     // Includes metaField when we're instructed to do so and metaField value exists.
-    if (includeMetaField && metaValue) {
-        measurement.addField(*spec.metaField, Value{metaValue});
+    if (includeMetaField && !metaValue.missing()) {
+        measurement.addField(*spec.metaField, metaValue);
     }
 
     auto& currentIdx = timeElem.fieldNameStringData();
@@ -187,15 +187,15 @@ void BucketUnpackerV1::extractSingleMeasurement(MutableDocument& measurement,
                                                 const BucketSpec& spec,
                                                 BucketUnpacker::Behavior behavior,
                                                 const BSONObj& bucket,
-                                                const BSONElement& metaValue,
+                                                const Value& metaValue,
                                                 bool includeTimeField,
                                                 bool includeMetaField) {
     auto rowKey = std::to_string(j);
     auto targetIdx = StringData{rowKey};
     auto&& dataRegion = bucket.getField(timeseries::kBucketDataFieldName).Obj();
 
-    if (includeMetaField && !metaValue.isNull()) {
-        measurement.addField(*spec.metaField, Value{metaValue});
+    if (includeMetaField && !metaValue.missing()) {
+        measurement.addField(*spec.metaField, metaValue);
     }
 
     for (auto&& dataElem : dataRegion) {
@@ -225,7 +225,7 @@ public:
     int measurementCount(const BSONElement& timeField) const override;
     bool getNext(MutableDocument& measurement,
                  const BucketSpec& spec,
-                 const BSONElement& metaValue,
+                 const Value& metaValue,
                  bool includeTimeField,
                  bool includeMetaField) override;
     void extractSingleMeasurement(MutableDocument& measurement,
@@ -233,7 +233,7 @@ public:
                                   const BucketSpec& spec,
                                   BucketUnpacker::Behavior behavior,
                                   const BSONObj& bucket,
-                                  const BSONElement& metaValue,
+                                  const Value& metaValue,
                                   bool includeTimeField,
                                   bool includeMetaField) override;
     std::size_t numberOfFields() override;
@@ -277,7 +277,7 @@ int BucketUnpackerV2::measurementCount(const BSONElement& timeField) const {
 
 bool BucketUnpackerV2::getNext(MutableDocument& measurement,
                                const BucketSpec& spec,
-                               const BSONElement& metaValue,
+                               const Value& metaValue,
                                bool includeTimeField,
                                bool includeMetaField) {
     // Get element and increment iterator
@@ -288,8 +288,8 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
     ++_timeColumn.it;
 
     // Includes metaField when we're instructed to do so and metaField value exists.
-    if (includeMetaField && metaValue) {
-        measurement.addField(*spec.metaField, Value{metaValue});
+    if (includeMetaField && !metaValue.missing()) {
+        measurement.addField(*spec.metaField, metaValue);
     }
 
     for (auto& fieldColumn : _fieldColumns) {
@@ -312,7 +312,7 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
                                                 const BucketSpec& spec,
                                                 BucketUnpacker::Behavior behavior,
                                                 const BSONObj& bucket,
-                                                const BSONElement& metaValue,
+                                                const Value& metaValue,
                                                 bool includeTimeField,
                                                 bool includeMetaField) {
     if (includeTimeField) {
@@ -322,8 +322,8 @@ void BucketUnpackerV2::extractSingleMeasurement(MutableDocument& measurement,
         measurement.addField(_timeColumn.column.name(), Value{*val});
     }
 
-    if (includeMetaField && !metaValue.isNull()) {
-        measurement.addField(*spec.metaField, Value{metaValue});
+    if (includeMetaField && !metaValue.missing()) {
+        measurement.addField(*spec.metaField, metaValue);
     }
 
     if (includeTimeField) {
@@ -442,7 +442,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
             "The $_internalUnpackBucket stage requires the data region to have a timeField object",
             timeFieldElem);
 
-    _metaValue = _bucket[timeseries::kBucketMetaFieldName];
+    _metaValue = Value{_bucket[timeseries::kBucketMetaFieldName]};
     if (_spec.metaField) {
         // The spec indicates that there might be a metadata region. Missing metadata in
         // measurements is expressed with missing metadata in a bucket. But we disallow undefined
@@ -450,14 +450,14 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
         uassert(5369600,
                 "The $_internalUnpackBucket stage allows metadata to be absent or otherwise, it "
                 "must not be the deprecated undefined bson type",
-                !_metaValue || _metaValue.type() != BSONType::Undefined);
+                _metaValue.missing() || _metaValue.getType() != BSONType::Undefined);
     } else {
         // If the spec indicates that the time series collection has no metadata field, then we
         // should not find a metadata region in the underlying bucket documents.
         uassert(5369601,
                 "The $_internalUnpackBucket stage expects buckets to have missing metadata regions "
                 "if the metaField parameter is not provided",
-                !_metaValue);
+                _metaValue.missing());
     }
 
 
