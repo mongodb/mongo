@@ -49,9 +49,16 @@ namespace mongo {
 namespace crypto {
 
 namespace {
+// Convenience wrapper to get a mutable uint8_t*
+// since DataRange returns a const pointer,
+// and all those casts get ugly.
+std::uint8_t* asUint8(DataRange dr) {
+    return const_cast<std::uint8_t*>(dr.data<std::uint8_t>());
+}
+
 template <typename Init>
 void initCipherContext(
-    EVP_CIPHER_CTX* ctx, const SymmetricKey& key, aesMode mode, const uint8_t* iv, Init init) {
+    EVP_CIPHER_CTX* ctx, const SymmetricKey& key, aesMode mode, ConstDataRange iv, Init init) {
     const auto keySize = key.getKeySize();
     const EVP_CIPHER* cipher = nullptr;
     if (keySize == sym256KeySize) {
@@ -66,7 +73,7 @@ void initCipherContext(
                           << " Mode: " << getStringFromCipherMode(mode),
             cipher);
 
-    const bool initOk = (1 == init(ctx, cipher, nullptr, key.getKey(), iv));
+    const bool initOk = (1 == init(ctx, cipher, nullptr, key.getKey(), iv.data<std::uint8_t>()));
     uassert(ErrorCodes::UnknownError,
             str::stream() << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()),
             initOk);
@@ -74,14 +81,16 @@ void initCipherContext(
 
 class SymmetricEncryptorOpenSSL : public SymmetricEncryptor {
 public:
-    SymmetricEncryptorOpenSSL(const SymmetricKey& key, aesMode mode, const uint8_t* iv)
+    SymmetricEncryptorOpenSSL(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
         : _ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free), _mode(mode) {
         initCipherContext(_ctx.get(), key, mode, iv, EVP_EncryptInit_ex);
     }
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
+    StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
         int len = 0;
-        if (1 != EVP_EncryptUpdate(_ctx.get(), out, &len, in, inLen)) {
+        if (1 !=
+            EVP_EncryptUpdate(
+                _ctx.get(), asUint8(out), &len, in.data<std::uint8_t>(), in.length())) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -89,26 +98,27 @@ public:
         return static_cast<size_t>(len);
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+    Status addAuthenticatedData(ConstDataRange in) final {
         fassert(51126, _mode == crypto::aesMode::gcm);
 
-        auto swUpdate = update(in, inLen, nullptr, 0);
+        auto swUpdate = update(in, {nullptr, 0});
         if (!swUpdate.isOK()) {
             return swUpdate.getStatus();
         }
 
         const auto len = swUpdate.getValue();
-        if (len != inLen) {
+        if (len != in.length()) {
             return {ErrorCodes::InternalError,
-                    str::stream() << "Unexpected write length while appending AAD: " << len};
+                    str::stream() << "Unexpected write length while appending AAD: "
+                                  << static_cast<int>(len)};
         }
 
         return Status::OK();
     }
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<std::size_t> finalize(DataRange out) final {
         int len = 0;
-        if (1 != EVP_EncryptFinal_ex(_ctx.get(), out, &len)) {
+        if (1 != EVP_EncryptFinal_ex(_ctx.get(), asUint8(out), &len)) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -116,10 +126,11 @@ public:
         return static_cast<size_t>(len);
     }
 
-    StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) final {
+    StatusWith<std::size_t> finalizeTag(DataRange out) final {
         if (_mode == aesMode::gcm) {
 #ifdef EVP_CTRL_GCM_GET_TAG
-            if (1 != EVP_CIPHER_CTX_ctrl(_ctx.get(), EVP_CTRL_GCM_GET_TAG, outLen, out)) {
+            if (1 !=
+                EVP_CIPHER_CTX_ctrl(_ctx.get(), EVP_CTRL_GCM_GET_TAG, out.length(), asUint8(out))) {
                 return Status(ErrorCodes::UnknownError,
                               str::stream()
                                   << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -141,55 +152,60 @@ private:
 
 class SymmetricDecryptorOpenSSL : public SymmetricDecryptor {
 public:
-    SymmetricDecryptorOpenSSL(const SymmetricKey& key, aesMode mode, const uint8_t* iv)
+    SymmetricDecryptorOpenSSL(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
         : _ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free), _mode(mode) {
         initCipherContext(_ctx.get(), key, mode, iv, EVP_DecryptInit_ex);
     }
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
+    StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
         int len = 0;
-        if (1 != EVP_DecryptUpdate(_ctx.get(), out, &len, in, inLen)) {
+        if (1 !=
+            EVP_DecryptUpdate(
+                _ctx.get(), asUint8(out), &len, in.data<std::uint8_t>(), in.length())) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
         }
-        return static_cast<size_t>(len);
+        return static_cast<std::size_t>(len);
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+    Status addAuthenticatedData(ConstDataRange authData) final {
         fassert(51125, _mode == crypto::aesMode::gcm);
 
-        auto swUpdate = update(in, inLen, nullptr, 0);
+        auto swUpdate = update(authData, {nullptr, 0});
         if (!swUpdate.isOK()) {
             return swUpdate.getStatus();
         }
 
         const auto len = swUpdate.getValue();
-        if (len != inLen) {
+        if (len != authData.length()) {
             return {ErrorCodes::InternalError,
-                    str::stream() << "Unexpected write length while appending AAD: " << len};
+                    str::stream() << "Unexpected write length while appending AAD: "
+                                  << static_cast<int>(len)};
         }
 
         return Status::OK();
     }
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<std::size_t> finalize(DataRange out) final {
         int len = 0;
-        if (1 != EVP_DecryptFinal_ex(_ctx.get(), out, &len)) {
+        if (1 != EVP_DecryptFinal_ex(_ctx.get(), asUint8(out), &len)) {
             return Status(ErrorCodes::UnknownError,
                           str::stream()
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
         }
-        return static_cast<size_t>(len);
+        return static_cast<std::size_t>(len);
     }
 
-    Status updateTag(const uint8_t* tag, size_t tagLen) final {
+    Status updateTag(ConstDataRange tag) final {
         // validateEncryptionOption asserts that platforms without GCM will never start in GCM mode
         if (_mode == aesMode::gcm) {
 #ifdef EVP_CTRL_GCM_GET_TAG
             if (1 !=
-                EVP_CIPHER_CTX_ctrl(
-                    _ctx.get(), EVP_CTRL_GCM_SET_TAG, tagLen, const_cast<uint8_t*>(tag))) {
+                EVP_CIPHER_CTX_ctrl(_ctx.get(),
+                                    EVP_CTRL_GCM_SET_TAG,
+                                    tag.length(),
+                                    const_cast<std::uint8_t*>(tag.data<std::uint8_t>()))) {
                 return Status(ErrorCodes::UnknownError,
                               str::stream()
                                   << "Unable to set GCM tag: "
@@ -198,7 +214,7 @@ public:
 #else
             return {ErrorCodes::UnsupportedFormat, "GCM support is not available"};
 #endif
-        } else if (tagLen != 0) {
+        } else if (tag.length() != 0) {
             return {ErrorCodes::BadValue, "Unexpected tag for non-gcm cipher"};
         }
 
@@ -220,8 +236,8 @@ std::set<std::string> getSupportedSymmetricAlgorithms() {
 #endif
 }
 
-Status engineRandBytes(uint8_t* buffer, size_t len) {
-    if (RAND_bytes(reinterpret_cast<unsigned char*>(buffer), len) == 1) {
+Status engineRandBytes(DataRange buffer) {
+    if (RAND_bytes(asUint8(buffer), buffer.length()) == 1) {
         return Status::OK();
     }
     return {ErrorCodes::UnknownError,
@@ -231,8 +247,7 @@ Status engineRandBytes(uint8_t* buffer, size_t len) {
 
 StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) try {
+                                                                           ConstDataRange iv) try {
     std::unique_ptr<SymmetricEncryptor> encryptor =
         std::make_unique<SymmetricEncryptorOpenSSL>(key, mode, iv);
     return std::move(encryptor);
@@ -242,8 +257,7 @@ StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const
 
 StatusWith<std::unique_ptr<SymmetricDecryptor>> SymmetricDecryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) try {
+                                                                           ConstDataRange iv) try {
     std::unique_ptr<SymmetricDecryptor> decryptor =
         std::make_unique<SymmetricDecryptorOpenSSL>(key, mode, iv);
     return std::move(decryptor);

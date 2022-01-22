@@ -297,7 +297,7 @@ void EncryptedDBClientBase::generateDataKey(JSContext* cx, JS::CallArgs args) {
         kmsProvider, _encryptionOptions.getKmsProviders().toBSON());
 
     SecureVector<uint8_t> dataKey(crypto::kFieldLevelEncryptionKeySize);
-    auto res = crypto::engineRandBytes(dataKey->data(), dataKey->size());
+    auto res = crypto::engineRandBytes({dataKey->data(), dataKey->size()});
     uassert(31042, "Error generating data key: " + res.codeString(), res.isOK());
 
 

@@ -329,8 +329,7 @@ TEST(SymmetricEncryptor, PaddingLogic) {
     // We will loop through all of the test cases, ensuring no fatal errors,
     // and ensuring correct encryption and decryption.
     for (auto& testCase : testData) {
-        auto swEnc =
-            crypto::SymmetricEncryptor::create(key, crypto::aesMode::cbc, iv.data(), iv.size());
+        auto swEnc = crypto::SymmetricEncryptor::create(key, crypto::aesMode::cbc, iv);
         ASSERT_OK(swEnc.getStatus());
         auto encryptor = std::move(swEnc.getValue());
         DataRangeCursor cryptoCursor(cryptoRange);
@@ -339,15 +338,11 @@ TEST(SymmetricEncryptor, PaddingLogic) {
         for (auto& updateBytes : testCase) {
             std::vector<uint8_t> plainText(updateBytes, updateBytes);
             std::copy(plainText.begin(), plainText.end(), std::back_inserter(accumulatedPlaintext));
-            auto swSize = encryptor->update(plainText.data(),
-                                            plainText.size(),
-                                            const_cast<uint8_t*>(cryptoCursor.data<uint8_t>()),
-                                            cryptoCursor.length());
+            auto swSize = encryptor->update(plainText, cryptoCursor);
             ASSERT_OK(swSize);
             cryptoCursor.advance(swSize.getValue());
         }
-        auto swSize = encryptor->finalize(const_cast<uint8_t*>(cryptoCursor.data<uint8_t>()),
-                                          cryptoCursor.length());
+        auto swSize = encryptor->finalize(cryptoCursor);
         ASSERT_OK(swSize);
 
         // finalize is guaranteed to output at least 16 bytes for the CBC blockmode
@@ -360,21 +355,16 @@ TEST(SymmetricEncryptor, PaddingLogic) {
         ASSERT_EQ(totalBlocks * 16, cryptoRange.length() - cryptoCursor.length());
 
         // Validate that the ciphertext can be decrypted
-        auto swDec =
-            crypto::SymmetricDecryptor::create(key, crypto::aesMode::cbc, iv.data(), iv.size());
+        auto swDec = crypto::SymmetricDecryptor::create(key, crypto::aesMode::cbc, iv);
         ASSERT_OK(swDec.getStatus());
         auto decryptor = std::move(swDec.getValue());
         std::array<uint8_t, 1024> decryptionBuffer;
         DataRangeCursor decryptionCursor(decryptionBuffer);
-        auto swUpdateSize =
-            decryptor->update(cryptoRange.data<uint8_t>(),
-                              cryptoRange.length() - cryptoCursor.length(),
-                              const_cast<uint8_t*>(decryptionCursor.data<uint8_t>()),
-                              decryptionCursor.length());
+        auto swUpdateSize = decryptor->update(
+            {cryptoRange.data(), cryptoRange.length() - cryptoCursor.length()}, decryptionCursor);
         ASSERT_OK(swUpdateSize.getStatus());
         decryptionCursor.advance(swUpdateSize.getValue());
-        auto swFinalizeSize = decryptor->finalize(
-            const_cast<uint8_t*>(decryptionCursor.data<uint8_t>()), decryptionCursor.length());
+        auto swFinalizeSize = decryptor->finalize(decryptionCursor);
         ASSERT_OK(swUpdateSize.getStatus());
         decryptionCursor.advance(swUpdateSize.getValue());
         ASSERT_EQ(totalSize, swUpdateSize.getValue() + swFinalizeSize.getValue());
@@ -420,21 +410,22 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     std::array<std::uint8_t, 12> iv;
     std::copy(kIV.begin(), kIV.end(), iv.begin());
 
-    auto encryptor =
-        uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, iv.data(), iv.size()));
+    auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, iv));
 
     constexpr auto kAAD = "Hello World"_sd;
-    ASSERT_OK(encryptor->addAuthenticatedData(asUint8(kAAD.rawData()), kAAD.size()));
+    ASSERT_OK(encryptor->addAuthenticatedData({kAAD.rawData(), kAAD.size()}));
 
     constexpr auto kPlaintextMessage = "01234567012345670123456701234567"_sd;
     constexpr auto kBufferSize = kPlaintextMessage.size() + (2 * crypto::aesBlockSize);
     std::array<std::uint8_t, kBufferSize> cipherText;
-    auto cipherLen = uassertStatusOK(encryptor->update(asUint8(kPlaintextMessage.rawData()),
-                                                       kPlaintextMessage.size(),
-                                                       cipherText.data(),
-                                                       cipherText.size()));
-    cipherLen += uassertStatusOK(
-        encryptor->finalize(cipherText.data() + cipherLen, cipherText.size() - cipherLen));
+    std::size_t cipherLen = 0;
+    {
+        DataRangeCursor cipherTextCursor(cipherText);
+        cipherLen = uassertStatusOK(encryptor->update(
+            {kPlaintextMessage.rawData(), kPlaintextMessage.size()}, cipherTextCursor));
+        cipherTextCursor.advance(cipherLen);
+        cipherLen += uassertStatusOK(encryptor->finalize(cipherTextCursor));
+    }
 
     constexpr auto kExpectedCipherText =
         "\xF1\x87\x38\x92\xA3\x0E\x77\x27\x92\xB1\x3B\xA6\x27\xB5\xF5\x2B"
@@ -442,26 +433,25 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     ASSERT_EQ(StringData(asChar(cipherText.data()), cipherLen), kExpectedCipherText);
 
     std::array<std::uint8_t, 12> tag;
-    const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag.data(), tag.size()));
+    const auto taglen = uassertStatusOK(encryptor->finalizeTag({tag}));
 
     constexpr auto kExpectedTag = "\xF9\xD6\xF9\x63\x21\x93\xE8\x5C\x42\xAA\x5E\x02"_sd;
     ASSERT_EQ(StringData(asChar(tag.data()), taglen), kExpectedTag);
 
-    auto decryptor =
-        uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, iv.data(), iv.size()));
-    ASSERT_OK(decryptor->addAuthenticatedData(asUint8(kAAD.rawData()), kAAD.size()));
+    auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, iv));
+    ASSERT_OK(decryptor->addAuthenticatedData({kAAD.rawData(), kAAD.size()}));
 
     std::array<std::uint8_t, kBufferSize> plainText;
-    auto plainLen = uassertStatusOK(
-        decryptor->update(cipherText.data(), cipherLen, plainText.data(), plainText.size()));
+    auto plainLen = uassertStatusOK(decryptor->update({cipherText.data(), cipherLen}, plainText));
 
     if (!succeed) {
         // Corrupt the authenticated tag, which should cause a failure below.
         ++tag[0];
     }
 
-    ASSERT_OK(decryptor->updateTag(tag.data(), tag.size()));
-    auto swFinalize = decryptor->finalize(plainText.data() + plainLen, plainText.size() - plainLen);
+    ASSERT_OK(decryptor->updateTag(tag));
+    auto swFinalize =
+        decryptor->finalize({plainText.data() + plainLen, plainText.size() - plainLen});
 
     if (!succeed) {
         ASSERT_NOT_OK(swFinalize.getStatus());
@@ -515,24 +505,20 @@ public:
         SymmetricKey key = aesGeneratePredictableKey256(test.key, "testID");
 
         // Validate encryption
-        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(
-            key, mode, asUint8(test.iv.c_str()), test.iv.size()));
+        auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, test.iv));
 
-        ASSERT_OK(encryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+        ASSERT_OK(encryptor->addAuthenticatedData(test.a));
 
         const size_t kBufferSize = test.plaintext.size();
         {
             // Validate encryption
             std::vector<uint8_t> encryptionResult(kBufferSize);
-            auto cipherLen = uassertStatusOK(encryptor->update(asUint8(test.plaintext.c_str()),
-                                                               test.plaintext.size(),
-                                                               encryptionResult.data(),
-                                                               encryptionResult.size()));
-            cipherLen += uassertStatusOK(encryptor->finalize(encryptionResult.data() + cipherLen,
-                                                             encryptionResult.size() - cipherLen));
+            auto cipherLen = uassertStatusOK(encryptor->update(test.plaintext, encryptionResult));
+            cipherLen += uassertStatusOK(encryptor->finalize(
+                {encryptionResult.data() + cipherLen, encryptionResult.size() - cipherLen}));
 
             ASSERT_EQ(test.ciphertext.size(), cipherLen);
-            ASSERT_EQ(hexblob::encode(StringData(test.ciphertext.data(), test.ciphertext.size())),
+            ASSERT_EQ(hexblob::encode(test.ciphertext),
                       hexblob::encode(
                           StringData(asChar(encryptionResult.data()), encryptionResult.size())));
 
@@ -540,7 +526,7 @@ public:
             // vectors can be larger than 12 bytes, but may be truncated.
 
             std::array<std::uint8_t, 12> tag;
-            const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag.data(), tag.size()));
+            const auto taglen = uassertStatusOK(encryptor->finalizeTag(tag));
             ASSERT_EQ(tag.size(), taglen);
             ASSERT_EQ(hexblob::encode(StringData(test.tag.data(), test.tag.size()))
                           .substr(0, aesGCMTagSize * 2),
@@ -548,18 +534,16 @@ public:
         }
         {
             // Validate decryption
-            auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(
-                key, mode, asUint8(test.iv.c_str()), test.iv.size()));
-            uassertStatusOK(decryptor->updateTag(asUint8(test.tag.data()), aesGCMTagSize));
+            auto decryptor =
+                uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, test.iv));
+            uassertStatusOK(decryptor->updateTag({test.tag.data(), aesGCMTagSize}));
 
-            ASSERT_OK(decryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+            ASSERT_OK(decryptor->addAuthenticatedData(test.a));
             std::vector<uint8_t> decryptionResult(kBufferSize);
-            auto decipherLen = uassertStatusOK(decryptor->update(asUint8(test.ciphertext.c_str()),
-                                                                 test.ciphertext.size(),
-                                                                 decryptionResult.data(),
-                                                                 decryptionResult.size()));
+            auto decipherLen =
+                uassertStatusOK(decryptor->update(test.ciphertext, decryptionResult));
             decipherLen += uassertStatusOK(decryptor->finalize(
-                decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen));
+                {decryptionResult.data() + decipherLen, decryptionResult.size() - decipherLen}));
 
             ASSERT_EQ(test.plaintext.size(), decipherLen);
             ASSERT_EQ(hexblob::encode(StringData(test.plaintext.data(), test.plaintext.size())),
@@ -568,20 +552,19 @@ public:
         }
         {
             // Validate that decryption with incorrect tag does not succeed
-            auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(
-                key, mode, asUint8(test.iv.c_str()), test.iv.size()));
+            auto decryptor =
+                uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, test.iv));
             auto tag = test.tag;
             tag[0]++;
-            uassertStatusOK(decryptor->updateTag(asUint8(tag.data()), aesGCMTagSize));
+            uassertStatusOK(decryptor->updateTag({tag.data(), aesGCMTagSize}));
 
-            ASSERT_OK(decryptor->addAuthenticatedData(asUint8(test.a.c_str()), test.a.size()));
+            ASSERT_OK(decryptor->addAuthenticatedData(test.a));
             std::vector<uint8_t> decryptionResult(kBufferSize);
-            auto decipherLen = uassertStatusOK(decryptor->update(asUint8(test.ciphertext.c_str()),
-                                                                 test.ciphertext.size(),
-                                                                 decryptionResult.data(),
-                                                                 decryptionResult.size()));
-            ASSERT_NOT_OK(decryptor->finalize(decryptionResult.data() + decipherLen,
-                                              decryptionResult.size() - decipherLen));
+            DataRangeCursor decryptionResultCursor(decryptionResult);
+            auto decipherLen =
+                uassertStatusOK(decryptor->update(test.ciphertext, decryptionResultCursor));
+            decryptionResultCursor.advance(decipherLen);
+            ASSERT_NOT_OK(decryptor->finalize(decryptionResultCursor));
         }
     }
 };

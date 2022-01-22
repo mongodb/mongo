@@ -34,6 +34,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/symmetric_key.h"
@@ -100,31 +101,28 @@ public:
 
     /**
      * Process a chunk of data from <in> and store the ciphertext in <out>.
-     * Returns the number of bytes written to <out> which will not exceed <outLen>.
-     * Because <inLen> for this and/or previous calls may not lie on a block boundary,
-     * the number of bytes written to <out> may be more or less than <inLen>.
+     * Returns the number of bytes written to <out> which will not exceed <out.length()>.
+     * Because <in.length()> for this and/or previous calls may not lie on a block boundary,
+     * the number of bytes written to <out> may be more or less than <in.length()>.
      */
-    virtual StatusWith<size_t> update(const uint8_t* in,
-                                      size_t inLen,
-                                      uint8_t* out,
-                                      size_t outLen) = 0;
+    virtual StatusWith<std::size_t> update(ConstDataRange in, DataRange out) = 0;
 
     /**
      * Append Additional AuthenticatedData (AAD) to a GCM encryption stream.
      */
-    virtual Status addAuthenticatedData(const uint8_t* in, size_t inLen) = 0;
+    virtual Status addAuthenticatedData(ConstDataRange authData) = 0;
 
     /**
      * Finish an encryption by flushing any buffered bytes for a partial cipherblock to <out>.
-     * Returns the number of bytes written, not to exceed <outLen>.
+     * Returns the number of bytes written, not to exceed <out.length()>.
      */
-    virtual StatusWith<size_t> finalize(uint8_t* out, size_t outLen) = 0;
+    virtual StatusWith<std::size_t> finalize(DataRange out) = 0;
 
     /**
      * For aesMode::gcm, writes the GCM tag to <out>.
-     * Returns the number of bytes used, not to exceed <outLen>.
+     * Returns the number of bytes used, not to exceed <out.length()>.
      */
-    virtual StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) = 0;
+    virtual StatusWith<std::size_t> finalizeTag(DataRange out) = 0;
 
     /**
      * Create an instance of a SymmetricEncryptor object from the currently available
@@ -132,8 +130,7 @@ public:
      */
     static StatusWith<std::unique_ptr<SymmetricEncryptor>> create(const SymmetricKey& key,
                                                                   aesMode mode,
-                                                                  const uint8_t* iv,
-                                                                  size_t inLen);
+                                                                  ConstDataRange iv);
 };
 
 /**
@@ -146,30 +143,27 @@ public:
 
     /**
      * Process a chunk of data from <in> and store the decrypted text in <out>.
-     * Returns the number of bytes written to <out> which will not exceed <outLen>.
-     * Because <inLen> for this and/or previous calls may not lie on a block boundary,
-     * the number of bytes written to <out> may be more or less than <inLen>.
+     * Returns the number of bytes written to <out> which will not exceed <out.length()>.
+     * Because <in.length()> for this and/or previous calls may not lie on a block boundary,
+     * the number of bytes written to <out> may be more or less than <in.length()>.
      */
-    virtual StatusWith<size_t> update(const uint8_t* in,
-                                      size_t inLen,
-                                      uint8_t* out,
-                                      size_t outLen) = 0;
+    virtual StatusWith<std::size_t> update(ConstDataRange in, DataRange out) = 0;
 
     /**
      * For aesMode::gcm, inform the cipher engine of additional authenticated data (AAD).
      */
-    virtual Status addAuthenticatedData(const uint8_t* in, size_t inLen) = 0;
+    virtual Status addAuthenticatedData(ConstDataRange authData) = 0;
 
     /**
      * For aesMode::gcm, informs the cipher engine of the GCM tag associated with this data stream.
      */
-    virtual Status updateTag(const uint8_t* tag, size_t tagLen) = 0;
+    virtual Status updateTag(ConstDataRange tag) = 0;
 
     /**
      * Finish an decryption by flushing any buffered bytes for a partial cipherblock to <out>.
-     * Returns the number of bytes written, not to exceed <outLen>.
+     * Returns the number of bytes written, not to exceed <out.length()>.
      */
-    virtual StatusWith<size_t> finalize(uint8_t* out, size_t outLen) = 0;
+    virtual StatusWith<std::size_t> finalize(DataRange out) = 0;
 
     /**
      * Create an instance of a SymmetricDecryptor object from the currently available
@@ -177,8 +171,7 @@ public:
      */
     static StatusWith<std::unique_ptr<SymmetricDecryptor>> create(const SymmetricKey& key,
                                                                   aesMode mode,
-                                                                  const uint8_t* iv,
-                                                                  size_t ivLen);
+                                                                  ConstDataRange iv);
 };
 
 /**
@@ -190,7 +183,7 @@ std::set<std::string> getSupportedSymmetricAlgorithms();
 /**
  * Generate a quantity of random bytes from the cipher engine.
  */
-Status engineRandBytes(uint8_t* buffer, size_t len);
+Status engineRandBytes(DataRange buffer);
 
 }  // namespace crypto
 }  // namespace mongo

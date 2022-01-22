@@ -46,11 +46,15 @@ namespace mongo {
 namespace crypto {
 
 namespace {
+// Convenience wrapper for getting mutable pointer from DataRange.
+std::uint8_t* asUint8(DataRange out) {
+    return const_cast<std::uint8_t*>(out.data<std::uint8_t>());
+}
 
 template <typename Parent>
 class SymmetricImplApple : public Parent {
 public:
-    SymmetricImplApple(const SymmetricKey& key, aesMode mode, const uint8_t* iv, size_t ivLen)
+    SymmetricImplApple(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
         : _ctx(nullptr, CCCryptorRelease) {
         static_assert(
             std::is_same<Parent, SymmetricEncryptor>::value ||
@@ -66,8 +70,8 @@ public:
         // Therefore we expect a 128 bit block length.
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Invalid ivlen for selected algorithm, expected "
-                              << kCCBlockSizeAES128 << ", got " << ivLen,
-                ivLen == kCCBlockSizeAES128);
+                              << kCCBlockSizeAES128 << ", got " << static_cast<int>(iv.length()),
+                iv.length() == kCCBlockSizeAES128);
 
         CCCryptorRef context = nullptr;
         constexpr auto op =
@@ -77,7 +81,7 @@ public:
                                             kCCOptionPKCS7Padding,
                                             key.getKey(),
                                             key.getKeySize(),
-                                            iv,
+                                            iv.data<std::uint8_t>(),
                                             &context);
         uassert(ErrorCodes::UnknownError,
                 str::stream() << "CCCryptorCreate failure: " << status,
@@ -86,9 +90,10 @@ public:
         _ctx.reset(context);
     }
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        size_t outUsed = 0;
-        const auto status = CCCryptorUpdate(_ctx.get(), in, inLen, out, outLen, &outUsed);
+    StatusWith<std::size_t> update(ConstDataRange in, DataRange out) final {
+        std::size_t outUsed = 0;
+        const auto status = CCCryptorUpdate(
+            _ctx.get(), in.data(), in.length(), asUint8(out), out.length(), &outUsed);
         if (status != kCCSuccess) {
             return Status(ErrorCodes::UnknownError,
                           str::stream() << "Unable to perform CCCryptorUpdate: " << status);
@@ -96,14 +101,14 @@ public:
         return outUsed;
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
-        fassert(51128, inLen == 0);
+    Status addAuthenticatedData(ConstDataRange authData) final {
+        fassert(51128, authData.length() == 0);
         return Status::OK();
     }
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<size_t> finalize(DataRange out) final {
         size_t outUsed = 0;
-        const auto status = CCCryptorFinal(_ctx.get(), out, outLen, &outUsed);
+        const auto status = CCCryptorFinal(_ctx.get(), asUint8(out), out.length(), &outUsed);
         if (status != kCCSuccess) {
             return Status(ErrorCodes::UnknownError,
                           str::stream() << "Unable to perform CCCryptorFinal: " << status);
@@ -119,7 +124,7 @@ class SymmetricEncryptorApple : public SymmetricImplApple<SymmetricEncryptor> {
 public:
     using SymmetricImplApple::SymmetricImplApple;
 
-    StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) final {
+    StatusWith<std::size_t> finalizeTag(DataRange) final {
         // CBC only, no tag to create.
         return 0;
     }
@@ -130,9 +135,9 @@ class SymmetricDecryptorApple : public SymmetricImplApple<SymmetricDecryptor> {
 public:
     using SymmetricImplApple::SymmetricImplApple;
 
-    Status updateTag(const uint8_t* tag, size_t tagLen) final {
+    Status updateTag(ConstDataRange tag) final {
         // CBC only, no tag to verify.
-        if (tagLen > 0) {
+        if (tag.length() > 0) {
             return {ErrorCodes::BadValue, "Unexpected tag for non-gcm cipher"};
         }
         return Status::OK();
@@ -145,8 +150,8 @@ std::set<std::string> getSupportedSymmetricAlgorithms() {
     return {aes256CBCName};
 }
 
-Status engineRandBytes(uint8_t* buffer, size_t len) {
-    auto result = SecRandomCopyBytes(kSecRandomDefault, len, buffer);
+Status engineRandBytes(DataRange buffer) {
+    auto result = SecRandomCopyBytes(kSecRandomDefault, buffer.length(), asUint8(buffer));
     if (result != errSecSuccess) {
         return {ErrorCodes::UnknownError,
                 str::stream() << "Failed generating random bytes: " << result};
@@ -157,10 +162,9 @@ Status engineRandBytes(uint8_t* buffer, size_t len) {
 
 StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) try {
+                                                                           ConstDataRange iv) try {
     std::unique_ptr<SymmetricEncryptor> encryptor =
-        std::make_unique<SymmetricEncryptorApple>(key, mode, iv, ivLen);
+        std::make_unique<SymmetricEncryptorApple>(key, mode, iv);
     return std::move(encryptor);
 } catch (const DBException& e) {
     return e.toStatus();
@@ -168,10 +172,9 @@ StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const
 
 StatusWith<std::unique_ptr<SymmetricDecryptor>> SymmetricDecryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) try {
+                                                                           ConstDataRange iv) try {
     std::unique_ptr<SymmetricDecryptor> decryptor =
-        std::make_unique<SymmetricDecryptorApple>(key, mode, iv, ivLen);
+        std::make_unique<SymmetricDecryptorApple>(key, mode, iv);
     return std::move(decryptor);
 } catch (const DBException& e) {
     return e.toStatus();

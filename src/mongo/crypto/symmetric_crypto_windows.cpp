@@ -162,15 +162,17 @@ static BCryptCryptoLoader& getBCryptCryptoLoader() {
 template <typename Parent>
 class SymmetricImplWindows : public Parent {
 public:
-    SymmetricImplWindows(const SymmetricKey& key, aesMode mode, const uint8_t* iv, size_t ivLen)
+    SymmetricImplWindows(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
         : _keyHandle(INVALID_HANDLE_VALUE), _mode(mode) {
         AlgoInfo& algo = getBCryptCryptoLoader().getAlgo(mode);
 
         // Initialize key storage buffers
         _keyObjectBuf->resize(algo.keyBlobSize);
 
+        const auto* iv_cbegin = iv.data<std::uint8_t>();
+        const auto* iv_cend = iv_cbegin + iv.length();
         if (mode == aesMode::cbc) {
-            std::copy(iv, iv + ivLen, std::back_inserter(_iv));
+            std::copy(iv_cbegin, iv_cend, std::back_inserter(_iv));
         } else if (mode == aesMode::gcm) {
             // In GCM mode, the _iv argument to BCrypt{Encrypt,Decrypt} is used
             // only for scratch storage. The real IV is loaded into the padding info.
@@ -179,7 +181,7 @@ public:
             // storage to contain the largest possible IV. This size can be acquired
             // from the algorithm's BCRYPT_BLOCK_LENGTH property.
             _iv = std::vector<unsigned char>(algo.blockLength);
-            std::copy(iv, iv + ivLen, std::back_inserter(_paddingNonce));
+            std::copy(iv_cbegin, iv_cend, std::back_inserter(_paddingNonce));
 
             _paddingInfo = std::make_unique<BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO>();
             BCRYPT_INIT_AUTH_MODE_INFO(*_paddingInfo);
@@ -265,15 +267,11 @@ class SymmetricEncryptorWindows : public SymmetricImplWindows<SymmetricEncryptor
 public:
     using SymmetricImplWindows::SymmetricImplWindows;
 
-    SymmetricEncryptorWindows(const SymmetricKey& key,
-                              aesMode mode,
-                              const uint8_t* iv,
-                              size_t ivLen)
-        : SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv, ivLen) {}
+    SymmetricEncryptorWindows(const SymmetricKey& key, aesMode mode, ConstDataRange iv)
+        : SymmetricImplWindows<SymmetricEncryptor>(key, mode, iv) {}
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        ConstDataRange inData(in, inLen);
-        DataRangeCursor outCursor(out, outLen);
+    StatusWith<std::size_t> update(ConstDataRange inData, DataRange outData) final {
+        DataRangeCursor outCursor(outData);
         return _packer.pack(inData, [this, &outCursor](ConstDataRange inData) {
             if (inData.length() > std::numeric_limits<ULONG>::max()) {
                 return StatusWith<size_t>{ErrorCodes::Overflow,
@@ -307,12 +305,12 @@ public:
         });
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+    Status addAuthenticatedData(ConstDataRange authData) final {
         fassert(5917500, _mode == aesMode::gcm);
         ULONG len = 0;
 
-        _paddingInfo->pbAuthData = const_cast<uint8_t*>(in);
-        _paddingInfo->cbAuthData = inLen;
+        _paddingInfo->pbAuthData = const_cast<PUCHAR>(authData.data<UCHAR>());
+        _paddingInfo->cbAuthData = authData.length();
 
         NTSTATUS status = BCryptEncrypt(
             _keyHandle, NULL, 0, _paddingInfo.get(), _iv.data(), _iv.size(), NULL, 0, &len, 0);
@@ -331,7 +329,7 @@ public:
     }
 
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<size_t> finalize(DataRange out) final {
         if (_paddingInfo) {
             _paddingInfo->dwFlags &= ~BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
             _paddingInfo->pbAuthData = NULL;
@@ -339,9 +337,11 @@ public:
         }
 
         // BCryptEncrypt may refuse to process GCM tags if no output buffer is provided.
-        uint8_t dummyOut;
-        if (!out) {
-            out = &dummyOut;
+        if (!out.data()) {
+            // const cast becauase DataRange wants a "writable" region,
+            // Our empty string isn't actually writable, but we give it a length of zero,
+            // So we'll never actually try to overwrite anything.
+            out = {const_cast<char*>(""), 0};
         }
 
         auto remainder = _packer.getBlock();
@@ -353,8 +353,8 @@ public:
                                         _paddingInfo.get(),
                                         _iv.data(),
                                         _iv.size(),
-                                        out,
-                                        outLen,
+                                        const_cast<PUCHAR>(out.data<UCHAR>()),
+                                        out.length(),
                                         &len,
                                         _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
 
@@ -366,13 +366,12 @@ public:
         return static_cast<size_t>(len);
     }
 
-    StatusWith<size_t> finalizeTag(uint8_t* out, size_t outLen) final {
+    StatusWith<size_t> finalizeTag(DataRange outRange) final {
         if (_mode == aesMode::cbc) {
             return 0;
         }
 
         ConstDataRange tag(_tag);
-        DataRange outRange(out, outLen);
         DataRangeCursor outCursor(outRange);
         outCursor.writeAndAdvance(tag);
         return tag.length();
@@ -383,9 +382,8 @@ class SymmetricDecryptorWindows : public SymmetricImplWindows<SymmetricDecryptor
 public:
     using SymmetricImplWindows::SymmetricImplWindows;
 
-    StatusWith<size_t> update(const uint8_t* in, size_t inLen, uint8_t* out, size_t outLen) final {
-        ConstDataRange inData(in, inLen);
-        DataRangeCursor outCursor(out, outLen);
+    StatusWith<std::size_t> update(ConstDataRange inData, DataRange outData) final {
+        DataRangeCursor outCursor(outData);
         return _packer.pack(inData, [this, &outCursor](ConstDataRange inData) {
             if (inData.length() > std::numeric_limits<ULONG>::max()) {
                 return StatusWith<size_t>{ErrorCodes::Overflow,
@@ -419,12 +417,12 @@ public:
         });
     }
 
-    Status addAuthenticatedData(const uint8_t* in, size_t inLen) final {
+    Status addAuthenticatedData(ConstDataRange in) final {
         fassert(8423310, _mode == aesMode::gcm);
         ULONG len = 0;
 
-        _paddingInfo->pbAuthData = const_cast<uint8_t*>(in);
-        _paddingInfo->cbAuthData = inLen;
+        _paddingInfo->pbAuthData = const_cast<PUCHAR>(in.data<UCHAR>());
+        _paddingInfo->cbAuthData = in.length();
 
         NTSTATUS status = BCryptDecrypt(
             _keyHandle, NULL, 0, _paddingInfo.get(), _iv.data(), _iv.size(), NULL, 0, &len, 0);
@@ -443,7 +441,7 @@ public:
     }
 
 
-    StatusWith<size_t> finalize(uint8_t* out, size_t outLen) final {
+    StatusWith<size_t> finalize(DataRange out) final {
         ULONG len = 0;
         if (_paddingInfo) {
             _paddingInfo->dwFlags &= ~BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG;
@@ -452,9 +450,11 @@ public:
         }
 
         // BCryptDecrypt may refuse to process GCM tags if no output buffer is provided.
-        uint8_t dummyOut;
-        if (!out) {
-            out = &dummyOut;
+        if (!out.data()) {
+            // const cast becauase DataRange wants a "writable" region,
+            // Our empty string isn't actually writable, but we give it a length of zero,
+            // So we'll never actually try to overwrite anything.
+            out = {const_cast<char*>(""), 0};
         }
 
         auto remainder = _packer.getBlock();
@@ -465,8 +465,8 @@ public:
                                         _paddingInfo.get(),
                                         _iv.data(),
                                         _iv.size(),
-                                        out,
-                                        outLen,
+                                        const_cast<PUCHAR>(out.data<UCHAR>()),
+                                        out.length(),
                                         &len,
                                         _mode == aesMode::cbc ? BCRYPT_BLOCK_PADDING : 0);
 
@@ -478,15 +478,14 @@ public:
         return static_cast<size_t>(len);
     }
 
-    Status updateTag(const uint8_t* tag, size_t tagLen) final {
+    Status updateTag(ConstDataRange tag) final {
         if (_mode == aesMode::cbc) {
             return Status::OK();
         }
 
         DataRange tagRange(_tag);
-        ConstDataRange providedRange(tag, tagLen);
         DataRangeCursor tagCursor(tagRange);
-        tagCursor.writeAndAdvance(providedRange);
+        tagCursor.writeAndAdvance(tag);
         return Status::OK();
     }
 };
@@ -497,8 +496,11 @@ std::set<std::string> getSupportedSymmetricAlgorithms() {
     return {aes256CBCName, aes256GCMName};
 }
 
-Status engineRandBytes(uint8_t* buffer, size_t len) {
-    NTSTATUS status = BCryptGenRandom(getBCryptCryptoLoader().getRandom(), buffer, len, 0);
+Status engineRandBytes(DataRange buffer) {
+    NTSTATUS status = BCryptGenRandom(getBCryptCryptoLoader().getRandom(),
+                                      const_cast<PUCHAR>(buffer.data<UCHAR>()),
+                                      buffer.length(),
+                                      0);
     if (status == STATUS_SUCCESS) {
         return Status::OK();
     }
@@ -510,11 +512,10 @@ Status engineRandBytes(uint8_t* buffer, size_t len) {
 
 StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) {
+                                                                           ConstDataRange iv) {
     try {
         std::unique_ptr<SymmetricEncryptor> encryptor =
-            std::make_unique<SymmetricEncryptorWindows>(key, mode, iv, ivLen);
+            std::make_unique<SymmetricEncryptorWindows>(key, mode, iv);
         return std::move(encryptor);
     } catch (const DBException& e) {
         return e.toStatus();
@@ -523,11 +524,10 @@ StatusWith<std::unique_ptr<SymmetricEncryptor>> SymmetricEncryptor::create(const
 
 StatusWith<std::unique_ptr<SymmetricDecryptor>> SymmetricDecryptor::create(const SymmetricKey& key,
                                                                            aesMode mode,
-                                                                           const uint8_t* iv,
-                                                                           size_t ivLen) {
+                                                                           ConstDataRange iv) {
     try {
         std::unique_ptr<SymmetricDecryptor> decryptor =
-            std::make_unique<SymmetricDecryptorWindows>(key, mode, iv, ivLen);
+            std::make_unique<SymmetricDecryptorWindows>(key, mode, iv);
         return std::move(decryptor);
     } catch (const DBException& e) {
         return e.toStatus();

@@ -60,44 +60,43 @@ void aeadGenerateIV(const SymmetricKey* key, uint8_t* buffer, size_t bufferLen) 
         fassert(51235, "IV buffer is too small for selected mode");
     }
 
-    auto status = engineRandBytes(buffer, aesCBCIVSize);
+    auto status = engineRandBytes({buffer, aesCBCIVSize});
     if (!status.isOK()) {
         fassert(51236, status);
     }
 }
 
 Status _aesEncrypt(const SymmetricKey& key,
-                   const std::uint8_t* in,
+                   const std::uint8_t* inPtr,
                    std::size_t inLen,
-                   std::uint8_t* out,
+                   std::uint8_t* outPtr,
                    std::size_t outLen,
                    std::size_t* resultLen,
                    bool ivProvided) try {
-
     if (!ivProvided) {
-        aeadGenerateIV(&key, out, aesCBCIVSize);
+        aeadGenerateIV(&key, outPtr, aesCBCIVSize);
     }
 
-    auto encryptor =
-        uassertStatusOK(SymmetricEncryptor::create(key, aesMode::cbc, out, aesCBCIVSize));
+    ConstDataRange in(inPtr, inLen);
+    DataRange iv(outPtr, aesCBCIVSize);
+    DataRangeCursor out(outPtr + aesCBCIVSize, outLen - aesCBCIVSize);
+    auto encryptor = uassertStatusOK(SymmetricEncryptor::create(key, aesMode::cbc, iv));
 
-    const size_t dataSize = outLen - aesCBCIVSize;
-    uint8_t* data = out + aesCBCIVSize;
+    const auto updateLen = uassertStatusOK(encryptor->update(in, out));
+    out.advance(updateLen);
 
-    const auto updateLen = uassertStatusOK(encryptor->update(in, inLen, data, dataSize));
-    const auto finalLen =
-        uassertStatusOK(encryptor->finalize(data + updateLen, dataSize - updateLen));
-    const auto len = updateLen + finalLen;
+    const auto finalLen = uassertStatusOK(encryptor->finalize(out));
+    out.advance(finalLen);
 
     // Some cipher modes, such as GCM, will know in advance exactly how large their ciphertexts will
     // be. Others, like CBC, will have an upper bound. When this is true, we must allocate enough
     // memory to store the worst case. We must then set the actual size of the ciphertext so that
     // the buffer it has been written to may be serialized.
-    invariant(len <= dataSize);
+    const auto len = updateLen + finalLen;
     *resultLen = aesCBCIVSize + len;
 
     // Check the returned length, including block size padding
-    if (len != aesCBCCipherOutputLength(inLen)) {
+    if (len != aesCBCCipherOutputLength(in.length())) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Encrypt error, expected cipher text of length "
                               << aesCBCCipherOutputLength(inLen) << " but found " << len};
@@ -122,17 +121,17 @@ Status _aesDecrypt(const SymmetricKey& key,
                               << "]"};
     }
 
-    const uint8_t* dataPtr = reinterpret_cast<const std::uint8_t*>(in.data());
 
-    auto decryptor =
-        uassertStatusOK(SymmetricDecryptor::create(key, aesMode::cbc, dataPtr, aesCBCIVSize));
+    ConstDataRange iv(in.data(), aesCBCIVSize);
+    ConstDataRange data(in.data() + aesCBCIVSize, in.length() - aesCBCIVSize);
+    auto decryptor = uassertStatusOK(SymmetricDecryptor::create(key, aesMode::cbc, iv));
 
-    const size_t dataSize = in.length() - aesCBCIVSize;
-    const uint8_t* data = dataPtr + aesCBCIVSize;
+    DataRangeCursor outCursor(out, outLen);
+    const auto updateLen = uassertStatusOK(decryptor->update(data, outCursor));
+    outCursor.advance(updateLen);
 
-    const auto updateLen = uassertStatusOK(decryptor->update(data, dataSize, out, outLen));
-
-    const auto finalLen = uassertStatusOK(decryptor->finalize(out + updateLen, outLen - updateLen));
+    const auto finalLen = uassertStatusOK(decryptor->finalize(outCursor));
+    outCursor.advance(finalLen);
 
     *resultLen = updateLen + finalLen;
     invariant(*resultLen <= outLen);
@@ -158,7 +157,7 @@ Status _aesDecrypt(const SymmetricKey& key,
      * key or ciphertext are corrupted and its unable to find any
      * expected padding.  It fails open by returning whatever it can.
      */
-    if (*resultLen >= dataSize) {
+    if (*resultLen >= data.length()) {
         return {ErrorCodes::BadValue,
                 "Decrypt error, plaintext is as large or larger than "
                 "the ciphertext. This usually indicates an invalid key."};
