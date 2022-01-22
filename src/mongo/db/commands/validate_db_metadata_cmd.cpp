@@ -140,7 +140,7 @@ public:
                 // If there is no collection name present in the input, run validation against all
                 // the collections.
                 if (auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName)) {
-                    viewCatalog->iterate([this, opCtx](const ViewDefinition& view) {
+                    viewCatalog->iterate(dbName, [this, opCtx](const ViewDefinition& view) {
                         return _validateView(opCtx, view);
                     });
                 }

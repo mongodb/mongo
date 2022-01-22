@@ -1186,7 +1186,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "applyOps not supported on view: " << requestNss.ns(),
-            collection || !ViewCatalog::get(db)->lookup(opCtx, requestNss));
+            collection || !ViewCatalog::get(opCtx)->lookup(opCtx, requestNss));
 
     // Decide whether to timestamp the write with the 'ts' field found in the operation. In general,
     // we do this for secondary oplog application, but there are some exceptions.
@@ -1810,7 +1810,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->getDb(opCtx, nss.ns());
         if (db && !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
-            ViewCatalog::get(db)->lookup(opCtx, nss)) {
+            ViewCatalog::get(opCtx)->lookup(opCtx, nss)) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }

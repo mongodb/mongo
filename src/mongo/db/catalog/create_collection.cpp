@@ -287,7 +287,7 @@ Status _createTimeseries(OperationContext* opCtx,
             }
 
             auto db = autoDb.ensureDbExists(opCtx);
-            if (auto view = ViewCatalog::get(db)->lookup(opCtx, ns); view) {
+            if (auto view = ViewCatalog::get(opCtx)->lookup(opCtx, ns); view) {
                 if (view->timeseries()) {
                     return Status(ErrorCodes::NamespaceExists,
                                   str::stream()
@@ -376,7 +376,7 @@ Status _createTimeseries(OperationContext* opCtx,
         }
 
         auto db = autoColl.ensureDbExists(opCtx);
-        if (auto view = ViewCatalog::get(db)->lookup(opCtx, ns)) {
+        if (auto view = ViewCatalog::get(opCtx)->lookup(opCtx, ns)) {
             if (view->timeseries()) {
                 return {ErrorCodes::NamespaceExists,
                         str::stream() << "A timeseries collection already exists. NS: " << ns};
@@ -390,6 +390,7 @@ Status _createTimeseries(OperationContext* opCtx,
             return {ErrorCodes::NotWritablePrimary,
                     str::stream() << "Not primary while creating collection " << ns};
         }
+
 
         _createSystemDotViewsIfNecessary(opCtx, db);
 
@@ -454,8 +455,9 @@ Status _createCollection(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection already exists. NS: " << nss);
         }
+
         auto db = autoDb.ensureDbExists(opCtx);
-        if (auto view = ViewCatalog::get(db)->lookup(opCtx, nss); view) {
+        if (auto view = ViewCatalog::get(opCtx)->lookup(opCtx, nss); view) {
             if (view->timeseries()) {
                 return Status(ErrorCodes::NamespaceExists,
                               str::stream()

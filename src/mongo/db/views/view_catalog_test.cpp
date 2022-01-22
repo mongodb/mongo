@@ -101,12 +101,12 @@ public:
         wuow.commit();
     }
 
-    void tearDown() {
+    void tearDown() override {
         CatalogTestFixture::tearDown();
     }
 
-    auto getViewCatalog() const {
-        return ViewCatalog::get(_db);
+    auto getViewCatalog() {
+        return ViewCatalog::get(operationContext());
     }
 
     Status createView(OperationContext* opCtx,
@@ -122,7 +122,7 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = ViewCatalog::createView(opCtx, _db, viewName, viewOn, pipeline, collation);
+        Status s = ViewCatalog::createView(opCtx, viewName, viewOn, pipeline, collation);
         wuow.commit();
 
         return s;
@@ -140,7 +140,7 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = ViewCatalog::modifyView(opCtx, _db, viewName, viewOn, pipeline);
+        Status s = ViewCatalog::modifyView(opCtx, viewName, viewOn, pipeline);
         wuow.commit();
 
         return s;
@@ -155,7 +155,7 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s = ViewCatalog::dropView(opCtx, _db, viewName);
+        Status s = ViewCatalog::dropView(opCtx, viewName);
         wuow.commit();
 
         return s;
@@ -533,7 +533,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
 
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(ViewCatalog::createView(
-            operationContext(), db(), viewName, viewOn, emptyPipeline, emptyCollation));
+            operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
     auto collectionCatalog = CollectionCatalog::get(operationContext());
@@ -574,7 +574,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
-        ASSERT_OK(ViewCatalog::dropView(operationContext(), db(), viewName));
+        ASSERT_OK(ViewCatalog::dropView(operationContext(), viewName));
     }
 
     ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
@@ -613,8 +613,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
-        ASSERT_OK(
-            ViewCatalog::modifyView(operationContext(), db(), viewName, viewOn, emptyPipeline));
+        ASSERT_OK(ViewCatalog::modifyView(operationContext(), viewName, viewOn, emptyPipeline));
         ASSERT(CollectionCatalog::get(operationContext())->lookupResourceName(resourceID).get() ==
                viewName.ns());
     }
@@ -645,7 +644,7 @@ TEST_F(ViewCatalogFixture, Iterate) {
     std::set<std::string> viewNames = {"db.view1", "db.view2", "db.view3"};
 
     Lock::DBLock dbLock(operationContext(), "db", MODE_IX);
-    getViewCatalog()->iterate([&viewNames](const ViewDefinition& view) {
+    getViewCatalog()->iterate("db", [&viewNames](const ViewDefinition& view) {
         std::string name = view.name().toString();
         ASSERT(viewNames.end() != viewNames.find(name));
         viewNames.erase(name);

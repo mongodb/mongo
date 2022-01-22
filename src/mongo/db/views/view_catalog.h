@@ -57,8 +57,7 @@ class Database;
  * modifications through the static functions copy the existing instance and perform the
  * modification on the copy. A new call to get() is necessary to observe the modification.
  *
- * Writes via the static functions are thread-safe and serialized with a mutex per Database -- this
- * is needed as concurrent updates may happen through direct writes to the views catalog collection.
+ * Writes via the static functions are thread-safe and serialized with a mutex.
  *
  * The static methods refresh the in-memory map with the views catalog collection if necessary,
  * throwing if the refresh fails.
@@ -68,19 +67,33 @@ public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
     using ViewIteratorCallback = std::function<bool(const ViewDefinition& view)>;
 
-    static std::shared_ptr<const ViewCatalog> get(const Database* db);
-    static void set(Database* db, std::unique_ptr<ViewCatalog> catalog);
+    static std::shared_ptr<const ViewCatalog> get(ServiceContext* svcCtx);
+    static std::shared_ptr<const ViewCatalog> get(OperationContext* opCtx);
 
-    explicit ViewCatalog(std::unique_ptr<DurableViewCatalog> durable)
-        : _durable(std::move(durable)), _valid(false), _viewGraphNeedsRefresh(true) {}
+    /**
+     * Add an entry to the ViewCatalog for the given database, backed by the durable storage
+     * 'catalog'.
+     */
+    static Status registerDatabase(OperationContext* opCtx,
+                                   StringData dbName,
+                                   std::unique_ptr<DurableViewCatalog> catalog);
+
+    /**
+     * Removes the ViewCatalog entries assocated with 'db' if any. Should be called when when a
+     * `DatabaseImpl` that has previously registered is about to be destructed (e.g. when closing a
+     * database).
+     */
+    static void unregisterDatabase(OperationContext* opCtx, Database* db);
 
     /**
      * Iterates through the catalog, applying 'callback' to each view. This callback function
      * executes under the catalog's mutex, so it must not access other methods of the catalog,
-     * acquire locks or run for a long time. If the 'callback' returns false, the iterator exists
+     * acquire locks or run for a long time. If the 'callback' returns false, the iterator exits
      * early.
+     *
+     * Caller must ensure corresponding database exists.
      */
-    void iterate(ViewIteratorCallback callback) const;
+    void iterate(StringData dbName, ViewIteratorCallback callback) const;
 
     /**
      * Create a new view 'viewName' with contents defined by running the specified aggregation
@@ -90,9 +103,10 @@ public:
      * before calling createView.
      *
      * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
+     *
+     * Caller must ensure corresponding database exists.
      */
     static Status createView(OperationContext* opCtx,
-                             const Database* db,
                              const NamespaceString& viewName,
                              const NamespaceString& viewOn,
                              const BSONArray& pipeline,
@@ -102,18 +116,19 @@ public:
      * Drop the view named 'viewName'.
      *
      * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
+     *
+     * Caller must ensure corresponding database exists.
      */
-    static Status dropView(OperationContext* opCtx,
-                           const Database* db,
-                           const NamespaceString& viewName);
+    static Status dropView(OperationContext* opCtx, const NamespaceString& viewName);
 
     /**
      * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
      *
      * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
+     *
+     * Caller must ensure corresponding database exists.
      */
     static Status modifyView(OperationContext* opCtx,
-                             const Database* db,
                              const NamespaceString& viewName,
                              const NamespaceString& viewOn,
                              const BSONArray& pipeline);
@@ -121,6 +136,8 @@ public:
     /**
      * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition, or
      * nullptr if it doesn't exist.
+     *
+     * Caller must ensure corresponding database exists.
      */
     std::shared_ptr<const ViewDefinition> lookup(OperationContext* opCtx,
                                                  const NamespaceString& nss) const;
@@ -128,6 +145,8 @@ public:
     /**
      * Same functionality as above, except this function skips validating durable views in the view
      * catalog.
+     *
+     * Caller must ensure corresponding database exists.
      */
     std::shared_ptr<const ViewDefinition> lookupWithoutValidatingDurableViews(
         OperationContext* opCtx, const NamespaceString& nss) const;
@@ -141,6 +160,8 @@ public:
      * collations. So in the case of queries on timeseries collections, we create a ResolvedView
      * with the request's collation (timeSeriesCollator) rather than the collection's default
      * collator.
+     *
+     * Caller must ensure corresponding database exists.
      */
     StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                                          const NamespaceString& nss,
@@ -157,9 +178,9 @@ public:
     };
 
     /**
-     * Returns statistics for this view catalog.
+     * Returns view statistics for the specified database.
      */
-    Stats getStats() const;
+    boost::optional<Stats> getStats(StringData dbName) const;
 
     /**
      * Returns Status::OK with the set of involved namespaces if the given pipeline is eligible to
@@ -178,20 +199,18 @@ public:
      * database.
      */
     static Status reload(OperationContext* opCtx,
-                         const Database* db,
+                         StringData dbName,
                          ViewCatalogLookupBehavior lookupBehavior);
 
     /**
      * Clears the in-memory state of the view catalog.
      */
-    static void clear(OperationContext* opCtx, const Database* db);
+    static void clear(OperationContext* opCtx, StringData dbName);
 
     /**
      * The view catalog needs to ignore external changes for its own modifications.
      */
-    static bool shouldIgnoreExternalChange(OperationContext* opCtx,
-                                           const Database* db,
-                                           const NamespaceString& name);
+    static bool shouldIgnoreExternalChange(OperationContext* opCtx, const NamespaceString& name);
 
 private:
     Status _createOrUpdateView(OperationContext* opCtx,
@@ -221,21 +240,32 @@ private:
                                             ViewCatalogLookupBehavior lookupBehavior);
 
     Status _reload(OperationContext* opCtx,
+                   StringData dbName,
                    ViewCatalogLookupBehavior lookupBehavior,
                    bool reloadForCollectionCatalog);
 
     /**
-     * uasserts with the InvalidViewDefinition error if the current in-memory state of the view
-     * catalog is invalid. This ensures that calling into the view catalog while it is invalid
-     * renders it inoperable.
+     * Holds all data for the views associated with a particular database. Prior to 5.3, the
+     * ViewCatalog object was owned by the Database object as a decoration. It has now transitioned
+     * to a global catalog, as a decoration on the ServiceContext. Each database gets its own record
+     * here, comprising the same information that was previously stored as top-level information
+     * prior to 5.3.
      */
-    void _requireValidCatalog() const;
+    struct ViewsForDatabase {
+        ViewMap viewMap;
+        std::shared_ptr<DurableViewCatalog> durable;
+        bool valid = false;
+        ViewGraph viewGraph;
+        bool viewGraphNeedsRefresh = true;
+        Stats stats;
 
-    ViewMap _viewMap;
-    std::shared_ptr<DurableViewCatalog> _durable;
-    bool _valid;
-    ViewGraph _viewGraph;
-    bool _viewGraphNeedsRefresh;
-    Stats _stats;
+        /**
+         * uasserts with the InvalidViewDefinition error if the current in-memory state of the view
+         * catalog for the given database is invalid. This ensures that calling into the view
+         * catalog while it is invalid renders it inoperable.
+         */
+        void requireValidCatalog() const;
+    };
+    StringMap<ViewsForDatabase> _viewsForDatabase;
 };
 }  // namespace mongo

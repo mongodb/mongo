@@ -58,19 +58,17 @@ void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const Namespa
     dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, name.db());
-    if (db) {
-        // On an external change, an invalid view definition can be detected when the view catalog
-        // is reloaded. This will prevent any further usage of the view catalog until the invalid
-        // view definitions are removed. We use kValidateDurableViews here to catch any invalid view
-        // definitions in the view catalog to make it unusable for subsequent callers.
-        if (ViewCatalog::shouldIgnoreExternalChange(opCtx, db, name)) {
-            return;
-        }
 
-        ViewCatalog::reload(opCtx, db, ViewCatalogLookupBehavior::kValidateDurableViews).ignore();
+    // On an external change, an invalid view definition can be detected when the view catalog
+    // is reloaded. This will prevent any further usage of the view catalog until the invalid
+    // view definitions are removed. We use kValidateDurableViews here to catch any invalid view
+    // definitions in the view catalog to make it unusable for subsequent callers.
+    if (ViewCatalog::shouldIgnoreExternalChange(opCtx, name)) {
+        return;
     }
+
+    ViewCatalog::reload(opCtx, name.db(), ViewCatalogLookupBehavior::kValidateDurableViews)
+        .ignore();
 }
 
 void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
@@ -85,7 +83,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
     if (db) {
         // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
         // view catalog.
-        ViewCatalog::clear(opCtx, db);
+        ViewCatalog::clear(opCtx, name.db());
     }
 }
 
@@ -93,6 +91,10 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
 
 const std::string& DurableViewCatalogImpl::getName() const {
     return _db->name();
+}
+
+const bool DurableViewCatalogImpl::belongsTo(const Database* db) const {
+    return _db == db;
 }
 
 void DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {

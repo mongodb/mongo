@@ -80,7 +80,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
         _collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _nss);
 
     if (!_collection) {
-        if (_database && ViewCatalog::get(_database)->lookup(opCtx, _nss)) {
+        if (ViewCatalog::get(opCtx)->lookup(opCtx, _nss)) {
             uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
         }
 

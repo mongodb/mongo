@@ -150,8 +150,7 @@ public:
             // for this check, only to validate if a view already exists for this namespace.
             if (autoDb->getDb() &&
                 !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
-                ViewCatalog::get(autoDb->getDb())
-                    ->lookupWithoutValidatingDurableViews(opCtx, nss)) {
+                ViewCatalog::get(opCtx)->lookupWithoutValidatingDurableViews(opCtx, nss)) {
                 return true;
             }
 

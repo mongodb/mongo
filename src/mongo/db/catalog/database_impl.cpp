@@ -154,14 +154,9 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
 
 DatabaseImpl::DatabaseImpl(const StringData name)
     : _name(name.toString()),
-      _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {
-    auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
-    auto viewCatalog = std::make_unique<ViewCatalog>(std::move(durableViewCatalog));
+      _viewsName(_name + "." + DurableViewCatalog::viewsCollectionName().toString()) {}
 
-    ViewCatalog::set(this, std::move(viewCatalog));
-}
-
-void DatabaseImpl::init(OperationContext* const opCtx) const {
+Status DatabaseImpl::init(OperationContext* const opCtx) {
     Status status = validateDBName(_name);
 
     if (!status.isOK()) {
@@ -170,6 +165,12 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
                       "Tried to open invalid db",
                       "db"_attr = _name);
         uasserted(10028, status.toString());
+    }
+
+    auto durableViewCatalog = std::make_unique<DurableViewCatalogImpl>(this);
+    status = ViewCatalog::registerDatabase(opCtx, _name, std::move(durableViewCatalog));
+    if (!status.isOK()) {
+        return status;
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
@@ -200,7 +201,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         Lock::CollectionLock systemViewsLock(
             opCtx, NamespaceString(_name, NamespaceString::kSystemDotViewsCollectionName), MODE_IS);
         Status reloadStatus =
-            ViewCatalog::reload(opCtx, this, ViewCatalogLookupBehavior::kValidateDurableViews);
+            ViewCatalog::reload(opCtx, _name, ViewCatalogLookupBehavior::kValidateDurableViews);
         if (!reloadStatus.isOK()) {
             LOGV2_WARNING_OPTIONS(20326,
                                   {logv2::LogTag::kStartupWarnings},
@@ -210,6 +211,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
                                   "namespace"_attr = _viewsName);
         }
     }
+
+    return status;
 }
 
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
@@ -294,7 +297,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
         });
 
 
-    ViewCatalog::get(this)->iterate([&](const ViewDefinition& view) {
+    ViewCatalog::get(opCtx)->iterate(name(), [&](const ViewDefinition& view) {
         nViews += 1;
         return true;
     });
@@ -345,7 +348,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
 
-    Status status = ViewCatalog::dropView(opCtx, this, viewName);
+    Status status = ViewCatalog::dropView(opCtx, viewName);
     Top::get(opCtx->getServiceContext()).collectionDropped(viewName);
     return status;
 }
@@ -372,11 +375,11 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
             if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
                 const auto viewCatalog =
                     DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
-                const auto viewStats = viewCatalog->getStats();
+                const auto viewStats = viewCatalog->getStats(nss.db());
                 uassert(ErrorCodes::CommandFailed,
                         str::stream() << "cannot drop collection " << nss
                                       << " when time-series collections are present.",
-                        viewStats.userTimeseries == 0);
+                        viewStats && viewStats->userTimeseries == 0);
             }
         } else if (!(nss.isHealthlog() || nss == NamespaceString::kLogicalSessionsNamespace ||
                      nss == NamespaceString::kKeysCollectionNamespace ||
@@ -673,8 +676,7 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
         status = {ErrorCodes::InvalidNamespace,
                   str::stream() << "invalid namespace name for a view: " + viewName.toString()};
     } else {
-        status =
-            ViewCatalog::createView(opCtx, this, viewName, viewOnNss, pipeline, options.collation);
+        status = ViewCatalog::createView(opCtx, viewName, viewOnNss, pipeline, options.collation);
     }
 
     audit::logCreateView(
@@ -828,7 +830,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
 
     stdx::lock_guard<Latch> lk(uniqueCollectionNamespaceMutex);
 
-    auto replacePercentSign = [&, this](char c) {
+    auto replacePercentSign = [&](char c) {
         if (c != '%') {
             return c;
         }

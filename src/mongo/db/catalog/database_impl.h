@@ -37,7 +37,7 @@ class DatabaseImpl final : public Database {
 public:
     explicit DatabaseImpl(StringData name);
 
-    void init(OperationContext*) const final;
+    Status init(OperationContext*) final;
 
     const std::string& name() const final {
         return _name;

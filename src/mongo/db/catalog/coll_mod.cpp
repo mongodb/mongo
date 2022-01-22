@@ -610,8 +610,8 @@ Status _collModInternal(OperationContext* opCtx,
 
     // May also modify a view instead of a collection.
     boost::optional<ViewDefinition> view;
-    if (db && !coll) {
-        const auto sharedView = ViewCatalog::get(db)->lookup(opCtx, nss);
+    if (!coll) {
+        const auto sharedView = ViewCatalog::get(opCtx)->lookup(opCtx, nss);
         if (sharedView) {
             // We copy the ViewDefinition as it is modified below to represent the requested state.
             view = {*sharedView};
@@ -695,7 +695,7 @@ Status _collModInternal(OperationContext* opCtx,
                 pipeline.append(item);
             }
             auto errorStatus =
-                ViewCatalog::modifyView(opCtx, db, nss, view->viewOn(), BSONArray(pipeline.obj()));
+                ViewCatalog::modifyView(opCtx, nss, view->viewOn(), BSONArray(pipeline.obj()));
             if (!errorStatus.isOK()) {
                 return errorStatus;
             }

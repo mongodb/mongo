@@ -305,7 +305,7 @@ AutoGetCollection::AutoGetCollection(
     }
 
     if (_autoDb->getDb()) {
-        _view = ViewCatalog::get(_autoDb->getDb())->lookup(opCtx, _resolvedNss);
+        _view = ViewCatalog::get(opCtx)->lookup(opCtx, _resolvedNss);
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Namespace " << _resolvedNss.ns() << " is a timeseries collection",
                 !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted ||

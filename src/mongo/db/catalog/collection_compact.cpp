@@ -51,7 +51,6 @@ using logv2::LogComponent;
 namespace {
 
 CollectionPtr getCollectionForCompact(OperationContext* opCtx,
-                                      Database* database,
                                       const NamespaceString& collectionNss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_IX));
 
@@ -60,7 +59,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx,
 
     if (!collection) {
         std::shared_ptr<const ViewDefinition> view =
-            ViewCatalog::get(database)->lookup(opCtx, collectionNss);
+            ViewCatalog::get(opCtx)->lookup(opCtx, collectionNss);
         uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
         uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
     }
@@ -81,7 +80,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     boost::optional<Lock::CollectionLock> collLk;
     collLk.emplace(opCtx, collectionNss, MODE_X);
 
-    CollectionPtr collection = getCollectionForCompact(opCtx, database, collectionNss);
+    CollectionPtr collection = getCollectionForCompact(opCtx, collectionNss);
     DisableDocumentValidation validationDisabler(opCtx);
 
     auto recordStore = collection->getRecordStore();
@@ -99,7 +98,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
         collLk.emplace(opCtx, collectionNss, MODE_IX);
 
         // Ensure the collection was not dropped during the re-lock.
-        collection = getCollectionForCompact(opCtx, database, collectionNss);
+        collection = getCollectionForCompact(opCtx, collectionNss);
         recordStore = collection->getRecordStore();
     }
 

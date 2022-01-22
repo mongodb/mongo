@@ -68,10 +68,8 @@ namespace {
  */
 class ViewCatalogWriter {
 public:
-    ViewCatalogWriter(Mutex& mutex,
-                      std::shared_ptr<const ViewCatalog> instance,
-                      std::shared_ptr<ViewCatalog>* storage)
-        : _mutex(mutex), _read(std::move(instance)), _storage(storage) {}
+    ViewCatalogWriter(Mutex& mutex, std::shared_ptr<ViewCatalog>* storage)
+        : _mutex(mutex), _storage(storage) {}
 
     ViewCatalogWriter(ViewCatalogWriter&&) = delete;
     ViewCatalogWriter& operator=(ViewCatalogWriter&&) = delete;
@@ -80,13 +78,15 @@ public:
         if (_write)
             return _write.get();
 
-        return _read.get();
+        // TODO (SERVER-57250): This atomic_load will be deprecated in C++20
+        return atomic_load(_storage).get();
     }
 
     ViewCatalog* writable() {
         if (!_write) {
             _lock = stdx::unique_lock<Mutex>(_mutex);
-            _write = std::make_shared<ViewCatalog>(*_read);
+            // TODO (SERVER-57250): This atomic_load will be deprecated in C++20
+            _write = std::make_shared<ViewCatalog>(*atomic_load(_storage));
         }
         return _write.get();
     }
@@ -101,7 +101,6 @@ public:
 private:
     Mutex& _mutex;
     stdx::unique_lock<Mutex> _lock;
-    std::shared_ptr<const ViewCatalog> _read;
     std::shared_ptr<ViewCatalog> _write;
     std::shared_ptr<ViewCatalog>* _storage;
 };
@@ -124,27 +123,32 @@ public:
     }
 
     ViewCatalogWriter writer() const {
-        return ViewCatalogWriter(_mutex, get(), &_catalog);
+        return ViewCatalogWriter(_mutex, &_catalog);
     }
 
-    void setIgnoreExternalChange(bool value) const {
-        _ignoreExternalChange = value;
+    void setIgnoreExternalChange(StringData dbName, bool value) const {
+        stdx::lock_guard lk{_externalChangeMutex};
+        if (value) {
+            _ignoreExternalChange.emplace(dbName);
+        } else {
+            _ignoreExternalChange.erase(dbName);
+        }
     }
 
-    bool shouldIgnoreExternalChange() const {
-        return _ignoreExternalChange;
+    bool shouldIgnoreExternalChange(StringData dbName) const {
+        stdx::lock_guard lk{_externalChangeMutex};
+        auto it = _ignoreExternalChange.find(dbName);
+        return it != _ignoreExternalChange.end();
     }
 
 private:
-    mutable std::shared_ptr<ViewCatalog> _catalog;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ViewCatalogStorage::mutex");  // Serializes writes
-
-    // This is safe to not be atomic because it is only accessed on the write path for the
-    // 'system.views' collection for this db. Modifications to this collection happens only through
-    // this class and we have it locked with MODE_X.
-    mutable bool _ignoreExternalChange = false;
-};
-auto getViewCatalog = Database::declareDecoration<ViewCatalogStorage>();
+    mutable std::shared_ptr<ViewCatalog> _catalog = std::make_shared<ViewCatalog>();
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ViewCatalogStorage::_mutex");  // Serializes writes
+    mutable Mutex _externalChangeMutex = MONGO_MAKE_LATCH(
+        "ViewCatalogStorage::_externalChangeMutex");  // Guards _ignoreExternalChange set
+    mutable StringSet _ignoreExternalChange;
+};  // namespace
+const auto getViewCatalog = ServiceContext::declareDecoration<ViewCatalogStorage>();
 
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
                                                              BSONObj collationSpec) {
@@ -157,38 +161,68 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
 }
 }  // namespace
 
-std::shared_ptr<const ViewCatalog> ViewCatalog::get(const Database* db) {
-    return getViewCatalog(db).get();
+std::shared_ptr<const ViewCatalog> ViewCatalog::get(ServiceContext* svcCtx) {
+    return getViewCatalog(svcCtx).get();
 }
 
-void ViewCatalog::set(Database* db, std::unique_ptr<ViewCatalog> catalog) {
-    getViewCatalog(db).set(std::move(catalog));
+std::shared_ptr<const ViewCatalog> ViewCatalog::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+Status ViewCatalog::registerDatabase(OperationContext* opCtx,
+                                     StringData dbName,
+                                     std::unique_ptr<DurableViewCatalog> durable) {
+    auto catalog = getViewCatalog(opCtx->getServiceContext()).writer();
+    auto it = catalog.writable()->_viewsForDatabase.find(dbName);
+    if (it != catalog.writable()->_viewsForDatabase.end()) {
+        return {ErrorCodes::AlreadyInitialized, "ViewCatalog entry for database already set"};
+    }
+
+    auto& vfdb = catalog.writable()->_viewsForDatabase[dbName];
+    vfdb.durable = std::move(durable);
+    vfdb.valid = false;
+    vfdb.viewGraphNeedsRefresh = true;
+    catalog.commit();
+    return Status::OK();
+}
+
+void ViewCatalog::unregisterDatabase(OperationContext* opCtx, Database* db) {
+    auto catalog = getViewCatalog(opCtx->getServiceContext()).writer();
+    auto it = catalog.writable()->_viewsForDatabase.find(db->name());
+    if (it != catalog.writable()->_viewsForDatabase.end() && it->second.durable->belongsTo(db)) {
+        catalog.writable()->_viewsForDatabase.erase(it);
+        catalog.commit();
+    }
 }
 
 Status ViewCatalog::reload(OperationContext* opCtx,
-                           const Database* db,
+                           StringData dbName,
                            ViewCatalogLookupBehavior lookupBehavior) {
-    auto catalog = getViewCatalog(db).writer();
+    auto catalog = getViewCatalog(opCtx->getServiceContext()).writer();
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(db->name(), NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
-    auto result =
-        catalog.writable()->_reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews, true);
+        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
+    auto result = catalog.writable()->_reload(
+        opCtx, dbName, ViewCatalogLookupBehavior::kValidateDurableViews, true);
     catalog.commit();
     return result;
 }
 
 Status ViewCatalog::_reload(OperationContext* opCtx,
+                            StringData dbName,
                             ViewCatalogLookupBehavior lookupBehavior,
                             bool reloadForCollectionCatalog) {
-    const auto& dbName = _durable->getName();
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName);
 
-    _viewMap.clear();
-    _valid = false;
-    _viewGraphNeedsRefresh = true;
-    _stats = {};
+    auto it = _viewsForDatabase.find(dbName);
+    invariant(it != _viewsForDatabase.end());
+    auto& vfdb = it->second;
 
-    absl::flat_hash_set<NamespaceString> viewsForDb;
+    vfdb.viewMap.clear();
+    vfdb.valid = false;
+    vfdb.viewGraphNeedsRefresh = true;
+    vfdb.stats = {};
+
+    absl::flat_hash_set<NamespaceString> viewNamesForDb;
 
     auto reloadCallback = [&](const BSONObj& view) -> Status {
         BSONObj collationSpec = view.hasField("collation") ? view["collation"].Obj() : BSONObj();
@@ -217,32 +251,33 @@ Status ViewCatalog::_reload(OperationContext* opCtx,
 
         if (!viewName.isOnInternalDb() && !viewName.isSystem()) {
             if (viewDef->timeseries()) {
-                _stats.userTimeseries += 1;
+                vfdb.stats.userTimeseries += 1;
             } else {
-                _stats.userViews += 1;
+                vfdb.stats.userViews += 1;
             }
         } else {
-            _stats.internal += 1;
+            vfdb.stats.internal += 1;
         }
 
-        _viewMap[viewName.ns()] = std::move(viewDef);
+        vfdb.viewMap[viewName.ns()] = std::move(viewDef);
         if (reloadForCollectionCatalog) {
-            viewsForDb.insert(viewName);
+            viewNamesForDb.insert(viewName);
         }
         return Status::OK();
     };
 
     try {
         if (lookupBehavior == ViewCatalogLookupBehavior::kValidateDurableViews) {
-            _durable->iterate(opCtx, reloadCallback);
+            vfdb.durable->iterate(opCtx, reloadCallback);
         } else if (lookupBehavior == ViewCatalogLookupBehavior::kAllowInvalidDurableViews) {
-            _durable->iterateIgnoreInvalidEntries(opCtx, reloadCallback);
+            vfdb.durable->iterateIgnoreInvalidEntries(opCtx, reloadCallback);
         } else {
             MONGO_UNREACHABLE;
         }
         if (reloadForCollectionCatalog) {
             CollectionCatalog::write(
-                opCtx, [&dbName, viewsForDb = std::move(viewsForDb)](CollectionCatalog& catalog) {
+                opCtx,
+                [&dbName, viewsForDb = std::move(viewNamesForDb)](CollectionCatalog& catalog) {
                     catalog.replaceViewsForDatabase(dbName, std::move(viewsForDb));
                 });
         }
@@ -250,20 +285,23 @@ Status ViewCatalog::_reload(OperationContext* opCtx,
         auto status = ex.toStatus();
         LOGV2(22547,
               "Could not load view catalog for database",
-              "db"_attr = _durable->getName(),
+              "db"_attr = vfdb.durable->getName(),
               "error"_attr = status);
         return status;
     }
 
-    _valid = true;
+    vfdb.valid = true;
     return Status::OK();
 }
 
-void ViewCatalog::clear(OperationContext* opCtx, const Database* db) {
-    auto catalog = getViewCatalog(db).writer();
+void ViewCatalog::clear(OperationContext* opCtx, StringData dbName) {
+    auto catalog = getViewCatalog(opCtx->getServiceContext()).writer();
+    auto it = catalog.writable()->_viewsForDatabase.find(dbName);
+    invariant(it != catalog.writable()->_viewsForDatabase.end());
+    auto& vfdb = it->second;
 
     // First, iterate through the views on this database and audit them before they are dropped.
-    for (auto&& view : catalog->_viewMap) {
+    for (auto&& view : vfdb.viewMap) {
         audit::logDropView(opCtx->getClient(),
                            (*view.second).name(),
                            (*view.second).viewOn().ns(),
@@ -271,33 +309,37 @@ void ViewCatalog::clear(OperationContext* opCtx, const Database* db) {
                            ErrorCodes::OK);
     }
 
-    catalog.writable()->_viewMap.clear();
-    catalog.writable()->_viewGraph.clear();
-    catalog.writable()->_valid = true;
-    catalog.writable()->_viewGraphNeedsRefresh = false;
-    catalog.writable()->_stats = {};
-    CollectionCatalog::write(opCtx, [db](CollectionCatalog& catalog) {
-        catalog.replaceViewsForDatabase(db->name(), {});
+    vfdb.viewMap.clear();
+    vfdb.viewGraph.clear();
+    vfdb.valid = true;
+    vfdb.viewGraphNeedsRefresh = false;
+    vfdb.stats = {};
+    CollectionCatalog::write(opCtx, [db = dbName.toString()](CollectionCatalog& catalog) {
+        catalog.replaceViewsForDatabase(db, {});
     });
     catalog.commit();
 }
 
-bool ViewCatalog::shouldIgnoreExternalChange(OperationContext* opCtx,
-                                             const Database* db,
-                                             const NamespaceString& name) {
-    return getViewCatalog(db).shouldIgnoreExternalChange();
+bool ViewCatalog::shouldIgnoreExternalChange(OperationContext* opCtx, const NamespaceString& name) {
+    return getViewCatalog(opCtx->getServiceContext()).shouldIgnoreExternalChange(name.db());
 }
 
-void ViewCatalog::_requireValidCatalog() const {
+void ViewCatalog::ViewsForDatabase::requireValidCatalog() const {
     uassert(ErrorCodes::InvalidViewDefinition,
             "Invalid view definition detected in the view catalog. Remove the invalid view "
             "manually to prevent disallowing any further usage of the view catalog.",
-            _valid);
+            valid);
 }
 
-void ViewCatalog::iterate(ViewIteratorCallback callback) const {
-    _requireValidCatalog();
-    for (auto&& view : _viewMap) {
+void ViewCatalog::iterate(StringData dbName, ViewIteratorCallback callback) const {
+    auto it = _viewsForDatabase.find(dbName);
+    if (it == _viewsForDatabase.end()) {
+        return;
+    }
+    auto& vfdb = it->second;
+
+    vfdb.requireValidCatalog();
+    for (auto&& view : vfdb.viewMap) {
         if (!callback(*view.second)) {
             break;
         }
@@ -314,7 +356,10 @@ Status ViewCatalog::_createOrUpdateView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    _requireValidCatalog();
+    auto it = _viewsForDatabase.find(viewName.db());
+    invariant(it != _viewsForDatabase.end());
+    auto& vfdb = it->second;
+    vfdb.requireValidCatalog();
 
     // Build the BSON definition for this view to be saved in the durable view catalog. If the
     // collation is empty, omit it from the definition altogether.
@@ -336,11 +381,12 @@ Status ViewCatalog::_createOrUpdateView(OperationContext* opCtx,
         return graphStatus;
     }
 
-    _durable->upsert(opCtx, viewName, viewDefBuilder.obj());
-    _viewMap[viewName.ns()] = view;
+    vfdb.durable->upsert(opCtx, viewName, viewDefBuilder.obj());
+    vfdb.viewMap[viewName.ns()] = view;
 
     // Reload the view catalog with the changes applied.
-    auto res = _reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews, false);
+    auto res =
+        _reload(opCtx, viewName.db(), ViewCatalogLookupBehavior::kValidateDurableViews, false);
     if (res.isOK()) {
         // Register the view in the CollectionCatalog mapping from ResourceID->namespace
         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
@@ -361,9 +407,13 @@ Status ViewCatalog::_createOrUpdateView(OperationContext* opCtx,
 }
 
 Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefinition& viewDef) {
+    auto it = _viewsForDatabase.find(viewDef.name().db());
+    invariant(it != _viewsForDatabase.end());
+    auto& vfdb = it->second;
 
     // Performs the insert into the graph.
-    auto doInsert = [this, &opCtx](const ViewDefinition& viewDef, bool needsValidation) -> Status {
+    auto doInsert = [this, opCtx, &vfdb](const ViewDefinition& viewDef,
+                                         bool needsValidation) -> Status {
         // Validate that the pipeline is eligible to serve as a view definition. If it is, this
         // will also return the set of involved namespaces.
         auto pipelineStatus = validatePipeline(opCtx, viewDef);
@@ -391,16 +441,16 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
             if (!collationStatus.isOK()) {
                 return collationStatus;
             }
-            return _viewGraph.insertAndValidate(viewDef, refs, pipelineSize);
+            return vfdb.viewGraph.insertAndValidate(viewDef, refs, pipelineSize);
         } else {
-            _viewGraph.insertWithoutValidating(viewDef, refs, pipelineSize);
+            vfdb.viewGraph.insertWithoutValidating(viewDef, refs, pipelineSize);
             return Status::OK();
         }
     };
 
-    if (_viewGraphNeedsRefresh) {
-        _viewGraph.clear();
-        for (auto&& iter : _viewMap) {
+    if (vfdb.viewGraphNeedsRefresh) {
+        vfdb.viewGraph.clear();
+        for (auto&& iter : vfdb.viewMap) {
             auto status = doInsert(*(iter.second.get()), false);
             // If we cannot fully refresh the graph, we will keep '_viewGraphNeedsRefresh' true.
             if (!status.isOK()) {
@@ -408,12 +458,12 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
             }
         }
         // Only if the inserts completed without error will we no longer need a refresh.
-        _viewGraphNeedsRefresh = false;
+        vfdb.viewGraphNeedsRefresh = false;
     }
 
     // Remove the view definition first in case this is an update. If it is not in the graph, it
     // is simply a no-op.
-    _viewGraph.remove(viewDef.name());
+    vfdb.viewGraph.remove(viewDef.name());
 
     return doInsert(viewDef, true);
 }
@@ -522,7 +572,6 @@ Status ViewCatalog::_validateCollation(OperationContext* opCtx,
 }
 
 Status ViewCatalog::createView(OperationContext* opCtx,
-                               const Database* db,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline,
@@ -532,7 +581,7 @@ Status ViewCatalog::createView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    const auto& catalogStorage = getViewCatalog(db);
+    const auto& catalogStorage = getViewCatalog(opCtx->getServiceContext());
     auto catalog = catalogStorage.writer();
 
     if (viewName.db() != viewOn.db())
@@ -552,8 +601,10 @@ Status ViewCatalog::createView(OperationContext* opCtx,
 
     Status result = Status::OK();
     {
-        ON_BLOCK_EXIT([&catalogStorage] { catalogStorage.setIgnoreExternalChange(false); });
-        catalogStorage.setIgnoreExternalChange(true);
+        ON_BLOCK_EXIT([&catalogStorage, &viewName] {
+            catalogStorage.setIgnoreExternalChange(viewName.db(), false);
+        });
+        catalogStorage.setIgnoreExternalChange(viewName.db(), true);
 
         result = catalog.writable()->_createOrUpdateView(
             opCtx, viewName, viewOn, pipeline, std::move(collator.getValue()));
@@ -565,7 +616,6 @@ Status ViewCatalog::createView(OperationContext* opCtx,
 }
 
 Status ViewCatalog::modifyView(OperationContext* opCtx,
-                               const Database* db,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline) {
@@ -573,7 +623,7 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    const auto& catalogStorage = getViewCatalog(db);
+    const auto& catalogStorage = getViewCatalog(opCtx->getServiceContext());
     auto catalog = catalogStorage.writer();
 
     if (viewName.db() != viewOn.db())
@@ -600,8 +650,10 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
 
     Status result = Status::OK();
     {
-        ON_BLOCK_EXIT([&catalogStorage] { catalogStorage.setIgnoreExternalChange(false); });
-        catalogStorage.setIgnoreExternalChange(true);
+        ON_BLOCK_EXIT([&catalogStorage, &viewName] {
+            catalogStorage.setIgnoreExternalChange(viewName.db(), false);
+        });
+        catalogStorage.setIgnoreExternalChange(viewName.db(), true);
 
         result = catalog.writable()->_createOrUpdateView(
             opCtx,
@@ -618,24 +670,28 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
     return result;
 }
 
-Status ViewCatalog::dropView(OperationContext* opCtx,
-                             const Database* db,
-                             const NamespaceString& viewName) {
+Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) {
     invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    const auto& catalogStorage = getViewCatalog(db);
+    const auto& catalogStorage = getViewCatalog(opCtx->getServiceContext());
     auto catalog = catalogStorage.writer();
-    catalog->_requireValidCatalog();
+
+    auto it = catalog.writable()->_viewsForDatabase.find(viewName.db());
+    invariant(it != catalog.writable()->_viewsForDatabase.end());
+    auto& vfdb = it->second;
+    vfdb.requireValidCatalog();
 
     Status result = Status::OK();
 
     {
-        ON_BLOCK_EXIT([&catalogStorage] { catalogStorage.setIgnoreExternalChange(false); });
+        ON_BLOCK_EXIT([&catalogStorage, &viewName] {
+            catalogStorage.setIgnoreExternalChange(viewName.db(), false);
+        });
 
-        catalogStorage.setIgnoreExternalChange(true);
+        catalogStorage.setIgnoreExternalChange(viewName.db(), true);
 
         // Save a copy of the view definition in case we need to roll back.
         auto viewPtr =
@@ -645,10 +701,10 @@ Status ViewCatalog::dropView(OperationContext* opCtx,
                     str::stream() << "cannot drop missing view: " << viewName.ns()};
         }
 
-        invariant(catalog->_valid);
-        catalog.writable()->_durable->remove(opCtx, viewName);
-        catalog.writable()->_viewGraph.remove(viewPtr->name());
-        catalog.writable()->_viewMap.erase(viewName.ns());
+        invariant(vfdb.valid);
+        vfdb.durable->remove(opCtx, viewName);
+        vfdb.viewGraph.remove(viewPtr->name());
+        vfdb.viewMap.erase(viewName.ns());
 
         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
@@ -668,7 +724,7 @@ Status ViewCatalog::dropView(OperationContext* opCtx,
 
         // Reload the view catalog with the changes applied.
         result = catalog.writable()->_reload(
-            opCtx, ViewCatalogLookupBehavior::kValidateDurableViews, false);
+            opCtx, viewName.db(), ViewCatalogLookupBehavior::kValidateDurableViews, false);
     }
     catalog.commit();
     return result;
@@ -678,9 +734,15 @@ std::shared_ptr<const ViewDefinition> ViewCatalog::_lookup(
     OperationContext* opCtx,
     const NamespaceString& ns,
     ViewCatalogLookupBehavior lookupBehavior) const {
-    ViewMap::const_iterator it = _viewMap.find(ns.ns());
-    if (it != _viewMap.end()) {
-        return it->second;
+    auto it = _viewsForDatabase.find(ns.db());
+    if (it == _viewsForDatabase.end()) {
+        return nullptr;
+    }
+    auto& vfdb = it->second;
+
+    ViewMap::const_iterator vmit = vfdb.viewMap.find(ns.ns());
+    if (vmit != vfdb.viewMap.end()) {
+        return vmit->second;
     }
     return nullptr;
 }
@@ -694,7 +756,13 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(OperationContext* opCtx,
 
 std::shared_ptr<const ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx,
                                                           const NamespaceString& ns) const {
-    if (!_valid && opCtx->getClient()->isFromUserConnection()) {
+    auto it = _viewsForDatabase.find(ns.db());
+    if (it == _viewsForDatabase.end()) {
+        return nullptr;
+    }
+    auto& vfdb = it->second;
+
+    if (!vfdb.valid && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
         if (!NamespaceString::validCollectionName(ns.ns())) {
             return nullptr;
@@ -703,7 +771,7 @@ std::shared_ptr<const ViewDefinition> ViewCatalog::lookup(OperationContext* opCt
         // ApplyOps should work on a valid existing collection, despite the presence of bad views
         // otherwise the server would crash. The view catalog will remain invalid until the bad view
         // definitions are removed.
-        _requireValidCatalog();
+        vfdb.requireValidCatalog();
     }
 
     return _lookup(opCtx, ns, ViewCatalogLookupBehavior::kValidateDurableViews);
@@ -718,7 +786,12 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
     OperationContext* opCtx,
     const NamespaceString& nss,
     boost::optional<BSONObj> timeSeriesCollator) const {
-    _requireValidCatalog();
+    auto it = _viewsForDatabase.find(nss.db());
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "View " << nss << " not found",
+            it != _viewsForDatabase.end());
+    auto& vfdb = it->second;
+    vfdb.requireValidCatalog();
 
     // Points to the name of the most resolved namespace.
     const NamespaceString* resolvedNss = &nss;
@@ -814,7 +887,12 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(
     MONGO_UNREACHABLE;
 }
 
-ViewCatalog::Stats ViewCatalog::getStats() const {
-    return _stats;
+boost::optional<ViewCatalog::Stats> ViewCatalog::getStats(StringData dbName) const {
+    auto it = _viewsForDatabase.find(dbName);
+    if (it == _viewsForDatabase.end()) {
+        return boost::none;
+    }
+    auto& vfdb = it->second;
+    return vfdb.stats;
 }
 }  // namespace mongo

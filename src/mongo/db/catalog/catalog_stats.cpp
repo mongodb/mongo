@@ -80,23 +80,25 @@ public:
         stats.internalCollections = catalogStats.internal;
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames();
-        for (const auto& dbName : viewCatalogDbNames) {
-            try {
-                const auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
-                if (!viewCatalog) {
-                    // The database may have been dropped between listing the database names and
-                    // looking up the view catalog.
-                    continue;
+        if (const auto viewCatalog = ViewCatalog::get(opCtx)) {
+            for (const auto& dbName : viewCatalogDbNames) {
+                try {
+                    const auto viewStats = viewCatalog->getStats(dbName);
+                    if (!viewStats) {
+                        // The database may have been dropped between listing the database names and
+                        // looking up the view catalog.
+                        continue;
+                    }
+
+                    stats.timeseries += viewStats->userTimeseries;
+                    stats.views += viewStats->userViews;
+                    stats.internalViews += viewStats->internal;
+                } catch (ExceptionForCat<ErrorCategory::Interruption>&) {
+                    LOGV2_DEBUG(5578400,
+                                2,
+                                "Failed to collect view catalog statistics",
+                                "db"_attr = dbName);
                 }
-                const auto viewStats = viewCatalog->getStats();
-                stats.timeseries += viewStats.userTimeseries;
-                stats.views += viewStats.userViews;
-                stats.internalViews += viewStats.internal;
-            } catch (ExceptionForCat<ErrorCategory::Interruption>&) {
-                LOGV2_DEBUG(5578400,
-                            2,
-                            "Failed to collect view catalog statistics",
-                            "dbName"_attr = dbName);
             }
         }
 

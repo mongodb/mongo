@@ -95,7 +95,7 @@ std::shared_ptr<const ViewCatalog> DatabaseHolderImpl::getViewCatalog(OperationC
     if (it != _dbs.end()) {
         const Database* db = it->second;
         if (db) {
-            return ViewCatalog::get(db);
+            return ViewCatalog::get(opCtx);
         }
     }
 
@@ -141,11 +141,23 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     if (auto db = _dbs[dbname])
         return db;
 
+    std::unique_ptr<DatabaseImpl> newDb;
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
-    ScopeGuard removeDbGuard([this, &lk, dbname] {
+    ScopeGuard removeDbGuard([this, &lk, &newDb, opCtx, dbname] {
         if (!lk.owns_lock())
             lk.lock();
-        _dbs.erase(dbname);
+        auto it = _dbs.find(dbname);
+        // If someone else hasn't either already removed it or already set it successfully, remove.
+        if (it != _dbs.end() && !it->second) {
+            _dbs.erase(it);
+        }
+        if (newDb) {
+            ViewCatalog::unregisterDatabase(opCtx, newDb.get());
+        }
+
+        // In case anyone else is trying to open the same DB simultaneously and waiting on our
+        // result, we should notify them we failed and let them try in our place.
+        _c.notify_all();
     });
 
     // Check casing in lock to avoid transient duplicates.
@@ -166,26 +178,55 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
             *justCreated = true;
     }
 
-    auto newDb = std::make_unique<DatabaseImpl>(dbname);
-    newDb->init(opCtx);
+    newDb = std::make_unique<DatabaseImpl>(dbname);
+    Status status = newDb->init(opCtx);
+    while (!status.isOK()) {
+        // If we get here, then initializing the database failed because another concurrent writer
+        // already registered their own Database instance with the ViewCatalog. We need to wait for
+        // them to finish.
+        lk.lock();
+
+        auto it = _dbs.find(dbname);
+        if (it != _dbs.end() && it->second) {
+            // Creating databases only requires a DB lock in MODE_IX. Thus databases can be created
+            // concurrently. If this thread "lost the race", return the database object that was
+            // persisted in the `_dbs` map.
+            removeDbGuard.dismiss();
+            return it->second;
+        }
+
+        // Consider using OperationContext::waitForConditionOrInterrupt if the logic here changes
+        // in such a way that we can easily express it as a predicate for that function.
+        _c.wait_for(lk, stdx::chrono::milliseconds(1));
+
+        it = _dbs.find(dbname);
+        if (it != _dbs.end() && it->second) {
+            // As above, another writer finished successfully, return the persisted object.
+            removeDbGuard.dismiss();
+            return it->second;
+        }
+
+        lk.unlock();
+
+        // Before we continue make sure we haven't been killed
+        opCtx->checkForInterrupt();
+
+        // At this point it's possible that the other writer just hasn't finished yet, or that they
+        // failed. In either case, we should check and see if we can initialize the database now.
+        status = newDb->init(opCtx);
+    }
 
     // Finally replace our nullptr entry with the new Database pointer.
     removeDbGuard.dismiss();
     lk.lock();
-    auto it = _dbs.find(dbname);
-    // Dropping a database requires a MODE_X lock, so the entry in the `_dbs` map cannot disappear.
-    invariant(it != _dbs.end());
-    if (it->second) {
-        // Creating databases only requires a DB lock in MODE_IX. Thus databases can concurrently
-        // created. If this thread "lost the race", return the database object that was persisted in
-        // the `_dbs` map.
-        return it->second;
-    }
 
-    it->second = newDb.release();
+    invariant(!_dbs[dbname]);
+    auto* db = newDb.release();
+    _dbs[dbname] = db;
     invariant(_getNamesWithConflictingCasing_inlock(dbname.toString()).empty());
+    _c.notify_all();
 
-    return it->second;
+    return db;
 }
 
 void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
@@ -253,14 +294,28 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
     const StringData dbName = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    stdx::unique_lock<SimpleMutex> lk(_m);
 
     DBs::const_iterator it = _dbs.find(dbName);
     if (it == _dbs.end()) {
         return;
     }
 
+    // Unlock to unregister this database from the ViewCatalog, then reacquire the lock.
     auto db = it->second;
+    lk.unlock();
+    ViewCatalog::unregisterDatabase(opCtx, db);
+    lk.lock();
+
+    // It's possible another thread altered the record before we reacquired the lock, so make sure
+    // we still have the same database.
+    it = _dbs.find(dbName);
+    if (it == _dbs.end() || db != it->second) {
+        return;
+    }
+
+    LOGV2_DEBUG(20311, 2, "DatabaseHolder::close", "db"_attr = dbName);
+
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog.onCloseDatabase(opCtx, dbName.toString());
     });
@@ -277,29 +332,25 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    while (true) {
+        std::vector<std::string> dbs;
+        {
+            stdx::lock_guard<SimpleMutex> lk(_m);
+            for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
+                // It is the caller's responsibility to ensure that no index builds are active in
+                // the database.
+                IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(i->first);
+                dbs.push_back(i->first);
+            }
+        }
 
-    std::set<std::string> dbs;
-    for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
-        // It is the caller's responsibility to ensure that no index builds are active in the
-        // database.
-        IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(i->first);
-        dbs.insert(i->first);
-    }
+        if (dbs.empty()) {
+            break;
+        }
 
-    auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-
-    for (const auto& name : dbs) {
-        LOGV2_DEBUG(20311, 2, "DatabaseHolder::closeAll name:{name}", "name"_attr = name);
-
-        Database* db = _dbs[name];
-        CollectionCatalog::write(
-            opCtx, [&](CollectionCatalog& catalog) { catalog.onCloseDatabase(opCtx, name); });
-        delete db;
-
-        _dbs.erase(name);
-
-        storageEngine->closeDatabase(opCtx, name).transitional_ignore();
+        for (const auto& name : dbs) {
+            close(opCtx, name);
+        }
     }
 }
 

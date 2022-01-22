@@ -77,7 +77,7 @@ public:
     /**
      * Sets up internal memory structures.
      */
-    virtual void init(OperationContext* opCtx) const = 0;
+    virtual Status init(OperationContext* opCtx) = 0;
 
     virtual const std::string& name() const = 0;
 

@@ -313,7 +313,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     auto db = databaseHolder->getDb(opCtx, ns.db());
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "Cannot create indexes on a view",
-            !db || !ViewCatalog::get(db)->lookup(opCtx, ns));
+            !db || !ViewCatalog::get(opCtx)->lookup(opCtx, ns));
 
     if (createCollImplicitly) {
         for (const auto& spec : specs) {
