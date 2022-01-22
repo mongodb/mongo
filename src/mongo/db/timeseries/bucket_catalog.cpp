@@ -644,8 +644,7 @@ void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats,
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
     int32_t numClosed = 0;
     while (!_idleBuckets.empty() &&
-           _memoryUsage.load() > static_cast<std::uint64_t>(
-                                     gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.load()) &&
+           _memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
            numClosed <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = _idleBuckets.back();
 
