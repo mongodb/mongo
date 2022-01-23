@@ -75,7 +75,7 @@ private:
 std::vector<uint8_t> LocalKMSService::encrypt(ConstDataRange cdr, StringData kmsKeyId) {
     std::vector<std::uint8_t> ciphertext(crypto::aeadCipherOutputLength(cdr.length()));
 
-    uassertStatusOK(crypto::aeadEncryptLocalKMS(_key, cdr, ciphertext.data(), ciphertext.size()));
+    uassertStatusOK(crypto::aeadEncryptLocalKMS(_key, cdr, {ciphertext}));
 
     return ciphertext;
 }
@@ -95,9 +95,7 @@ BSONObj LocalKMSService::encryptDataKeyByString(ConstDataRange cdr, StringData k
 SecureVector<uint8_t> LocalKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
     SecureVector<uint8_t> plaintext(uassertStatusOK(aeadGetMaximumPlainTextLength(cdr.length())));
 
-    size_t outLen = plaintext->size();
-    uassertStatusOK(crypto::aeadDecryptLocalKMS(_key, cdr, plaintext->data(), &outLen));
-    plaintext->resize(outLen);
+    plaintext->resize(uassertStatusOK(crypto::aeadDecryptLocalKMS(_key, cdr, {*plaintext})));
 
     return plaintext;
 }

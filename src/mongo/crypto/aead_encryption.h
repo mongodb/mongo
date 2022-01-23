@@ -70,39 +70,33 @@ Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe);
  * Uses AEAD_AES_256_CBC_HMAC_SHA_512 encryption to encrypt a local datakey.
  * Writes output to out.
  */
-Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, uint8_t* out, size_t outLen);
+Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, DataRange out);
+
 /**
  * Internal calls for the aeadEncryption algorithm. Only used for testing.
  */
 Status aeadEncryptWithIV(ConstDataRange key,
-                         const uint8_t* in,
-                         size_t inLen,
-                         const uint8_t* iv,
-                         size_t ivLen,
-                         const uint8_t* associatedData,
-                         uint64_t associatedDataLen,
+                         ConstDataRange in,
+                         ConstDataRange iv,
+                         ConstDataRange associatedData,
                          ConstDataRange dataLenBitsEncodedStorage,
-                         uint8_t* out,
-                         size_t outLen);
+                         DataRange out);
 
 /**
  * Internal call for the aeadDecryption algorithm. Only used for testing.
  */
-Status aeadDecrypt(const SymmetricKey& key,
-                   ConstDataRange ciphertext,
-                   const uint8_t* associatedData,
-                   uint64_t associatedDataLen,
-                   uint8_t* out,
-                   size_t* outLen);
+StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
+                                    ConstDataRange ciphertext,
+                                    ConstDataRange associatedData,
+                                    DataRange out);
 
 /**
  * Decrypts the cipherText using AEAD_AES_256_CBC_HMAC_SHA_512 decryption. Writes output
  * to out.
  */
-Status aeadDecryptLocalKMS(const SymmetricKey& key,
-                           ConstDataRange cipher,
-                           uint8_t* out,
-                           size_t* outLen);
+StatusWith<std::size_t> aeadDecryptLocalKMS(const SymmetricKey& key,
+                                            ConstDataRange cipher,
+                                            DataRange out);
 
 }  // namespace crypto
 }  // namespace mongo

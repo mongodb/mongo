@@ -47,6 +47,10 @@ constexpr size_t kIVSize = 16;
 // object, a value of 1<<16 was decided to cap the maximum size of AssociatedData.
 constexpr int kMaxAssociatedDataLength = 1 << 16;
 
+std::uint8_t* asUint8(DataRange buffer) {
+    return const_cast<std::uint8_t*>(buffer.data<std::uint8_t>());
+}
+
 size_t aesCBCCipherOutputLength(size_t plainTextLen) {
     return aesBlockSize * (1 + plainTextLen / aesBlockSize);
 }
@@ -55,31 +59,29 @@ std::pair<size_t, size_t> aesCBCExpectedPlaintextLen(size_t cipherTextLength) {
     return {cipherTextLength - aesCBCIVSize - aesBlockSize, cipherTextLength - aesCBCIVSize};
 }
 
-void aeadGenerateIV(const SymmetricKey* key, uint8_t* buffer, size_t bufferLen) {
-    if (bufferLen < aesCBCIVSize) {
+void aeadGenerateIV(const SymmetricKey* key, DataRange buffer) {
+    if (buffer.length() < aesCBCIVSize) {
         fassert(51235, "IV buffer is too small for selected mode");
     }
 
-    auto status = engineRandBytes({buffer, aesCBCIVSize});
+    auto status = engineRandBytes({asUint8(buffer), aesCBCIVSize});
     if (!status.isOK()) {
         fassert(51236, status);
     }
 }
 
-Status _aesEncrypt(const SymmetricKey& key,
-                   const std::uint8_t* inPtr,
-                   std::size_t inLen,
-                   std::uint8_t* outPtr,
-                   std::size_t outLen,
-                   std::size_t* resultLen,
-                   bool ivProvided) try {
+StatusWith<std::size_t> _aesEncrypt(const SymmetricKey& key,
+                                    ConstDataRange in,
+                                    DataRange outRange,
+                                    bool ivProvided) try {
     if (!ivProvided) {
-        aeadGenerateIV(&key, outPtr, aesCBCIVSize);
+        aeadGenerateIV(&key, outRange);
     }
 
-    ConstDataRange in(inPtr, inLen);
-    DataRange iv(outPtr, aesCBCIVSize);
-    DataRangeCursor out(outPtr + aesCBCIVSize, outLen - aesCBCIVSize);
+    DataRangeCursor out(outRange);
+    DataRange iv(asUint8(out), aesCBCIVSize);
+    out.advance(aesCBCIVSize);
+
     auto encryptor = uassertStatusOK(SymmetricEncryptor::create(key, aesMode::cbc, iv));
 
     const auto updateLen = uassertStatusOK(encryptor->update(in, out));
@@ -93,55 +95,53 @@ Status _aesEncrypt(const SymmetricKey& key,
     // memory to store the worst case. We must then set the actual size of the ciphertext so that
     // the buffer it has been written to may be serialized.
     const auto len = updateLen + finalLen;
-    *resultLen = aesCBCIVSize + len;
 
     // Check the returned length, including block size padding
     if (len != aesCBCCipherOutputLength(in.length())) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Encrypt error, expected cipher text of length "
-                              << aesCBCCipherOutputLength(inLen) << " but found " << len};
+                              << aesCBCCipherOutputLength(in.length()) << " but found " << len};
     }
 
-    return Status::OK();
+    return aesCBCIVSize + len;
 } catch (const AssertionException& ex) {
     return ex.toStatus();
 }
 
-Status _aesDecrypt(const SymmetricKey& key,
-                   ConstDataRange in,
-                   std::uint8_t* out,
-                   std::size_t outLen,
-                   std::size_t* resultLen) try {
+StatusWith<std::size_t> _aesDecrypt(const SymmetricKey& key,
+                                    ConstDataRange inRange,
+                                    DataRange outRange) try {
     // Check the plaintext buffer can fit the product of decryption
-    auto [lowerBound, upperBound] = aesCBCExpectedPlaintextLen(in.length());
-    if (upperBound > outLen) {
+    auto [lowerBound, upperBound] = aesCBCExpectedPlaintextLen(inRange.length());
+    if (upperBound > outRange.length()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "Cleartext buffer of size " << outLen
+                str::stream() << "Cleartext buffer of size " << outRange.length()
                               << " too small for output which can be as large as " << upperBound
                               << "]"};
     }
 
 
-    ConstDataRange iv(in.data(), aesCBCIVSize);
-    ConstDataRange data(in.data() + aesCBCIVSize, in.length() - aesCBCIVSize);
+    ConstDataRangeCursor in(inRange);
+    ConstDataRange iv(inRange.data(), aesCBCIVSize);
+    in.advance(aesCBCIVSize);
+
     auto decryptor = uassertStatusOK(SymmetricDecryptor::create(key, aesMode::cbc, iv));
 
-    DataRangeCursor outCursor(out, outLen);
-    const auto updateLen = uassertStatusOK(decryptor->update(data, outCursor));
-    outCursor.advance(updateLen);
+    DataRangeCursor out(outRange);
+    const auto updateLen = uassertStatusOK(decryptor->update(in, out));
+    out.advance(updateLen);
 
-    const auto finalLen = uassertStatusOK(decryptor->finalize(outCursor));
-    outCursor.advance(finalLen);
+    const auto finalLen = uassertStatusOK(decryptor->finalize(out));
+    out.advance(finalLen);
 
-    *resultLen = updateLen + finalLen;
-    invariant(*resultLen <= outLen);
+    auto outputLen = updateLen + finalLen;
 
     // Check the returned length, excluding headers block padding
-    if (*resultLen < lowerBound || *resultLen > upperBound) {
+    if ((outputLen < lowerBound) || (outputLen > upperBound)) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Decrypt error, expected clear text length in interval"
                               << "[" << lowerBound << "," << upperBound << "]"
-                              << "but found " << *resultLen};
+                              << "but found " << outputLen};
     }
 
     /* Check that padding was removed.
@@ -157,13 +157,13 @@ Status _aesDecrypt(const SymmetricKey& key,
      * key or ciphertext are corrupted and its unable to find any
      * expected padding.  It fails open by returning whatever it can.
      */
-    if (*resultLen >= data.length()) {
+    if (outputLen >= in.length()) {
         return {ErrorCodes::BadValue,
                 "Decrypt error, plaintext is as large or larger than "
                 "the ciphertext. This usually indicates an invalid key."};
     }
 
-    return Status::OK();
+    return outputLen;
 } catch (const AssertionException& ex) {
     return ex.toStatus();
 }
@@ -181,10 +181,7 @@ size_t aeadCipherOutputLength(size_t plainTextLen) {
     return aesOutLen + kHmacOutSize;
 }
 
-Status aeadEncryptLocalKMS(const SymmetricKey& key,
-                           const ConstDataRange in,
-                           uint8_t* out,
-                           size_t outLen) {
+Status aeadEncryptLocalKMS(const SymmetricKey& key, ConstDataRange in, DataRange out) {
     if (key.getKeySize() != kFieldLevelEncryptionKeySize) {
         return Status(ErrorCodes::BadValue,
                       "AEAD encryption key is the incorrect length. "
@@ -200,17 +197,9 @@ Status aeadEncryptLocalKMS(const SymmetricKey& key,
     dataLenBitsEncoded.write<BigEndian<uint64_t>>(static_cast<uint64_t>(0));
 
     ConstDataRange keyCDR(key.getKey(), kAeadAesHmacKeySize);
+    ConstDataRange empty(nullptr, 0);
 
-    return aeadEncryptWithIV(keyCDR,
-                             in.data<uint8_t>(),
-                             in.length(),
-                             nullptr,
-                             0,
-                             nullptr,
-                             0,
-                             dataLenBitsEncoded,
-                             out,
-                             outLen);
+    return aeadEncryptWithIV(keyCDR, in, empty, empty, dataLenBitsEncoded, out);
 }
 
 Status aeadEncryptDataFrame(FLEEncryptionFrame& dataframe) {
@@ -263,105 +252,91 @@ Status aeadEncryptDataFrame(FLEEncryptionFrame& dataframe) {
     }
 
     ConstDataRange aeadKey(key->getKey(), kAeadAesHmacKeySize);
-    return aeadEncryptWithIV(aeadKey,
-                             plaintext.data<uint8_t>(),
-                             plaintext.length(),
-                             iv.data<uint8_t>(),
-                             iv.length(),
-                             associatedData.data<uint8_t>(),
-                             associatedData.length(),
-                             dataLenBitsEncoded,
-                             dataframe.getCiphertextMutable(),
-                             dataframe.getDataLength());
+    DataRange out(dataframe.getCiphertextMutable(), dataframe.getDataLength());
+    return aeadEncryptWithIV(aeadKey, plaintext, iv, associatedData, dataLenBitsEncoded, out);
 }
 
 Status aeadEncryptWithIV(ConstDataRange key,
-                         const uint8_t* in,
-                         const size_t inLen,
-                         const uint8_t* iv,
-                         const size_t ivLen,
-                         const uint8_t* associatedData,
-                         const uint64_t associatedDataLen,
+                         ConstDataRange in,
+                         ConstDataRange iv,
+                         ConstDataRange associatedData,
                          ConstDataRange dataLenBitsEncoded,
-                         uint8_t* out,
-                         size_t outLen) {
+                         DataRange out) {
     if (key.length() != kAeadAesHmacKeySize) {
         return Status(ErrorCodes::BadValue, "Invalid key size.");
     }
 
-    if (!(in && out)) {
+    if (!(in.length() && out.length())) {
         return Status(ErrorCodes::BadValue, "Invalid AEAD parameters.");
     }
 
-    if (outLen != aeadCipherOutputLength(inLen)) {
+    if (out.length() != aeadCipherOutputLength(in.length())) {
         return Status(ErrorCodes::BadValue, "Invalid output buffer size.");
     }
 
-    if (associatedDataLen >= kMaxAssociatedDataLength) {
+    if (associatedData.length() >= kMaxAssociatedDataLength) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "AssociatedData for encryption is too large. Cannot be larger than "
                           << kMaxAssociatedDataLength << " bytes.");
     }
 
-    const uint8_t* macKey = reinterpret_cast<const uint8_t*>(key.data());
-    const uint8_t* encKey = reinterpret_cast<const uint8_t*>(key.data() + sym256KeySize);
-
-    size_t aesOutLen = outLen - kHmacOutSize;
-
-    size_t cipherTextLen = 0;
-
-    SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
-
     bool ivProvided = false;
-    if (ivLen != 0) {
-        invariant(ivLen == 16);
-        std::copy(iv, iv + ivLen, out);
+    if (iv.length() != 0) {
+        invariant(iv.length() == 16);
+        out.write(iv);
         ivProvided = true;
     }
 
-    auto sEncrypt = _aesEncrypt(symEncKey, in, inLen, out, aesOutLen, &cipherTextLen, ivProvided);
+    const auto* macKey = reinterpret_cast<const std::uint8_t*>(key.data());
+    const auto* encKey = reinterpret_cast<const std::uint8_t*>(key.data() + sym256KeySize);
 
-    if (!sEncrypt.isOK()) {
-        return sEncrypt;
+    SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, "aesKey", 1);
+    std::size_t aesOutLen = out.length() - kHmacOutSize;
+
+    auto swEncrypt = _aesEncrypt(symEncKey, in, {asUint8(out), aesOutLen}, ivProvided);
+    if (!swEncrypt.isOK()) {
+        return swEncrypt.getStatus();
     }
 
-    SHA512Block hmacOutput =
-        SHA512Block::computeHmac(macKey,
-                                 sym256KeySize,
-                                 {ConstDataRange(associatedData, associatedDataLen),
-                                  ConstDataRange(out, cipherTextLen),
-                                  dataLenBitsEncoded});
+    // Split `out` into two separate ranges.
+    // One for the just written ciphertext,
+    // and another for the HMAC signature on the end.
+    ConstDataRange cipherTextRange(out.data(), swEncrypt.getValue());
+    DataRange hmacRange(asUint8(out) + cipherTextRange.length(), kHmacOutSize);
 
-    std::copy(hmacOutput.data(), hmacOutput.data() + kHmacOutSize, out + cipherTextLen);
+    SHA512Block hmacOutput = SHA512Block::computeHmac(
+        macKey, sym256KeySize, {associatedData, cipherTextRange, dataLenBitsEncoded});
+
+    // We intentionally only write the first 256 bits of the digest produced by SHA512.
+    ConstDataRange truncatedHash(hmacOutput.data(), kHmacOutSize);
+    hmacRange.write(truncatedHash);
     return Status::OK();
 }
 
-Status aeadDecrypt(const SymmetricKey& key,
-                   ConstDataRange ciphertext,
-                   const uint8_t* associatedData,
-                   const uint64_t associatedDataLen,
-                   uint8_t* out,
-                   size_t* outLen) {
+StatusWith<std::size_t> aeadDecrypt(const SymmetricKey& key,
+                                    ConstDataRange in,
+                                    ConstDataRange associatedData,
+                                    DataRange out) {
     if (key.getKeySize() < kAeadAesHmacKeySize) {
         return Status(ErrorCodes::BadValue, "Invalid key size.");
     }
 
-    if (!out) {
+    if (!out.length()) {
         return Status(ErrorCodes::BadValue, "Invalid AEAD parameters.");
     }
 
-    if (ciphertext.length() < kHmacOutSize) {
+    if (in.length() < kHmacOutSize) {
         return Status(ErrorCodes::BadValue, "Ciphertext is not long enough.");
     }
 
     size_t expectedMaximumPlainTextSize =
-        uassertStatusOK(aeadGetMaximumPlainTextLength(ciphertext.length()));
-    if ((*outLen) != expectedMaximumPlainTextSize) {
+        uassertStatusOK(aeadGetMaximumPlainTextLength(in.length()));
+    if (out.length() != expectedMaximumPlainTextSize) {
         return Status(ErrorCodes::BadValue, "Output buffer must be as long as the cipherText.");
     }
 
-    if (associatedDataLen >= kMaxAssociatedDataLength) {
+    if (associatedData.length() >= kMaxAssociatedDataLength) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
                           << "AssociatedData for encryption is too large. Cannot be larger than "
@@ -371,59 +346,53 @@ Status aeadDecrypt(const SymmetricKey& key,
     const uint8_t* macKey = key.getKey();
     const uint8_t* encKey = key.getKey() + sym256KeySize;
 
-    size_t aesLen = ciphertext.length() - kHmacOutSize;
+    // Split input into actual ciphertext, and the HMAC bit at the end.
+    const auto* inEnd = in.data() + in.length();
+    const auto* hmacStart = inEnd - kHmacOutSize;
+    ConstDataRange cipherText(in.data(), hmacStart);
+    ConstDataRange hmacRange(hmacStart, inEnd);
 
     // According to the rfc on AES encryption, the associatedDataLength is defined as the
     // number of bits in associatedData in BigEndian format. This is what the code segment
     // below describes.
     std::array<uint8_t, sizeof(uint64_t)> dataLenBitsEncodedStorage;
     DataRange dataLenBitsEncoded(dataLenBitsEncodedStorage);
-    dataLenBitsEncoded.write<BigEndian<uint64_t>>(associatedDataLen * 8);
+    dataLenBitsEncoded.write<BigEndian<uint64_t>>(associatedData.length() * 8);
 
-    SHA512Block hmacOutput =
-        SHA512Block::computeHmac(macKey,
-                                 sym256KeySize,
-                                 {ConstDataRange(associatedData, associatedDataLen),
-                                  ConstDataRange(ciphertext.data(), aesLen),
-                                  dataLenBitsEncoded});
+    SHA512Block hmacOutput = SHA512Block::computeHmac(
+        macKey, sym256KeySize, {associatedData, cipherText, dataLenBitsEncoded});
 
+    // Note that while we produce a 512bit digest with SHA512,
+    // we only store and validate the first 256 bits (32 bytes).
     if (consttimeMemEqual(reinterpret_cast<const unsigned char*>(hmacOutput.data()),
-                          ciphertext.data<const unsigned char>() + aesLen,
+                          reinterpret_cast<const unsigned char*>(hmacRange.data()),
                           kHmacOutSize) == false) {
         return Status(ErrorCodes::BadValue, "HMAC data authentication failed.");
     }
 
     SymmetricKey symEncKey(encKey, sym256KeySize, aesAlgorithm, key.getKeyId(), 1);
 
-    auto sDecrypt =
-        _aesDecrypt(symEncKey, ConstDataRange(ciphertext.data(), aesLen), out, aesLen, outLen);
-    if (!sDecrypt.isOK()) {
-        return sDecrypt;
-    }
-
-    return Status::OK();
+    return _aesDecrypt(symEncKey, cipherText, out);
 }
 
 Status aeadDecryptDataFrame(FLEDecryptionFrame& dataframe) {
     auto ciphertext = dataframe.getCiphertext();
     auto associatedData = dataframe.getAssociatedData();
     auto& plaintext = dataframe.getPlaintextMutable();
-    size_t outLen = plaintext.size();
-    Status status = aeadDecrypt(*dataframe.getKey(),
-                                ciphertext,
-                                associatedData.data<uint8_t>(),
-                                associatedData.length(),
-                                plaintext.data(),
-                                &outLen);
-    plaintext.resize(outLen);
-    return status;
+    auto swPlainSize = aeadDecrypt(*dataframe.getKey(), ciphertext, associatedData, plaintext);
+    if (swPlainSize.isOK()) {
+        plaintext.resize(swPlainSize.getValue());
+    } else {
+        plaintext.resize(0);
+    }
+
+    return swPlainSize.getStatus();
 }
 
-Status aeadDecryptLocalKMS(const SymmetricKey& key,
-                           const ConstDataRange cipher,
-                           uint8_t* out,
-                           size_t* outLen) {
-    return aeadDecrypt(key, cipher, nullptr, 0, out, outLen);
+StatusWith<std::size_t> aeadDecryptLocalKMS(const SymmetricKey& key,
+                                            ConstDataRange cipher,
+                                            DataRange out) {
+    return aeadDecrypt(key, cipher, {nullptr, 0}, out);
 }
 
 }  // namespace crypto

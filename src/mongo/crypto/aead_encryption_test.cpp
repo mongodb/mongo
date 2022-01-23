@@ -78,8 +78,6 @@ TEST(AEAD, EncryptAndDecrypt) {
         0x79, 0x20, 0x77, 0x69, 0x74, 0x68, 0x6f, 0x75, 0x74, 0x20, 0x69, 0x6e, 0x63, 0x6f, 0x6e,
         0x76, 0x65, 0x6e, 0x69, 0x65, 0x6e, 0x63, 0x65};
 
-    std::array<uint8_t, 192> cryptoBuffer = {};
-
     std::array<uint8_t, 16> iv = {0x1a,
                                   0xf3,
                                   0x8c,
@@ -102,24 +100,16 @@ TEST(AEAD, EncryptAndDecrypt) {
         0x6e, 0x63, 0x69, 0x70, 0x6c, 0x65, 0x20, 0x6f, 0x66, 0x20, 0x41, 0x75, 0x67, 0x75,
         0x73, 0x74, 0x65, 0x20, 0x4b, 0x65, 0x72, 0x63, 0x6b, 0x68, 0x6f, 0x66, 0x66, 0x73};
 
-    const size_t dataLen = 42;
-
     std::array<uint8_t, sizeof(uint64_t)> dataLenBitsEncodedStorage;
     DataRange dataLenBitsEncoded(dataLenBitsEncodedStorage);
-    dataLenBitsEncoded.write<BigEndian<uint64_t>>(dataLen * 8);
+    dataLenBitsEncoded.write<BigEndian<uint64_t>>(associatedData.size() * 8);
 
-    const size_t outLen = crypto::aeadCipherOutputLength(128);
+    std::array<uint8_t, 192> cryptoBuffer = {};
+    const size_t outLen = crypto::aeadCipherOutputLength(plainTextTest.size());
+    ASSERT_EQ(outLen, cryptoBuffer.size());
 
-    ASSERT_OK(crypto::aeadEncryptWithIV(symKey,
-                                        plainTextTest.data(),
-                                        plainTextTest.size(),
-                                        iv.data(),
-                                        iv.size(),
-                                        associatedData.data(),
-                                        dataLen,
-                                        dataLenBitsEncoded,
-                                        cryptoBuffer.data(),
-                                        outLen));
+    ASSERT_OK(crypto::aeadEncryptWithIV(
+        symKey, {plainTextTest}, {iv}, {associatedData}, dataLenBitsEncoded, {cryptoBuffer}));
 
     std::array<uint8_t, 192> cryptoBufferTest = {
         0x1a, 0xf3, 0x8c, 0x2d, 0xc2, 0xb9, 0x6f, 0xfd, 0xd8, 0x66, 0x94, 0x09, 0x23, 0x41, 0xbc,
@@ -136,28 +126,21 @@ TEST(AEAD, EncryptAndDecrypt) {
         0xa7, 0xf4, 0x5c, 0x21, 0x68, 0x39, 0x64, 0x5b, 0x20, 0x12, 0xbf, 0x2e, 0x62, 0x69, 0xa8,
         0xc5, 0x6a, 0x81, 0x6d, 0xbc, 0x1b, 0x26, 0x77, 0x61, 0x95, 0x5b, 0xc5};
 
-    ASSERT_EQ(0, std::memcmp(cryptoBuffer.data(), cryptoBufferTest.data(), 192));
+    ASSERT_EQ(cryptoBuffer.size(), cryptoBufferTest.size());
+    ASSERT_EQ(0, std::memcmp(cryptoBuffer.data(), cryptoBufferTest.data(), cryptoBuffer.size()));
 
     std::array<uint8_t, 144> plainText = {};
-    size_t plainTextDecryptLen = 144;
-    ASSERT_OK(crypto::aeadDecrypt(key,
-                                  ConstDataRange(cryptoBuffer),
-                                  associatedData.data(),
-                                  dataLen,
-                                  plainText.data(),
-                                  &plainTextDecryptLen));
+    auto swPlainTextLen = crypto::aeadDecrypt(key, {cryptoBuffer}, {associatedData}, {plainText});
+    ASSERT_OK(swPlainTextLen.getStatus());
 
-    ASSERT_EQ(0, std::memcmp(plainText.data(), plainTextTest.data(), 128));
+    ASSERT_EQ(plainTextTest.size(), swPlainTextLen.getValue());
+    ASSERT_EQ(0, std::memcmp(plainText.data(), plainTextTest.data(), plainTextTest.size()));
 
     // Decrypt should fail if we alter the key.
     (*aesVector)[0] ^= 1;
     key = SymmetricKey(aesVector, aesAlgorithm, "aeadEncryptDecryptTest");
-    ASSERT_NOT_OK(crypto::aeadDecrypt(key,
-                                      ConstDataRange(cryptoBuffer),
-                                      associatedData.data(),
-                                      dataLen,
-                                      plainText.data(),
-                                      &plainTextDecryptLen));
+    ASSERT_NOT_OK(
+        crypto::aeadDecrypt(key, {cryptoBuffer}, {associatedData}, {plainText}).getStatus());
 }
 }  // namespace
 }  // namespace mongo
