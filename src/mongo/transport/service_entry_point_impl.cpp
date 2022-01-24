@@ -248,10 +248,9 @@ bool ServiceEntryPointImpl::shutdown(Milliseconds timeout) {
     // When running under address sanitizer, we get false positive leaks due to disorder around
     // the lifecycle of a connection and request. When we are running under ASAN, we try a lot
     // harder to dry up the server from active connections before going on to really shut down.
-    return shutdownAndWait(timeout);
-#else
-    return true;
+    invariant(shutdownAndWait(timeout), "Shutdown did not complete within the time limit");
 #endif
+    return true;
 }
 
 bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
@@ -276,7 +275,8 @@ bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
             "shutdown: exhausted grace period for {workers} active workers to "
             "drain; continuing with shutdown...",
             "shutdown: exhausted grace period active workers to drain; continuing with shutdown...",
-            "workers"_attr = numOpenSessions());
+            "workers"_attr = numOpenSessions(),
+            "timeout"_attr = timeout);
     }
 
     transport::ServiceExecutor::shutdownAll(_svcCtx, deadline);
