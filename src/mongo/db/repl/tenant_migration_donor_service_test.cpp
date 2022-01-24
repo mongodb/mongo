@@ -53,6 +53,8 @@
 namespace mongo {
 namespace repl {
 
+#ifdef MONGO_CONFIG_SSL
+
 class TenantMigrationDonorServiceTest : public ServiceContextMongoDTest {
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -166,8 +168,6 @@ protected:
     }();
 };
 
-#ifdef MONGO_CONFIG_SSL
-
 TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
     // Advance the clock by some arbitrary amount of time so we are not starting at 0 seconds.
     _clkSource->advance(Milliseconds(10000));
@@ -202,6 +202,13 @@ TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
               getServiceContext()->getFastClockSource()->now());
 
     taskFp->setMode(FailPoint::off);
+}
+
+#else
+
+TEST(TenantMigrationServiceNoSSL, NoopTestCaseForNosslVariant) {
+    // Without this test case, running this test binary on nossl variant will fail with a "no suites
+    // registered." error.
 }
 
 #endif
