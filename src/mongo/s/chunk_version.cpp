@@ -37,20 +37,6 @@ namespace mongo {
 
 constexpr StringData ChunkVersion::kShardVersionField;
 
-StatusWith<ChunkVersion> ChunkVersion::parseWithField(const BSONObj& obj, StringData field) {
-    BSONElement versionElem = obj[field];
-    if (versionElem.eoo())
-        return {ErrorCodes::NoSuchKey,
-                str::stream() << "Expected field " << field << " not found."};
-
-    if (versionElem.type() != Array)
-        return {ErrorCodes::TypeMismatch,
-                str::stream() << "Invalid type " << versionElem.type()
-                              << " for shardVersion element. Expected an array"};
-
-    return fromBSON(versionElem.Obj());
-}
-
 StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
     BSONObjIterator it(obj);
     if (!it.more())
@@ -182,8 +168,8 @@ StatusWith<ChunkVersion> ChunkVersion::parseLegacyWithField(const BSONObj& obj, 
     return version;
 }
 
-void ChunkVersion::appendWithField(BSONObjBuilder* out, StringData field) const {
-    BSONArrayBuilder arr(out->subarrayStart(field));
+void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
+    BSONArrayBuilder arr(builder->subarrayStart(field));
     arr.appendTimestamp(_combined);
     arr.append(_epoch);
     arr.append(_timestamp);

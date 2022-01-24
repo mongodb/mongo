@@ -115,11 +115,11 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         migrationType._fromShard = std::move(migrationFromShard);
     }
 
-    {
-        auto chunkVersionStatus = ChunkVersion::parseWithField(source, chunkVersion.name());
-        if (!chunkVersionStatus.isOK())
-            return chunkVersionStatus.getStatus();
-        migrationType._chunkVersion = chunkVersionStatus.getValue();
+    try {
+        auto chunkVersionStatus = ChunkVersion::fromBSONArrayThrowing(source[chunkVersion.name()]);
+        migrationType._chunkVersion = chunkVersionStatus;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     {
@@ -160,7 +160,7 @@ BSONObj MigrationType::toBSON() const {
     builder.append(fromShard.name(), _fromShard.toString());
     builder.append(toShard.name(), _toShard.toString());
 
-    _chunkVersion.appendWithField(&builder, chunkVersion.name());
+    _chunkVersion.serializeToBSON(chunkVersion.name(), &builder);
 
     builder.append(waitForDelete.name(), _waitForDelete);
     builder.append(forceJumbo.name(), _forceJumbo);

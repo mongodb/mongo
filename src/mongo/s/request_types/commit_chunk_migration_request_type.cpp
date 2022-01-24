@@ -124,14 +124,12 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
         request._toShard = std::move(toShard.getValue());
     }
 
-    {
-        auto statusWithChunkVersion =
-            ChunkVersion::parseWithField(obj, kFromShardCollectionVersion);
-        if (!statusWithChunkVersion.isOK()) {
-            return statusWithChunkVersion.getStatus();
-        }
-
-        request._collectionEpoch = statusWithChunkVersion.getValue().epoch();
+    try {
+        auto fromShardVersion =
+            ChunkVersion::fromBSONArrayThrowing(obj[kFromShardCollectionVersion]);
+        request._collectionEpoch = fromShardVersion.epoch();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     {
@@ -172,7 +170,7 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
         migrateChunk.append(ChunkType::lastmod() + "Timestamp",
                             migratedChunk.getVersion().getTimestamp());
     }
-    fromShardCollectionVersion.appendWithField(builder, kFromShardCollectionVersion);
+    fromShardCollectionVersion.serializeToBSON(kFromShardCollectionVersion, builder);
 
     builder->append(kValidAfter, validAfter);
 }

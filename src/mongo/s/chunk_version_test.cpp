@@ -41,13 +41,11 @@ using unittest::assertGet;
 
 TEST(ChunkVersionParsing, ToFromBSONRoundtrip) {
     ChunkVersion version(1, 2, OID::gen(), Timestamp(42));
-    const auto roundTripVersion = assertGet(ChunkVersion::parseWithField(
-        [&] {
-            BSONObjBuilder builder;
-            version.appendWithField(&builder, "testVersionField");
-            return builder.obj();
-        }(),
-        "testVersionField"));
+    const auto roundTripVersion = ChunkVersion::fromBSONArrayThrowing([&] {
+        BSONObjBuilder builder;
+        version.serializeToBSON("testVersionField", &builder);
+        return builder.obj();
+    }()["testVersionField"]);
 
     ASSERT_EQ(version, roundTripVersion);
 }
@@ -66,20 +64,19 @@ TEST(ChunkVersionParsing, ToFromBSONLegacyRoundtrip) {
 }
 
 TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
-    ASSERT_THROWS_CODE(
-        uassertStatusOK(ChunkVersion::parseWithField(
-            BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << OID::gen())),
-            "testVersionField")),
-        AssertionException,
-        ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(ChunkVersion::fromBSONArrayThrowing(
+                           BSON("testVersionField" << BSON_ARRAY(
+                                    Timestamp(Seconds(2), 3) << OID::gen()))["testVersionField"]),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST(ChunkVersionParsing, FromBSON) {
     const OID oid = OID::gen();
     const Timestamp timestamp(42);
-    ChunkVersion chunkVersionComplete = assertGet(ChunkVersion::parseWithField(
-        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3) << oid << timestamp)),
-        "testVersionField"));
+    ChunkVersion chunkVersionComplete = ChunkVersion::fromBSONArrayThrowing(
+        BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)
+                                              << oid << timestamp))["testVersionField"]);
 
     ASSERT(chunkVersionComplete.epoch().isSet());
     ASSERT_EQ(oid, chunkVersionComplete.epoch());
@@ -90,17 +87,16 @@ TEST(ChunkVersionParsing, FromBSON) {
 
 TEST(ChunkVersionParsing, FromBSONMissingEpoch) {
     ASSERT_THROWS_CODE(
-        uassertStatusOK(ChunkVersion::parseWithField(
-            BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3))), "testVersionField")),
-        AssertionException,
+        ChunkVersion::fromBSONArrayThrowing(
+            BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)))["testVersionField"]),
+        DBException,
         ErrorCodes::TypeMismatch);
 }
 
 TEST(ChunkVersionParsing, FromBSONMissingMajorAndMinor) {
-    const OID oid = OID::gen();
-    ASSERT_THROWS_CODE(uassertStatusOK(ChunkVersion::parseWithField(BSON("testVersionField" << oid),
-                                                                    "testVersionField")),
-                       AssertionException,
+    ASSERT_THROWS_CODE(ChunkVersion::fromBSONArrayThrowing(
+                           BSON("testVersionField" << OID::gen())["testVersionField"]),
+                       DBException,
                        ErrorCodes::TypeMismatch);
 }
 

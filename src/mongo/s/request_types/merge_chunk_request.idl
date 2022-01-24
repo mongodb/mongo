@@ -45,9 +45,9 @@ types:
     my_uuid:
         bson_serialization_type: object
         description: "A UUID for some reason not generic uuid type."
-        cpp_type: "mongo::UUID"
-        deserializer: "mongo::UUID::parse"
-        serializer: "mongo::UUID::toBSON"
+        cpp_type: UUID
+        deserializer: UUID::parse
+        serializer: UUID::toBSON
 
     # serialize [<major/minor>, <epoch>, <timestamp>]
     # equivalent to using ChunkVersion::appendToCommand / ChunkVersion::parseFromCommand

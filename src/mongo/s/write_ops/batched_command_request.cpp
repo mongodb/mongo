@@ -188,7 +188,7 @@ void BatchedCommandRequest::setWriteCommandRequestBase(
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     _visit([&](auto&& op) { op.serialize({}, builder); });
     if (_shardVersion) {
-        _shardVersion->appendWithField(builder, ChunkVersion::kShardVersionField);
+        _shardVersion->serializeToBSON(ChunkVersion::kShardVersionField, builder);
     }
 
     if (_dbVersion) {

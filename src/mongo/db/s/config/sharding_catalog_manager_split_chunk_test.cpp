@@ -90,8 +90,8 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
                                                          splitPoints,
                                                          "shard0000",
                                                          false /* fromChunkSplitter*/));
-        auto collVersion = assertGet(ChunkVersion::parseWithField(versions, "collectionVersion"));
-        auto shardVersion = assertGet(ChunkVersion::parseWithField(versions, "shardVersion"));
+        auto collVersion = ChunkVersion::fromBSONArrayThrowing(versions["collectionVersion"]);
+        auto shardVersion = ChunkVersion::fromBSONArrayThrowing(versions["shardVersion"]);
 
         ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
         ASSERT_EQ(collVersion, shardVersion);

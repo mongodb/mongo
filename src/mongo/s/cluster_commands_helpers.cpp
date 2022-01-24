@@ -245,7 +245,7 @@ BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion) {
 
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
-    version.appendWithField(&cmdWithVersionBob, ChunkVersion::kShardVersionField);
+    version.serializeToBSON(ChunkVersion::kShardVersionField, &cmdWithVersionBob);
     return cmdWithVersionBob.obj();
 }
 

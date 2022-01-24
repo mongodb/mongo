@@ -64,7 +64,7 @@ BSONObj selectMedianKey(OperationContext* opCtx,
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     chunkRange.append(&cmd);
     cmd.appendBool("force", true);
-    chunkVersion.appendWithField(&cmd, ChunkVersion::kShardVersionField);
+    chunkVersion.serializeToBSON(ChunkVersion::kShardVersionField, &cmd);
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 

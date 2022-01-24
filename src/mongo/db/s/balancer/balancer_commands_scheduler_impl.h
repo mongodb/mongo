@@ -239,7 +239,7 @@ public:
             .append(kShardName, getTarget().toString())
             .append(kEpoch, _version.epoch());
 
-        _version.appendWithField(&commandBuilder, ChunkVersion::kShardVersionField);
+        _version.serializeToBSON(ChunkVersion::kShardVersionField, &commandBuilder);
 
         return commandBuilder.obj();
     }
@@ -314,7 +314,7 @@ public:
             .append(kMaxValue, _upperBoundKey)
             .append(kEstimatedValue, _estimatedValue);
 
-        _version.appendWithField(&commandBuilder, ChunkVersion::kShardVersionField);
+        _version.serializeToBSON(ChunkVersion::kShardVersionField, &commandBuilder);
 
         return commandBuilder.obj();
     }

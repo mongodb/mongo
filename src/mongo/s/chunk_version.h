@@ -62,13 +62,6 @@ public:
     ChunkVersion() : ChunkVersion(0, 0, OID(), Timestamp()) {}
 
     /**
-     * Parses the BSON formatted by appendWithField. If the field is missing, returns 'NoSuchKey',
-     * otherwise if the field is not properly formatted can return any relevant parsing error
-     * (BadValue, TypeMismatch, etc).
-     */
-    static StatusWith<ChunkVersion> parseWithField(const BSONObj& obj, StringData field);
-
-    /**
      * Parses 'obj', which is expected to have three elements: the major/minor versions, the object
      * id, and the timestamp. The field names don't matter, so 'obj' can be a BSONArray.
      */
@@ -217,27 +210,22 @@ public:
     }
 
     /**
-     * Serializes the version held by this object to 'out' in the form:
-     *  { ..., <field>: [ <combined major/minor>, <OID epoch> ], ... }.
-     */
-    void appendWithField(BSONObjBuilder* out, StringData field) const;
-
-    /**
-     * NOTE: This format is being phased out. Use appendWithField instead.
+     * NOTE: This format is being phased out. Use serializeToBSON instead.
      *
      * Serializes the version held by this object to 'out' in the legacy form:
-     *  { ..., <field>: [ <combined major/minor> ], <field>Epoch: [ <OID epoch> ], ... }
+     *  { ..., <field>: [ <combined major/minor> ],
+     *         <field>Epoch: [ <OID epoch> ],
+     *         <field>Timestamp: [ <Timestamp> ] ... }
      */
     void appendLegacyWithField(BSONObjBuilder* out, StringData field) const;
 
     BSONObj toBSON() const;
 
     /**
-     * Same as ChunkVersion::appendWithField adapted for IDL
+     * Serializes the version held by this object to 'out' in the form:
+     *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
      */
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-        appendWithField(builder, fieldName);
-    }
+    void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
 

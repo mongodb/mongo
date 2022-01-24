@@ -57,8 +57,6 @@ static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 // Field names for sorting options.
 static constexpr auto kNaturalSortField = "$natural";
 
-static constexpr auto kShardVersionField = "shardVersion";
-
 /**
  * Assert that collectionName is valid.
  */
