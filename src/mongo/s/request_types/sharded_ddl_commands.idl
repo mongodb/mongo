@@ -127,6 +127,10 @@ structs:
                 type: object_owned
                 description: "The collation to use for the shard key index."
                 optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 
     CreateCollectionResponse:
         description: "Response of the create collection command"

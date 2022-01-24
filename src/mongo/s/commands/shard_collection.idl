@@ -74,3 +74,7 @@ structs:
         description: "The options to create the time-series collection with."
         type: TimeseriesOptions
         optional: true
+      collectionUUID:
+        description: "The expected UUID of the collection."
+        type: uuid
+        optional: true

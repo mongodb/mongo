@@ -34,6 +34,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/create_gen.h"
@@ -473,6 +474,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             getCollation(opCtx, nss(), _doc.getCollation()).second,
                             _doc.getUnique().value_or(false))) {
                     _result = createCollectionResponseOpt;
+                    _checkCollectionUUIDMismatch(opCtx);
                     // The collection was already created and commited but there was a
                     // stepdown after the commit.
                     RecoverableCriticalSectionService::get(opCtx)
@@ -511,6 +513,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     }
                 }
 
+                _checkCollectionUUIDMismatch(opCtx);
                 _createPolicy(opCtx);
                 _createCollectionAndIndexes(opCtx);
 
@@ -673,6 +676,11 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
                 "collections in the config db must be empty to be sharded",
                 numDocs == 0);
     }
+}
+
+void CreateCollectionCoordinator::_checkCollectionUUIDMismatch(OperationContext* opCtx) const {
+    AutoGetCollection coll{opCtx, nss(), MODE_IS};
+    checkCollectionUUIDMismatch(opCtx, coll.getCollection(), _doc.getCollectionUUID());
 }
 
 void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* opCtx) {

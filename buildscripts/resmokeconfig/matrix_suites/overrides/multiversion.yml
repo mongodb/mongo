@@ -152,6 +152,8 @@
         - backport_required_multiversion
         - replica_sets_multiversion_backport_required_multiversion
         - disabled_due_to_server_60490
+        # TODO (SERVER-60185): Remove this tag once the feature flag is enabled by default.
+        - featureFlagCommandsAcceptCollectionUUID
       exclude_files:
         # Enable when 4.6 becomes last stable
         - jstests/sharding/query/merge_command_options.js

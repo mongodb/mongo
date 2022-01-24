@@ -98,6 +98,11 @@ private:
     void _checkCommandArguments(OperationContext* opCtx);
 
     /**
+     * Checks that the collection has UUID matching the collectionUUID parameter, if provided.
+     */
+    void _checkCollectionUUIDMismatch(OperationContext* opCtx) const;
+
+    /**
      * Ensures the collection is created locally and has the appropiate shard index.
      */
     void _createCollectionAndIndexes(OperationContext* opCtx);

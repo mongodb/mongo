@@ -103,6 +103,7 @@ public:
         requestParamsObj.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
         requestParamsObj.setCollation(shardCollRequest.getCollation());
         requestParamsObj.setTimeseries(shardCollRequest.getTimeseries());
+        requestParamsObj.setCollectionUUID(shardCollRequest.getCollectionUUID());
         shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
         shardsvrCollRequest.setDbName(nss.db());
 
