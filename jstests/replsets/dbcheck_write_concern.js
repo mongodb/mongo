@@ -13,7 +13,11 @@
 const replSet = new ReplSetTest({
     name: "dbCheckWriteConcern",
     nodes: 2,
-    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}}
+    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
+    settings: {
+        // Prevent the primary from stepping down when we temporarily shut down the secondary.
+        electionTimeoutMillis: 60000
+    }
 });
 replSet.startSet();
 replSet.initiate();
