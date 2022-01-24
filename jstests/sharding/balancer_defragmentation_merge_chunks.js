@@ -195,6 +195,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
 {
     // Reset collection before starting
     const initialNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
+    jsTest.log("Initial number of chunks " + initialNumChunks);
     // Pause after phase 1 completes to check merging succeeded
     setFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase", {skip: 1});
     assert.commandWorked(st.s.adminCommand({
@@ -205,9 +206,9 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     st.startBalancer();
     // Wait for phase 1 to complete
     waitForFailpointOnConfigNodes("beforeTransitioningDefragmentationPhase", 0);
-    const numChunksPost = findChunksUtil.countChunksForNs(st.config, coll3);
-    jsTest.log("Number of chunks after merging " + numChunksPost);
-    assert.lte(numChunksPost, initialNumChunks);
+    const numChunksAfterMerging = findChunksUtil.countChunksForNs(st.config, coll3);
+    jsTest.log("Number of chunks after merging " + numChunksAfterMerging);
+    assert.lte(numChunksAfterMerging, initialNumChunks);
     // Turn fail point off, let phase 3 run and complete
     clearFailPointOnConfigNodes("beforeTransitioningDefragmentationPhase");
     assert.soon(function() {
@@ -218,7 +219,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     st.stopBalancer();
     const finalNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
     jsTest.log("Number of chunks after splitting " + finalNumChunks);
-    assert.lte(finalNumChunks, numChunksPost);
+    assert.lte(finalNumChunks, initialNumChunks);
 }
 
 const collection4 = db[collName + collCounter];
