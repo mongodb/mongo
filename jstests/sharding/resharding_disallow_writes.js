@@ -85,7 +85,7 @@ reshardingTest.withReshardingInBackground(
 
             jsTestLog("Completed operations");
         },
-        afterReshardingFn: (tempNS) => {
+        afterReshardingFn: () => {
             jsTestLog("Join possible ongoing collMod command");
             assert.commandWorked(sourceCollection.runCommand("collMod"));
         }
