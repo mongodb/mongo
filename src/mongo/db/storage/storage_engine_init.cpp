@@ -46,6 +46,7 @@
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -64,6 +65,12 @@ void createLockFile(ServiceContext* service);
 StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx,
                                                          const StorageEngineInitFlags initFlags) {
     ServiceContext* service = opCtx->getServiceContext();
+
+    if (storageGlobalParams.restore) {
+        uassert(6260400,
+                "Cannot use --restore when the 'featureFlagSelectiveBackup' is disabled",
+                feature_flags::gSelectiveBackup.isEnabledAndIgnoreFCV());
+    }
 
     // This should be set once.
     if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{})
