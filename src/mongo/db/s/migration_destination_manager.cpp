@@ -332,7 +332,9 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
         _stateChangedCV.notify_all();
     }
 
-    _sessionMigration->forceFail(msg);
+    if (_sessionMigration) {
+        _sessionMigration->forceFail(msg);
+    }
 }
 
 void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
@@ -347,7 +349,9 @@ void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
         _stateChangedCV.notify_all();
     }
 
-    _sessionMigration->forceFail(msg);
+    if (_sessionMigration) {
+        _sessionMigration->forceFail(msg);
+    }
 }
 
 bool MigrationDestinationManager::isActive() const {
