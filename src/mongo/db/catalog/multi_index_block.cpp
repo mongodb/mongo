@@ -271,10 +271,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             info = statusWithInfo.getValue();
             indexInfoObjs.push_back(info);
 
-            // TODO SERVER-54592: Remove FCV check once feature flag is enabled for v5.2.
             boost::optional<TimeseriesOptions> options = collection->getTimeseriesOptions();
             if (options &&
-                serverGlobalParams.featureCompatibility.isFCVUpgradingToOrAlreadyLatest() &&
                 timeseries::doesBucketsIndexIncludeMeasurement(
                     opCtx, collection->ns(), *options, info)) {
                 invariant(collection->getTimeseriesBucketsMayHaveMixedSchemaData());
