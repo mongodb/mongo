@@ -557,7 +557,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
     va_list ap;
 
     va_start(ap, cursor);
-    WT_IGNORE_RET(__wt_cursor_set_valuev(cursor, ap));
+    WT_IGNORE_RET(__wt_cursor_set_valuev(cursor, cursor->value_format, ap));
     va_end(ap);
 }
 
@@ -566,13 +566,13 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
  *     WT_CURSOR->set_value worker implementation.
  */
 int
-__wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
+__wt_cursor_set_valuev(WT_CURSOR *cursor, const char *fmt, va_list ap)
 {
     WT_DECL_RET;
     WT_ITEM *buf, *item, tmp;
     WT_SESSION_IMPL *session;
     size_t sz;
-    const char *fmt, *str;
+    const char *str;
     va_list ap_copy;
 
     buf = &cursor->value;
@@ -589,7 +589,6 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
     F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
     /* Fast path some common cases. */
-    fmt = cursor->value_format;
     if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON) || WT_STREQ(fmt, "u")) {
         item = va_arg(ap, WT_ITEM *);
         sz = item->size;
@@ -604,11 +603,11 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
         *(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
     } else {
         va_copy(ap_copy, ap);
-        ret = __wt_struct_sizev(session, &sz, cursor->value_format, ap_copy);
+        ret = __wt_struct_sizev(session, &sz, fmt, ap_copy);
         va_end(ap_copy);
         WT_ERR(ret);
         WT_ERR(__wt_buf_initsize(session, buf, sz));
-        WT_ERR(__wt_struct_packv(session, buf->mem, sz, cursor->value_format, ap));
+        WT_ERR(__wt_struct_packv(session, buf->mem, sz, fmt, ap));
     }
     F_SET(cursor, WT_CURSTD_VALUE_EXT);
     buf->size = sz;

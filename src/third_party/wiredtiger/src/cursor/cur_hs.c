@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int __curhs_file_cursor_next(WT_SESSION_IMPL *, WT_CURSOR *);
-static int __curhs_file_cursor_open(WT_SESSION_IMPL *, WT_CURSOR **);
+static int __curhs_file_cursor_open(WT_SESSION_IMPL *, WT_CURSOR *, WT_CURSOR **);
 static int __curhs_file_cursor_prev(WT_SESSION_IMPL *, WT_CURSOR *);
 static int __curhs_file_cursor_search_near(WT_SESSION_IMPL *, WT_CURSOR *, int *);
 static int __curhs_prev_visible(WT_SESSION_IMPL *, WT_CURSOR_HS *);
@@ -20,14 +20,14 @@ static int __curhs_search_near_helper(WT_SESSION_IMPL *, WT_CURSOR *, bool);
  *     Open a new history store table cursor, internal function.
  */
 static int
-__curhs_file_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+__curhs_file_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
     const char *open_cursor_cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL};
 
     WT_WITHOUT_DHANDLE(
-      session, ret = __wt_open_cursor(session, WT_HS_URI, NULL, open_cursor_cfg, &cursor));
+      session, ret = __wt_open_cursor(session, WT_HS_URI, owner, open_cursor_cfg, &cursor));
     WT_RET(ret);
 
     /* History store cursors should always ignore tombstones. */
@@ -74,7 +74,7 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
       (session->dhandle != NULL && WT_IS_METADATA(S2BT(session)->dhandle)) ||
       session == conn->default_session)
         return (0);
-    WT_RET(__curhs_file_cursor_open(session, &cursor));
+    WT_RET(__curhs_file_cursor_open(session, NULL, &cursor));
     WT_RET(cursor->close(cursor));
     return (0);
 }
@@ -1116,7 +1116,7 @@ __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
     WT_ERR(__wt_strdup(session, WT_HS_URI, &cursor->uri));
 
     /* Open the file cursor for operations on the regular history store .*/
-    WT_ERR(__curhs_file_cursor_open(session, &hs_cursor->file_cursor));
+    WT_ERR(__curhs_file_cursor_open(session, owner, &hs_cursor->file_cursor));
 
     WT_WITH_BTREE(session, CUR2BT(hs_cursor->file_cursor),
       ret = __wt_cursor_init(cursor, WT_HS_URI, owner, NULL, cursorp));

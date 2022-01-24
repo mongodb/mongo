@@ -95,6 +95,7 @@ src/cursor/cur_metadata.c
 src/cursor/cur_stat.c
 src/cursor/cur_std.c
 src/cursor/cur_table.c
+src/cursor/cur_version.c
 src/evict/evict_file.c
 src/evict/evict_lru.c
 src/evict/evict_page.c

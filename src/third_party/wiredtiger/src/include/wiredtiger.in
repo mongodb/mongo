@@ -736,6 +736,7 @@ struct __wt_cursor {
 #define	WT_CURSTD_RAW_SEARCH		0x1000000u
 #define	WT_CURSTD_VALUE_EXT		0x2000000u	/* Value points out of tree. */
 #define	WT_CURSTD_VALUE_INT		0x4000000u	/* Value points into tree. */
+#define WT_CURSTD_VERSION_CURSOR 0x8000000u /* Version cursor. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
@@ -918,10 +919,13 @@ struct __wt_session {
 	 * The cursor does not support data modification., a string; default empty.}
 	 * @config{debug = (, configure debug specific behavior on a cursor.  Generally only used
 	 * for internal testing purposes., a set of related configuration options defined below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict, Configure the cursor to evict the page
-	 * positioned on when the reset API is used., a boolean flag; default \c false.}
-	 * @config{
-	 * ),,}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;dump_version, open a version cursor\, which is a debug
+	 * cursor on a table that enables iteration through the history of values for a given key.,
+	 * a boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict,
+	 * Configure the cursor to evict the page positioned on when the reset API is used., a
+	 * boolean flag; default \c false.}
+	 * @config{ ),,}
 	 * @config{dump, configure the cursor for dump format inputs and outputs: "hex" selects a
 	 * simple hexadecimal format\, "json" selects a JSON format with each record formatted as
 	 * fields named by column names if available\, "pretty" selects a human-readable format

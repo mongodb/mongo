@@ -553,12 +553,20 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 
         if (btree->type == BTREE_ROW) {
             WT_ERR(__cursor_row_search(cbt, false, cbt->ref, &leaf_found));
-            if (leaf_found && cbt->compare == 0)
-                WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
+            if (leaf_found && cbt->compare == 0) {
+                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
+                    valid = true;
+                else
+                    WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
+            }
         } else {
             WT_ERR(__cursor_col_search(cbt, cbt->ref, &leaf_found));
-            if (leaf_found && cbt->compare == 0)
-                WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
+            if (leaf_found && cbt->compare == 0) {
+                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
+                    valid = true;
+                else
+                    WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
+            }
         }
     }
     if (!valid) {
@@ -566,17 +574,26 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 
         if (btree->type == BTREE_ROW) {
             WT_ERR(__cursor_row_search(cbt, false, NULL, NULL));
-            if (cbt->compare == 0)
-                WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
+            if (cbt->compare == 0) {
+                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
+                    valid = true;
+                else
+                    WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
+            }
         } else {
             WT_ERR(__cursor_col_search(cbt, NULL, NULL));
-            if (cbt->compare == 0)
-                WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
+            if (cbt->compare == 0) {
+                if (F_ISSET(cursor, WT_CURSTD_KEY_ONLY))
+                    valid = true;
+                else
+                    WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
+            }
         }
     }
 
     if (valid)
-        ret = __cursor_kv_return(cbt, cbt->upd_value);
+        ret = F_ISSET(cursor, WT_CURSTD_KEY_ONLY) ? __wt_key_return(cbt) :
+                                                    __cursor_kv_return(cbt, cbt->upd_value);
     else if (__cursor_fix_implicit(btree, cbt)) {
         /*
          * Creating a record past the end of the tree in a fixed-length column-store implicitly

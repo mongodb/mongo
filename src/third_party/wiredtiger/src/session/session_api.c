@@ -459,6 +459,7 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
   WT_CURSOR *other, const char *cfg[], uint64_t hash_value, WT_CURSOR **cursorp)
 {
     WT_COLGROUP *colgroup;
+    WT_CONFIG_ITEM cval;
     WT_DATA_SOURCE *dsrc;
     WT_DECL_RET;
 
@@ -510,8 +511,19 @@ __session_open_cursor_int(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *
      * Less common cursor types.
      */
     case 'f':
-        if (WT_PREFIX_MATCH(uri, "file:"))
-            WT_RET(__wt_curfile_open(session, uri, owner, cfg, cursorp));
+        if (WT_PREFIX_MATCH(uri, "file:")) {
+            /*
+             * Open a version cursor instead of a table cursor if we are using the special debug
+             * configuration.
+             */
+            if ((ret = __wt_config_gets_def(session, cfg, "debug.dump_version", 0, &cval)) == 0 &&
+              cval.val) {
+                if (WT_STREQ(uri, WT_HS_URI))
+                    WT_RET_MSG(session, EINVAL, "cannot open version cursor on the history store");
+                WT_RET(__wt_curversion_open(session, uri, owner, cfg, cursorp));
+            } else
+                WT_RET(__wt_curfile_open(session, uri, owner, cfg, cursorp));
+        }
         break;
     case 'm':
         if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
