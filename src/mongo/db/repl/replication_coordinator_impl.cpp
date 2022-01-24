@@ -2504,14 +2504,36 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
     // The state transition should never be rollback within this class.
     invariant(_stateTransition != ReplicationCoordinator::OpsKillingStateTransitionEnum::kRollback);
 
-    // Enqueues RSTL in X mode.
-    _rstlLock.emplace(_opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
+    int rstlTimeout = fassertOnLockTimeoutForStepUpDown.load();
+    Date_t start{Date_t::now()};
+    if (rstlTimeout > 0 && deadline - start > Seconds(rstlTimeout)) {
+        deadline = start + Seconds(rstlTimeout);  // cap deadline
+    }
 
-    ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
-    _startKillOpThread();
+    try {
+        // Enqueues RSTL in X mode.
+        _rstlLock.emplace(_opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
 
-    // Wait for RSTL to be acquired.
-    _rstlLock->waitForLockUntil(deadline);
+        ON_BLOCK_EXIT([&] { _stopAndWaitForKillOpThread(); });
+        _startKillOpThread();
+
+        // Wait for RSTL to be acquired.
+        _rstlLock->waitForLockUntil(deadline);
+
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        if (rstlTimeout > 0 && Date_t::now() - start >= Seconds(rstlTimeout)) {
+            auto lockerInfo =
+                opCtx->lockState()->getLockerInfo(CurOp::get(opCtx)->getLockStatsBase());
+            BSONObjBuilder lockRep;
+            lockerInfo->stats.report(&lockRep);
+            LOGV2_FATAL(5675600,
+                        "Time out exceeded waiting for RSTL, stepUp/stepDown is not possible "
+                        "thus calling abort() to allow cluster to progress.",
+                        "lockRep"_attr = lockRep.obj());
+        }
+        // Rethrow to keep processing as before at a higher layer.
+        throw;
+    }
 };
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThread() {
@@ -2616,7 +2638,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                                           const bool force,
                                           const Milliseconds& waitTime,
                                           const Milliseconds& stepdownTime) {
-
     const Date_t startTime = _replExecutor->now();
     const Date_t stepDownUntil = startTime + stepdownTime;
     const Date_t waitUntil = startTime + waitTime;

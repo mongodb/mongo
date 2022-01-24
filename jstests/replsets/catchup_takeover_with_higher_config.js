@@ -57,6 +57,11 @@ assert.eq(replSet.getPrimary(), nodes[0]);
 const statusBeforeTakeover =
     assert.commandWorked(nodes[1].adminCommand({serverStatus: 1, wiredTiger: 0}));
 
+for (const node of nodes) {
+    // Disable nodes from fasserting due to RSTL timeout
+    node.adminCommand({setParameter: 1, fassertOnLockTimeoutForStepUpDown: 0});
+}
+
 // Failpoint to hang node1 before the automatic reconfig on stepup bumps the config term.
 const hangBeforeTermBumpFpNode1 = configureFailPoint(nodes[1], "hangBeforeReconfigOnDrainComplete");
 const initialConfig = assert.commandWorked(nodes[0].adminCommand({replSetGetConfig: 1})).config;

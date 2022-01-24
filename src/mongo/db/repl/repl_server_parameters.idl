@@ -596,6 +596,17 @@ server_parameters:
         validator:
             gte: 1
 
+    fassertOnLockTimeoutForStepUpDown:
+        description: >-
+            Time limit threshold to fassert if getting RSTL times out when executing a stepdown or stepup command.
+            Set to 0 to disable.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: fassertOnLockTimeoutForStepUpDown
+        default: 15
+        validator:
+            gte: 0
+
 
 feature_flags:
     featureFlagRetryableFindAndModify:
