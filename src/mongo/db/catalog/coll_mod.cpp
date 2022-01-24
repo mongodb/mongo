@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/coll_mod_index.h"
 #include "mongo/db/catalog/coll_mod_write_ops_tracker.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -126,6 +127,13 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
 
     ParsedCollModRequest cmr;
 
+    try {
+        checkCollectionUUIDMismatch(opCtx, coll, cmd.getCollModRequest().getCollectionUUID());
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    // TODO (SERVER-62732): Check options directly rather than using a loop.
     auto cmdObj = cmd.toBSON(BSONObj());
     for (const auto& e : cmdObj) {
         const auto fieldName = e.fieldNameStringData();
@@ -423,6 +431,7 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             cmr.dryRun = e.trueValue();
             // The dry run option should never be included in a collMod oplog entry.
             continue;
+        } else if (fieldName == CollMod::kCollectionUUIDFieldName) {
         } else {
             if (isTimeseries) {
                 return Status(ErrorCodes::InvalidOptions,
