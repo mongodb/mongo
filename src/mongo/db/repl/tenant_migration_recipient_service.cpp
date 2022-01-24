@@ -994,6 +994,8 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
             return;
         }
 
+        auto uniqueOpCtx = cc().makeOperationContext();
+        auto opCtx = uniqueOpCtx.get();
         stdx::lock_guard lk(_mutex);
 
         const auto& data = dataStatus.getValue();
@@ -1023,8 +1025,6 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDonorFilenam
                             "filename"_attr = doc["filename"].String(),
                             "backupCursorId"_attr = data.cursorId);
 
-                auto uniqueOpCtx = cc().makeOperationContext();
-                auto opCtx = uniqueOpCtx.get();
                 auto donatedFilesNs = getDonatedFilesNs(getMigrationUUID());
                 auto status = writeConflictRetry(
                     opCtx,
@@ -1847,13 +1847,12 @@ SemiFuture<void>
 TenantMigrationRecipientService::Instance::_advanceStableTimestampToStartApplyingDonorOpTime() {
     Timestamp startApplyingDonorTimestamp;
     {
+        auto opCtx = cc().makeOperationContext();
         stdx::lock_guard lk(_mutex);
 
         if (_stateDoc.getProtocol() != MigrationProtocolEnum::kShardMerge) {
             return SemiFuture<void>::makeReady();
         }
-
-        auto opCtx = cc().makeOperationContext();
 
         invariant(_stateDoc.getStartApplyingDonorOpTime());
         startApplyingDonorTimestamp = _stateDoc.getStartApplyingDonorOpTime()->getTimestamp();
@@ -2387,6 +2386,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     return AsyncTry([this, self = shared_from_this(), executor, token, cancelWhenDurable] {
                return ExecutorFuture(**executor)
                    .then([this, self = shared_from_this()] {
+                       auto opCtx = cc().makeOperationContext();
+
                        stdx::unique_lock lk(_mutex);
                        // Instance task can be started only once for the current term on a primary.
                        invariant(!_taskState.isDone());
@@ -2411,7 +2412,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            // retry and we can delete immediately to allow the migration to restart.
                            // Otherwise, there is a real conflict so we should throw
                            // ConflictingInProgress.
-                           auto opCtx = cc().makeOperationContext();
                            lk.unlock();
                            auto deleted =
                                uassertStatusOK(tenantMigrationRecipientEntryHelpers::
@@ -2439,7 +2439,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            lk.unlock();
                            // Update the state document outside the mutex to avoid a deadlock in the
                            // case of a concurrent stepdown.
-                           auto opCtx = cc().makeOperationContext();
                            uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(
                                opCtx.get(), stateDoc));
                            return SemiFuture<void>::makeReady();
