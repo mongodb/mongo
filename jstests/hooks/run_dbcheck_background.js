@@ -68,7 +68,8 @@ function runBackgroundDbCheck(hosts) {
             assert.commandWorked(primary.getDB(dbName).runCommand({dbCheck: 1}));
             jsTestLog("dbCheck done on database " + dbName);
         } catch (e) {
-            if (e.code === ErrorCodes.NamespaceNotFound || e.code === ErrorCodes.LockTimeout) {
+            if (e.code === ErrorCodes.NamespaceNotFound || e.code === ErrorCodes.LockTimeout ||
+                e.code == ErrorCodes.Interrupted) {
                 jsTestLog("Skipping dbCheck on database " + dbName +
                           " due to transient error: " + tojson(e));
                 return;
