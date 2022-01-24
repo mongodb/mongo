@@ -33,6 +33,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 namespace {
@@ -80,6 +81,8 @@ void recordCurOpMetrics(OperationContext* opCtx) {
         scanAndOrderCounter.increment();
     if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
         writeConflictsCounter.increment(n);
+
+    queryEngineCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }
 
 }  // namespace mongo

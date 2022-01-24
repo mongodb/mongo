@@ -32,6 +32,7 @@
 #include <map>
 
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
@@ -335,6 +336,69 @@ public:
 };
 
 extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
+
+class QueryEngineCounters {
+public:
+    QueryEngineCounters()
+        : sbeFindQueryMetric("query.queryExecutionEngine.find.sbe", &sbeFindQueryCounter),
+          classicFindQueryMetric("query.queryExecutionEngine.find.classic",
+                                 &classicFindQueryCounter),
+          sbeOnlyAggregationMetric("query.queryExecutionEngine.aggregate.sbeOnly",
+                                   &sbeOnlyAggregationCounter),
+          classicOnlyAggregationMetric("query.queryExecutionEngine.aggregate.classicOnly",
+                                       &classicOnlyAggregationCounter),
+          sbeHybridAggregationMetric("query.queryExecutionEngine.aggregate.sbeHybrid",
+                                     &sbeHybridAggregationCounter),
+          classicHybridAggregationMetric("query.queryExecutionEngine.aggregate.classicHybrid",
+                                         &classicHybridAggregationCounter) {}
+
+    void incrementQueryEngineCounters(CurOp* curop) {
+        auto& debug = curop->debug();
+        const BSONObj& cmdObj = curop->opDescription();
+        auto cmdName = cmdObj.firstElementFieldNameStringData();
+        if (cmdName == "find" && debug.classicEngineUsed) {
+            if (debug.classicEngineUsed.get()) {
+                classicFindQueryCounter.increment();
+            } else {
+                sbeFindQueryCounter.increment();
+            }
+        } else if (cmdName == "aggregate" && debug.classicEngineUsed && debug.documentSourceUsed) {
+            if (debug.classicEngineUsed.get()) {
+                if (debug.documentSourceUsed.get()) {
+                    classicHybridAggregationCounter.increment();
+                } else {
+                    classicOnlyAggregationCounter.increment();
+                }
+            } else {
+                if (debug.documentSourceUsed.get()) {
+                    sbeHybridAggregationCounter.increment();
+                } else {
+                    sbeOnlyAggregationCounter.increment();
+                }
+            }
+        }
+    }
+
+    // Query counters that record whether a find query was fully or partially executed in SBE, or
+    // fully executed using the classic engine. One or the other will always be incremented during a
+    // query.
+    Counter64 sbeFindQueryCounter;
+    Counter64 classicFindQueryCounter;
+    ServerStatusMetricField<Counter64> sbeFindQueryMetric;
+    ServerStatusMetricField<Counter64> classicFindQueryMetric;
+    // Aggregation query counters that record whether an aggregation was fully or partially executed
+    // in DocumentSource (an sbe/classic hybrid plan), or fully pushed down to the sbe/classic
+    // layer. Only incremented during aggregations.
+    Counter64 sbeOnlyAggregationCounter;
+    Counter64 classicOnlyAggregationCounter;
+    Counter64 sbeHybridAggregationCounter;
+    Counter64 classicHybridAggregationCounter;
+    ServerStatusMetricField<Counter64> sbeOnlyAggregationMetric;
+    ServerStatusMetricField<Counter64> classicOnlyAggregationMetric;
+    ServerStatusMetricField<Counter64> sbeHybridAggregationMetric;
+    ServerStatusMetricField<Counter64> classicHybridAggregationMetric;
+};
+extern QueryEngineCounters queryEngineCounters;
 
 class OperatorCountersAggExpressions {
 private:

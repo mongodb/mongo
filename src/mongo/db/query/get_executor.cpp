@@ -1075,6 +1075,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
+    // Mark that this query uses the classic engine, unless this has already been set.
+    OpDebug& opDebug = CurOp::get(opCtx)->debug();
+    if (!opDebug.classicEngineUsed) {
+        opDebug.classicEngineUsed = true;
+    }
     auto ws = std::make_unique<WorkingSet>();
     ClassicPrepareExecutionHelper helper{
         opCtx, *collection, ws.get(), canonicalQuery.get(), nullptr, plannerOptions};
@@ -1183,7 +1188,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
     if (extractAndAttachPipelineStages) {
         extractAndAttachPipelineStages(cq.get());
     }
-
+    // Mark that this query uses the SBE engine, unless this has already been set.
+    OpDebug& opDebug = CurOp::get(opCtx)->debug();
+    if (!opDebug.classicEngineUsed) {
+        opDebug.classicEngineUsed = false;
+    }
     // Analyze the provided query and build the list of candidate plans for it.
     auto nss = cq->nss();
     auto yieldPolicy = makeSbeYieldPolicy(opCtx, requestedYieldPolicy, collection, nss);
