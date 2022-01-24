@@ -381,5 +381,12 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
             {logv2::LogTag::kStartupWarnings},
             "The ephemeralForTest storage engine is for testing only. Do not use in production");
     }
+
+    if (storageParams.restore) {
+        LOGV2_OPTIONS(
+            6260401,
+            {logv2::LogTag::kStartupWarnings},
+            "Running with --restore. This should only be used when restoring from a backup");
+    }
 }
 }  // namespace mongo

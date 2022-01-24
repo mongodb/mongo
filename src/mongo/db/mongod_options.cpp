@@ -491,6 +491,9 @@ Status storeMongodOptions(const moe::Environment& params) {
     if (params.count("notablescan")) {
         storageGlobalParams.noTableScan.store(params["notablescan"].as<bool>());
     }
+    if (params.count("restore") && params["restore"].as<bool>() == true) {
+        storageGlobalParams.restore = 1;
+    }
 
     repl::ReplSettings replSettings;
     if (params.count("replication.replSet")) {

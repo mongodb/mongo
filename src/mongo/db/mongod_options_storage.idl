@@ -111,6 +111,14 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
 
+    restore:
+        description: >-
+            This should only be used when restoring from a backup. Mongod will behave differently by
+            handling collections with missing data files, allowing database renames, skipping oplog
+            entries for collections not restored and more.
+        arg_vartype: Switch
+        source: [ cli, ini ]
+
     'storage.journal.enabled':
         description: 'Enable journaling'
         short_name: journal
