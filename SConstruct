@@ -1813,14 +1813,32 @@ if not env.TargetOSIs('windows'):
 # following appends contents of SHLINKFLAGS_EXTRA variable to the linker command
 env.AppendUnique(SHLINKFLAGS=['$SHLINKFLAGS_EXTRA'])
 
+class ForceVerboseConftest():
+    """
+    This class allows for configurable substition calls to enable forcing
+    the conftest to use verbose logs even when verbose mode is not specified.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __call__(self, target, source, env, for_signature):
+        for t in target:
+            # TODO: SERVER-60915 switch to SCons api conftest check
+            if 'conftest' in str(t):
+                return None
+        return self.msg
+
 if not env.Verbose():
-    env.Append( CCCOMSTR = "Compiling $TARGET" )
-    env.Append( CXXCOMSTR = env["CCCOMSTR"] )
-    env.Append( SHCCCOMSTR = "Compiling $TARGET" )
-    env.Append( SHCXXCOMSTR = env["SHCCCOMSTR"] )
-    env.Append( LINKCOMSTR = "Linking $TARGET" )
-    env.Append( SHLINKCOMSTR = env["LINKCOMSTR"] )
-    env.Append( ARCOMSTR = "Generating library $TARGET" )
+    # Even though we are not in Verbose mode, conftest logs should
+    # always be verbose, because they go to a file and not seen
+    # by the user anyways.
+    env.Append( CCCOMSTR = ForceVerboseConftest("Compiling $TARGET") )
+    env.Append( CXXCOMSTR = ForceVerboseConftest(env["CCCOMSTR"] ) )
+    env.Append( SHCCCOMSTR = ForceVerboseConftest("Compiling $TARGET" ) )
+    env.Append( SHCXXCOMSTR = ForceVerboseConftest(env["SHCCCOMSTR"] ) )
+    env.Append( LINKCOMSTR = ForceVerboseConftest("Linking $TARGET" ) )
+    env.Append( SHLINKCOMSTR = ForceVerboseConftest(env["LINKCOMSTR"] ) )
+    env.Append( ARCOMSTR = ForceVerboseConftest("Generating library $TARGET" ) )
 
 # Link tools other than mslink don't setup TEMPFILE in LINKCOM,
 # disabling SCons automatically falling back to a temp file when
