@@ -69,7 +69,8 @@ replTest.awaitReplication();
 {
     // Expect an error on the secondary.
     const healthlog = secondary.getDB('local').system.healthlog;
-    assert.soon(() => healthlog.find().hasNext(), 'expected health log to not be empty');
+    assert.soon(() => healthlog.find({severity: 'error'}).hasNext(),
+                'expected health log to have an error, but found none');
 
     const errors = healthlog.find({severity: 'error'});
     assert(errors.hasNext(), 'expected error, found none');
