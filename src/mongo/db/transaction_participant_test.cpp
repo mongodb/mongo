@@ -3171,7 +3171,7 @@ void setupAdditiveMetrics(const int metricValue, OperationContext* opCtx) {
  */
 void buildParametersInfoString(StringBuilder* sb,
                                LogicalSessionId sessionId,
-                               const TxnNumber txnNum,
+                               const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                                const APIParameters apiParameters,
                                const repl::ReadConcernArgs readConcernArgs,
                                bool autocommitVal) {
@@ -3182,7 +3182,9 @@ void buildParametersInfoString(StringBuilder* sb,
     auto apiStrictString = apiParameters.getAPIStrict().value_or(false) ? "true" : "false";
     auto apiDeprecationErrorsString =
         apiParameters.getAPIDeprecationErrors().value_or(false) ? "true" : "false";
-    (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString() << ", txnNumber: " << txnNum
+    (*sb) << "parameters:{ lsid: " << lsidBuilder.done().toString()
+          << ", txnNumber: " << txnNumberAndRetryCounter.getTxnNumber()
+          << ", txnRetryCounter: " << txnNumberAndRetryCounter.getTxnRetryCounter()
           << ", autocommit: " << autocommitString << ", apiVersion: \"" << apiVersionString
           << "\", apiStrict: " << apiStrictString
           << ", apiDeprecationErrors: " << apiDeprecationErrorsString
@@ -3240,7 +3242,7 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
                                        TransactionParticipant::Participant txnParticipant,
                                        std::string terminationCause,
                                        const LogicalSessionId sessionId,
-                                       const TxnNumber txnNum,
+                                       const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                                        const int metricValue,
                                        const bool wasPrepared,
                                        bool autocommitVal = false,
@@ -3263,7 +3265,7 @@ std::string buildTransactionInfoString(OperationContext* opCtx,
     // to true.
     buildParametersInfoString(&parametersInfo,
                               sessionId,
-                              txnNum,
+                              txnNumberAndRetryCounter,
                               APIParameters::get(opCtx),
                               repl::ReadConcernArgs::get(opCtx),
                               autocommitVal);
@@ -3504,7 +3506,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterCommit) {
                                    txnParticipant,
                                    "committed",
                                    *opCtx()->getLogicalSessionId(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
                                    metricValue,
                                    false);
 
@@ -3554,7 +3556,7 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterCommit) {
                                    txnParticipant,
                                    "committed",
                                    *opCtx()->getLogicalSessionId(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
                                    metricValue,
                                    true);
 
@@ -3598,7 +3600,7 @@ TEST_F(TransactionsMetricsTest, TestTransactionInfoForLogAfterAbort) {
                                    txnParticipant,
                                    "aborted",
                                    *opCtx()->getLogicalSessionId(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
                                    metricValue,
                                    false,
                                    true);
@@ -3648,7 +3650,7 @@ TEST_F(TransactionsMetricsTest, TestPreparedTransactionInfoForLogAfterAbort) {
                                    txnParticipant,
                                    "aborted",
                                    *opCtx()->getLogicalSessionId(),
-                                   *opCtx()->getTxnNumber(),
+                                   {*opCtx()->getTxnNumber(), *opCtx()->getTxnRetryCounter()},
                                    metricValue,
                                    true,
                                    true);

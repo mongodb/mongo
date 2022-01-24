@@ -59,6 +59,7 @@ function verifyCurrentOpFields(res, isActive) {
     const parameters = transaction.parameters;
     const expectedParametersFields = [
         "txnNumber",
+        "txnRetryCounter",
         "autocommit",
         "readConcern",
     ];

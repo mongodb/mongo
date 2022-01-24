@@ -2319,6 +2319,8 @@ std::string TransactionParticipant::Participant::_transactionInfoForLog(
     lsidBuilder.doneFast();
 
     parametersBuilder.append("txnNumber", o().activeTxnNumberAndRetryCounter.getTxnNumber());
+    parametersBuilder.append("txnRetryCounter",
+                             *o().activeTxnNumberAndRetryCounter.getTxnRetryCounter());
     parametersBuilder.append("autocommit", p().autoCommit ? *p().autoCommit : true);
     apiParameters.appendInfo(&parametersBuilder);
     readConcernArgs.appendInfo(&parametersBuilder);
@@ -2393,6 +2395,8 @@ void TransactionParticipant::Participant::_transactionInfoForLog(
     lsidBuilder.doneFast();
 
     parametersBuilder.append("txnNumber", o().activeTxnNumberAndRetryCounter.getTxnNumber());
+    parametersBuilder.append("txnRetryCounter",
+                             *o().activeTxnNumberAndRetryCounter.getTxnRetryCounter());
     parametersBuilder.append("autocommit", p().autoCommit ? *p().autoCommit : true);
     apiParameters.appendInfo(&parametersBuilder);
     readConcernArgs.appendInfo(&parametersBuilder);
