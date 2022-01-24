@@ -51,7 +51,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         # The last test executed so far.
         self._last_test = None
 
-        self._replicator = cluster_to_cluster_dummy_replicator.DummyReplicator(hook_logger, fixture)
+        self._replicator = self._fixture.replicator
 
         self._before_cycle_replicator_action = self._replicator.resume
         self._after_cycle_replicator_action = self._replicator.pause
@@ -71,28 +71,25 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
 
         # Set up the initial replication direction.
         clusters = self._fixture.get_independent_clusters()
-        self._source_cluster = clusters[0]
-        self._destination_cluster = clusters[1]
+        self._source_cluster = clusters[self._fixture.source_cluster_index]
+        self._destination_cluster = clusters[1 - self._fixture.source_cluster_index]
 
-        self._shell_options["global_vars"]["TestData"][
-            "sourceConnectionString"] = self._source_cluster.get_driver_connection_url()
-        self._shell_options["global_vars"]["TestData"][
-            "destinationConnectionString"] = self._destination_cluster.get_driver_connection_url()
+        source_url = self._source_cluster.get_driver_connection_url()
+        dest_url = self._destination_cluster.get_driver_connection_url()
+        self.logger.info("Setting source cluster string: '%s', destination cluster string: '%s'",
+                         source_url, dest_url)
 
-        self.logger.info(
-            "Setting source cluster string: '%s', destination cluster string: '%s'",
-            self._shell_options["global_vars"]["TestData"]["sourceConnectionString"],
-            self._shell_options["global_vars"]["TestData"]["destinationConnectionString"])
+        # The TestData needs to be set to allow the data consistency hooks to run correctly.
+        self._shell_options["global_vars"]["TestData"]["sourceConnectionString"] = source_url
+        self._shell_options["global_vars"]["TestData"]["destinationConnectionString"] = dest_url
+
+        self._replicator.set_cli_options({'sourceURI': source_url, 'destinationURI': dest_url})
 
     def after_suite(self, test_report, teardown_flag=None):
         """After suite."""
         # Stop the replicator only if it hasn't been stopped already.
         if self._test_num % self._tests_per_cycle != 0 or not self._restart_every_cycle:
-            stop_options = {
-                "test": self._last_test, "test_report": test_report,
-                "shell_options": self._shell_options
-            }
-            self._run_replicator_action(test_report, self._replicator.stop, stop_options)
+            self._run_replicator_action(test_report, self._replicator.stop)
 
         self._run_data_consistency_check(self._last_test, test_report)
         self._run_check_repl_db_hash(self._last_test, test_report)
@@ -115,9 +112,7 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         # Every 'n' tests, the replicator should be pause / stop the replicator and perform data
         # consistency checks.
         if self._test_num % self._tests_per_cycle == 0:
-            action_options = self._make_after_cycle_options(test, test_report)
-            self._run_replicator_action(test_report, self._after_cycle_replicator_action,
-                                        action_options)
+            self._run_replicator_action(test_report, self._after_cycle_replicator_action)
 
             self._run_data_consistency_check(test, test_report)
             self._run_check_repl_db_hash(test, test_report)
@@ -139,39 +134,27 @@ class ClusterToClusterReplication(interface.Hook):  # pylint: disable=too-many-i
         check_db_hash.after_test(test, test_report)
         check_db_hash.after_suite(test_report)
 
-    def _run_replicator_action(self, test_report, action, action_options=None):
+    def _run_replicator_action(self, test_report, action):
         self.logger.info(f"Running replicator action: {action.__name__}")
         replicator_action_case = _ReplicatorActionTestCase(self.logger, self._last_test, self,
-                                                           action, action_options)
+                                                           action)
         replicator_action_case.run_dynamic_test(test_report)
         self.logger.info(f"Ran replicator action: {action.__name__}")
-
-    def _make_after_cycle_options(self, test, test_report):
-        # If the replicator is to be restarted, make the options appropriate for stopping it.
-        after_cycle_options = None
-        if self._restart_every_cycle:
-            after_cycle_options = {
-                "test": test, "test_report": test_report, "shell_options": self._shell_options
-            }
-
-        return after_cycle_options
 
 
 class _ReplicatorActionTestCase(interface.DynamicTestCase):
     """_ReplicatorActionTestCase class, to run a replicator action as a test."""
 
     def __init__(  # pylint: disable=too-many-arguments
-            self, logger, base_test_name, hook, action, action_options):
+            self, logger, base_test_name, hook, action):
         """Initialize _ReplicatorActionTestCase."""
         interface.DynamicTestCase.__init__(self, logger, f"replicator_action:{action.__name__}",
                                            "Run a replicator action.", base_test_name, hook)
         self._action = action
-        self._action_options = action_options
 
     def run_test(self):
         try:
-            self._action(self._action_options)
+            self._action()
         except:
-            self.logger.exception("Failed to run replicator action '%s' with options '%s'",
-                                  self._action, self._action_options)
+            self.logger.exception("Failed to run replicator action '%s'.", self._action)
             raise

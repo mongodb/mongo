@@ -11,7 +11,7 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
             self, logger, job_num, fixturelib, cluster0_options, cluster1_options,
-            dbpath_prefix=None, preserve_dbpath=False):
+            replicator_options, dbpath_prefix=None, preserve_dbpath=False):
         """Initialize with different options for the clusters."""
 
         interface.MultiClusterFixture.__init__(self, logger, job_num, fixturelib,
@@ -65,12 +65,20 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
                                                    self.job_num, **cluster_options["settings"])
             self.clusters.append(cluster)
 
+        self.replicator_options = replicator_options
+        replicator_logger = self.fixturelib.new_fixture_node_logger(replicator_options["class"],
+                                                                    self.job_num, "replicator")
+        self.replicator = self.fixturelib.make_fixture(replicator_options["class"],
+                                                       replicator_logger, self.job_num,
+                                                       **replicator_options["settings"])
+
     def setup(self):
         """Set up the cluster to cluster fixture according to the options provided."""
 
         for i, cluster in enumerate(self.clusters):
             self.logger.info(f"Setting up cluster {i}.")
             cluster.setup()
+        self.replicator.setup()
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -80,42 +88,55 @@ class ClusterToClusterFixture(interface.MultiClusterFixture):  # pylint: disable
             out.extend(cluster.pids())
         if not out:
             self.logger.debug('No clusters when gathering cluster to cluster fixture pids.')
+
+        replicator_pids = self.replicator.pids()
+        self.logger.info(f"Gathering replicator pids: {replicator_pids}")
+        out.extend(replicator_pids)
+
         return out
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
-        # Wait for each of the clusters.
+        # Wait for each of the clusters and the replicator.
         for cluster in self.clusters:
             cluster.await_ready()
+        self.replicator.await_ready()
 
     def _do_teardown(self, mode=None):
-        """Shut down the clusters."""
-        self.logger.info("Stopping all clusters...")
-
+        """Shut down the clusters and the replicator."""
         running_at_start = self.is_running()
         if not running_at_start:
-            self.logger.warning("All clusters were expected to be running, but weren't.")
+            self.logger.warning(
+                "All clusters and replicators were expected to be running, but weren't.")
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
+        self.logger.info("Stopping the replicator...")
+        teardown_handler.teardown(self.replicator, "replicator", mode=mode)
+        self.logger.info("Stopped the replicator...")
+
+        self.logger.info("Stopping all clusters...")
         for i, cluster in enumerate(self.clusters):
             teardown_handler.teardown(cluster, f"cluster {i}", mode=mode)
 
         if teardown_handler.was_successful():
-            self.logger.info("Successfully stopped all clusters.")
+            self.logger.info("Successfully stopped all clusters and replicators.")
         else:
             self.logger.error("Stopping the fixture failed.")
             raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
-        """Return true if all clusters are still operating."""
-        return all(cluster.is_running() for cluster in self.clusters)
+        """Return true if all clusters and replicators are still operating."""
+        return all(cluster.is_running()
+                   for cluster in self.clusters) and self.replicator.is_running()
 
     def get_node_info(self):
         """Return a list of dicts of NodeInfo objects."""
         output = []
         for cluster in self.clusters:
             output += cluster.get_node_info()
+        output += self.replicator.get_node_info()
+
         return output
 
     def get_driver_connection_url(self):
