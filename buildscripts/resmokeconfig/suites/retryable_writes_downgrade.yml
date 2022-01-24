@@ -111,6 +111,9 @@ selector:
   # operation and cluster times aren't shared between shells.
   # "Cowardly refusing to run test with network retries enabled when it uses startParallelShell()"
   - uses_parallel_shell
+  # Used for tests which can run in multiversion configurations but cannot run while a replica set
+  # or shard is being actively upgraded or downgraded.
+  - cannot_run_during_upgrade_downgrade
 
 executor:
   archive:
