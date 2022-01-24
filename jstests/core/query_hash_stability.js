@@ -4,6 +4,10 @@
  * @tags: [
  *   assumes_read_concern_local,
  *   requires_fcv_51,
+ *   # The test expects the plan cache key on a given node to remain stable. However, the plan
+ *   # cache key is allowed to change between versions. Therefore, this test cannot run in
+ *   # passthroughs that do upgrade/downgrade.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 (function() {
