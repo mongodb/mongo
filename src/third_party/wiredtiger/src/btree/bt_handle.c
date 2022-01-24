@@ -527,10 +527,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
      * is that we want to initialize it once the first time we open the btree during a run and then
      * for every subsequent open, we want to reuse it. This so that we're still able to read
      * transaction ids from the previous time a btree was open in the same run.
-     *
-     * FIXME-WT-8590: When we begin discarding dhandles more aggressively, we need to check that
-     * updates aren't having their transaction ids wiped after reopening the dhandle. The runtime
-     * write generation is relevant here since it should remain static across the entire run.
      */
     btree->write_gen = WT_MAX(ckpt->write_gen + 1, conn->base_write_gen);
     WT_ASSERT(session, ckpt->write_gen >= ckpt->run_write_gen);
