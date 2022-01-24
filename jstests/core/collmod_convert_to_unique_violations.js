@@ -1,5 +1,5 @@
 /**
- * Tests that the CannotEnableIndexConstraint error returned when collmod fails to convert an index
+ * Tests that the CannotConvertIndexToUnique error returned when collmod fails to convert an index
  * to unique contains correct information about violations found.
  *
  * @tags: [
@@ -49,7 +49,7 @@ function sortViolationsArray(arr) {
 
 // Checks that the violations match what we expect.
 function assertFailedWithViolations(result, violations) {
-    assert.commandFailedWithCode(result, ErrorCodes.CannotEnableIndexConstraint);
+    assert.commandFailedWithCode(result, ErrorCodes.CannotConvertIndexToUnique);
     assert.eq(
         bsonWoCompare(sortViolationsArray(result.violations), sortViolationsArray(violations)),
         0,

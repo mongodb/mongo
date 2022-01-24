@@ -31,9 +31,7 @@
 
 #include "mongo/db/catalog/coll_mod_index.h"
 
-#include <fmt/format.h>
-
-#include "mongo/db/catalog/cannot_enable_index_constraint_info.h"
+#include "mongo/db/catalog/cannot_convert_index_to_unique_info.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -179,8 +177,8 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
         duplicateRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
     }
     if (!duplicateRecordsList.empty()) {
-        uassertStatusOK(buildEnableConstraintErrorStatus(
-            "unique", buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
+        uassertStatusOK(buildConvertUniqueErrorStatus(
+            buildDuplicateViolations(opCtx, collection, duplicateRecordsList)));
     }
 
     *newUnique = true;
@@ -350,11 +348,10 @@ BSONArray buildDuplicateViolations(OperationContext* opCtx,
     return duplicateViolations.arr();
 }
 
-Status buildEnableConstraintErrorStatus(const std::string& indexType, const BSONArray& violations) {
-    return Status(CannotEnableIndexConstraintInfo(violations),
-                  fmt::format("Cannot enable {} constraint. Please resolve conflicting documents "
-                              "before running collMod again.",
-                              indexType));
+Status buildConvertUniqueErrorStatus(const BSONArray& violations) {
+    return Status(CannotConvertIndexToUniqueInfo(violations),
+                  "Cannot convert the index to unique. Please resolve conflicting documents "
+                  "before running collMod again.");
 }
 
 }  // namespace mongo

@@ -457,7 +457,7 @@ error_codes:
 
     - {code: 358, name: InternalTransactionNotSupported}
 
-    - {code: 359, name: CannotEnableIndexConstraint, extra: CannotEnableIndexConstraintInfo}
+    - {code: 359, name: CannotConvertIndexToUnique, extra: CannotConvertIndexToUniqueInfo}
 
     - {code: 360, name: ShardVersionRefreshCanceled, categories: [InternalOnly]}
 

@@ -27,24 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/cannot_enable_index_constraint_info.h"
+#pragma once
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
-namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(CannotEnableIndexConstraintInfo);
+/**
+ * Represents an error returned from the collMod command when an attempt to enforce the constraint
+ * on an index fails because constraint violations exist.
+ */
+class CannotConvertIndexToUniqueInfo final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::CannotConvertIndexToUnique;
 
-}  // namespace
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-void CannotEnableIndexConstraintInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("violations", _violations);
-}
+    explicit CannotConvertIndexToUniqueInfo(const BSONArray& violations)
+        : _violations(violations.getOwned()) {}
 
-std::shared_ptr<const ErrorExtraInfo> CannotEnableIndexConstraintInfo::parse(const BSONObj& obj) {
-    return std::make_shared<CannotEnableIndexConstraintInfo>(BSONArray(obj["violations"].Obj()));
-}
+    void serialize(BSONObjBuilder* bob) const override;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder bob;
+        serialize(&bob);
+        return bob.obj();
+    }
+
+private:
+    // Includes the '_id' and fields that violate the index constraint for each document.
+    BSONArray _violations;
+};
 
 }  // namespace mongo

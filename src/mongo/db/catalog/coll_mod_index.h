@@ -92,8 +92,8 @@ BSONArray buildDuplicateViolations(OperationContext* opCtx,
                                    const std::list<std::set<RecordId>>& duplicateRecordsList);
 
 /**
- * Returns the formatted error status for not being able to enable the index constraint.
+ * Returns the formatted error status for not being able to convert the index to unique.
  */
-Status buildEnableConstraintErrorStatus(const std::string& indexType, const BSONArray& violations);
+Status buildConvertUniqueErrorStatus(const BSONArray& violations);
 
 }  // namespace mongo

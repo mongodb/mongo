@@ -493,7 +493,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/db/write_ops',
-        'cannot_enable_index_constraint_info',
+        'cannot_convert_index_to_unique_info',
         'clustered_collection_options',
         'collection',
         'collection_options',
@@ -559,9 +559,9 @@ env.Library(
 )
 
 env.Library(
-    target='cannot_enable_index_constraint_info',
+    target='cannot_convert_index_to_unique_info',
     source=[
-        'cannot_enable_index_constraint_info.cpp',
+        'cannot_convert_index_to_unique_info.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

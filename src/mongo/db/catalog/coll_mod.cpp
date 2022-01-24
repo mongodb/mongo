@@ -539,8 +539,8 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     // Throws exception if index contains duplicates.
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, cmr.indexRequest.idx);
     if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildEnableConstraintErrorStatus(
-            "unique", buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+        uassertStatusOK(buildConvertUniqueErrorStatus(
+            buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
     }
 
     return Status::OK();
@@ -571,8 +571,8 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
     auto idx = cmr.indexRequest.idx;
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
     if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildEnableConstraintErrorStatus(
-            "unique", buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+        uassertStatusOK(buildConvertUniqueErrorStatus(
+            buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueSideWriteTracker,

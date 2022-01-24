@@ -97,7 +97,7 @@ const testCollModConvertUniqueWithSideWrites = function(performCrudOpsFunc, expe
                 primary,
                 testDB,
                 {collMod: collName, index: {keyPattern: {a: 1}, unique: true}},
-                ErrorCodes.CannotEnableIndexConstraint,
+                ErrorCodes.CannotConvertIndexToUnique,
                 assertViolations,
                 expectedViolations);
         }
