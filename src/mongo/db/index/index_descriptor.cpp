@@ -106,6 +106,7 @@ constexpr StringData IndexDescriptor::kTextVersionFieldName;
 constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
+constexpr StringData IndexDescriptor::kCommentFieldName;
 
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
@@ -132,6 +133,11 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
     if (BSONElement collationElement = _infoObj[kCollationFieldName]) {
         invariant(collationElement.isABSONObj());
         _collation = collationElement.Obj().getOwned();
+    }
+
+    if (BSONElement commentElement = _infoObj[kCommentFieldName]) {
+        invariant(commentElement.isABSONObj());
+        _comment = commentElement.Obj().getOwned();
     }
 }
 

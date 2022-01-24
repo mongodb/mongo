@@ -94,6 +94,7 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kUniqueFieldName,
     IndexDescriptor::kWeightsFieldName,
     IndexDescriptor::kOriginalSpecFieldName,
+    IndexDescriptor::kCommentFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
@@ -500,7 +501,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     "clustered" == indexSpecElemFieldName) &&
                    !indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {
             return {ErrorCodes::TypeMismatch,
-                    str::stream() << "The field '" << indexSpecElemFieldName << " has value "
+                    str::stream() << "The field '" << indexSpecElemFieldName << "' has value "
                                   << indexSpecElem.toString()
                                   << ", which is not convertible to bool"};
         } else if ((IndexDescriptor::kDefaultLanguageFieldName == indexSpecElemFieldName ||
@@ -520,6 +521,13 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     str::stream() << "The field '" << indexSpecElemFieldName
                                   << "' must be a number, but got "
                                   << typeName(indexSpecElem.type())};
+        } else if (IndexDescriptor::kCommentFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::Object) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << IndexDescriptor::kCommentFieldName
+                            << "' must be an object, but got " << typeName(indexSpecElem.type())};
+            }
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().
