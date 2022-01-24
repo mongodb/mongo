@@ -110,8 +110,8 @@ public:
      * Resets the SingleTransactionStats object stored in this TransactionMetricsObserver instance,
      * preparing it for the new transaction or retryable write with the given number.
      */
-    void resetSingleTransactionStats(TxnNumber txnNumber) {
-        _singleTransactionStats = SingleTransactionStats(txnNumber);
+    void resetSingleTransactionStats(TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
+        _singleTransactionStats = SingleTransactionStats(txnNumberAndRetryCounter);
     }
 
 private:

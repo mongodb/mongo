@@ -1,5 +1,5 @@
 /**
- * Confirms inclusion of a 'transaction' object containing lsid and txnNumber in
+ * Confirms inclusion of a 'transaction' object containing lsid, txnNumber, and txnRetryCounter in
  * currentOp() for a prepared transaction and an active non-prepared transaction.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
@@ -32,6 +32,16 @@ function checkCurrentOpFields(currentOp,
                               timeAfterTransactionStarts,
                               timeBeforeCurrentOp) {
     const transactionDocument = currentOp[0].transaction;
+    assert.eq(transactionDocument.parameters.txnNumber,
+              NumberLong(0),
+              "Expected 'txnNumber' to be NumberLong(0) but got " +
+                  transactionDocument.parameters.txnRetryCounter +
+                  " instead: " + tojson(transactionDocument));
+    assert.eq(transactionDocument.parameters.txnRetryCounter,
+              0,
+              "Expected 'txnRetryCounter' to be 0 but got " +
+                  transactionDocument.parameters.txnRetryCounter +
+                  " instead: " + tojson(transactionDocument));
     assert.eq(transactionDocument.parameters.autocommit,
               false,
               "Expected 'autocommit' to be false but got " +

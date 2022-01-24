@@ -116,7 +116,7 @@ void SingleTransactionStats::report(BSONObjBuilder* builder,
                                     TickSource* tickSource,
                                     TickSource::Tick curTick) const {
     BSONObjBuilder parametersBuilder(builder->subobjStart("parameters"));
-    parametersBuilder.append("txnNumber", _txnNumber);
+    parametersBuilder.append("txnNumber", _txnNumberAndRetryCounter.getTxnNumber());
 
     if (!isForMultiDocumentTransaction()) {
         // For retryable writes, we only include the txnNumber.
@@ -124,6 +124,7 @@ void SingleTransactionStats::report(BSONObjBuilder* builder,
         return;
     }
 
+    parametersBuilder.append("txnRetryCounter", *_txnNumberAndRetryCounter.getTxnRetryCounter());
     parametersBuilder.append("autocommit", *_autoCommit);
     readConcernArgs.appendInfo(&parametersBuilder);
     parametersBuilder.done();

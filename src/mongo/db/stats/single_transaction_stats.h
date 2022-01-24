@@ -62,8 +62,10 @@ public:
         }
     };
 
-    SingleTransactionStats() : _txnNumber(kUninitializedTxnNumber){};
-    SingleTransactionStats(TxnNumber txnNumber) : _txnNumber(txnNumber){};
+    SingleTransactionStats()
+        : _txnNumberAndRetryCounter(kUninitializedTxnNumber, kUninitializedTxnRetryCounter){};
+    SingleTransactionStats(TxnNumberAndRetryCounter txnNumberAndRetryCounter)
+        : _txnNumberAndRetryCounter(txnNumberAndRetryCounter){};
 
     /**
      * Sets the transaction's start time, only if it hasn't already been set.
@@ -226,8 +228,8 @@ public:
                 TickSource::Tick curTick) const;
 
 private:
-    // The transaction number of the transaction.
-    TxnNumber _txnNumber;
+    // The struct containing the transaction number and transaction retry counter.
+    TxnNumberAndRetryCounter _txnNumberAndRetryCounter;
 
     // Unset for retryable write, 'false' for multi-document transaction.  Value 'true' is
     // for future use.

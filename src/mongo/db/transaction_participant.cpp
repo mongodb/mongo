@@ -2585,8 +2585,7 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
     _resetTransactionState(lk, TransactionState::kNone);
 
     // Reset the transactions metrics
-    o(lk).transactionMetricsObserver.resetSingleTransactionStats(
-        txnNumberAndRetryCounter.getTxnNumber());
+    o(lk).transactionMetricsObserver.resetSingleTransactionStats(txnNumberAndRetryCounter);
 }
 
 void RetryableWriteTransactionParticipantCatalog::addParticipant(
@@ -2846,7 +2845,7 @@ void TransactionParticipant::Participant::_invalidate(WithLock wl) {
 
     // Reset the transactions metrics.
     o(wl).transactionMetricsObserver.resetSingleTransactionStats(
-        o().activeTxnNumberAndRetryCounter.getTxnNumber());
+        o().activeTxnNumberAndRetryCounter);
 }
 
 void TransactionParticipant::Participant::_resetRetryableWriteState() {
