@@ -1838,9 +1838,9 @@ public:
             if (auto optionalSlot = it->second.getSlot(); optionalSlot) {
                 _context->pushExpr(*optionalSlot);
             } else {
-                auto expr = it->second.extractExpr();
-                _context->pushExpr(expr->clone());
-                it->second = std::move(expr);
+                auto preGeneratedExpr = it->second.extractExpr();
+                _context->pushExpr(preGeneratedExpr->clone());
+                it->second = std::move(preGeneratedExpr);
             }
             return;
         }
