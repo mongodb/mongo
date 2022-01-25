@@ -1086,16 +1086,7 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     const auto& uuid = coll.getUuid();
     if (coll.getDefragmentCollection() && !_defragmentationStates.contains(uuid)) {
         _initializeCollectionState(lk, opCtx, coll);
-        // Fulfill pending promise of actionable operation if needed
-        if (_nextStreamingActionPromise) {
-            auto nextStreamingAction = _nextStreamingAction(opCtx);
-            if (nextStreamingAction) {
-                _concurrentStreamingOps++;
-                _nextStreamingActionPromise.get().setWith([&] { return *nextStreamingAction; });
-                _nextStreamingActionPromise = boost::none;
-                return;
-            }
-        }
+        _yieldNextStreamingAction(lk, opCtx);
     } else if (!coll.getDefragmentCollection() && _defragmentationStates.contains(uuid)) {
         _transitionPhases(opCtx, coll, DefragmentationPhaseEnum::kFinished);
         _defragmentationStates.erase(uuid);
@@ -1126,7 +1117,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
         auto selectedChunksFromPreviousRound = chunksToMove.size();
         for (auto it = _defragmentationStates.begin(); it != _defragmentationStates.end();) {
             try {
-                _refreshDefragmentationPhaseFor(opCtx, it->first);
+                const auto phaseAdvanced = _refreshDefragmentationPhaseFor(opCtx, it->first);
                 auto& collDefragmentationPhase = it->second;
                 if (!collDefragmentationPhase) {
                     it = _defragmentationStates.erase(it, std::next(it));
@@ -1136,6 +1127,8 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
                     collDefragmentationPhase->popNextMigration(opCtx, usedShards);
                 if (actionableMigration.has_value()) {
                     chunksToMove.push_back(std::move(*actionableMigration));
+                } else if (phaseAdvanced) {
+                    _yieldNextStreamingAction(lk, opCtx);
                 }
                 ++it;
             } catch (DBException& e) {
@@ -1167,7 +1160,7 @@ SemiFuture<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStre
     return std::move(future).semi();
 }
 
-void BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(OperationContext* opCtx,
+bool BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(OperationContext* opCtx,
                                                                         const UUID& collUuid) {
     auto& currentPhase = _defragmentationStates.at(collUuid);
     auto currentPhaseCompleted = [&currentPhase] {
@@ -1175,13 +1168,15 @@ void BalancerDefragmentationPolicyImpl::_refreshDefragmentationPhaseFor(Operatio
     };
 
     if (!currentPhaseCompleted()) {
-        return;
+        return false;
     }
 
     auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, collUuid);
     while (currentPhaseCompleted()) {
         currentPhase = _transitionPhases(opCtx, coll, currentPhase->getNextPhase());
     }
+
+    return true;
 }
 
 boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextStreamingAction(
@@ -1282,7 +1277,7 @@ void BalancerDefragmentationPolicyImpl::acknowledgeMoveResult(OperationContext* 
         return;
     }
 
-    _defragmentationStates[action.uuid]->applyActionResult(opCtx, action, result);
+    _defragmentationStates.at(action.uuid)->applyActionResult(opCtx, action, result);
     _processEndOfAction(lk, opCtx);
 }
 
@@ -1296,18 +1291,21 @@ void BalancerDefragmentationPolicyImpl::closeActionStream() {
     _streamClosed = true;
 }
 
-void BalancerDefragmentationPolicyImpl::_processEndOfAction(WithLock, OperationContext* opCtx) {
-    // Fulfill promise if needed
+void BalancerDefragmentationPolicyImpl::_processEndOfAction(WithLock lk, OperationContext* opCtx) {
+    --_concurrentStreamingOps;
+    _yieldNextStreamingAction(lk, opCtx);
+}
+
+void BalancerDefragmentationPolicyImpl::_yieldNextStreamingAction(WithLock,
+                                                                  OperationContext* opCtx) {
     if (_nextStreamingActionPromise) {
         auto nextStreamingAction = _nextStreamingAction(opCtx);
         if (nextStreamingAction) {
+            ++_concurrentStreamingOps;
             _nextStreamingActionPromise.get().setWith([&] { return *nextStreamingAction; });
             _nextStreamingActionPromise = boost::none;
-            return;
         }
     }
-    // ... otherwise, just lower the counter
-    --_concurrentStreamingOps;
 }
 
 std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transitionPhases(

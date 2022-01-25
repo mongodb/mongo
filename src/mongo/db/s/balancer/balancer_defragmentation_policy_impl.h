@@ -128,7 +128,7 @@ private:
      * Advances the defragmentation state of the specified collection to the next actionable phase
      * (or sets the related DefragmentationPhase object to nullptr if nothing more can be done).
      */
-    void _refreshDefragmentationPhaseFor(OperationContext* opCtx, const UUID& collUuid);
+    bool _refreshDefragmentationPhaseFor(OperationContext* opCtx, const UUID& collUuid);
 
     /**
      * Move to the next phase and persist the phase change. This will end defragmentation if the
@@ -162,6 +162,8 @@ private:
     void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
 
     void _processEndOfAction(WithLock, OperationContext* opCtx);
+
+    void _yieldNextStreamingAction(WithLock, OperationContext* opCtx);
 
     Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
 
