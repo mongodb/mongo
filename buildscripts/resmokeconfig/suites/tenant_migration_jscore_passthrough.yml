@@ -109,6 +109,8 @@ selector:
   - uses_parallel_shell
   # Profile settings are stored in-memory only so are not transferred to the recipient.
   - requires_profiling
+  # capped collections are banned in Serverless
+  - requires_capped
   # emptycapped command is blocked during tenant migration.
   - requires_emptycapped
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
