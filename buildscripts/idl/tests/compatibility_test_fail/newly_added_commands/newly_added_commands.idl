@@ -1,0 +1,124 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "../buildscripts/idl/tests/compatibility_test_fail/new/imports.idl"
+
+types:
+    bsonSerializationTypeAny:
+        bson_serialization_type:
+                                - int
+                                - any
+        description: "The bson_serialization_type contains 'any'"
+        cpp_type: "std::int32_t"
+
+structs:
+    NewStructFieldNoUnstableField:
+        description: "new struct field has no unstable field specified"
+        fields:
+            newStructFieldNoUnstableField:
+                type: bool
+
+    NewStructFieldTypeContainsAny:
+        description: "new struct field type has bson_serialization_type with 'any'"
+        fields:
+            newStructFieldTypeContainsAny:
+                type: bsonSerializationTypeAny
+                unstable: false
+
+commands:
+    newCommandParameterNoUnstableField:
+        description: "newly added command has a parameter without the unstable field specified"
+        command_name: newCommandParameterNoUnstableField
+        namespace: ignored
+        cpp_name: newCommandParameterNoUnstableField
+        strict: true
+        api_version: "1"
+        fields:
+            flag1:
+                type: bool
+        reply_type: OkReply
+
+    newCommandReplyNoUnstableField:
+        description: "newly added command has a reply field without the unstable field specified"
+        command_name: newCommandReplyNoUnstableField
+        namespace: ignored
+        cpp_name: newCommandReplyNoUnstableField
+        strict: true
+        api_version: "1"
+        reply_type: NewStructFieldNoUnstableField
+
+    newCommandTypeStructFieldNoUnstableField:
+        description: "newly added command has a command type struct field without the unstable
+                      field specified"
+        command_name: newCommandTypeStructFieldNoUnstableField
+        namespace: type
+        type: NewStructFieldNoUnstableField
+        cpp_name: newCommandTypeStructFieldNoUnstableField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandParameterBsonSerializationTypeAny:
+        description: "newly added command has a parameter type that has bson_serialization_type
+                      with 'any'"
+        command_name: newCommandParameterBsonSerializationTypeAny
+        namespace: ignored
+        cpp_name: newCommandParameterBsonSerializationTypeAny
+        strict: true
+        api_version: "1"
+        fields:
+            flag1:
+                type: bsonSerializationTypeAny
+                unstable: false
+        reply_type: OkReply
+
+    newCommandReplyBsonSerializationTypeAny:
+        description: "newly added command has a reply field type that has bson_serialization_type
+                      with 'any'"
+        command_name: newCommandReplyBsonSerializationTypeAny
+        namespace: ignored
+        cpp_name: newCommandReplyBsonSerializationTypeAny
+        strict: true
+        api_version: "1"
+        reply_type: NewStructFieldTypeContainsAny
+
+    newCommandTypeStructFieldBsonSerializationTypeAny:
+        description: "newly added command has a command struct field type that has
+                      bson_serialization_type with 'any'"
+        command_name: newCommandTypeStructFieldBsonSerializationTypeAny
+        namespace: type
+        type: NewStructFieldTypeContainsAny
+        cpp_name: newCommandTypeStructFieldBsonSerializationTypeAny
+        strict: true
+        api_version: "1"
+        reply_type: OkReply

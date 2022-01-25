@@ -680,13 +680,13 @@ class IDLCompatibilityContext(object):
     def add_reply_field_bson_any_not_allowed_error(self, command_name: str, field_name: str,
                                                    type_name: str, file: str) -> None:
         """
-        Add an error about the old and new reply field bson serialization_type being 'any'.
+        Add an error about the reply field bson serialization_type being 'any'.
 
-        Add an error about the old and new reply field type's bson serialization type being of
+        Add an error about the reply field type's bson serialization type being of
         type 'any' when it is not explicitly allowed.
         """
         self._add_error(ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
-                        ("'%s' has an old and new reply field or sub-field '%s' of type '%s' "
+                        ("'%s' has a reply field or sub-field '%s' of type '%s' "
                          "that has a bson serialization type 'any' when it "
                          "is not explicitly allowed.") % (command_name, field_name, type_name),
                         file)
@@ -830,22 +830,22 @@ class IDLCompatibilityContext(object):
             is_command_parameter: bool) -> None:
         # pylint: disable=too-many-arguments,invalid-name
         """
-        Add an error about the old and new command or param type bson serialization_type being 'any'.
+        Add an error about the command or param type bson serialization_type being 'any'.
 
-        Add an error about the old and new command or parameter type's bson serialization type
+        Add an error about the command or parameter type's bson serialization type
         being of type 'any' when it is not explicitly allowed.
         """
         if is_command_parameter:
             self._add_error(ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED,
                             command_name,
-                            ("'%s' has an old and new field or sub-field '%s' of type "
+                            ("'%s' has a field or sub-field '%s' of type "
                              "'%s' that has a bson "
                              "serialization type 'any' when it is not explicitly allowed.") %
                             (command_name, field_name, type_name), file)
         else:
             self._add_error(
                 ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
-                ("'%s' or its sub-struct has an old and new type '%s' that has a bson "
+                ("'%s' or its sub-struct has a type '%s' that has a bson "
                  "serialization type 'any' when it is not explicitly allowed.") % (command_name,
                                                                                    type_name), file)
 

@@ -45,6 +45,7 @@ structs:
                 description: "The number of seconds after which a pre-image is eligible for
                               deletion. A string value 'off' enables the default expiration policy."
                 optional: true
+                unstable: false
                 type:
                     variant: [string, safeInt64]
     ChangeStreamOptions:
@@ -53,6 +54,7 @@ structs:
             preAndPostImages:
                 type: PreAndPostImagesOptions
                 optional: true
+                unstable: false
     GetChangeStreamOptionsResponse:
         description: "A response for the get change streams options command."
         chained_structs:
@@ -77,10 +79,12 @@ commands:
                 description: "The pre- and post-images options to set."
                 type: PreAndPostImagesOptions
                 optional: true
+                unstable: false
             writeConcern:
                 description: "The level of write concern for the command."
                 type: WriteConcern
                 optional: true
+                unstable: false
         reply_type: OkReply
     getChangeStreamOptions:
         description: "A command to get the change streams options."

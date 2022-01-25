@@ -13,3 +13,9 @@ find idls -maxdepth 1 -mindepth 1 -type d | while read dir; do
   echo "Performing idl check compatibility with release: $dir:"
   $python buildscripts/idl/idl_check_compatibility.py -v --old-include "$dir/src" --old-include "$dir/src/mongo/db/modules/enterprise/src" --new-include src --new-include src/mongo/db/modules/enterprise/src "$dir/src" src
 done
+
+# Run the idl compatibility checker script with the current src directory as both the "old" and
+# "new" versions. This is so that we can check that commands that were newly added since the last
+# release adhere to compatibility requirements.
+echo "Performing idl check compatibility for newly added commands since the last release:"
+$python buildscripts/idl/idl_check_compatibility.py -v --old-include src --old-include src/mongo/db/modules/enterprise/src --new-include src --new-include src/mongo/db/modules/enterprise/src src src
