@@ -91,8 +91,8 @@ MONGO_INITIALIZER(Behaviors_Win32)(InitializerContext*) {
     // hook the C runtime's error display
     _CrtSetReportHook(&crtDebugCallback);
 
-    if (_setmaxstdio(2048) == -1) {
-        LOGV2_WARNING(23326, "Failed to increase max open files limit from default of 512 to 2048");
+    if (_setmaxstdio(8192) == -1) {
+        LOGV2_WARNING(23326, "Failed to increase max open files limit from default of 512 to 8192");
     }
 
     // Let's try to set minimum Windows Kernel quantum length to smallest viable timer resolution in
