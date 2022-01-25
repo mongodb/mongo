@@ -156,7 +156,7 @@ public:
     // If the server persists in TransientFault for more than this duration
     // it will move to the ActiveFault state and terminate.
     Milliseconds getActiveFaultDuration() const {
-        return Milliseconds(Seconds(mongo::gActiveFaultDurationSecs.load()));
+        return Seconds(mongo::gActiveFaultDurationSecs.load());
     }
 
     Milliseconds getPeriodicHealthCheckInterval(FaultFacetType type) const {

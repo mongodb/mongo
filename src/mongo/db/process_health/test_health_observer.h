@@ -46,7 +46,7 @@ protected:
     }
 
     Milliseconds getObserverTimeout() const override {
-        return Milliseconds(Seconds(30));
+        return Seconds(30);
     }
 
     Future<HealthCheckStatus> periodicCheckImpl(
