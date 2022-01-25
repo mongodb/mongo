@@ -332,6 +332,16 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
+          python ./buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir src/mongo/db/modules/enterprise/src
+          mkdir -p mongodb/feature_flags
+          cp ./all_feature_flags.txt mongodb/feature_flags
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source "${workdir}/compile_venv/bin/activate"
           python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-core MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
           mkdir -p mongodb/jstests/hooks
           if [ -d jstests/hooks ]
