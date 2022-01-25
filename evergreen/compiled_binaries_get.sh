@@ -6,8 +6,8 @@ cd src
 set -o errexit
 set -o verbose
 
-activate_venv
-$python -m pip --disable-pip-version-check install "db-contrib-tool==0.1.7"
+setup_db_contrib_tool_venv
+activate_db_contrib_tool_venv
 
 rm -rf /data/install dist-test/bin
 
