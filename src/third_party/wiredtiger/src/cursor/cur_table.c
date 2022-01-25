@@ -505,29 +505,31 @@ __curtable_insert(WT_CURSOR *cursor)
     JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, insert);
     WT_ERR(__curtable_open_indices(ctable));
 
+    cp = ctable->cg_cursors;
+    primary = *cp++;
+
     /*
      * Split out the first insert, it may be allocating a recno.
      *
      * If the table has indices, we also need to know whether this record is replacing an existing
      * record so that the existing index entries can be removed. We discover if this is an overwrite
      * by configuring the primary cursor for no-overwrite, and checking if the insert detects a
-     * duplicate key.
+     * duplicate key. By default, when insert finds a duplicate, it returns the value it found. We
+     * don't want that value to overwrite our own, override that behavior.
      */
-    cp = ctable->cg_cursors;
-    primary = *cp++;
-
     flag_orig = F_MASK(primary, WT_CURSTD_OVERWRITE);
-    if (ctable->table->nindices > 0)
+    if (ctable->table->nindices > 0) {
         F_CLR(primary, WT_CURSTD_OVERWRITE);
+        F_SET(primary, WT_CURSTD_DUP_NO_VALUE);
+    }
     ret = primary->insert(primary);
 
     /*
-     * !!!
-     * WT_CURSOR.insert clears the set internally/externally flags
-     * but doesn't touch the items. We could make a copy each time
-     * for overwrite cursors, but for now we just reset the flags.
+     * WT_CURSOR.insert clears the set internally/externally flags but doesn't touch the items. We
+     * could make a copy each time for overwrite cursors, but for now we just reset the flags.
      */
     F_SET(primary, flag_orig | WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+    F_CLR(primary, WT_CURSTD_DUP_NO_VALUE);
 
     if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
         WT_ERR(__curtable_update(cursor));

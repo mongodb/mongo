@@ -898,11 +898,9 @@ retry:
          * If not overwriting, fail if the key exists, else insert the key/value pair.
          */
         if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) && cbt->compare == 0) {
-            WT_WITH_UPDATE_VALUE_SKIP_BUF(
-              ret = __wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
-            WT_ERR(ret);
+            WT_ERR(__wt_cursor_valid(cbt, cbt->tmp, WT_RECNO_OOB, &valid));
             if (valid)
-                WT_ERR(WT_DUPLICATE_KEY);
+                goto duplicate;
         }
 
         ret = __cursor_row_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD);
@@ -926,13 +924,11 @@ retry:
          */
         if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
             if (cbt->compare == 0) {
-                WT_WITH_UPDATE_VALUE_SKIP_BUF(
-                  ret = __wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
-                WT_ERR(ret);
+                WT_ERR(__wt_cursor_valid(cbt, NULL, cbt->recno, &valid));
                 if (valid)
-                    WT_ERR(WT_DUPLICATE_KEY);
+                    goto duplicate;
             } else if (__cursor_fix_implicit(btree, cbt))
-                WT_ERR(WT_DUPLICATE_KEY);
+                goto duplicate;
         }
 
         WT_ERR(__cursor_col_modify(cbt, &cbt->iface.value, WT_UPDATE_STANDARD));
@@ -944,6 +940,18 @@ err:
         goto retry;
     }
 
+    /* Return the found value for any duplicate key. */
+    if (0) {
+duplicate:
+        if (F_ISSET(cursor, WT_CURSTD_DUP_NO_VALUE))
+            ret = WT_DUPLICATE_KEY;
+        else {
+            __wt_value_return(cbt, cbt->upd_value);
+            if ((ret = __cursor_localvalue(cursor)) == 0)
+                ret = WT_DUPLICATE_KEY;
+        }
+    }
+
     /* Insert doesn't maintain a position across calls, clear resources. */
     if (ret == 0) {
 done:
@@ -952,7 +960,7 @@ done:
             F_SET(cursor, WT_CURSTD_KEY_EXT);
     }
     WT_TRET(__cursor_reset(cbt));
-    if (ret != 0)
+    if (ret != 0 && ret != WT_DUPLICATE_KEY)
         __cursor_state_restore(cursor, &state);
 
     return (ret);

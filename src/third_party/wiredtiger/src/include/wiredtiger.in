@@ -446,7 +446,9 @@ struct __wt_cursor {
 	 *
 	 * If the cursor was not configured with "overwrite=true", both the key
 	 * and value must be set and the record must not already exist; the
-	 * record will be inserted.
+	 * record will be inserted. If the record already exists, the
+	 * ::WT_DUPLICATE_KEY error is returned and the value found in the tree
+	 * can be retrieved using WT_CURSOR::get_value.
 	 *
 	 * @snippet ex_all.c Insert a new record and fail if the record exists
 	 *
@@ -464,7 +466,8 @@ struct __wt_cursor {
 	 * with "append=true", the cursor ends with no key set and a subsequent
 	 * call to the WT_CURSOR::get_key method will fail. The cursor ends with
 	 * no value set and a subsequent call to the WT_CURSOR::get_value method
-	 * will fail.
+	 * will fail, except for the ::WT_DUPLICATE_KEY error return, in which
+	 * case the value currently stored for the key can be retrieved.
 	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length bit field column-store (that is, a store with an
@@ -709,34 +712,35 @@ struct __wt_cursor {
 	const char *internal_uri;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define	WT_CURSTD_APPEND		0x0000001u
-#define	WT_CURSTD_BULK			0x0000002u
-#define	WT_CURSTD_CACHEABLE		0x0000004u
-#define	WT_CURSTD_CACHED		0x0000008u
-#define	WT_CURSTD_DEAD			0x0000010u
-#define	WT_CURSTD_DEBUG_COPY_KEY	0x0000020u
-#define	WT_CURSTD_DEBUG_COPY_VALUE	0x0000040u
-#define	WT_CURSTD_DEBUG_RESET_EVICT	0x0000080u
-#define	WT_CURSTD_DUMP_HEX		0x0000100u
-#define	WT_CURSTD_DUMP_JSON		0x0000200u
-#define	WT_CURSTD_DUMP_PRETTY		0x0000400u
-#define	WT_CURSTD_DUMP_PRINT		0x0000800u
-#define	WT_CURSTD_HS_READ_ALL	0x0001000u
-#define	WT_CURSTD_HS_READ_COMMITTED	0x0002000u
-#define	WT_CURSTD_IGNORE_TOMBSTONE	0x0004000u
-#define	WT_CURSTD_JOINED		0x0008000u
-#define	WT_CURSTD_KEY_EXT		0x0010000u	/* Key points out of tree. */
-#define	WT_CURSTD_KEY_INT		0x0020000u	/* Key points into tree. */
-#define	WT_CURSTD_KEY_ONLY		0x0040000u
-#define	WT_CURSTD_META_INUSE		0x0080000u
-#define	WT_CURSTD_OPEN			0x0100000u
-#define	WT_CURSTD_OVERWRITE		0x0200000u
-#define	WT_CURSTD_PREFIX_SEARCH		0x0400000u
-#define	WT_CURSTD_RAW			0x0800000u
-#define	WT_CURSTD_RAW_SEARCH		0x1000000u
-#define	WT_CURSTD_VALUE_EXT		0x2000000u	/* Value points out of tree. */
-#define	WT_CURSTD_VALUE_INT		0x4000000u	/* Value points into tree. */
-#define WT_CURSTD_VERSION_CURSOR 0x8000000u /* Version cursor. */
+#define	WT_CURSTD_APPEND		0x00000001u
+#define	WT_CURSTD_BULK			0x00000002u
+#define	WT_CURSTD_CACHEABLE		0x00000004u
+#define	WT_CURSTD_CACHED		0x00000008u
+#define	WT_CURSTD_DEAD			0x00000010u
+#define	WT_CURSTD_DEBUG_COPY_KEY	0x00000020u
+#define	WT_CURSTD_DEBUG_COPY_VALUE	0x00000040u
+#define	WT_CURSTD_DEBUG_RESET_EVICT	0x00000080u
+#define	WT_CURSTD_DUMP_HEX		0x00000100u
+#define	WT_CURSTD_DUMP_JSON		0x00000200u
+#define	WT_CURSTD_DUMP_PRETTY		0x00000400u
+#define	WT_CURSTD_DUMP_PRINT		0x00000800u
+#define	WT_CURSTD_DUP_NO_VALUE          0x00001000u
+#define	WT_CURSTD_HS_READ_ALL		0x00002000u
+#define	WT_CURSTD_HS_READ_COMMITTED	0x00004000u
+#define	WT_CURSTD_IGNORE_TOMBSTONE	0x00008000u
+#define	WT_CURSTD_JOINED		0x00010000u
+#define	WT_CURSTD_KEY_EXT		0x00020000u /* Key points out of tree. */
+#define	WT_CURSTD_KEY_INT		0x00040000u /* Key points into tree. */
+#define	WT_CURSTD_KEY_ONLY		0x00080000u
+#define	WT_CURSTD_META_INUSE		0x00100000u
+#define	WT_CURSTD_OPEN			0x00200000u
+#define	WT_CURSTD_OVERWRITE		0x00400000u
+#define	WT_CURSTD_PREFIX_SEARCH		0x00800000u
+#define	WT_CURSTD_RAW			0x01000000u
+#define	WT_CURSTD_RAW_SEARCH		0x02000000u
+#define	WT_CURSTD_VALUE_EXT		0x04000000u /* Value points out of tree. */
+#define	WT_CURSTD_VALUE_INT		0x08000000u /* Value points into tree. */
+#define WT_CURSTD_VERSION_CURSOR	0x10000000u /* Version cursor. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
