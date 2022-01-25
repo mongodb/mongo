@@ -102,6 +102,7 @@ public:
             ErrorCodes::IllegalOperation, "Can't rename a collection to itself", fromNss != toNss);
 
         RenameCollectionOptions options;
+        options.expectedSourceUUID = renameRequest.getCollectionUUID();
         options.dropTarget = renameRequest.getDropTarget();
         options.stayTemp = renameRequest.getStayTemp();
         validateAndRunRenameCollection(

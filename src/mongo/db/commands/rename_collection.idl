@@ -55,3 +55,7 @@ commands:
                 before the rename."
                 type: bool
                 default: false
+            collectionUUID:
+                description: "The expected UUID of the collection."
+                type: uuid
+                optional: true

@@ -48,6 +48,7 @@ class OpTime;
  * temporariness.
  */
 struct RenameCollectionOptions {
+    boost::optional<UUID> expectedSourceUUID;
     bool dropTarget = false;
     bool stayTemp = false;
     bool markFromMigrate = false;

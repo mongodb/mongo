@@ -78,6 +78,10 @@ structs:
                 description: "If true, the original collection will remain temp if it was temp
                 before the rename."
                 default: false
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 
     RenameCollectionResponse:
         description: "Response for the rename collection command"

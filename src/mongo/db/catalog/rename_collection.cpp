@@ -35,6 +35,7 @@
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -318,6 +319,8 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
 
+    checkCollectionUUIDMismatch(opCtx, sourceColl, options.expectedSourceUUID);
+
     AutoStatsTracker statsTracker(
         opCtx,
         source,
@@ -458,6 +461,10 @@ Status renameBetweenDBs(OperationContext* opCtx,
         !opCtx->inMultiDocumentTransaction(),
         str::stream() << "renameBetweenDBs not supported in multi-document transaction: source: "
                       << source << "; target: " << target);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Cannot provide an expected source collection UUID when renaming between databases",
+            !options.expectedSourceUUID);
 
     boost::optional<Lock::DBLock> sourceDbLock;
     boost::optional<Lock::CollectionLock> sourceCollLock;

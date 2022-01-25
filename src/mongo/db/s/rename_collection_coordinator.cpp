@@ -34,6 +34,7 @@
 #include "mongo/db/s/rename_collection_coordinator.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/ops/insert.h"
@@ -178,7 +179,16 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 fromNss.db() == toNss.db());
                         _doc.setOptShardedCollInfo(optSourceCollType);
                     } else if (fromNss.db() != toNss.db()) {
+                        uassert(ErrorCodes::InvalidOptions,
+                                "Cannot provide an expected source collection UUID when renaming "
+                                "between databases",
+                                !_doc.getCollectionUUID());
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
+                    }
+
+                    {
+                        AutoGetCollection coll{opCtx, fromNss, MODE_IS};
+                        checkCollectionUUIDMismatch(opCtx, *coll, _doc.getCollectionUUID());
                     }
 
                     // Make sure the target namespace is not a view

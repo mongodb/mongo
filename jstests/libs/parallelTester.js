@@ -237,6 +237,7 @@ if (typeof _threadInject != "undefined") {
             "collection_uuid_find.js",
             "collection_uuid_write_commands.js",
             "collection_uuid_coll_mod.js",
+            "collection_uuid_rename_collection.js",
         ]);
 
         // Get files, including files in subdirectories.

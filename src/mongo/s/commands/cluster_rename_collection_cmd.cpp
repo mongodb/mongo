@@ -77,6 +77,7 @@ public:
             RenameCollectionRequest renameCollReq(request().getTo());
             renameCollReq.setDropTarget(request().getDropTarget());
             renameCollReq.setStayTemp(request().getStayTemp());
+            renameCollReq.setCollectionUUID(request().getCollectionUUID());
 
             ShardsvrRenameCollection renameCollRequest(fromNss);
             renameCollRequest.setDbName(fromNss.db());
