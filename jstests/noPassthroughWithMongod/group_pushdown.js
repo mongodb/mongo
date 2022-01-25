@@ -15,13 +15,14 @@ if (!checkSBEEnabled(db, ["featureFlagSBEGroupPushdown"])) {
 const coll = db.group_pushdown;
 coll.drop();
 
-assert.commandWorked(coll.insert([
+const docs = [
     {"_id": 1, "item": "a", "price": 10, "quantity": 2, "date": ISODate("2014-01-01T08:00:00Z")},
     {"_id": 2, "item": "b", "price": 20, "quantity": 1, "date": ISODate("2014-02-03T09:00:00Z")},
     {"_id": 3, "item": "a", "price": 5, "quantity": 5, "date": ISODate("2014-02-03T09:05:00Z")},
     {"_id": 4, "item": "b", "price": 10, "quantity": 10, "date": ISODate("2014-02-15T08:00:00Z")},
     {"_id": 5, "item": "c", "price": 5, "quantity": 10, "date": ISODate("2014-02-15T09:05:00Z")},
-]));
+];
+assert.commandWorked(coll.insert(docs));
 
 let assertGroupPushdown = function(
     coll, pipeline, expectedResults, expectedGroupCountInExplain, options = {}) {
@@ -348,24 +349,40 @@ explain = coll.explain().aggregate(
     [{$group: {_id: "$item", s: {$sum: "$price"}, stdev: {$stdDevPop: "$price"}}}]);
 assert.neq(null, getAggPlanStage(explain, "GROUP", true), explain);
 
-// $group cannot be pushed down to SBE when there's $match with $or due to an issue with
-// subplanning even though $group alone can be pushed down.
-const matchWithOr = {
-    $match: {$or: [{"item": "a"}, {"price": 10}]}
+// $group can be pushed down to SBE when subplanning is involved. Note that the top $or expression
+// triggers subplanning.
+(function() {
+// Use another collection to not interfere with other test cases even when a test case fails since
+// we create indexes to verify group pushdown when subplanning is involed.
+const coll = db.group_pushdown_subplanning;
+coll.drop();
+
+assert.commandWorked(coll.insert(docs));
+
+const verifyGroupPushdownWhenSubplanning = () => {
+    const matchWithOr = {$match: {$or: [{"item": "a"}, {"price": 10}]}};
+    const groupPushedDown = {$group: {_id: "$item", quantity: {$sum: "$quantity"}}};
+    assertResultsMatchWithAndWithoutPushdown(coll,
+                                             [matchWithOr, groupPushedDown],
+                                             [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}],
+                                             1);
+    // A trival $and with only one $or will be optimized away and thus $or will be the top
+    // expression.
+    const matchWithTrivialAndOr = {$match: {$and: [{$or: [{"item": "a"}, {"price": 10}]}]}};
+    assertResultsMatchWithAndWithoutPushdown(coll,
+                                             [matchWithTrivialAndOr, groupPushedDown],
+                                             [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}],
+                                             1);
 };
-const groupPossiblyPushedDown = {
-    $group: {_id: "$item", quantity: {$sum: "$quantity"}}
-};
-assertNoGroupPushdown(coll,
-                      [matchWithOr, groupPossiblyPushedDown],
-                      [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
-// A trival $and with only one $or will be optimized away and thus $or will be the top expression.
-const matchWithTrivialAndOr = {
-    $match: {$and: [{$or: [{"item": "a"}, {"price": 10}]}]}
-};
-assertNoGroupPushdown(coll,
-                      [matchWithTrivialAndOr, groupPossiblyPushedDown],
-                      [{_id: "a", quantity: 7}, {_id: "b", quantity: 10}]);
+
+// Verify that $group can be pushed down when subplanning is involved.
+verifyGroupPushdownWhenSubplanning();
+
+// Create an index on 'item' field.
+coll.createIndex({item: 1});
+// Verify that $group can be pushed down when there's an index and subplanning is involved.
+verifyGroupPushdownWhenSubplanning();
+}());
 
 // $bucketAuto is a group-like stage that is not compatible with SBE HashAggStage.
 // TODO SERVER-62401: Supporting a $bucketAuto will require a range-based group-aggregate

@@ -106,8 +106,7 @@ namespace {
  *    0. When the 'internalQueryForceClassicEngine' feature flag is 'false'.
  *    1. When 'allowDiskUse' is false. We currently don't support spilling in the SBE HashAgg
  *       stage. This will change once that is supported when SERVER-58436 is complete.
- *    2. $match stage does not have $or and thus, does not need subplanning.
- *    3. When the DocumentSourceGroup has 'doingMerge=false', this will change when we implement
+ *    2. When the DocumentSourceGroup has 'doingMerge=false', this will change when we implement
  *       hash table spilling in SERVER-58436.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGroupsForPushdown(
@@ -119,12 +118,6 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
     // which requires stages to be wrapped in an interface.
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> groupsForPushdown;
 
-    // In case that we have a top $or for $match stage, it triggers the tripwire assertion 5842500
-    // because subplanning does not expect that the base query has pushed down $group stage(s) but
-    // it does when $group stage exist in pipeline.
-    // TODO SERVER-60197: Remove this check after supporting this scenario.
-    auto queryNeedsSubplanning = SubplanStage::needsSubplanning(*cq);
-
     // This handles the case of unionWith against an unknown collection.
     if (collection == nullptr) {
         return {};
@@ -132,7 +125,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> extractSbeCompatibleGr
 
     if (!feature_flags::gFeatureFlagSBEGroupPushdown.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        cq->getForceClassicEngine() || queryNeedsSubplanning) {
+        cq->getForceClassicEngine()) {
         return {};
     }
 

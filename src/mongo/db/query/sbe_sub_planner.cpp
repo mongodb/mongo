@@ -39,12 +39,8 @@
 
 namespace mongo::sbe {
 CandidatePlans SubPlanner::plan(
-    std::vector<std::unique_ptr<QuerySolution>> solutions,
-    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
-    tassert(5842900,
-            "Lowering parts of aggregation pipeline into SBE isn't supported with sub-planning",
-            _cq.pipeline().empty());
-
+    std::vector<std::unique_ptr<QuerySolution>>,
+    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>>) {
     std::function<mongo::PlanCacheKey(const CanonicalQuery& cq, const CollectionPtr& coll)>
         createPlanCacheKey = [](const CanonicalQuery& cq, const CollectionPtr& coll) {
             return plan_cache_key_factory::make<mongo::PlanCacheKey>(cq, coll);
@@ -112,6 +108,12 @@ CandidatePlans SubPlanner::plan(
 
     // Build a plan stage tree from a composite solution.
     auto compositeSolution = std::move(subplanSelectStat.getValue());
+
+    // If some agg pipeline stages are being pushed down, extend the solution with them.
+    if (!_cq.pipeline().empty()) {
+        compositeSolution = QueryPlanner::extendWithAggPipeline(_cq, std::move(compositeSolution));
+    }
+
     auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
         _opCtx, _collection, _cq, *compositeSolution, _yieldPolicy);
     auto status = prepareExecutionPlan(root.get(), &data);
@@ -130,6 +132,11 @@ CandidatePlans SubPlanner::planWholeQuery() const {
 
     // Only one possible plan. Build the stages from the solution.
     if (solutions.size() == 1) {
+        // If some agg pipeline stages are being pushed down, extend the solution with them.
+        if (!_cq.pipeline().empty()) {
+            solutions[0] = QueryPlanner::extendWithAggPipeline(_cq, std::move(solutions[0]));
+        }
+
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
         auto status = prepareExecutionPlan(root.get(), &data);
