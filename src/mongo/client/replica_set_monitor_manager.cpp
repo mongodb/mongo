@@ -79,7 +79,7 @@ Status ReplicaSetMonitorManagerNetworkConnectionHook::validateHost(
         return Status::OK();
     }
 
-    if (auto streamableMonitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
+    if (auto streamableMonitor = checked_pointer_cast<StreamableReplicaSetMonitor>(
             ReplicaSetMonitorManager::get()->getMonitorForHost(remoteHost))) {
 
         auto publisher = streamableMonitor->getEventsPublisher();

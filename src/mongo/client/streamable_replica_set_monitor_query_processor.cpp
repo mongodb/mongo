@@ -51,7 +51,7 @@ void StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor::
 
     const auto& setName = newDescription->getSetName();
     if (setName) {
-        auto replicaSetMonitor = std::static_pointer_cast<StreamableReplicaSetMonitor>(
+        auto replicaSetMonitor = checked_pointer_cast<StreamableReplicaSetMonitor>(
             ReplicaSetMonitorManager::get()->getMonitor(*setName));
         if (!replicaSetMonitor) {
             LOGV2_DEBUG(4333215,

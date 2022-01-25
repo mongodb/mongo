@@ -151,11 +151,9 @@ SemiFuture<void> getRecipientAcceptSplitFuture(ExecutorPtr executor,
     auto monitor = ReplicaSetMonitor::createIfNeeded(recipientConnectionString);
     invariant(monitor);
 
-    // TODO SERVER-62079 : Remove check for scanning RSM as it does not exist anymore.
-    auto streamableMonitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(monitor);
-    uassert(6142507,
-            "feature \"shard split\" can only work with a StreamableReplicaSetMonitor.",
-            streamableMonitor);
+    // Only StreamableReplicaSetMonitor derives ReplicaSetMonitor.  Therefore static cast is
+    // possible
+    auto streamableMonitor = checked_pointer_cast<StreamableReplicaSetMonitor>(monitor);
 
     auto listener = std::make_shared<RecipientAcceptSplitListener>(
         recipientConnectionString.getServers().size(),

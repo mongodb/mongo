@@ -373,7 +373,7 @@ public:
         _executor = repl::makeTestExecutor();
 
         // Retrieve monitor installed by _rsmMonitor.setup(...)
-        auto monitor = std::dynamic_pointer_cast<StreamableReplicaSetMonitor>(
+        auto monitor = checked_pointer_cast<StreamableReplicaSetMonitor>(
             ReplicaSetMonitor::createIfNeeded(_validRepl.getURI()));
         invariant(monitor);
         _publisher = monitor->getEventsPublisher();
