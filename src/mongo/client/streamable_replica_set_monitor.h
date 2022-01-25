@@ -139,11 +139,15 @@ public:
 
     bool isKnownToHaveGoodPrimary() const override;
     void runScanForMockReplicaSet() override;
+    class StreamableReplicaSetMonitorDiscoveryTimeProcessor;
 
 private:
     class StreamableReplicaSetMonitorQueryProcessor;
     using StreamableReplicaSetMontiorQueryProcessorPtr =
         std::shared_ptr<StreamableReplicaSetMonitor::StreamableReplicaSetMonitorQueryProcessor>;
+
+    using StreamableReplicaSetMonitorDiscoveryTimeProcessorPtr = std::shared_ptr<
+        StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor>;
 
     struct HostQuery {
         HostQuery(std::shared_ptr<ReplicaSetMonitorStats> stats)
@@ -297,6 +301,7 @@ private:
     // any outstanding queries for this RSM instance.
     StreamableReplicaSetMontiorQueryProcessorPtr _queryProcessor;
 
+    StreamableReplicaSetMonitorDiscoveryTimeProcessorPtr _primaryDiscoveryTimeProcessor;
     const MongoURI _uri;
 
     std::shared_ptr<executor::EgressTagCloser> _connectionManager;

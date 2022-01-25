@@ -40,6 +40,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/streamable_replica_set_monitor_discovery_time_processor.h"
 #include "mongo/client/streamable_replica_set_monitor_query_processor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/bson_extract_optime.h"
@@ -190,6 +191,8 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     : ReplicaSetMonitor(cleanupCallback),
       _errorHandler(std::make_unique<SdamErrorHandler>(uri.getSetName())),
       _queryProcessor(std::make_shared<StreamableReplicaSetMonitorQueryProcessor>()),
+      _primaryDiscoveryTimeProcessor(
+          std::make_shared<StreamableReplicaSetMonitorDiscoveryTimeProcessor>()),
       _uri(uri),
       _connectionManager(connectionManager),
       _executor(executor),
@@ -266,6 +269,8 @@ void StreamableReplicaSetMonitor::init() {
     _eventsPublisher->registerListener(_serverDiscoveryMonitor);
 
     _eventsPublisher->registerListener(_queryProcessor);
+
+    _eventsPublisher->registerListener(_primaryDiscoveryTimeProcessor);
 
     _isDropped.store(false);
 
