@@ -375,12 +375,17 @@ const verifyGroupPushdownWhenSubplanning = () => {
                                              1);
 };
 
-// Verify that $group can be pushed down when subplanning is involved.
+// Verify that $group can be pushed down when subplanning is involved. With this test case,
+// subplanning code path is involved but "Subplanning" does not actually happen and instead,
+// it falls back to planning a whole query.
 verifyGroupPushdownWhenSubplanning();
 
-// Create an index on 'item' field.
+// Create indexes on 'item' and 'price' fields to cover all sub-expressions of $match.
 coll.createIndex({item: 1});
-// Verify that $group can be pushed down when there's an index and subplanning is involved.
+coll.createIndex({price: 1});
+
+// Verify that $group can be pushed down when there are indexes that cover all sub-expressions
+// and "Subplanning" actually happens.
 verifyGroupPushdownWhenSubplanning();
 }());
 
