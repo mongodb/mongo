@@ -29,9 +29,13 @@
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
-# test_hs22.py
-# Test the case that out of order timestamp
-# update is followed by a tombstone.
+'''
+ test_hs22.py
+ Test the following cases with out of order(OOO) timestamps:
+ - OOO update followed by a tombstone.
+ - Multiple OOO updates in a single transaction.
+ - Most recent OOO updates that require squashing.
+'''
 class test_hs22(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=50MB'
 
@@ -172,4 +176,109 @@ class test_hs22(wttest.WiredTigerTestCase):
         # Search the key again to verify the data is still as expected.
         self.session.begin_transaction("read_timestamp=" + self.timestamp_str(15))
         self.assertEqual(cursor[key1], value2)
+        self.session.rollback_transaction()
+
+    def test_out_of_order_timestamp_update_same_txn(self):
+        uri = 'table:test_hs22'
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
+        cursor = self.session.open_cursor(uri)
+        self.conn.set_timestamp(
+            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
+
+        key1 = self.key1
+
+        if self.value_format == '8t':
+            value1 = 97  # 'a'
+            value2 = 98  # 'b'
+            value3 = 99  # 'c'
+            value4 = 100 # 'd'
+        else:
+            value1 = 'a'
+            value2 = 'b'
+            value3 = 'c'
+            value4 = 'd'
+
+        self.session.begin_transaction()
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(1))
+        cursor[key1] = value1
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(3))
+        cursor[key1] = value2
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(4))
+        cursor[key1] = value3
+        self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(3))
+        cursor[key1] = value4
+        self.session.commit_transaction()
+
+        # Do a checkpoint to trigger
+        # history store reconciliation.
+        self.session.checkpoint()
+
+        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+
+        # Search the key to evict it.
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        self.assertEqual(evict_cursor[key1], value4)
+        self.assertEqual(evict_cursor.reset(), 0)
+        self.session.rollback_transaction()
+
+        # Search the key again to verify the data is still as expected.
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(10))
+        self.assertEqual(cursor[key1], value4)
+        self.session.rollback_transaction()
+
+    def test_out_of_order_timestamp_squash_updates(self):
+        uri = 'table:test_hs22'
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format)
+        cursor = self.session.open_cursor(uri)
+        self.conn.set_timestamp(
+            'oldest_timestamp=' + self.timestamp_str(1) + ',stable_timestamp=' + self.timestamp_str(1))
+
+        key1 = self.key1
+
+        if self.value_format == '8t':
+            value1 = 97  # 'a'
+            value2 = 98  # 'b'
+            value3 = 99  # 'c'
+            value4 = 100 # 'd'
+            value5 = 101 # 'e'
+        else:
+            value1 = 'a'
+            value2 = 'b'
+            value3 = 'c'
+            value4 = 'd'
+            value5 = 'e'
+
+        self.session.begin_transaction()
+        cursor[key1] = value1
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(15))
+
+        self.session.begin_transaction()
+        cursor[key1] = value2
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(18))
+
+        self.session.begin_transaction()
+        cursor.set_key(key1)
+        cursor.remove()
+        cursor[key1] = value3
+        cursor[key1] = value4
+        cursor[key1] = value5
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(11))
+
+        # Do a checkpoint to trigger
+        # history store reconciliation.
+        self.session.checkpoint()
+
+        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+
+        # Search the key to evict it.
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(18))
+        self.assertEqual(evict_cursor[key1], value5)
+        self.assertEqual(evict_cursor.reset(), 0)
+        self.session.rollback_transaction()
+
+        # Search the key again to verify the data is still as expected.
+        self.session.begin_transaction("read_timestamp=" + self.timestamp_str(18))
+        self.assertEqual(cursor[key1], value5)
         self.session.rollback_transaction()
