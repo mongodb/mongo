@@ -336,6 +336,12 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
         WT_WITH_CHECKPOINT_LOCK(session,
           WT_WITH_SCHEMA_LOCK(
             session, ret = __tier_flush_meta(session, tiered, local_uri, obj_uri)));
+        /*
+         * If a user did a flush_tier with sync off, it is possible that a drop happened before the
+         * flush work unit was processed. Ignore non-existent errors.
+         */
+        if (ret == ENOENT)
+            ret = 0;
         WT_ERR(ret);
 
         /*
