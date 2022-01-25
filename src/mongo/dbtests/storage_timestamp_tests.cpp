@@ -2695,7 +2695,7 @@ public:
         const LogicalTime beforeDropTs = currentTime.clusterTime();
 
         // Drop all of the indexes.
-        dropIndexes(_opCtx, nss, "*");
+        dropIndexes(_opCtx, nss, boost::none, "*");
 
         // Assert that each index is dropped individually and with its own timestamp. The order of
         // dropping and creating are not guaranteed to be the same, but assert all of the created
@@ -2770,7 +2770,7 @@ public:
         const LogicalTime beforeDropTs = currentTime.clusterTime();
 
         // Drop all of the indexes.
-        dropIndexes(_opCtx, nss, std::vector<std::string>{"a_1", "b_1", "c_1"});
+        dropIndexes(_opCtx, nss, boost::none, std::vector<std::string>{"a_1", "b_1", "c_1"});
 
         // Assert that each index is dropped individually and with its own timestamp. The order of
         // dropping and creating are not guaranteed to be the same, but assert all of the created

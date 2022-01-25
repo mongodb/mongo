@@ -35,6 +35,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -343,13 +344,16 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString&
 
 DropIndexesReply dropIndexes(OperationContext* opCtx,
                              const NamespaceString& nss,
+                             const boost::optional<UUID>& expectedUUID,
                              const IndexArgument& index) {
     // We only need to hold an intent lock to send abort signals to the active index builder(s) we
     // intend to abort.
     boost::optional<AutoGetCollection> collection;
     collection.emplace(opCtx, nss, MODE_IX);
 
+    checkCollectionUUIDMismatch(opCtx, collection->getCollection(), expectedUUID);
     uassertStatusOK(checkView(opCtx, nss, collection->getCollection()));
+
     const UUID collectionUUID = (*collection)->uuid();
     const NamespaceStringOrUUID dbAndUUID = {nss.db().toString(), collectionUUID};
     uassertStatusOK(checkReplState(opCtx, dbAndUUID, collection->getCollection()));

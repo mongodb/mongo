@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -439,6 +440,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
             AutoGetCollection collection(opCtx, ns, MODE_IS);
             CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
+
+            checkCollectionUUIDMismatch(opCtx, collection.getCollection(), cmd.getCollectionUUID());
 
             // Before potentially taking an exclusive collection lock, check if all indexes already
             // exist while holding an intent lock.

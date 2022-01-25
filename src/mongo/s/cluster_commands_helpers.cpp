@@ -621,6 +621,10 @@ RawResponsesResult appendRawResponses(
     output->append("code", firstError.code());
     output->append("codeName", ErrorCodes::errorString(firstError.code()));
     *errmsg = firstError.reason();
+    if (auto extra = firstError.extraInfo()) {
+        extra->serialize(output);
+    }
+
     return {false, shardsWithSuccessResponses, successARSResponses, firstStaleConfigErrorReceived};
 }
 

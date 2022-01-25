@@ -226,3 +226,8 @@ commands:
                 type: bool
                 optional: true
                 unstable: false
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
+                unstable: true

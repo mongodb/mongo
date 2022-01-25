@@ -52,6 +52,7 @@ using IndexArgument = stdx::variant<std::string, std::vector<std::string>, mongo
  */
 DropIndexesReply dropIndexes(OperationContext* opCtx,
                              const NamespaceString& nss,
+                             const boost::optional<UUID>& expectedUUID,
                              const IndexArgument& index);
 
 /**

@@ -102,10 +102,16 @@ public:
                     opCtx, request().getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
                 auto timeseriesCmd =
                     timeseries::makeTimeseriesDropIndexesCommand(opCtx, request(), *options);
-                return dropIndexes(opCtx, timeseriesCmd.getNamespace(), timeseriesCmd.getIndex());
+                return dropIndexes(opCtx,
+                                   timeseriesCmd.getNamespace(),
+                                   request().getCollectionUUID(),
+                                   timeseriesCmd.getIndex());
             }
 
-            return dropIndexes(opCtx, request().getNamespace(), request().getIndex());
+            return dropIndexes(opCtx,
+                               request().getNamespace(),
+                               request().getCollectionUUID(),
+                               request().getIndex());
         }
     };
 } cmdDropIndexes;
