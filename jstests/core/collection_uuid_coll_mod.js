@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   featureFlagCommandsAcceptCollectionUUID,
+ *   no_selinux,
  *   tenant_migration_incompatible,
  * ]
  */
