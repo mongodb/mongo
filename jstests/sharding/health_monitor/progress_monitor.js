@@ -2,7 +2,7 @@
  *  @tags: [multiversion_incompatible]
  */
 const PROGRESS_TIMEOUT_SECONDS = 5;
-const CHECK_PING_SECONDS = 1;
+const monitoringIntervalMs = 500;
 (function() {
 'use strict';
 
@@ -10,14 +10,13 @@ const params = {
     setParameter: {
         healthMonitoringIntensities: tojson({
             values: [
-                {type: "test", intensity: "non-critical"},
-                {type: "ldap", intensity: "off"},
-                {type: "dns", intensity: "off"}
+                {type: "test", intensity: "critical"},
             ]
         }),
-        healthMonitoringIntervals: tojson({values: [{type: "test", interval: NumberInt(500)}]}),
+        healthMonitoringIntervals:
+            tojson({values: [{type: "test", interval: NumberInt(monitoringIntervalMs)}]}),
         progressMonitor:
-            tojson({interval: PROGRESS_TIMEOUT_SECONDS, deadline: PROGRESS_TIMEOUT_SECONDS}),
+            tojson({interval: PROGRESS_TIMEOUT_SECONDS * 1000, deadline: PROGRESS_TIMEOUT_SECONDS}),
         featureFlagHealthMonitoring: true
     }
 };
@@ -32,13 +31,13 @@ assert.commandWorked(st.s1.adminCommand(
     {"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 2}}}));
 
 // Set the failpoint on one of the mongos's to pause its healthchecks.
+jsTestLog("hang test health observer on " + st.s1.host);
 assert.commandWorked(
     st.s1.adminCommand({"configureFailPoint": 'hangTestHealthObserver', "mode": "alwaysOn"}));
-sleep(CHECK_PING_SECONDS * 1000);
-// Make sure the failpoint on its own doesn't bring down the server.
-assert.commandWorked(st.s1.adminCommand({"ping": 1}));
+
 // Wait for the progress monitor timeout to elapse.
-sleep(PROGRESS_TIMEOUT_SECONDS * 1000);
+sleep(1.1 * PROGRESS_TIMEOUT_SECONDS * 1000);
+jsTestLog("Done sleeping");
 
 assert.soon(() => {
     try {
@@ -59,7 +58,7 @@ assert.soon(() => {
     }
     sleep(1000);
     return false;
-}, "Pinging faulty mongos should fail with network error.", PROGRESS_TIMEOUT_SECONDS * 1000);
+}, "Pinging faulty mongos should fail with network error.");
 // Don't validate exit codes, since a mongos will exit on its own with a non-zero exit code.
 
 st.stop({skipValidatingExitCode: true});

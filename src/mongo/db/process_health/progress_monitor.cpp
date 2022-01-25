@@ -32,6 +32,7 @@
 #include "mongo/db/process_health/progress_monitor.h"
 
 #include "mongo/db/process_health/fault_manager.h"
+#include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/db/process_health/health_observer.h"
 #include "mongo/logv2/log.h"
 
@@ -65,7 +66,16 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
     // Check the liveness of every health observer.
     for (auto observer : observers) {
         const auto stats = observer->getStats();
-        if (!_faultManager->getConfig().isHealthObserverEnabled(observer->getType())) {
+        const auto observerType = observer->getType();
+        const auto observerIntensity =
+            _faultManager->getConfig().getHealthObserverIntensity(observerType);
+
+        if (observerIntensity != HealthObserverIntensityEnum::kCritical) {
+            LOGV2_DEBUG(6290401,
+                        2,
+                        "Skip checking progress of not critical health observer",
+                        "observerType"_attr = (str::stream() << observerType),
+                        "intensity"_attr = HealthObserverIntensity_serializer(observerIntensity));
             continue;
         }
 
@@ -81,6 +91,7 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
         if (stats.currentlyRunningHealthCheck &&
             now - stats.lastTimeCheckStarted >
                 _faultManager->getConfig().getPeriodicLivenessDeadline()) {
+
             // Crash because this health checker is running for too long.
             crashCb(str::stream() << "Health observer " << observer->getType()
                                   << " is still running since "
@@ -109,10 +120,12 @@ void ProgressMonitor::progressMonitorCheck(std::function<void(std::string cause)
     // and check again. Note: this should be rare.
     for (auto observer : secondPass) {
         const auto stats = observer->getStats();
+
         if (!_faultManager->getConfig().isHealthObserverEnabled(observer->getType()) &&
             !stats.currentlyRunningHealthCheck &&
             now - stats.lastTimeCheckStarted >
                 _faultManager->getConfig().getPeriodicLivenessDeadline() * 2) {
+
             // Crash because this health checker was never started.
             crashCb(str::stream() << "Health observer " << observer->getType()
                                   << " did not run since "
@@ -129,8 +142,9 @@ void ProgressMonitor::_progressMonitorLoop() {
     while (!_terminate.load()) {
         progressMonitorCheck(_crashCb);
 
-        const auto interval =
-            Microseconds(_faultManager->getConfig().getPeriodicLivenessCheckInterval());
+        const auto interval = duration_cast<Microseconds>(
+            _faultManager->getConfig().getPeriodicLivenessCheckInterval());
+
         // Breaking up the sleeping interval to check for `_terminate` more often.
         for (int i = 0; i < kSleepsPerInterval && !_terminate.load(); ++i) {
             sleepFor(interval / kSleepsPerInterval);
