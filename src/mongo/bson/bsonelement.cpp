@@ -271,7 +271,15 @@ namespace {
 
 // Compares two string elements using a simple binary compare.
 int compareElementStringValues(const BSONElement& leftStr, const BSONElement& rightStr) {
-    return leftStr.valueStringData().compare(rightStr.valueStringData());
+    // we use memcmp as we allow zeros in UTF8 strings
+    int lsz = leftStr.valuestrsize();
+    int rsz = rightStr.valuestrsize();
+    int common = std::min(lsz, rsz);
+    int res = memcmp((leftStr.value() + 4), (rightStr.value() + 4), common);
+    if (res)
+        return res;
+    // longer std::string is the greater one
+    return lsz - rsz;
 }
 
 }  // namespace
