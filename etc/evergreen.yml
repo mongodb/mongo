@@ -2809,6 +2809,11 @@ tasks:
           --link-model=dynamic-sdk
           ${csfle_task_compile_flags}
           DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/csfle_run_tests.sh"
     - command: s3.put
       params:
         aws_key: ${aws_key}
