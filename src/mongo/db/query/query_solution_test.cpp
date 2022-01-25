@@ -1072,4 +1072,77 @@ TEST(QuerySolutionTest, NodeIdsAssignedInPostOrderFashionStartingFromOne) {
     ASSERT_EQ(root->children[1]->nodeId(), 2);
 }
 
+TEST(QuerySolutionTest, GroupNodeWithIndexScan) {
+    QueryTestServiceContext serviceCtx;
+    auto opCtx = serviceCtx.makeOperationContext();
+    const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
+        opCtx.get(), std::unique_ptr<CollatorInterface>(nullptr), NamespaceString("test.dummy")));
+    auto scanNode =
+        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
+    GroupNode node(
+        std::move(scanNode),
+        boost::intrusive_ptr<ExpressionConstant>(new ExpressionConstant(expCtx.get(), Value(0))),
+        {},
+        false);
+    node.computeProperties();
+
+    ASSERT_EQ(node.fetched(), true);
+    ASSERT_EQ(node.sortedByDiskLoc(), false);
+    ASSERT_TRUE(node.providedSorts().getIgnoredFields().empty());
+    ASSERT_BSONOBJ_EQ(node.providedSorts().getBaseSortPattern(), BSONObj());
+
+    ASSERT_TRUE(node.getFieldAvailability("any_field") == FieldAvailability::kNotProvided);
+}
+
+TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
+    // Simple EqLookupNode with IndexScan subtree.
+    auto scanNode =
+        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1)));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1);
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
+    EqLookupNode node(std::move(scanNode), "col", "local", "remote", "as");
+    node.computeProperties();
+
+    auto child = node.children[0];
+    ASSERT_EQ(node.fetched(), child->fetched());
+    ASSERT_EQ(node.sortedByDiskLoc(), child->sortedByDiskLoc());
+
+    // Expected empty sort order, as the EqLookupNode order inferrence is not supported yet.
+    ASSERT_TRUE(node.providedSorts().getIgnoredFields().empty());
+    ASSERT_BSONOBJ_EQ(node.providedSorts().getBaseSortPattern(), BSONObj());
+
+    ASSERT_TRUE(node.getFieldAvailability("as") == FieldAvailability::kNotProvided);
+    ASSERT_TRUE(node.getFieldAvailability("a") == child->getFieldAvailability("a"));
+    ASSERT_TRUE(node.getFieldAvailability("b") == child->getFieldAvailability("b"));
+}
+
+TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
+    // A EqLookupNode with IndexScan subtree, where local field "b" is overwritten.
+    // This affects the field availability and sort order.
+    auto scanNode =
+        std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1 << "b" << 1 << "c"
+                                                                       << "1")));
+    scanNode->bounds.isSimpleRange = true;
+    scanNode->bounds.startKey = BSON("a" << 1 << "b" << 1 << "c"
+                                         << "1");
+    scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1 << "c"
+                                       << "1");
+    EqLookupNode node(std::move(scanNode), "col", "local", "remote", "b");
+    node.computeProperties();
+
+    auto child = node.children[0];
+    // Expected empty sort order, as the EqLookupNode order inferrence is not supported yet.
+    ASSERT_TRUE(node.providedSorts().getIgnoredFields().empty());
+    ASSERT_BSONOBJ_EQ(node.providedSorts().getBaseSortPattern(), BSONObj());
+
+    ASSERT_TRUE(node.getFieldAvailability("a") == child->getFieldAvailability("a"));
+    ASSERT_TRUE(node.getFieldAvailability("b") == FieldAvailability::kNotProvided);
+    ASSERT_TRUE(node.getFieldAvailability("c") == child->getFieldAvailability("c"));
+    ASSERT_TRUE(node.getFieldAvailability("other") == child->getFieldAvailability("other"));
+}
+
 }  // namespace

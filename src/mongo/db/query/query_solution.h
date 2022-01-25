@@ -1310,14 +1310,15 @@ struct GroupNode : public QuerySolutionNode {
     }
 
     FieldAvailability getFieldAvailability(const std::string& field) const {
-        return FieldAvailability::kFullyProvided;
+        // All fields are available, but none of them map to original document.
+        return FieldAvailability::kNotProvided;
     }
     bool sortedByDiskLoc() const override {
         return false;
     }
 
     const ProvidedSortSet& providedSorts() const final {
-        return children.back()->providedSorts();
+        return kEmptySet;
     }
 
     QuerySolutionNode* clone() const override;
@@ -1330,6 +1331,82 @@ struct GroupNode : public QuerySolutionNode {
     // the fields in the 'groupByExpressions' and the fields in the input Expressions of the
     // 'accumulators'.
     StringSet requiredFields;
+};
+
+/**
+ * Represents a lookup from a foreign collection by equality match on foreign and local fields.
+ * Performs left outer join between the child (local) collection and other (foreign) collection.
+ * Each local document will have a field with array of all matched documents in foreign collection.
+ * Matching is performed using equality operator on specified fields in local and foreign documents.
+ *
+ * Only direct lookup from foreign collection is supported. Foreign collection is represented
+ * by direct name rather than QuerySolutionNode.
+ */
+struct EqLookupNode : public QuerySolutionNode {
+    EqLookupNode(std::unique_ptr<QuerySolutionNode> child,
+                 const std::string& foreignCollection,
+                 const std::string& joinFieldLocal,
+                 const std::string& joinFieldForeign,
+                 const std::string& joinField)
+        : QuerySolutionNode(std::move(child)),
+          foreignCollection(foreignCollection),
+          joinFieldLocal(joinFieldLocal),
+          joinFieldForeign(joinFieldForeign),
+          joinField(joinField) {}
+
+    StageType getType() const override {
+        return STAGE_EQ_LOOKUP;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        if (field == joinField) {
+            // This field is available, but isn't mapped to the original document.
+            return FieldAvailability::kNotProvided;
+        } else {
+            return children[0]->getFieldAvailability(field);
+        }
+    }
+
+    bool sortedByDiskLoc() const override {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        // TODO SERVER-62815: The ProvidedSortSet will need to be computed here in order to allow
+        // sort optimization. The "joinField" field overwrites the field in the result outer
+        // document, this can affect the provided sort. For now, use conservative kEmptySet.
+        return kEmptySet;
+    }
+
+    QuerySolutionNode* clone() const override;
+
+    /**
+     * The foreign (inner) collection namespace name.
+     */
+    std::string foreignCollection;
+
+    /**
+     * The local (outer) join field.
+     */
+    std::string joinFieldLocal;
+
+    /**
+     * The foreign (inner) join field.
+     */
+    std::string joinFieldForeign;
+
+    /**
+     * The "as" field for the output field that will be added to local (outer) document.
+     * The field stores the array of all matched foreign (inner) documents.
+     * If the field already exists in the local (outer) document, the field will be overwritten.
+     */
+    std::string joinField;
 };
 
 struct SentinelNode : public QuerySolutionNode {

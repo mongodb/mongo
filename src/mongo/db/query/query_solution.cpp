@@ -1525,6 +1525,35 @@ QuerySolutionNode* GroupNode::clone() const {
 }
 
 /**
+ * EqLookupNode.
+ */
+void EqLookupNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "EQ_LOOKUP\n";
+    addIndent(ss, indent + 1);
+    *ss << "from = " << foreignCollection << "\n";
+    addIndent(ss, indent + 1);
+    *ss << "as = " << joinField << "\n";
+    addIndent(ss, indent + 1);
+    *ss << "localField = " << joinFieldLocal << "\n";
+    addIndent(ss, indent + 1);
+    *ss << "foreignField = " << joinFieldForeign << "\n";
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+QuerySolutionNode* EqLookupNode::clone() const {
+    auto copy =
+        std::make_unique<EqLookupNode>(std::unique_ptr<QuerySolutionNode>(children[0]->clone()),
+                                       foreignCollection,
+                                       joinFieldLocal,
+                                       joinFieldForeign,
+                                       joinField);
+    return copy.release();
+}
+/**
  * SentinelNode.
  */
 QuerySolutionNode* SentinelNode::clone() const {
