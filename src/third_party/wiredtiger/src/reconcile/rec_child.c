@@ -16,8 +16,10 @@ static int
 __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_CHILD_STATE *statep)
 {
     WT_PAGE_DELETED *page_del;
+    WT_TXN *txn;
 
     page_del = ref->ft_info.del;
+    txn = session->txn;
 
     /*
      * Internal pages with child leaf pages in the WT_REF_DELETED state are a special case during
@@ -34,7 +36,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, WT_C
      * visible to others.
      */
     if (F_ISSET(r, WT_REC_CLEAN_AFTER_REC | WT_REC_VISIBILITY_ERR) && page_del != NULL &&
-      __wt_page_del_active(session, ref, false)) {
+      __wt_page_del_active(session, ref, !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))) {
         if (F_ISSET(r, WT_REC_VISIBILITY_ERR))
             WT_RET_PANIC(session, EINVAL, "reconciliation illegally skipped an update");
         return (__wt_set_return(session, EBUSY));

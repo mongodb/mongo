@@ -373,11 +373,13 @@ __sync_ref_int_obsolete_cleanup(WT_SESSION_IMPL *session, WT_REF *parent, WT_REF
  *     Return if checkpoint requires we read this page.
  */
 static int
-__sync_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+__sync_page_skip(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_ADDR_COPY addr;
 
     WT_UNUSED(context);
+    WT_UNUSED(visible_all);
 
     *skipp = false; /* Default to reading */
 
@@ -480,6 +482,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
         oldest_id = __wt_txn_oldest_id(session);
 
         LF_SET(WT_READ_CACHE | WT_READ_NO_WAIT | WT_READ_SKIP_INTL);
+        if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+            LF_SET(WT_READ_VISIBLE_ALL);
+
         for (;;) {
             WT_ERR(__wt_tree_walk(session, &walk, flags));
             if (walk == NULL)
@@ -562,6 +567,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             LF_SET(WT_READ_CACHE);
             internal_cleanup = false;
         }
+
+        if (!F_ISSET(txn, WT_READ_VISIBLE_ALL))
+            LF_SET(WT_READ_VISIBLE_ALL);
 
         for (;;) {
             WT_ERR(__sync_dup_walk(session, walk, flags, &prev));

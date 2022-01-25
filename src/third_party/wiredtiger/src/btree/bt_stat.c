@@ -86,7 +86,8 @@ __stat_tree_walk(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, btree_row_leaf, 0);
 
     next_walk = NULL;
-    while ((ret = __wt_tree_walk(session, &next_walk, 0)) == 0 && next_walk != NULL) {
+    while (
+      (ret = __wt_tree_walk(session, &next_walk, WT_READ_VISIBLE_ALL)) == 0 && next_walk != NULL) {
         WT_WITH_PAGE_INDEX(session, ret = __stat_page(session, next_walk->page, stats));
         WT_RET(ret);
     }

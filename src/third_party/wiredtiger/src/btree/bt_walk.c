@@ -238,7 +238,8 @@ __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp
  */
 static inline int
 __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp,
-  int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *), void *func_cookie, uint32_t flags)
+  int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool, bool *), void *func_cookie,
+  uint32_t flags)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -253,6 +254,10 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
     pindex = NULL;
     restart_sleep = restart_yield = 0;
     empty_internal = false;
+
+    /* Ensure we have a snapshot to check visibility or we only check global visibility.
+     */
+    WT_ASSERT(session, LF_ISSET(WT_READ_VISIBLE_ALL) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* All current tree walks skip deleted pages. */
     LF_SET(WT_READ_SKIP_DELETED);
@@ -427,7 +432,7 @@ descend:
                 /*
                  * Try to skip deleted pages visible to us.
                  */
-                if (__wt_delete_page_skip(session, ref, false))
+                if (__wt_delete_page_skip(session, ref, LF_ISSET(WT_READ_VISIBLE_ALL)))
                     break;
             } else if (LF_ISSET(WT_READ_TRUNCATE)) {
                 /*
@@ -442,7 +447,7 @@ descend:
 
             /* See if our caller wants to skip this page. */
             if (skip_func != NULL) {
-                WT_ERR(skip_func(session, ref, func_cookie, &skip));
+                WT_ERR(skip_func(session, ref, func_cookie, LF_ISSET(WT_READ_VISIBLE_ALL), &skip));
                 if (skip)
                     break;
             }
@@ -537,7 +542,8 @@ __wt_tree_walk_count(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
  */
 int
 __wt_tree_walk_custom_skip(WT_SESSION_IMPL *session, WT_REF **refp,
-  int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *), void *func_cookie, uint32_t flags)
+  int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool, bool *), void *func_cookie,
+  uint32_t flags)
 {
     return (__tree_walk_internal(session, refp, NULL, skip_func, func_cookie, flags));
 }
@@ -550,7 +556,8 @@ __wt_tree_walk_custom_skip(WT_SESSION_IMPL *session, WT_REF **refp,
  *     this page is disk-based, crack the cell to figure out it's a leaf page without reading it.
  */
 static int
-__tree_walk_skip_count_callback(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+__tree_walk_skip_count_callback(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     uint64_t *skipleafcntp;
 
@@ -560,7 +567,7 @@ __tree_walk_skip_count_callback(WT_SESSION_IMPL *session, WT_REF *ref, void *con
     /*
      * Skip deleted pages visible to us.
      */
-    if (ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, ref, false))
+    if (ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, ref, visible_all))
         *skipp = true;
     else if (*skipleafcntp > 0 && F_ISSET(ref, WT_REF_FLAG_LEAF)) {
         --*skipleafcntp;

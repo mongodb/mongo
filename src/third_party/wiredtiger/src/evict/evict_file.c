@@ -42,6 +42,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
     /* Walk the tree, discarding pages. */
     walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT;
+    if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+        walk_flags |= WT_READ_VISIBLE_ALL;
+
     next_ref = NULL;
     WT_ERR(__wt_tree_walk(session, &next_ref, walk_flags));
     while ((ref = next_ref) != NULL) {

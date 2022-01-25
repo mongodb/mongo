@@ -276,10 +276,12 @@ err:
  *     Skip leaf pages, all we want are internal pages.
  */
 static int
-__compact_walk_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+__compact_walk_page_skip(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_UNUSED(context);
     WT_UNUSED(session);
+    WT_UNUSED(visible_all);
 
     /* All we want are the internal pages. */
     *skipp = F_ISSET(ref, WT_REF_FLAG_LEAF) ? true : false;
@@ -354,8 +356,8 @@ __wt_compact(WT_SESSION_IMPL *session)
          * already in memory, and if a page is read, set its generation to a low value so it is
          * evicted quickly.
          */
-        WT_ERR(__wt_tree_walk_custom_skip(
-          session, &ref, __compact_walk_page_skip, NULL, WT_READ_NO_GEN | WT_READ_WONT_NEED));
+        WT_ERR(__wt_tree_walk_custom_skip(session, &ref, __compact_walk_page_skip, NULL,
+          WT_READ_NO_GEN | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL));
         if (ref == NULL)
             break;
 

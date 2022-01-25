@@ -2011,12 +2011,14 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
  *     traversal.
  */
 static inline int
-__wt_btcur_skip_page(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+__wt_btcur_skip_page(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_ADDR_COPY addr;
     uint8_t previous_state;
 
     WT_UNUSED(context);
+    WT_UNUSED(visible_all);
 
     *skipp = false; /* Default to reading */
 

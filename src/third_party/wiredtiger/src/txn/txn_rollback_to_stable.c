@@ -1234,12 +1234,15 @@ __rollback_abort_fast_truncate(
  *     Skip if rollback to stable doesn't requires to read this page.
  */
 int
-__wt_rts_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
+__wt_rts_page_skip(
+  WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     wt_timestamp_t rollback_timestamp;
 
     rollback_timestamp = *(wt_timestamp_t *)(context);
     *skipp = false; /* Default to reading */
+
+    WT_UNUSED(visible_all);
 
     /* If the page state is other than on disk, we want to look at it. */
     if (ref->state != WT_REF_DISK)
@@ -1269,7 +1272,7 @@ __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollbac
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
     while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
-              WT_READ_NO_EVICT | WT_READ_WONT_NEED)) == 0 &&
+              WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
       ref != NULL)
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
             WT_WITH_PAGE_INDEX(

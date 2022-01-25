@@ -38,7 +38,8 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 
     next_walk = NULL;
     while (__wt_tree_walk_count(session, &next_walk, &walk_count,
-             WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT) == 0 &&
+             WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT |
+               WT_READ_VISIBLE_ALL) == 0 &&
       next_walk != NULL) {
         ++seen_count;
         page = next_walk->page;

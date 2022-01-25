@@ -1798,6 +1798,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     }
 
     walk_flags = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
+    if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+        walk_flags |= WT_READ_VISIBLE_ALL;
 
     /*
      * Choose a random point in the tree if looking for candidates in a tree with no starting point

@@ -766,6 +766,9 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
         if (F_ISSET(cbt, WT_CBT_READ_ONCE))
             LF_SET(WT_READ_WONT_NEED);
 
+        if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+            LF_SET(WT_READ_VISIBLE_ALL);
+
         /*
          * If we are running with snapshot isolation, and not interested in returning tombstones, we
          * could potentially skip pages. The skip function looks at the aggregated timestamp

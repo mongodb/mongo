@@ -827,11 +827,15 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     WT_BTREE *btree;
     WT_PAGE *page;
     WT_REF *next_walk;
+    uint32_t flags;
 
     btree = S2BT(session);
+    flags = WT_READ_PREV;
+    if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+        LF_SET(WT_READ_VISIBLE_ALL);
 
     next_walk = NULL;
-    WT_RET(__wt_tree_walk(session, &next_walk, WT_READ_PREV));
+    WT_RET(__wt_tree_walk(session, &next_walk, flags));
     if (next_walk == NULL)
         return (WT_NOTFOUND);
 
