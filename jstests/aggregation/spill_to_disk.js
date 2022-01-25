@@ -57,17 +57,40 @@ function test({pipeline, expectedCodes, canSpillToDisk}) {
     }
 }
 
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1024
-}));
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast: 1}));
+function setHashAggParameters(memoryLimit, atLeast) {
+    const oldMemoryLimit =
+        assert
+            .commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: memoryLimit
+            }))
+            .was;
 
-test({
+    const oldAtLeast =
+        assert
+            .commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast: atLeast
+            }))
+            .was;
+    return {memoryLimit: oldMemoryLimit, atLeast: oldAtLeast};
+}
+
+function testWithHashAggMemoryLimit({pipeline, expectedCodes, canSpillToDisk, memoryLimit}) {
+    // If a test sets a specific memory limit, we should do more frequent checks to respect it.
+    const oldSettings = setHashAggParameters(memoryLimit, 1 /*atLEast*/);
+    try {
+        test({pipeline, expectedCodes, canSpillToDisk});
+    } finally {
+        setHashAggParameters(oldSettings.memoryLimit, oldSettings.atLeast);
+    }
+}
+
+testWithHashAggMemoryLimit({
     pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
+    memoryLimit: 1024
 });
 
 // Sorting with _id would use index which doesn't require external sort, so sort by 'random'
