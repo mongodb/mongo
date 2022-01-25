@@ -16,15 +16,18 @@ crl() {
     echo -e "[ CA_default ]\ndatabase = ${CADB}/index.txt\n" >> "$CONFIG"
     echo -e "certificate = $CA\nprivate_key = $CA\ndefault_md = sha256" >> "$CONFIG"
 
-    DAYS="3651"
-    CRLDAYS="3650"
+    VALIDITY_OPTIONS="-days 824 -crldays 823"
     if [ "$2" = "expired" ]; then
-        DAYS="1"
-        CRLDAYS="1"
+        # -enddate 010101000000Z = expires on 0:00:00, Jan 1, 2000. 
+        # -crlsec 1 = valid for 1 second from now. 
+        # i.e. this certificate will be completely invalid very soon.
+        VALIDITY_OPTIONS="-enddate 010101000000Z -crlsec 1"
     elif [ "$2" = "revoked" ]; then
         openssl ca -config "$CADB/config" -revoke "jstests/libs/client_revoked.pem"
     fi
-    openssl ca -config "$CADB/config" -gencrl -out "$DEST" -md sha256 -days "$DAYS" -crldays "$CRLDAYS"
+    openssl ca -config "$CADB/config" -gencrl -out "$DEST" -md sha256 $VALIDITY_OPTIONS
+    jstests/ssl/x509/mkdigest.py crl sha256 "$DEST"
+    jstests/ssl/x509/mkdigest.py crl sha1 "$DEST"
 }
 crl crl.pem empty
 crl crl_expired.pem expired

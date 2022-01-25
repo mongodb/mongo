@@ -42,14 +42,10 @@ requireSSLProvider('windows', function() {
         assert.eq(exitStatus, 0, "successfully connected with SSL");
     };
 
+    const trusted_client_thumbprint = cat('jstests/libs/trusted-client.pem.digest.sha1');
+
     assert.doesNotThrow(function() {
-        try {
-            // trusted-client.pfx
-            testWithCert("thumbprint=6AE38B35F4551B6BDCDB89AFABE0B277046F2735");
-        } catch (e) {
-            // Transitional: Pre Oct-2019 trusted-client.pfx
-            testWithCert("thumbprint=9ca511552f14d3fc2009d425873599bf77832238");
-        }
+        testWithCert("thumbprint=" + trusted_client_thumbprint);
     });
 
     assert.doesNotThrow(function() {

@@ -213,6 +213,7 @@ certs:
   not_before: -10000000
   not_after: -1000000
   extensions:
+    extendedKeyUsage: [serverAuth]
     subjectAltName:
       DNS: localhost
       IP: 127.0.0.1
@@ -226,7 +227,8 @@ certs:
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth]
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 - name: 'localhost-cn-with-san.pem'
   description: Localhost based certificate using non-matching subject alternate name.
@@ -234,6 +236,7 @@ certs:
   Subject: {CN: 'localhost'}
   Issuer: 'ca.pem'
   extensions:
+    extendedKeyUsage: [serverAuth]
     subjectAltName:
       DNS: 'example.com'
 
@@ -246,17 +249,22 @@ certs:
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth]
     subjectAltName:
-      DNS: ['*.example.com', 'localhost', '127.0.0.1', 'morefun!']
+      DNS: ['*.example.com', 'localhost', 'morefun!']
+      IP: 127.0.0.1
 
 - name: 'not_yet_valid.pem'
   description: A certificate which has yet to reach its validity date.
   Subject: {CN: 'not_yet_valid'}
   not_before: 630720000 # 20 years hence
-  not_after: 1261440000 # a further 20
+  not_after: 701913600 # a further 824 days after
   extensions:
+    extendedKeyUsage: [serverAuth]
     mongoRoles:
     - {role: backup, db: admin}
     - {role: readAnyDatabase, db: admin}
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
 
 - name: 'password_protected.pem'
   description: Server cerificate using an encrypted private key.
@@ -270,7 +278,8 @@ certs:
     extendedKeyUsage: [serverAuth]
     authorityKeyIdentifier: issuer
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 - name: 'server.pem'
   description: General purpose server certificate file.
@@ -282,7 +291,8 @@ certs:
     extendedKeyUsage: [serverAuth, clientAuth]
     authorityKeyIdentifier: issuer
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 - name: 'server_no_subject.pem'
   description: Server certificate with empty Subject, but critical SAN.
@@ -295,7 +305,7 @@ certs:
     authorityKeyIdentifier: issuer
     subjectAltName:
         critical: true
-        DNS: 'localhost'
+        DNS: localhost
         IP: ['127.0.0.1', '::1']
 
 - name: 'server_no_subject_no_SAN.pem'
@@ -312,20 +322,25 @@ certs:
   description: General purpose server certificate with good SANs.
   Subject: {CN: 'Kernel Client Peer Role'}
   extensions:
+    extendedKeyUsage: [serverAuth, clientAuth]
     subjectAltName:
-      DNS: 'localhost'
+      DNS: localhost
       IP: ['127.0.0.1', '::1']
 
 - name: 'server_SAN2.pem'
   description: General purpose server certificate with bad SANs.
   Subject: {CN: 'Kernel Client Peer Role'}
   extensions:
+    extendedKeyUsage: [serverAuth]
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1', '::1']
+      DNS: localhost
+      IP: ['127.0.0.1', '::1']
 
 - name: 'server_no_SAN.pem'
   description: General purpose server certificate with missing SAN.
   Subject: {CN: localhost, title: 'Server no SAN attribute'}
+  extensions:
+    extendedKeyUsage: [serverAuth]
 
 # For tenant migration testing.
 - name: 'rs0.pem'
@@ -337,6 +352,9 @@ certs:
     subjectKeyIdentifier: hash
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth]
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
     authorityKeyIdentifier: issuer
 
 - name: 'rs1.pem'
@@ -348,6 +366,9 @@ certs:
     subjectKeyIdentifier: hash
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth]
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
     authorityKeyIdentifier: issuer
 
 - name: 'rs2.pem'
@@ -359,6 +380,9 @@ certs:
     subjectKeyIdentifier: hash
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth]
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
     authorityKeyIdentifier: issuer
 
 - name: 'tenant_migration_donor.pem'
@@ -677,8 +701,10 @@ certs:
     CN: 'server'
   Issuer: 'rollover_ca.pem'
   extensions:
+    extendedKeyUsage: [serverAuth, clientAuth]
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 ###
 # Intermediate
@@ -696,13 +722,20 @@ certs:
   Subject: {CN: 'Server Via Intermediate'}
   Issuer: 'intermediate-ca.pem'
   append_cert: 'intermediate-ca.pem'
+  extensions:
+    extendedKeyUsage: [serverAuth, clientAuth]
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
 
 - name: 'server-intermediate-leaf.pem'
   description: Server certificate signed by intermediate CA.
   Subject: {CN: 'Server Leaf Via Intermediate'}
   extensions:
+    extendedKeyUsage: [serverAuth]
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
   Issuer: 'intermediate-ca.pem'
 
 - name: 'intermediate-ca-chain.pem'
@@ -729,12 +762,13 @@ certs:
   Subject: {O: 'MongoDB, Inc. (Splithorizon)', CN: 'server'}
   Issuer: 'splithorizon-ca.pem'
   extensions:
+    extendedKeyUsage: [serverAuth, clientAuth]
     subjectAltName:
       DNS:
         - 'localhost'
-        - '127.0.0.1'
         - 'splithorizon1'
         - 'splithorizon2'
+      IP: 127.0.0.1
 
 ###
 # Trusted CA
@@ -747,7 +781,8 @@ certs:
   extensions:
     basicConstraints: {CA: true}
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 # trusted-client.pfx created by mkspecial.sh
 - name: 'trusted-client.pem'
@@ -758,8 +793,10 @@ certs:
     passphrase: 'qwerty'
     name: 'trusted-client.pfx'
   extensions:
+    extendedKeyUsage: [clientAuth]
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 # trusted-server.pfx created by mkspecial.sh
 - name: 'trusted-server.pem'
@@ -770,8 +807,10 @@ certs:
     passphrase: 'qwerty'
     name: 'trusted-server.pfx'
   extensions:
+    extendedKeyUsage: [serverAuth]
     subjectAltName:
-      DNS: ['localhost', '127.0.0.1']
+      DNS: localhost
+      IP: 127.0.0.1
 
 - name: 'trusted-client-testdb-roles.pem'
   description: Client certificate with X509 role grants via trusted chain.

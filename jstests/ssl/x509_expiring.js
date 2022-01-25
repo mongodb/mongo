@@ -52,6 +52,9 @@ function test(expiration, expect) {
     MongoRunner.stopMongod(mongo);
 }
 
-test(30, false);
+assert.doesNotThrow(
+    () => test(100, false),
+    [],
+    "If this fails, the server.pem certificate is expiring soon (<= 100 days) -- this is bad! Please file a ticket with the server security team to renew testing certificates.");
 test(7300, true);  // Work so long as certs expire no more than 20 years from now
 })();
