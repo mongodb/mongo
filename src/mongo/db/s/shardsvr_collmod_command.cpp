@@ -34,15 +34,23 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_util.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_manager_targeter.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(collModPrimaryDispatching);
 
 class ShardsvrCollModCommand final : public BasicCommandWithRequestParser<ShardsvrCollModCommand> {
 public:
@@ -102,6 +110,21 @@ public:
         CurOp::get(opCtx)->raiseDbProfileLevel(
             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(cmd.getDbName()));
 
+        boost::optional<FixedFCVRegion> fcvRegion;
+        fcvRegion.emplace(opCtx);
+        bool useDDLCoordinator = fcvRegion.get()->isGreaterThanOrEqualTo(
+            multiversion::FeatureCompatibilityVersion::kVersion_5_3);
+        if (MONGO_unlikely(collModPrimaryDispatching.shouldFail()) || !useDDLCoordinator) {
+            return runWithDispatchingCommands(opCtx, result, cmd);
+        } else {
+            return runWithDDLCoordinator(opCtx, result, cmd, fcvRegion);
+        }
+    }
+
+    bool runWithDDLCoordinator(OperationContext* opCtx,
+                               BSONObjBuilder& result,
+                               const ShardsvrCollMod& cmd,
+                               boost::optional<FixedFCVRegion>& fcvRegion) {
         auto coordinatorDoc = CollModCoordinatorDocument();
         coordinatorDoc.setCollModRequest(cmd.getCollModRequest());
         coordinatorDoc.setShardingDDLCoordinatorMetadata(
@@ -109,8 +132,55 @@ public:
         auto service = ShardingDDLCoordinatorService::getService(opCtx);
         auto collModCoordinator = checked_pointer_cast<CollModCoordinator>(
             service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+        fcvRegion = boost::none;
         result.appendElements(collModCoordinator->getResult(opCtx));
         return true;
+    }
+
+    bool runWithDispatchingCommands(OperationContext* opCtx,
+                                    BSONObjBuilder& result,
+                                    const ShardsvrCollMod& cmd) {
+        const auto& nss = cmd.getNamespace();
+        auto collModCmd = CollMod(nss);
+        collModCmd.setCollModRequest(cmd.getCollModRequest());
+        auto collModCmdObj = collModCmd.toBSON({});
+
+        const auto targeter = ChunkManagerTargeter(opCtx, nss);
+        const auto& routingInfo = targeter.getRoutingInfo();
+        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+            collModCmdObj =
+                timeseries::makeTimeseriesCommand(collModCmdObj,
+                                                  nss,
+                                                  CollMod::kCommandName,
+                                                  CollMod::kIsTimeseriesNamespaceFieldName);
+        }
+
+        std::set<ShardId> participants;
+        if (routingInfo.isSharded()) {
+            std::unique_ptr<CollatorInterface> collator;
+            const auto expCtx =
+                make_intrusive<ExpressionContext>(opCtx, std::move(collator), targeter.getNS());
+            routingInfo.getShardIdsForQuery(
+                expCtx, {} /* query */, {} /* collation */, &participants);
+        } else {
+            participants.insert(routingInfo.dbPrimary());
+        }
+
+        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        const auto& responses = sharding_util::sendCommandToShards(
+            opCtx,
+            targeter.getNS().db(),
+            CommandHelpers::appendMajorityWriteConcern(collModCmdObj, opCtx->getWriteConcern()),
+            {std::make_move_iterator(participants.begin()),
+             std::make_move_iterator(participants.end())},
+            executor);
+
+        std::string errmsg;
+        auto ok = appendRawResponses(opCtx, &errmsg, &result, std::move(responses)).responseOK;
+        if (!errmsg.empty()) {
+            CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
+        }
+        return ok;
     }
 
     void validateResult(const BSONObj& resultObj) final {

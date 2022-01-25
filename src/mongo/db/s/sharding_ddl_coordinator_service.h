@@ -71,6 +71,8 @@ public:
 
     std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;
 
+    void waitForCollModCoordinatorsToComplete(OperationContext* opCtx) const;
+
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
@@ -78,6 +80,11 @@ private:
     void _waitForRecoveryCompletion(OperationContext* opCtx) const;
     void _afterStepDown() override;
     size_t _countCoordinatorDocs(OperationContext* opCtx);
+
+    mutable Mutex _collModCompletionMutex =
+        MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_collModCompletionMutex");
+    size_t _numActiveCollModCoordinators{0};
+    mutable stdx::condition_variable _allCollModCompletedCV;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
 

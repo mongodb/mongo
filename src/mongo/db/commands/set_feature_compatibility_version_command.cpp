@@ -69,6 +69,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
@@ -385,6 +386,15 @@ public:
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                // TODO (SERVER-62325): Remove collMod draining mechanism after 6.0 branching.
+                if (actualVersion > requestedVersion &&
+                    requestedVersion < multiversion::FeatureCompatibilityVersion::kVersion_5_3) {
+                    // No more collMod coordinators will start because we have already switched
+                    // the FCV value to kDowngrading. Wait for the ongoing collMod coordinators to
+                    // finish.
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCollModCoordinatorsToComplete(opCtx);
+                }
                 // If we are only running phase-1, then we are done
                 return true;
             }

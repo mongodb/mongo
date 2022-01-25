@@ -86,6 +86,10 @@ public:
         return _coordId.getNss();
     }
 
+    DDLCoordinatorTypeEnum operationType() const {
+        return _coordId.getOperationType();
+    }
+
     const ForwardableOperationMetadata& getForwardableOpMetadata() const {
         invariant(metadata().getForwardableOpMetadata());
         return metadata().getForwardableOpMetadata().get();

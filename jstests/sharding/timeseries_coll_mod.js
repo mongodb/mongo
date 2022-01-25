@@ -16,38 +16,61 @@ const collName = 'testColl';
 const timeField = 'tm';
 const metaField = 'mt';
 const viewNss = `${dbName}.${collName}`;
+const indexName = 'index';
 
-const mongo = new ShardingTest({shards: 2, rs: {nodes: 2}});
-const mongos = mongo.s0;
-const db = mongos.getDB(dbName);
+function runTest(primaryDispatching) {
+    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    const mongos = st.s0;
+    const db = mongos.getDB(dbName);
 
-if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(mongo.shard0)) {
-    jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
-    mongo.stop();
-    return;
+    if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
+        jsTestLog(
+            "Skipping test because the sharded time-series collection feature flag is disabled");
+        st.stop();
+        return;
+    }
+
+    assert.commandWorked(
+        db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+
+    // Setting collModPrimaryDispatching failpoint to make sure the fallback logic of dispatching
+    // collMod command at primary shard works.
+    if (primaryDispatching) {
+        const primary = st.getPrimaryShard(dbName);
+        assert.commandWorked(primary.adminCommand(
+            {configureFailPoint: 'collModPrimaryDispatching', mode: 'alwaysOn'}));
+    }
+
+    // Granularity update works for unsharded time-series collection.
+    assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: 'minutes'}}));
+
+    // Shard the time-series collection.
+    assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(db[collName].createIndex({[metaField]: 1}, {name: indexName}));
+    assert.commandWorked(mongos.adminCommand({
+        shardCollection: viewNss,
+        key: {[metaField]: 1},
+    }));
+
+    // Normal collMod commands works for the sharded time-series collection.
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: indexName, hidden: true}}));
+    assert.commandWorked(
+        db.runCommand({collMod: collName, index: {name: indexName, hidden: false}}));
+
+    // Updates for timeField and metaField are disabled.
+    assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {timeField: 'x'}}),
+                                 40415 /* Failed to parse */);
+    assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {metaField: 'x'}}),
+                                 40415 /* Failed to parse */);
+    // Granularity update is currently disabled for sharded time-series collection.
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}),
+        ErrorCodes.NotImplemented);
+
+    st.stop();
 }
 
-assert.commandWorked(
-    db.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
-
-// granularity update works for unsharded time-series colleciton.
-assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: 'minutes'}}));
-
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-assert.commandWorked(db[collName].createIndex({[metaField]: 1}));
-assert.commandWorked(mongos.adminCommand({
-    shardCollection: viewNss,
-    key: {[metaField]: 1},
-}));
-
-// timeField and metaField updates are disabled.
-assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {timeField: 'x'}}),
-                             40415 /* Failed to parse */);
-assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {metaField: 'x'}}),
-                             40415 /* Failed to parse */);
-// granularity update is currently disabled for sharded time-series collection.
-assert.commandFailedWithCode(db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}),
-                             ErrorCodes.NotImplemented);
-
-mongo.stop();
+runTest(false);
+runTest(true);
 })();

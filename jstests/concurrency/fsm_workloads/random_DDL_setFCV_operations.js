@@ -37,10 +37,11 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.transitions = {
-        create: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
-        drop: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
-        rename: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
-        setFCV: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10}
+        create: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
+        drop: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
+        rename: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
+        collMod: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10},
+        setFCV: {create: 0.225, drop: 0.225, rename: 0.225, collMod: 0.225, setFCV: 0.10}
     };
 
     $config.teardown = function(db, collName, cluster) {

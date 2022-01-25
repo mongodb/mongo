@@ -117,6 +117,13 @@ ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(Operati
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
     auto coord = constructShardingDDLCoordinatorInstance(this, std::move(initialState));
+
+    bool isCollMod = coord->operationType() == DDLCoordinatorTypeEnum::kCollMod;
+    if (isCollMod) {
+        stdx::lock_guard lg(_collModCompletionMutex);
+        ++_numActiveCollModCoordinators;
+    }
+
     coord->getConstructionCompletionFuture()
         .thenRunOn(getInstanceCleanupExecutor())
         .getAsync([this](auto status) {
@@ -130,9 +137,27 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
                 _recoveredCV.notify_all();
             }
         });
+
+    if (isCollMod) {
+        coord->getCompletionFuture()
+            .thenRunOn(getInstanceCleanupExecutor())
+            .getAsync([this](auto status) {
+                stdx::lock_guard lg(_collModCompletionMutex);
+                if (--_numActiveCollModCoordinators == 0) {
+                    _allCollModCompletedCV.notify_all();
+                }
+            });
+    }
     return coord;
 }
 
+void ShardingDDLCoordinatorService::waitForCollModCoordinatorsToComplete(
+    OperationContext* opCtx) const {
+    _waitForRecoveryCompletion(opCtx);
+    stdx::unique_lock lk(_collModCompletionMutex);
+    opCtx->waitForConditionOrInterrupt(
+        _allCollModCompletedCV, lk, [this]() { return _numActiveCollModCoordinators == 0; });
+}
 
 void ShardingDDLCoordinatorService::_afterStepDown() {
     stdx::lock_guard lg(_mutex);

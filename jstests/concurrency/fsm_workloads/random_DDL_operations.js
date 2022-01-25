@@ -56,6 +56,15 @@ var $config = (function() {
                     ErrorCodes.ConflictingOperationInProgress,
                     ErrorCodes.IllegalOperation
                 ]);
+        },
+        collMod: function(db, collName, connCache) {
+            db = getRandomDb(db);
+            const coll = getRandomCollection(db);
+
+            jsTestLog('Executing collMod state: ' + coll.getFullName());
+            assertAlways.commandWorkedOrFailedWithCode(
+                db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}),
+                [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
         }
     };
 
