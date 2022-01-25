@@ -49,9 +49,19 @@ void addLogRotator(StringData logType, LogRotateCallback cb) {
     logRotateCallbacks.emplace(logType, std::move(cb));
 }
 
-bool rotateLogs(bool renameFiles,
-                boost::optional<StringData> logType,
-                std::function<void(Status)> onMinorError) {
+void LogRotateErrorAppender::append(const Status& err) {
+    if (_combined.isOK()) {
+        _combined = err;
+    } else if (!err.isOK()) {
+        // if there are multiple, distinct error codes, use OperationFailed instead
+        auto newCode = (_combined.code() == err.code()) ? err.code() : ErrorCodes::OperationFailed;
+        _combined = Status(newCode, str::stream() << _combined.reason() << ", " << err.reason());
+    }
+}
+
+Status rotateLogs(bool renameFiles,
+                  boost::optional<StringData> logType,
+                  std::function<void(Status)> onMinorError) {
     std::string suffix = "." + terseCurrentTimeForFilename();
 
     LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix, "logType"_attr = logType);
@@ -59,19 +69,17 @@ bool rotateLogs(bool renameFiles,
     if (logType) {
         auto it = logRotateCallbacks.find(logType.get());
         if (it == logRotateCallbacks.end()) {
-            LOGV2_WARNING(
-                ErrorCodes::NoSuchKey, "Unknown log type for rotate", "logType"_attr = logType);
-            return false;
+            LOGV2_WARNING(6221500, "Unknown log type for rotate", "logType"_attr = logType);
+            return Status(ErrorCodes::NoSuchKey, "Unknown log type for rotate");
         }
         auto status = it->second(renameFiles, suffix, onMinorError);
         if (!status.isOK()) {
             LOGV2_WARNING(
                 1947001, "Log rotation failed", "reason"_attr = status, "logType"_attr = logType);
-            return false;
         }
-        return true;
+        return status;
     } else {
-        bool ret = true;
+        LogRotateErrorAppender errors;
         for (const auto& entry : logRotateCallbacks) {
             auto status = entry.second(renameFiles, suffix, onMinorError);
             if (!status.isOK()) {
@@ -79,10 +87,10 @@ bool rotateLogs(bool renameFiles,
                               "Log rotation failed",
                               "reason"_attr = status,
                               "logType"_attr = entry.first);
-                ret = false;
+                errors.append(status);
             }
         }
-        return ret;
+        return errors.getCombinedStatus();
     }
 }
 

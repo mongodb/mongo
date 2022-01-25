@@ -214,16 +214,23 @@ OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
         logType = stdx::get<std::string>(arg);
     }
 
-    int minorErrorCount = 0;
-    const bool ok = logv2::rotateLogs(
-        serverGlobalParams.logRenameOnRotate, logType, [&](Status) { ++minorErrorCount; });
-    if (ok) {
-        logProcessDetailsForLogRotate(opCtx->getServiceContext());
-    }
+    logv2::LogRotateErrorAppender minorErrors;
+    auto status = logv2::rotateLogs(serverGlobalParams.logRenameOnRotate,
+                                    logType,
+                                    [&minorErrors](Status err) { minorErrors.append(err); });
 
-    uassert(ErrorCodes::OperationFailed,
-            "Log rotation failed due to one or more errors",
-            ok && (minorErrorCount == 0));
+    // Mask the detailed error message so file paths & host info are not
+    // revealed to the client, but keep the real status code as a hint.
+    constexpr auto rotateErrmsg = "Log rotation failed due to one or more errors"_sd;
+    uassert(status.code(), rotateErrmsg, status.isOK());
+
+    logProcessDetailsForLogRotate(opCtx->getServiceContext());
+
+    status = minorErrors.getCombinedStatus();
+    if (!status.isOK()) {
+        LOGV2_ERROR(6221501, "Log rotation failed", "error"_attr = status);
+        uasserted(status.code(), rotateErrmsg);
+    }
 
     return OkReply();
 }

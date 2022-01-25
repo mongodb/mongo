@@ -238,8 +238,9 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
             rotation->previous = now;
         }
 
-        if (!logv2::rotateLogs(serverGlobalParams.logRenameOnRotate, {}, {})) {
-            LOGV2_ERROR(4719800, "Log rotation failed");
+        if (auto status = logv2::rotateLogs(serverGlobalParams.logRenameOnRotate, {}, {});
+            !status.isOK()) {
+            LOGV2_ERROR(4719800, "Log rotation failed", "error"_attr = status);
         }
         if (rotation->logFileStatus == LogFileStatus::kNeedToRotateLogFile) {
             logProcessDetailsForLogRotate(getGlobalServiceContext());

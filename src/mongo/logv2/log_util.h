@@ -49,7 +49,25 @@ using LogRotateCallback = std::function<Status(bool, StringData, std::function<v
 void addLogRotator(StringData logType, LogRotateCallback cb);
 
 /**
- * Rotates the log files.  Returns true if all logs rotate successfully.
+ * Class that combines error Status objects into a single Status object.
+ */
+class LogRotateErrorAppender {
+public:
+    LogRotateErrorAppender() : _combined(Status::OK()) {}
+    LogRotateErrorAppender(const Status& init) : _combined(init) {}
+
+    const Status& getCombinedStatus() const {
+        return _combined;
+    }
+
+    void append(const Status& err);
+
+private:
+    Status _combined;
+};
+
+/**
+ * Rotates the log files.  Returns Status::OK() if all logs rotate successfully.
  *
  * renameFiles - true means we rename files, false means we expect the file to be renamed
  *               externally
@@ -59,9 +77,9 @@ void addLogRotator(StringData logType, LogRotateCallback cb);
  * We expect logrotate to rename the existing file before we rotate, and so the next open
  * we do should result in a file create.
  */
-bool rotateLogs(bool renameFiles,
-                boost::optional<StringData> logType,
-                std::function<void(Status)> onMinorError);
+Status rotateLogs(bool renameFiles,
+                  boost::optional<StringData> logType,
+                  std::function<void(Status)> onMinorError);
 
 /**
  * Returns true if system logs should be redacted.
