@@ -92,7 +92,7 @@ const Seconds kShortBalanceRoundInterval(1);
 static constexpr StringData kBalancerPolicyStatusDraining = "draining"_sd;
 static constexpr StringData kBalancerPolicyStatusZoneViolation = "zoneViolation"_sd;
 static constexpr StringData kBalancerPolicyStatusChunksImbalance = "chunksImbalance"_sd;
-static constexpr StringData kBalancerPolicyStatusChunksMerging = "chunksMerging"_sd;
+static constexpr StringData kBalancerPolicyStatusDefragmentingChunks = "defragmentingChunks"_sd;
 
 /**
  * Utility class to generate timing and statistics for a single balancer round.
@@ -933,9 +933,11 @@ Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCt
                                                           const NamespaceString& ns) {
     try {
         auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
-        bool isMerging = coll.getDefragmentCollection();
-        if (isMerging) {
-            return {false, kBalancerPolicyStatusChunksMerging.toString()};
+        bool isDefragmenting = coll.getDefragmentCollection();
+        if (isDefragmenting) {
+            return {false,
+                    kBalancerPolicyStatusDefragmentingChunks.toString(),
+                    _defragmentationPolicy->reportProgressOn(coll.getUuid())};
         }
     } catch (DBException&) {
         // Catch exceptions to keep consistency with errors thrown before defragmentation
@@ -947,20 +949,20 @@ Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCt
     }
     auto chunksToMove = uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(opCtx, ns));
     if (chunksToMove.empty()) {
-        return {true, boost::none};
+        return {true, boost::none, boost::none};
     }
     const auto& migrationInfo = chunksToMove.front();
 
     switch (migrationInfo.reason) {
         case MigrateInfo::drain:
-            return {false, kBalancerPolicyStatusDraining.toString()};
+            return {false, kBalancerPolicyStatusDraining.toString(), boost::none};
         case MigrateInfo::zoneViolation:
-            return {false, kBalancerPolicyStatusZoneViolation.toString()};
+            return {false, kBalancerPolicyStatusZoneViolation.toString(), boost::none};
         case MigrateInfo::chunksImbalance:
-            return {false, kBalancerPolicyStatusChunksImbalance.toString()};
+            return {false, kBalancerPolicyStatusChunksImbalance.toString(), boost::none};
     }
 
-    return {true, boost::none};
+    return {true, boost::none, boost::none};
 }
 
 }  // namespace mongo

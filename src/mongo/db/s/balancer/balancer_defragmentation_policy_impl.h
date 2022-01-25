@@ -58,6 +58,8 @@ public:
                                    const DefragmentationAction& action,
                                    const DefragmentationActionResponse& response) = 0;
 
+    virtual BSONObj reportProgress() const = 0;
+
     virtual bool isComplete() const = 0;
 };
 
@@ -74,6 +76,8 @@ public:
     bool isDefragmentingCollection(const UUID& uuid) override {
         return _defragmentationStates.contains(uuid);
     }
+
+    virtual BSONObj reportProgressOn(const UUID& uuid) override;
 
     MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
                                          stdx::unordered_set<ShardId>* usedShards) override;
@@ -111,7 +115,7 @@ private:
     /**
      * Returns the next action from any collection in phase 1 or 3 or boost::none if there are no
      * actions to perform.
-     * Must be called while holding the _streamingMutex.
+     * Must be called while holding the _stateMutex.
      */
     boost::optional<DefragmentationAction> _nextStreamingAction(OperationContext* opCtx);
 
@@ -129,7 +133,7 @@ private:
     /**
      * Move to the next phase and persist the phase change. This will end defragmentation if the
      * next phase is kFinished.
-     * Must be called while holding the _streamingMutex.
+     * Must be called while holding the _stateMutex.
      */
     std::unique_ptr<DefragmentationPhase> _transitionPhases(OperationContext* opCtx,
                                                             const CollectionType& coll,
@@ -145,7 +149,7 @@ private:
     /**
      * Write the new phase to the defragmentationPhase field in config.collections. If phase is
      * kFinished, the field will be removed.
-     * Must be called while holding the _streamingMutex.
+     * Must be called while holding the _stateMutex.
      */
     void _persistPhaseUpdate(OperationContext* opCtx,
                              DefragmentationPhaseEnum phase,
@@ -153,13 +157,13 @@ private:
 
     /**
      * Remove all datasize fields from config.chunks for the given namespace.
-     * Must be called while holding the _streamingMutex.
+     * Must be called while holding the _stateMutex.
      */
     void _clearDataSizeInformation(OperationContext* opCtx, const UUID& uuid);
 
     void _processEndOfAction(WithLock, OperationContext* opCtx);
 
-    Mutex _streamingMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_streamingMutex");
+    Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
 
     unsigned _concurrentStreamingOps{0};
 

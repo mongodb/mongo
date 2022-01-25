@@ -286,6 +286,19 @@ public:
         return _pendingActionsByShards.empty() && _outstandingActions == 0;
     }
 
+    BSONObj reportProgress() const override {
+
+        size_t rangesToMerge = 0, rangesWithoutDataSize = 0;
+        for (const auto& [_, pendingActions] : _pendingActionsByShards) {
+            rangesToMerge += pendingActions.rangesToMerge.size();
+            rangesWithoutDataSize += pendingActions.rangesWithoutDataSize.size();
+        }
+        auto remainingChunksToProcess =
+            static_cast<long long>(_outstandingActions + rangesToMerge + rangesWithoutDataSize);
+
+        return BSON("remainingChunksToProcess" << remainingChunksToProcess);
+    }
+
 private:
     struct PendingActions {
         std::vector<ChunkRange> rangesToMerge;
@@ -535,6 +548,14 @@ public:
     bool isComplete() const override {
         return _smallChunksByShard.empty() && _outstandingMigrations.empty() &&
             _actionableMerges.empty() && _outstandingMerges.empty();
+    }
+
+    BSONObj reportProgress() const override {
+        size_t numSmallChunks = 0;
+        for (const auto& [shardId, smallChunks] : _smallChunksByShard) {
+            numSmallChunks += smallChunks.size();
+        }
+        return BSON("remainingChunksToProcess" << static_cast<long long>(numSmallChunks));
     }
 
 
@@ -1014,6 +1035,17 @@ public:
         return _pendingActionsByShards.empty() && _outstandingActions == 0;
     }
 
+    BSONObj reportProgress() const override {
+        size_t rangesToFindSplitPoints = 0, rangesToSplit = 0;
+        for (const auto& [shardId, pendingActions] : _pendingActionsByShards) {
+            rangesToFindSplitPoints += pendingActions.rangesToFindSplitPoints.size();
+            rangesToSplit += pendingActions.rangesToSplit.size();
+        }
+        auto remainingChunksToProcess =
+            static_cast<long long>(_outstandingActions + rangesToFindSplitPoints + rangesToSplit);
+        return BSON("remainingChunksToProcess" << remainingChunksToProcess);
+    }
+
 private:
     struct PendingActions {
         std::vector<ChunkRange> rangesToFindSplitPoints;
@@ -1050,7 +1082,7 @@ private:
 
 void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     OperationContext* opCtx, const CollectionType& coll) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     const auto& uuid = coll.getUuid();
     if (coll.getDefragmentCollection() && !_defragmentationStates.contains(uuid)) {
         _initializeCollectionState(lk, opCtx, coll);
@@ -1070,10 +1102,24 @@ void BalancerDefragmentationPolicyImpl::refreshCollectionDefragmentationStatus(
     }
 }
 
+BSONObj BalancerDefragmentationPolicyImpl::reportProgressOn(const UUID& uuid) {
+    const std::string kCurrentPhase("currentPhase");
+    const std::string kProgress("progress");
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    auto match = _defragmentationStates.find(uuid);
+    if (match == _defragmentationStates.end() || !match->second) {
+        return BSON(kCurrentPhase << "None");
+    }
+    const auto& collDefragmentationPhase = match->second;
+    return BSON(
+        kCurrentPhase << DefragmentationPhase_serializer(collDefragmentationPhase->getType())
+                      << kProgress << collDefragmentationPhase->reportProgress());
+}
+
 MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
     OperationContext* opCtx, stdx::unordered_set<ShardId>* usedShards) {
     MigrateInfoVector chunksToMove;
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     // TODO (SERVER-61635) evaluate fairness
     bool done = false;
     while (!done) {
@@ -1109,7 +1155,7 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
 
 SemiFuture<DefragmentationAction> BalancerDefragmentationPolicyImpl::getNextStreamingAction(
     OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     if (_concurrentStreamingOps < kMaxConcurrentOperations) {
         if (auto action = _nextStreamingAction(opCtx)) {
             _concurrentStreamingOps++;
@@ -1176,7 +1222,7 @@ boost::optional<DefragmentationAction> BalancerDefragmentationPolicyImpl::_nextS
 void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext* opCtx,
                                                                MergeInfo action,
                                                                const Status& result) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     // Check if collection defragmentation has been canceled
     if (!_defragmentationStates.contains(action.uuid)) {
         return;
@@ -1189,7 +1235,7 @@ void BalancerDefragmentationPolicyImpl::acknowledgeMergeResult(OperationContext*
 
 void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
     OperationContext* opCtx, DataSizeInfo action, const StatusWith<DataSizeResponse>& result) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     // Check if collection defragmentation has been canceled
     if (!_defragmentationStates.contains(action.uuid)) {
         return;
@@ -1202,7 +1248,7 @@ void BalancerDefragmentationPolicyImpl::acknowledgeDataSizeResult(
 
 void BalancerDefragmentationPolicyImpl::acknowledgeAutoSplitVectorResult(
     OperationContext* opCtx, AutoSplitVectorInfo action, const StatusWith<SplitPoints>& result) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     // Check if collection defragmentation has been canceled
     if (!_defragmentationStates.contains(action.uuid)) {
         return;
@@ -1216,7 +1262,7 @@ void BalancerDefragmentationPolicyImpl::acknowledgeAutoSplitVectorResult(
 void BalancerDefragmentationPolicyImpl::acknowledgeSplitResult(OperationContext* opCtx,
                                                                SplitInfoWithKeyPattern action,
                                                                const Status& result) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     // Check if collection defragmentation has been canceled
     if (!_defragmentationStates.contains(action.uuid)) {
         return;
@@ -1230,7 +1276,7 @@ void BalancerDefragmentationPolicyImpl::acknowledgeSplitResult(OperationContext*
 void BalancerDefragmentationPolicyImpl::acknowledgeMoveResult(OperationContext* opCtx,
                                                               MigrateInfo action,
                                                               const Status& result) {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     // Check if collection defragmentation has been canceled
     if (!_defragmentationStates.contains(action.uuid)) {
         return;
@@ -1241,7 +1287,7 @@ void BalancerDefragmentationPolicyImpl::acknowledgeMoveResult(OperationContext* 
 }
 
 void BalancerDefragmentationPolicyImpl::closeActionStream() {
-    stdx::lock_guard<Latch> lk(_streamingMutex);
+    stdx::lock_guard<Latch> lk(_stateMutex);
     _defragmentationStates.clear();
     if (_nextStreamingActionPromise) {
         _nextStreamingActionPromise.get().setFrom(EndOfActionStream());
@@ -1306,7 +1352,8 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
           "namespace"_attr = coll.getNss(),
           "phase"_attr = nextPhaseObject
               ? DefragmentationPhase_serializer(nextPhaseObject->getType())
-              : "Null phase");
+              : "None",
+          "details"_attr = nextPhaseObject ? nextPhaseObject->reportProgress() : BSONObj());
     return nextPhaseObject;
 }
 

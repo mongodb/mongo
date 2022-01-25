@@ -73,6 +73,7 @@ public:
                     nss.isValid());
             const auto& balancerStatus = Balancer::get(opCtx)->getBalancerStatusForNs(opCtx, nss);
             Response response(balancerStatus.balancerCompliant);
+            response.setDetails(balancerStatus.details);
             response.setFirstComplianceViolation(
                 balancerStatus.firstComplianceViolation.is_initialized()
                     ? boost::optional<StringData>(

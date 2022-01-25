@@ -45,7 +45,11 @@ structs:
             firstComplianceViolation:
                 type: string
                 optional: true
-                description: "One of the following: draining, zoneViolation, chunksImbalance or chunksMerging"
+                description: "One of the following: draining, zoneViolation, chunksImbalance or defragmentingChunks"
+            details:
+                type: object_owned
+                optional: true
+                description: "Extra information on the detected violation (if any)"
 
 commands:
     balancerCollectionStatus:

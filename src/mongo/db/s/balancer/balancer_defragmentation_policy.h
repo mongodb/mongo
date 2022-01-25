@@ -57,6 +57,8 @@ public:
      */
     virtual bool isDefragmentingCollection(const UUID& uuid) = 0;
 
+    virtual BSONObj reportProgressOn(const UUID& uuid) = 0;
+
     virtual MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
                                                  stdx::unordered_set<ShardId>* usedShards) = 0;
 

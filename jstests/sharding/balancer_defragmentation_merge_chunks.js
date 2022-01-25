@@ -125,7 +125,7 @@ jsTest.log("Begin and end defragmentation with balancer off.");
     }));
     let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
     assert.eq(beforeStatus.balancerCompliant, false);
-    assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
+    assert.eq(beforeStatus.firstComplianceViolation, 'defragmentingChunks');
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll1,
         defragmentCollection: false,
@@ -147,7 +147,7 @@ jsTest.log("Begin and end defragmentation with balancer on");
     }));
     let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
     assert.eq(beforeStatus.balancerCompliant, false);
-    assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
+    assert.eq(beforeStatus.firstComplianceViolation, 'defragmentingChunks');
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll1,
         defragmentCollection: false,
@@ -158,7 +158,7 @@ jsTest.log("Begin and end defragmentation with balancer on");
     st.awaitBalancerRound();
     // ... then check
     let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll1}));
-    assert.neq(afterStatus.firstComplianceViolation, 'chunksMerging');
+    assert.neq(afterStatus.firstComplianceViolation, 'defragmentingChunks');
     st.stopBalancer();
 }
 
@@ -175,7 +175,7 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     st.startBalancer();
     let beforeStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll2}));
     assert.eq(beforeStatus.balancerCompliant, false);
-    assert.eq(beforeStatus.firstComplianceViolation, 'chunksMerging');
+    assert.eq(beforeStatus.firstComplianceViolation, 'defragmentingChunks');
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll2,
         defragmentCollection: false,
@@ -186,7 +186,7 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     st.awaitBalancerRound();
     // ... then check
     let afterStatus = assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll2}));
-    assert.neq(afterStatus.firstComplianceViolation, 'chunksMerging');
+    assert.neq(afterStatus.firstComplianceViolation, 'defragmentingChunks');
     st.stopBalancer();
 }
 
@@ -214,7 +214,7 @@ jsTest.log("Balancer on, begin defragmentation and let it complete");
     assert.soon(function() {
         let balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll3}));
-        return balancerStatus.firstComplianceViolation != 'chunksMerging';
+        return balancerStatus.firstComplianceViolation != 'defragmentingChunks';
     });
     st.stopBalancer();
     const finalNumChunks = findChunksUtil.countChunksForNs(st.config, coll3);
@@ -251,7 +251,7 @@ jsTest.log("Changed uuid causes defragmentation to restart");
     assert.soon(function() {
         let balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll4}));
-        return balancerStatus.firstComplianceViolation != 'chunksMerging';
+        return balancerStatus.firstComplianceViolation != 'defragmentingChunks';
     });
     st.stopBalancer();
     // Ensure the defragmentation succeeded
@@ -286,7 +286,7 @@ jsTest.log("Refined shard key causes defragmentation to restart");
     assert.soon(function() {
         let balancerStatus =
             assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: coll5}));
-        return balancerStatus.firstComplianceViolation != 'chunksMerging';
+        return balancerStatus.firstComplianceViolation != 'defragmentingChunks';
     });
     st.stopBalancer();
     // Ensure the defragmentation succeeded
