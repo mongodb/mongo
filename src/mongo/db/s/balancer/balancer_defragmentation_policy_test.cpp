@@ -221,7 +221,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAddSingleChunkCollectionTr
 
     // 1. The collection should be marked as undergoing through phase 1 of the algorithm...
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeChunks);
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
     ASSERT_TRUE(future.isReady());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
@@ -361,7 +361,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
 
     // 1. The collection should be marked as undergoing through phase 1 of the algorithm...
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeChunks);
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
     ASSERT_TRUE(future.isReady());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future.get());
@@ -509,14 +509,23 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
     // Test
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(future.isReady());
-    MergeInfo mergeAction = stdx::get<MergeInfo>(future.get());
-    ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMin(), BSON("x" << 0));
-    ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMax(), BSON("x" << 5));
     auto future2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(future2.isReady());
+    // Verify the content of the received merge actions
+    // (Note: there is no guarantee on the order provided by the stream)
+    MergeInfo mergeAction = stdx::get<MergeInfo>(future.get());
     MergeInfo mergeAction2 = stdx::get<MergeInfo>(future2.get());
-    ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMin(), BSON("x" << 5));
-    ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMax(), BSON("x" << 10));
+    if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 0)) == 0) {
+        ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMin(), BSON("x" << 0));
+        ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMax(), BSON("x" << 5));
+        ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMin(), BSON("x" << 5));
+        ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMax(), BSON("x" << 10));
+    } else {
+        ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMin(), BSON("x" << 0));
+        ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMax(), BSON("x" << 5));
+        ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMin(), BSON("x" << 5));
+        ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMax(), BSON("x" << 10));
+    }
     auto future3 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future3.isReady());
 }
@@ -534,22 +543,49 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
     }
     auto coll = setupCollectionWithPhase(chunkList, boost::none);
     _defragmentationPolicy.refreshCollectionDefragmentationStatus(operationContext(), coll);
-    // Test
+    // Three actions (in an unspecified order) should be immediately available.
     auto future = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(future.isReady());
-    MergeInfo mergeAction = stdx::get<MergeInfo>(future.get());
-    ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMin(), BSON("x" << 0));
-    ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMax(), BSON("x" << 5));
     auto future2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(future2.isReady());
-    MergeInfo mergeAction2 = stdx::get<MergeInfo>(future2.get());
-    ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMin(), BSON("x" << 6));
-    ASSERT_BSONOBJ_EQ(mergeAction2.chunkRange.getMax(), BSON("x" << 10));
     auto future3 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(future3.isReady());
-    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(future3.get());
-    ASSERT_BSONOBJ_EQ(dataSizeAction.chunkRange.getMin(), BSON("x" << 5));
-    ASSERT_BSONOBJ_EQ(dataSizeAction.chunkRange.getMax(), BSON("x" << 6));
+    // Verify their content of the received merge actions
+    uint8_t timesLowerRangeMergeFound = 0;
+    uint8_t timesUpperRangeMergeFound = 0;
+    uint8_t timesMiddleRangeDataSizeFound = 0;
+    auto inspectAction = [&](const DefragmentationAction& action) {
+        stdx::visit(
+            visit_helper::Overloaded{
+                [&](const MergeInfo& mergeAction) {
+                    if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 0)) == 0 &&
+                        mergeAction.chunkRange.getMax().woCompare(BSON("x" << 5)) == 0) {
+                        ++timesLowerRangeMergeFound;
+                    }
+                    if (mergeAction.chunkRange.getMin().woCompare(BSON("x" << 6)) == 0 &&
+                        mergeAction.chunkRange.getMax().woCompare(BSON("x" << 10)) == 0) {
+                        ++timesUpperRangeMergeFound;
+                    }
+                },
+                [&](const DataSizeInfo& dataSizeAction) {
+                    if (dataSizeAction.chunkRange.getMin().woCompare(BSON("x" << 5)) == 0 &&
+                        dataSizeAction.chunkRange.getMax().woCompare(BSON("x" << 6)) == 0) {
+                        ++timesMiddleRangeDataSizeFound;
+                    }
+                },
+                [&](const AutoSplitVectorInfo& _) { FAIL("Unexpected action type"); },
+                [&](const SplitInfoWithKeyPattern& _) { FAIL("Unexpected action type"); },
+                [&](const MigrateInfo& _) { FAIL("Unexpected action type"); },
+                [&](const EndOfActionStream& _) { FAIL("Unexpected action type"); }},
+            action);
+    };
+    inspectAction(future.get());
+    inspectAction(future2.get());
+    inspectAction(future3.get());
+    ASSERT_EQ(1, timesLowerRangeMergeFound);
+    ASSERT_EQ(1, timesUpperRangeMergeFound);
+    ASSERT_EQ(1, timesMiddleRangeDataSizeFound);
+
     auto future4 = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_FALSE(future4.isReady());
 }
@@ -580,7 +616,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPha
 
     // Should be in phase 1
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeChunks);
+    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // There should be a datasize entry and no migrations
     stdx::unordered_set<ShardId> usedShards;
     auto pendingMigrations =

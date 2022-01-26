@@ -41,8 +41,9 @@ enums:
         description: "The list of phases composing the Collection Chunks Defragmentation Algorithm"
         type: string
         values:
-            kMergeChunks : "mergeChunks"
+            kMergeAndMeasureChunks : "mergeAndMeasureChunks"
             kMoveAndMergeChunks: "moveAndMergeChunks"
+            kMergeChunks : "mergeChunks"
             kSplitChunks: "splitChunks"
             kFinished: "finished"
 
