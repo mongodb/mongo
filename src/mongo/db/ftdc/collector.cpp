@@ -70,10 +70,6 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
     opCtx->lockState()->skipAcquireTicket();
 
-    // Ensure future transactions read without a timestamp.
-    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
-
     for (auto& collector : _collectors) {
         // Skip collection if this collector has no data to return
         if (!collector->hasData()) {
@@ -98,6 +94,10 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
 
         end = client->getServiceContext()->getPreciseClockSource()->now();
         subObjBuilder.appendDate(kFTDCCollectEndField, end);
+
+        // Ensure the collector did not set a read timestamp.
+        invariant(opCtx->recoveryUnit()->getTimestampReadSource() ==
+                  RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
     builder.appendDate(kFTDCCollectEndField, end);
