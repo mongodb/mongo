@@ -723,7 +723,7 @@ private:
                                    NamespaceString::kChangeStreamPreImagesNamespace,
                                    &dropReply,
                                    DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-                uassert(6023700,
+                uassert(deletionStatus.code(),
                         str::stream() << "Failed to drop the change stream pre-images collection"
                                       << causedBy(deletionStatus.reason()),
                         deletionStatus.isOK() ||
