@@ -68,13 +68,6 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
         });
     }
 }
-
-// Placeholder algorithm.
-void validateSecurityTokenSignature(BSONObj authUser, const SHA256Block& sig) {
-    auto computed =
-        SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
-    uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == sig);
-}
 }  // namespace
 
 SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(OperationContext* opCtx) {
@@ -97,24 +90,50 @@ SecurityTokenAuthenticationGuard::~SecurityTokenAuthenticationGuard() {
     }
 }
 
-void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) try {
-    if (securityToken.nFields() == 0) {
-        return;
-    }
+BSONObj signSecurityToken(BSONObj obj) {
+    auto authUserElem = obj[SecurityToken::kAuthenticatedUserFieldName];
+    uassert(ErrorCodes::BadValue,
+            "Invalid field(s) in token being signed",
+            (authUserElem.type() == Object) && (obj.nFields() == 1));
 
+    auto authUserObj = authUserElem.Obj();
+    ConstDataRange authUserCDR(authUserObj.objdata(), authUserObj.objsize());
+
+    // Placeholder algorithm.
+    auto sig = SHA256Block::computeHash({authUserCDR});
+
+    BSONObjBuilder signedToken(obj);
+    signedToken.appendBinData(SecurityToken::kSigFieldName, sig.size(), BinDataGeneral, sig.data());
+    return signedToken.obj();
+}
+
+SecurityToken verifySecurityToken(BSONObj obj) {
     uassert(ErrorCodes::BadValue, "Multitenancy not enabled", gMultitenancySupport);
 
-    auto token = SecurityToken::parse({"Security Token"}, securityToken);
+    auto token = SecurityToken::parse({"Security Token"}, obj);
     auto authenticatedUser = token.getAuthenticatedUser();
     uassert(ErrorCodes::BadValue,
             "Security token authenticated user requires a valid Tenant ID",
             authenticatedUser.getTenant());
 
-    validateSecurityTokenSignature(securityToken["authenticatedUser"].Obj(), token.getSig());
+    // Use actual authenticatedUser object as passed to preserve hash input.
+    auto authUserObj = obj[SecurityToken::kAuthenticatedUserFieldName].Obj();
+    ConstDataRange authUserCDR(authUserObj.objdata(), authUserObj.objsize());
 
-    securityTokenDecoration(opCtx) = std::move(token);
+    // Placeholder algorithm.
+    auto computed = SHA256Block::computeHash({authUserCDR});
+
+    uassert(ErrorCodes::Unauthorized, "Token signature invalid", computed == token.getSig());
+    return token;
+}
+
+void readSecurityTokenMetadata(OperationContext* opCtx, BSONObj securityToken) try {
+    if (securityToken.nFields() == 0) {
+        return;
+    }
+
+    securityTokenDecoration(opCtx) = verifySecurityToken(securityToken);
     LOGV2_DEBUG(5838100, 4, "Accepted security token", "token"_attr = securityToken);
-
 } catch (const DBException& ex) {
     uassertStatusOK(ex.toStatus().withContext("Unable to parse Security Token from Metadata"));
 }

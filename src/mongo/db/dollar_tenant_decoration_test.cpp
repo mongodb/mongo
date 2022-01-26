@@ -79,17 +79,10 @@ protected:
     }
 
     BSONObj makeSecurityToken(const UserName& userName) {
+        constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
         auto authUser = userName.toBSON(true /* serialize token */);
         ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
-
-        BSONObjBuilder token;
-        token.append("authenticatedUser", authUser);
-
-        auto block =
-            SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
-        token.appendBinData("sig", block.size(), BinDataGeneral, block.data());
-
-        return token.obj();
+        return auth::signSecurityToken(BSON(authUserFieldName << authUser));
     }
 
     ServiceContext::UniqueClient client;

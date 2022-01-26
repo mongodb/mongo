@@ -50,6 +50,18 @@ private:
 };
 
 /**
+ * Takes an unsigned security token as input and applies
+ * the temporary signature algorithm to extend it into a full SecurityToken.
+ */
+BSONObj signSecurityToken(BSONObj obj);
+
+/**
+ * Verify the contents of the provided security token
+ * using the temporary signing algorithm,
+ */
+SecurityToken verifySecurityToken(BSONObj obj);
+
+/**
  * Parse any SecurityToken from the OpMsg and place it as a decoration
  * on OperationContext
  */

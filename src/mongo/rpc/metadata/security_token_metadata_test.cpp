@@ -45,21 +45,13 @@ namespace rpc {
 namespace test {
 namespace {
 
-constexpr auto kAuthenticatedUserFieldName = "authenticatedUser"_sd;
 constexpr auto kPingFieldName = "ping"_sd;
-constexpr auto kSigFieldName = "sig"_sd;
 
 BSONObj makeSecurityToken(const UserName& userName) {
+    constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
     auto authUser = userName.toBSON(true /* serialize token */);
     ASSERT_EQ(authUser["tenant"_sd].type(), jstOID);
-
-    BSONObjBuilder token;
-    token.append(kAuthenticatedUserFieldName, authUser);
-
-    auto block = SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
-    token.appendBinData(kSigFieldName, block.size(), BinDataGeneral, block.data());
-
-    return token.obj();
+    return auth::signSecurityToken(BSON(authUserFieldName << authUser));
 }
 
 class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {};

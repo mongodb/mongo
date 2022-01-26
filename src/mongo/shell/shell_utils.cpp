@@ -49,6 +49,7 @@
 #include "mongo/base/shim.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/auth/security_token.h"
 #include "mongo/db/hasher.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
@@ -425,20 +426,10 @@ BSONObj _createSecurityToken(const BSONObj& args, void* data) {
     uassert(6161500,
             "_createSecurityToken requires a single object argument",
             (args.nFields() == 1) && (args.firstElement().type() == Object));
+
+    constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
     auto authUser = args.firstElement().Obj();
-
-    // Temporary algorithm.
-    auto digest =
-        SHA256Block::computeHash({ConstDataRange(authUser.objdata(), authUser.objsize())});
-
-    BSONObjBuilder ret;
-    {
-        BSONObjBuilder token(ret.subobjStart(""_sd));
-        token.append("authenticatedUser"_sd, authUser);
-        token.appendBinData("sig"_sd, digest.size(), BinDataGeneral, digest.data());
-        token.doneFast();
-    }
-    return ret.obj();
+    return BSON("" << auth::signSecurityToken(BSON(authUserFieldName << authUser)));
 }
 
 BSONObj replMonitorStats(const BSONObj& a, void* data) {
