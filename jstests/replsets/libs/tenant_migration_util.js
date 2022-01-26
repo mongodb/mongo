@@ -15,7 +15,7 @@ var TenantMigrationUtil = (function() {
         return flagDoc.hasOwnProperty("featureFlagShardMerge") &&
             flagDoc.featureFlagShardMerge.value &&
             MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           flagDoc.featureFlagShardMerge.fcv) >= 0;
+                                           flagDoc.featureFlagShardMerge.version) >= 0;
     }
 
     /**

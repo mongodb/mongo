@@ -1,6 +1,6 @@
 /**
  * Tests that the "shard merge" protocol is enabled only in the proper FCV.
- * @tags: [requires_fcv_52, featureFlagShardMerge, disabled_due_to_server_61671]
+ * @tags: [requires_fcv_52, featureFlagShardMerge]
  */
 
 (function() {
@@ -60,20 +60,33 @@ function runTest(downgradeFCV) {
         return eval(cmd + "Cmd()");
     }
 
-    function upgradeTest(cmd) {
+    function testCommandWithShardMerge(cmd) {
         let msg = cmd + " shouldn't reject 'shard merge' protocol when it's enabled";
         assert.commandWorked(adminDB.runCommand(func(cmd)), msg);
     }
 
-    function downgradeTest(cmd) {
-        let msg = cmd + " should reject 'shard merge' protocol when it's disabled";
-        let expectedErrorMsg = "'protocol' field is not supported for FCV below 5.2'";
-        let response = assert.commandFailedWithCode(
-            adminDB.runCommand(func(cmd)), ErrorCodes.InvalidOptions, msg);
+    function testCommandFailsWithShardMerge(cmd, reason, expectedErrorMsg, expectedErrorCode) {
+        let msg = `${cmd} ${reason}`;
+        let response =
+            assert.commandFailedWithCode(adminDB.runCommand(func(cmd)), expectedErrorCode, msg);
         assert.neq(-1,
                    response.errmsg.indexOf(expectedErrorMsg),
                    "Error message did not contain '" + expectedErrorMsg + "', found:\n" +
                        tojson(response));
+    }
+
+    function testCommandFailsShardMergeNotSupported(cmd) {
+        testCommandFailsWithShardMerge(cmd,
+                                       "should reject 'shard merge' protocol when it's disabled",
+                                       "protocol 'shard merge' not supported",
+                                       ErrorCodes.IllegalOperation);
+    }
+
+    function testCommandFailsProtocolFieldNotSupported(cmd) {
+        testCommandFailsWithShardMerge(cmd,
+                                       "should reject 'protocol' field when it's disabled",
+                                       "'protocol' field is not supported for FCV below 5.2'",
+                                       ErrorCodes.InvalidOptions);
     }
 
     // Enable below fail points to prevent starting the donor/recipient POS instance.
@@ -89,14 +102,19 @@ function runTest(downgradeFCV) {
     // Shard merge is enabled, so this call should work.
     let cmds = ["donorStartMigration", "recipientSyncData", "recipientForgetMigration"];
     cmds.forEach((cmd) => {
-        upgradeTest(cmd);
+        testCommandWithShardMerge(cmd);
     });
 
     assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
-
     // Now that FCV is downgraded, shard merge is automatically disabled.
     cmds.forEach((cmd) => {
-        downgradeTest(cmd);
+        if (MongoRunner.compareBinVersions(downgradeFCV, "5.2") >= 0) {
+            // The "protocol" field is ok, but it can't be "shard merge".
+            testCommandFailsShardMergeNotSupported(cmd);
+        } else {
+            // The "protocol" field is not supported.
+            testCommandFailsProtocolFieldNotSupported(cmd);
+        }
     });
 
     rst.stopSet();

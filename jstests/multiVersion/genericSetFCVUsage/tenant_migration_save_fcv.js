@@ -4,7 +4,6 @@
  * @tags: [
  *  requires_majority_read_concern,
  *  incompatible_with_windows_tls,
- *  disabled_due_to_server_61671,
  *  ]
  */
 
@@ -74,9 +73,11 @@ function runTest(downgradeFCV) {
     // The migration will not be able to continue in the downgraded version.
     TenantMigrationTest.assertAborted(migrationThread.returnData());
     // Change-of-FCV detection message.
-    if (isRunningMergeProtocol) {
+    if (isRunningMergeProtocol && MongoRunner.compareBinVersions(downgradeFCV, "5.2") < 0) {
+        // FCV is too old for shard merge.
         checkLog.containsJson(newRecipientPrimary, 5949504);
     } else {
+        // Can't change FCVs during a migration.
         checkLog.containsJson(newRecipientPrimary, 5356200);
     }
 
