@@ -124,6 +124,8 @@ all:
     test_file: jstests/sharding/collation_shard_targeting_hashed_shard_key.js
   - ticket: SERVER-57588
     test_file: jstests/core/match_numeric_components.js
+  - ticket: SERVER-58506
+    test_file: jstests/noPassthrough/getParameterWithDetails.js
   - ticket: SERVER-60682
     test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
   - ticket: SERVER-60685

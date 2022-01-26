@@ -32,10 +32,12 @@ env.Library(
     target='server_parameter',
     source=[
         'server_parameter.cpp',
+        env.Idlc('server_parameter.idl')[0],
         'server_parameter_with_storage.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'idl_parser',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/options_parser/options_parser',

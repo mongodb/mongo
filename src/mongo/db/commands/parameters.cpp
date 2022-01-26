@@ -33,6 +33,7 @@
 
 #include <set>
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/idl/server_parameter_gen.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/util/log.h"
@@ -184,6 +186,19 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
     return Status::OK();
 }
 
+
+GetParameterOptions parseGetParameterOptions(BSONElement elem) {
+    if (elem.type() == BSONType::Object) {
+        return GetParameterOptions::parse({"getParameter"}, elem.Obj());
+    }
+    if ((elem.type() == BSONType::String) && (elem.valueStringDataSafe() == "*"_sd)) {
+        GetParameterOptions ret;
+        ret.setAllParameters(true);
+        return ret;
+    }
+    return GetParameterOptions{};
+}
+
 // for automationServiceDescription
 Mutex autoServiceDescriptorMutex;
 std::string autoServiceDescriptorValue;
@@ -211,27 +226,39 @@ public:
     std::string help() const override {
         std::string h =
             "get administrative option(s)\nexample:\n"
-            "{ getParameter:1, notablescan:1 }\n";
+            "{ getParameter:1, notablescan:1 }\n"
+            "pass a document as the value for getParameter to request options\nexample:\n"
+            "{ getParameter:{showDetails: true}, notablescan:1}\n";
         appendParameterNames(&h);
-        h += "{ getParameter:'*' } to get everything\n";
+        h += "{ getParameter:'*' } or { getParameter:{allParameters: true} } to get everything\n";
         return h;
     }
     bool errmsgRun(OperationContext* opCtx,
                    const string& dbname,
                    const BSONObj& cmdObj,
                    string& errmsg,
-                   BSONObjBuilder& result) {
-        bool all = *cmdObj.firstElement().valuestrsafe() == '*';
+                   BSONObjBuilder& result) override {
+        const auto options = parseGetParameterOptions(cmdObj.firstElement());
+        const bool all = options.getAllParameters();
 
         int before = result.len();
 
         const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
         for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
             if (all || cmdObj.hasElement(i->first.c_str())) {
-                i->second->append(opCtx, result, i->second->name());
+                if (options.getShowDetails()) {
+                    BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
+                    i->second->append(opCtx, detailBob, "value");
+                    detailBob.appendBool("settableAtRuntime",
+                                         i->second->allowedToChangeAtRuntime());
+                    detailBob.appendBool("settableAtStartup",
+                                         i->second->allowedToChangeAtStartup());
+                    detailBob.doneFast();
+                } else {
+                    i->second->append(opCtx, result, i->second->name());
+                }
             }
         }
-
         if (before == result.len()) {
             errmsg = "no option found to get";
             return false;
