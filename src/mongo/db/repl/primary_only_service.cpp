@@ -334,7 +334,7 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     invariant(newTerm > _term,
               str::stream() << "term " << newTerm << " is not greater than " << _term);
     _term = newTerm;
-    _state = State::kRebuilding;
+    _setState(State::kRebuilding, lk);
     _source = CancellationSource();
 
     // Install a new executor, while moving the old one into 'newThenOldScopedExecutor' so it
@@ -439,7 +439,7 @@ void PrimaryOnlyService::onStepDown() {
                         {ErrorCodes::InterruptedDueToReplStateChange,
                          "PrimaryOnlyService interrupted due to stepdown"});
 
-    _state = State::kPaused;
+    _setState(State::kPaused, lk);
     _rebuildStatus = Status::OK();
 
     _afterStepDown();
@@ -476,7 +476,7 @@ void PrimaryOnlyService::shutdown() {
         // complete.
         std::swap(savedInstances, _activeInstances);
 
-        _state = State::kShutdown;
+        _setState(State::kShutdown, lk);
         // shutdown can race with startup, so access _hasExecutor in this critical section.
         hasExecutor = _getHasExecutor();
     }
@@ -510,8 +510,7 @@ PrimaryOnlyService::getOrCreateInstance(OperationContext* opCtx, BSONObj initial
     InstanceID instanceID = idElem.wrap().getOwned();
 
     stdx::unique_lock lk(_mutex);
-    opCtx->waitForConditionOrInterrupt(
-        _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
+    _waitForStateNotRebuilding(opCtx, lk);
     if (_state == State::kRebuildFailed) {
         uassertStatusOK(_rebuildStatus);
     }
@@ -547,8 +546,7 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
               opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     stdx::unique_lock lk(_mutex);
-    opCtx->waitForConditionOrInterrupt(
-        _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
+    _waitForStateNotRebuilding(opCtx, lk);
 
     if (_state == State::kShutdown || _state == State::kPaused) {
         return boost::none;
@@ -577,8 +575,7 @@ std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::g
     std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> instances;
 
     stdx::unique_lock lk(_mutex);
-    opCtx->waitForConditionOrInterrupt(
-        _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
+    _waitForStateNotRebuilding(opCtx, lk);
 
     if (_state == State::kShutdown || _state == State::kPaused) {
         return instances;
@@ -689,12 +686,11 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
 
             stdx::lock_guard lk(_mutex);
             if (_state != State::kRebuilding || _term != term) {
-                _rebuildCV.notify_all();
+                _stateChangeCV.notify_all();
                 return;
             }
-            _state = State::kRebuildFailed;
+            _setState(State::kRebuildFailed, lk);
             _rebuildStatus = std::move(status);
-            _rebuildCV.notify_all();
             return;
         }
     }
@@ -703,7 +699,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         {
             stdx::lock_guard lk(_mutex);
             if (_state != State::kRebuilding || _term != term) {  // Node stepped down
-                _rebuildCV.notify_all();
+                _stateChangeCV.notify_all();
                 return;
             }
         }
@@ -716,7 +712,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
     stdx::lock_guard lk(_mutex);
     if (_state != State::kRebuilding || _term != term) {
         // Node stepped down before finishing rebuilding service from previous stepUp.
-        _rebuildCV.notify_all();
+        _stateChangeCV.notify_all();
         return;
     }
     invariant(_activeInstances.empty());
@@ -739,8 +735,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         [[maybe_unused]] auto newInstance =
             _insertNewInstance(lk, std::move(instance), std::move(instanceID));
     }
-    _state = State::kRunning;
-    _rebuildCV.notify_all();
+    _setState(State::kRunning, lk);
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInstance(
@@ -789,6 +784,20 @@ StringData PrimaryOnlyService::_getStateString(WithLock) const {
             MONGO_UNREACHABLE;
     }
 }
+
+void PrimaryOnlyService::_waitForStateNotRebuilding(OperationContext* opCtx,
+                                                    BasicLockableAdapter m) {
+
+    opCtx->waitForConditionOrInterrupt(
+        _stateChangeCV, m, [this]() { return _state != State::kRebuilding; });
+}
+
+void PrimaryOnlyService::_setState(State newState, WithLock) {
+    if (std::exchange(_state, newState) != newState) {
+        _stateChangeCV.notify_all();
+    }
+}
+
 
 PrimaryOnlyService::AllowOpCtxWhenServiceRebuildingBlock::AllowOpCtxWhenServiceRebuildingBlock(
     Client* client)

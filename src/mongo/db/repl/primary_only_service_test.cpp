@@ -1106,3 +1106,43 @@ TEST_F(PrimaryOnlyServiceTest, ReportCurOpInfo) {
     ASSERT_EQ(1, ops[0]["instanceID"]["_id"].Int());
     ASSERT_TRUE(ops[0].hasField("state"));
 }
+
+TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditionVariable) {
+    /*
+     * 1. `onStepUp()` changes `_state` to `kRebuilding`.
+     * 2. `lookupInstance()` is called immediately and blocks on the condition variable, after the
+     * initial predicate check returns `false` since `_state == kRebuilding`.
+     * 3. `onStepDown()` is called and sets `_state` to `kPaused`. After changing the state, it
+     * should notify waiters on the condition variable.
+     * 4. `lookupInstance()` should return after receiving the notification from `onStepDown()`.
+     */
+
+    stepDown();
+
+    stdx::thread stepUpThread;
+    stdx::thread lookUpInstanceThread;
+
+    {
+        FailPointEnableBlock stepUpFailpoint("PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic");
+        stepUpThread = stdx::thread([this] {
+            ThreadClient tc("StepUpThread", getServiceContext());
+            stepUp();
+        });
+
+        stepUpFailpoint->waitForTimesEntered(stepUpFailpoint.initialTimesEntered() + 1);
+
+        lookUpInstanceThread = stdx::thread([this] {
+            ThreadClient tc("LookUpInstanceThread", getServiceContext());
+            auto opCtx = makeOperationContext();
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+        });
+        // This is a best effort to wait for the `waitForConditionOrInterrupt` in `lookupInstance`
+        // to make the initial call to its predicate while `_state` is `kRebuilding`.
+        sleepmillis(100);
+
+        stepDown();
+    }
+
+    stepUpThread.join();
+    lookUpInstanceThread.join();
+}
