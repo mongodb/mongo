@@ -43,6 +43,7 @@ feature_flags:
 
     featureFlagNoChangeStreamEventsDueToOrphans:
         description: Feature flag for preventing the generation of change stream events due to
-            writes on oprhan documents.
+            writes on orphan documents.
         cpp_varname: gFeatureFlagNoChangeStreamEventsDueToOrphans
-        default: false
+        default: true
+        version: 5.3

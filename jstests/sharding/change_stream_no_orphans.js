@@ -9,7 +9,7 @@
  *   - Distributed update/delete (from router) via transaction on multi-documents
  *
  * @tags: [
- *   requires_fcv_52,
+ *   requires_fcv_53,
  *   featureFlagNoChangeStreamEventsDueToOrphans,
  * ]
  */

@@ -9,6 +9,7 @@
  *  requires_sharding,
  *  assumes_balancer_off,
  *  uses_change_streams,
+ *  requires_fcv_53,
  *  featureFlagNoChangeStreamEventsDueToOrphans
  * ];
  */
