@@ -2825,6 +2825,86 @@ tasks:
         content_type: ${content_type|application/tar}
         display_name: "Mongo CSFLE Library"
 
+- name: csfle_create_debug_lib
+  tags: []
+  commands:
+    - *f_expansions_write
+    - func: "scons compile"
+      vars:
+        targets: archive-mongo-csfle-dev archive-mongo-csfle-debug
+        task_compile_flags: >-
+          --dbg=on
+          --opt=off
+          --allocator=system
+          --enable-free-mon=off
+          --enterprise-features=fle
+          --js-engine=none
+          --link-model=dynamic-sdk
+          DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/mongo-csfle-dev.${ext|tgz}"
+        remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1_dev-${version}.${ext|tgz}"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/tar}
+        display_name: "Mongo CSFLE Library dev"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/mongo-csfle-debug.${ext|tgz}"
+        remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1_debug-${version}.${ext|tgz}"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/tar}
+        display_name: "Mongo CSFLE Library debug"
+
+- name: csfle_install_tests
+  tags: []
+  depends_on:
+    - name: csfle_create_debug_lib
+  commands:
+    - *f_expansions_write
+    - func: "scons compile"
+      vars:
+        targets: archive-mongo-csfle-shlib-test
+        compiling_for_test: true
+        task_install_action:
+          default
+        task_compile_flags: >-
+          --allocator=system
+          --enable-free-mon=off
+          --enterprise-features=fle
+          --js-engine=none
+          --link-model=static
+          DESTDIR='$BUILD_ROOT/csfle-lib-$MONGO_VERSION'
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/mongo-csfle-shlib-test-runtime.${ext|tgz}"
+        remote_file: "${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_shlib_test-${version}.${ext|tgz}"
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/tar}
+        display_name: "Mongo CSFLE Shared Library Test"
+
+- name: csfle_run_tests
+  tags: []
+  depends_on:
+    - name: csfle_install_tests
+  commands:
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/csfle_run_tests.sh"
+
 - name: compile_benchmarks
   tags: []
   depends_on: []
@@ -7301,6 +7381,36 @@ task_groups:
   tasks:
     - "csfle_create_lib"
 
+- name: csfle_build_debug_and_test
+  setup_task:
+    - func: "f_expansions_write"
+    - func: "apply compile expansions"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
+  teardown_task:
+  - func: "attach scons logs"
+  setup_group_can_fail_task: true
+  setup_group:
+    - command: manifest.load
+    - func: "git get project and add git tag"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "set up venv"
+    - func: "upload pip requirements"
+    - func: "get buildnumber"
+    - func: "f_expansions_write"
+    - func: "set up win mount script"
+    - func: "generate compile expansions"
+  teardown_group:
+    - func: "umount shared scons directory"
+  max_hosts: 1
+  tasks:
+    - "csfle_create_debug_lib"
+    - "csfle_install_tests"
+    - "csfle_run_tests"
+
 #######################################
 #               Modules               #
 #######################################
@@ -9501,6 +9611,9 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+    distros:
+      - rhel80-xlarge
+  - name: csfle_build_debug_and_test
     distros:
       - rhel80-xlarge
   - name: .updatefuzzer
