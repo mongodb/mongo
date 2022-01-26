@@ -18,6 +18,7 @@ sys.path.append(str(pathlib.Path(os.path.join(os.getcwd(), __file__)).parent.par
 # pylint: disable=wrong-import-position
 from buildscripts.util.oauth import get_client_cred_oauth_credentials, Configs
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import SetupMultiversion, download
+from buildscripts.build_system_options import PathOptions
 
 
 class LinuxBuildIDExtractor:
@@ -121,6 +122,7 @@ class Mapper:
             client_credentials_user_name=self.default_client_credentials_user_name)
         self.client_id = client_id
         self.client_secret = client_secret
+        self.path_options = PathOptions()
 
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
@@ -246,9 +248,11 @@ class Mapper:
         binaries_path = self.download(self.url)
         binaries_unpacked_path = self.unpack(binaries_path)
 
-        # we need to analyze two directories: bin inside debug-symbols and lib inside binaries.
-        # bin holds main binaries, like mongos, mongod, mongo ...
-        # lib holds shared libraries, tons of them. some build variants do not contain shared libraries.
+        # we need to analyze two directories: main binary folder inside debug-symbols and
+        # shared libraries folder inside binaries.
+        # main binary folder holds main binaries, like mongos, mongod, mongo ...
+        # shared libraries folder holds shared libraries, tons of them.
+        # some build variants do not contain shared libraries.
 
         debug_symbols_unpacked_path = os.path.join(debug_symbols_unpacked_path, 'dist-test')
         binaries_unpacked_path = os.path.join(binaries_unpacked_path, 'dist-test')
@@ -258,9 +262,10 @@ class Mapper:
         self.logger.info("INSIDE unpacked binaries/dist-test: %s",
                          os.listdir(binaries_unpacked_path))
 
-        # start with 'bin' folder
+        # start with main binary folder
         for binary in self.selected_binaries:
-            full_bin_path = os.path.join(debug_symbols_unpacked_path, 'bin', binary)
+            full_bin_path = os.path.join(debug_symbols_unpacked_path,
+                                         self.path_options.main_binary_folder_name, binary)
 
             if not os.path.exists(full_bin_path):
                 self.logger.error("Could not find binary at %s", full_bin_path)
@@ -278,18 +283,21 @@ class Mapper:
                 'file_name': binary, 'version': self.version
             }
 
-        # move to 'lib' folder.
+        # move to shared libraries folder.
         # it contains all shared library binary files,
         # we run readelf on each of them.
-        lib_folder_path = os.path.join(binaries_unpacked_path, 'lib')
+        lib_folder_path = os.path.join(binaries_unpacked_path,
+                                       self.path_options.shared_library_folder_name)
 
         if not os.path.exists(lib_folder_path):
             # sometimes we don't get lib folder, which means there is no shared libraries for current build variant.
-            self.logger.info("'lib' folder does not exist.")
+            self.logger.info("'%s' folder does not exist.",
+                             self.path_options.shared_library_folder_name)
             sofiles = []
         else:
             sofiles = os.listdir(lib_folder_path)
-            self.logger.info("'lib' folder: %s", sofiles)
+            self.logger.info("'%s' folder: %s", self.path_options.shared_library_folder_name,
+                             sofiles)
 
         for sofile in sofiles:
             sofile_path = os.path.join(lib_folder_path, sofile)

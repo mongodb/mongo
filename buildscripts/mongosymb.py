@@ -31,8 +31,10 @@ from typing import Dict
 import requests
 
 # pylint: disable=wrong-import-position
+# pylint: disable=too-many-branches
 sys.path.append(str(Path(os.getcwd(), __file__).parent.parent))
 from buildscripts.util.oauth import Configs, get_oauth_credentials
+from buildscripts.build_system_options import PathOptions
 
 
 class PathDbgFileResolver(object):
@@ -193,6 +195,7 @@ class PathResolver(object):
                                client_id=self.client_id, auth_domain=self.auth_domain,
                                redirect_port=self.redirect_port, scope=self.scope)
         self.http_client = requests.Session()
+        self.path_options = PathOptions()
 
         # create cache dir if it doesn't exist
         if not os.path.exists(self.cache_dir):
@@ -270,7 +273,7 @@ class PathResolver(object):
         Use to utar/unzip files.
 
         :param path: full path of file
-        :return: full path of 'bin' directory of unpacked file
+        :return: full path of directory of unpacked file
         """
         out_dir = path.replace('.tgz', '', 1)
         if not os.path.exists(out_dir):
@@ -316,6 +319,16 @@ class PathResolver(object):
                 response = self.http_client.get(f'{self.host}/find_by_id',
                                                 params={'build_id': build_id})
                 if response.status_code != 200:
+                    # if we could not find the path of binary, that might be system library.
+                    # we can try using frame's own `path` data.
+                    # symbolization can succeed only if that binary exists on local
+                    # machine (more specifically: in the given path).
+                    system_path = soinfo.get('path')
+                    if system_path:
+                        sys.stdout.write(
+                            f"Could not find path of binary from symbolizer web service. Trying to use the "
+                            f"provided path: {system_path}\n")
+                        return system_path
                     sys.stderr.write(
                         f"Server returned unsuccessful status: {response.status_code}, "
                         f"response body: {response.text}\n")
@@ -352,7 +365,9 @@ class PathResolver(object):
         if not binary_name.endswith('.debug') and not binary_name.endswith('.so'):
             binary_name = f'{binary_name}.debug'
 
-        return os.path.join(path, binary_name)
+        inner_folder_name = self.path_options.get_binary_folder_name(binary_name)
+
+        return os.path.join(path, inner_folder_name, binary_name)
 
 
 def parse_input(trace_doc, dbg_path_resolver):
@@ -484,7 +499,8 @@ def classic_output(frames, outfile, **kwargs):  # pylint: disable=unused-argumen
             for sframe in symbinfo:
                 outfile.write(" {file:s}:{line:d}:{column:d}: {fn:s}\n".format(**sframe))
         else:
-            outfile.write(" Couldn't extract symbols: {path:s}!!!\n".format(**frame))
+            outfile.write(" Couldn't extract symbols: path={path}\n".format(
+                path=frame.get('path', 'no value found')))
 
 
 def make_argument_parser(parser=None, **kwargs):
@@ -582,8 +598,6 @@ def main(options):
     if not trace_doc or not trace_doc.strip():
         print("Please provide the backtrace through stdin for symbolization;"
               "e.g. `your/symbolization/command < /file/with/stacktrace`")
-    trace_doc = trace_doc[trace_doc.find('{'):]
-    trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
 
     # Search the trace_doc for an object having "backtrace" and "processInfo" keys.
     def bt_search(obj):
@@ -598,9 +612,18 @@ def main(options):
             pass
         return None
 
-    trace_doc = bt_search(trace_doc)
-
-    if not trace_doc:
+    # given a log file including traceback,
+    # we try to find traceback from that file, analyzing each line until we find it
+    for line in trace_doc.splitlines():
+        possible_trace_doc = line[line.find('{'):]
+        try:
+            possible_trace_doc = json.JSONDecoder().raw_decode(possible_trace_doc)[0]
+            trace_doc = bt_search(possible_trace_doc)
+            if trace_doc:
+                break
+        except json.JSONDecodeError:
+            pass
+    else:
         print("could not find json backtrace object in input", file=sys.stderr)
         exit(1)
 
