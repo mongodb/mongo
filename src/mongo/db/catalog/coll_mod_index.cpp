@@ -183,6 +183,25 @@ void _processCollModIndexRequestUnique(OperationContext* opCtx,
 
     *newUnique = true;
     autoColl->getWritableCollection(opCtx)->updateUniqueSetting(opCtx, idx->indexName());
+    idx->getEntry()->accessMethod()->setEnforceDuplicateConstraints(false);
+}
+
+/**
+ * Adjusts enforceDuplicateConstraints setting on an index.
+ */
+void _processCollModIndexRequestDisallowNewDuplicateKeys(
+    OperationContext* opCtx,
+    AutoGetCollection* autoColl,
+    const IndexDescriptor* idx,
+    bool indexDisallowNewDuplicateKeys,
+    boost::optional<bool>* newDisallowNewDuplicateKeys,
+    boost::optional<bool>* oldDisallowNewDuplicateKeys) {
+    *newDisallowNewDuplicateKeys = indexDisallowNewDuplicateKeys;
+    auto accessMethod = idx->getEntry()->accessMethod();
+    *oldDisallowNewDuplicateKeys = accessMethod->isEnforcingDuplicateConstraints();
+    if (*oldDisallowNewDuplicateKeys != *newDisallowNewDuplicateKeys) {
+        accessMethod->setEnforceDuplicateConstraints(indexDisallowNewDuplicateKeys);
+    }
 }
 
 }  // namespace
@@ -198,9 +217,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
     auto indexExpireAfterSeconds = collModIndexRequest.indexExpireAfterSeconds;
     auto indexHidden = collModIndexRequest.indexHidden;
     auto indexUnique = collModIndexRequest.indexUnique;
+    auto indexDisallowNewDuplicateKeys = collModIndexRequest.indexDisallowNewDuplicateKeys;
 
     // Return early if there are no index modifications requested.
-    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique) {
+    if (!indexExpireAfterSeconds && !indexHidden && !indexUnique &&
+        !indexDisallowNewDuplicateKeys) {
         return;
     }
 
@@ -209,6 +230,8 @@ void processCollModIndexRequest(OperationContext* opCtx,
     boost::optional<bool> newHidden;
     boost::optional<bool> oldHidden;
     boost::optional<bool> newUnique;
+    boost::optional<bool> newDisallowNewDuplicateKeys;
+    boost::optional<bool> oldDisallowNewDuplicateKeys;
 
     // TTL Index
     if (indexExpireAfterSeconds) {
@@ -230,12 +253,23 @@ void processCollModIndexRequest(OperationContext* opCtx,
             opCtx, autoColl, idx, mode, docsForUniqueIndex, &newUnique);
     }
 
+    if (indexDisallowNewDuplicateKeys) {
+        _processCollModIndexRequestDisallowNewDuplicateKeys(opCtx,
+                                                            autoColl,
+                                                            idx,
+                                                            *indexDisallowNewDuplicateKeys,
+                                                            &newDisallowNewDuplicateKeys,
+                                                            &oldDisallowNewDuplicateKeys);
+    }
+
     *indexCollModInfo =
         IndexCollModInfo{!newExpireSecs ? boost::optional<Seconds>() : Seconds(*newExpireSecs),
                          !oldExpireSecs ? boost::optional<Seconds>() : Seconds(*oldExpireSecs),
                          newHidden,
                          oldHidden,
                          newUnique,
+                         oldDisallowNewDuplicateKeys,
+                         newDisallowNewDuplicateKeys,
                          idx->indexName()};
 
     // This matches the default for IndexCatalog::refreshEntry().
@@ -251,26 +285,37 @@ void processCollModIndexRequest(OperationContext* opCtx,
     autoColl->getWritableCollection(opCtx)->getIndexCatalog()->refreshEntry(
         opCtx, autoColl->getWritableCollection(opCtx), idx, flags);
 
-    opCtx->recoveryUnit()->onCommit(
-        [oldExpireSecs, newExpireSecs, oldHidden, newHidden, newUnique, result](
-            boost::optional<Timestamp>) {
-            // add the fields to BSONObjBuilder result
-            if (oldExpireSecs) {
-                result->append("expireAfterSeconds_old", *oldExpireSecs);
-            }
-            if (newExpireSecs) {
-                result->append("expireAfterSeconds_new", *newExpireSecs);
-            }
-            if (newHidden) {
-                invariant(oldHidden);
-                result->append("hidden_old", *oldHidden);
-                result->append("hidden_new", *newHidden);
-            }
-            if (newUnique) {
-                invariant(*newUnique);
-                result->appendBool("unique_new", true);
-            }
-        });
+    opCtx->recoveryUnit()->onCommit([oldExpireSecs,
+                                     newExpireSecs,
+                                     oldHidden,
+                                     newHidden,
+                                     newUnique,
+                                     oldDisallowNewDuplicateKeys,
+                                     newDisallowNewDuplicateKeys,
+                                     result](boost::optional<Timestamp>) {
+        // add the fields to BSONObjBuilder result
+        if (oldExpireSecs) {
+            result->append("expireAfterSeconds_old", *oldExpireSecs);
+        }
+        if (newExpireSecs) {
+            result->append("expireAfterSeconds_new", *newExpireSecs);
+        }
+        if (newHidden) {
+            invariant(oldHidden);
+            result->append("hidden_old", *oldHidden);
+            result->append("hidden_new", *newHidden);
+        }
+        if (newUnique) {
+            invariant(*newUnique);
+            result->appendBool("unique_new", true);
+        }
+        if (newDisallowNewDuplicateKeys) {
+            // Unlike other fields, 'disallowNewDuplicateKeys' can have the same old and new values.
+            invariant(oldDisallowNewDuplicateKeys);
+            result->append("disallowNewDuplicateKeys_old", *oldDisallowNewDuplicateKeys);
+            result->append("disallowNewDuplicateKeys_new", *newDisallowNewDuplicateKeys);
+        }
+    });
 
     if (MONGO_unlikely(assertAfterIndexUpdate.shouldFail())) {
         LOGV2(20307, "collMod - assertAfterIndexUpdate fail point enabled");

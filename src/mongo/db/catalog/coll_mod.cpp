@@ -164,15 +164,16 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
             if (!cmdIndex.getExpireAfterSeconds() && !cmdIndex.getHidden() &&
-                !cmdIndex.getUnique()) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "no expireAfterSeconds, hidden, or unique field");
+                !cmdIndex.getUnique() && !cmdIndex.getDisallowNewDuplicateKeys()) {
+                return Status(
+                    ErrorCodes::InvalidOptions,
+                    "no expireAfterSeconds, hidden, unique, or disallowNewDuplicateKeys field");
             }
 
             auto cmrIndex = &cmr.indexRequest;
             auto indexObj = e.Obj();
 
-            if (cmdIndex.getUnique()) {
+            if (cmdIndex.getUnique() || cmdIndex.getDisallowNewDuplicateKeys()) {
                 uassert(ErrorCodes::InvalidOptions,
                         "collMod does not support converting an index to unique",
                         feature_flags::gCollModIndexUnique.isEnabled(
@@ -307,6 +308,15 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
                 } else {
                     cmrIndex->indexHidden = cmdIndex.getHidden();
                 }
+            }
+
+            // The 'disallowNewDuplicateKeys' option is an ephemeral setting. It is replicated but
+            // still susceptible to process restarts. We do not compare the requested change with
+            // the existing state, so there is no need for the no-op conversion logic that we have
+            // for 'hidden' or 'unique'.
+            if (cmdIndex.getDisallowNewDuplicateKeys()) {
+                cmr.numModifications++;
+                cmrIndex->indexDisallowNewDuplicateKeys = cmdIndex.getDisallowNewDuplicateKeys();
             }
 
             // The index options doc must contain either the name or key pattern, but not both.
@@ -450,6 +460,12 @@ StatusWith<ParsedCollModRequest> parseCollModRequest(OperationContext* opCtx,
         oplogEntryBuilder->append(e);
     }
 
+    // Currently disallows the use of 'indexDisallowNewDuplicateKeys' with other collMod options.
+    if (cmr.indexRequest.indexDisallowNewDuplicateKeys && cmr.numModifications > 1) {
+        return {ErrorCodes::InvalidOptions,
+                "disallowNewDuplicateKeys cannot be combined with any other modification."};
+    }
+
     return {std::move(cmr)};
 }
 
@@ -572,16 +588,17 @@ StatusWith<std::unique_ptr<CollModWriteOpsTracker::Token>> _setUpCollModIndexUni
     const auto& cmr = statusW.getValue();
     auto idx = cmr.indexRequest.idx;
     auto violatingRecordsList = scanIndexForDuplicates(opCtx, collection, idx);
-    if (!violatingRecordsList.empty()) {
-        uassertStatusOK(buildConvertUniqueErrorStatus(
-            buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
-    }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangAfterCollModIndexUniqueSideWriteTracker,
                                                      opCtx,
                                                      "hangAfterCollModIndexUniqueSideWriteTracker",
                                                      []() {},
                                                      nss);
+
+    if (!violatingRecordsList.empty()) {
+        uassertStatusOK(buildConvertUniqueErrorStatus(
+            buildDuplicateViolations(opCtx, collection, violatingRecordsList)));
+    }
 
     return std::move(writeOpsToken);
 }

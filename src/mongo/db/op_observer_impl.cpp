@@ -992,6 +992,10 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                 auto oldHidden = indexInfo->oldHidden.get();
                 o2Builder.append("hidden_old", oldHidden);
             }
+            if (indexInfo->oldDisallowNewDuplicateKeys) {
+                auto oldDisallowNewDuplicateKeys = indexInfo->oldDisallowNewDuplicateKeys.get();
+                o2Builder.append("disallowNewDuplicates_old", oldDisallowNewDuplicateKeys);
+            }
         }
 
         MutableOplogEntry oplogEntry;

@@ -99,6 +99,8 @@ struct IndexCollModInfo {
     boost::optional<bool> hidden;
     boost::optional<bool> oldHidden;
     boost::optional<bool> unique;
+    boost::optional<bool> disallowNewDuplicateKeys;
+    boost::optional<bool> oldDisallowNewDuplicateKeys;
     std::string indexName;
 };
 

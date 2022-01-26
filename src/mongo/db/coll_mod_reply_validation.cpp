@@ -40,5 +40,17 @@ void validateReply(const CollModReply& reply) {
                               << "(hidden_new and hidden_old) or none of them.",
                 false);
     }
+
+    auto disallowNewDuplicateKeys_new = reply.getDisallowNewDuplicateKeys_new().is_initialized();
+    auto disallowNewDuplicateKeys_old = reply.getDisallowNewDuplicateKeys_old().is_initialized();
+
+    if ((!disallowNewDuplicateKeys_new && disallowNewDuplicateKeys_old) ||
+        (disallowNewDuplicateKeys_new && !disallowNewDuplicateKeys_old)) {
+        uassert(ErrorCodes::CommandResultSchemaViolation,
+                str::stream() << "Invalid CollModReply: Reply should define either both fields "
+                              << "(disallowNewDuplicateKeys_new and disallowNewDuplicateKeys_old) "
+                                 "or none of them.",
+                false);
+    }
 }
 }  // namespace mongo::coll_mod_reply_validation

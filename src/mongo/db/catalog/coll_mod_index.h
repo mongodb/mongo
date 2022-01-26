@@ -49,6 +49,7 @@ struct ParsedCollModIndexRequest {
     boost::optional<long long> indexExpireAfterSeconds;
     boost::optional<bool> indexHidden;
     boost::optional<bool> indexUnique;
+    boost::optional<bool> indexDisallowNewDuplicateKeys;
 };
 
 /**

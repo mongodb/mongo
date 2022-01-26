@@ -63,6 +63,10 @@ structs:
                 optional: true
                 type: safeBool
                 unstable: true
+            disallowNewDuplicateKeys:
+                optional: true
+                type: safeBool
+                unstable: true
 
     CollModReply:
         description: "The collMod command's reply."
@@ -85,6 +89,14 @@ structs:
                 type: safeBool
                 unstable: false
             unique_new:
+                optional: true
+                type: safeBool
+                unstable: true
+            disallowNewDuplicateKeys_old:
+                optional: true
+                type: safeBool
+                unstable: true
+            disallowNewDuplicateKeys_new:
                 optional: true
                 type: safeBool
                 unstable: true
