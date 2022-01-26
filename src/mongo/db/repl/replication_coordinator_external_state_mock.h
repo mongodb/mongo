@@ -78,6 +78,7 @@ public:
     virtual Status storeLocalConfigDocument(OperationContext* opCtx,
                                             const BSONObj& config,
                                             bool writeOplog);
+    virtual Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config);
     virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* opCtx);
     virtual Status storeLocalLastVoteDocument(OperationContext* opCtx, const LastVote& lastVote);
     virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);

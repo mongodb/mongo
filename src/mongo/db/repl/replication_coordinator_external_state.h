@@ -159,6 +159,11 @@ public:
                                             bool writeOplog) = 0;
 
     /**
+     * Replaces the replica set config document in local storage, or returns an error.
+     **/
+    virtual Status replaceLocalConfigDocument(OperationContext* opCtx, const BSONObj& config) = 0;
+
+    /**
      * Creates the collection for "lastVote" documents and initializes it, or returns an error.
      */
     virtual Status createLocalLastVoteCollection(OperationContext* opCtx) = 0;
