@@ -1480,7 +1480,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/minimizer-outputs.json
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-${build_id}.json
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-${task_id}-${execution}.json
         bucket: mciuploads
         permissions: private
         visibility: signed
@@ -1492,7 +1492,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/jstestfuzz/out/minimizer-outputs-minimizedtest.js
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-minimizedtest-${build_id}.js
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/minimizer-outputs-minimizedtest-${task_id}-${execution}.js
         bucket: mciuploads
         permissions: private
         visibility: signed
