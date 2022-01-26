@@ -637,6 +637,14 @@ structs:
                 type:
                     variant: [safeInt, string]
 
+    one_variant_uuid:
+        description: UnitTest for a single variant with a bindata type
+        strict: false
+        fields:
+            value:
+                type:
+                    variant: [int, uuid]
+
     one_variant_compound:
         description: UnitTest for a single variant which accepts string, doc, or array of string
         strict: false
@@ -996,6 +1004,14 @@ commands:
         api_version: ""
         type:
             variant: [int, string, array<string>]
+
+    CommandTypeVariantUUIDCommand:
+        description: Command with a variant parameter that can be a bindata type
+        command_name: CommandTypeVariantCommand
+        namespace: type
+        api_version: ""
+        type:
+            variant: [int, uuid]
 
     CommandTypeVariantStructCommand:
         description: Command with a variant parameter that can be a struct

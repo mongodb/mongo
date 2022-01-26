@@ -602,6 +602,57 @@ class TestBinder(testcase.IDLTestcase):
                         foo: array<int>
             """))
 
+    def test_variant_positive(self):
+        # type: () -> None
+        """Positive variant test cases."""
+
+        # Setup some common types
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+                default: foo
+            int:
+                description: foo
+                cpp_type: std::int32_t
+                bson_serialization_type: int
+                deserializer: mongo::BSONElement::_numberInt
+            bindata_function:
+                bson_serialization_type: bindata
+                bindata_subtype: function
+                description: "A BSON bindata of function sub type"
+                cpp_type: "std::vector<std::uint8_t>"
+                deserializer: "mongo::BSONElement::_binDataVector"
+        """)
+
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - string
+                            - int
+            """))
+
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - string
+                            - bindata_function
+            """))
+
     def test_variant_negative(self):
         # type: () -> None
         """Negative variant test cases."""
@@ -637,12 +688,6 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 cpp_type: "std::int32_t"
                 deserializer: "mongo::BSONElement::safeNumberInt"
-            bindata_function:
-                bson_serialization_type: bindata
-                bindata_subtype: function
-                description: "A BSON bindata of function sub type"
-                cpp_type: "std::vector<std::uint8_t>"
-                deserializer: "mongo::BSONElement::_binDataVector"
         """)
 
         self.assert_bind_fail(
@@ -684,20 +729,6 @@ class TestBinder(testcase.IDLTestcase):
                             - int
                         default: 1
             """), idl.errors.ERROR_ID_VARIANT_NO_DEFAULT)
-
-        # Bindata is banned in variants for now.
-        self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
-        structs:
-            foo:
-                description: foo
-                fields:
-                    my_variant_field:
-                        type:
-                            variant:
-                            - string
-                            - bindata_function
-            """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
         # Enums are banned in variants for now.
         self.assert_bind_fail(

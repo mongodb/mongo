@@ -30,6 +30,7 @@
 
 import hashlib
 import io
+import itertools
 import os
 import re
 import sys
@@ -1962,11 +1963,26 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         }
 
         with self._with_template(template_params):
-            # See https://en.cppreference.com/w/cpp/utility/variant/visit
-            # This lambda is a template instantiated for each alternate type. Use "if constexpr"
-            # to compile the appropriate serialization code for each.
-            with self._block('stdx::visit([builder](auto&& arg) {', '}, ${access_member});'):
-                self._writer.write_template('idl::idlSerialize(builder, ${field_name}, arg);')
+            with self._block('stdx::visit(visit_helper::Overloaded{', '}, ${access_member});'):
+                for variant_type in itertools.chain(
+                        field.type.variant_types,
+                    [field.type.variant_struct_type] if field.type.variant_struct_type else []):
+
+                    template_params[
+                        'cpp_type'] = 'std::vector<' + variant_type.cpp_type + '>' if variant_type.is_array else variant_type.cpp_type
+
+                    with self._block('[builder](const ${cpp_type}& value) {', '},'):
+                        bson_cpp_type = cpp_types.get_bson_cpp_type(variant_type)
+                        if bson_cpp_type and bson_cpp_type.has_serializer():
+                            assert not field.type.is_array
+                            expression = bson_cpp_type.gen_serializer_expression(
+                                self._writer, 'value')
+                            template_params['expression'] = expression
+                            self._writer.write_template(
+                                'builder->append(${field_name}, ${expression});')
+                        else:
+                            self._writer.write_template(
+                                'idl::idlSerialize(builder, ${field_name}, value);')
 
     def _gen_serializer_method_common(self, field):
         # type: (ast.Field) -> None
@@ -2604,10 +2620,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Generate mongo includes third
         header_list = [
-            'mongo/bson/bsonobjbuilder.h',
-            'mongo/db/auth/authorization_contract.h',
-            'mongo/db/commands.h',
-            'mongo/idl/command_generic_argument.h',
+            'mongo/bson/bsonobjbuilder.h', 'mongo/db/auth/authorization_contract.h',
+            'mongo/db/commands.h', 'mongo/idl/command_generic_argument.h',
+            'mongo/util/visit_helper.h'
         ]
 
         if spec.server_parameters:

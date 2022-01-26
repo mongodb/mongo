@@ -476,6 +476,8 @@ void TestLoopbackVariant(TestT test_value) {
                 arrayBuilder.append(item);
             }
         }
+    } else if constexpr (std::is_same_v<TestT, UUID>) {
+        test_value.appendToBuilder(&bob, "value");
     } else {
         bob.append("value", test_value);
     }
@@ -511,6 +513,9 @@ void TestLoopbackVariant(TestT test_value) {
 TEST(IDLVariantTests, TestVariantRoundtrip) {
     TestLoopbackVariant<One_variant, int, NumberInt>(1);
     TestLoopbackVariant<One_variant, std::string, String>("test_value");
+
+    TestLoopbackVariant<One_variant_uuid, int, NumberInt>(1);
+    TestLoopbackVariant<One_variant_uuid, UUID, BinData>(UUID::gen());
 
     TestLoopbackVariant<One_variant_compound, std::string, String>("test_value");
     TestLoopbackVariant<One_variant_compound, BSONObj, Object>(BSON("x" << 1));
@@ -2561,6 +2566,8 @@ void TestLoopbackCommandTypeVariant(TestT test_value) {
         // TestT might be an IDL struct type like One_string.
         BSONObjBuilder subObj(bob.subobjStart(CommandT::kCommandParameterFieldName));
         test_value.serialize(&subObj);
+    } else if constexpr (std::is_same_v<TestT, UUID>) {
+        test_value.appendToBuilder(&bob, CommandT::kCommandParameterFieldName);
     } else {
         bob.append(CommandT::kCommandParameterFieldName, test_value);
     }
@@ -2595,6 +2602,9 @@ TEST(IDLCommand, TestCommandTypeVariant) {
     TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::string, String>("test_value");
     TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::vector<std::string>, Array>(
         {"x", "y"});
+
+    TestLoopbackCommandTypeVariant<CommandTypeVariantUUIDCommand, int, NumberInt>(1);
+    TestLoopbackCommandTypeVariant<CommandTypeVariantUUIDCommand, UUID, BinData>(UUID::gen());
 
     TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, bool, Bool>(true);
     TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, One_string, Object>(

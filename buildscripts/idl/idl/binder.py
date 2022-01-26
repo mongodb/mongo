@@ -87,15 +87,15 @@ def _validate_bson_types_list(ctxt, idl_type, syntax_type):
             ctxt.add_bad_bson_type_error(idl_type, syntax_type, idl_type.name, bson_type)
             return False
 
-        # V1 restiction: cannot mix bindata into list of types
-        if bson_type == "bindata":
-            ctxt.add_bad_bson_type_error(idl_type, syntax_type, idl_type.name, bson_type)
-            return False
+        if not isinstance(idl_type, syntax.VariantType):
+            if bson_type == "bindata":
+                ctxt.add_bad_bson_type_error(idl_type, syntax_type, idl_type.name, bson_type)
+                return False
 
-        # Cannot mix non-scalar types into the list of types
-        if not isinstance(idl_type, syntax.VariantType) and not bson.is_scalar_bson_type(bson_type):
-            ctxt.add_bad_bson_scalar_type_error(idl_type, syntax_type, idl_type.name, bson_type)
-            return False
+            # Cannot mix non-scalar types into the list of types
+            if not bson.is_scalar_bson_type(bson_type):
+                ctxt.add_bad_bson_scalar_type_error(idl_type, syntax_type, idl_type.name, bson_type)
+                return False
 
     return True
 
