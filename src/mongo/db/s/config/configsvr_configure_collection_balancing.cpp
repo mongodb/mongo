@@ -75,18 +75,11 @@ public:
                     str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                     nss.isValid());
 
-            const auto chunkSizeBytes = [&]() -> boost::optional<int64_t> {
-                if (request().getChunkSizeMB()) {
-                    return *request().getChunkSizeMB() * 1024 * 1024;
-                }
-                return boost::none;
-            }();
-
             // throws if collection does not exist or parameters are invalid
             ShardingCatalogManager::get(opCtx)->configureCollectionBalancing(
                 opCtx,
                 nss,
-                chunkSizeBytes,
+                request().getChunkSizeMB(),
                 request().getDefragmentCollection(),
                 request().getEnableAutoSplitter());
         }

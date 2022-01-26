@@ -115,6 +115,34 @@ function waitForFailpointOnConfigNodes(failpoint, timesEntered) {
 // Setup collection for first tests
 const coll1 = setupCollection();
 
+jsTest.log("Test command chunk size bounds.");
+{
+    st.stopBalancer();
+    // 1GB is a valid chunk size.
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: coll1,
+        chunkSize: 1024,
+    }));
+    // This overflows conversion to bytes in an int32_t, ensure it fails non-silently
+    assert.commandFailedWithCode(st.s.adminCommand({
+        configureCollectionBalancing: coll1,
+        chunkSize: 4 * 1024 * 1024,
+    }),
+                                 ErrorCodes.InvalidOptions);
+    // This overflows conversion to bytes in an int64_t, ensure it fails non-silently
+    assert.commandFailedWithCode(st.s.adminCommand({
+        configureCollectionBalancing: coll1,
+        chunkSize: 8796093022209,
+    }),
+                                 ErrorCodes.InvalidOptions);
+    // Negative numbers are not allowed
+    assert.commandFailedWithCode(st.s.adminCommand({
+        configureCollectionBalancing: coll1,
+        chunkSize: -1,
+    }),
+                                 ErrorCodes.InvalidOptions);
+}
+
 jsTest.log("Begin and end defragmentation with balancer off.");
 {
     st.stopBalancer();
