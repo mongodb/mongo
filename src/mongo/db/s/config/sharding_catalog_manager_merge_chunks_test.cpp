@@ -96,8 +96,8 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
             ->commitChunksMerge(
                 operationContext(), _nss1, collUuid, rangeToBeMerged, _shardId, validAfter));
 
-    auto collVersion = ChunkVersion::fromBSONArrayThrowing(versions["collectionVersion"]);
-    auto shardVersion = ChunkVersion::fromBSONArrayThrowing(versions["shardVersion"]);
+    auto collVersion = ChunkVersion::parseArrayPositionalFormat(versions["collectionVersion"]);
+    auto shardVersion = ChunkVersion::parseArrayPositionalFormat(versions["shardVersion"]);
 
     ASSERT_TRUE(origVersion.isOlderThan(shardVersion));
     ASSERT_EQ(collVersion, shardVersion);

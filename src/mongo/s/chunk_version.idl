@@ -41,7 +41,7 @@ types:
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
         serializer: ChunkVersion::serializeToBSON
-        deserializer: ChunkVersion::parsePositionalFormat
+        deserializer: ChunkVersion::parseArrayPositionalFormat
 
     # DO NOT add any new usages of this format, use ChunkVersion above instead
     #
@@ -49,8 +49,8 @@ types:
     # compatibility with certain on-disk documents and on-wire messages. It is written as:
     #   { 0: <major/minor>, 1: <epoch>, 2: <timestamp> } (note the array encoded as a BSON object)
     ChunkVersionArrayWronglyEncodedAsBSONObjFormat:
-        bson_serialization_type: object
+        bson_serialization_type: any
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
-        serializer: ChunkVersion::toArrayWronglyEncodedAsBSONObj
-        deserializer: ChunkVersion::parsePositionalFormat
+        serializer: ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON
+        deserializer: ChunkVersion::parseArrayOrObjectPositionalFormat

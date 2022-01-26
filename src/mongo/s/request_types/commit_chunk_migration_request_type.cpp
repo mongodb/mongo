@@ -126,7 +126,7 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
 
     try {
         auto fromShardVersion =
-            ChunkVersion::fromBSONArrayThrowing(obj[kFromShardCollectionVersion]);
+            ChunkVersion::parseArrayPositionalFormat(obj[kFromShardCollectionVersion]);
         request._collectionEpoch = fromShardVersion.epoch();
     } catch (const DBException& ex) {
         return ex.toStatus();

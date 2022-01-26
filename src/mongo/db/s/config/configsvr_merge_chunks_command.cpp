@@ -94,7 +94,7 @@ public:
                                                                       request().getChunkRange(),
                                                                       request().getShard(),
                                                                       request().getValidAfter()));
-            return ConfigSvrMergeResponse{ChunkVersion::parsePositionalFormat(
+            return ConfigSvrMergeResponse{ChunkVersion::parseArrayOrObjectPositionalFormat(
                 shardAndCollVers[ChunkVersion::kShardVersionField])};
         }
 

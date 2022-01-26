@@ -41,7 +41,7 @@ using unittest::assertGet;
 
 TEST(ChunkVersionParsing, ToFromBSONRoundtrip) {
     ChunkVersion version(1, 2, OID::gen(), Timestamp(42));
-    const auto roundTripVersion = ChunkVersion::fromBSONArrayThrowing([&] {
+    const auto roundTripVersion = ChunkVersion::parseArrayPositionalFormat([&] {
         BSONObjBuilder builder;
         version.serializeToBSON("testVersionField", &builder);
         return builder.obj();
@@ -64,7 +64,7 @@ TEST(ChunkVersionParsing, ToFromBSONLegacyRoundtrip) {
 }
 
 TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
-    ASSERT_THROWS_CODE(ChunkVersion::fromBSONArrayThrowing(
+    ASSERT_THROWS_CODE(ChunkVersion::parseArrayPositionalFormat(
                            BSON("testVersionField" << BSON_ARRAY(
                                     Timestamp(Seconds(2), 3) << OID::gen()))["testVersionField"]),
                        DBException,
@@ -74,7 +74,7 @@ TEST(ChunkVersionParsing, FromBSONMissingTimestamp) {
 TEST(ChunkVersionParsing, FromBSON) {
     const OID oid = OID::gen();
     const Timestamp timestamp(42);
-    ChunkVersion chunkVersionComplete = ChunkVersion::fromBSONArrayThrowing(
+    ChunkVersion chunkVersionComplete = ChunkVersion::parseArrayPositionalFormat(
         BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)
                                               << oid << timestamp))["testVersionField"]);
 
@@ -87,14 +87,14 @@ TEST(ChunkVersionParsing, FromBSON) {
 
 TEST(ChunkVersionParsing, FromBSONMissingEpoch) {
     ASSERT_THROWS_CODE(
-        ChunkVersion::fromBSONArrayThrowing(
+        ChunkVersion::parseArrayPositionalFormat(
             BSON("testVersionField" << BSON_ARRAY(Timestamp(Seconds(2), 3)))["testVersionField"]),
         DBException,
         ErrorCodes::TypeMismatch);
 }
 
 TEST(ChunkVersionParsing, FromBSONMissingMajorAndMinor) {
-    ASSERT_THROWS_CODE(ChunkVersion::fromBSONArrayThrowing(
+    ASSERT_THROWS_CODE(ChunkVersion::parseArrayPositionalFormat(
                            BSON("testVersionField" << OID::gen())["testVersionField"]),
                        DBException,
                        ErrorCodes::TypeMismatch);

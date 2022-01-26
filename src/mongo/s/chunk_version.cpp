@@ -37,8 +37,8 @@ namespace mongo {
 
 constexpr StringData ChunkVersion::kShardVersionField;
 
-ChunkVersion ChunkVersion::parsePositionalFormat(const BSONObj& obj) {
-    BSONObjIterator it(obj);
+ChunkVersion ChunkVersion::parseArrayOrObjectPositionalFormat(const BSONElement& element) {
+    BSONObjIterator it(element.Obj());
     uassert(ErrorCodes::BadValue, "Unexpected empty version array", it.more());
 
     // Expect the major and minor versions (must be present)
@@ -173,12 +173,16 @@ void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) co
     arr.append(_timestamp);
 }
 
-BSONObj ChunkVersion::toArrayWronglyEncodedAsBSONObj() const {
-    BSONArrayBuilder arr;
-    arr.appendTimestamp(_combined);
-    arr.append(_epoch);
-    arr.append(_timestamp);
-    return arr.obj();
+void ChunkVersion::serializeToPositionalFormatWronglyEncodedAsBSON(StringData field,
+                                                                   BSONObjBuilder* builder) const {
+    BSONObjBuilder subObjBuilder(builder->subobjStart(field));
+    subObjBuilder.appendElements([&] {
+        BSONArrayBuilder arr;
+        arr.appendTimestamp(_combined);
+        arr.append(_epoch);
+        arr.append(_timestamp);
+        return arr.obj();
+    }());
 }
 
 void ChunkVersion::appendLegacyWithField(BSONObjBuilder* out, StringData field) const {

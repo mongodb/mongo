@@ -71,15 +71,12 @@ public:
      * The latter format was introduced by mistake in 4.4 and is no longer generated from 5.3
      * onwards, but it is backwards compatible with the 5.2 and older binaries.
      */
-    static ChunkVersion parsePositionalFormat(const BSONObj& obj);
-    static ChunkVersion parsePositionalFormat(const BSONElement& element) {
-        return parsePositionalFormat(element.Obj());
-    }
-    static ChunkVersion fromBSONArrayThrowing(const BSONElement& element) {
+    static ChunkVersion parseArrayOrObjectPositionalFormat(const BSONElement& element);
+    static ChunkVersion parseArrayPositionalFormat(const BSONElement& element) {
         uassert(ErrorCodes::TypeMismatch,
                 "Invalid type for chunkVersion element. Expected an array",
                 element.type() == Array);
-        return parsePositionalFormat(element);
+        return parseArrayOrObjectPositionalFormat(element);
     }
 
     /**
@@ -215,7 +212,8 @@ public:
      *  { ..., <field>: [ <combined major/minor>, <OID epoch>, <Timestamp> ], ... }.
      */
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
-    BSONObj toArrayWronglyEncodedAsBSONObj() const;
+    void serializeToPositionalFormatWronglyEncodedAsBSON(StringData fieldName,
+                                                         BSONObjBuilder* builder) const;
 
     /**
      * NOTE: This format is being phased out. Use serializeToBSON instead.
