@@ -49,8 +49,7 @@ namespace {
 
 bool computeIsStandaloneOrPrimary(OperationContext* opCtx) {
     const auto replCoord{repl::ReplicationCoordinator::get(opCtx)};
-    return replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-        replCoord->getMemberState() == repl::MemberState::RS_PRIMARY;
+    return replCoord->canAcceptWritesForDatabase(opCtx, "admin");
 }
 
 }  // namespace
