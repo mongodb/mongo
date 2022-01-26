@@ -783,7 +783,10 @@ public:
                                 makeNot(makeFunction("isDate", var.clone())));
         };
 
-        if (arity == 2) {
+        if (arity == 0) {
+            // Return a zero constant if the expression has no operand children.
+            _context->pushExpr(makeConstant(sbe::value::TypeTags::NumberInt32, 0));
+        } else if (arity == 2) {
             auto rhs = _context->popExpr();
             auto lhs = _context->popExpr();
             auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
