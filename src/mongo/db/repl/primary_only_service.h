@@ -332,6 +332,14 @@ protected:
     std::vector<std::shared_ptr<Instance>> getAllInstances(OperationContext* opCtx);
 
 private:
+    enum class State {
+        kRunning,
+        kPaused,
+        kRebuilding,
+        kRebuildFailed,
+        kShutdown,
+    };
+
     /**
      * Represents a PrimaryOnlyService::Instance that has already been scheduled to be run.
      */
@@ -434,6 +442,17 @@ private:
      */
     StringData _getStateString(WithLock) const;
 
+    /**
+     *  Blocks until `_state` is not equal to `kRebuilding`. May release the mutex, but always
+     * acquires it before returning.
+     */
+    void _waitForStateNotRebuilding(OperationContext* opCtx, BasicLockableAdapter m);
+
+    /**
+     * Updates `_state` with `newState` and notifies waiters on `_stateChangeCV`.
+     */
+    void _setState(State newState, WithLock);
+
     ServiceContext* const _serviceContext;
 
     // All member variables are labeled with one of the following codes indicating the
@@ -445,8 +464,8 @@ private:
     // (W)  Synchronization required only for writes.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyService::_mutex");
 
-    // Condvar to receive notifications when _rebuildInstances has completed after stepUp.
-    stdx::condition_variable _rebuildCV;  // (S)
+    // Condvar to receive notifications when _state changes.
+    stdx::condition_variable _stateChangeCV;  // (S)
 
     // A ScopedTaskExecutor that is used to perform all work run on behalf of an Instance.
     // This ScopedTaskExecutor wraps _executor and is created at stepUp and destroyed at
@@ -467,14 +486,6 @@ private:
     // to _executor directly, they should only ever use _scopedExecutor so that they get the
     // guarantee that all outstanding tasks are interrupted at stepDown.
     std::shared_ptr<executor::TaskExecutor> _executor;  // (W)
-
-    enum class State {
-        kRunning,
-        kPaused,
-        kRebuilding,
-        kRebuildFailed,
-        kShutdown,
-    };
 
     State _state = State::kPaused;  // (M)
 
