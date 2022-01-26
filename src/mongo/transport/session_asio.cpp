@@ -287,8 +287,8 @@ const std::shared_ptr<SSLManagerInterface> TransportLayerASIO::ASIOSession::getS
     return _sslContext->manager;
 }
 
-// The unique_lock here is held by TransportLayerASIO to synchronize with the asyncConnect
-// timeout callback. It will be unlocked before the SSL actually handshake begins.
+// The unique_lock here is held by TransportLayerASIO to synchronize with the timeout callback for
+// both connect and asyncConnect. It will be unlocked before the SSL handshake actually begins.
 Future<void> TransportLayerASIO::ASIOSession::handshakeSSLForEgressWithLock(
     stdx::unique_lock<Latch> lk, const HostAndPort& target, const ReactorHandle& reactor) {
     if (!_sslContext->egress) {

@@ -602,31 +602,43 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(
         // The handshake is complete once either of the following passes the finish line:
         // - The thread running the handshake returns from `handshakeSSLForEgress`.
         // - The thread running `TimerService` cancels the handshake due to a timeout.
-        auto finishLine = std::make_shared<StrongWeakFinishLine>(2);
+        struct HandshakeState {
+            StrongWeakFinishLine finishLine{2};
+            Mutex mutex = MONGO_MAKE_LATCH("HandshakeState::mutex");
+        };
+        auto hs = std::make_shared<HandshakeState>();
 
         // Schedules a task to cancel the synchronous handshake if it does not complete before the
         // specified timeout.
         auto timer = _timerService->makeTimer();
+
 #ifndef _WIN32
         // TODO SERVER-62035: enable the following on Windows.
         if (timeout > Milliseconds(0)) {
-            timer->waitUntil(_timerService->now() + timeout)
-                .getAsync([finishLine, session](Status status) {
-                    if (status.isOK() && finishLine->arriveStrongly())
-                        session->end();
-                });
+            timer->waitUntil(_timerService->now() + timeout).getAsync([hs, session](Status status) {
+                if (status.isOK() && hs->finishLine.arriveStrongly()) {
+                    // Holding the `mutex` ensures the socket object inside the session is not moved
+                    // by `handshakeSSLForEgressWithLock` while the timer is ending the session.
+                    auto lk = stdx::lock_guard(hs->mutex);
+                    session->end();
+                }
+            });
         }
 #endif
 
         Date_t timeBefore = Date_t::now();
-        auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
+        stdx::unique_lock<Latch> lk(hs->mutex);
+        // The mutex is released before performing the blocking SSL handshake, so the timer can
+        // acquire the mutex and end the session even when the blocking handshake is in progress.
+        auto sslStatus =
+            session->handshakeSSLForEgressWithLock(std::move(lk), peer, nullptr).getNoThrow();
         Date_t timeAfter = Date_t::now();
 
         if (timeAfter - timeBefore > kSlowOperationThreshold) {
             networkCounter.incrementNumSlowSSLOperations();
         }
 
-        if (finishLine->arriveStrongly()) {
+        if (hs->finishLine.arriveStrongly()) {
             timer->cancel();
         } else if (!sslStatus.isOK()) {
             // We only take this path if the handshake times out. Overwrite the socket exception
