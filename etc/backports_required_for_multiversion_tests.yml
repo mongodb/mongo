@@ -124,6 +124,8 @@ last-continuous:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-58506
+      test_file: jstests/noPassthrough/getParameterWithDetails.js
     - ticket: SERVER-57766
       test_file: jstests/sharding/resharding_metrics.js
     - ticket: SERVER-61757
@@ -411,6 +413,8 @@ last-lts:
       test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
     - ticket: SERVER-60685
       test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    - ticket: SERVER-58506
+      test_file: jstests/noPassthrough/getParameterWithDetails.js
     - ticket: SERVER-57766
       test_file: jstests/sharding/resharding_metrics.js
     - ticket: SERVER-61757
