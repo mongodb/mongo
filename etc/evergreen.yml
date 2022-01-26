@@ -6944,6 +6944,116 @@ tasks:
             - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
                'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
+- name: csfle_push
+  tags: ["publish_csfle"]
+  patchable: false
+  stepback: false
+  depends_on:
+   - name: csfle_create_lib
+  commands:
+    - command: manifest.load
+    - func: "f_expansions_write"
+    - func: "git get project and add git tag"
+    - func: "set task expansion macros"
+    - func: "f_expansions_write"
+    - func: "kill processes"
+    - func: "cleanup environment"
+    - func: "set up venv"
+    - func: "upload pip requirements"
+    - func: "get buildnumber"
+    - func: "f_expansions_write"
+    - func: "generate compile expansions"
+    - func: "apply compile expansions"
+    - func: "f_expansions_write"
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: ${project}/mongo_csfle/${build_variant}/${revision}/mongo_csfle_v1-${version}.${ext|tgz}
+        bucket: mciuploads
+        local_file: src/mongo_csfle_v1.${ext|tgz}
+    - func: "generate compile expansions"
+    - func: "apply compile expansions"
+    - func: "set up remote credentials"
+      vars:
+        aws_key_remote: ${repo_aws_key}
+        aws_secret_remote: ${repo_aws_secret}
+    - func: "f_expansions_write"
+    - func: "set up notary client credentials"
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/notary_client_csfle_run.sh"
+    # Put the csfle tarball/zipfile
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
+    # Put the csfle tarball signature
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: ${content_type|application/gzip}
+        remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
+    # Put the csfle tarball sha1
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        aws_key: ${aws_key}
+        permissions: public-read
+        bucket: build-push-testing
+        content_type: text/plain
+        remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
+    # Put the csfle tarball sha256
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        permissions: public-read
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        content_type: text/plain
+        remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
+    # Put the csfle tarball md5
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        local_file: src/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        aws_key: ${aws_key}
+        bucket: build-push-testing
+        permissions: public-read
+        content_type: text/plain
+        remote_file: ${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
+    - command: s3Copy.copy
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        s3_copy_files:
+            #Binaries
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
+            #SHA1 for binaries
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
+            #SHA256 for binaries
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
+            #MD5 for binaries
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/mongo_csfle_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
+
 - <<: *task_template
   name: search
   tags: []
@@ -7658,6 +7768,7 @@ buildvariants:
     - ubuntu1804-build
   - name: build_variant_gen
   - name: .csfle
+  - name: .publish_csfle
 #  - name: .aggfuzzer .common # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7750,6 +7861,9 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - ubuntu1804-test
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -7879,6 +7993,7 @@ buildvariants:
     - ubuntu2004-large
   - name: build_variant_gen
   - name: .csfle
+  - name: .publish_csfle
 #  - name: .aggfuzzer .common !.multiversion # Disabled for FCV 5.3
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -7952,6 +8067,7 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -8311,6 +8427,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -8427,6 +8544,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -8543,6 +8661,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -9021,6 +9140,9 @@ buildvariants:
       - windows-vsCurrent-large
   - name: .concurrency .common
   - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel70-small
   - name: disk_wiredtiger
   - name: .jscore .common !.auth
   - name: json_schema
@@ -9254,6 +9376,9 @@ buildvariants:
     distros:
     - rhel70-small
   - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel70-small
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -10120,6 +10245,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
@@ -10207,8 +10333,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
-    distros:
-      - rhel80-xlarge
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10268,6 +10393,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10664,6 +10790,9 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel70-small
   - name: .publish
     distros:
     - rhel70-small
@@ -10749,6 +10878,9 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
+    distros:
+    - rhel70-small
   - name: .publish
     distros:
     - rhel70-small
@@ -10861,6 +10993,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -10961,6 +11094,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: .publish
     distros:
     - suse15-small
@@ -11065,6 +11199,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -11175,6 +11310,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .csfle
+  - name: .publish_csfle
   - name: test_packages
     distros:
     - ubuntu2004-package
