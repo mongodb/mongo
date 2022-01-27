@@ -448,7 +448,11 @@ public:
                     MoveAndMergeRequest moveRequest(std::move(*match));
                     _outstandingMigrations.erase(match);
 
-                    auto onSuccess = [&] {
+                    if (_aborted) {
+                        return;
+                    }
+
+                    if (migrationResponse.isOK()) {
                         auto transferredAmount = moveRequest.getMovedDataSizeBytes();
                         _shardInfos.at(moveRequest.getSourceShard()).currentSizeBytes -=
                             transferredAmount;
@@ -459,26 +463,53 @@ public:
                                 _shardInfos.at(rhs).currentSizeBytes;
                         });
                         _actionableMerges.push_back(std::move(moveRequest));
-                    };
-
-                    auto onRetriableError = [&moveRequest] {
-                        moveRequest.chunkToMove->busyInOperation = false;
-                        moveRequest.chunkToMergeWith->busyInOperation = false;
-                    };
-
-                    auto onNonRetriableError = [&]() {
-                        _abort(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
-                    };
-
-                    if (!_aborted) {
-                        handleActionResult(_nss,
-                                           _uuid,
-                                           getType(),
-                                           migrationResponse,
-                                           onSuccess,
-                                           onRetriableError,
-                                           onNonRetriableError);
+                        return;
                     }
+
+                    LOGV2_DEBUG(6290000,
+                                1,
+                                "Migration failed during collection defragmentation",
+                                "namespace"_attr = _nss,
+                                "uuid"_attr = _uuid,
+                                "currentPhase"_attr = getType(),
+                                "error"_attr = redact(migrationResponse));
+
+                    moveRequest.chunkToMove->busyInOperation = false;
+                    moveRequest.chunkToMergeWith->busyInOperation = false;
+
+                    if (isRetriableForDefragmentation(migrationResponse)) {
+                        // The migration will be eventually retried
+                        return;
+                    }
+
+                    const auto exceededTimeLimit = [&] {
+                        // All errors thrown by the migration destination shard are converted
+                        // into OperationFailed. Thus we need to inspect the error message to
+                        // match the real error code.
+
+                        // TODO SERVER-62990 introduce and propagate specific error code for
+                        // migration failed due to range deletion pending
+                        return migrationResponse == ErrorCodes::OperationFailed &&
+                            migrationResponse.reason().find(ErrorCodes::errorString(
+                                ErrorCodes::ExceededTimeLimit)) != std::string::npos;
+                    };
+
+                    if (exceededTimeLimit()) {
+                        // The migration failed because there is still a range deletion
+                        // pending on the recipient.
+                        moveRequest.chunkToMove->shardsToAvoid.emplace(
+                            moveRequest.getDestinationShard());
+                        return;
+                    }
+
+                    LOGV2_ERROR(6290001,
+                                "Encountered non-retriable error on migration during "
+                                "collection defragmentation",
+                                "namespace"_attr = _nss,
+                                "uuid"_attr = _uuid,
+                                "currentPhase"_attr = getType(),
+                                "error"_attr = redact(migrationResponse));
+                    _abort(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
                 },
                 [&](const MergeInfo& mergeAction) {
                     auto& mergeResponse = stdx::get<Status>(response);
@@ -575,6 +606,10 @@ private:
         const ShardId shard;
         long long estimatedSizeBytes;
         bool busyInOperation;
+        // Last time we failed to find a suitable destination shard due to temporary constraints
+        boost::optional<Date_t> lastFailedAttemptTime;
+        // Shards that still have a deletion pending for this range
+        stdx::unordered_set<ShardId> shardsToAvoid;
     };
 
     struct ShardInfo {
@@ -598,7 +633,12 @@ private:
 
     static bool compareChunkRangeInfoIterators(const ChunkRangeInfoIterator& lhs,
                                                const ChunkRangeInfoIterator& rhs) {
-        return lhs->estimatedSizeBytes < rhs->estimatedSizeBytes;
+        // Small chunks are ordered by decreasing order of estimatedSizeBytes
+        // except the ones that we failed to move due to temporary constraints that will be at the
+        // end of the list ordered by last attempt time
+        return lhs->lastFailedAttemptTime.value_or(Date_t::min()) <=
+            rhs->lastFailedAttemptTime.value_or(Date_t::min()) &&
+            lhs->estimatedSizeBytes < rhs->estimatedSizeBytes;
     }
 
     // Helper class to generate the Migration and Merge actions required to join together the chunks
@@ -711,7 +751,10 @@ private:
             if (!chunk.getEstimatedSizeBytes().has_value()) {
                 LOGV2_WARNING(
                     6172701,
-                    "Chunk with no estimated size detected while building MoveAndMergeChunksPhase");
+                    "Chunk with no estimated size detected while building MoveAndMergeChunksPhase",
+                    "namespace"_attr = _nss,
+                    "uuid"_attr = _uuid,
+                    "range"_attr = chunk.getRange());
                 _abort(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
                 return;
             }
@@ -805,15 +848,59 @@ private:
                 candidateIt = smallChunksInShard.erase(candidateIt);
                 continue;
             }
+
+            size_t siblingsDiscardedDueToRangeDeletion = 0;
+
             for (const auto& sibling : candidateSiblings) {
-                if (!sibling->busyInOperation && usedShards.count(sibling->shard) == 0) {
-                    smallChunkSiblings->push_back(sibling);
+                if (sibling->busyInOperation || usedShards.count(sibling->shard)) {
+                    continue;
                 }
+                if ((*candidateIt)->shardsToAvoid.count(sibling->shard)) {
+                    ++siblingsDiscardedDueToRangeDeletion;
+                    continue;
+                }
+                smallChunkSiblings->push_back(sibling);
             }
+
             if (!smallChunkSiblings->empty()) {
                 *nextSmallChunk = *candidateIt;
                 return true;
             }
+
+
+            if (siblingsDiscardedDueToRangeDeletion == candidateSiblings.size()) {
+                // All the siblings have been discarded because an overlapping range deletion is
+                // still pending on the destination shard.
+                if (!(*candidateIt)->lastFailedAttemptTime) {
+                    // This is the first time we discard this chunk due to overlapping range
+                    // deletions pending. Enqueue it back on the list so we will try to move it
+                    // again when we will have drained all the other chunks for this shard.
+                    LOGV2_DEBUG(6290002,
+                                1,
+                                "Postponing small chunk processing due to pending range deletion "
+                                "on recipient shard(s)",
+                                "namespace"_attr = _nss,
+                                "uuid"_attr = _uuid,
+                                "range"_attr = (*candidateIt)->range,
+                                "estimatedSizeBytes"_attr = (*candidateIt)->estimatedSizeBytes,
+                                "numCandidateSiblings"_attr = candidateSiblings.size());
+                    (*candidateIt)->lastFailedAttemptTime = Date_t::now();
+                    (*candidateIt)->shardsToAvoid.clear();
+                    smallChunksInShard.emplace_back(*candidateIt);
+                } else {
+                    LOGV2(6290003,
+                          "Discarding small chunk due to pending range deletion on recipient shard",
+                          "namespace"_attr = _nss,
+                          "uuid"_attr = _uuid,
+                          "range"_attr = (*candidateIt)->range,
+                          "estimatedSizeBytes"_attr = (*candidateIt)->estimatedSizeBytes,
+                          "numCandidateSiblings"_attr = candidateSiblings.size(),
+                          "lastFailedAttempt"_attr = (*candidateIt)->lastFailedAttemptTime);
+                }
+                candidateIt = smallChunksInShard.erase(candidateIt);
+                continue;
+            }
+
             ++candidateIt;
         }
         // No candidate could be found - clear the shard entry if needed
