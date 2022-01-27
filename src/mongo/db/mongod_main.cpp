@@ -1385,7 +1385,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
     if (auto sep = serviceContext->getServiceEntryPoint()) {
         LOGV2_OPTIONS(4784923, {LogComponent::kCommand}, "Shutting down the ServiceEntryPoint");
-        if (!sep->shutdown(Seconds(30))) {
+        if (!sep->shutdown(Seconds(10))) {
             LOGV2_OPTIONS(20563,
                           {LogComponent::kNetwork},
                           "Service entry point did not shutdown within the time limit");
