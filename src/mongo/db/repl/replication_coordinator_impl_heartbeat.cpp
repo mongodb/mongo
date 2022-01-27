@@ -238,7 +238,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             // the new commit point we learned of is on the same branch of history as our own
             // oplog.
             if (_getMemberState_inlock().arbiter() ||
-                (!_getMemberState_inlock().startup() && !_getMemberState_inlock().startup2())) {
+                (!_getMemberState_inlock().startup() && !_getMemberState_inlock().startup2() &&
+                 !_getMemberState_inlock().rollback())) {
                 // The node that sent the heartbeat is not guaranteed to be our sync source.
                 const bool fromSyncSource = false;
                 _advanceCommitPoint(
