@@ -643,7 +643,7 @@ def main():
 # of writing there aren't any, and in any case a partial core dump is better
 # than none because of an ENOSPC.
 def avoid_asan_dump(pid):
-    with open(f"/proc/{pid}/coredump_filter", "w+") as f:
+    with open("/proc/%d/coredump_filter" % pid, "w+") as f:
         mask = int(f.read(), 16)
         mask &= 0xfffffffe
         f.write(str(hex(mask)))

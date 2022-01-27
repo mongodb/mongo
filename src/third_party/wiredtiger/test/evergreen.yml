@@ -3965,7 +3965,7 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
-    python_binary: 'python'
+    python_binary: '/cygdrive/c/Python39/python'
     test_env_vars:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
