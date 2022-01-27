@@ -145,7 +145,11 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
         builder.appendElementsUnique(topLevelDoc);
         auto operation = builder.obj();
 
-        operations->emplace_back(operation);
+        OplogEntry oplogEntry{operation};
+        if (oplogEntry.getNeedsRetryImage()) {
+            oplogEntry.setTimestampForRetryImage(applyOpsOplogEntry.getTimestamp());
+        }
+        operations->emplace_back(std::move(oplogEntry));
     }
 }
 
