@@ -13,6 +13,7 @@ const testDB = conn.getDB("admin");
 const expectedParamDefaults = {
     internalQueryPlanEvaluationWorks: 10000,
     internalQueryPlanEvaluationCollFraction: 0.3,
+    internalQueryPlanEvaluationCollFractionSbe: 0.0,
     internalQueryPlanEvaluationMaxResults: 101,
     internalQueryCacheMaxEntriesPerCollection: 5000,
     // This is a deprecated alias for "internalQueryCacheMaxEntriesPerCollection".
@@ -89,11 +90,14 @@ assertSetParameterSucceeds("internalQueryPlanEvaluationWorks", 11);
 assertSetParameterFails("internalQueryPlanEvaluationWorks", 0);
 assertSetParameterFails("internalQueryPlanEvaluationWorks", -1);
 
-assertSetParameterSucceeds("internalQueryPlanEvaluationCollFraction", 0.0);
-assertSetParameterSucceeds("internalQueryPlanEvaluationCollFraction", 0.444);
-assertSetParameterSucceeds("internalQueryPlanEvaluationCollFraction", 1.0);
-assertSetParameterFails("internalQueryPlanEvaluationCollFraction", -0.1);
-assertSetParameterFails("internalQueryPlanEvaluationCollFraction", 1.0001);
+for (let paramName of ["internalQueryPlanEvaluationCollFraction",
+                       "internalQueryPlanEvaluationCollFractionSbe"]) {
+    assertSetParameterSucceeds(paramName, 0.0);
+    assertSetParameterSucceeds(paramName, 0.444);
+    assertSetParameterSucceeds(paramName, 1.0);
+    assertSetParameterFails(paramName, -0.1);
+    assertSetParameterFails(paramName, 1.0001);
+}
 
 assertSetParameterSucceeds("internalQueryPlanEvaluationMaxResults", 11);
 assertSetParameterSucceeds("internalQueryPlanEvaluationMaxResults", 0);
