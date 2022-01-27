@@ -23,10 +23,6 @@ assert.eq(coll.aggregate(pipeline).toArray(), [{all: [1, 2, [3], 4]}]);
 pipeline = [{$project: {_id: 0, all: {$concatArrays: ['$a']}}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{all: [1, 2]}]);
 
-// Concatenation with no arguments.
-pipeline = [{$project: {_id: 0, all: {$concatArrays: []}}}];
-assert.eq(coll.aggregate(pipeline).toArray(), [{all: []}]);
-
 // Any nullish inputs will result in null.
 pipeline = [{$project: {_id: 0, all: {$concatArrays: ['$a', '$e']}}}];
 assert.eq(coll.aggregate(pipeline).toArray(), [{all: null}]);
