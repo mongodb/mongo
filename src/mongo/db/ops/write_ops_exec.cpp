@@ -248,7 +248,8 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault"); fp &&
                 fp->shouldFail() &&
                 feature_flags::gClusteredIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility) &&
+                !clustered_util::requiresLegacyFormat(ns)) {
                 defaultCollectionOptions.clusteredIndex =
                     clustered_util::makeDefaultClusteredIdIndex();
             }

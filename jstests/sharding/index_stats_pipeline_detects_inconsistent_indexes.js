@@ -1,6 +1,9 @@
 /**
  * Test to demonstrate usage of $indexStats in an aggregation pipeline to detect inconsistent
  * indexes in a sharded cluster.
+ * @tags: [
+ *   expects_explicit_underscore_id_index,
+ * ]
  */
 
 (function() {

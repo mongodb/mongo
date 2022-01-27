@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   expects_explicit_underscore_id_index,
+ * ]
+ */
 (function() {
 
 var s = new ShardingTest({name: "stats", shards: 2, mongos: 1});

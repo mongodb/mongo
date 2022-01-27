@@ -5075,7 +5075,16 @@ tasks:
 
 - <<: *gen_task_template
   name: clustered_collection_passthrough_gen
-  tags: ["large"]
+  tags: ["large", "clustered_collections"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
+  name: sharding_clustered_collections_gen
+  tags: ["large", "clustered_collections"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -7468,7 +7477,7 @@ buildvariants:
   - name: .auth !.audit !.multiversion
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
-  - name: clustered_collection_passthrough_gen
+  - name: .clustered_collections
   - name: .misc_js
   - name: disk_wiredtiger
   - name: free_monitoring
@@ -9680,7 +9689,7 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: clustered_collection_passthrough_gen
+  - name: .clustered_collections
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:

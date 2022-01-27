@@ -8,7 +8,7 @@ const kRotationInterval = 30;
 let st = new ShardingTest({
     mongos: 1,
     shards: {rs0: {nodes: 2}},
-    other: {configOptions: {setParameter: "KeysRotationIntervalSec=30"}}
+    other: {configOptions: {setParameter: {"KeysRotationIntervalSec": 30}}}
 });
 
 let keys = st.s.getDB("admin").system.keys.find();

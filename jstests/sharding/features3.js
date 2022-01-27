@@ -5,6 +5,9 @@
 //   - Inserts 10k documents and ensures they're evenly distributed
 //   - Verifies a $where query can be killed on multiple DBs
 //   - Tests fsync and fsync+lock permissions on sharded db
+// @tags: [
+//   expects_explicit_underscore_id_index,
+// ]
 (function() {
 'use strict';
 

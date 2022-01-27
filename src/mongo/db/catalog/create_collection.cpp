@@ -482,10 +482,16 @@ Status _createCollection(OperationContext* opCtx,
                           "'expireAfterSeconds' requires clustering to be enabled");
         }
 
-        if (!collectionOptions.clusteredIndex && (!idIndex || idIndex->isEmpty()) &&
-            // Capped, clustered collections different in behavior significantly from normal capped
-            // collections. Notably, they allow out-of-order insertion.
-            !collectionOptions.capped && clusterAllCollectionsByDefault.shouldFail()) {
+        if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
+            !collectionOptions.clusteredIndex.is_initialized() &&
+            (!idIndex || idIndex->isEmpty()) && !collectionOptions.capped &&
+            !clustered_util::requiresLegacyFormat(nss) &&
+            feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility)) {
+            // Capped, clustered collections different in behavior significantly from normal
+            // capped collections. Notably, they allow out-of-order insertion.
+            //
+            // Additionally, don't set the collection to be clustered in the default format if it
+            // requires legacy format.
             collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
         }
 

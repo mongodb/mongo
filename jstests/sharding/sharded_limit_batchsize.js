@@ -80,7 +80,7 @@ function testSingleBatch(coll, numShards) {
 //
 
 var st =
-    new ShardingTest({shards: 2, other: {shardOptions: {setParameter: "enableTestCommands=1"}}});
+    new ShardingTest({shards: 2, other: {shardOptions: {setParameter: {"enableTestCommands": 1}}}});
 
 var db = st.s.getDB("test");
 var shardedCol = db.getCollection("sharded_limit_batchsize");

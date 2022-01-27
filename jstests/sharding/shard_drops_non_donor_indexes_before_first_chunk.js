@@ -1,6 +1,9 @@
 /**
  * Verify that a recipient shard drops indexes that do not exist on the donor shard before
  * receiving its first chunk.
+ * @tags: [
+ *   expects_explicit_underscore_id_index,
+ * ]
  */
 (function() {
 "use strict";

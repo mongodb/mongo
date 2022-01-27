@@ -2,6 +2,7 @@
 // use the collection's default collation once it gets to the shards.
 //
 // @tags: [
+//   expects_explicit_underscore_id_index,
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]

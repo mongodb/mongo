@@ -1,0 +1,40 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/sharding/*.js
+  - jstests/sharding/change_streams/*.js
+  - jstests/sharding/query/*.js
+  - jstests/sharding/load_balancer_support/*.js
+  - jstests/sharding/health_monitor/*.js
+  exclude_files:
+  # TODO (SERVER-62616): Investigate compatibility with resharding.
+  - jstests/sharding/*reshard*.js
+  # TODO (SERVER-62616): Calls reshardCollection.
+  - jstests/sharding/balancer_defragmentation_merge_chunks.js
+  # TODO (SERVER-60824): Support non-blocking sort() to prevent 'Sort exceeded memory limit'.
+  - jstests/sharding/shard6.js
+  # Expects hint(_id) to yield an index scan instead of a table scan.
+  - jstests/sharding/shard2.js
+  # TODO (SERVER-62811): Establish intended behavior.
+  - jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
+  # TODO (SERVER-62874): Investigate the following test failures.
+  - jstests/sharding/transactions_reject_writes_for_moved_chunks.js
+  - jstests/sharding/internal_sessions_partial_index.js
+  - jstests/sharding/change_stream_chunk_migration.js
+  - jstests/sharding/change_stream_show_migration_events.js
+  - jstests/sharding/move_primary_with_writes.js
+  exclude_with_any_tags:
+  - expects_explicit_underscore_id_index
+
+executor:
+  config:
+    shell_options:
+      nodb: ''
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagClusteredIndexes: true
+            enableTestCommands: 1
+            internalQueryForceClassicEngine: 1
+            failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"

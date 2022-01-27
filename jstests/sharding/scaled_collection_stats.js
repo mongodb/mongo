@@ -1,5 +1,8 @@
 /**
  * Verifies that scaling is applied after summing the statistics together from individual shards.
+ * @tags: [
+ *   expects_explicit_underscore_id_index,
+ * ]
  */
 (function() {
 "use strict";
