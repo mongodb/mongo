@@ -39,9 +39,12 @@ namespace trial_period {
 /**
  * Returns the number of times that we are willing to work a plan during a trial period.
  *
- * Calculated based on a fixed query knob and the size of the collection.
+ * Calculated based on a fixed query knob and the size of the collection multiplied by
+ * 'collFraction'.
  */
-size_t getTrialPeriodMaxWorks(OperationContext* opCtx, const CollectionPtr& collection);
+size_t getTrialPeriodMaxWorks(OperationContext* opCtx,
+                              const CollectionPtr& collection,
+                              double collFraction);
 
 /**
  * Returns the max number of documents which we should allow any plan to return during the

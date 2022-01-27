@@ -48,11 +48,25 @@ server_parameters:
       gt: 0
 
   internalQueryPlanEvaluationCollFraction:
-    description: "For large collections, the number times we work() candidate plans is taken as this fraction of the collection size."
+    description: "For large collections, the ceiling for the number times we work() candidate plans
+    is taken as this fraction of the collection size. Applies only to the classic execution engine."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryPlanEvaluationCollFraction"
     cpp_vartype: AtomicDouble
     default: 0.3
+    validator:
+      gte: 0.0
+      lte: 1.0
+
+  internalQueryPlanEvaluationCollFractionSbe:
+    description: "For large collections, the ceiling for the number of individual storage cursor
+    reads allowed during the multi-planning trial period is calculated based on this constant.
+    Applies only for for queries using the SBE execution engine. This is the analog of the
+    'internalQueryPlanEvaluationCollFraction' knob above but for SBE."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanEvaluationCollFractionSbe"
+    cpp_vartype: AtomicDouble
+    default: 0.0
     validator:
       gte: 0.0
       lte: 1.0

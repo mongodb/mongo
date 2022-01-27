@@ -214,7 +214,7 @@ public:
         // We get the number of works done during the trial period in order to make sure that there
         // are more documents in the collection than works done in the trial period. This ensures
         // neither of the plans reach EOF or produce results.
-        size_t numWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), nullptr);
+        size_t numWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), nullptr, 0);
         size_t smallNumber = 10;
         // The following condition must be met in order for the following test to work. Specifically
         // this condition guarantees that the score of the plan using the index on d will score
