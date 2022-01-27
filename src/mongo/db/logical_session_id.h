@@ -79,7 +79,8 @@ inline bool operator!=(const LogicalSessionRecord& lhs, const LogicalSessionReco
 LogicalSessionId makeLogicalSessionIdForTest();
 
 LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUIDForTest(
-    boost::optional<LogicalSessionId> parentLsid = boost::none);
+    boost::optional<LogicalSessionId> parentLsid = boost::none,
+    boost::optional<TxnNumber> parentTxnNumber = boost::none);
 
 LogicalSessionId makeLogicalSessionIdWithTxnUUIDForTest(
     boost::optional<LogicalSessionId> parentLsid = boost::none);

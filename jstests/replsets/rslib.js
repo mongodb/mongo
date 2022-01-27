@@ -23,6 +23,8 @@ var waitForNewlyAddedRemovalForNodeToBeCommitted;
 var assertVoteCount;
 var disconnectSecondaries;
 var reconnectSecondaries;
+var createRstArgs;
+var createRst;
 
 (function() {
 "use strict";
@@ -833,6 +835,41 @@ reconnectSecondaries = function(rst) {
             if (node2 !== node) {
                 node2.reconnect(node);
             }
+        }
+    }
+};
+
+createRstArgs = function(rst) {
+    const rstArgs = {
+        name: rst.name,
+        nodeHosts: rst.nodes.map(node => `127.0.0.1:${node.port}`),
+        nodeOptions: rst.nodeOptions,
+        keyFile: rst.keyFile,
+        host: rst.host,
+        waitForKeys: false,
+    };
+    return rstArgs;
+};
+
+/**
+ * Returns a new ReplSetTest created based on the given 'rstArgs'. If 'retryOnRetryableErrors'
+ * is true, retries on retryable errors (e.g. errors caused by shutdown).
+ */
+createRst = function(rstArgs, retryOnRetryableErrors) {
+    const kCreateRstRetryIntervalMS = 100;
+
+    while (true) {
+        try {
+            return new ReplSetTest({rstArgs: rstArgs});
+        } catch (e) {
+            if (retryOnRetryableErrors && isNetworkError(e)) {
+                jsTest.log(`Failed to create ReplSetTest for ${
+                    rstArgs.name} inside tenant migration thread: ${tojson(e)}. Retrying in ${
+                    kCreateRstRetryIntervalMS}ms.`);
+                sleep(kCreateRstRetryIntervalMS);
+                continue;
+            }
+            throw e;
         }
     }
 };

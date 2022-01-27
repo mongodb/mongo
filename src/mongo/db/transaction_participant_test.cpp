@@ -4743,14 +4743,12 @@ TEST_F(ShardTxnParticipantTest, CannotContinueTransactionUsingTxnRetryCounterLes
     ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 1);
 }
 
-TEST_F(ShardTxnParticipantTest, CannotRetryInProgressTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest,
+       CannotRetryInProgressTransactionForRetryableWrite_OriginalTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
-
-    txnParticipant.unstashTransactionResources(opCtx(), "insert");
-    txnParticipant.stashTransactionResources(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber(), 0},
@@ -4758,17 +4756,78 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressTransactionForRetryableWrit
                                                       true /* startTransaction */),
                        AssertionException,
                        50911);
+
     ASSERT_TRUE(txnParticipant.transactionIsInProgress());
 }
 
-TEST_F(ShardTxnParticipantTest, CannotRetryPreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest,
+       CannotRetryInProgressTransactionForRetryableWrite_ConflictingTransactionForRetryableWrite) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    const auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    OperationContextSession::checkIn(opCtx());
+
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(
+            makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+}
+
+TEST_F(ShardTxnParticipantTest,
+       CannotRetryInProgressTransactionForRetryableWrite_ConflictingRetryableWrite) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    const auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+    OperationContextSession::checkIn(opCtx());
+
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(parentLsid);
+        newOpCtx->setTxnNumber(parentTxnNumber);
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
+                                                          {parentTxnNumber},
+                                                          boost::none /* autocommit */,
+                                                          boost::none /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+}
+
+TEST_F(ShardTxnParticipantTest,
+       CannotRetryPreparedTransactionForRetryableWrite_OriginalTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsInProgress());
-    txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
     txnParticipant.prepareTransaction(opCtx(), {});
-    ASSERT_TRUE(txnParticipant.transactionIsPrepared());
+    ASSERT(txnParticipant.transactionIsPrepared());
+    txnParticipant.stashTransactionResources(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber(), 0},
@@ -4779,7 +4838,73 @@ TEST_F(ShardTxnParticipantTest, CannotRetryPreparedTransactionForRetryableWrites
     ASSERT(txnParticipant.transactionIsPrepared());
 }
 
-TEST_F(ShardTxnParticipantTest, CanRetryCommittedUnpreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest,
+       CannotRetryPreparedTransactionForRetryableWrite_ConflictingTransactionForRetryableWrite) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    const auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsInProgress());
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant.prepareTransaction(opCtx(), {});
+    ASSERT(txnParticipant.transactionIsPrepared());
+    txnParticipant.stashTransactionResources(opCtx());
+    OperationContextSession::checkIn(opCtx());
+
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(
+            makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+        newOpCtx->setTxnNumber(0);
+        newOpCtx->setInMultiDocumentTransaction();
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                               newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    ASSERT(txnParticipant.transactionIsPrepared());
+}
+
+TEST_F(ShardTxnParticipantTest,
+       CannotRetryPreparedTransactionForRetryableWrite_ConflictingRetryableWrite) {
+    const auto parentLsid = makeLogicalSessionIdForTest();
+    const auto parentTxnNumber = *opCtx()->getTxnNumber();
+
+    opCtx()->setLogicalSessionId(
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber));
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsInProgress());
+    txnParticipant.unstashTransactionResources(opCtx(), "prepareTransaction");
+    txnParticipant.prepareTransaction(opCtx(), {});
+    ASSERT(txnParticipant.transactionIsPrepared());
+    txnParticipant.stashTransactionResources(opCtx());
+    OperationContextSession::checkIn(opCtx());
+
+    runFunctionFromDifferentOpCtx([parentLsid, parentTxnNumber](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(parentLsid);
+        newOpCtx->setTxnNumber(parentTxnNumber);
+
+        MongoDOperationContextSession ocs(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+        ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
+                                                          {parentTxnNumber},
+                                                          boost::none /* autocommit */,
+                                                          boost::none /* startTransaction */),
+                           AssertionException,
+                           ErrorCodes::RetryableTransactionInProgress);
+    });
+
+    ASSERT(txnParticipant.transactionIsPrepared());
+}
+
+TEST_F(ShardTxnParticipantTest, CanRetryCommittedUnpreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4795,7 +4920,7 @@ TEST_F(ShardTxnParticipantTest, CanRetryCommittedUnpreparedTransactionForRetryab
     ASSERT(txnParticipant.transactionIsCommitted());
 }
 
-TEST_F(ShardTxnParticipantTest, CanRetryCommittedPreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest, CanRetryCommittedPreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4813,7 +4938,7 @@ TEST_F(ShardTxnParticipantTest, CanRetryCommittedPreparedTransactionForRetryable
     ASSERT(txnParticipant.transactionIsCommitted());
 }
 
-TEST_F(ShardTxnParticipantTest, AbortingCommittedUnpreparedTransactionForRetryableWritesIsNoop) {
+TEST_F(ShardTxnParticipantTest, AbortingCommittedUnpreparedTransactionForRetryableWriteIsNoop) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4826,7 +4951,7 @@ TEST_F(ShardTxnParticipantTest, AbortingCommittedUnpreparedTransactionForRetryab
     ASSERT(txnParticipant.transactionIsCommitted());
 }
 
-TEST_F(ShardTxnParticipantTest, AbortingCommittedPreparedTransactionForRetryableWritesIsNoop) {
+TEST_F(ShardTxnParticipantTest, AbortingCommittedPreparedTransactionForRetryableWriteIsNoop) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4842,7 +4967,7 @@ TEST_F(ShardTxnParticipantTest, AbortingCommittedPreparedTransactionForRetryable
 }
 
 TEST_F(ShardTxnParticipantTest,
-       CannotAddOperationToCommittedUnpreparedTransactionForRetryableWrites) {
+       CannotAddOperationToCommittedUnpreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4860,8 +4985,7 @@ TEST_F(ShardTxnParticipantTest,
     ASSERT(txnParticipant.getTransactionOperationsForTest().empty());
 }
 
-TEST_F(ShardTxnParticipantTest,
-       CannotAddOperationToCommittedPreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest, CannotAddOperationToCommittedPreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4881,8 +5005,7 @@ TEST_F(ShardTxnParticipantTest,
     ASSERT(txnParticipant.getTransactionOperationsForTest().empty());
 }
 
-TEST_F(ShardTxnParticipantTest,
-       CannotAddOperationToAbortedUnpreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest, CannotAddOperationToAbortedUnpreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4898,7 +5021,7 @@ TEST_F(ShardTxnParticipantTest,
     ASSERT(txnParticipant.getTransactionOperationsForTest().empty());
 }
 
-TEST_F(ShardTxnParticipantTest, CannotAddOperationToAbortedPreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest, CannotAddOperationToAbortedPreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
@@ -4914,7 +5037,7 @@ TEST_F(ShardTxnParticipantTest, CannotAddOperationToAbortedPreparedTransactionFo
     ASSERT(txnParticipant.getTransactionOperationsForTest().empty());
 }
 
-TEST_F(ShardTxnParticipantTest, CannotAddOperationToPreparedTransactionForRetryableWrites) {
+TEST_F(ShardTxnParticipantTest, CannotAddOperationToPreparedTransactionForRetryableWrite) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());

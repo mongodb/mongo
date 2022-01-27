@@ -2,8 +2,9 @@
  * Utilities for testing tenant migrations.
  */
 var TenantMigrationUtil = (function() {
+    load("jstests/replsets/rslib.js");
+
     const kExternalKeysNs = "config.external_validation_keys";
-    const kCreateRstRetryIntervalMS = 100;
 
     /**
      * Returns true if feature flag 'featureFlagShardMerge' is enabled, false otherwise.
@@ -225,39 +226,6 @@ var TenantMigrationUtil = (function() {
         return res;
     }
 
-    function createRstArgs(rst) {
-        const rstArgs = {
-            name: rst.name,
-            nodeHosts: rst.nodes.map(node => `127.0.0.1:${node.port}`),
-            nodeOptions: rst.nodeOptions,
-            keyFile: rst.keyFile,
-            host: rst.host,
-            waitForKeys: false,
-        };
-        return rstArgs;
-    }
-
-    /**
-     * Returns a new ReplSetTest created based on the given 'rstArgs'. If 'retryOnRetryableErrors'
-     * is true, retries on retryable errors (e.g. errors caused by shutdown).
-     */
-    function createRst(rstArgs, retryOnRetryableErrors) {
-        while (true) {
-            try {
-                return new ReplSetTest({rstArgs: rstArgs});
-            } catch (e) {
-                if (retryOnRetryableErrors && isNetworkError(e)) {
-                    jsTest.log(`Failed to create ReplSetTest for ${
-                        rstArgs.name} inside tenant migration thread: ${tojson(e)}. Retrying in ${
-                        kCreateRstRetryIntervalMS}ms.`);
-                    sleep(kCreateRstRetryIntervalMS);
-                    continue;
-                }
-                throw e;
-            }
-        }
-    }
-
     /**
      * Returns the TenantMigrationAccessBlocker serverStatus output for the migration or shard merge
      * for the given node.
@@ -424,8 +392,8 @@ var TenantMigrationUtil = (function() {
                 if (!checkIfRetriableErrorForTenantDbHashCheck(e)) {
                     throw e;
                 } else {
-                    print(`Got error: ${tojson(e)}. Failover occurred during tenant dbhash check, retrying 
-                        tenant dbhash check.`);
+                    print(`Got error: ${tojson(e)}. Failover occurred during tenant dbhash check,` +
+                          ` retrying tenant dbhash check.`);
                 }
             }
         }

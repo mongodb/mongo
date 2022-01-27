@@ -162,6 +162,11 @@ class TransactionParticipant {
         // fulfilled and the optional is reset when the participant transitions out of prepare.
         boost::optional<SharedPromise<void>> _exitPreparePromise;
 
+        // An optional promise that is non-none while the participant is in progress or in prepare.
+        // The promise is fulfilled and the optional is reset when the participant commits or
+        // aborts.
+        boost::optional<SharedPromise<void>> _completionPromise;
+
     private:
         static bool _isLegalTransition(StateFlag oldState, StateFlag newState);
 
@@ -499,6 +504,33 @@ public:
          * deadlock.
          */
         SharedSemiFuture<void> onExitPrepare() const;
+
+        /**
+         * If the participant is in progress or in prepare, returns a future whose promise is
+         * fulfilled when the participant commits or aborts.
+         *
+         * If the participant is not in progress or in prepare, returns an immediately ready future.
+         *
+         * The caller should not wait on the future with the session checked out, since that
+         * will prevent the promise from being able to be fulfilled, i.e., will cause a
+         * deadlock.
+         */
+        SharedSemiFuture<void> onCompletion() const;
+
+        /**
+         * If there is an open retryable internal transaction (i.e. one that is in progress or
+         * prepare) on any internal session associated with this session, returns a future whose
+         * promise is fulfilled when the transaction commits or aborts. See the header comment for
+         * RetryableWriteTransactionParticipantCatalog for the definition of such sessions.
+         *
+         * If there is none, returns an immediately ready future.
+         *
+         * The caller should not wait on the future with the session checked out, since that
+         * will prevent the promise from being able to be fulfilled, i.e., will cause a
+         * deadlock.
+         */
+        SharedSemiFuture<void> onConflictingInternalTransactionCompletion(
+            OperationContext* opCtx) const;
 
         /**
          * Transfers management of transaction resources from the currently checked-out
@@ -854,8 +886,10 @@ public:
         void _setNewTxnNumberAndRetryCounter(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
-        // Asserts that there is no open retryable internal transaction (i.e. not committed or
-        // aborted) apart from the one being run by the given 'opCtx', if any.
+        // Asserts that there is no open retryable internal transaction (i.e. one that is in
+        // progress or in prepare) on any internal session associated with this session. See the
+        // header comment for RetryableWriteTransactionParticipantCatalog for the definition of
+        // such sessions.
         void _uassertNoConflictingInternalTransactionForRetryableWrite(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 

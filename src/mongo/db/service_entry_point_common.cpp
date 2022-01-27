@@ -118,6 +118,7 @@ MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
+MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeInRunCommand);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
@@ -850,6 +851,20 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     _sessionTxnState = std::make_unique<MongoDOperationContextSession>(opCtx);
     _txnParticipant.emplace(TransactionParticipant::get(opCtx));
 
+    // Used for waiting for an in-progress transaction to transition out of the conflicting state.
+    auto waitForInProgressTxn = [](OperationContext* opCtx, auto& stateTransitionFuture) {
+        // Check the session back in and wait for the conflict to resolve.
+        MongoDOperationContextSession::checkIn(opCtx);
+        stateTransitionFuture.wait(opCtx);
+        // Wait for any commit or abort oplog entry to be visible in the oplog. This will prevent a
+        // new transaction from missing the transaction table update for the previous commit or
+        // abort due to an oplog hole.
+        auto storageInterface = repl::StorageInterface::get(opCtx);
+        storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+        // Check out the session again.
+        MongoDOperationContextSession::checkOut(opCtx);
+    };
+
     auto apiParamsFromClient = APIParameters::get(opCtx);
     auto apiParamsFromTxn = _txnParticipant->getAPIParameters(opCtx);
     uassert(
@@ -873,22 +888,22 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
                     sessionOptions.getStartTransaction());
                 beganOrContinuedTxn = true;
             } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
-                auto prepareCompleted = _txnParticipant->onExitPrepare();
+                auto prevTxnExitedPrepare = _txnParticipant->onExitPrepare();
 
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterNewStatementBlocksBehindPrepare,
                     opCtx,
                     "waitAfterNewStatementBlocksBehindPrepare");
 
-                // Check the session back in and wait for ongoing prepared transaction to complete.
-                MongoDOperationContextSession::checkIn(opCtx);
-                prepareCompleted.wait(opCtx);
-                // Wait for the prepared commit or abort oplog entry to be visible in the oplog.
-                // This will prevent a new transaction from missing the transaction table update for
-                // the previous prepared commit or abort due to an oplog hole.
-                auto storageInterface = repl::StorageInterface::get(opCtx);
-                storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
-                MongoDOperationContextSession::checkOut(opCtx);
+                waitForInProgressTxn(opCtx, prevTxnExitedPrepare);
+            } catch (const ExceptionFor<ErrorCodes::RetryableTransactionInProgress>&) {
+                auto conflictingTxnCommittedOrAborted =
+                    _txnParticipant->onConflictingInternalTransactionCompletion(opCtx);
+
+                waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite
+                    .pauseWhileSet();
+
+                waitForInProgressTxn(opCtx, conflictingTxnCommittedOrAborted);
             }
         }
 
