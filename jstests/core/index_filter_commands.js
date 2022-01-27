@@ -35,6 +35,7 @@
 
 (function() {
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 load("jstests/libs/sbe_explain_helpers.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
@@ -160,8 +161,14 @@ var explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
 
 const winningPlan = getWinningPlan(explain.queryPlanner);
-engineSpecificAssertion(
-    isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
+const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
+if (collectionIsClustered) {
+    assert(isCollscan(db, getWinningPlan(explain.queryPlanner)),
+           "Expected collscan: " + tojson(explain));
+} else {
+    engineSpecificAssertion(
+        isIdhack(db, winningPlan), isIdIndexScan(db, winningPlan, "FETCH"), db, winningPlan);
+}
 // Clear filters
 // Clearing filters on a missing collection should be a no-op.
 assert.commandWorked(missingCollection.runCommand('planCacheClearFilters'));

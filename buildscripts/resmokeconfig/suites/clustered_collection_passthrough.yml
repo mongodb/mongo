@@ -60,15 +60,9 @@ selector:
   - jstests/core/uniqueness.js
   # Expects to see the usage of _id_ index by using $indexStats.
   - jstests/core/index_stats.js
-  # TODO (SERVER-62826): Investigate the following failures
-  - jstests/core/profile_update.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/profile_delete.js
-  - jstests/core/orf.js
-  - jstests/core/index_filter_commands.js
+  # TODO (SERVER-62707): bound collscans with regexes.
   - jstests/core/index_bounds_pipe.js
-  - jstests/core/index_many2.js
-  - jstests/core/profile_insert.js
+  # Expects an index on _id to cover the query.
   - jstests/core/covered_index_simple_id.js
   # TODO (SERVER-61259): $text not supported: "No query solutions"
   - jstests/core/fts6.js

@@ -7,6 +7,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
+
 const t = db.jstests_orf;
 t.drop();
 
@@ -20,8 +22,10 @@ assert.commandWorked(t.insert(a));
 // a series of _id index point intervals.
 const explain = t.find({$or: a}).hint({_id: 1}).explain(true);
 printjson(explain);
+const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 assert.eq(200, explain.executionStats.nReturned, 'n');
-assert.eq(200, explain.executionStats.totalKeysExamined, 'keys examined');
+const expectedKeysExamined = collectionIsClustered ? 0 : 200;
+assert.eq(expectedKeysExamined, explain.executionStats.totalKeysExamined, 'keys examined');
 assert.eq(200, explain.executionStats.totalDocsExamined, 'docs examined');
 
 assert.eq(200, t.count({$or: a}));

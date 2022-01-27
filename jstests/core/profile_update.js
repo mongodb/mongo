@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 // Setup test db and collection.
@@ -96,16 +97,25 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.update({_id: "new value", a: 4}, {$inc: {b: 1}}, {upsert: true}));
 profileObj = getLatestProfilerEntry(testDB);
 
+const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
+// A clustered collection has no actual index on _id. While a bounded collection scan is in
+// principle an efficient option, the query planner only defaults to collection scan if no suitable
+// index is available.
+const expectedPlan = collectionIsClustered ? "IXSCAN { a: 1 }" : "IXSCAN { _id: 1 }";
+const expectedKeysExamined = collectionIsClustered ? 1 : 0;
+const expectedDocsExamined = expectedKeysExamined;
+const expectedKeysInserted = collectionIsClustered ? 1 : 2;
+
 assert.eq(profileObj.command,
           {q: {_id: "new value", a: 4}, u: {$inc: {b: 1}}, multi: false, upsert: true},
           tojson(profileObj));
-assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
-assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
+assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
+assert.eq(profileObj.docsExamined, expectedDocsExamined, tojson(profileObj));
+assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
 assert.eq(profileObj.nMatched, 0, tojson(profileObj));
 assert.eq(profileObj.nModified, 0, tojson(profileObj));
 assert.eq(profileObj.nUpserted, 1, tojson(profileObj));
-assert.eq(profileObj.planSummary, "IXSCAN { _id: 1 }", tojson(profileObj));
+assert.eq(profileObj.planSummary, expectedPlan, tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
@@ -137,17 +147,25 @@ for (var i = 0; i < indices.length; i++) {
     const profileObj = profiles[i];
     const index = indices[i];
 
+    // A clustered collection has no actual index on _id. While a bounded collection scan is in
+    // principle an efficient option, the query planner only defaults to collection scan if no
+    // suitable index is available.
+    const expectedPlan = collectionIsClustered ? "IXSCAN { a: 1 }" : "IXSCAN { _id: 1 }";
+    const expectedKeysExamined = collectionIsClustered ? 1 : 0;
+    const expectedDocsExamined = expectedKeysExamined;
+    const expectedKeysInserted = collectionIsClustered ? 1 : 2;
+
     assert.eq(
         profileObj.command,
         {q: {_id: `new value ${index}`, a: index}, u: {$inc: {b: 1}}, multi: false, upsert: true},
         tojson(profileObj));
-    assert.eq(profileObj.keysExamined, 0, tojson(profileObj));
-    assert.eq(profileObj.docsExamined, 0, tojson(profileObj));
-    assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
+    assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
+    assert.eq(profileObj.docsExamined, expectedDocsExamined, tojson(profileObj));
+    assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
     assert.eq(profileObj.nMatched, 0, tojson(profileObj));
     assert.eq(profileObj.nModified, 0, tojson(profileObj));
     assert.eq(profileObj.nUpserted, 1, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { _id: 1 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, expectedPlan, tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 }

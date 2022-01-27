@@ -10,6 +10,7 @@
 "use strict";
 
 // For 'getLatestProfilerEntry()'.
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/profiler.js");
 
 var testDB = db.getSiblingDB("profile_insert");
@@ -26,10 +27,14 @@ assert.commandWorked(coll.insert(doc));
 
 var profileObj = getLatestProfilerEntry(testDB);
 
+const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
+// A clustered collection has no actual index on _id.
+let expectedKeysInserted = collectionIsClustered ? 0 : 1;
+
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "insert", tojson(profileObj));
 assert.eq(profileObj.ninserted, 1, tojson(profileObj));
-assert.eq(profileObj.keysInserted, 1, tojson(profileObj));
+assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
 assert.eq(profileObj.command.ordered, true, tojson(profileObj));
 assert.eq(profileObj.protocol, "op_msg", tojson(profileObj));
 assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
@@ -54,8 +59,10 @@ assert.commandWorked(bulk.execute());
 
 profileObj = getLatestProfilerEntry(testDB);
 
+expectedKeysInserted = collectionIsClustered ? 0 : 2;
+
 assert.eq(profileObj.ninserted, 2, tojson(profileObj));
-assert.eq(profileObj.keysInserted, 2, tojson(profileObj));
+assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 //

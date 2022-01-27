@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 // Setup test db and collection.
@@ -32,13 +33,17 @@ assert.commandWorked(
 
 var profileObj = getLatestProfilerEntry(testDB);
 
+const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
+// A clustered collection has no actual index on _id.
+let expectedKeysDeleted = collectionIsClustered ? 1 : 2;
+
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "remove", tojson(profileObj));
 assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
 assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
 assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
 assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
-assert.eq(profileObj.keysDeleted, 2, tojson(profileObj));
+assert.eq(profileObj.keysDeleted, expectedKeysDeleted, tojson(profileObj));
 assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
 assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
@@ -57,8 +62,10 @@ for (i = 0; i < 10; ++i) {
 assert.commandWorked(coll.remove({a: {$gte: 2}}));
 profileObj = getLatestProfilerEntry(testDB);
 
+// A clustered collection has no actual index on _id.
+expectedKeysDeleted = collectionIsClustered ? 0 : 8;
 assert.eq(profileObj.ndeleted, 8, tojson(profileObj));
-assert.eq(profileObj.keysDeleted, 8, tojson(profileObj));
+assert.eq(profileObj.keysDeleted, expectedKeysDeleted, tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 //
