@@ -7,6 +7,7 @@
 (function() {
 
 load('jstests/disk/libs/wt_file_helper.js');
+load('jstests/noPassthrough/libs/index_build.js');
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -23,16 +24,30 @@ let testDB = mongod.getDB(dbName);
 assert.commandWorked(testDB.createCollection("a"));
 assert.commandWorked(testDB.createCollection("b"));
 
+assert.commandWorked(testDB.getCollection("a").insert({x: 1}));
+
+IndexBuildTest.pauseIndexBuilds(mongod);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(mongod,
+                                                       testDB.getCollection("a").getFullName(),
+                                                       {x: 1},
+                                                       {},
+                                                       [ErrorCodes.InterruptedAtShutdown]);
+IndexBuildTest.waitForIndexBuildToScanCollection(
+    testDB, testDB.getCollection("a").getName(), "x_1");
+
 assert.commandWorked(testDB.adminCommand({fsync: 1}));
 
 const collUri = getUriForColl(testDB.getCollection("a"));
-const indexUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/"_id_");
+const indexIdUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/"_id_");
+const indexXUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/"x_1");
 
 MongoRunner.stopMongod(mongod);
+awaitIndexBuild();
 
 // Remove data files for collection "a" after shutting down.
 removeFile(dbpath + "/" + collUri + ".wt");
-removeFile(dbpath + "/" + indexUri + ".wt");
+removeFile(dbpath + "/" + indexIdUri + ".wt");
+removeFile(dbpath + "/" + indexXUri + ".wt");
 
 // Perform a startup and shutdown with no other operations in between.
 mongod = startMongodOnExistingPath(dbpath);
