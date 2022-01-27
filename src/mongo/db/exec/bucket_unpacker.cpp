@@ -512,14 +512,15 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
         return result;
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr) ||
                ComparisonMatchExpressionBase::isInternalExprComparison(matchExpr->matchType())) {
-        return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
-                                         bucketSpec,
-                                         bucketMaxSpanSeconds,
-                                         collationMatchesDefault,
-                                         pExpCtx,
-                                         haveComputedMetaField,
-                                         assumeNoMixedSchemaData,
-                                         policy);
+        return createComparisonPredicate(
+            checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
+            bucketSpec,
+            bucketMaxSpanSeconds,
+            collationMatchesDefault,
+            pExpCtx,
+            haveComputedMetaField,
+            assumeNoMixedSchemaData,
+            policy);
     } else if (matchExpr->matchType() == MatchExpression::GEO) {
         auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
         if (geoExpr.getPred() == GeoExpression::WITHIN ||
