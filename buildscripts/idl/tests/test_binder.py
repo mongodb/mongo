@@ -653,6 +653,19 @@ class TestBinder(testcase.IDLTestcase):
                             - bindata_function
             """))
 
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                fields:
+                    my_variant_field:
+                        type:
+                            variant:
+                            - string
+                            - int
+                        default: 1
+            """))
+
     def test_variant_negative(self):
         # type: () -> None
         """Negative variant test cases."""
@@ -715,20 +728,6 @@ class TestBinder(testcase.IDLTestcase):
                             - int
                             - not_defined
             """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
-
-        self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
-        structs:
-            foo:
-                description: foo
-                fields:
-                    my_variant_field:
-                        type:
-                            variant:
-                            - string
-                            - int
-                        default: 1
-            """), idl.errors.ERROR_ID_VARIANT_NO_DEFAULT)
 
         # Enums are banned in variants for now.
         self.assert_bind_fail(

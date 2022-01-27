@@ -118,7 +118,6 @@ ERROR_ID_MISSING_REPLY_TYPE = "ID0074"
 ERROR_ID_USELESS_VARIANT = "ID0076"
 ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL = "ID0077"
 ERROR_ID_VARIANT_COMPARISON = "ID0078"
-ERROR_ID_VARIANT_NO_DEFAULT = "ID0079"
 ERROR_ID_VARIANT_DUPLICATE_TYPES = "ID0080"
 ERROR_ID_VARIANT_STRUCTS = "ID0081"
 ERROR_ID_NO_VARIANT_ENUM = "ID0082"
@@ -709,14 +708,6 @@ class ParserContext(object):
         """Add an error about a struct with generate_comparison_operators and a variant field."""
         self._add_error(location, ERROR_ID_VARIANT_COMPARISON,
                         ("generate_comparison_operators is not supported with variant types"))
-
-    def add_variant_no_default_error(self, location, field_name):
-        # type: (common.SourceLocation, str) -> None
-        """Add an error about a variant having a default value."""
-        self._add_error(
-            location, ERROR_ID_VARIANT_NO_DEFAULT,
-            "Field '%s' is a variant, and default values for variants aren't implemented yet" %
-            (field_name))
 
     def add_variant_duplicate_types_error(self, location, field_name, type_name):
         # type: (common.SourceLocation, str, str) -> None

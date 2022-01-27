@@ -357,6 +357,14 @@ structs:
             V_bool:
                 type: bool
                 default: true
+            V_variant_string:
+                type:
+                    variant: [string, int]
+                default: '"a default"'
+            V_variant_int:
+                type:
+                    variant: [string, int]
+                default: 42
 
 ##################################################################################################
 #

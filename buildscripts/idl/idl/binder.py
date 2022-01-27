@@ -757,8 +757,6 @@ def _validate_variant_type(ctxt, syntax_symbol, field):
     # type: (errors.ParserContext, syntax.VariantType, syntax.Field) -> None
     # pylint: disable=unused-argument
     """Validate that this field is a proper variant type."""
-    if field.default:
-        ctxt.add_variant_no_default_error(syntax_symbol, field.name)
 
     # Check for duplicate BSON serialization types.
     type_count: typing.Counter[str] = collections.Counter()
