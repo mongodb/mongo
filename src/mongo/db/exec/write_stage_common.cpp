@@ -74,14 +74,12 @@ PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
         return Action::kWrite;
     }
 
-    // SERVER-61847 will remove this if-stmt.
-    if (!OperationShardingState::isOperationVersioned(_opCtx)) {
-        // Direct writes to shards (not forwarded by router) are allowed.
-        return Action::kWrite;
-    }
-
     const auto docBelongsToMe = _documentBelongsToMe(doc.toBson());
-    return (docBelongsToMe) ? Action::kWrite : Action::kSkip;
+    if (docBelongsToMe)
+        return Action::kWrite;
+    else
+        return OperationShardingState::isOperationVersioned(_opCtx) ? Action::kSkip
+                                                                    : Action::kWriteAsFromMigrate;
 }
 
 bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {

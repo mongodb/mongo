@@ -149,7 +149,9 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
     _specificStats.isModUpdate = params.driver->type() == UpdateDriver::UpdateType::kOperator;
 }
 
-BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId) {
+BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
+                                        RecordId& recordId,
+                                        bool writeToOrphan) {
     const UpdateRequest* const request = _params.request;
     UpdateDriver* driver = _params.driver;
     CanonicalQuery* cq = _params.canonicalQuery;
@@ -272,7 +274,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         }
 
         // Ensure we set the type correctly
-        args.source = request->source();
+        args.source = writeToOrphan ? OperationSource::kFromMigrate : request->source();
 
         if (inPlace) {
             if (!request->explain()) {
@@ -453,17 +455,26 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::NEED_TIME;
         }
 
+        bool writeToOrphan = false;
         if (!_params.request->explain() && _isUserInitiatedWrite) {
             const auto action = _preWriteFilter.computeAction(member->doc.value());
             if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
-                LOGV2_DEBUG(5983200,
-                            1,
-                            "Abort update operation to orphan document to prevent a wrong change "
-                            "stream event",
+                LOGV2_DEBUG(
+                    5983200,
+                    3,
+                    "Skipping update operation to orphan document to prevent a wrong change "
+                    "stream event",
+                    "namespace"_attr = collection()->ns(),
+                    "record"_attr = member->doc.value());
+                return PlanStage::NEED_TIME;
+            } else if (action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
+                LOGV2_DEBUG(6184701,
+                            3,
+                            "Marking update operation to orphan document with the fromMigrate flag "
+                            "to prevent a wrong change stream event",
                             "namespace"_attr = collection()->ns(),
                             "record"_attr = member->doc.value());
-
-                return PlanStage::NEED_TIME;
+                writeToOrphan = true;
             }
         }
 
@@ -488,7 +499,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         BSONObj newObj;
         try {
             // Do the update, get us the new version of the doc.
-            newObj = transformAndUpdate({oldSnapshot, member->doc.value().toBson()}, recordId);
+            newObj = transformAndUpdate(
+                {oldSnapshot, member->doc.value().toBson()}, recordId, writeToOrphan);
         } catch (const WriteConflictException&) {
             memberFreer.dismiss();  // Keep this member around so we can retry updating it.
             return prepareToRetryWSM(id, out);

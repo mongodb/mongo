@@ -61,9 +61,7 @@ jsTest.log('A direct update to a shard on an orphaned document generates an upda
     // Send a direct update to first shard on an orphaned document.
     assert.commandWorked(st.shard0.getCollection(collNS).update({name: 'matt'}, {$set: {age: 21}}));
 
-    // The orphaned document is actually updated and an update event is notified.
-    assert.soon(() => changeStream.hasNext(), 'An update event is expected');
-    assert.eq(changeStream.next().operationType, 'update');
+    // No change stream event is generated.
     assert(!changeStream.hasNext());
 
     // The orphaned document on first shard has been touched.
@@ -75,9 +73,7 @@ jsTest.log('A direct delete to a shard on an orphaned document generates an upda
     // Send a direct delete to first shard on an orphaned document.
     assert.commandWorked(st.shard0.getCollection(collNS).remove({name: 'matt'}));
 
-    // The orphaned document is actually deleted and a delete event is notified.
-    assert.soon(() => changeStream.hasNext(), 'A delete event is expected');
-    assert.eq(changeStream.next().operationType, 'delete');
+    // No change stream event is generated.
     assert(!changeStream.hasNext());
 
     // The orphaned document on first shard has been touched.

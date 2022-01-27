@@ -45,7 +45,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -169,17 +168,25 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         return PlanStage::NEED_TIME;
     }
 
+    bool writeToOrphan = false;
     if (!_params->isExplain && !_params->fromMigrate) {
         const auto action = _preWriteFilter.computeAction(member->doc.value());
         if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
             LOGV2_DEBUG(5983201,
-                        1,
-                        "Abort delete operation to orphan document to prevent a wrong change "
+                        3,
+                        "Skipping delete operation to orphan document to prevent a wrong change "
                         "stream event",
                         "namespace"_attr = collection()->ns(),
                         "record"_attr = member->doc.value());
-
-            return NEED_TIME;
+            return PlanStage::NEED_TIME;
+        } else if (action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
+            LOGV2_DEBUG(6184700,
+                        3,
+                        "Marking delete operation to orphan document with the fromMigrate flag "
+                        "to prevent a wrong change stream event",
+                        "namespace"_attr = collection()->ns(),
+                        "record"_attr = member->doc.value());
+            writeToOrphan = true;
         }
     }
 
@@ -215,7 +222,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                                          _params->stmtId,
                                          recordId,
                                          _params->opDebug,
-                                         _params->fromMigrate,
+                                         writeToOrphan || _params->fromMigrate,
                                          false,
                                          _params->returnDeleted ? Collection::StoreDeletedDoc::On
                                                                 : Collection::StoreDeletedDoc::Off);

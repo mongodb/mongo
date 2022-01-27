@@ -160,7 +160,9 @@ private:
      * memory, then commits these changes to the database. Returns a possibly unowned copy
      * of the newly-updated version of the document.
      */
-    BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj, RecordId& recordId);
+    BSONObj transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
+                               RecordId& recordId,
+                               bool writeOnOrphan);
 
     /**
      * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to

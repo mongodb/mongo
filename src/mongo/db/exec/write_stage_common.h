@@ -51,10 +51,12 @@ public:
     /**
      * This class represents the different kind of actions we can take when handling a write
      * operation:
-     *   -  kSkip: skip the current write operation.
      *   - kWrite: perform the current write operation.
+     *   - kWriteAsFromMigrate: perform the current write operation but marking it with the
+     *     fromMigrate flag.
+     *   - kSkip: skip the current write operation.
      */
-    enum class Action { kWrite, kSkip };
+    enum class Action { kWrite, kWriteAsFromMigrate, kSkip };
 
     PreWriteFilter(OperationContext* opCtx, NamespaceString nss);
 
@@ -95,6 +97,5 @@ bool ensureStillMatches(const CollectionPtr& collection,
                         WorkingSet* ws,
                         WorkingSetID id,
                         const CanonicalQuery* cq);
-
 }  // namespace write_stage_common
 }  // namespace mongo

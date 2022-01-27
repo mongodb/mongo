@@ -244,7 +244,9 @@ private:
      * operation context does not match the shard version on the active metadata object.
      */
     std::shared_ptr<ScopedCollectionDescription::Impl> _getMetadataWithVersionCheckAt(
-        OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime);
+        OperationContext* opCtx,
+        const boost::optional<mongo::LogicalTime>& atClusterTime,
+        bool supportNonVersionedOperations = false);
 
     // The service context under which this instance runs
     ServiceContext* const _serviceContext;

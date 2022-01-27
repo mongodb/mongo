@@ -273,7 +273,11 @@ var removeShardWithName = function(st, shardName) {
 let checkCRUDCommands = function(testDB) {
     for (let command in CRUDCommands) {
         jsTestLog('Testing CRUD command: ' + command);
-        CRUDCommands[command].assertFunc(testDB.runCommand(CRUDCommands[command].command), testDB);
+        assert.soonNoExcept(() => {
+            CRUDCommands[command].assertFunc(testDB.runCommand(CRUDCommands[command].command),
+                                             testDB);
+            return true;
+        });
     }
 };
 

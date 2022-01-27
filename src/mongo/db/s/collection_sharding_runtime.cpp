@@ -107,8 +107,10 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
                   "getOwnershipFilter called by operation that doesn't specify shard version");
     }
 
-    auto metadata = _getMetadataWithVersionCheckAt(
-        opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
+    auto metadata =
+        _getMetadataWithVersionCheckAt(opCtx,
+                                       repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
+                                       supportNonVersionedOperations);
 
     if (!supportNonVersionedOperations) {
         invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
@@ -319,12 +321,24 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
 
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
-    OperationContext* opCtx, const boost::optional<mongo::LogicalTime>& atClusterTime) {
-    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-    if (!optReceivedShardVersion)
+    OperationContext* opCtx,
+    const boost::optional<mongo::LogicalTime>& atClusterTime,
+    bool supportNonVersionedOperations) {
+
+    if (!ShardingState::get(opCtx)->enabled())
         return kUnshardedCollection;
 
-    const auto& receivedShardVersion = *optReceivedShardVersion;
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+        repl::ReadConcernLevel::kAvailableReadConcern)
+        return kUnshardedCollection;
+
+    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
+    if (!optReceivedShardVersion && !supportNonVersionedOperations)
+        return kUnshardedCollection;
+
+    // Assume that the received shard version was IGNORED if the current operation wasn't verioned.
+    const auto& receivedShardVersion =
+        optReceivedShardVersion ? *optReceivedShardVersion : ChunkVersion::IGNORED();
 
     // An operation with read concern 'available' should never have shardVersion set.
     invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
@@ -333,6 +347,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
     auto optCurrentMetadata = _getCurrentMetadataIfKnown(atClusterTime);
+
     uassert(StaleConfigInfo(
                 _nss, receivedShardVersion, boost::none, ShardingState::get(opCtx)->shardId()),
             str::stream() << "sharding status of collection " << _nss.ns()
