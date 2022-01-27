@@ -3729,6 +3729,7 @@ buildvariants:
 
 - name: ubuntu2004-perf-tests
   display_name: Ubuntu 20.04 Performance tests
+  batchtime: 1440 # 1 day
   run_on:
     - ubuntu2004-medium
   expansions:
