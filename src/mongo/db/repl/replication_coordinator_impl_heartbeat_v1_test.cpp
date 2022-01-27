@@ -1283,6 +1283,91 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
     }
 }
 
+TEST_F(ReplCoordHBV1Test, DoNotAttemptToUpdateLastCommittedOpTimeFromHeartbeatIfInRollbackState) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))
+                            << "protocolVersion" << 1),
+                       HostAndPort("node1", 12345));
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getLastCommittedOpTime());
+
+    auto config = getReplCoord()->getConfig();
+
+    auto lastAppliedOpTime = OpTime({11, 1}, 2);
+    auto commitPoint = OpTime({15, 1}, 2);
+    replCoordSetMyLastAppliedOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
+
+    // Node 1 is the current primary.
+    rpc::ReplSetMetadata metadata(
+        2,                                                         // term
+        {commitPoint, Date_t() + Seconds(commitPoint.getSecs())},  // committed OpTime
+        commitPoint,                                               // visibleOpTime
+        config.getConfigVersion(),
+        0,
+        {},     // replset id
+        1,      // currentSyncSourceIndex
+        true);  // isPrimary
+
+    auto net = getNet();
+    BSONObjBuilder responseBuilder;
+    ASSERT_OK(metadata.writeToMetadata(&responseBuilder));
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setConfigVersion(config.getConfigVersion());
+    hbResp.setSetName(config.getReplSetName());
+    hbResp.setState(MemberState::RS_PRIMARY);
+    responseBuilder.appendElements(hbResp.toBSON());
+    auto hbRespObj = responseBuilder.obj();
+
+    {
+        // We must take the RSTL in mode X before making state transitions.
+        auto opCtx = makeOperationContext();
+        ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        ASSERT_OK(getReplCoord()->setFollowerModeRollback(opCtx.get()));
+    }
+
+    // Last committed optime should not advance in ROLLBACK state.
+    ASSERT_EQ(getReplCoord()->getMemberState(), MemberState::RS_ROLLBACK);
+    {
+        net->enterNetwork();
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS(config.getMemberAt(1).getHostAndPort(), request.target);
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_EQUALS(OpTime(), getReplCoord()->getLastCommittedOpTime());
+        ASSERT_EQUALS(2, getReplCoord()->getTerm());
+    }
+
+    // Set follower mode to SECONDARY so commit point can be advanced through heartbeats.
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_EQUALS(commitPoint, getReplCoord()->getLastCommittedOpTime());
+    }
+}
+
 TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     init();
     assertStartSuccess(BSON("_id"
