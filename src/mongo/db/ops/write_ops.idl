@@ -176,9 +176,8 @@ structs:
                 description: "This flag is set to true when the write command was originally sent
                               to the time-series view, but got rewritten to target time-series
                               buckets namespace."
-                type: bool
+                type: optionalBool
                 unstable: false
-                optional: true
             collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
