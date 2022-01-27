@@ -741,7 +741,13 @@ public:
             o(lk).txnState.transitionTo(TransactionState::kAbortedWithPrepare);
         }
 
-        void setCommittedStmtIdsForTest(OperationContext* opCtx, std::vector<int> stmtIdsCommitted);
+        /**
+         * Used by secondary oplog application for prepared transactions or unit tests to directly
+         * add the statement ids that were written.
+         */
+        void addCommittedStmtIds(OperationContext* opCtx,
+                                 const std::vector<StmtId>& stmtIdsCommitted,
+                                 const repl::OpTime& writeOpTime);
 
     private:
         // Checks whether the given statementId for the specified transaction has already executed

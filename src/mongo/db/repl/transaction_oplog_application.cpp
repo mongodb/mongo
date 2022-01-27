@@ -464,6 +464,15 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         auto status = _applyOperationsForTransaction(opCtx, ops, mode);
 
+        if (opCtx->isRetryableWrite()) {
+            for (const auto& op : ops) {
+                if (!op.getStatementIds().empty()) {
+                    txnParticipant.addCommittedStmtIds(
+                        opCtx, op.getStatementIds(), entry.getOpTime());
+                }
+            }
+        }
+
         if (MONGO_unlikely(applyPrepareTxnOpsFailsWithWriteConflict.shouldFail())) {
             LOGV2(4947101, "Hit applyPrepareTxnOpsFailsWithWriteConflict failpoint");
             status = Status(ErrorCodes::WriteConflict,

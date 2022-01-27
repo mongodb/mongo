@@ -1618,7 +1618,7 @@ void TransactionParticipant::Participant::addTransactionOperation(
     invariant(p().autoCommit && !*p().autoCommit &&
               o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
-    p().transactionOperations.push_back(operation);
+
     const auto stmtIds = operation.getStatementIds();
     for (auto stmtId : stmtIds) {
         auto [_, inserted] = p().transactionStmtIds.insert(stmtId);
@@ -1626,6 +1626,7 @@ void TransactionParticipant::Participant::addTransactionOperation(
                 str::stream() << "Found two operations using the same stmtId of " << stmtId,
                 inserted);
     }
+    p().transactionOperations.push_back(operation);
 
     p().transactionOperationBytes +=
         repl::DurableOplogEntry::getDurableReplOperationSize(operation);
@@ -3004,11 +3005,13 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
     return updateRequest;
 }
 
-void TransactionParticipant::Participant::setCommittedStmtIdsForTest(
-    OperationContext* opCtx, std::vector<int> stmtIdsCommitted) {
+void TransactionParticipant::Participant::addCommittedStmtIds(
+    OperationContext* opCtx,
+    const std::vector<StmtId>& stmtIdsCommitted,
+    const repl::OpTime& writeOpTime) {
     stdx::lock_guard<Client> lg(*opCtx->getClient());
     for (auto stmtId : stmtIdsCommitted) {
-        p().activeTxnCommittedStatements.emplace(stmtId, repl::OpTime());
+        p().activeTxnCommittedStatements.emplace(stmtId, writeOpTime);
     }
 }
 

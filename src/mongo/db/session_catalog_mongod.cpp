@@ -299,7 +299,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // There may be sessions that are checked out during this scan, but none of them
     // can be prepared transactions, since only oplog application can make transactions
     // prepared on secondaries and oplog application has been stopped at this moment.
-    std::vector<LogicalSessionId> sessionIdToReacquireLocks;
+    std::vector<OperationSessionInfo> sessionsToReacquireLocks;
 
     SessionKiller::Matcher matcher(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
@@ -310,7 +310,14 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         }
 
         if (txnParticipant.transactionIsPrepared()) {
-            sessionIdToReacquireLocks.emplace_back(session.getSessionId());
+            const auto txnNumberAndRetryCounter =
+                txnParticipant.getActiveTxnNumberAndRetryCounter();
+
+            OperationSessionInfo sessionInfo;
+            sessionInfo.setSessionId(session.getSessionId());
+            sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+            sessionInfo.setTxnRetryCounter(txnNumberAndRetryCounter.getTxnRetryCounter());
+            sessionsToReacquireLocks.emplace_back(sessionInfo);
         }
     });
     killSessionTokens(opCtx, std::move(sessionKillTokens));
@@ -319,17 +326,32 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         // Create a new opCtx because we need an empty locker to refresh the locks.
         auto newClient = opCtx->getServiceContext()->makeClient("restore-prepared-txn");
         AlternativeClientRegion acr(newClient);
-        for (const auto& sessionId : sessionIdToReacquireLocks) {
+        for (const auto& sessionInfo : sessionsToReacquireLocks) {
             auto newOpCtx = cc().makeOperationContext();
-            newOpCtx->setLogicalSessionId(sessionId);
-            MongoDOperationContextSession ocs(newOpCtx.get());
+            newOpCtx->setLogicalSessionId(*sessionInfo.getSessionId());
+            newOpCtx->setTxnNumber(*sessionInfo.getTxnNumber());
+            newOpCtx->setTxnRetryCounter(*sessionInfo.getTxnRetryCounter());
+            newOpCtx->setInMultiDocumentTransaction();
+
+            // Use MongoDOperationContextSessionWithoutRefresh to check out the session because:
+            // - The in-memory state for this session has been kept in sync with the on-disk state
+            //   by secondary oplog application for prepared transactions so no refresh will be
+            //   done anyway.
+            // - The in-memory state for any external and/or internal sessions associated with this
+            //   session may be out-of-date with the on-disk state but no refresh is necessary since
+            //   the transaction is already in the prepared state so it no longer needs to go
+            //   through conflict and write history check. In addition, a refresh of any session is
+            //   expected to cause a deadlock since this 'newOpCtx' will need to acquire the global
+            //   lock in the IS mode prior to reading the config.transactions collection but it
+            //   cannot do that while the RSTL lock is being held by 'opCtx'.
+            MongoDOperationContextSessionWithoutRefresh ocs(newOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
             LOGV2_DEBUG(21979,
                         3,
                         "Restoring locks of prepared transaction. SessionId: {sessionId} "
                         "TxnNumberAndRetryCounter: {txnNumberAndRetryCounter}",
                         "Restoring locks of prepared transaction",
-                        "sessionId"_attr = sessionId.getId(),
+                        "sessionId"_attr = sessionInfo.getSessionId()->getId(),
                         "txnNumberAndRetryCounter"_attr =
                             txnParticipant.getActiveTxnNumberAndRetryCounter());
             txnParticipant.refreshLocksForPreparedTransaction(newOpCtx.get(), false);
