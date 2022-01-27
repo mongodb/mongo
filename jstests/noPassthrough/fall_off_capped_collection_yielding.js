@@ -21,10 +21,12 @@ for (let i = 0; i < numDocs; ++i) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 
-// The classic query engine may check for interrupts a couple times before accessing data, so
-// 'internalQueryExecYieldIterations' must be set to a value slightly higher to ensure the classic
-// query engine has accessed data before deciding to yield.
+// The classic query engine may check for interrupt/check for yield a couple times before accessing
+// data, so 'internalQueryExecYieldIterations' must be set to a value slightly higher to ensure the
+// classic query engine has accessed data before deciding to yield.
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
+// Set the yield MS counter to a very high value so that we never yield due to time.
+assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 50000}));
 
 const failPoint =
     configureFailPoint(testDB, "setYieldAllLocksHang", {namespace: coll.getFullName()});
