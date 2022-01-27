@@ -1748,26 +1748,66 @@ schema, per returned document:
 }
 ```
 
-# Time-series Collections
+# Clustered Collections
 
-## Clustered Collections
-
-Collections clustered by _id store documents in _id-order on the RecordStore. Unlike regular
-collections, they do not require a separate index from _id values to RecordIds. RecordIDs are
-encoded using each document's _id value, rather than a 64-bit integer. Currently, this value must be
-an ObjectId.
-
-Clustered collections may be created with the `clusteredIndex` collection creation option, but this
-feature is limited to internal time-series buckets collections only.
-
-## TTL Deletions
+Clustered collections store documents ordered by their cluster key on the RecordStore. The cluster
+key must currently be `{_id: 1}` and unique.
+Clustered collections may be created with the `clusteredIndex` collection creation option. The
+`clusteredIndex` option accepts the following formats:
+* A document that specifies the clustered index configuration.
+  ```
+  {clusteredIndex: {key: {_id: 1}, unique: true}}
+  ```
+* A legacy boolean parameter for backwards compatibility with 5.0 time-series collections.
+  ```
+  {clusteredIndex: true}
+  ```
 
 Like a secondary TTL index, clustered collections can delete old data when created with the
 `expireAfterSeconds` collection creation option.
 
+Unlike regular collections, clustered collections do not require a separate index from cluster key
+values to `RecordId`s, so they lack an index on _id. While a regular collection must access two
+different tables to read or write to a document, a clustered collection requires a single table
+access. Queries over the _id key use bounded collection scans when no other index is available.
+
+## Time Series Collections
+
+A time-series collection is a view of an internal clustered collection named
+`system.buckets.<name>`, where `<name>` is the name of the time-series collection. The cluster key
+values are ObjectId's.
+
 The TTL monitor will only delete data from a time-series bucket collection when a bucket's minimum
 time, _id, is past the expiration plus the bucket maximum time span (default 1 hour). This
 procedure avoids deleting buckets with data that is not older than the expiration time.
+
+## Capped clustered collections
+
+Capped clustered collections are available internally. Unlike regular capped collections, clustered
+capped collections require TTL-based deletion in lieu of size-based deletion. Because on clustered
+collections the natural order is the cluster key order rather than the insertion order, capped
+deletions remove the documents with lowest cluster key value, which may not be the oldest documents
+inserted. In order to guarantee capped insert-order semantics the caller should insert monotonically
+increasing cluster key values.
+
+Because unlike regular capped collections, clustered collections do not need to preserve insertion
+order, they allow non-serialised concurrent writes. In order to avoid missing documents while
+tailing a clustered collection, the user is required to enforce visibility rules similar to the ['no
+holes' point](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/catalog/README.md#oplog-visibility).
+Majority read concern is similarly required.
+
+## Clustered RecordIds
+
+`RecordId`s can be arbitrarily long and are encoded as binary strings using each document's cluster
+key value, rather than a 64-bit integer. The binary string is generate using `KeyString` and
+discards the `TypeBits`. The [`kSmallStr` format](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/record_id.h#L330)
+supports small binary strings like the ones used for time series buckets. The [`kLargeStr` format](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/record_id.h#L336)
+supports larger strings and can be cheaply passed by value.
+
+Secondary indexes append `RecordId`s to the end of the `KeyString`. Because a `RecordId` in a
+clustered collection can be arbitrarily long, its size is appended at the end and [encoded](https://github.com/mongodb/mongo/blob/r5.2.0/src/mongo/db/storage/key_string.cpp#L608)
+right-to-left over up to 4 bytes, using the lower 7 bits of a byte, the high bit serving as a
+continuation bit.
 
 # Glossary
 **binary comparable**: Two values are binary comparable if the lexicographical order over their byte
