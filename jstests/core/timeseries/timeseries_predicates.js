@@ -53,13 +53,27 @@ function checkAllBucketings(predicate, documents) {
     }
 }
 
-// $in
-checkAllBucketings({x: {$in: [2, 3, 4]}}, [
-    {x: 1},
-    {x: 2},
-    {x: 3},
-    {x: 42},
-]);
+// Test $in...
+{
+    // ... with a simple list of equalities.
+    checkAllBucketings({x: {$in: [2, 3, 4]}}, [
+        {x: 1},
+        {x: 2},
+        {x: 3},
+        {x: 42},
+    ]);
+
+    // ... with equalities which contain an array.
+    checkAllBucketings({x: {$in: [1, [2, 3, 4], 5]}}, [
+        {},
+        {x: 1},
+        {x: 2},
+        {x: [2, 3]},
+        {x: [2, 3, 4]},
+        {x: 5},
+        {x: 42},
+    ]);
+}
 
 // $exists: true
 checkAllBucketings({x: {$exists: true}}, [

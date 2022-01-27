@@ -559,19 +559,36 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
                 policy, matchExpr, "can't handle {$eq: null} predicate (inside $in predicate)");
 
         auto result = std::make_unique<OrMatchExpression>();
+
+        bool alwaysTrue = false;
         for (auto&& elem : inExpr->getEqualities()) {
             // If inExpr is {$in: [X, Y]} then the elems are '0: X' and '1: Y'.
             auto eq = std::make_unique<EqualityMatchExpression>(
                 inExpr->path(), elem, nullptr /*annotation*/, inExpr->getCollator());
-            result->add(createComparisonPredicate(eq.get(),
-                                                  bucketSpec,
-                                                  bucketMaxSpanSeconds,
-                                                  collationMatchesDefault,
-                                                  pExpCtx,
-                                                  haveComputedMetaField,
-                                                  assumeNoMixedSchemaData,
-                                                  policy));
+            auto child = createComparisonPredicate(eq.get(),
+                                                   bucketSpec,
+                                                   bucketMaxSpanSeconds,
+                                                   collationMatchesDefault,
+                                                   pExpCtx,
+                                                   haveComputedMetaField,
+                                                   assumeNoMixedSchemaData,
+                                                   policy);
+
+            // As with OR, only add the child if it has been succesfully translated, otherwise the
+            // $in cannot be correctly mapped to bucket level fields and we should return nullptr.
+            if (child) {
+                result->add(std::move(child));
+            } else {
+                alwaysTrue = true;
+                if (policy == IneligiblePredicatePolicy::kIgnore)
+                    break;
+            }
         }
+        if (alwaysTrue)
+            return nullptr;
+
+        // As above, no special case for an empty IN: returning nullptr would be incorrect because
+        // it means 'always-true', here.
         return result;
     }
     return handleIneligible(policy, matchExpr, "can't handle this predicate");
